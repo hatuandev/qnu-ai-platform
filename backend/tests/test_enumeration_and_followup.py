@@ -79,6 +79,7 @@ async def test_short_followup_resolves_before_retrieval_instead_of_empty_no_answ
     with (patch("app.modules.rag.conversation_resolution.structured_call", AsyncMock(
             return_value=FollowupResolution(mode="followup", antecedent_id=0, question=standalone))),
           patch("app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot", AsyncMock(return_value=snapshot())),
+          patch('app.modules.rag.source_fact_resolution.resolve_fact_scope', AsyncMock(return_value=None)),
           patch("app.modules.rag.service.fact_layer.lookup_facts", AsyncMock(return_value=[])),
           patch("app.modules.rag.service.hybrid_retriever.retrieve", AsyncMock(return_value=[])) as retrieve,
           patch("app.modules.rag.service.load_row_anchors", AsyncMock(return_value=[])),

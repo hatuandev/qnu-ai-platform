@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import TYPE_CHECKING
 
 from sqlalchemy import and_, case, func, literal_column, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,9 @@ from app.modules.knowledge.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from app.modules.rag.source_fact_resolution import FactScope
 
 
 def _fact_entity_text(fact: KnowledgeFact | object) -> str:
@@ -129,9 +133,12 @@ class FactLayer:
         target_entities: list[str] | None = None,
         active_index_revision_ids: set[str] | None = None,
         requested_years: list[int] | None = None,
-    ) -> list[KnowledgeFact]:
+        source_scope: FactScope | None = None,
+    ) -> list[KnowledgeFact | dict]:
         """Look up fact records matching identified keywords or entity codes, strictly bound to approved documents."""
         conditions = []
+        if source_scope is not None and not source_scope.rows:
+            return []
 
         # 1. Match specific entity codes (e.g. 7480107, 6.8, IELTS)
         if entity_codes:
@@ -164,7 +171,7 @@ class FactLayer:
                     if len(words) >= 2 and len(clean_kw) >= 4:
                         conditions.append(_fact_search_query(clean_kw))
 
-        if not conditions:
+        if not conditions and source_scope is None:
             return []
         if active_index_revision_ids is not None and not active_index_revision_ids:
             return []
@@ -196,12 +203,12 @@ class FactLayer:
                         KnowledgeDocument.status.in_(["approved", "ready"]),
                     ),
                 ),
-                or_(*conditions),
+                or_(*conditions) if source_scope is None else True,
             )
         )
 
         # 4. Optional attribute filter
-        if fact_attributes:
+        if fact_attributes and source_scope is None:
             attr_conditions = [KnowledgeFact.attribute_name.ilike(f"%{attr}%") for attr in fact_attributes]
             attr_conditions.extend(KnowledgeFact.raw_data["attribute_code"].astext == attr for attr in fact_attributes)
             attr_conditions.append(KnowledgeFact.attribute_code.in_(fact_attributes))
@@ -221,15 +228,20 @@ class FactLayer:
         # Entity precision must be applied BEFORE LIMIT, not to an arbitrary slice
         # dominated by common attribute names. Never search values for an identity.
         identities = []
-        for name in target_entities or []:
+        if source_scope is not None:
+            identities = [and_(KnowledgeFact.binding_id == binding, KnowledgeFact.index_revision_id == index,
+                               KnowledgeFact.raw_data['source_unit_id'].astext == unit,
+                               KnowledgeFact.raw_data['column_id'].astext.in_(source_scope.eligible_columns(row, fact_attributes)))
+                          for (binding, index, unit), row in source_scope.rows.items()]
+        for name in (target_entities or []) if source_scope is None else []:
             if len(name.strip().split()) >= 2:
                 identities.append(func.to_tsvector(literal_column("'simple'::regconfig"),
                     func.coalesce(KnowledgeFact.entity_text, KnowledgeFact.entity_name)).op("@@")(
                         func.phraseto_tsquery(literal_column("'simple'::regconfig"), name.strip())))
-        for code in entity_codes or []:
-            if re.fullmatch(r"\d+(?:\.\d+)*", code.strip()):
-                identities.extend([KnowledgeFact.entity_code == code.strip(),
-                                   KnowledgeFact.raw_data["entity_code"].astext == code.strip()])
+        for code in (entity_codes or []) if source_scope is None else []:
+            if code != 'certificate_conversion' and re.fullmatch(r"[\w]+(?:[-_./][\w]+)*", code.strip()):
+                identities.extend([func.upper(KnowledgeFact.entity_code) == code.strip().upper(),
+                                   func.upper(KnowledgeFact.raw_data["entity_code"].astext) == code.strip().upper()])
         if identities:
             query = query.where(or_(*identities))
         if requested_years:
@@ -249,6 +261,8 @@ class FactLayer:
             logger.exception("Fact lookup failed")
             raise AppException("Không thể tra cứu dữ liệu số.", code="FACT_LOOKUP_UNAVAILABLE", status_code=503) from e
 
+        if source_scope is not None:
+            return [source_scope.bind(fact) for fact in rows[:limit]]
         if subject_names:
             clean_subjs = [s.strip().lower() for s in subject_names if s and s.strip()]
             rows.sort(

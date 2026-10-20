@@ -13,6 +13,7 @@ from app.modules.rag.query_router import QueryClassifier, QueryIntent
 from app.modules.rag.schemas import AskRequest, RetrievalSnapshot
 from app.modules.rag.service import rag_service
 from app.modules.rag.vector_indexer import VectorIndexer
+from tests.rag_test_proofs import bind_literal_test_candidates
 
 
 @pytest.fixture(autouse=True)
@@ -177,6 +178,7 @@ class TestRevisionSafeQdrantIndexing:
 
 # Routing/temperature/citation tests isolate generation; semantic audit behavior
 # (including rejection and provider errors) is exercised in test_rag_batch_492.
+@patch('app.modules.rag.canonical_candidates.bind_candidates', new=AsyncMock(side_effect=bind_literal_test_candidates))
 @patch("app.modules.rag.response_audit.audit_visible_answer", new=AsyncMock(side_effect=lambda db, req, snap, answer, candidates:
     {"accepted": True, "candidate_ids": [c.chunk_id for c in candidates]}))
 class TestCitationGroundingAndFactFirst:
@@ -241,6 +243,10 @@ class TestCitationGroundingAndFactFirst:
             patch("app.modules.rag.service.hybrid_retriever.retrieve", new_callable=AsyncMock) as mock_retrieve,
             patch("app.modules.rag.service.modelops_service.generate", new_callable=AsyncMock) as mock_generate,
             patch("app.modules.rag.service.semantic_cache.set", new_callable=AsyncMock),
+            # This test isolates the legacy hybrid composer, not the new source-cell strategy.
+            # Source resolution/temporal proof have real-source tests in Context565.
+            patch("app.modules.rag.source_fact_resolution.resolve_fact_scope", new_callable=AsyncMock, return_value=None),
+            patch("app.modules.rag.service.decide_table_answer", return_value=None),
         ):
             mock_cache_get.return_value = None
             mock_lookup.return_value = [mock_fact]
@@ -299,6 +305,9 @@ class TestCitationGroundingAndFactFirst:
                 patch("app.modules.rag.service.fact_layer.lookup_facts", new_callable=AsyncMock) as mock_lookup,
                 patch("app.modules.rag.service.hybrid_retriever.retrieve", new_callable=AsyncMock) as mock_retrieve,
                 patch("app.modules.rag.service.modelops_service.generate", new_callable=AsyncMock) as mock_generate,
+                # Keep this unit test on its intent-weight/temperature branch.
+                patch("app.modules.rag.source_fact_resolution.resolve_fact_scope", new_callable=AsyncMock, return_value=None),
+                patch("app.modules.rag.service.decide_table_answer", return_value=None),
             ):
                 mock_get.return_value = None
                 mock_lookup.return_value = []

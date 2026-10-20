@@ -63,7 +63,7 @@ async def route_turn(db: AsyncSession, req: AskRequest) -> tuple[AskRequest, dic
             req._intent_trace['planning'] = True
             if dependent:
                 effective, resolution = await resolve_followup(db, req, hybrid=True)
-                method = 'model'
+                method = 'model' if req._intent_trace.get('router_model_calls') else 'rule'
             else:
                 effective, resolution = await resolve_followup(db, req)
                 if resolution or req._intent_trace.get('router_model_calls'):

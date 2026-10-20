@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
  
 from app.core.stopwords import get_vietnamese_stopwords
+from app.modules.knowledge.entity_codes import code_candidates
+from app.modules.knowledge.metric_roles import ATTRIBUTES, metric_role_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +241,8 @@ class QueryClassifier:
         clean_query = query.strip()
         query_lower = clean_query.lower()
 
-        entity_codes: list[str] = []
+        explicit_codes = code_candidates(clean_query)
+        entity_codes: list[str] = list(explicit_codes)
         fact_attributes: list[str] = []
         keywords: list[str] = []
         target_entities: list[str] = []
@@ -247,15 +250,16 @@ class QueryClassifier:
         # 1. Detect program codes (e.g., 7480107, 7480201)
         for match in self.RE_PROGRAM_CODE.finditer(clean_query):
             code = match.group(1)
-            entity_codes.append(code)
+            if code not in entity_codes:
+                entity_codes.append(code)
             keywords.append(code)
 
         # 1b. Detect canonical major names in admissions
         for major_name, code in self.MAJOR_NAME_TO_CODE.items():
             if re.search(r"\b" + re.escape(major_name) + r"\b", query_lower):
-                if code not in entity_codes:
+                if not explicit_codes and code not in entity_codes:
                     entity_codes.append(code)
-                if code not in keywords:
+                if not explicit_codes and code not in keywords:
                     keywords.append(code)
                 if major_name not in keywords:
                     keywords.append(major_name)
@@ -311,6 +315,12 @@ class QueryClassifier:
                     fact_attributes.append("cutoff_score")
                 elif "tổ hợp" in kw:
                     fact_attributes.append("subject_combinations")
+
+        metric, _ = metric_role_evidence(clean_query)
+        if metric:
+            has_admissions_fact = True
+            fact_attributes.append(ATTRIBUTES[metric])
+            keywords.append(ATTRIBUTES[metric])
 
         # 4b. Ambiguous "môn học ... xét tuyển" paraphrase means subject combinations.
         # Must exclude direct-admission tables (HSG / tuyển thẳng / ưu tiên xét tuyển)

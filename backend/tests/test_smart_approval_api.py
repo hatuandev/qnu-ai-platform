@@ -233,16 +233,20 @@ async def test_important_content_failures_are_never_downgraded(database, failure
 
 async def test_real_two_connection_concurrent_duplicate_has_one_committed_decision(storage):
     import asyncio
+    import re
     from types import SimpleNamespace
     from uuid import uuid4
 
     from sqlalchemy import delete
+    from sqlalchemy.engine import make_url
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     from app.core.config import settings
     from app.modules.knowledge.models import KnowledgeCollection
 
-    assert "qnu_test_context548_" in settings.DATABASE_URL
+    test_url = make_url(settings.DATABASE_URL)
+    assert settings.ENVIRONMENT == 'test' and test_url.host in {'localhost', '127.0.0.1'}
+    assert re.fullmatch(r'qnu_test_context\d+_[a-f0-9]{12}', test_url.database or '')
     engine = create_async_engine(settings.DATABASE_URL)
     factory = async_sessionmaker(engine, expire_on_commit=False)
     ids = None

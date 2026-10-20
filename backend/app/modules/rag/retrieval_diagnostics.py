@@ -1,11 +1,14 @@
 """Content-free retrieval telemetry; facts and exhaustive lists are separate paths."""
 
 from app.modules.rag.fusion import FusionCandidate
+from app.modules.rag.intent_debug import intent_debug_enabled
 from app.modules.rag.schemas import AskRequest, AskResponse
 
 
 def attach_diagnostics(req: AskRequest, response: AskResponse) -> AskResponse:
     trace = dict(req._retrieval_diagnostics)
+    if not intent_debug_enabled():
+        trace.pop('fact_resolution', None)
     trace.setdefault("branch", "structured_or_dialogue")
     trace.setdefault("retrieval_executed", False)
     trace["citation_count"] = len(response.citations)

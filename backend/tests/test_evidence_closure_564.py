@@ -127,12 +127,68 @@ def test_source_row_can_be_shared_but_note_does_not_expand_other_fact_rows():
     assert fact.id not in {b.id for b in groups.get(blocks[1].id, [])}
 
 
+def test_referenced_note_does_not_pull_its_unrequested_list_siblings():
+    blocks, fact = evidence()
+    blocks[1].text = 'a) Counts refer to students.'
+    parent = canonical('policy', '1. Several independent notes:', 60)
+    sibling = canonical('unrelated', 'b) A different independent requirement.', 150)
+    packed = pack_context([*blocks, parent, sibling, fact], [fact], [], 5, 36000, atomic_lists=False)
+    assert fact.id in {b.id for b in packed}
+    assert {parent.id, sibling.id}.isdisjoint({b.id for b in packed})
+    dependency_groups(packed)
+
+
 def test_canonical_text_without_reviewed_facts_keeps_existing_behavior():
     paragraph = canonical('paragraph', 'Applications open in March.', 0)
     packed = pack_context([paragraph], [paragraph], [], 5, 36000)
     assert packed == [paragraph]
     projected = source_grounded_claims(claim(paragraph, packed), packed)
     assert projected[0]['text'] == paragraph.text
+
+
+def test_canonical_only_pack_preserves_transitive_required_context():
+    note = canonical('a', 'A qualified source statement.', 0, ['b'])
+    condition = canonical('b', 'This condition requires an exception.', 100, ['c'])
+    exception = canonical('c', 'Except the excluded audience.', 200, ['a'])
+    packed = pack_context([note, condition, exception], [note], [], 5, 36000, atomic_lists=False)
+    assert {b.id for b in packed} == {note.id, condition.id, exception.id}
+    dependency_groups(packed)
+    assert source_grounded_claims(claim(note, packed), packed)
+
+
+def test_numbered_group_member_keeps_its_own_footnote():
+    parent = canonical('parent', '1. Required steps:', 0)
+    child = canonical('child', 'a) Complete the required checks.', 100, ['footnote'])
+    sibling = canonical('sibling', 'b) Retain records.', 200)
+    note = canonical('footnote', 'The exception is mandatory.', 300)
+    note.section = 'Footnotes'
+    packed = pack_context([parent, child, sibling, note], [parent], [], 5, 36000)
+    assert {parent.id, child.id, sibling.id, note.id} <= {b.id for b in packed}
+    dependency_groups(packed)
+    assert source_grounded_claims(claim(child, packed), packed)
+
+
+def test_structural_ancestor_keeps_its_required_note_within_budget():
+    parent = canonical('parent', '# Applicable conditions', 0, ['footnote'])
+    body = canonical('body', 'A qualified source statement.', 100)
+    body.parent_id = parent.unit_id
+    note = canonical('footnote', 'Except the excluded audience.', 200)
+    source = [parent, body, note]
+    packed = pack_context(source, [body], [], 5, 36000)
+    assert note.id in {b.id for b in packed}
+    dependency_groups(packed)
+    trace = {}
+    refused = pack_context(source, [body], [], 5, 100, diagnostics=trace)
+    assert not refused and trace['dropped'][0]['reason'] == 'character_budget'
+
+
+@pytest.mark.parametrize('refs', [['absent'], ['b', ['invalid']], 'b'])
+def test_invalid_canonical_chain_remains_an_evidence_error(refs):
+    paragraph = canonical('a', 'A qualified source statement.', 0)
+    paragraph.fact_context['context_unit_ids'] = refs
+    with pytest.raises(AppException) as error:
+        dependency_groups([paragraph, canonical('b', 'Condition.', 100)])
+    assert error.value.code == 'EVIDENCE_CONTEXT_MISSING'
 
 
 @pytest.mark.parametrize('refs', [None, 'note', ['note', 4]])

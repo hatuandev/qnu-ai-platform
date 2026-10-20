@@ -1,9 +1,39 @@
 """Topic-first recovery ordering without changing source text or scope."""
 
+import re
 from itertools import zip_longest
 
 from app.modules.rag.evidence_bm25 import tokens
 from app.modules.rag.evidence_schemas import EvidenceBlock
+
+
+def recovery_order(ranked: list[EvidenceBlock], supplemental: list[EvidenceBlock],
+                   priority: list[EvidenceBlock]) -> list[EvidenceBlock]:
+    """Keep ranked full conditions ahead of supplemental table summaries.
+
+    Formula/caption bodies restore otherwise absent modalities. A table row is
+    only a retrieval anchor and must not crowd out its higher-ranked full rule.
+    """
+    bodies = [block for block in supplemental if block.fact_context.get('source_kind') != 'table']
+    return list({block.id: block for block in [*priority, *bodies, *ranked, *supplemental]}.values())
+
+
+def answer_facets(topics: list[str], question: str) -> list[str]:
+    """Locators and literal scenario inputs constrain evidence; they are not facts to repeat.
+
+    The complete original question still reaches both independent semantic audits.
+    This only prevents a scope locator/input from becoming a second public-answer demand.
+    """
+    scenario = bool(re.search(r'\b[^\W\d_]\w*\s*=\s*[-+]?\d', question))
+    result = []
+    for topic in topics:
+        locator = re.fullmatch(r'(?:điều|mục|phần|chương|bảng|hình|phụ lục)\s+[\dIVXLCDM]+(?:[.\-][\dIVXLCDM]+)*', topic, re.IGNORECASE)
+        given = (scenario and not re.fullmatch(r'(?:19|20)\d{2}', topic.strip())
+                 and topic.casefold() in question.casefold() and bool(re.match(r'(?:[^\W\d_]\w*\s*=|\d)', topic)))
+        if locator or given:
+            continue
+        result.append(topic)
+    return result
 
 
 def merge_candidates(left: list[EvidenceBlock], right: list[EvidenceBlock], limit: int) -> list[EvidenceBlock]:

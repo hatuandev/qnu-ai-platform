@@ -3,7 +3,9 @@
 import logging
 import re
 import time
+from typing import Literal
 
+from pydantic import Field, create_model
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
@@ -35,7 +37,9 @@ when the user does not name one; it supplies IDENTITY ONLY, never numerical fact
 institution does NOT mean all universities or a nationwide metric. Preserve any explicit different
 institution in the question. Do not invent additional institutions, topics or subquestions."""
 
-METRIC = """Locate source SCOPE PASSAGES or TABLE HEADERS defining the quantity requested by the user.
+METRIC = """Locate source SCOPE PASSAGES or TABLE HEADERS defining the attributes requested by the user.
+Attributes may be numbers, dates, responsibilities, states or conditions. Non-numerical
+headers are valid scope evidence: do not demand a quantity definition for a text/date query.
 For an EXPLICIT requested DATA YEAR, metric similarity alone is not enough: return context IDs
 only for tables whose applicability to that year is established by their own source text.
 Include the exact applicability statement carrying the data year, not just the column names.
@@ -223,8 +227,13 @@ async def _metric_payload(db: AsyncSession, req: AskRequest, catalog: RowCatalog
     if not introductions:
         return None
     scope = assistant_scope(req)
-    metric = await structured_call(db, req, MetricScope, METRIC + "\n" + IDENTITY,
-        {"question": question, "assistant_scope": scope, "introductions": list(introductions.values())}, max_tokens=1000)
+    contract = create_model('RowMetricScope', __base__=MetricScope,
+        context_ids=(list[Literal[tuple(introductions)]], Field(default_factory=list, max_length=12)))
+    labels = [{'entity': row['entity'], 'headers': [cell['header'] for cell in row['cells']]}
+              for row in catalog.rows.values()]
+    metric = await structured_call(db, req, contract, METRIC + "\n" + IDENTITY,
+        {"question": question, "assistant_scope": scope, "introductions": list(introductions.values()),
+         'source_row_labels': labels}, max_tokens=1000)
     if not metric.context_ids or any(key not in introductions for key in metric.context_ids):
         return None
     # One original header/intro can be linked to several entity rows. Resolve by
@@ -336,7 +345,7 @@ async def answer_from_rows(db: AsyncSession, req: AskRequest, snapshot: Retrieva
     started = time.perf_counter()
     if req.collection_id != snapshot.collection_id:
         raise AppException("Phạm vi trả lời không khớp snapshot.", code="ROW_ANSWER_SCOPE_MISMATCH", status_code=403)
-    catalog = build_catalog(rows, snapshot)
+    catalog = build_catalog(rows, snapshot, req.question)
     if not catalog.cells:
         return None
     payload = await _metric_payload(db, req, catalog)

@@ -8,6 +8,7 @@ import pytest
 from app.modules.rag.fusion import FusionCandidate
 from app.modules.rag.schemas import AskRequest, RetrievalSnapshot
 from app.modules.rag.service import RagService, is_refusal_answer
+from tests.rag_test_proofs import bind_literal_test_candidates
 
 
 @pytest.mark.parametrize("has_evidence", [True, False])
@@ -35,6 +36,7 @@ async def test_status_and_cache_follow_visible_answer_not_citation_presence(answ
           patch("app.modules.rag.service.hybrid_retriever.retrieve", AsyncMock(return_value=[candidate])),
           patch("app.modules.rag.service.hybrid_retriever.expand_with_neighbors", AsyncMock(return_value={})),
           patch("app.modules.rag.service.load_row_anchors", AsyncMock(return_value=[])),
+          patch('app.modules.rag.canonical_candidates.bind_candidates', new=bind_literal_test_candidates),
           patch("app.modules.rag.service.semantic_cache.get", AsyncMock(return_value=None)),
           patch("app.modules.rag.service.semantic_cache.set", AsyncMock()) as cache,
           # This test isolates status/cache presentation; the independent semantic

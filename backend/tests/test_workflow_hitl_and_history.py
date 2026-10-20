@@ -19,6 +19,7 @@ from app.modules.workflows.schemas import (
     WorkflowExecuteResponse,
     WorkflowNodeSpec,
 )
+from tests.rag_test_proofs import bind_literal_test_candidates
 
 
 @pytest.fixture(autouse=True)
@@ -202,6 +203,7 @@ async def test_get_recent_conversation_history_fetches_and_formats_in_chronologi
 
 
 @pytest.mark.asyncio
+@patch('app.modules.rag.canonical_candidates.bind_candidates', new=bind_literal_test_candidates)
 @patch("app.modules.rag.response_audit.audit_visible_answer", new=AsyncMock(side_effect=lambda db, req, snap, answer, candidates:
     {"accepted": True, "candidate_ids": [c.chunk_id for c in candidates]}))
 async def test_rag_service_injects_history_into_llm_messages():

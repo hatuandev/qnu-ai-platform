@@ -136,6 +136,7 @@ async def test_service_missing_fact_checks_prose_in_same_snapshot():
     db.get.return_value = SimpleNamespace(collection_metadata={})
     recovered = AskResponse(status="answered", answer="A verified source passage")
     with (patch("app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot", AsyncMock(return_value=snap)),
+          patch("app.modules.rag.source_fact_resolution.load_published_blocks", AsyncMock(return_value=[])),
           patch("app.modules.rag.service.fact_layer.lookup_facts", AsyncMock(return_value=[])),
           patch("app.modules.rag.snapshot_fact_evidence.load_snapshot_table_evidence", AsyncMock(return_value=[])),
           patch("app.modules.rag.prose_fallback.answer_from_prose", AsyncMock(return_value=recovered)) as fallback):

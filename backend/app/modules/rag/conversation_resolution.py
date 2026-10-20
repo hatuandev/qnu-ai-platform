@@ -13,6 +13,7 @@ from app.modules.rag.evidence_model import structured_call
 from app.modules.rag.evidence_schemas import StrictContract
 from app.modules.rag.intent_contracts import ContextReferent, Intent, validate_referents
 from app.modules.rag.intent_rules import useful_user_questions
+from app.modules.rag.query_constraints import metric_attributes
 from app.modules.rag.query_router import query_classifier
 from app.modules.rag.schemas import AskRequest
 
@@ -80,6 +81,8 @@ async def resolve_followup(db: AsyncSession, req: AskRequest, *, hybrid: bool = 
         return req, None
     if any(not input_guardrail.check(question).is_safe for question in previous):
         return req, {"mode": "clarify", "reason": "UNSAFE_ANTECEDENT"}
+    if hybrid and (literal := literal_year_change(req, previous)):
+        return literal
     payload = {"current_question": req.question, "previous_questions": [{"id": i, "question": q} for i, q in enumerate(previous)]}
     if hybrid:
         if req.question.strip().casefold() in {'có', 'co', 'không', 'khong', 'yes', 'no', 'ok', 'được'}:
@@ -90,6 +93,7 @@ async def resolve_followup(db: AsyncSession, req: AskRequest, *, hybrid: bool = 
         async with asyncio.timeout(20):
             result = await structured_call(db, req, FollowupResolution, INSTRUCTION + '\n' + HYBRID_INSTRUCTION,
                 payload, max_tokens=1200, max_attempts=1)
+        result = normalize_user_references(result, req.question, previous)
         req._intent_trace.update(classification_method='model', confidence=result.confidence,
             intent=result.intent or ('KNOWLEDGE_FOLLOWUP' if result.mode != 'independent' else 'KNOWLEDGE'),
             context_referents=[ref.model_dump() for ref in result.referents])
@@ -173,6 +177,47 @@ async def resolve_followup(db: AsyncSession, req: AskRequest, *, hybrid: bool = 
                   "antecedent_question": antecedent, "standalone_question": result.question}
     logger.info("rag_followup_resolved assistant=%s antecedent=%d", req.assistant_code, result.antecedent_id)
     return req.model_copy(update={"question": result.question}), resolution
+
+
+def normalize_user_references(result: FollowupResolution, current: str, previous: list[str]) -> FollowupResolution:
+    """Repair only an unambiguous quote address, never its value or semantic scope."""
+    turns = {-1: current, **dict(enumerate(previous))}
+    refs = []
+    for ref in result.referents:
+        if ref.field == 'topic' and metric_attributes(current) and ref.value not in result.question:
+            continue  # An explicitly changed metric does not inherit the superseded one.
+        if ref.quote not in turns.get(ref.source_turn, '') and ref.value in ref.quote:
+            matches = [index for index, text in turns.items() if ref.quote in text]
+            if len(matches) == 1:
+                ref = ref.model_copy(update={'source_turn': matches[0]})
+        refs.append(ref)
+    return result.model_copy(update={'referents': refs})
+
+
+def literal_year_change(req: AskRequest, previous: list[str]) -> tuple[AskRequest, dict] | None:
+    """A year-only correction preserves the complete preceding user request.
+
+    No clock, assistant answer or model knowledge supplies any inherited value.
+    Multi-entity/year requests remain with the independently validated resolver.
+    """
+    from app.modules.knowledge.entity_codes import code_candidates
+    from app.modules.rag.intent_rules import normalize_dialogue
+
+    value = normalize_dialogue(req.question)
+    match = re.fullmatch(r'(?:(?:con|the|vay|thi) )?nam ((?:19|20)\d{2})(?: (?:thi sao|nhe))?', value)
+    if not match:
+        return None
+    base = next((q for q in reversed(previous) if metric_attributes(q) and
+        (code_candidates(q) or re.search(r'\b(?:ngành|chương trình|program)\b', q, re.IGNORECASE))), '')
+    if (not base or len(set(re.findall(r'\b(?:19|20)\d{2}\b', base))) != 1
+            or len(code_candidates(base)) > 1
+            or re.search(r'\b(?:so sánh|và|hoặc|and|or)\b', base, re.IGNORECASE)):
+        return None
+    standalone = re.sub(r'\b(?:19|20)\d{2}\b', match[1], base)
+    req._intent_trace['literal_year_change'] = True
+    return req.model_copy(update={'question': standalone}), {'mode': 'followup',
+        'reason': 'LITERAL_USER_YEAR_CHANGE', 'current_question': req.question,
+        'standalone_question': standalone, 'antecedent_question': base}
 
 
 def _valid_contextual_query(result: FollowupResolution, current: str, previous: list[str]) -> bool:

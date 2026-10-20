@@ -12,6 +12,7 @@ from app.modules.rag.composer import (
 )
 from app.modules.rag.query_router import query_classifier
 from app.modules.rag.schemas import RetrievalSnapshot
+from tests.rag_test_proofs import bind_literal_test_candidates
 
 
 @pytest.fixture(autouse=True)
@@ -103,6 +104,7 @@ def test_format_planner_instructions():
 
 
 @pytest.mark.asyncio
+@patch('app.modules.rag.canonical_candidates.bind_candidates', new=bind_literal_test_candidates)
 @patch("app.modules.rag.response_audit.audit_visible_answer", new=AsyncMock(side_effect=lambda db, req, snap, answer, candidates:
     {"accepted": True, "candidate_ids": [c.chunk_id for c in candidates]}))
 async def test_rag_service_entity_scoped_prompt_assembly():
@@ -117,6 +119,8 @@ async def test_rag_service_entity_scoped_prompt_assembly():
 
     # Mock retriever candidates containing multi-major raw text
     mock_candidate = MagicMock()
+    mock_candidate.binding_id = 'bnd_test'
+    mock_candidate.index_revision_id = 'idx_test'
     mock_candidate.chunk_id = "chunk_multi_1"
     mock_candidate.document_id = "doc_multi_1"
     mock_candidate.page_number = 15

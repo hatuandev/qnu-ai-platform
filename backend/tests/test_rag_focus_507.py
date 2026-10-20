@@ -30,10 +30,12 @@ def block(key, text, start=0, **values):
 async def test_server_owned_answer_ids_keep_exact_text_and_negative_verdict(entailed):
     answer = "Applicants must rank this program first. Other ranks are excluded."
     spans = answer_spans(answer)
-    value = {"all_assertions_supported": entailed, "answers_original_question": True,
-        "essential_conditions_retained": True, "conflict": False, "evidence_ids": ["e0"],
-        "assertions": [{"answer_span_id": key, "evidence_id": "e0", "evidence_quote": span,
-            "entailed": entailed, "relevant": True} for key, span in spans.items()]}
+    # The reader selects server-owned bodies; no model-authored quote or global
+    # summary can override these exact per-span negative verdicts.
+    value = {"answers_original_question": True,
+        "essential_conditions_retained": True, "conflict": False,
+        "assertions": [{"answer_span_id": key, "evidence_id": "e0",
+            "entailed": entailed, "relevant": True} for key in spans]}
     req = AskRequest(question="Which rank?", collection_id="c")
     snapshot = RetrievalSnapshot(snapshot_id="s", collection_id="c", binding_revisions={"b": "i"})
     candidate = FusionCandidate("chunk", "b", answer, 1, binding_id="b", index_revision_id="i")

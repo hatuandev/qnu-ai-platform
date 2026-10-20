@@ -4,6 +4,7 @@ import re
 from itertools import pairwise
 from typing import Any
 
+from app.modules.knowledge.entity_codes import code_cell
 from app.modules.knowledge.facts import detect_column_role
 from app.modules.knowledge.parsers.markdown_parser import _split_gfm_row
 from app.modules.knowledge.services.source_pages import canonical_pages
@@ -13,7 +14,11 @@ SEPARATOR = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$")
 
 
 def clean_cell(value: str) -> str:
-    return re.sub(r"[*_`]", "", value).strip()
+    text = value.strip()
+    for marker in ('**', '__', '`', '*', '_'):
+        if text.startswith(marker) and text.endswith(marker) and len(text) > 2 * len(marker):
+            text = text[len(marker):-len(marker)].strip()
+    return text
 
 
 def _boundary_noise(lines: list[str]) -> bool:
@@ -55,7 +60,7 @@ def _successor(previous: list[str] | None, row: list[str]) -> bool:
     return bool(previous and len(row) == len(previous) and row[0].strip().isdigit()
                 and previous[0].strip().isdigit() and int(row[0]) == int(previous[0]) + 1
                 and any(any(char.isalpha() for char in cell) for cell in row[1:])
-                and any(re.fullmatch(r"\d{3,}", cell.strip()) for cell in row[1:]))
+                and any(code_cell(cell.strip()) and any(c.isdigit() for c in cell) for cell in row[1:]))
 
 
 def _coded_data_row(row: list[str]) -> bool:
@@ -139,16 +144,20 @@ def row_identities(row: list[str], table: dict[str, Any]) -> list[tuple[int, int
         first = start + 1
         if end - first < 2:
             continue
-        code_cols = [col for col in range(first, end) if detect_column_role(" / ".join(paths[col]))[0] == "code"
-                     and re.fullmatch(r"\d{3,}[A-Za-z]*", clean_cell(row[col]))]
-        text_cols = [col for col in range(first, end) if any(char.isalpha() for char in row[col])]
+        roles = {col: detect_column_role(" / ".join(paths[col]))[0] for col in range(first, end)}
+        code_cols = [col for col in range(first, end) if roles[col] == "code" and code_cell(clean_cell(row[col]))]
+        named_cols = [col for col in range(first, end) if roles[col] == "name" and clean_cell(row[col])]
+        text_cols = [col for col in range(first, end) if col not in code_cols and roles[col] is None
+                     and any(char.isalpha() for char in row[col])]
         descriptive = [col for col in text_cols if sum(char.isalpha() for char in row[col]) / max(len(row[col]), 1) > 0.5]
         def diversity(column: int) -> float:
             values = [clean_cell(value[column]).casefold() for value in table["rows"] if len(value) > column and any(char.isalpha() for char in value[column])]
             return len(set(values)) / max(len(table["rows"]), 1)
 
-        identity = min(text_cols, key=lambda col: min(abs(col - c) for c in code_cols)) if text_cols and code_cols else max(descriptive or text_cols or [first], key=diversity)
+        identity = (named_cols[0] if len(named_cols) == 1 else code_cols[0] if len(code_cols) == 1
+                    else max(descriptive or text_cols or [first], key=diversity))
         code = clean_cell(row[code_cols[0]]) if len(code_cols) == 1 else None
-        name = clean_cell(row[identity]) if text_cols else " ".join([*paths[identity], clean_cell(row[identity])])
+        name = (clean_cell(row[identity]) if named_cols or code_cols or text_cols
+                else " ".join([*paths[identity], clean_cell(row[identity])]))
         identities.append((identity, end, name, code))
     return identities

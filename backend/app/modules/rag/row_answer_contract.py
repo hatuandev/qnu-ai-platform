@@ -20,6 +20,7 @@ from app.modules.rag.evidence_schemas import EvidenceBlock, QuoteReference, Stri
 from app.modules.rag.evidence_validation import bind_quote
 from app.modules.rag.fusion import FusionCandidate
 from app.modules.rag.schemas import RetrievalSnapshot
+from app.modules.rag.source_labels import row_identity
 
 
 class RowSelection(StrictContract):
@@ -137,7 +138,7 @@ def _cell_payload(key: str, cell: SourceCell) -> dict:
     return payload
 
 
-def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int) -> None:
+def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int, question: str = '') -> None:
     unit = SourceUnit.model_validate(row.metadata["source_unit"])
     tables = extract_context_tables(unit.header_context + "\n" + unit.text, 1)
     if len(tables) != 1 or len(tables[0]["rows"]) != 1:
@@ -145,6 +146,9 @@ def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int) -> None:
     table = tables[0]
     values = _split_gfm_row(unit.text)
     identities = row_identities(values, table)
+    if question:
+        matched = row_identity(values, table, question)
+        identities = [matched] if matched else []
     if len(identities) != 1 or len(values) != len(table["headers"]):
         return
     identity, _, entity, entity_code = identities[0]
@@ -188,7 +192,7 @@ def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int) -> None:
             "note_candidates": [key for key in context_ids if catalog.contexts[key].start > unit.start]}
 
 
-def build_catalog(rows: list[FusionCandidate], snapshot: RetrievalSnapshot) -> RowCatalog:
+def build_catalog(rows: list[FusionCandidate], snapshot: RetrievalSnapshot, question: str = '') -> RowCatalog:
     catalog = RowCatalog()
     for index, row in enumerate(rows):
         meta = row.metadata or {}
@@ -196,7 +200,7 @@ def build_catalog(rows: list[FusionCandidate], snapshot: RetrievalSnapshot) -> R
                 or not meta.get("source_revision_id") or not meta.get("canonical_hash")):
             raise AppException("Hàng trả lời không khớp snapshot nguồn.", code="ROW_ANSWER_SOURCE_INVALID", status_code=503)
         try:
-            _add_row(catalog, row, index)
+            _add_row(catalog, row, index, question)
         except (ValueError, TypeError, KeyError, IndexError) as exc:
             raise AppException("Tọa độ ô nguồn không hợp lệ.", code="ROW_ANSWER_SOURCE_INVALID", status_code=503) from exc
     return catalog

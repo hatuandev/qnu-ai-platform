@@ -53,6 +53,7 @@ async def test_unknown_fact_uses_linked_rows_without_changing_stored_year(suppor
     snap = RetrievalSnapshot(snapshot_id="snapshot", collection_id="collection", binding_revisions={"binding": "index"})
     response = AskResponse(status="answered" if supported else "insufficient_context", answer="Source-bound row answer")
     with (patch("app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot", AsyncMock(return_value=snap)),
+          patch('app.modules.rag.source_fact_resolution.resolve_fact_scope', AsyncMock(return_value=None)),
           patch("app.modules.rag.service.fact_layer.lookup_facts", AsyncMock(return_value=[fact])),
           patch("app.modules.rag.snapshot_fact_evidence.load_snapshot_table_evidence", AsyncMock(return_value=[])),
           patch("app.modules.rag.prose_fallback.load_published_blocks", AsyncMock(return_value=[])),

@@ -158,6 +158,13 @@ class RagService:
         if not input_guardrail.check(req.original_question or req.question).is_safe:
             return await self._ask(db, req, candidate_snapshot=candidate_snapshot)
         effective, resolution, direct = await route_turn(db, req)
+        from app.modules.rag.query_constraints import metric_attributes, requested_unit
+
+        current_metrics = metric_attributes(req.original_question or req.question)
+        effective._current_fact_constraints = {
+            **({'metrics': current_metrics} if current_metrics else {}),
+            **({'unit': requested_unit(req.original_question or req.question)}
+               if requested_unit(req.original_question or req.question) else {})}
         if direct is not None:
             req._retrieval_diagnostics = {'branch': 'conversation', 'retrieval_executed': False}
             direct.latency_ms = round((time.perf_counter() - started) * 1000, 2)
@@ -249,19 +256,28 @@ class RagService:
         from app.modules.rag.combination_enumeration import enumerate_combinations
 
         analysis = query_classifier.analyze(req.question, module_code=req.module_code)
+        if req._current_fact_constraints.get('metrics'):
+            analysis.fact_attributes = req._current_fact_constraints['metrics']
+        if req._current_fact_constraints.get('metric'):
+            analysis.fact_attributes = [req._current_fact_constraints['metric']]
         enumeration = await enumerate_combinations(db, req, snapshot, analysis,
             candidate_mode=candidate_snapshot is not None)
         if enumeration is not None:
             req._retrieval_diagnostics.update(branch="enumeration", retrieval_executed=False,
                 budget_note="Exhaustive enumeration is not truncated by context_top_k")
             return enumeration
+        from app.modules.rag.source_identity_enumeration import enumerate_source_identities
+
+        identities = await enumerate_source_identities(db, req, snapshot, candidate_mode=candidate_snapshot is not None)
+        if identities is not None:
+            return identities
         from app.modules.rag.glossary_expansion import resolve_glossary_queries
 
         glossary_queries, glossary_trace = await resolve_glossary_queries(
             db, req.collection_id, req.question,
             plan_years=[int(year) for year in re.findall(r"\b(?:19|20)\d{2}\b", req.question)])
         glossary_version = glossary_trace.get("settings_version", 0) if glossary_trace.get("enabled") else 0
-        policy_version = req.policy_fingerprint() + ":weighted-expansion-v1:verified-answer-v2" + (
+        policy_version = req.policy_fingerprint() + ":weighted-expansion-v1:verified-answer-v5" + (
             f":glossary-v{glossary_version}" if glossary_version else ":glossary-off")
 
         # 2. Check Semantic Cache (history-aware; skipped for context-dependent shorts)
@@ -299,6 +315,16 @@ class RagService:
         # 3. Query Intent Analysis & Fact-First Routing (module-aware, reusable)
         lookup_limit = 1000 if typed_fact_query else 10 if analysis.intent == QueryIntent.EXACT_FACT else 5
 
+        from app.modules.rag.source_fact_resolution import resolve_fact_scope, verify_fact_proof
+
+        source_scope = (await resolve_fact_scope(db, snapshot, req.question,
+                        candidate_mode=candidate_snapshot is not None)) if typed_fact_query else None
+        if source_scope is not None:
+            req._retrieval_diagnostics['fact_resolution'] = source_scope.trace
+            # Catalog aliases are retrieval hints, never source identity proof.
+            analysis.entity_codes = [code for code in source_scope.resolved_codes if code]
+            analysis.target_entities = list(dict.fromkeys(row['name'] for row in source_scope.rows.values()))
+
         facts = await fact_layer.lookup_facts(
             db,
             req.collection_id,
@@ -312,9 +338,34 @@ class RagService:
             target_entities=analysis.target_entities if analysis.target_entities else None,
             active_index_revision_ids=set(snapshot.binding_revisions.values()),
             requested_years=[int(year) for year in re.findall(r"\b(?:19|20)\d{2}\b", req.question)],
+            **({'source_scope': source_scope} if source_scope is not None else {}),
         )
-        decision = decide_table_answer(req.question, facts, module_code=req.module_code)
-        if decision and decision["status"] == "missing" and not decision.get("claim_bindings"):
+        decision = decide_table_answer(req.question, facts, module_code=req.module_code,
+            requested_metric=req._current_fact_constraints.get('metric'),
+            requested_unit=req._current_fact_constraints.get('unit'),
+            requested_metrics=req._current_fact_constraints.get('metrics'),
+            source_entity_codes=analysis.entity_codes if source_scope else None,
+            source_entity_names=analysis.target_entities if source_scope else None)
+        if source_scope is not None and decision is None:
+            facts = []  # A code in narrative prose is not permission to attach adjacent numeric facts.
+        if source_scope is not None:
+            source_scope.trace.update(candidate_fact_count=len(facts),
+                selected_fact_ids=(decision or {}).get('matched_fact_ids', []),
+                answer_decision_reason=(decision or {}).get('reason'))
+            if decision and not set(source_scope.candidates).issubset(source_scope.resolved_codes):
+                decision.update(status='missing', reason='ENTITY_CODE_UNRESOLVED', facts=[], claim_bindings=[],
+                    matched_fact_ids=[], answer='Chưa đối chiếu được đầy đủ mã được hỏi với định danh trong nguồn đã xuất bản.')
+            if decision and not source_scope.candidates and source_scope.ambiguous_identity:
+                decision.update(status='ambiguous', reason='ENTITY_SCOPE_AMBIGUOUS', facts=[], claim_bindings=[],
+                    matched_fact_ids=[], answer='Tên được hỏi có nhiều định danh hoặc phạm vi nguồn. Cần xác định mã hoặc nguồn trước khi chọn dữ liệu.')
+            if decision and decision.get('matched_fact_ids'):
+                proof = await verify_fact_proof(db, req, snapshot, source_scope, decision,
+                    limit=retrieval_policy.context_top_k if retrieval_policy else evidence_policy.context_limit,
+                    max_chars=retrieval_policy.max_context_chars if retrieval_policy else evidence_policy.max_context_chars)
+                if not proof:
+                    decision.update(status='missing', reason='FACT_PROOF_BUDGET_EXCEEDED', facts=[],
+                        claim_bindings=[], matched_fact_ids=[], answer='Nhóm bằng chứng đầy đủ vượt ngân sách đối soát của lượt hỏi.')
+        if source_scope is None and decision and decision["status"] == "missing" and not decision.get("claim_bindings"):
             from app.modules.rag.snapshot_fact_evidence import load_snapshot_table_evidence
 
             table_evidence = await load_snapshot_table_evidence(db, snapshot)
@@ -339,7 +390,7 @@ class RagService:
         if decision is not None:
             from app.modules.rag.prose_fallback import answer_from_prose, can_check_prose
 
-            if can_check_prose(decision):
+            if source_scope is None and can_check_prose(decision):
                 prose_answer = await answer_from_prose(db, req, snapshot, evidence_policy, decision["reason"],
                     candidate_mode=candidate_snapshot is not None)
                 if prose_answer is not None:
@@ -352,12 +403,18 @@ class RagService:
             citations = [Citation(source_id=f.get("binding_id") or str(f["id"]),
                                   title=f.get("source_title") or f["entity_name"] + " — " + f["attribute_name"],
                                   page_number=f["raw_data"].get("page_number"),
-                                  quote=f"{f['entity_name']} · {f['raw_data'].get('header_path') or f['attribute_name']} = {f['attribute_value']}",
+                                  quote=f.get('canonical_quote') or f"{f['entity_name']} · {f['raw_data'].get('header_path') or f['attribute_name']} = {f['attribute_value']}",
+                                  canonical_hash=f.get('canonical_hash'), span_start=f.get('span_start'), span_end=f.get('span_end'),
                                   source_pages=location_pages(f["raw_data"].get("source_locations")) or sorted({p for p in (f["raw_data"].get("page_number"), f["raw_data"].get("header_page_number")) if isinstance(p, int)}),
                                   source_locations=citation_locations(f["raw_data"]),
                                   binding_id=f.get("binding_id"), index_revision_id=f.get("index_revision_id"),
                                   source_revision_id=f["raw_data"].get("source_revision_id")) for f in matched]
             decision["glossary_expansion"] = glossary_trace
+            citations.extend(Citation(source_id=ref['binding_id'], title='Chú thích nguồn', quote=ref['quote'],
+                binding_id=ref['binding_id'], index_revision_id=ref['index_revision_id'],
+                source_revision_id=ref['source_revision_id'], canonical_hash=ref['canonical_hash'],
+                span_start=ref['start'], span_end=ref['end'], page_number=ref.get('page_number'))
+                for ref in decision.get('proof_context_references', []))
             return AskResponse(status="answered" if decision["status"] == "supported" else "insufficient_context",
                                answer=decision["answer"], answer_format="markdown_table" if matched else "paragraph",
                                answer_decision=decision, citations=citations,
@@ -621,9 +678,11 @@ class RagService:
                     answer_decision={"reason": "NUMERIC_GROUNDING_FAILED", "unsupported_numbers": ungrounded_numbers},
                     latency_ms=round((time.perf_counter() - start_time) * 1000, 2))
 
+            from app.modules.rag.canonical_candidates import bind_candidates, canonical_citation
             from app.modules.rag.response_audit import audit_visible_answer
 
-            verdict = await audit_visible_answer(db, req, snapshot, clean_answer, candidates)
+            bound_candidates = await bind_candidates(db, snapshot, candidates, candidate_mode=candidate_snapshot is not None)
+            verdict = await audit_visible_answer(db, req, snapshot, clean_answer, [c for c, _ in bound_candidates])
             req._retrieval_diagnostics["visible_answer_audit"] = verdict
             if not verdict["accepted"]:
                 from app.modules.rag.prose_fallback import answer_from_prose
@@ -640,10 +699,8 @@ class RagService:
             # Cite the exact excerpts the semantic reader accepted, not a separate
             # word-overlap heuristic (which may miss paraphrases or keep an extra).
             used_ids = set(verdict["candidate_ids"])
-            used_candidates = list({c.chunk_id: c for c in candidates if c.chunk_id in used_ids}.values())
-            final_citations = citation_guard.build_citations(used_candidates)
-            for citation, candidate in zip(final_citations, used_candidates, strict=True):
-                citation.quote = candidate.content
+            final_citations = list({block.id: canonical_citation(block, candidate.document_id) for candidate, block in bound_candidates
+                                    if candidate.chunk_id in used_ids}.values())
 
         exec_ms = round((time.perf_counter() - start_time) * 1000, 2)
         resp = AskResponse(

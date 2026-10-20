@@ -158,6 +158,10 @@ async def load_published_blocks(db: AsyncSession, snapshot: RetrievalSnapshot, *
         except ValueError as exc:
             raise AppException("Đơn vị nguồn không khớp chứng cứ hoặc bản chỉ mục.",
                 code="EVIDENCE_UNIT_INVALID", status_code=503) from exc
+        unresolved = {row_id: [field.get('column_id') for field in fields if field.get('state') in {'ambiguous', 'unreadable'}
+                              or field.get('usage') == 'description_only']
+            for table in source_artifact.get('tables', [])
+            for row_id, fields in zip(table.get('row_unit_ids') or [], table.get('row_fields') or [])}
         source_blocks = [EvidenceBlock(id=f"{source.id}:{unit.start}:{unit.end}", binding_id=binding.id,
             index_revision_id=index.id, source_revision_id=source.id,
             title=(source.snapshot_metadata or {}).get("title") or binding.id,
@@ -165,7 +169,9 @@ async def load_published_blocks(db: AsyncSession, snapshot: RetrievalSnapshot, *
             header_context="\n".join([*unit.heading_path, unit.header_context]), start=unit.start, end=unit.end,
             source_context=markdown[:1200],
             canonical_hash=source.canonical_hash, temporal_scope=unit.temporal,
-            fact_context={"source_kind": unit.kind, **({"qnu_block_id": unit.qnu_block_id,
+            fact_context={"source_kind": unit.kind,
+                **({'unresolved_cell_columns': unresolved[unit.id]} if unresolved.get(unit.id) else {}),
+                **({"qnu_block_id": unit.qnu_block_id,
                 "shared_context_unit_ids": unit_context_ids(manifest, unit.id, include_fields=False),
                 "field_context_unit_ids": {column: unit_context_ids(manifest, unit.id, column)
                                            for column in unit.field_context_refs},
@@ -202,6 +208,21 @@ def scope_headers(blocks: list[EvidenceBlock], selected: list[EvidenceBlock], ye
     return result
 
 
+def _complete_packing_group(seeds: list[EvidenceBlock | None], groups: dict[str, list[EvidenceBlock]],
+                            already_selected: set[str]) -> list[EvidenceBlock]:
+    """Close every added parent/list member before charging or admitting the group."""
+    pending = [block for block in seeds if block is not None]
+    seen, result = set(already_selected), []
+    while pending:
+        block = pending.pop(0)
+        if block.id in seen:
+            continue
+        seen.add(block.id)
+        result.append(block)
+        pending.extend(groups.get(block.id, []))
+    return result
+
+
 def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], years: list[int],
                  limit: int, max_chars: int, *, atomic_lists: bool = True,
                  enumeration_subject: str | None = None, diagnostics: dict | None = None,
@@ -211,7 +232,14 @@ def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], year
     headers = {source_identity(b): b for b in scope_headers(blocks, ordered, years)}
     groups = {member.id: group for group in list_groups(blocks) if matches_subject(group, enumeration_subject)
               for member in group} if atomic_lists else {}
-    for member, dependencies in dependency_groups(blocks).items():
+    dependencies_by_id = dependency_groups(blocks)
+    # A referenced note carries its directed required refs, not every sibling
+    # in an enumeration that happens to contain that note.
+    required_groups = {block.id: dependencies_by_id[block.id] for block in blocks
+                       if block.id in dependencies_by_id and
+                       (block.fact_context.get("context_unit_ids") or
+                        block.origin == "reviewed_fact" and block.fact_context.get("verified_dependencies"))}
+    for member, dependencies in dependencies_by_id.items():
         groups[member] = sorted({b.id: b for b in [*groups.get(member, []), *dependencies]}.values(), key=lambda b: b.start)
     if atomic_lists:
         for group in list_groups(blocks):
@@ -243,7 +271,7 @@ def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], year
         body_ids = {b.id for b in bodies}
         continuations = [block for member in bodies for block in sentence_continuations(blocks, member)
                          if block.id not in seen and block.id not in body_ids][:2]
-        pair = list({b.id: b for b in [header, *parents, *bodies, *continuations] if b is not None and b.id not in seen}.values())
+        pair = _complete_packing_group([header, *parents, *bodies, *continuations], required_groups, seen)
         intros = {b.source_revision_id: b.source_context for b in pair if b.source_context and b.source_revision_id not in intro_sources}
         size = sum(len(json.dumps(model_block(b), ensure_ascii=False)) + 1 for b in pair)
         size += len(json.dumps(intros, ensure_ascii=False)) if intros else 0

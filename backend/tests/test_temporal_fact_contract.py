@@ -76,6 +76,7 @@ async def test_rag_runtime_missing_year_blocks_model_and_retrieval():
          patch("app.modules.rag.service.fact_layer.lookup_facts", AsyncMock(return_value=[fact])), \
          patch("app.modules.rag.snapshot_fact_evidence.load_snapshot_table_evidence", AsyncMock(return_value=[])), \
          patch("app.modules.rag.prose_fallback.load_published_blocks", AsyncMock(return_value=[])), \
+         patch("app.modules.rag.source_fact_resolution.load_published_blocks", AsyncMock(return_value=[])), \
          patch("app.modules.rag.service.hybrid_retriever.retrieve", AsyncMock()) as retrieval, \
          patch("app.modules.rag.service.modelops_service.generate", AsyncMock()) as model:
         result = await RagService().ask(db, AskRequest(question="Điểm chuẩn Công nghệ thông tin năm 2026?", collection_id="collection", module_code="admissions"))

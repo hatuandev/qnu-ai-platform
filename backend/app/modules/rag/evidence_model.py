@@ -306,6 +306,11 @@ just its attached quotes. If selected evidence distinguishes an earlier and upda
 value for the requested metric, preserve BOTH scopes unless the question pins one.
 For formulas copy source glyphs verbatim or quote the
 entire block; never replace them with a similar Unicode symbol.
+An explicitly quoted source restriction, unknown state or rule forbidding calculation
+can completely answer a question negatively. Do not insist on a numerical result when
+the source explicitly says required inputs are missing or undefined. User-supplied
+scenario inputs constrain the question; do not require the document to repeat them
+as historical facts. No arithmetic or invented substitution for a missing input.
 Do NOT infer not-offered/not-required/not-announced from absence.
 Apply source_preferences only to equivalent applicability tuples. When an old-source
 claim is replaced by preferred-source evidence for that SAME tuple, set scope_compatible

@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 from app.modules.knowledge.facts import column_role_evidence, detect_column_role
+from app.modules.knowledge.metric_roles import ATTRIBUTES, header_unit
 from app.modules.knowledge.normalization.retrieval_units import build_unit_manifest, manifest_digest
 from app.modules.knowledge.parsers.markdown_parser import _split_gfm_row
 from app.modules.knowledge.services.fact_identity import build_fact_identity
@@ -19,10 +20,10 @@ from app.modules.knowledge.services.table_context import (
 )
 from app.modules.knowledge.services.temporal_metadata import extract_temporal_metadata
 
-ARTIFACT_VERSION = "structured-source-v7-context-links"
+ARTIFACT_VERSION = "structured-source-v8-quantity-roles"
 _YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
 _ATTRIBUTE_CODES = {"benchmark": "cutoff_score", "quota": "expected_quota", "combos": "subject_combinations",
-                    "tuition": "tuition_fee", "code": "entity_code", "method": "admission_method"}
+                    "tuition": "tuition_fee", "code": "entity_code", "method": "admission_method", **ATTRIBUTES}
 
 
 def cell_context(header: str) -> dict[str, Any]:
@@ -39,6 +40,7 @@ def cell_context(header: str) -> dict[str, Any]:
                 "years": years, "status": "proposed" if len(years) == 1 else "ambiguous" if years else "unknown",
                 "evidence": "column_header"}
     return {"attribute_code": _ATTRIBUTE_CODES.get(role) if specific else None, "temporal_context": temporal,
+            "unit": header_unit(header) if role in {"quota", "reported_count", "estimate", "rate", "tuition"} else None,
             "attribute_context": {"raw_header": header, "status": "recognized" if specific else "unknown"},
             "qualifiers": {"method": methods[-1] if role == "benchmark" and len(methods) == 1 else None}}
 

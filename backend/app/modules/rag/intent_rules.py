@@ -19,7 +19,7 @@ _SOCIAL = {kind: re.compile(base + _POLITE) for kind, base in _SOCIAL_BASES.item
 _META = re.compile(r'(?:ban la ai|ban ten (?:la )?gi|ban (?:co the )?(?:giup|ho tro)(?: duoc)? (?:gi|nhung gi)|'
                    r'ban co the lam (?:gi|nhung gi)|who are you|what can you do|'
                    r'ban co the (?:tu van|ho tro) [a-z ]{2,70} (?:khong|duoc khong))')
-_DEPENDENT = re.compile(r'^(?:con |vay |khong toi hoi |khong minh hoi |what about )|'
+_DEPENDENT = re.compile(r'^(?:con |vay |the |khong toi hoi |khong minh hoi |what about )|'
                         r'\b(?:(?:nganh|truong|chuong trinh|doi tuong|nam|cai) (?:do|nay|truoc)|'
                         r'that program|those|same program|instead)\b')
 

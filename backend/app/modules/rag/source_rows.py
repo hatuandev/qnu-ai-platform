@@ -9,6 +9,7 @@ from sqlalchemy import func, literal_column, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
+from app.modules.knowledge.entity_codes import code_candidates, code_in_question
 from app.modules.knowledge.models import (
     KnowledgeBinding,
     KnowledgeChunk,
@@ -25,12 +26,14 @@ from app.modules.knowledge.services.source_artifact import (
     get_structured_review_state,
 )
 from app.modules.knowledge.services.source_links import build_context_graph, validate_context_graph
-from app.modules.knowledge.services.table_context import extract_context_tables, row_identities
+from app.modules.knowledge.services.table_context import extract_context_tables
 from app.modules.rag.evidence_bm25 import rank_blocks, tokens
 from app.modules.rag.evidence_schemas import EvidenceBlock
 from app.modules.rag.fusion import FusionCandidate
+from app.modules.rag.query_constraints import source_name_in_question
 from app.modules.rag.query_router import query_classifier
 from app.modules.rag.schemas import RetrievalSnapshot
+from app.modules.rag.source_labels import row_identity
 
 logger = logging.getLogger(__name__)
 
@@ -86,10 +89,15 @@ def _matches_row(header: str, text: str, question: str) -> bool:
         return False
     wanted = " " + _key(question) + " "
     tables = extract_context_tables(header + "\n" + text, 1)
-    identities = [identity for table in tables for row in table["rows"] for identity in row_identities(row, table)]
-    return any((len(_key(name).split()) >= 2 and " " + _key(name) + " " in wanted)
+    identities = [identity for table in tables for row in table["rows"]
+                  if (identity := row_identity(row, table, question))]
+    explicit_codes = code_candidates(question)
+    if explicit_codes:
+        return any(code and code_in_question(code, question) for _, _, _, code in identities)
+    return any((source_name_in_question(name, question) if '_' in name else
+                len(_key(name).split()) >= 2 and " " + _key(name) + " " in wanted)
                or code and not re.fullmatch(r"(?:19|20)\d{2}", code)
-               and re.search(r"(?<!\w)" + re.escape(code) + r"(?!\w)", question)
+               and code_in_question(code, question)
                for _, _, name, code in identities)
 
 
@@ -163,7 +171,7 @@ async def load_row_anchors(db: AsyncSession, snapshot: RetrievalSnapshot, questi
     words = re.findall(r"[^\W\d_]+", question.casefold())
     analysis = query_classifier.analyze(question)
     searches = [name for name in analysis.target_entities if len(name.split()) >= 2]
-    searches += re.findall(r"\b\d{7}\b", question)
+    searches += code_candidates(question)
     if not searches:
         searches = [" ".join(words[i:i + 2]) for i in range(len(words) - 1)]
     terms = [func.to_tsvector(literal_column("'simple'::regconfig"), KnowledgeChunk.content).op("@@")(

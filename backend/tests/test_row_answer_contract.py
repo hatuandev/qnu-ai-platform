@@ -144,6 +144,7 @@ async def test_row_rejection_is_returned_without_free_generation_or_cache():
     db.get.return_value = SimpleNamespace(collection_metadata={})
     rejected = AskResponse(status="insufficient_context", answer="Chưa đủ căn cứ.")
     with (patch("app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot", AsyncMock(return_value=snapshot)),
+          patch("app.modules.rag.source_fact_resolution.load_published_blocks", AsyncMock(return_value=[])),
           patch("app.modules.rag.service.fact_layer.lookup_facts", AsyncMock(return_value=[])),
           patch("app.modules.rag.service.hybrid_retriever.retrieve", AsyncMock(return_value=[])),
           patch("app.modules.rag.service.load_row_anchors", AsyncMock(return_value=rows)),

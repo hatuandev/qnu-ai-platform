@@ -13,6 +13,7 @@ from app.modules.rag.facts import fact_layer
 from app.modules.rag.fusion import FusionCandidate, reciprocal_rank_fusion
 from app.modules.rag.reranker import reranker_client
 from app.modules.rag.schemas import RetrievalSnapshot
+from tests.rag_test_proofs import bind_literal_test_candidates
 
 
 @pytest.fixture(autouse=True)
@@ -308,7 +309,10 @@ async def test_api_rag_ask_no_context():
 @pytest.mark.asyncio
 @patch("app.modules.rag.response_audit.audit_visible_answer", new=AsyncMock(side_effect=lambda db, req, snap, answer, candidates:
     {"accepted": True, "candidate_ids": [c.chunk_id for c in candidates]}))
-async def test_api_rag_ask_with_modelops_synthesis():
+@patch('app.modules.rag.source_fact_resolution.resolve_fact_scope', new=AsyncMock(return_value=None))
+@patch('app.modules.rag.service.decide_table_answer', return_value=None)
+@patch('app.modules.rag.canonical_candidates.bind_candidates', new=AsyncMock(side_effect=bind_literal_test_candidates))
+async def test_api_rag_ask_with_modelops_synthesis(_decision):
     """Verify RagService.ask calls ModelOps generate and returns synthesized answer with citations."""
     from unittest.mock import AsyncMock, patch
 
@@ -376,7 +380,10 @@ async def test_api_rag_ask_with_modelops_synthesis():
 @pytest.mark.asyncio
 @patch("app.modules.rag.response_audit.audit_visible_answer", new=AsyncMock(side_effect=lambda db, req, snap, answer, candidates:
     {"accepted": True, "candidate_ids": [c.chunk_id for c in candidates]}))
-async def test_rag_ask_dynamic_fallback_model():
+@patch('app.modules.rag.source_fact_resolution.resolve_fact_scope', new=AsyncMock(return_value=None))
+@patch('app.modules.rag.service.decide_table_answer', return_value=None)
+@patch('app.modules.rag.canonical_candidates.bind_candidates', new=AsyncMock(side_effect=bind_literal_test_candidates))
+async def test_rag_ask_dynamic_fallback_model(_decision):
     """Verify RagService invokes fallback_model when primary_model generation fails."""
     from unittest.mock import AsyncMock, patch
 

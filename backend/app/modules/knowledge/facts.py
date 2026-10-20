@@ -16,6 +16,8 @@ import re
 import unicodedata
 from typing import Any
 
+from app.modules.knowledge.metric_roles import metric_role_evidence
+
 logger = logging.getLogger(__name__)
 
 _YEAR_RE = re.compile(r"(19|20)\d{2}")
@@ -91,7 +93,7 @@ def parse_vietnamese_float(raw: str | None) -> float | None:
 _ROLE_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("code", ("mã ngành", "mã xét tuyển", "mã số", "mã")),
     ("name", ("tên ngành", "tên chương trình", "ngành đào tạo", "ngành", "tên")),
-    ("quota", ("chỉ tiêu", "số lượng tuyển", "số lượng", "sl")),
+    ("quota", ("chỉ tiêu", "quota")),
     ("benchmark", ("điểm chuẩn", "điểm trúng tuyển", "điểm xét tuyển", "điểm")),
     ("combos", ("tổ hợp môn", "tổ hợp xét tuyển", "tổ hợp", "môn xét tuyển")),
     ("method", ("phương thức tuyển sinh", "phương thức", "hình thức xét")),
@@ -105,6 +107,11 @@ def detect_column_role(header: str) -> tuple[str | None, str | None]:
     normalized = _normalize_header(header)
     year_match = _YEAR_RE.search(normalized)
     year = year_match.group(0) if year_match else None
+    metric, _ = metric_role_evidence(header)
+    if metric:
+        return metric, year
+    if re.search(r'\b(?:ghi nhận|ước tính|dự báo)\b', normalized):
+        return None, year
     for role, keywords in _ROLE_KEYWORDS:
         if any(keyword in normalized for keyword in keywords):
             return role, year
@@ -114,6 +121,11 @@ def detect_column_role(header: str) -> tuple[str | None, str | None]:
 def column_role_evidence(header: str) -> tuple[str | None, str | None]:
     """Expose the existing catalog match; callers can reject weak/composite labels."""
     normalized = _normalize_header(header)
+    metric, match = metric_role_evidence(header)
+    if metric:
+        return metric, match
+    if re.search(r'\b(?:ghi nhận|ước tính|dự báo)\b', normalized):
+        return None, None
     for role, keywords in _ROLE_KEYWORDS:
         matched = next((keyword for keyword in keywords if keyword in normalized), None)
         if matched:
@@ -194,6 +206,15 @@ class FactExtractor:
                     role_cells, entity, collection_id, document_id, location
                 )
             )
+            # A bare quantity is still source content, but is not an admissions quota.
+            for column, ((role, _), cell) in enumerate(zip(roles, cells)):
+                if role is None and cell.strip() and re.search(r'\bsố lượng\b', headers[column], re.IGNORECASE):
+                    facts.append({'collection_id': collection_id, 'document_id': document_id,
+                        'entity_name': entity, 'entity_type': 'table_row', 'attribute_name': headers[column],
+                        'attribute_value': cell.strip(), 'confidence': 0.0,
+                        'raw_data': {**location, 'column_index': column, 'header_path': headers[column],
+                            'entity_code': code or None, 'attribute_code': None,
+                            'temporal_context': {'type': 'unknown', 'status': 'unknown'}}})
         return facts
 
     def _cell_facts(
@@ -228,6 +249,9 @@ class FactExtractor:
                 quota = parse_vietnamese_int(cell)
                 if quota is not None:
                     add(f"Chỉ tiêu{suffix}".strip(), str(quota), _CONFIDENCE_EXACT)
+            elif role in {"reported_count", "estimate", "rate"}:
+                label = {"reported_count": "Số lượng ghi nhận", "estimate": "Số lượng ước tính", "rate": "Tỷ lệ"}[role]
+                add(f"{label}{suffix}", cell, _CONFIDENCE_EXACT)
             elif role == "benchmark":
                 score = parse_vietnamese_float(cell)
                 if score is not None:

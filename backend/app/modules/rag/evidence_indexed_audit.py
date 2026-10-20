@@ -98,6 +98,8 @@ An additional reference with the right subject cannot rescue that unrelated body
 Only use essential_conditions passages applicable to requested.entity and education_level.
 Never introduce requirements from another record's duration/qualification/career section.
 Evaluate requested_topics against PUBLIC claim text, not merely unused attached quotes.
+An explicit source denial/unknown or no-calculation rule may answer a request fully
+without a numeric value. Do not replace such a rule with an invented calculation.
 If historical_reference is supplied, question/requested describe a separately
 authorized reference-year lookup. Audit THAT year and the unchanged original
 topic/conditions, not applicability to historical_reference.requested_year.

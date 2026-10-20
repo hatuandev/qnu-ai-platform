@@ -3,7 +3,7 @@
 import re
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, Field, create_model
+from pydantic import AfterValidator, Field, create_model, model_validator
 from pydantic_core import PydanticCustomError
 
 from app.core.evidence_policy import EvidencePolicy
@@ -40,6 +40,42 @@ class SpanAssertion(StrictContract):
     relevant: bool
 
 
+class IndexedSpanAssertion(StrictContract):
+    answer_span_id: str
+    evidence_id: str
+    entailed: bool
+    relevant: bool
+
+
+class IndexedVisibleAudit(StrictContract):
+    answers_original_question: bool
+    essential_conditions_retained: bool
+    conflict: bool
+    assertions: list[IndexedSpanAssertion]
+    missing_constraints: list[str] = Field(default_factory=list, max_length=8)
+
+    @property
+    def all_assertions_supported(self) -> bool:
+        return bool(self.assertions) and all(check.entailed for check in self.assertions)
+
+    @property
+    def evidence_ids(self) -> list[str]:
+        return list(dict.fromkeys(check.evidence_id for check in self.assertions))
+
+
+def indexed_audit_contract(spans: dict[str, str], evidence: dict[str, str]):
+    """Readers select immutable proof bodies; they cannot rewrite source quotes.
+
+    No redundant global entailment/ID summary is accepted from the model. Every
+    supplied atomic verdict remains authoritative, including negative verdicts.
+    """
+    check = create_model('IndexedVisibleAssertion', __base__=IndexedSpanAssertion,
+        answer_span_id=(Literal[tuple(spans)], ...), evidence_id=(Literal[tuple(evidence)], ...))
+    checks = Annotated[list[check], exact_id_items(tuple(spans), 'answer_span_id')]
+    return create_model('IndexedVisibleSpanAudit', __base__=IndexedVisibleAudit,
+        assertions=(checks, Field(min_length=len(spans), max_length=len(spans))))
+
+
 def answer_spans(answer: str) -> dict[str, str]:
     """Server-owned spans cover every character without asking the model to copy."""
     parts = re.split(r"(?<=[.!?;])\s+(?=[A-ZÀ-Ỹ])|\n+", answer)
@@ -55,7 +91,12 @@ def span_audit_contract(spans: dict[str, str], evidence: dict[str, str]):
     check = create_model("VisibleSpanAssertion", __base__=SpanAssertion,
         answer_span_id=(Literal[tuple(spans)], ...), evidence_id=(Literal[tuple(evidence)], ...))
     checks = Annotated[list[Annotated[check, AfterValidator(proof)]], exact_id_items(tuple(spans), "answer_span_id")]
+    def consistent_summary(value):
+        if value.all_assertions_supported != all(check.entailed for check in value.assertions):
+            raise PydanticCustomError('assertion_summary', 'Summary must agree with all supplied assertion verdicts; re-evaluate rather than assuming support')
+        return value
     return create_model("VisibleSpanAudit", __base__=VisibleAnswerAudit,
+        __validators__={'consistent_summary': model_validator(mode='after')(consistent_summary)},
         assertions=(checks, Field(min_length=len(spans), max_length=len(spans))))
 
 
@@ -102,21 +143,35 @@ async def audit_visible_answer(db, req, snapshot, answer, candidates) -> dict:
     if not spans or len(spans) > 24 or any(len(span) > 4000 for span in spans.values()):
         return {"accepted": False, "reason": "ANSWER_SPAN_BUDGET_EXCEEDED"}
     proofs = {e["id"]: e["text"] for e in evidence}
-    audit = await structured_call(db, req, span_audit_contract(spans, proofs), INSTRUCTION +
+    # A whole short source body was already a permitted contiguous proof. Bind it
+    # on the server instead of asking a model to transcribe numbering/formatting.
+    # Long bodies retain the existing bounded, exact-subquote contract.
+    indexed_proofs = all(len(text) <= 4000 for text in proofs.values())
+    contract = indexed_audit_contract(spans, proofs) if indexed_proofs else span_audit_contract(spans, proofs)
+    instruction = INSTRUCTION
+    if indexed_proofs:
+        instruction = instruction.replace('Return exact evidence_ids used.', 'Select an evidence_id independently for each answer span.')
+        instruction = instruction.replace('Give its own evidence_id and exact contiguous evidence_quote for EACH answer_span_id.',
+            'Give its own evidence_id for EACH answer_span_id. The server binds that exact whole evidence body as its quote.')
+        instruction += ('\nReturn only schema fields. Do not emit evidence_quote, evidence_ids or '
+            'all_assertions_supported summaries. A false entailed/relevant verdict stays false; '
+            'never turn it true to complete the response. Judge every clause against its selected source body.')
+    audit = await structured_call(db, req, contract, instruction +
         "\nThe server has already split the answer into answer_spans. Return EXACTLY one assertion "
         "per answer_span_id. Do not copy or rewrite answer text. Each check evaluates ALL clauses "
         "in that span; an unsupported extra means entailed=false. The span's OWN source quote "
-        "must prove every clause. If no evidence supports a span, mark it false with an empty quote. "
+        "must prove every clause. If no evidence supports a span, mark it false. "
         "Do not substitute training knowledge for documents or invent absent question requirements.",
         {"question": req.original_question or req.question, "answer": answer,
          "answer_spans": spans, "evidence": evidence}, max_tokens=2000)
     # The public text stays byte-for-byte unchanged. Only server IDs map checks
     # back to it; the model cannot paraphrase a span and accidentally reject it.
     assertions = [VisibleAssertion(answer_quote=spans[c.answer_span_id], evidence_id=c.evidence_id,
-        evidence_quote=c.evidence_quote or " ", entailed=c.entailed, relevant=c.relevant)
-        if isinstance(c, SpanAssertion) else c for c in audit.assertions]
-    ids = audit.evidence_ids
-    valid = bool(ids) and len(set(ids)) == len(ids) and set(ids).issubset({e["id"] for e in evidence})
+        evidence_quote=proofs[c.evidence_id] if isinstance(c, IndexedSpanAssertion) else c.evidence_quote or " ",
+        entailed=c.entailed, relevant=c.relevant)
+        if isinstance(c, (SpanAssertion, IndexedSpanAssertion)) else c for c in audit.assertions]
+    ids = list(dict.fromkeys(audit.evidence_ids))
+    valid = bool(ids) and set(ids).issubset({e["id"] for e in evidence})
     atomic_valid, _ = validate_assertions(answer, proofs, assertions)
     # Identity validity must not be reported false just because semantic checks
     # rejected a clause. Collect IDs independently of the early-exit validator.
@@ -125,7 +180,9 @@ async def audit_visible_answer(db, req, snapshot, answer, candidates) -> dict:
     accepted = (valid and atomic_valid and audit.all_assertions_supported and audit.answers_original_question
                 and audit.essential_conditions_retained and not audit.conflict and not audit.missing_constraints)
     # Do not put duplicate answer/source text into diagnostics or logs.
-    return {**audit.model_dump(exclude={"assertions"}), "accepted": bool(accepted), "evidence_ids_valid": valid,
+    return {**audit.model_dump(exclude={"assertions"}), 'all_assertions_supported': audit.all_assertions_supported,
+            'proof_binding': 'server_owned_body' if indexed_proofs else 'exact_subquote', "evidence_ids": ids,
+            "accepted": bool(accepted), "evidence_ids_valid": valid,
             "atomic_spans_valid": atomic_valid, "assertion_count": len(audit.assertions),
             "candidate_ids": [indexed[key] for key in ids if key in indexed],
             "unsupported_assertions": sum(not check.entailed or not check.relevant for check in assertions),

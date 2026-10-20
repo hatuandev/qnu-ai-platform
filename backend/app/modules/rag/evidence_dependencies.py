@@ -124,6 +124,22 @@ def _fact_groups(blocks: list[EvidenceBlock]) -> dict[str, list[EvidenceBlock]]:
     return result
 
 
+def _canonical_context(block: EvidenceBlock, by_unit: dict[str, EvidenceBlock]) -> list[EvidenceBlock]:
+    """Follow directed mandatory refs without pulling unrelated consumers of a note."""
+    pending, seen, members = [block], set(), []
+    while pending:
+        current = pending.pop(0)
+        if current.id in seen:
+            continue
+        seen.add(current.id)
+        members.append(current)
+        refs = current.fact_context.get("context_unit_ids", [])
+        if not isinstance(refs, list) or any(not isinstance(ref, str) or ref not in by_unit for ref in refs):
+            raise _missing_context()
+        pending.extend(by_unit[ref] for ref in refs)
+    return members
+
+
 def dependency_groups(blocks: list[EvidenceBlock]) -> dict[str, list[EvidenceBlock]]:
     """Never cross binding/index/hash; all members retain their original raw spans."""
     sources = defaultdict(list)
@@ -139,9 +155,7 @@ def dependency_groups(blocks: list[EvidenceBlock]) -> dict[str, list[EvidenceBlo
         for block in ordered:
             refs = block.fact_context.get("context_unit_ids", [])
             if refs:
-                if any(ref not in by_unit for ref in refs):
-                    raise _missing_context()
-                explicit[block.id] = [block, *[by_unit[ref] for ref in refs]]
+                explicit[block.id] = _canonical_context(block, by_unit)
         children = defaultdict(list)
         for block in ordered:
             if block.parent_id in by_unit:

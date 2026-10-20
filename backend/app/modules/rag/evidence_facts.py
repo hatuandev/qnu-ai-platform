@@ -157,7 +157,8 @@ def _standard_fact(raw: dict, index: dict, fact: KnowledgeFact,
 
 
 async def reviewed_fact_blocks(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot,
-                               plan: QueryPlan, blocks: list[EvidenceBlock], *, exhaustive: bool = False) -> list[EvidenceBlock]:
+                               plan: QueryPlan, blocks: list[EvidenceBlock], *, exhaustive: bool = False,
+                               selected_fact_ids: set[str] | None = None) -> list[EvidenceBlock]:
     if not snapshot.binding_revisions:
         return []
     query = (select(KnowledgeFact).join(KnowledgeBinding, KnowledgeFact.binding_id == KnowledgeBinding.id)
@@ -168,6 +169,10 @@ async def reviewed_fact_blocks(db: AsyncSession, req: AskRequest, snapshot: Retr
                KnowledgeBinding.status == "active",
                KnowledgeFact.index_revision_id.in_(snapshot.binding_revisions.values()))
         .order_by(KnowledgeFact.id))
+    if selected_fact_ids is not None:
+        if not selected_fact_ids:
+            return []
+        query = query.where(KnowledgeFact.id.in_(selected_fact_ids))
     try:
         facts = []
         cursor = None

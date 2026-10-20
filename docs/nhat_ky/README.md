@@ -7,6 +7,14 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-20** | [Phiên567](./2026-10-20_phien_567_sua_rag_va_benchmark_85.md) | Sửa RAG và benchmark frozen85% | Cuối51/60=85%;44/50positive;9FAIL;Ruff36/focused118+wire49PASS;full2785PASS/18FAIL exact nền;DBdọn/Storagepolicyblocked |
+
+| **2026-10-20** | [Phiên566](./2026-10-20_phien_566_benchmark_rag_85.md) | Benchmark RAG trên nguồn đã xuất bản | 34/60=56,67%FAIL;positive28/50;social4/4;TCP64/64;sealsgiữ;58threads/29gapsdọn |
+
+| **2026-10-20** | [Phiên565](./2026-10-20_phien_565_entity_metric_resolution.md) | Source-grounded entity/metric và numeric RAG | Focused253/54newPASS;full2747PASS/18FAIL/17SKIP+23subtestsPASS,exact18nền;ASGI13/TCP10/audit23PASS |
+
+| **2026-10-20** | [Phiên564](./2026-10-20_phien_564_evidence_dependency_closure.md) | Evidence closure và RAG thực tế | Focused343PASS; full2693PASS/18FAIL exactnền/27addedPASS; TCP đoạn văn cócitationPASS; factAM-0007 BLOCKED; Storagepolicyblocked |
+
 | **2026-10-20** | [Phiên563](./2026-10-20_phien_563_diagnose_evidence_context_missing.md) | Chẩn đoán EVIDENCE_CONTEXT_MISSING | Không Qwen overflow; source-row pack bug tái hiện khôngLLM, chưa appfix/E2E |
 
 | **2026-10-20** | [Phiên562](./2026-10-20_phien_562_hybrid_intent_conversation.md) | Hybrid intent, user-bound context, sessions và widget | Full2666PASS/18FAIL exact561/172addedPASS; FE6/Qwen3/browserPASS; Knowledge E2E409; DB dọn/runtimepolicyblocked |

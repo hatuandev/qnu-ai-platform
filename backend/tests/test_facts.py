@@ -52,7 +52,11 @@ def test_extract_admissions_table_row_facts():
     by_attr = {(f["entity_name"], f["attribute_name"]): f["attribute_value"] for f in facts}
 
     assert by_attr[("Công nghệ thông tin (7480201)", "Mã ngành")] == "7480201"
-    assert by_attr[("Công nghệ thông tin (7480201)", "Chỉ tiêu")] == "180"
+    # Context565 changes the contract: this source never labels the quantity as quota.
+    assert by_attr[("Công nghệ thông tin (7480201)", "Số lượng")] == "180"
+    assert ("Công nghệ thông tin (7480201)", "Chỉ tiêu") not in by_attr
+    quantity = next(f for f in facts if f['attribute_name'] == 'Số lượng')
+    assert quantity['raw_data']['attribute_code'] is None
     # Method lists stay raw text, never parsed as decimals
     assert by_attr[("Công nghệ thông tin (7480201)", "Phương thức tuyển sinh")] == "1,4"
     assert (

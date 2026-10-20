@@ -6,6 +6,14 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-20** | Codex | Context567 sửa RAG và benchmark85% | Frozen64TCP cuối51/60=85%,positive44/50,social4/4,9FAIL;93/93citation;109Qwen/0fallback;full2785PASS/18FAIL/17SKIP exact565,38addedPASS/0new;source/model/index seals giữ,DB dọn/Storage policyblocked,noGitwrites | [Nhật ký567](./nhat_ky/2026-10-20_phien_567_sua_rag_va_benchmark_85.md) |
+
+| **2026-10-20** | Codex | Context566 benchmark RAG85% trên nguồn hiện tại | Frozen60+4social,TCP64/64HTTP200;34/60=56,67%FAIL,positive28/50.57/57citationvalidnhưngmetric/unit/partialfail;128Qwen+3fallbackpolicycũ;sealsgiữ,58threads/29gapsdọn;noappfix/Gitwrites | [Nhật ký566](./nhat_ky/2026-10-20_phien_566_benchmark_rag_85.md) |
+
+| **2026-10-20** | Codex | Context565 entity/metric nguồn và numeric RAG | Focused253/54newPASS; full2747PASS/18FAIL/17SKIP+23subtestsPASS,exact564/0regression. ASGI13/TCP10PASS,source-sealed,audit23;DB dọn | [Nhật ký565](./nhat_ky/2026-10-20_phien_565_entity_metric_resolution.md) |
+
+| **2026-10-20** | Codex | Context564 evidence dependency closure và RAG E2E | Exactrow/refs/member closure fixed; focused343PASS; full2693PASS/18FAIL exact562/27addedPASS. TCP prose citationPASS; AM-0007 factanswer chưađạt, PARTIAL. DB/conversations dọn, runtimepolicyblocked | [Nhật ký564](./nhat_ky/2026-10-20_phien_564_evidence_dependency_closure.md) |
+
 | **2026-10-20** | Codex | Context563 điều tra thiếu evidence context | Usage Qwen success <5K tokens; pack thiếu canonical row,0drop; tăng budget vẫn409, thêm row trong bộ nhớPASS. Report-only/noLLM/noappfix | [Nhật ký563](./nhat_ky/2026-10-20_phien_563_diagnose_evidence_context_missing.md) |
 
 | **2026-10-20** | Codex | Context562 hybrid intent và conversation scope | Social/meta không inference/retrieval; Qwen3/live UI PASS; full2666PASS/18FAIL exact nền/172addedPASS; Knowledge409 BLOCKED, DB dọn/runtimepolicyblocked | [Nhật ký562](./nhat_ky/2026-10-20_phien_562_hybrid_intent_conversation.md) |

@@ -27,9 +27,17 @@ from app.modules.rag.evidence_schemas import QueryPlan, StrictContract
 from app.modules.rag.evidence_validation import YEAR
 from app.modules.rag.evidence_verification import verify_bound_answer
 from app.modules.rag.fusion import FusionCandidate
-from app.modules.rag.prose_selection import distinct_candidates, merge_candidates, topic_order
+from app.modules.rag.prose_selection import (
+    answer_facets,
+    distinct_candidates,
+    merge_candidates,
+    recovery_order,
+    topic_order,
+)
 from app.modules.rag.schemas import AskRequest, AskResponse, RetrievalSnapshot
 from app.modules.rag.source_candidates import linked_candidates, reference_priority
+from app.modules.rag.source_labels import supplemental_context
+from app.modules.rag.temporal_answer import is_temporal_table_question
 
 
 class RecoveryIntent(StrictContract):
@@ -56,13 +64,16 @@ async def recovery_plan(db, req, question, years):
         "required_topics must preserve each explicit compared year, entity, method and event; "
         "a list request requires the list, not just one member. Never broaden scope or negate it. "
         "required_topics are requested answer facets, not separate demands to repeat each entity name. "
+        "A conditional calculation with a missing input asks whether a result is determined; "
+        "user-supplied input values are constraints, not separate facts for the source to restate. "
+        "An explicit source restriction or undefined value can fully answer a request negatively. "
         "entity preserves the target class or individual; intent preserves the decision asked. "
         "Keep event and round separate when stated; otherwise null, never invented. "
         "A yes/no existence question asks for the supported answer and essential restrictions, "
         "not every date/fee/formula nearby. Do not turn 'is there a formula' into a request to calculate.",
         {"question": question}, max_tokens=500)
     return RecoveryPlan(query=question, years=years, historical_reference_allowed=False,
-        attribute=intent.topic, coverage=intent.coverage, requested_topics=intent.required_topics,
+        attribute=intent.topic, coverage=intent.coverage, requested_topics=answer_facets(intent.required_topics, question),
         enumeration_subject=intent.topic if intent.coverage == "enumeration" else None,
         entity=intent.entity, intent=intent.intent, event=intent.event, round=intent.round,
         scalar_update_lookup=intent.scalar_update_lookup)
@@ -72,10 +83,11 @@ def can_check_prose(decision: dict | None) -> bool:
     """Never override a supported/partial answer, conflict or ambiguous scope."""
     return bool(decision and decision.get("status") == "missing"
         and not decision.get("claim_bindings") and not decision.get("cells")
-        and decision.get("reason") in {
+        and (decision.get("reason") in {
             "NO_COMPATIBLE_FACT_EVIDENCE", "DATA_YEAR_UNVERIFIED",
             "ROW_METRIC_SCOPE_UNRESOLVED", "ROW_SELECTION_MISSING", "ROW_AUDIT_REJECTED",
-        })
+        } or (decision.get('reason') == 'METRIC_UNVERIFIED'
+              and not (decision.get('requested') or {}).get('years'))))
 
 
 async def answer_from_prose(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot,
@@ -108,13 +120,18 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
         trace["reason"] = "NO_PROSE_CANDIDATES"
         return None
     plan = await recovery_plan(db, req, question, years)
+    supplemental = supplemental_context(blocks, question,
+        allow_tables=not is_temporal_table_question(question, req.module_code)
+        and trace['trigger'] not in {'ROW_AUDIT_REJECTED', 'ROW_SELECTION_MISSING', 'ROW_AUDIT_SCOPE_MISSING'})
+    candidates_pool = list({b.id: b for b in [*prose, *supplemental]}.values())
     retrieval = configured_policy(req.runtime_policy)
     # Honor configured context policy, not a hidden 6000-character/3-body cap.
     # Whole evidence groups still must fit; provider checks its actual window.
     limit = retrieval.context_top_k if retrieval else policy.context_limit
     budget = retrieval.max_context_chars if retrieval else policy.max_context_chars
-    ranked = rank_blocks(prose, [plan.attribute or question, *plan.requested_topics], policy.candidate_limit, years)
-    prose_ids = {block.id for block in prose}
+    ranked = rank_blocks(candidates_pool, [plan.attribute or question, *plan.requested_topics,
+        *[b.text for b in supplemental]], policy.candidate_limit, years)
+    prose_ids = {block.id for block in candidates_pool}
     section_hits = [block for block in section_neighbors(blocks, plan.attribute or question, years, policy.candidate_limit)
                     if block.id in prose_ids]
     allowed_section_ids = {b.id for b in rank_blocks(section_hits,
@@ -125,7 +142,7 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     ranked = merge_candidates(section_hits, ranked, policy.candidate_limit)
     topics = list(dict.fromkeys([plan.attribute or question, *plan.requested_topics, plan.entity or ""]))
     ranked = distinct_candidates(topic_order(ranked, topics))
-    linked = linked_candidates(prose, ranked, years, max_links=1)
+    linked = linked_candidates(candidates_pool, ranked, years, max_links=1)
     # Reserve the direct lexical hit and its reference-linked counterpart BEFORE
     # reranking. A semantically similar boilerplate must not crowd an update out.
     priority = (reference_priority(linked) if getattr(plan, "scalar_update_lookup", False)
@@ -156,10 +173,10 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     # For a focused question the cross-encoder has seen the ORIGINAL decision,
     # event and subject. Do not undo that ranking with generic topic word counts
     # (an unrelated round can contain every word of a short topic label).
-    ranked = list({b.id: b for b in [*priority,
-        *(topic_order(ranked, topics) if plan.coverage == "enumeration" else ranked)]}.values())
+    ranked = recovery_order(topic_order(ranked, topics) if plan.coverage == 'enumeration' else ranked,
+                            supplemental, priority)
     packing = {}
-    selected = pack_context(prose, ranked, years, limit, budget, atomic_lists=plan.coverage == "enumeration",
+    selected = pack_context(blocks, ranked, years, limit, budget, atomic_lists=plan.coverage == "enumeration",
         enumeration_subject=plan.enumeration_subject, diagnostics=packing,
         coverage_goals=[], priority_ids={b.id for b in priority}, allow_first_whole_group=True)
     trace.update(candidate_count=len(ranked), section_candidates=len(section_hits), context_count=len(selected), lexical_engine="evidence_bm25",
@@ -189,7 +206,7 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
         # Retry the highest-priority WHOLE proof group, not half a syntactic list
         # or an arbitrary smaller character cap. Completeness is still audited.
         fit_seeds = list({b.id: b for b in [*priority, *([anchor] if anchor else [])]}.values())
-        fitted = pack_context(prose, fit_seeds, years, limit, budget,
+        fitted = pack_context(blocks, fit_seeds, years, limit, budget,
             atomic_lists=plan.coverage == "enumeration",
             enumeration_subject=plan.enumeration_subject, diagnostics=fit_packing,
             coverage_goals=[], priority_ids={b.id for b in priority}, allow_first_whole_group=True)
@@ -215,7 +232,11 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
                  verification_errors=verified.errors, verifier_complete=verified.verifier.complete,
                  topic_coverage=verified.verifier.topic_coverage,
                  audit_complete=verified.audit.complete if verified.audit else None)
-    if not verified.complete or not verified.verifier.complete or not verified.claims or verified.verifier.conflict:
+    # Final complete is computed from retained claims by the independent whole-
+    # answer audit plus topic, scope, formula, qualifier and list-coverage gates.
+    # The initial proposal's summary can include an unrelated claim later rejected;
+    # it must not overrule the final audited set (same contract as evidence_pipeline).
+    if not verified.complete or not verified.claims or verified.verifier.conflict:
         return None
     response = decision_response(req, snapshot, "supported", "VERIFIED_PROSE_FALLBACK", plan,
                                  bindings=verified.claims, started=started)

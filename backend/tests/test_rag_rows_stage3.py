@@ -161,6 +161,7 @@ async def test_untyped_metric_does_not_promote_all_same_entity_facts_over_the_ro
     from app.modules.rag.schemas import AskRequest, RetrievalSnapshot
     from app.modules.rag.service import RagService
     from app.modules.rag.source_rows import source_rows
+    from tests.rag_test_proofs import bind_literal_test_candidates
 
     rows = source_rows(*fixture_source(), "Điểm sàn Quản lý giáo dục 2026?")
     snapshot = RetrievalSnapshot(snapshot_id="s", collection_id="c", tenant_id="t", workspace_id="w", binding_revisions={"binding_a": "index_a"})
@@ -172,6 +173,7 @@ async def test_untyped_metric_does_not_promote_all_same_entity_facts_over_the_ro
          patch("app.modules.rag.service.hybrid_retriever.retrieve", AsyncMock(return_value=[])), \
          patch("app.modules.rag.service.hybrid_retriever.expand_with_neighbors", AsyncMock(return_value={})), \
          patch("app.modules.rag.service.load_row_anchors", AsyncMock(return_value=rows)), \
+         patch('app.modules.rag.canonical_candidates.bind_candidates', new=bind_literal_test_candidates), \
          patch("app.modules.rag.service.answer_from_rows", AsyncMock(return_value=None)), \
          patch("app.modules.rag.response_audit.audit_visible_answer", AsyncMock(side_effect=lambda db, req, snap, answer, candidates:
              {"accepted": True, "candidate_ids": [c.chunk_id for c in candidates]})), \
