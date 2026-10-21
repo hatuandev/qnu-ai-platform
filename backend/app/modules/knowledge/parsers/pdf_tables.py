@@ -13,6 +13,7 @@ from app.modules.knowledge.normalization.qnu_markdown import (
     QnuSourceLocation,
 )
 from app.modules.knowledge.parsers.markdown_parser import _split_gfm_row
+from app.modules.knowledge.parsers.pdf_reconciliation import literal_table
 
 # A bare dash or slash is not readable data on its own; it stays ambiguous unless the document defines it.
 UNRESOLVED_CELL_SYMBOLS = frozenset({"-", "–", "—", "/"})
@@ -114,7 +115,7 @@ def ocr_table(text: str) -> dict[str, Any] | None:
 
 
 def native_table(table: dict[str, Any]) -> dict[str, Any]:
-    matrix, boxes = table.get("matrix") or [], table.get("cell_boxes") or []
+    matrix, boxes = table.get("glyph_matrix") or table.get("matrix") or [], table.get("cell_boxes") or []
     width = max((len(row) for row in matrix), default=0)
     header = table.get("header") or {}
     names = header.get("names") or []
@@ -138,11 +139,13 @@ def native_table(table: dict[str, Any]) -> dict[str, Any]:
             cells.append({"raw": value if value is not None else "",
                           "origin": origin, "bbox": box, "unresolved": box is None})
         grid.append(cells)
-    # The engine's names, bounding box and proposed depth do not establish row roles.
-    # Preserve every matrix row until a separate review or explicit markup establishes headers.
-    result = {"grid": grid, "header_depth": 0,
+    # Engine proposals cannot consume rows. Only independently captured role evidence can.
+    evidence = table.get("header_evidence") or {}
+    depth = evidence.get("depth", 0) if evidence.get("status") == "verified" else 0
+    depth = depth if isinstance(depth, int) and 0 < depth < len(grid) else 0
+    result = {"grid": grid, "header_depth": depth,
               "external_headers": names if header.get("external") else [], "raw_native": table}
-    if matrix and not header.get("external") and (names or table.get("proposed_header_depth")):
+    if not depth and matrix and not header.get("external") and (names or table.get("proposed_header_depth")):
         result["header_proposal"] = {"basis": "native_engine_proposal", "labels": names,
                                      "depth": table.get("proposed_header_depth", 1)}
     return result
@@ -164,17 +167,27 @@ def table_blocks(table: dict[str, Any], *, block_id: str, parent_id: str | None,
         external = table.get("external_headers") or []
         columns.append({"id": f"c{c + 1:02d}", "header_path": path or external[c:c + 1]})
     flags = []
-    if table.get("raw_native"):
-        flags.append(QnuQualityFlag(code="native_header_needs_review", detail="Header PDF được parser đề xuất; chưa là xác nhận của người duyệt."))
-    elif table.get("header_proposal"):
+    if table.get("raw_native", {}).get("cell_text_conflicts"):
+        flags.append(QnuQualityFlag(code="native_cell_glyph_conflict",
+            detail="Nội dung ô không khớp các glyph trong vùng nguồn; giữ cả hai bản, chưa cho dùng như dữ liệu đã kiểm chứng."))
+    literal_verified = literal_table(table)
+    role_status = "confirmed" if literal_verified else "unresolved"
+    if table.get("raw_native") and not depth:
+        flags.append(QnuQualityFlag(code="native_header_needs_review", status=role_status,
+            detail="Không nhận đề xuất engine làm header; lưới nguồn đủ chỉ cho phép giữ literal khi chưa rõ vai trò cột."))
+    elif not depth and table.get("header_proposal"):
         flags.append(QnuQualityFlag(code="native_header_needs_review",
             detail="Lớp chữ gốc của trang lặp lại mọi nhãn ở dòng đầu bảng OCR; parser đề xuất header, chưa phải xác nhận của người duyệt."))
     if not depth and not table.get("external_headers"):
-        flags.append(QnuQualityFlag(code="table_header_unresolved", detail="Không suy dòng đầu thành header; giữ mọi dòng."))
+        flags.append(QnuQualityFlag(code="table_header_unresolved", status=role_status, detail="Không suy dòng đầu thành header; giữ mọi dòng và không tạo fact từ cột chưa rõ vai trò."))
     container = QnuBlock(id=block_id, parent_id=parent_id, type="table", source_locations=[location],
                          section_path=section_path, attributes={"representation": "records", "columns": columns,
                                                                "engine_used": engine},
                          quality_flags=flags, source_data=table)
+    if literal_verified:
+        container.attributes["native_literal_coverage"] = {"status":"verified", "semantic_roles_verified":False}
+        if not depth:
+            container.attributes["column_roles"] = "unknown"
     if depth >= len(grid):
         container.attributes["representation"] = "gfm"
         container.body = "| " + " | ".join(format_cell_value(" / ".join(c["header_path"]), join_multiline=True) for c in columns) + " |\n"
@@ -220,7 +233,17 @@ def table_blocks(table: dict[str, Any], *, block_id: str, parent_id: str | None,
                      for key, entry in definitions.items()]
         if spanning:
             row_flags.append(QnuQualityFlag(code="spanning_row_needs_review", detail="Dòng gộp có thể là nhãn nhóm hoặc ghi chú; chưa suy vai trò."))
+        body = "\n\n".join(lines)
+        if literal_verified and (spanning or not depth):
+            attributes["interpretation"] = "literal_only"
+            for field in fields.values():
+                if field["state"] == "present":
+                    field["state"] = "ambiguous"
+            if spanning:
+                attributes["row_role"] = "source_merged_literal"
+                body = grid[r][0]["raw"]
+                row_flags = [f for f in row_flags if f.code != "spanning_row_needs_review"]
         blocks.append(QnuBlock(id=row_id, parent_id=block_id, type="table_row", source_locations=[
             location.model_copy(update={"locator": f"{location.locator}/row/{r + 1}"})],
-            section_path=section_path, attributes=attributes, quality_flags=row_flags, body="\n\n".join(lines)))
+            section_path=section_path, attributes=attributes, quality_flags=row_flags, body=body))
     return blocks

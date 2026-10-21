@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
+from collections import Counter
 from typing import Any
 
 import pymupdf
 
 from app.modules.knowledge.parsers.blocks import find_page_tables
 from app.modules.knowledge.parsers.native_headers import native_header_matrix
+from app.modules.knowledge.parsers.pdf_header_roles import header_role_evidence
 
 
 def _geometry_json(value: Any) -> Any:
@@ -20,9 +23,10 @@ def _geometry_json(value: Any) -> Any:
 
 def capture_native_page(page: Any) -> dict[str, Any]:
     """Keep raw strings and real geometry; never turn table boxes into cell boxes."""
-    layout = page.get_text("dict", flags=pymupdf.TEXTFLAGS_DICT & ~pymupdf.TEXT_PRESERVE_IMAGES)
+    layout = _geometry_json(page.get_text("dict", flags=pymupdf.TEXTFLAGS_DICT & ~pymupdf.TEXT_PRESERVE_IMAGES))
     tables: list[dict[str, Any]] = []
     errors: list[str] = []
+    drawings = _geometry_json(page.get_drawings())
     try:
         detected = find_page_tables(page)
         for index, table in enumerate(getattr(detected, "tables", []) or []):
@@ -38,15 +42,67 @@ def capture_native_page(page: Any) -> dict[str, Any]:
                            "names": list(getattr(header, "names", []) or []),
                            "bbox": list(header.bbox) if header and header.bbox else None},
             })
+            tables[-1]["geometry"] = getattr(table, "qnu_geometry", {})
+            tables[-1]["header_evidence"] = (header_role_evidence(tables[-1], layout, drawings)
+                if tables[-1]["geometry"].get("status") != "unresolved" else {})
     except Exception as exc:
         # Text remains available, but table completeness is explicitly not certified.
         errors.append(type(exc).__name__)
-    images = [{"bbox": list(image["bbox"]), "width": image.get("width"), "height": image.get("height")}
-              for image in page.get_image_info()]
+    images = []
+    for image in page.get_image_info(xrefs=True):
+        resource = {"bbox": list(image["bbox"]), "width": image.get("width"), "height": image.get("height")}
+        if image.get("xref"):
+            payload = page.parent.extract_image(image["xref"])["image"]
+            resource.update(sha256=hashlib.sha256(payload).hexdigest(), xref=image["xref"])
+        images.append(resource)
+    # Visible drawing operations are independent of the extracted layout and OCR.
+    # Hidden OCR layers, replacement glyphs and unmapped characters cannot certify text.
+    visible = Counter()
+    for trace in page.get_texttrace():
+        if trace.get("type") not in {0, 1} or trace.get("opacity", 0) < .99:
+            continue
+        visible.update(chr(c[0]) for c in trace["chars"] if c[0] > 0 and not chr(c[0]).isspace())
+    glyphs = Counter(char for block in layout.get("blocks", []) for line in block.get("lines", [])
+                     for span in line.get("spans", []) for char in span.get("text", "") if not char.isspace())
+    visible_text = bool(glyphs) and not (glyphs - visible) and all(
+        char.isprintable() and char != "\ufffd" for char in glyphs)
+    for table in tables:
+        table["visible_text_verified"] = visible_text
+    if visible_text and tables:
+        from app.modules.knowledge.services.layout_text import reconstruct_layout_text
+
+        glyph_blocks = page.get_text("rawdict", flags=pymupdf.TEXTFLAGS_RAWDICT & ~pymupdf.TEXT_PRESERVE_IMAGES)["blocks"]
+        for table in tables:
+            projected = [list(row) for row in table["matrix"]]
+            corrections = []
+            conflicts = []
+            for ri,row in enumerate(table["cell_boxes"]):
+                for ci,box in enumerate(row):
+                    if not box:
+                        continue
+                    original = table["matrix"][ri][ci] or ""
+                    text = reconstruct_layout_text(glyph_blocks, tuple(box))
+                    chars = lambda value: Counter(c for c in value if not c.isspace())
+                    if "".join(original.split()) != "".join(text.split()):
+                        glyphs = [c for b in glyph_blocks for line in b.get("lines",[]) for s in line.get("spans",[])
+                                  for c in s.get("chars",[]) if box[0] <= (c["bbox"][0]+c["bbox"][2])/2 <= box[2]
+                                  and box[1] <= (c["bbox"][1]+c["bbox"][3])/2 <= box[3]]
+                        record = {"row":ri,"column":ci,"original":original,"projected":text,
+                                  "basis":"native_glyph_baselines", "glyphs":_geometry_json(glyphs)}
+                        if chars(original) == chars(text):
+                            projected[ri][ci] = text
+                            corrections.append(record)
+                        else:
+                            conflicts.append(record)
+            if corrections:
+                table["glyph_matrix"],table["cell_text_projections"] = projected,corrections
+            if conflicts:
+                table["cell_text_conflicts"] = conflicts
     return {"page": page.number + 1, "page_label": page.get_label() or None,
             "width": layout["width"], "height": layout["height"], "rotation": page.rotation,
             "bbox_space": "pymupdf_unrotated_points", "layout": layout,
-            "tables": tables, "images": images, "drawings": _geometry_json(page.get_drawings()), "table_errors": errors}
+            "tables": tables, "images": images, "drawings": drawings, "table_errors": errors,
+            "visible_text_verified": visible_text}
 
 
 def intersection_fraction(box: list[float], target: list[float]) -> float:

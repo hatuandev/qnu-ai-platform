@@ -57,6 +57,7 @@ from app.modules.knowledge.services.source_extraction import (
     EXTRACTION_VERSION,
     SourceExtraction,
     extract_source,
+    extraction_version_for,
     save_source_preview,
 )
 from app.modules.knowledge.services.source_pages import (
@@ -219,7 +220,8 @@ class SourceIngestionService:
             ocr_config_hash = await ocr_configuration_fingerprint(db)
             annotation_policy = (batch.chunk_config or {}).get("unit_temporal_annotation")
             annotation_hash = compute_sha256(json.dumps(annotation_policy or {}, sort_keys=True, ensure_ascii=False))
-            artifact_key = compute_sha256(f"{item.origin_file_hash}:{parser_profile}:{ocr_engine}:{ocr_config_hash}:{EXTRACTION_VERSION}:source-units-v1:{annotation_hash}")
+            extraction_version = extraction_version_for(item.origin_file_type)
+            artifact_key = compute_sha256(f"{item.origin_file_hash}:{parser_profile}:{ocr_engine}:{ocr_config_hash}:{extraction_version}:source-units-v1:{annotation_hash}")
 
             existing_artifact_res = await db.execute(
                 select(KnowledgeSourceRevision)
@@ -377,7 +379,7 @@ class SourceIngestionService:
                 },
                 quality_report=quality_report,
                 parser_profile_hash=compute_sha256(parser_profile),
-                normalizer_version=EXTRACTION_VERSION,
+                normalizer_version=extraction_version,
                 artifact_key=artifact_key,
                 lock_version=1,
                 started_at=datetime.now(UTC),
@@ -1295,7 +1297,10 @@ class SourceIngestionService:
         review_base = await db.get(KnowledgeSourceRevision, reserved_revision_id) if reserved_revision_id else current_rev
         figure_reviews = (review_base.snapshot_metadata or {}).get(KEY) or []
         if figure_reviews and extraction.qnu_document is not None:
-            await asyncio.to_thread(apply_figure_reviews, extraction.qnu_document, file_bytes, figure_reviews, binding.id)
+            from app.modules.knowledge.services.source_extraction import _native_pdf_lock
+
+            async with _native_pdf_lock:
+                await asyncio.to_thread(apply_figure_reviews, extraction.qnu_document, file_bytes, figure_reviews, binding.id)
         preview_path = await save_source_preview(current_rev.snapshot_storage_path, extraction)
         raw_text, parsed_page_count, ocr_pages = extraction.raw_text, extraction.page_count, extraction.pages
         parsed_tables_count = len(extraction.tables)
@@ -1385,8 +1390,8 @@ class SourceIngestionService:
             },
             quality_report=quality_report,
             parser_profile_hash=compute_sha256(parser_profile),
-            normalizer_version=EXTRACTION_VERSION,
-            artifact_key=compute_sha256(f"{current_rev.origin_file_hash}:{parser_profile}:{EXTRACTION_VERSION}"),
+            normalizer_version=extraction_version_for(file_type),
+            artifact_key=compute_sha256(f"{current_rev.origin_file_hash}:{parser_profile}:{extraction_version_for(file_type)}"),
             lock_version=1,
             started_at=datetime.now(UTC),
             finished_at=datetime.now(UTC),

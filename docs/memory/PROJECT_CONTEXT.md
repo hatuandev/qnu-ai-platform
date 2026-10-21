@@ -7,6 +7,24 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-10-21 — Context586: đã thử lại đủ6câu PDF với Luna timeout30s: 2 PASS, 4 FAIL.** P05/P16 PASS; P01 từ chối, P07 thiếu điều kiện, P09/P10 ROW_ANSWER_SOURCE_INVALID. 21 Luna success/0fallback,17/17 citations resolve;runner0/scorer1/postcheckPASS. Source/model/config/code/vector giữ,327stagingpoints/0retrievable;chưa publish. Benchmark64gốc54/60 giữ; không app fix/commit/push/reindex/restart/deploy. Current fullNOTRUN. [Nhật ký586](../nhat_ky/2026-10-21_phien_586_thu_lai_du_6_cau_pdf.md).
+
+- **2026-10-21 — Context585: timeout Luna đã đổi từ15 lên30giây theo yêu cầu; P16 thử riêng PASS.** HTTP200/fresh DB readback30; 36,7giây toàn luồng, 6/6 citations, 5 Luna success/0fallback. Giữ model/source/index/code/vector;327stagingpoints/0retrievable, chưa publish. Benchmark64 gốc giữ54/60, không ghép điểm. Full hiện tại NOT RUN; không app fix/commit/push/reindex/restart/deploy. [Nhật ký585](../nhat_ky/2026-10-21_phien_585_timeout_luna30_va_thu_lai_p16.md).
+
+- **2026-10-21 — Context584: đối chiếu 6 lỗi PDF.** Không mất nội dung cần cho 6 câu; khoảng hở heading/legend metadata, đóng gói điều kiện, xử lý unknown và audit; P16 timeout provider15s. 19 probe chẩn đoán PASS, source pair/7trang visual kiểm; no LLM/app fix/knowledge write. P05 chưa có raw audit để quy chính xác predicate. Chi tiết và giới hạn trong báo cáo. [Nhật ký584](../nhat_ky/2026-10-21_phien_584_phan_tich_6_loi_pdf.md).
+
+- **2026-10-21 — Context583: benchmark PDF staging frozen64 54/60=90.0%, social4/4; 85% ĐẠT.** Positive44/50, negative10/10; DOCX57659/60 lịch sử, gains P06, losses P01/P05/P07/P09/P10/P16. Actual Luna only105usage/0fallback; source/config/code/vector seals giữ,327points/0retrievable. Candidate service thật, không HTTP E2E; không app fix/publish/reindex/model/Git writes. Current fullNOTRUN; full582FAIL18lịch sử. [Nhật ký583](../nhat_ky/2026-10-21_phien_583_benchmark_pdf64.md).
+
+- **2026-10-21 — Context582: PDF hết 70 mục chặn, vector staging đạt.** Revision 4 `ks_rev_fef00606f91f`, builder v5, READY_WITH_LIMITATIONS/0 blocker; 10 bảng/695 ô khớp, 3 footnote, 7 tên trường `_` dựng lại từ glyph. Nạp thật327chunks/415facts, chưa publish/64NOTRUN. Focused159/Ruff11 PASS; full2985PASS/18FAIL nền/17SKIP+23subtests, 27 mới PASS/0 lỗi mới theo ID/cause. Hai DB test dọn; Storage xóa bị policy chặn, không bypass; source/model ngoài phạm vi giữ. [Nhật ký582](../nhat_ky/2026-10-21_phien_582_go_chan_pdf_va_regression.md).
+
+- **2026-10-21 — Context581: PDF đã nạp lại, benchmark64 BLOCKED.** DOCX đã purge; rev2ks_rev_d495e1fe0477 dùng parser mới, MD/JSON/projection/192ô Bảng1 PASS. Còn70blockers, vector404 do nguồn pending;0index/vector mới, chưa publish;64NOTRUN, model giữ. [Nhật ký581](../nhat_ky/2026-10-21_phien_581_nap_pdf_va_chan_benchmark64.md).
+
+- **2026-10-21 — Context580: sửa cấu trúc PDF, giữ chuẩn QNU Markdown và DOCX.** Offline Bảng1 16×12/header3/192ô khớp; Bảng3 7×1; MD/JSON/hash/projection PASS. Cache version riêng PDF; parser124PASS+23subtests, full2958PASS/18FAIL nền/17SKIP, 0 lỗi mới theo ID/cause. Hai DB test đã dọn, Storage bị policy chặn; không thay revision phục vụ hoặc publish. [Nhật ký580](../nhat_ky/2026-10-21_phien_580_sua_luoi_pdf_chuan_md.md).
+
+- **2026-10-21 — Context579: xác định nguyên nhân PDF Bảng 1 bị 34 cột.** Native nhận cạnh nền thành lưới; bỏ nền được 16×12 nhưng header chưa đúng, 20 đoạn viền bị coi là figure; trang 6 không OCR. Probe D01–D08 PASS/exit0, chất lượng Q01–Q03 FAIL; không sửa app hoặc dữ liệu nguồn. [Nhật ký579](../nhat_ky/2026-10-21_phien_579_phan_tich_bang_pdf.md).
+
+- **2026-10-20 — Context578: dọn col_admissions và nạp PDF export 18 trang; source/cặp MD-JSON/cú pháp/projection PASS, nội dung NEEDS_ATTENTION.** Binding bnd_12190866d5ec, revision ks_rev_1071c152fab0; Bảng 1 nhận 34 thay vì 12 cột. Chưa vector/publish; Repository/kho khác/config giữ nguyên, không sửa app hoặc Git writes ngoài docs. [Nhật ký578](../nhat_ky/2026-10-20_phien_578_nap_pdf_phuc_tap.md).
+
 - **2026-10-20 — Context577: người dùng chấp nhận kết quả và yêu cầu commit local gói parser/bản đọc/RAG Context568–576 trên main.** Kiểm tra phạm vi, credential theo mẫu, encoding và diff; không sửa thêm app, không push hoặc thay đổi dữ liệu/vận hành. Test ứng dụng không chạy lại; 18 lỗi nền và P06 vẫn được ghi nhận. [Nhật ký577](../nhat_ky/2026-10-20_phien_577_commit_parser_reader_rag.md).
 
 - **2026-10-20 — Context576: ranh giới thuật nguồn/giả định/đánh giá hồ sơ; 44 regression mới PASS, focused 393 PASS, Ruff 15 file PASS; frozen64 59/60 = 98.33% (baseline 59/60), social 4/4; N18 PASS, B03 PASS trên code chốt; còn P06. Full 2949 PASS / 18 FAIL / 17 SKIP, không có lỗi pytest mới theo ID/nguyên nhân. Dọn: DB_REMOVED_STORAGE_POLICY_BLOCKED; model/nguồn/index giữ nguyên; không commit/push/reindex/publish/restart/deploy.** [Nhật ký576](../nhat_ky/2026-10-20_phien_576_sua_n18_b03_va_kiem_chung.md).

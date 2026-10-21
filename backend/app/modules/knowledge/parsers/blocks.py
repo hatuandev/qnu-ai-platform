@@ -259,6 +259,10 @@ def find_page_tables(page: Any, **kwargs: Any) -> Any:
         if missing_lines:
             kwargs["add_lines"] = missing_lines
     try:
+        if not any(key in kwargs for key in ("strategy", "vertical_strategy", "horizontal_strategy")):
+            from app.modules.knowledge.parsers.pdf_grid import find_ruled_tables
+
+            return find_ruled_tables(page, kwargs)
         return page.find_tables(**kwargs)
     except Exception as exc:
         logger.debug("find_page_tables failed: %s", exc)

@@ -29,6 +29,16 @@ EXTRACTION_VERSION = "layout-v22-document-structure"
 _native_pdf_lock = asyncio.Lock()
 
 
+def extraction_version_for(file_type: str | None) -> str:
+    """Invalidate PDF artifacts when their geometry builder changes; keep Office keys stable."""
+    if (file_type or "").lower().lstrip(".") != "pdf":
+        return EXTRACTION_VERSION
+    from app.modules.knowledge.parsers.pdf_structure import PDF_STRUCTURE_VERSION
+
+    fingerprint = hashlib.sha256(f"{EXTRACTION_VERSION}:{PDF_STRUCTURE_VERSION}".encode()).hexdigest()
+    return f"pdf-{fingerprint[:28]}"
+
+
 @dataclass
 class SourceExtraction:
     raw_text: str

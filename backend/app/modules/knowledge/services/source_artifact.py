@@ -84,6 +84,8 @@ def build_source_artifact(markdown: str, page_count: int, metadata: dict[str, An
                 code_columns = [col for col in range(identity) if identity + 1 == end and code and clean_cell(row[col]) == code
                                 and detect_column_role(headers[col])[0] == "code"]
                 for col in [*code_columns, *range(identity + 1, end)]:
+                    if table.get("standard") and table.get("row_fields") and table["row_fields"][row_index][col]["state"] != "present":
+                        continue  # Literal-only/unknown fields cannot produce facts or fact-header errors.
                     cell = clean_cell(row[col])
                     if not cell:
                         continue

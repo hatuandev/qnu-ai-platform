@@ -82,8 +82,27 @@ async def verify_content_source(revision: Any) -> None:
     await verify_effective_projection(revision, artifact, document)
     raw = await storage_service.get(revision.snapshot_storage_path)
     if raw is None or hashlib.sha256(raw).hexdigest() != revision.origin_file_hash:
-        from app.core.exceptions import AppException
         raise AppException("Tệp nguồn không khớp phiên bản.", code="SOURCE_HASH_MISMATCH", status_code=409)
+    if document.document_meta.get("source_format") == "pdf":
+        import asyncio
+        import json
+
+        from app.modules.knowledge.parsers.pdf_fidelity import verify_pdf_source
+        from app.modules.knowledge.services.source_figure_review import KEY, verify_figure_reviews
+
+        try:
+            reference = (revision.snapshot_metadata or {})["qnu_markdown"]["raw_evidence"]
+            evidence = await storage_service.get(reference["path"])
+            if evidence is None or hashlib.sha256(evidence).hexdigest() != reference["sha256"]:
+                raise ValueError("PDF_RAW_EVIDENCE_MISMATCH")
+            from app.modules.knowledge.services.source_extraction import _native_pdf_lock
+
+            async with _native_pdf_lock:
+                await asyncio.to_thread(verify_pdf_source, document, raw, json.loads(evidence))
+                await asyncio.to_thread(verify_figure_reviews, document, raw,
+                    (revision.snapshot_metadata or {}).get(KEY) or [], revision.binding_id)
+        except (ValueError, KeyError, TypeError) as exc:
+            raise AppException("Nội dung PDF không còn khớp bằng chứng nguồn.", code="SOURCE_LAYOUT_MISMATCH", status_code=409) from exc
     if document.document_meta.get("source_format") == "docx":
         import asyncio
 

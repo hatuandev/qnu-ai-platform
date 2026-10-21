@@ -1,6 +1,7 @@
 """Authenticated, source-hash-bound transcription review; never publication approval."""
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from datetime import UTC, datetime
 from io import BytesIO
@@ -22,6 +23,12 @@ VERSION = "source-figure-review/v1"
 
 
 def _image_hashes(content: bytes) -> set[str]:
+    if content.startswith(b"%PDF"):
+        import pymupdf
+
+        with pymupdf.open(stream=content, filetype="pdf") as document:
+            return {hashlib.sha256(document.extract_image(image["xref"])["image"]).hexdigest()
+                    for page in document for image in page.get_image_info(xrefs=True) if image.get("xref")}
     with ZipFile(BytesIO(content)) as package:
         return {hashlib.sha256(package.read(name)).hexdigest() for name in package.namelist()
                 if name.startswith("word/media/") and not name.endswith("/")}
@@ -41,7 +48,13 @@ async def record_figure_review(db: AsyncSession, collection_id: str, binding_id:
     if not revision or revision.status != "queued":
         raise AppException("Chỉ ghi xác nhận trước khi bản nháp bắt đầu xử lý.", code="FIGURE_REVIEW_CONFLICT", status_code=409)
     raw = await storage_service.get(revision.snapshot_storage_path)
-    if raw is None or hashlib.sha256(raw).hexdigest() != revision.origin_file_hash or image_sha256 not in _image_hashes(raw):
+    if raw is None or hashlib.sha256(raw).hexdigest() != revision.origin_file_hash:
+        raise AppException("Ảnh hoặc tệp nguồn không khớp.", code="FIGURE_SOURCE_MISMATCH", status_code=409)
+    from app.modules.knowledge.services.source_extraction import _native_pdf_lock
+
+    async with _native_pdf_lock:
+        hashes = await asyncio.to_thread(_image_hashes, raw)
+    if image_sha256 not in hashes:
         raise AppException("Ảnh hoặc tệp nguồn không khớp.", code="FIGURE_SOURCE_MISMATCH", status_code=409)
     current = list((revision.snapshot_metadata or {}).get(KEY) or [])
     prior = next((r for r in current if r["image_sha256"] == image_sha256), None)
@@ -81,7 +94,7 @@ def apply_figure_reviews(document: QnuStructuredDocument, content: bytes, record
         block = matched[0]
         block.body = text
         block.attributes["source_figure_review"] = review
-        block.quality_flags = [f for f in block.quality_flags if f.code != "figure_content_unverified"]
+        block.quality_flags = [f for f in block.quality_flags if f.code not in {"figure_content_unverified", "visual_content_untranscribed"}]
 
 
 def verify_figure_reviews(document: QnuStructuredDocument, content: bytes, records: list[dict], binding_id: str) -> None:
