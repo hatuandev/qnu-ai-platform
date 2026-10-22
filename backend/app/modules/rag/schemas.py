@@ -24,6 +24,7 @@ class RetrievalSnapshot(SingleApplicationModel):
         description="Bản đồ khóa phiên bản {binding_id: active_index_revision_id}",
     )
     vector_generations: dict[str, str] = Field(default_factory=dict)
+    knowledge_wiki_enabled: bool = False
 
 
     created_at: str = Field(
@@ -39,6 +40,8 @@ class RetrievalSnapshot(SingleApplicationModel):
             "binding_revisions": sorted(self.binding_revisions.items()),
             "vector_generations": sorted(self.vector_generations.items()),
         }
+        if self.knowledge_wiki_enabled:
+            payload["knowledge_wiki"] = "qnu-knowledge-wiki/v1"
         return hashlib.sha256(
             json.dumps(payload, ensure_ascii=True, sort_keys=True).encode("utf-8")
         ).hexdigest()[:20]
@@ -119,9 +122,12 @@ class Citation(BaseModel):
 
 class AskRequest(SingleApplicationModel):
     _retrieval_diagnostics: dict[str, Any] = PrivateAttr(default_factory=dict)
+    _wiki_context: dict[str, Any] = PrivateAttr(default_factory=dict)
     _intent_trace: dict[str, Any] = PrivateAttr(default_factory=dict)
     _assistant_identity: dict[str, Any] = PrivateAttr(default_factory=dict)
     _current_fact_constraints: dict[str, str] = PrivateAttr(default_factory=dict)
+    _source_obligations: dict[str, dict[tuple, dict]] = PrivateAttr(default_factory=dict)
+    _source_dependency_reviews: dict[str, dict] = PrivateAttr(default_factory=dict)
     original_question: str | None = Field(None, min_length=1, max_length=4000,
         description="Câu hỏi gốc được DAG giữ lại trước bước viết lại truy vấn")
     question: str = Field(..., min_length=1, max_length=2000, description="Câu hỏi người dùng")

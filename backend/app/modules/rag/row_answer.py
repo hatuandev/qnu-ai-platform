@@ -39,6 +39,10 @@ institution does NOT mean all universities or a nationwide metric. Preserve any 
 institution in the question. Do not invent additional institutions, topics or subquestions."""
 
 METRIC = """Locate source SCOPE PASSAGES or TABLE HEADERS defining the attributes requested by the user.
+If the question asks what a symbol means, whether it was defined, how to preserve
+an unknown value, or how a legend applies, select answer_mode=rules. This requires
+source prose/legend verification, not a numerical cell response. A limited or
+ambiguous cell can locate that source, never prove a numeric interpretation.
 Attributes may be numbers, dates, responsibilities, states or conditions. Non-numerical
 headers are valid scope evidence: do not demand a quantity definition for a text/date query.
 For an EXPLICIT requested DATA YEAR, metric similarity alone is not enough: return context IDs
@@ -362,7 +366,7 @@ async def answer_from_rows(db: AsyncSession, req: AskRequest, snapshot: Retrieva
     started = time.perf_counter()
     if req.collection_id != snapshot.collection_id:
         raise AppException("Phạm vi trả lời không khớp snapshot.", code="ROW_ANSWER_SCOPE_MISMATCH", status_code=403)
-    catalog = build_catalog(rows, snapshot, req.question)
+    catalog = build_catalog(rows, snapshot, req.question, allow_descriptive=True)
     if not catalog.cells:
         return None
     payload = await _metric_payload(db, req, catalog)
@@ -382,6 +386,11 @@ async def answer_from_rows(db: AsyncSession, req: AskRequest, snapshot: Retrieva
         allowed_cells = {cell["id"] for table in payload["tables"] for cell in table["cells"]}
         if not set(selection.cell_ids).issubset(allowed_cells):
             raise ValueError("Cells are outside the selected metric scope")
+        limited = any(catalog.cells[key].description_only or (catalog.cells[key].standard
+            and catalog.cells[key].state_source == 'declared'
+            and catalog.cells[key].state in {'ambiguous', 'unreadable'}) for key in selection.cell_ids)
+        if limited:
+            return _missing(snapshot, 'ROW_RULE_REQUIRES_CONTEXT', [], started)
         selection = retain_scoped_cells(selection, catalog, req.original_question or req.question)
         validate_selection(selection, catalog, req.original_question or req.question)
         selection = close_empty_cells(selection, catalog)

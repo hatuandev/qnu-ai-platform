@@ -8,6 +8,7 @@ export async function refreshSourceQueries(
   const queryKeys = [
     ["knowledge-source", collectionId, sourceId],
     ["knowledge-source-chunk-sets", collectionId, sourceId],
+    ["knowledge-source-pages", collectionId, sourceId],
     ["knowledge-binding", sourceId],
     ["source-context-studio", collectionId, sourceId],
     ["knowledge-bindings", collectionId],

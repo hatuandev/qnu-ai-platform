@@ -62,6 +62,7 @@ class SourceCell:
     temporal: dict | None = None
     standard: bool = False
     state_source: str = "legacy"
+    description_only: bool = False
 
 
 @dataclass
@@ -103,7 +104,8 @@ def _same_cell(raw: str, parsed: str) -> bool:
     return canonical.strip() == parsed.strip()
 
 
-def _standard_fields(row: FusionCandidate, headers: list[str], values: list[str]) -> list[dict] | None:
+def _standard_fields(row: FusionCandidate, headers: list[str], values: list[str], *,
+                     allow_descriptive: bool = False) -> list[dict] | None:
     """Exact declared cell metadata, or None for artifacts published without it."""
     fields, columns = row.metadata.get("row_fields"), row.metadata.get("row_columns")
     if not isinstance(fields, list) or not isinstance(columns, list):
@@ -122,24 +124,27 @@ def _standard_fields(row: FusionCandidate, headers: list[str], values: list[str]
             raise ValueError("Standard row header disagrees with its column path")
         if cell_field.get("state") not in QNU_CELL_STATES:
             raise ValueError("Standard row cell state is unavailable")
-        if cell_field.get("usage") == "description_only" or usage.get(cell_field.get("column_id")) == "description_only":
-            raise ValueError("Source limitation is not answer-bearing quantitative evidence")
-        if (cell_field.get("state_source", state_source) == "declared"
-                and cell_field.get("state") in {"ambiguous", "unreadable"}):
-            raise ValueError("Unresolved standard cell cannot answer")
+        if not allow_descriptive:
+            if cell_field.get("usage") == "description_only" or usage.get(cell_field.get("column_id")) == "description_only":
+                raise ValueError("Source limitation is not answer-bearing quantitative evidence")
+            if (cell_field.get("state_source", state_source) == "declared"
+                    and cell_field.get("state") in {"ambiguous", "unreadable"}):
+                raise ValueError("Unresolved standard cell cannot answer")
     return fields
 
 
 def _cell_payload(key: str, cell: SourceCell) -> dict:
     payload = {"id": key, "header": cell.header, "value": cell.value,
-               "state": cell.state, "standard": cell.standard, "state_source": cell.state_source}
+               "state": cell.state, "standard": cell.standard, "state_source": cell.state_source,
+               "description_only": cell.description_only}
     if cell.standard:
         payload.update(column_id=cell.column_id, header_path=cell.header_path, normalized=cell.normalized,
                        field_source=cell.field_source, field_origin=cell.field_origin, temporal=cell.temporal)
     return payload
 
 
-def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int, question: str = '') -> None:
+def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int, question: str = '', *,
+             allow_descriptive: bool = False) -> None:
     unit = SourceUnit.model_validate(row.metadata["source_unit"])
     tables = extract_context_tables(unit.header_context + "\n" + unit.text, 1)
     if len(tables) != 1 or len(tables[0]["rows"]) != 1:
@@ -165,7 +170,7 @@ def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int, question: st
         catalog.contexts[key] = _block(row, context, key)
         context_ids.append(key)
     refs = [_reference(body), _reference(catalog.contexts[context_ids[0]])]
-    standard_fields = _standard_fields(row, table["headers"], values)
+    standard_fields = _standard_fields(row, table["headers"], values, allow_descriptive=allow_descriptive)
     state_source = row.metadata.get("cell_state_source") or "legacy"
     cells = []
     for column, (label, value) in enumerate(zip(table["headers"], values, strict=True)):
@@ -183,7 +188,9 @@ def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int, question: st
             column_id=field.get("column_id") if field else None,
             header_path=field.get("header_path") if field else None,
             temporal=temporal, standard=bool(field),
-            state_source=field.get("state_source", state_source) if field else state_source)
+            state_source=field.get("state_source", state_source) if field else state_source,
+            description_only=bool(field and (field.get("usage") == "description_only"
+                or unit.field_usage.get(field.get("column_id")) == "description_only")))
         catalog.cells[key] = cell
         cells.append(_cell_payload(key, cell))
     if cells:
@@ -193,7 +200,8 @@ def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int, question: st
             "note_candidates": [key for key in context_ids if catalog.contexts[key].start > unit.start]}
 
 
-def build_catalog(rows: list[FusionCandidate], snapshot: RetrievalSnapshot, question: str = '') -> RowCatalog:
+def build_catalog(rows: list[FusionCandidate], snapshot: RetrievalSnapshot, question: str = '', *,
+                  allow_descriptive: bool = False) -> RowCatalog:
     catalog = RowCatalog()
     for index, row in enumerate(rows):
         meta = row.metadata or {}
@@ -201,7 +209,7 @@ def build_catalog(rows: list[FusionCandidate], snapshot: RetrievalSnapshot, ques
                 or not meta.get("source_revision_id") or not meta.get("canonical_hash")):
             raise AppException("Hàng trả lời không khớp snapshot nguồn.", code="ROW_ANSWER_SOURCE_INVALID", status_code=503)
         try:
-            _add_row(catalog, row, index, question)
+            _add_row(catalog, row, index, question, allow_descriptive=allow_descriptive)
         except (ValueError, TypeError, KeyError, IndexError) as exc:
             raise AppException("Tọa độ ô nguồn không hợp lệ.", code="ROW_ANSWER_SOURCE_INVALID", status_code=503) from exc
     return catalog
@@ -222,7 +230,8 @@ def validate_selection(selection: RowSelection, catalog: RowCatalog, question: s
     years = {int(year) for year in re.findall(r"\b(?:19|20)\d{2}\b", question)}
     for key in selection.cell_ids:
         cell = catalog.cells[key]
-        if cell.standard and cell.state_source == "declared" and cell.state in {"ambiguous", "unreadable"}:
+        if cell.description_only or (cell.standard and cell.state_source == "declared"
+                                    and cell.state in {"ambiguous", "unreadable"}):
             raise ValueError("Unresolved standard cell is not answer-bearing")
         temporal = cell.temporal or {}
         if temporal.get("review_basis") == "human_review" and temporal.get("status") == "verified":

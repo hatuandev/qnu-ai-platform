@@ -2,12 +2,14 @@
 import copy
 import hashlib
 from io import BytesIO
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from docx import Document
 from docx.oxml import OxmlElement
 
 import tests.test_semantic_lifecycle as lifecycle
+from app.core.exceptions import AppException
 from app.modules.knowledge.models import KnowledgeBinding, KnowledgeSourceRevision
 from app.modules.knowledge.parsers import get_document_parser
 from app.modules.knowledge.parsers.docling_structure import build_qnu_structured_document
@@ -18,6 +20,17 @@ from app.modules.knowledge.services.semantic_annotations import SemanticAnnotati
 from app.modules.knowledge.services.source_artifact import get_structured_review_state
 
 storage, database = lifecycle.storage, lifecycle.database
+
+
+@pytest.fixture(autouse=True)
+def offline_wiki_provider():
+    # These tests verify native content/indexing. Wiki compilation has separate
+    # adapter and persistence tests; its optional provider must not perform I/O
+    # or borrow application pool connections across pytest event loops here.
+    with patch("app.modules.knowledge.services.wiki_build.model_generator", AsyncMock(
+        side_effect=AppException("TEST provider unavailable", code="KNOWLEDGE_WIKI_MODEL_REQUIRED", status_code=409)
+    )):
+        yield
 
 
 async def native_pair(database, value="12"):
@@ -59,6 +72,18 @@ async def test_clean_docx_is_auto_ready_without_human_semantic_approval(database
     assert rev.quality_report["overall_status"] == "passed"
     assert not get_structured_review_state(rev)[1]
     assert not rev.parse_provenance.get("semantic_store")
+
+
+async def test_wiki_policy_is_sealed_before_automatic_readiness_and_cannot_change_silently(database):
+    rev = await native_pair(database)
+    assert rev.parse_provenance["knowledge_wiki_policy"]["enabled"]
+    assert content_readiness(rev)["status"] == "AUTO_READY"
+    provenance = copy.deepcopy(rev.parse_provenance)
+    provenance["knowledge_wiki_policy"]["max_calls"] += 1
+    rev.parse_provenance = provenance
+    report = content_readiness(rev)
+    assert report["status"] == "NEEDS_ATTENTION"
+    assert report["blockers"][0]["reason_code"] == "CONTENT_READINESS_STALE"
 
 
 async def test_optional_pending_assertion_does_not_block_verified_content(database):
@@ -143,6 +168,9 @@ async def test_automatic_unknown_builds_staging_vectors_without_publishing(datab
             index = await vector_generation_service.build_generation_for_source(db, *database.ids[:2], generation.id,
                 expected_source_revision_id=rev.id)
         assert index.status == "ready" and index.source_revision_v2_id == rev.id
+        wiki = index.parity_report["knowledge_wiki"]
+        assert wiki["status"] == "unavailable" and wiki["pages"] == []
+        assert wiki["failure_code"] == "KNOWLEDGE_WIKI_MODEL_REQUIRED"
         assert collected and all(c["is_retrievable"] is False and c["document_status"] == "staging" for c in collected)
         binding = await db.get(KnowledgeBinding, database.ids[1])
         assert binding.active_index_revision_id is None

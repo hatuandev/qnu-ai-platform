@@ -1804,6 +1804,33 @@ export const knowledgeApi = {
     return document;
   },
 
+  async getSourceKnowledgePages(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+  ): Promise<import("@/types/knowledge-wiki").KnowledgeWikiResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/knowledge-pages`,
+      { headers: getAuthHeaders() },
+    );
+    if (!res.ok)
+      throw new Error(
+        extractErrorMessage(
+          await res.json().catch(() => ({})),
+          "Không đọc được trang tri thức.",
+        ),
+      );
+    const view: import("@/types/knowledge-wiki").KnowledgeWikiResponse =
+      await res.json();
+    if (
+      view.source_revision_id !== revisionId ||
+      view.binding_id !== sourceId ||
+      view.collection_id !== collectionId
+    )
+      throw new Error("Trang tri thức không khớp phiên bản tài liệu.");
+    return view;
+  },
+
   async editSourceContext(
     collectionId: string,
     sourceId: string,

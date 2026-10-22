@@ -104,6 +104,9 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
         "do not invent a number or perform arithmetic when required inputs are absent. "
         "For questions about a document's own status, its same-source introduction establishes which "
         "document is speaking; the status sentence need not repeat the full institution name. "
+        "A declarative source disclaimer can be styled as a heading. For source_content questions "
+        "select that exact declaration as primary evidence when it directly answers the question; "
+        "do not treat a bare title/date as proof of a value or applicability. Supporting headings stay context. "
         "Conditions outside the user's "
         "question are optional ONLY when they cannot change applicability. Before selecting a permission, "
         "retain its prerequisites, exceptions and negated scopes from the SAME rule, including "
@@ -144,7 +147,8 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
              "uncovered_list_block_ids": coverage_missing}, max_tokens=4000)
         proposal = resolve_proposal(draft, catalog, blocks, separate_context=compact)
         claims, rejected = bind_claims(proposal, blocks)
-    projected = source_grounded_claims(claims, blocks, primary_only=compact)
+    projected = source_grounded_claims(claims, blocks, primary_only=compact,
+        allow_primary_heading=requested.get('question_scope') == 'source_content')
     by_block = {block.id: block for block in blocks}
     for claim in projected:
         body = by_block[claim["references"][0]["block_id"]]

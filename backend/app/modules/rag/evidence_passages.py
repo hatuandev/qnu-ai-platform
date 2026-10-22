@@ -58,7 +58,12 @@ def passage_catalog(blocks):
     catalog = {}
     for index, block in enumerate(blocks, 1):
         # Keep punctuation, decimal values and formulas intact in every raw span.
-        starts = [0, *[m.end() for m in re.finditer(r"(?<!\d\.)(?<=[.!?;])\s+(?=[A-ZÀ-Ỹ])", block.text)], len(block.text)]
+        boundary = r"(?<!\d\.)(?<=[.!?;])\s+(?=[A-ZÀ-Ỹ])"
+        if block.fact_context.get('source_kind') not in {'list', 'table'}:
+            boundary += (r"|(?<!\d)\d{1,2}[/.-]\d{1,2}[/.-]\d{4}\s+"
+                         r"(?=(?:và|and)\s+(?!\s|(?:năm\s+)?\d))|"
+                         r"\n+(?=\s*[^\n:;]{1,80}:\s*\S)")
+        starts = [0, *[m.end() for m in re.finditer(boundary, block.text)], len(block.text)]
         for part, (start, end) in enumerate(pairwise(starts), 1):
             quote = block.text[start:end].strip()
             if len(quote) >= 3:
@@ -148,7 +153,8 @@ def resolve_proposal(proposal: PassageProposal, catalog, blocks: list[EvidenceBl
     return AnswerProposal(status=proposal.status, claims=claims, missing_constraints=proposal.missing_constraints)
 
 
-def source_grounded_claims(claims: list[dict], blocks: list[EvidenceBlock], *, primary_only: bool = False) -> list[dict]:
+def source_grounded_claims(claims: list[dict], blocks: list[EvidenceBlock], *, primary_only: bool = False,
+                           allow_primary_heading: bool = False) -> list[dict]:
     """Publish selected source sentences, not a lossy paraphrase of conditions."""
     by_id = {block.id: block for block in blocks}
     intros = dependency_intros(blocks)
@@ -175,7 +181,8 @@ def source_grounded_claims(claims: list[dict], blocks: list[EvidenceBlock], *, p
             if primary_only and reference != claim["references"][0]:
                 continue
             block = by_id[reference["block_id"]]
-            if context_only(block):
+            if context_only(block) and not (allow_primary_heading and reference == claim['references'][0]
+                    and block.fact_context.get('source_kind') == 'heading'):
                 continue
             identity = tuple(reference.get(key) for key in ("binding_id", "index_revision_id",
                 "source_revision_id", "canonical_hash", "origin", "fact_id", "start", "end", "quote"))

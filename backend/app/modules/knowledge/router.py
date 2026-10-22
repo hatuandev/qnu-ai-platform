@@ -119,9 +119,12 @@ from app.modules.knowledge.services.vector_load_service import (
     get_vector_load_state,
     queue_vector_load,
 )
+from app.modules.knowledge.wiki_router import router as wiki_router
 from app.modules.rag.schemas import AskResponse
 
 router = APIRouter(prefix="/knowledge", tags=["Knowledge Bases"])
+
+router.include_router(wiki_router)
 
 
 @router.post(

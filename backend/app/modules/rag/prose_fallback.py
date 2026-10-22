@@ -22,10 +22,11 @@ from app.modules.rag.evidence_context import model_context
 from app.modules.rag.evidence_model import structured_call
 from app.modules.rag.evidence_pipeline import decision_response
 from app.modules.rag.evidence_precedence import active_preferences
+from app.modules.rag.evidence_repair import retain_safe_claims
 from app.modules.rag.evidence_retrieval import bounded_rerank
 from app.modules.rag.evidence_schemas import QueryPlan, StrictContract
 from app.modules.rag.evidence_validation import YEAR
-from app.modules.rag.evidence_verification import verify_bound_answer
+from app.modules.rag.evidence_verification import blocking_repair_errors, verify_bound_answer
 from app.modules.rag.fusion import FusionCandidate
 from app.modules.rag.prose_selection import (
     answer_facets,
@@ -92,6 +93,31 @@ def can_check_prose(decision: dict | None) -> bool:
               and not (decision.get('requested') or {}).get('years'))))
 
 
+async def recover_empty_source_read(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot,
+                                    policy: EvidencePolicy, response: AskResponse, *,
+                                    started: float, candidate_mode: bool) -> AskResponse:
+    """Reuse the existing independent canonical check after an empty wiki proposal.
+
+    Never override explicit evidence policy, a partial answer, conflict, binding
+    rejection or provider failure. The original request's deadline remains hard.
+    """
+    decision = response.answer_decision or {}
+    if (policy.enabled or not snapshot.knowledge_wiki_enabled or decision.get('status') != 'missing'
+            or decision.get('reason') != 'INVALID_OR_EMPTY_CLAIMS'
+            or (decision.get('requested') or {}).get('question_scope') != 'source_content'
+            or decision.get('claim_bindings') or decision.get('binding_rejections')):
+        return response
+    remaining = policy.timeout_seconds - (time.perf_counter() - started)
+    if remaining <= 0:
+        return response
+    try:
+        async with asyncio.timeout(remaining):
+            verified = await answer_from_prose(db, req, snapshot, policy, 'EMPTY_SOURCE_READ', candidate_mode=candidate_mode)
+    except TimeoutError as exc:
+        raise AppException('Đối soát nguồn vượt ngân sách thời gian còn lại.', code='EVIDENCE_TIMEOUT', status_code=504) from exc
+    return verified or response
+
+
 async def answer_from_prose(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot,
                             policy: EvidencePolicy, reason: str, *, candidate_mode: bool = False) -> AskResponse | None:
     if req.collection_id != snapshot.collection_id:
@@ -125,7 +151,8 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     supplemental = supplemental_context(blocks, question,
         allow_tables=(trace['trigger'] == 'ROW_RULE_REQUIRES_CONTEXT'
         or not is_temporal_table_question(question, req.module_code))
-        and trace['trigger'] not in {'ROW_AUDIT_REJECTED', 'ROW_AUDIT_SCOPE_MISSING'})
+        and trace['trigger'] not in {'ROW_AUDIT_REJECTED', 'ROW_AUDIT_SCOPE_MISSING'},
+        allow_descriptive_unresolved=trace['trigger'] == 'ROW_RULE_REQUIRES_CONTEXT')
     candidates_pool = list({b.id: b for b in [*prose, *supplemental]}.values())
     retrieval = configured_policy(req.runtime_policy)
     # Honor configured context policy, not a hidden 6000-character/3-body cap.
@@ -189,8 +216,8 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     ranked = list({b.id: b for b in [*addressed, *ranked]}.values())
     priority = list({b.id: b for b in [*addressed, *priority]}.values())
     packing = {}
-    selected = pack_context(blocks, ranked, years, limit, budget, atomic_lists=plan.coverage == "enumeration",
-        enumeration_subject=plan.enumeration_subject, diagnostics=packing,
+    selected = pack_context(blocks, ranked, years, limit, budget, atomic_lists=True,
+        enumeration_subject=plan.enumeration_subject if plan.coverage == 'enumeration' else None, diagnostics=packing,
         coverage_goals=[], priority_ids={b.id for b in priority}, allow_first_whole_group=True)
     trace.update(candidate_count=len(ranked), section_candidates=len(section_hits), context_count=len(selected), lexical_engine="evidence_bm25",
                  max_context_chars=budget, context_limit=limit, max_output_tokens=req.max_tokens)
@@ -221,8 +248,8 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
         # or an arbitrary smaller character cap. Completeness is still audited.
         fit_seeds = list({b.id: b for b in [*priority, *([anchor] if anchor else [])]}.values())
         fitted = pack_context(blocks, fit_seeds, years, limit, budget,
-            atomic_lists=plan.coverage == "enumeration",
-            enumeration_subject=plan.enumeration_subject, diagnostics=fit_packing,
+            atomic_lists=True,
+            enumeration_subject=plan.enumeration_subject if plan.coverage == 'enumeration' else None, diagnostics=fit_packing,
             coverage_goals=[], priority_ids={b.id for b in priority}, allow_first_whole_group=True)
         fitted_ids = {b.id for b in fitted}
         if not fitted or fitted_ids == selected_ids or not anchor or anchor.id not in fitted_ids:
@@ -241,15 +268,36 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     trace["stage"] = "verification"
     verified = await verify_bound_answer(db, bounded, payload, claims, selected, plan, rules)
     trace['semantic_repair_attempted'] = False
-    if not verified.complete and not verified.verifier.conflict:
-        # One repair on the SAME pinned source passages, never a larger corpus,
-        # extra model, unverified fallback or a positive override of the audit.
+    trace['repair_stop_reason'] = 'budget_exhausted'
+    seen_repairs = set()
+    for repair_round in range(2):
+        if verified.complete or verified.verifier.conflict:
+            trace['repair_stop_reason'] = 'complete' if verified.complete else 'conflict'
+            break
+        gaps = getattr(verified, 'source_condition_gaps', {})
+        qualifiers = getattr(verified, 'source_qualifier_gaps', [])
+        facets = tuple(t for t in plan.requested_topics if verified.verifier.topic_coverage.get(t) is not True)
+        if repair_round and not (gaps or qualifiers or facets or verified.missing):
+            trace['repair_stop_reason'] = 'unresolved_verdict'
+            break  # No actionable source/facet gap: do not replay an unverified answer.
+        signature = (tuple(sorted(gaps.items())), tuple((q.block_id, q.quote) for q in qualifiers),
+                     facets, tuple(verified.missing))
+        if signature in seen_repairs:
+            trace['repair_stop_reason'] = 'no_progress'
+            break
+        seen_repairs.add(signature)
+        trace.setdefault('condition_repair_rounds', []).append({'round': repair_round + 1,
+            'condition_ids': sorted(gaps), 'qualifier_blocks': [q.block_id for q in qualifiers],
+            'missing_topics': list(facets)})
+        # Two rounds on the SAME source, for changed condition OR answer-facet gaps.
+        # Restoring a prerequisite may expose a discarded facet that needs reselection.
         trace['semantic_repair_attempted'] = True
-        trace['initial_verification'] = {'missing_constraints': verified.missing,
+        current_feedback = {'missing_constraints': verified.missing,
             'verification_errors': verified.errors, 'topic_coverage': verified.verifier.topic_coverage,
             'source_condition_gaps': getattr(verified, 'source_condition_gaps', {}),
             'audit_complete': verified.audit.complete if verified.audit else None}
-        repaired_payload = {**payload, 'coverage_repair': trace['initial_verification'],
+        trace.setdefault('initial_verification', current_feedback)
+        repaired_payload = {**payload, 'coverage_repair': current_feedback,
             'instruction': payload['instruction'] + ' Repair missing answer facets/conditions using ONLY supplied source IDs. '
             'A source-declared unknown can answer a numerical premise negatively; never invent a value. '
             'Keep exact prerequisites, exceptions and preservation instructions in public evidence IDs. '
@@ -257,7 +305,8 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
             'prefer its whole_passage_id over selecting only its permission sentence.'}
         gaps = getattr(verified, 'source_condition_gaps', {})
         qualifiers = getattr(verified, 'source_qualifier_gaps', [])
-        if ((gaps or qualifiers) and verified.claims and not verified.errors
+        if ((gaps or qualifiers) and verified.claims and not blocking_repair_errors(verified)
+                and (not repair_round or gaps)
                 and all(verified.verifier.topic_coverage.get(t) is True for t in plan.requested_topics)):
             try:
                 restored = restore_condition_claims(gaps, selected, qualifiers)
@@ -283,8 +332,11 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
             if not claims or proposal.status in {'conflict', 'clarify'}:
                 trace.update(reason='SEMANTIC_REPAIR_NO_BOUND_CLAIMS', stage='complete')
                 return None
+            claims = retain_safe_claims(claims, verified.claims, selected)
         verified = await verify_bound_answer(db, bounded, repaired_payload, claims, selected, plan, rules)
     trace["stage"] = "complete"
+    if verified.complete:
+        trace['repair_stop_reason'] = 'complete'
     trace.update(reason="VERIFIED_PROSE" if verified.complete else "PROSE_NOT_FULLY_VERIFIED",
                  accepted_claims=len(verified.claims), missing_constraints=verified.missing,
                  verification_errors=verified.errors, verifier_complete=verified.verifier.complete,

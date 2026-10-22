@@ -26,7 +26,8 @@ def row_identity(cells: list[str], table: dict, question: str) -> tuple[int, int
     return identities[0]
 
 
-def supplemental_context(blocks: list[EvidenceBlock], question: str, *, allow_tables: bool) -> list[EvidenceBlock]:
+def supplemental_context(blocks: list[EvidenceBlock], question: str, *, allow_tables: bool,
+                         allow_descriptive_unresolved: bool = False) -> list[EvidenceBlock]:
     """Exact row labels and immediate caption bodies within one immutable section."""
     selected = {}
     ordered = sorted(blocks, key=lambda b: (source_identity(b), b.start, b.end))
@@ -35,7 +36,7 @@ def supplemental_context(blocks: list[EvidenceBlock], question: str, *, allow_ta
             continue
         kind = block.fact_context.get('source_kind')
         if (allow_tables and kind == 'table' and block.text != block.header_context
-                and not block.fact_context.get('unresolved_cell_columns')
+                and (allow_descriptive_unresolved or not block.fact_context.get('unresolved_cell_columns'))
                 and block.unit_id != f'{block.parent_id}:header'):
             cells = _split_gfm_row(block.text)
             labels = [clean_cell(cell) for cell in cells if len(clean_cell(cell)) >= 3

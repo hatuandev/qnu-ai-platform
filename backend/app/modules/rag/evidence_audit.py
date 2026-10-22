@@ -157,6 +157,9 @@ def _advisory_missing(item: str, accepted: list[dict], question: str, years: lis
 
 def literal_condition_retained(reference: dict, claims: list[dict], role: ConstraintRole, years: list[int]) -> bool:
     """Find the owning public claim, preserving role-specific year proof."""
+    if reference.get('origin', 'canonical') != 'canonical' or any(
+            type(reference.get(key)) is not int or reference[key] < 0 for key in ('start', 'end')):
+        return False  # Derived fact IDs are evidence, not canonical character coordinates.
     squash = lambda value: ' '.join(value.split())
     identity = ('binding_id', 'index_revision_id', 'source_revision_id', 'canonical_hash')
     year_role = role in {'data_year', 'document_year', 'event_year'}
@@ -164,12 +167,25 @@ def literal_condition_retained(reference: dict, claims: list[dict], role: Constr
     # with a requested year, never substitute the source's different year.
     proof_years = years or sorted(data_year_values(reference['quote']) if role == 'data_year'
         else {int(value) for value in YEAR.findall(reference['quote'])})
-    return any(squash(reference['quote']) in squash(claim['text'])
-        and any(all(own.get(key) == reference.get(key) for key in identity)
-                and own.get('start', -1) <= reference['start'] and own.get('end', -1) >= reference['end']
-                for own in claim['references'])
-        and (role == 'value_constraint' or year_role and retained_condition(role, reference, [claim], proof_years))
-        for claim in claims)
+    def retained(quote: str) -> bool:
+        start = reference['start'] + reference['quote'].index(quote)
+        end = start + len(quote)
+        return any(squash(quote) in squash(claim['text'])
+            and any(all(own.get(key) == reference.get(key) for key in identity)
+                    and own.get('origin', 'canonical') == 'canonical'
+                    and all(type(own.get(key)) is int for key in ('start', 'end'))
+                    and own.get('start', -1) <= start and own.get('end', -1) >= end
+                    for own in claim['references'])
+            and (role == 'value_constraint' or year_role and retained_condition(role, reference, [claim], proof_years))
+            for claim in claims)
+    if retained(reference['quote']):
+        return True
+    if role != 'value_constraint':
+        return False
+    from app.modules.rag.source_scope_audit import source_clauses
+
+    clauses = source_clauses({'body': reference['quote']})
+    return bool(clauses) and all(retained(clause) for clause in clauses.values())
 
 
 def audit_coverage(audit: SemanticAudit, claims: list[dict], blocks: list[EvidenceBlock],

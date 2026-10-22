@@ -230,6 +230,11 @@ def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], year
                  allow_first_whole_group: bool = False) -> list[EvidenceBlock]:
     """Admit whole body/same-source-heading pairs, never truncate off their proof."""
     headers = {source_identity(b): b for b in scope_headers(blocks, ordered, years)}
+    captions = {b.id for b in blocks if re.match(
+        r'^\s*(?:\*\*)?(?:bảng|table|hình|figure|sơ đồ|biểu đồ)\s+'
+        r'(?:\d+(?:\.\d+)*|[IVXLCDM]+)[.:]\s', b.text, re.IGNORECASE)}
+    table_headers = {b.id for b in blocks if b.fact_context.get('source_kind') == 'table'
+        and (b.unit_id == f'{b.parent_id}:header' or b.header_context and b.text == b.header_context)}
     groups = {member.id: group for group in list_groups(blocks) if matches_subject(group, enumeration_subject)
               for member in group} if atomic_lists else {}
     dependencies_by_id = dependency_groups(blocks)
@@ -239,6 +244,15 @@ def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], year
                        if block.id in dependencies_by_id and
                        (block.fact_context.get("context_unit_ids") or
                         block.origin == "reviewed_fact" and block.fact_context.get("verified_dependencies"))}
+    if atomic_lists:
+        for group in list_groups(blocks):
+            # A directed table reference may enter the middle of a rule. Close
+            # that rule too; never walk backwards from a shared note to its consumers.
+            if group[0].parent_id and all(b.parent_id == group[0].parent_id
+                    and b.fact_context.get('source_kind') == 'list' for b in group):
+                for member in group:
+                    required_groups[member.id] = list({b.id: b for b in
+                        [*group, *required_groups.get(member.id, [])]}.values())
     for member, dependencies in dependencies_by_id.items():
         groups[member] = sorted({b.id: b for b in [*groups.get(member, []), *dependencies]}.values(), key=lambda b: b.start)
     if atomic_lists:
@@ -276,11 +290,13 @@ def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], year
         size = sum(len(json.dumps(model_block(b), ensure_ascii=False)) + 1 for b in pair)
         size += len(json.dumps(intros, ensure_ascii=False)) if intros else 0
         body_count = sum(not re.fullmatch(r"\s*#{1,6}\s+[^\n]+\s*", b.text)
-                         and b.id not in {h.id for h in headers.values()} for b in [*selected, *pair])
+                         and b.id not in captions and b.id not in table_headers
+                         and b.id not in {h.id for h in headers.values()}
+                         for b in [*selected, *pair])
         # One atomic proof unit can consist of more physical blocks than K.
         # Opt-in recovery may admit that FIRST unit whole, never a partial formula
         # or list. No further unrelated body can then enter; byte budget is hard.
-        oversized_first = allow_first_whole_group and not selected and len(bodies) > 1
+        oversized_first = allow_first_whole_group and not selected and len(pair) > 1
         if (body_count > limit and not oversized_first) or used + size > max_chars:
             dropped.append({"block_id": body.id, "reason": "block_limit" if body_count > limit else "character_budget",
                             "group_size": len(pair), "characters": size})
@@ -305,6 +321,10 @@ def structural_context(blocks: list[EvidenceBlock], body: EvidenceBlock) -> list
     same = [block for block in blocks if (block.binding_id, block.index_revision_id, block.source_revision_id) == identity]
     by_unit = {block.unit_id: block for block in same if block.unit_id}
     result = []
+    if body.fact_context.get('source_kind') == 'table' and body.parent_id:
+        from app.modules.rag.source_locators import table_captions
+
+        result.extend(table_captions(same, body.parent_id))
     if body.record_heading_id:
         result.extend(b for b in same if b.id == body.record_heading_id)
     parent = by_unit.get(body.parent_id)

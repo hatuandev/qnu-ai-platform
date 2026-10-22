@@ -95,6 +95,12 @@ class ChunkSetService:
             )
 
         canonical_md = source_rev.canonical_markdown or ""
+        if (source_rev.parse_provenance or {}).get("knowledge_wiki_policy") is not None:
+            await db.flush()
+            await db.refresh(source_rev, with_for_update=True)
+            canonical_md = source_rev.canonical_markdown or ""
+            if source_rev.status != "ready":
+                raise AppException("Nguồn đã đổi trạng thái trước khi biên soạn.", code="SOURCE_REVISION_NOT_READY", status_code=409)
         if not canonical_md.strip():
             raise AppException("Bản nguồn không có Markdown chuẩn hóa.", code="EMPTY_CANONICAL_CONTENT", status_code=422)
         clean_config = {k: v for k, v in (chunk_config or {}).items() if not k.startswith("_")}
@@ -153,7 +159,8 @@ class ChunkSetService:
         )
         key_res = await db.execute(key_stmt)
         key_match = key_res.scalars().first()
-        if key_match and key_match.chunk_config.get("_manifest"):
+        if (key_match and key_match.chunk_config.get("_manifest")
+                and (source_rev.parse_provenance or {}).get("knowledge_wiki_policy") is None):
             logger.info(
                 "Reusing identical chunk set %s across revisions via chunk_set_key %s",
                 key_match.id,
@@ -234,6 +241,18 @@ class ChunkSetService:
             manifest_hash=manifest_hash,
             status="ready",
         )
+        from app.modules.knowledge.services.wiki_build import build_revision_wiki
+
+        if (source_rev.parse_provenance or {}).get("knowledge_wiki_policy") is not None:
+            binding = await db.get(KnowledgeBinding, source_rev.binding_id)
+            if binding is None:
+                raise AppException("Không tìm thấy nguồn biên soạn tri thức.", code="SOURCE_NOT_FOUND", status_code=404)
+            from app.modules.knowledge.models import KnowledgeCollection
+
+            collection = await db.get(KnowledgeCollection, binding.collection_id)
+            if collection is None:
+                raise AppException("Không tìm thấy kho biên soạn tri thức.", code="COLLECTION_NOT_FOUND", status_code=404)
+            saved_config["_knowledge_wiki"] = await build_revision_wiki(db, source_rev, collection)
         saved_config["_bundle"] = make_bundle(source_rev, artifact, chunk_set)
         saved_config["_bundle_hash"] = digest(saved_config["_bundle"])
         chunk_set.chunk_config = saved_config

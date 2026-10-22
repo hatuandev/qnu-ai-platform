@@ -31,6 +31,14 @@ async def validate_candidate_artifacts(db: AsyncSession, revisions: list[Any]) -
         artifact = get_source_artifact(source)
         if source.binding_id != index.binding_id:
             raise AppException("Nguồn không thuộc bản chỉ mục.", code="SOURCE_REVISION_CHANGED", status_code=409)
+        if report.get("knowledge_wiki") is not None:
+            from app.modules.knowledge.models import KnowledgeBinding
+            from app.modules.knowledge.services.wiki_compiler import validate_wiki_bundle
+
+            binding = await db.get(KnowledgeBinding, index.binding_id)
+            if binding is None:
+                raise AppException("Không tìm thấy nguồn của trang tri thức.", code="SOURCE_NOT_READY", status_code=409)
+            validate_wiki_bundle(report["knowledge_wiki"], source, binding.collection_id)
         from app.modules.knowledge.services.derived_bundle import validate_index_bundle
 
         bundle_collection_id = await validate_index_bundle(db, index, source, artifact)
@@ -90,6 +98,8 @@ async def resolve_candidate_snapshot(db: AsyncSession, collection_id: str, gener
             collection_epoch=plan.collection.index_epoch, tenant_id=plan.collection.tenant_id,
             workspace_id=plan.collection.workspace_id, binding_revisions=serving,
             vector_generations={binding_id: generation_id for binding_id in serving},
+            knowledge_wiki_enabled=any(((r.parity_report or {}).get("knowledge_wiki") or {}).get("status") == "ready"
+                                      for r in plan.indexes.values()),
         )
 
     collection = await get_scoped_collection(db, collection_id, actor=actor)
@@ -120,7 +130,9 @@ async def resolve_candidate_snapshot(db: AsyncSession, collection_id: str, gener
                              collection_epoch=collection.index_epoch, tenant_id=collection.tenant_id,
                              workspace_id=collection.workspace_id,
                              binding_revisions={r.binding_id: r.id for r in selected},
-                             vector_generations={r.binding_id: generation.id for r in selected})
+                             vector_generations={r.binding_id: generation.id for r in selected},
+                             knowledge_wiki_enabled=any(((r.parity_report or {}).get("knowledge_wiki") or {}).get("status") == "ready"
+                                                       for r in selected))
 
 
 async def ask_candidate(db: AsyncSession, collection_id: str, generation_id: str,

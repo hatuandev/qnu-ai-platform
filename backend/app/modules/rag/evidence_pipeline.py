@@ -48,7 +48,7 @@ from app.modules.rag.evidence_validation import (
     evidence_digest,
     validate_plan_years,
 )
-from app.modules.rag.evidence_verification import verify_bound_answer
+from app.modules.rag.evidence_verification import complete_source_conditions, verify_bound_answer
 from app.modules.rag.fusion import FusionCandidate
 from app.modules.rag.schemas import AskRequest, AskResponse, Citation, RetrievalSnapshot
 
@@ -130,6 +130,15 @@ async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalS
     blocks = await load_published_blocks(db, snapshot, candidate_mode=candidate_mode)
     blocks += await reviewed_fact_blocks(db, req, snapshot, plan, blocks)
     blocks = scope_candidates(blocks, plan)
+    from app.modules.rag.source_labels import supplemental_context
+    from app.modules.rag.source_locators import addressed_prose, referenced_sections
+    from app.modules.rag.wiki_context import read_wiki_context
+
+    wiki_hits = await read_wiki_context(db, req, snapshot, plan, blocks, candidate_mode=candidate_mode,
+                                       max_navigation_chars=policy.max_context_chars,
+                                       max_total_chars=policy.max_context_chars)
+    addressed = list({b.id: b for b in [*referenced_sections(blocks, req.question),
+        *addressed_prose(blocks, req.question), *supplemental_context(blocks, req.question, allow_tables=True)]}.values())
     record_hits = record_candidates(blocks, plan, policy.context_limit)
     rules = active_preferences(policy, plan, blocks)
     preferred = preference_candidates(rules, plan, blocks)
@@ -171,7 +180,7 @@ async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalS
     shortlist = list({b.id: b for b in [*direct, *shortlist, *preferred[:2]]}.values())
     neighbors = enumeration_neighbors(blocks, shortlist, 6, subject=plan.enumeration_subject or plan.entity) if plan.coverage == "enumeration" else []
     tails = list_tail_context(blocks, neighbors) if neighbors else []
-    shortlist = list({b.id: b for b in [*record_hits, *direct, *table_rows, *shortlist, *neighbors, *tails]}.values())
+    shortlist = list({b.id: b for b in [*addressed, *record_hits, *direct, *table_rows, *shortlist, *wiki_hits, *neighbors, *tails]}.values())
     if plan.coverage == "enumeration":
         subject = plan.enumeration_subject or plan.entity
         sections = section_neighbors(blocks, subject or plan.query, plan.years, 3)
@@ -183,17 +192,19 @@ async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalS
             group = next(group for group in groups if group[0].id == best[0].id)
             shortlist = list({b.id: b for b in [*sections, *group, *list_tail_context(blocks, group), *shortlist]}.values())
     packing = {}
-    selected = pack_context(blocks, shortlist, plan.years, policy.context_limit, policy.max_context_chars,
-                            atomic_lists=plan.coverage == "enumeration", enumeration_subject=plan.enumeration_subject or plan.entity,
+    navigation_chars = sum(len(page["markdown"]) for page in req._wiki_context.get("pages", []))
+    selected = pack_context(blocks, shortlist, plan.years, policy.context_limit, policy.max_context_chars - navigation_chars,
+                            atomic_lists=True, enumeration_subject=plan.enumeration_subject if plan.coverage == "enumeration" else None,
                             diagnostics=packing, coverage_goals=[*plan.requested_topics, req.question, plan.attribute or "", plan.method or "", *(missing or [])],
-                            priority_ids={b.id for b in record_hits})
+                            priority_ids={b.id for b in [*record_hits, *addressed,
+                                *(direct if plan.question_scope == 'source_content' else [])]})
     req._retrieval_diagnostics.setdefault("context_stages", []).append({
         "candidate_limit": policy.candidate_limit, "context_limit": policy.context_limit,
-        "max_context_chars": policy.max_context_chars, "corpus_blocks": len(blocks),
+        "max_context_chars": policy.max_context_chars, "navigation_chars": navigation_chars, "corpus_blocks": len(blocks),
         "shortlist_count": len(shortlist), "packed_count": len(selected),
         "packed_characters": packing["packed_characters"], "dropped": packing["dropped"],
         "unique_sources": len({b.source_revision_id for b in selected}),
-        "lexical_engine": "evidence_bm25", "atomic_lists": plan.coverage == "enumeration"})
+        "lexical_engine": "evidence_bm25", "atomic_lists": True})
     logger.info("evidence_selection conversation=%s snapshot=%s corpus=%d candidates=%d packed=%d chars=%d dropped=%s ids=%s",
                 req.conversation_id, snapshot.snapshot_id, len(blocks), len(shortlist), len(selected), packing["packed_characters"],
                 packing["dropped"], [b.id for b in selected])
@@ -213,14 +224,21 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     plan = await structured_call(db, req, QueryPlan, PLAN_INSTRUCTION,
         {"question": req.question, "history": req.history or [], "configured_reference_year": default_year,
          "assistant_scope": scope, "resolved_institution_roles": roles}, max_tokens=1000)
-    if roles:
+    if roles and plan.question_scope == "source_content" and roles.get("target_basis") == "assistant_scope":
+        # Persona identifies the assistant, not the owner of a specifically read document.
+        # Retain exact question/snapshot; explicit institution requests still use role proof.
+        plan.target_institution = None
+        plan.query = req.question
+        plan.search_queries = []
+    elif roles:
         plan.target_institution = roles["target_institution"]
         plan.exam_organizer = roles["exam_organizer"]
         if plan.target_institution:
             plan.query = f"{plan.target_institution}: {plan.query}"[:2000]
             plan.search_queries = [f"{plan.target_institution}: {query}" for query in plan.search_queries]
     progress["planning_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
-    if not plan.years and not plan.document_years and not plan.event_years and default_year:
+    if (plan.question_scope == "applicability" and not plan.years and not plan.document_years
+            and not plan.event_years and default_year):
         plan.years = [default_year]
     try:
         validate_plan_years(plan, req.question, req.history or [], default_year)
@@ -232,10 +250,12 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     glossary_queries, glossary_trace = await resolve_glossary_queries(
         db, req.collection_id, req.question,
         plan_years=plan.years, plan_method=plan.method, plan_entity=plan.entity)
-    if plan.requires_year and not requested_years:
+    requires_applicability_year = plan.requires_year and plan.question_scope == "applicability"
+    if requires_applicability_year and not requested_years:
+        req._retrieval_diagnostics["retrieval_executed"] = False
         return decision_response(req, snapshot, "clarify", "YEAR_REQUIRED", plan, started=started,
                                  glossary=glossary_trace)
-    if plan.requires_year and not YEAR.search(plan.query):
+    if plan.requires_year and requested_years and not YEAR.search(plan.query):
         plan.query += " năm " + ", ".join(map(str, requested_years))
     progress["stage"] = "retrieval"
     stage_started = time.perf_counter()
@@ -251,12 +271,14 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     progress["stage"] = "proposal"
     stage_started = time.perf_counter()
     payload = {"question": req.question, "requested": plan.model_dump(), **evidence,
-               "source_preferences": preferences, "assistant_scope": scope}
+               "source_preferences": preferences, "assistant_scope": scope,
+               "knowledge_pages": req._wiki_context.get("pages", [])}
     proposal, claims, rejected, repaired = await propose_bound_claims(db, req, payload, blocks)
     progress["proposal_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
     progress["stage"] = "verification"
     stage_started = time.perf_counter()
     verified = await verify_bound_answer(db, req, payload, claims, blocks, plan, rules) if claims else None
+    verified = await complete_source_conditions(db, req, payload, verified, blocks, plan, rules)
     repair_history = []
     corrective = False
     added = []
@@ -281,8 +303,9 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
         union = list({b.id: b for b in [*corrected, *blocks]}.values())
         ordered = [*[b for b in blocks if b.id in pinned], *corrected, *blocks]
         corrected = pack_context(union, list({b.id: b for b in ordered}.values()), plan.years,
-            policy.context_limit, policy.max_context_chars, atomic_lists=plan.coverage == "enumeration",
-            enumeration_subject=plan.enumeration_subject or plan.entity, coverage_goals=feedback)
+            policy.context_limit, policy.max_context_chars - sum(len(page["markdown"])
+                for page in req._wiki_context.get("pages", [])), atomic_lists=True,
+            enumeration_subject=plan.enumeration_subject if plan.coverage == "enumeration" else None, coverage_goals=feedback)
         added = new_evidence(blocks, corrected)
         progress["corrective_retrieval_ms"] = round((time.perf_counter() - retrieval_started) * 1000, 2)
         if added:
@@ -290,7 +313,8 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
             blocks = corrected
             rules = active_preferences(policy, plan, blocks)
             preferences = [rule.model_dump() for rule in rules]
-            payload = {**payload, **model_context(blocks), "source_preferences": preferences}
+            payload = {**payload, **model_context(blocks), "source_preferences": preferences,
+                       "knowledge_pages": req._wiki_context.get("pages", [])}
             progress["stage"] = "corrective_verification"
             corrected_proposal, claims, corrected_errors, quote_repaired = await propose_bound_claims(db, req,
                 {**payload, "previous_proposal": proposal.model_dump(), "coverage_feedback": repair_history,
@@ -305,6 +329,7 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
                 claims = retain_safe_claims(claims, previous_verified.claims if previous_verified else [], blocks)
                 if claims:
                     corrected_verified = await verify_bound_answer(db, req, payload, claims, blocks, plan, rules)
+                    corrected_verified = await complete_source_conditions(db, req, payload, corrected_verified, blocks, plan, rules)
                     if corrected_verified.claims or not previous_verified or not previous_verified.claims or corrected_verified.verifier.conflict:
                         verified, proposal = corrected_verified, corrected_proposal
             if verified is previous_verified and previous_verified is not None:

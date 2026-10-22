@@ -44,14 +44,21 @@ def source_fingerprint(source: Any, artifact: dict) -> dict:
     if artifact.get("semantic_effective"):
         fingerprint["semantic_annotation_hash"] = artifact["semantic_effective"]["semantic_hash"]
         fingerprint["semantic_snapshot_sha256"] = artifact["semantic_effective"]["snapshot_sha256"]
+    wiki_policy = (source.parse_provenance or {}).get("knowledge_wiki_policy")
+    if wiki_policy is not None:
+        fingerprint["knowledge_wiki_policy_hash"] = digest(wiki_policy)
     return fingerprint
 
 
 def make_bundle(source: Any, artifact: dict, chunk_set: Any) -> dict:
     manifest = chunk_set.chunk_config.get("_manifest", [])
-    return {"version": BUNDLE_VERSION, "chunk_structure_version": CHUNK_VERSION,
+    bundle = {"version": BUNDLE_VERSION, "chunk_structure_version": CHUNK_VERSION,
             **source_fingerprint(source, artifact), "manifest_hash": digest(manifest),
             "config_hash": chunk_set.config_hash, "chunk_strategy": chunk_set.chunk_strategy}
+    wiki = (chunk_set.chunk_config or {}).get("_knowledge_wiki")
+    if wiki is not None:
+        bundle["knowledge_wiki_hash"] = wiki.get("sha256")
+    return bundle
 
 
 def validate_chunk_set(source: Any, artifact: dict, chunk_set: Any) -> dict:
@@ -59,6 +66,11 @@ def validate_chunk_set(source: Any, artifact: dict, chunk_set: Any) -> dict:
     bundle = config.get("_bundle")
     manifest = config.get("_manifest", [])
     expected = make_bundle(source, artifact, chunk_set)
+    wiki = config.get("_knowledge_wiki")
+    if wiki is not None:
+        from app.modules.knowledge.services.wiki_compiler import validate_wiki_bundle
+
+        validate_wiki_bundle(wiki, source, wiki.get("collection_id", ""))
     valid = (chunk_set.source_revision_id == source.id and chunk_set.status == "ready"
              and bundle == expected and config.get("_bundle_hash") == digest(expected)
              and chunk_set.manifest_hash == expected["manifest_hash"]
@@ -112,7 +124,8 @@ async def validate_index_bundle(db: Any, index: Any, source: Any, artifact: dict
     if (not binding or source.binding_id != index.binding_id or report.get("derived_bundle_hash") != digest(bundle)
             or report.get("derived_bundle_version") != BUNDLE_VERSION or not report.get("parity_passed")
             or report.get("expected_count") != chunk_set.chunk_count
-            or report.get("verified_count") != chunk_set.chunk_count):
+            or report.get("verified_count") != chunk_set.chunk_count
+            or report.get("knowledge_wiki") != (chunk_set.chunk_config or {}).get("_knowledge_wiki")):
         raise AppException("Vector không khớp tập dẫn xuất đã duyệt.", code="DERIVED_BUNDLE_INVALID", status_code=409)
     chunks = list((await db.execute(select(KnowledgeChunk).where(
         KnowledgeChunk.index_revision_id == index.id,

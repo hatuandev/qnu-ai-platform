@@ -247,15 +247,22 @@ class RagService:
         if converted is not None:
             req._retrieval_diagnostics.update(branch="score_conversion", retrieval_executed=False)
             return converted
+        analysis = query_classifier.analyze(req.question, module_code=req.module_code)
+        # Wiki enriches narrative navigation. It must not replace the existing
+        # coordinate-bound fact/row route simply because an index has pages.
+        use_evidence = evidence_policy.enabled or (snapshot.knowledge_wiki_enabled and not analysis.is_fact_first)
         logger.info("rag_execution_branch assistant=%s snapshot=%s branch=%s", req.assistant_code,
-                    snapshot.snapshot_id, "evidence" if evidence_policy.enabled else "fact_hybrid")
-        if evidence_policy.enabled:
+                    snapshot.snapshot_id, "evidence" if use_evidence else "fact_hybrid")
+        if use_evidence:
             req._retrieval_diagnostics.update(branch="evidence", retrieval_executed=True)
-            return await answer_with_evidence(db, req, snapshot, evidence_policy,
-                                              candidate_mode=candidate_snapshot is not None)
+            response = await answer_with_evidence(db, req, snapshot, evidence_policy,
+                                                  candidate_mode=candidate_snapshot is not None)
+            from app.modules.rag.prose_fallback import recover_empty_source_read
+
+            return await recover_empty_source_read(db, req, snapshot, evidence_policy, response,
+                started=start_time, candidate_mode=candidate_snapshot is not None)
         from app.modules.rag.combination_enumeration import enumerate_combinations
 
-        analysis = query_classifier.analyze(req.question, module_code=req.module_code)
         if req._current_fact_constraints.get('metrics'):
             analysis.fact_attributes = req._current_fact_constraints['metrics']
         if req._current_fact_constraints.get('metric'):

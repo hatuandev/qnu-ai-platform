@@ -203,7 +203,8 @@ def provider_failure_diagnostics(exc: Exception) -> dict[str, str | int | None]:
             request_id = str(UUID(candidate))
         except ValueError:
             pass  # Non-UUID identifiers can contain arbitrary echoed input.
-    return {"error_type": type(exc).__name__, "http_status": response.status_code if response is not None else None,
+    return {"error_type": type(exc).__name__, "app_error_code": exc.code if isinstance(exc, AppException) else None,
+            "http_status": response.status_code if response is not None else None,
             "reason": classify_key_failure(exc).reason, "upstream_request_id": request_id}
 
 

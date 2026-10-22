@@ -157,6 +157,7 @@ class HybridRetriever:
         """Resolve and validate an immutable tenant-scoped retrieval snapshot."""
         binding_revisions: dict[str, str] = {}
         vector_generations: dict[str, str] = {}
+        knowledge_wiki_enabled = False
 
         collection = await db.get(KnowledgeCollection, collection_id)
         if not collection:
@@ -173,6 +174,7 @@ class HybridRetriever:
                 KnowledgeBinding.id,
                 KnowledgeBinding.active_index_revision_id,
                 KnowledgeIndexRevision.vector_generation_id,
+                KnowledgeIndexRevision.parity_report,
             ).join(
                 KnowledgeIndexRevision,
                 KnowledgeBinding.active_index_revision_id == KnowledgeIndexRevision.id,
@@ -200,6 +202,8 @@ class HybridRetriever:
                         binding_revisions[str(row[0])] = str(row[1])
                     if len(row) >= 3 and row[2] is not None:
                         vector_generations[str(row[0])] = str(row[2])
+                    if len(row) >= 4 and isinstance(row[3], dict):
+                        knowledge_wiki_enabled |= (row[3].get("knowledge_wiki") or {}).get("status") == "ready"
         except Exception as exc:
             raise AppException(
                 f"Không thể khóa retrieval snapshot: {exc}",
@@ -213,6 +217,7 @@ class HybridRetriever:
             collection_epoch=collection.index_epoch,
             binding_revisions=binding_revisions,
             vector_generations=vector_generations,
+            knowledge_wiki_enabled=knowledge_wiki_enabled,
         )
 
         if pinned_snapshot:
@@ -226,7 +231,7 @@ class HybridRetriever:
                     code="STALE_RETRIEVAL_SNAPSHOT",
                     status_code=409,
                 )
-            return pinned_snapshot
+            return pinned_snapshot.model_copy(update={"knowledge_wiki_enabled": knowledge_wiki_enabled})
         return current
 
     async def search_sparse_fts(

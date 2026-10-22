@@ -87,6 +87,12 @@ def _condition_scope(claims, blocks):
     roots = [b for b in blocks if b.id in primary]
     related = {ref['block_id'] for c in claims for ref in c.get('references', [])}
     for root in roots:
+        if root.fact_context.get('source_kind') == 'table' or root.origin == 'reviewed_fact':
+            # A summary row does not define its complete conditions. Independently
+            # inspect bounded SAME-source policy passages already retrieved too;
+            # this does not assert that any such condition applies to this row.
+            related.update(b.id for b in blocks if source_identity(b) == source_identity(root)
+                and b.fact_context.get('source_kind') in {'paragraph', 'list', 'note'})
         related.update(b.id for b in blocks if root.parent_id and b.parent_id == root.parent_id
                        and source_identity(b) == source_identity(root))
     while True:
@@ -108,7 +114,11 @@ def audit_payload(payload, blocks):
     if payload.get("compact_passages"):
         compact = compact_claim_context(compact, payload.get("claims", []))
     claims = payload.get('claims', [])
-    clauses = _source_conditions(claims, catalog, _condition_scope(claims, blocks))
+    related = _condition_scope(claims, blocks)
+    # Derived fact display labels have no canonical char offsets. Their original
+    # canonical policies still participate; never audit synthetic labels as source clauses.
+    canonical = {b.id for b in blocks if b.origin == 'canonical' and b.id in related}
+    clauses = _source_conditions(claims, catalog, canonical)
     owners = literal_condition_claims(clauses, catalog, claims, blocks)
     return {**compact, "passages": passages, **({'source_conditions': clauses} if clauses else {}),
             **({'source_condition_claims': owners} if owners else {})}, catalog
@@ -175,6 +185,11 @@ Reject a primary body from another record, qualification level or requested attr
 table_row headers/cells are exact source coordinates. Its section is positional;
 use explicit row identity and applicable source restrictions, not a surrounding
 subsection name as a blanket row scope. Never borrow another row's cell or conditions.
+Header-to-cell alignment is supplied by the server, not a model's claimed role.
+A literal cell saying that an action does not change a quantity directly answers
+whether that action changes that quantity. Do not reject the cell merely because
+its column label is broader or awkwardly worded. Still verify row identity, scope,
+negation and governing source conditions; literal presence alone is not applicability.
 An additional reference with the right subject cannot rescue that unrelated body.
 Only use essential_conditions passages applicable to requested.entity and education_level.
 Never introduce requirements from another record's duration/qualification/career section.

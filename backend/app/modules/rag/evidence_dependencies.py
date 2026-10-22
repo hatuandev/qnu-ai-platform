@@ -33,6 +33,8 @@ def _numbered_groups(source: list[EvidenceBlock]) -> list[list[EvidenceBlock]]:
                 break
             if child.fact_context.get('source_kind') in {'table', 'image'}:
                 break  # A following matrix is not an unmarked continuation of a numbered rule.
+            if re.match(r'^\s*(?:bảng|table|hình|figure|sơ đồ|biểu đồ)\s+\d+(?:\.\d+)*\b', child.text, re.IGNORECASE):
+                break  # A caption starts another structural object, even when stored as prose.
             if not children and not run and family(child) is None and _level(child) is None:
                 # An unmarked explanatory run (formula lines, legend lead-in) belongs
                 # to its numbered parent; option bullets keep their own packing rule.

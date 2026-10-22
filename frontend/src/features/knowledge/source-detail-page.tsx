@@ -64,6 +64,7 @@ import type {
 } from "@/types/knowledge";
 import { DeleteSourceButton } from "./components/delete-source-button";
 import { IngestionReadinessPanel } from "./components/ingestion-readiness-panel";
+import { KnowledgeWikiPanel } from "./components/knowledge-wiki-panel";
 import { QnuStandardEditor } from "./components/qnu-standard-editor";
 import { SemanticCheckpointImport } from "./components/semantic-checkpoint-import";
 import { SemanticReviewPreview } from "./components/semantic-review-preview";
@@ -702,6 +703,14 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
 
         {/* Tab 1: Canonical Markdown Content */}
         <TabsContent value="content" className="space-y-3">
+          {activeRev && (
+            <KnowledgeWikiPanel
+              key={activeRev.id}
+              collectionId={collectionId}
+              sourceId={sourceId}
+              revisionId={activeRev.id}
+            />
+          )}
           {!isMarkdownVisible && (
             <p className="text-sm text-muted-foreground">
               Dùng Xem Markdown để mở nội dung đã chuẩn hóa.

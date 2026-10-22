@@ -17,6 +17,7 @@ class QueryPlan(StrictContract):
     document_years: list[int] = Field(default_factory=list, max_length=10)
     event_years: list[int] = Field(default_factory=list, max_length=10)
     requires_year: bool = False
+    question_scope: Literal["source_content", "applicability"] = "applicability"
     uses_history: bool = False
     historical_reference_allowed: bool = True
     coverage: Literal["focused", "enumeration", "comparison"] = "focused"

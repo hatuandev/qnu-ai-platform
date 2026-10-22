@@ -268,6 +268,12 @@ class VectorGenerationService:
                 status_code=422,
             )
 
+        from app.modules.knowledge.services.wiki_compiler import validate_wiki_bundle
+
+        knowledge_wiki = (chunk_set.chunk_config or {}).get("_knowledge_wiki")
+        if knowledge_wiki is not None:
+            validate_wiki_bundle(knowledge_wiki, source_rev, col.id)
+
         # Next revision number for binding
         rev_no_stmt = select(func.coalesce(func.max(KnowledgeIndexRevision.revision_no), 0) + 1).where(
             KnowledgeIndexRevision.binding_id == binding.id
@@ -422,6 +428,8 @@ class VectorGenerationService:
             "expected_count": db_count,
             "checked_at": utcnow().isoformat(),
         }
+        if knowledge_wiki is not None:
+            parity_report["knowledge_wiki"] = knowledge_wiki
         if chunk_set.chunk_config.get("_bundle"):
             from app.modules.knowledge.services.derived_bundle import BUNDLE_VERSION
 

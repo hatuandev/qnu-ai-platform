@@ -7,6 +7,10 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [16 — Trang tri thức và đọc nguồn có giới hạn](./16_trang_tri_thuc_va_doc_nguon.md):
+  biên soạn nguồn/thực thể/khái niệm, vai trò năm, nguồn nguyên văn và điều hướng
+  theo snapshot đã xuất bản; model động, budget, cache và trạng thái lỗi.
+
 - [15 — Phân luồng hội thoại và phiên chat](./15_phan_luong_hoi_thoai_va_phien_chat.md): social/meta, contextual rewrite, quyền debug, continuation capability và tách phiên public/widget.
 
 - [Nạp tài liệu tự động và đối chiếu nâng cao](./smart_approval.md): ba trạng thái chất lượng, nạp vector tách publication; Smart Approval, audit và transaction trong chế độ nâng cao.

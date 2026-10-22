@@ -175,6 +175,11 @@ async def prepare_standard_revision(revision: Any, *, automatic: bool = False) -
                                "structured_review_required": True, "serving_format": VERSION}
     if automatic and reference.get("status") == "ready":
         from app.modules.knowledge.services.automatic_ingestion import seal_automatic_content
+        from app.modules.knowledge.wiki_schemas import WikiPolicy
+
+        revision.parse_provenance = {**revision.parse_provenance,
+            "knowledge_wiki_policy": WikiPolicy(compiler_version="qnu-wiki-compiler/v3",
+                                                 render_mode="extractive").model_dump()}
         await seal_automatic_content(revision)
 
 

@@ -48,14 +48,25 @@ async def _structured_call(db: AsyncSession, req: AskRequest, contract: type[Con
     error_kind = None
     text = ""
     for attempt in range(max_attempts):
+        call_trace = {"stage": contract.__name__, "attempt": attempt + 1, "status": "started",
+                      "max_output_tokens": base_output}
+        req._retrieval_diagnostics.setdefault("model_contract_calls", []).append(call_trace)
         if req._intent_trace.get('planning'):
             req._intent_trace['router_model_calls'] = req._intent_trace.get('router_model_calls', 0) + 1
-        result = await modelops_service.generate(db, LLMGenerateRequest(
-            messages=messages, tenant_id=req.tenant_id, assistant_code=req.assistant_code,
-            conversation_id=req.conversation_id, preferred_model_name=req.preferred_model_name,
-            preferred_provider_id=req.preferred_provider_id, fallback_model_name=req.fallback_model,
-            fallback_provider_id=req.fallback_provider_id, temperature=0, thinking_budget=0,
-            max_tokens=base_output))
+        try:
+            result = await modelops_service.generate(db, LLMGenerateRequest(
+                messages=messages, tenant_id=req.tenant_id, assistant_code=req.assistant_code,
+                conversation_id=req.conversation_id, preferred_model_name=req.preferred_model_name,
+                preferred_provider_id=req.preferred_provider_id, fallback_model_name=req.fallback_model,
+                fallback_provider_id=req.fallback_provider_id, temperature=0, thinking_budget=0,
+                max_tokens=base_output))
+        except AppException as exc:
+            from app.modules.modelops.services.key_rotation import provider_failure_diagnostics
+
+            call_trace.update(status="failed", error_code=exc.code, **provider_failure_diagnostics(exc))
+            raise
+        call_trace.update(finish_reason=getattr(result, "finish_reason", None),
+            prompt_tokens=getattr(result, "prompt_tokens", None), completion_tokens=getattr(result, "completion_tokens", None))
         if req._intent_trace.get('planning'):
             req._intent_trace['router_provider'] = getattr(result, 'provider_id', None)
             req._intent_trace['router_model'] = getattr(result, 'model', None)
@@ -63,7 +74,9 @@ async def _structured_call(db: AsyncSession, req: AskRequest, contract: type[Con
         if text.startswith("```") and "\n" in text:
             text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
         try:
-            return validate_data_instance(contract, text)
+            value = validate_data_instance(contract, text)
+            call_trace["status"] = "valid"
+            return value
         except (ValidationError, ValueError) as exc:
             error = exc
             error_kind = type(exc).__name__
@@ -72,6 +85,8 @@ async def _structured_call(db: AsyncSession, req: AskRequest, contract: type[Con
                 "constraints": {key: value for key, value in (e.get("ctx") or {}).items()
                     if value is None or isinstance(value, (str, int, float, bool))}}
                 for e in exc.errors(include_input=False, include_url=False)] if isinstance(exc, ValidationError) else []
+            call_trace.update(status="invalid", validation_types=sorted({item["type"] for item in constraints}),
+                              error_code=error_code)
             logger.warning("evidence_contract_invalid stage=%s attempt=%d error_count=%d error_types=%s provider=%s model=%s",
                            contract.__name__, attempt + 1, len(constraints),
                            sorted({item["type"] for item in constraints}), result.provider, result.model)
@@ -140,6 +155,21 @@ Split duration, qualification, careers or contact channels when several are requ
 Do not add adjacent topics or expected values. Keep attribute nonempty for compound
 questions; enumeration_subject does not replace requested_topics.
 requires_year=true when eligibility, figures, fees or schedules can change by year.
+question_scope=source_content when the user asks what a specified document,
+table, rule, exception, diagram or symbol SAYS, or compares its own thresholds
+and units without asserting applicability to a current season. A rule's relative
+deadline does not by itself demand a calendar year. Do not invent admission-year
+requirements for such questions. Set requires_year=false for this source-bounded
+reading unless the question separately asks applicability in an unspecified year.
+Questions about a named document's legal status, simulated/test character or
+whether it can be applied in real life read that document's own scope statement:
+use source_content, not a request for this year's admissions eligibility.
+Being published in this knowledge collection is a publication state, not proof
+of a calendar-year requirement or institutional ownership. Do not add the
+assistant's institution as the owner of a specifically named document's rules.
+question_scope=applicability when the user asks for applicable eligibility, current
+figures, fees or schedules rather than the content of a specified source. Clarify
+missing year where genuinely necessary; never assume the latest/machine year.
 historical_reference_allowed=false when the user explicitly forbids information
 from other years or requests only the exact season without historical reference.
 Otherwise allow a separately labeled historical reference if current evidence is missing.
@@ -163,6 +193,11 @@ policy, not necessarily a list of each member. Synonyms must preserve these role
 Do not derive facts or values from the question. Do not include an expected answer."""
 
 PROPOSE_INSTRUCTION = """Answer only using identified official evidence blocks.
+knowledge_pages are derived navigation summaries, not original source evidence.
+Use them to understand the topic, years, conditions and exceptions, but every claim
+and citation must be independently supported by identified original block.text.
+Never cite or quote a generated page as proof, or accept its proposed temporal role
+as verified data. Keep the exact numbered-method/code mapping from original evidence.
 Respect requested.education_level, requested_topics and the ORIGINAL question.
 record_label/record_path are structural retrieval hints from repeated source templates.
 Inspect the identified record heading to establish the actual subject. Do not answer

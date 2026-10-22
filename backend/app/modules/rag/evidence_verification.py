@@ -15,10 +15,12 @@ from app.modules.rag.evidence_indexed_audit import (
     INDEXED_AUDIT_INSTRUCTION,
     audit_contract,
     audit_payload,
+    literal_condition_claims,
     resolve_audit,
 )
 from app.modules.rag.evidence_lists import uncovered_list_members
 from app.modules.rag.evidence_model import VERIFY_INSTRUCTION, structured_call
+from app.modules.rag.evidence_obligations import missing_conditions, remember_conditions
 from app.modules.rag.evidence_precedence import apply_precedence, validate_superseding_quotes
 from app.modules.rag.evidence_schemas import (
     EvidenceBlock,
@@ -32,6 +34,8 @@ from app.modules.rag.evidence_validation import (
     temporal_references_supported,
 )
 from app.modules.rag.schemas import AskRequest
+from app.modules.rag.source_dependency_agreement import reconcile_dependencies
+from app.modules.rag.source_dependency_review import review_dependencies
 
 
 @dataclass
@@ -45,6 +49,11 @@ class VerifiedAnswer:
     uncovered: list[str]
     source_condition_gaps: dict[str, str] = field(default_factory=dict)
     source_qualifier_gaps: list[QuoteReference] = field(default_factory=list)
+
+
+def blocking_repair_errors(verified: VerifiedAnswer) -> bool:
+    retained = {claim['id'] for claim in verified.claims}
+    return any(not error.get('claim_id') or error['claim_id'] in retained for error in verified.errors)
 
 
 def row_scope_entity(plan: QueryPlan, claims: list[dict]) -> str | None:
@@ -67,9 +76,48 @@ def row_scope_entity(plan: QueryPlan, claims: list[dict]) -> str | None:
     return name if len(row) >= 2 and len(requested) - len(row) in (0, 1) and requested[-len(row):] == row else plan.entity
 
 
+async def complete_source_conditions(db: AsyncSession, req: AskRequest, payload: dict,
+                                     verified: VerifiedAnswer | None, blocks: list[EvidenceBlock],
+                                     plan: QueryPlan, rules: list) -> VerifiedAnswer | None:
+    """Copy missing, audited source clauses and reverify within two request-wide rounds."""
+    from app.modules.rag.evidence_claims import restore_condition_claims
+
+    trace = req._retrieval_diagnostics.setdefault('source_condition_completion', [])
+    while verified and not verified.complete and len(trace) < 2:
+        gaps = getattr(verified, 'source_condition_gaps', {})
+        qualifiers = getattr(verified, 'source_qualifier_gaps', [])
+        if (not (gaps or qualifiers) or not verified.claims or blocking_repair_errors(verified) or verified.verifier.conflict
+                or any(verified.verifier.topic_coverage.get(t) is not True for t in plan.requested_topics)):
+            break
+        signature = {'clause_ids': sorted(gaps), 'qualifier_blocks': sorted(q.block_id for q in qualifiers)}
+        if signature in trace:
+            break
+        try:
+            restored = restore_condition_claims(gaps, blocks, qualifiers)
+        except ValueError as exc:
+            raise AppException('Không đối chiếu được điều kiện nguồn cần phục hồi.',
+                code='SOURCE_CONDITION_REPAIR_INVALID', status_code=503) from exc
+        public = {(ref['block_id'], ref['quote']) for c in verified.claims for ref in c['references']
+                  if ref['quote'] in c['text']}
+        restored = [c for c in restored if (c['references'][0]['block_id'],c['text']) not in public]
+        if not restored or len(verified.claims) + len(restored) > 48:
+            break
+        used = {c['id'] for c in verified.claims}
+        for c in restored:
+            while c['id'] in used:
+                c['id'] = '_' + c['id']
+            used.add(c['id'])
+        trace.append(signature)
+        verified = await verify_bound_answer(db, req, payload, [*verified.claims,*restored], blocks, plan, rules)
+    return verified
+
+
 async def verify_bound_answer(db: AsyncSession, req: AskRequest, payload: dict,
                               claims: list[dict], blocks: list[EvidenceBlock], plan: QueryPlan,
                               rules: list) -> VerifiedAnswer:
+    # Selection feedback is historical, not evidence for an independent verdict.
+    payload = {key: value for key, value in payload.items() if key not in {
+        'coverage_repair', 'previous_proposal', 'coverage_feedback', 'repair_instruction'}}
     scope_errors = [{"claim_id": c["id"], "reason": reason} for c in claims
                     if (reason := scope_error(c, blocks, plan))]
     rejected_ids = {error["claim_id"] for error in scope_errors}
@@ -133,8 +181,25 @@ async def verify_bound_answer(db: AsyncSession, req: AskRequest, payload: dict,
                                         indexed_payload, max_tokens=2400,
                                         error_code="EVIDENCE_VERIFICATION_INVALID")
         audit = resolve_audit(indexed, accepted, catalog, clauses, blocks)
+        remember_conditions(req, plan, indexed, audit, clauses, catalog, blocks)
+        req._retrieval_diagnostics.setdefault('source_audit_checks', []).append({
+            'claim_ids': [claim['id'] for claim in accepted],
+            'complete': audit.complete,
+            'condition_checks': [{'clause_id': check.clause_id, 'required': check.required,
+                'retained_by': check.retained_by,
+                'block_id': catalog[check.clause_id.split('.c')[0]].block_id}
+                for check in getattr(indexed, 'source_conditions', [])],
+            'missing_condition_ids': list(audit.source_condition_gaps)})
         accepted, audit_errors, missing, complete = audit_coverage(audit, accepted, blocks,
             sorted(set(plan.years + plan.document_years + plan.event_years)), question=req.question)
+        if audit.complete and accepted:
+            owners = literal_condition_claims(clauses, catalog, accepted, blocks)
+            pending = {key: text for key, text in clauses.items() if not owners.get(key)}
+            dependencies = await review_dependencies(db, req, plan, accepted, blocks, pending, catalog, structured_call)
+            if dependencies is not None:
+                dependencies = await reconcile_dependencies(db, req, plan, accepted, blocks, clauses,
+                    catalog, indexed, dependencies, structured_call)
+                remember_conditions(req, plan, dependencies, audit, clauses, catalog, blocks)
         if not audit.complete:
             complete = False
             missing = list(dict.fromkeys([*missing, 'Kiểm chứng toàn bộ câu trả lời chưa đầy đủ.']))
@@ -163,5 +228,12 @@ async def verify_bound_answer(db: AsyncSession, req: AskRequest, payload: dict,
     known_ids = {claim['id'] for claim in accepted}
     qualifier_gaps = [q.reference for q in audit.required_qualifiers
         if q.requirement in missing and set(q.retained_by).issubset(known_ids)] if audit else []
+    obligations, unavailable = missing_conditions(req, plan, accepted, blocks)
+    if obligations or unavailable:
+        complete = False
+        missing = list(dict.fromkeys([*missing, 'Chưa giữ đủ điều kiện nguồn đã xác minh cho câu hỏi này.']))
+        qualifier_gaps = list({(ref.block_id, ref.quote): ref for ref in [*qualifier_gaps, *obligations]}.values())
+    if unavailable:
+        errors.append({'reason': 'SOURCE_CONDITION_CONTEXT_MISSING', 'block_ids': unavailable})
     return VerifiedAnswer(accepted, complete, missing, errors, verifier, audit, uncovered,
                           audit.source_condition_gaps if audit else {}, qualifier_gaps)

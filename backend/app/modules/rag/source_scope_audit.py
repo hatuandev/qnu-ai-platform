@@ -28,7 +28,7 @@ def source_clauses(proofs: dict[str, str]) -> dict[str, str]:
         # not a demand to repeat every date from the surrounding sentence.
         parts = re.split(r'(?<!\d\.)(?<=[.!?])\s+(?=[A-ZÀ-Ỹ])|(?<=;)\s+|'
                          r'\n+(?=\s*(?:\d+|[a-z])[.)]\s|\s*[^\n:;]+:\s*\S)|'
-                         r'(?<=\d{4})\s+(?=(?:và|and)\s)', text)
+                         r'(?<=\d{4})\s+(?=(?:và|and)\s+(?!\s|(?:năm\s+)?\d))', text)
         for index, part in enumerate(parts):
             if len(part.strip()) >= 3:
                 result[f'{key}.c{index}'] = part.strip()
