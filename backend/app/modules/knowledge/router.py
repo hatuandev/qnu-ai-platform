@@ -13,6 +13,7 @@ from app.core.exceptions import EntityNotFoundError
 from app.modules.auth.dependencies import require_permission
 from app.modules.auth.schemas import AuthActor
 from app.modules.jobs.schemas import JobResponse
+from app.modules.knowledge.compilation_router import router as compilation_router
 from app.modules.knowledge.glossary_schemas import (
     GlossaryReview,
     GlossarySettingsResponse,
@@ -125,6 +126,7 @@ from app.modules.rag.schemas import AskResponse
 router = APIRouter(prefix="/knowledge", tags=["Knowledge Bases"])
 
 router.include_router(wiki_router)
+router.include_router(compilation_router)
 
 
 @router.post(

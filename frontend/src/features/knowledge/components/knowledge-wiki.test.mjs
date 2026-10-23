@@ -92,6 +92,7 @@ const { KnowledgeWikiContent } = load(
     "@tanstack/react-query": {},
     "@/rbac/context": {},
     "@/services/knowledge-api": {},
+    "./knowledge-wiki-navigation": { KnowledgeWikiNavigation: () => null },
     "react-markdown": ReactMarkdown,
     "remark-gfm": remarkGfm,
     "@/components/ui/accordion": primitive([

@@ -252,7 +252,10 @@ class ChunkSetService:
             collection = await db.get(KnowledgeCollection, binding.collection_id)
             if collection is None:
                 raise AppException("Không tìm thấy kho biên soạn tri thức.", code="COLLECTION_NOT_FOUND", status_code=404)
-            saved_config["_knowledge_wiki"] = await build_revision_wiki(db, source_rev, collection)
+            from app.modules.knowledge.services.wiki_reuse import find_reusable_wiki
+
+            reused = await find_reusable_wiki(db, source_rev, collection.id, conf_hash)
+            saved_config["_knowledge_wiki"] = reused if reused is not None else await build_revision_wiki(db, source_rev, collection)
         saved_config["_bundle"] = make_bundle(source_rev, artifact, chunk_set)
         saved_config["_bundle_hash"] = digest(saved_config["_bundle"])
         chunk_set.chunk_config = saved_config

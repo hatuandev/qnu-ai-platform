@@ -28,7 +28,14 @@ class WikiPolicy(WikiContract):
 
 class WikiReference(WikiContract):
     unit_id: str = Field(min_length=1, max_length=200)
-    quote: str = Field(min_length=3, max_length=WIKI_REFERENCE_MAX_CHARS)
+    quote: str = Field(min_length=1, max_length=WIKI_REFERENCE_MAX_CHARS)
+    literal_only: bool = Field(default=False, exclude_if=lambda value: not value)
+
+    @model_validator(mode="after")
+    def short_literal(self):
+        if len(self.quote) < 3 and not self.literal_only:
+            raise ValueError("Short text requires a server-bound literal inventory reference")
+        return self
 
 
 class WikiTemporalScope(WikiContract):
@@ -169,3 +176,6 @@ class WikiReadPolicy(WikiContract):
     max_calls: int = Field(2, ge=1, le=4)
     max_page_chars: int = Field(14000, ge=2000, le=30000)
     timeout_seconds: float = Field(30, ge=1, le=90)
+    max_link_depth: int = Field(1, ge=0, le=2)
+    max_link_nodes: int = Field(3, ge=1, le=6)
+    max_link_edges: int = Field(32, ge=0, le=128)

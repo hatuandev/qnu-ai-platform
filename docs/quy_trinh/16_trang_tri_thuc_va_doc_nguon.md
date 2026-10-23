@@ -301,5 +301,7 @@ Candidate chỉ được đọc index `ready` qua luồng kiểm thử có quy�
 
 Không thêm bảng/migration, không đổi default model, không tắt validation hay
 Quality Gate, không tự chuyển active pointer. Cơ chế phục vụ nguồn cũ giữ nguyên
-khi snapshot chưa có trang tri thức. Chưa có hợp nhất trang thực thể xuyên nguồn
-hoặc đồ thị wiki; đó là phạm vi tiếp theo, không thuộc ba ưu tiên đầu.
+khi snapshot chưa có trang tri thức. Ba ưu tiên đầu không hợp nhất thực thể
+xuyên nguồn. Phần liên kết, revision và đối chiếu bổ sung từ Context600 được mô
+tả tại [quy trình17](./17_lien_ket_revision_va_doi_chieu_wiki.md); cùng nhắc tên
+không trở thành bằng chứng cùng một đối tượng.

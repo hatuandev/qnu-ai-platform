@@ -4,17 +4,16 @@ import asyncio
 import hashlib
 import json
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
-from app.modules.knowledge.models import (
-    KnowledgeBinding,
-    KnowledgeCollection,
-    KnowledgeIndexRevision,
-    KnowledgeSourceRevision,
+from app.modules.knowledge.services.wiki_compiler import (
+    render_page,
+    source_units,
+    validate_wiki_bundle,
 )
-from app.modules.knowledge.services.wiki_compiler import render_page, validate_wiki_bundle
+from app.modules.knowledge.services.wiki_links import build_page_links, expand_linked_pages
+from app.modules.knowledge.services.wiki_snapshot import snapshot_records
 from app.modules.knowledge.wiki_schemas import WikiPage, WikiReadAction, WikiReadPolicy
 from app.modules.rag.evidence_bm25 import tokens
 from app.modules.rag.evidence_dependencies import dependency_groups
@@ -52,18 +51,12 @@ def section_matches(section: dict, plan: QueryPlan) -> bool:
 
 
 async def load_wiki_pages(db: AsyncSession, snapshot: RetrievalSnapshot, blocks: list[EvidenceBlock],
-                          plan: QueryPlan, candidate_mode: bool) -> list[dict]:
+                          plan: QueryPlan, candidate_mode: bool, *, scope_state: dict | None = None) -> list[dict]:
     if not snapshot.binding_revisions:
         return []
-    query = (select(KnowledgeSourceRevision, KnowledgeIndexRevision, KnowledgeBinding)
-        .join(KnowledgeIndexRevision, KnowledgeIndexRevision.source_revision_v2_id == KnowledgeSourceRevision.id)
-        .join(KnowledgeBinding, KnowledgeBinding.id == KnowledgeIndexRevision.binding_id)
-        .join(KnowledgeCollection, KnowledgeCollection.id == KnowledgeBinding.collection_id)
-        .where(KnowledgeIndexRevision.id.in_(snapshot.binding_revisions.values()),
-            KnowledgeBinding.collection_id == snapshot.collection_id, KnowledgeBinding.status == "active",
-            KnowledgeCollection.is_active.is_(True), KnowledgeSourceRevision.status == "ready",
-            KnowledgeIndexRevision.status.in_(["ready", "active"] if candidate_mode else ["active"])))
-    records = (await db.execute(query)).all()
+    records = await snapshot_records(db, snapshot, candidate_mode)
+    if scope_state is not None:
+        scope_state["binding_revisions"] = {binding.id: index.id for _, index, binding in records}
     result = []
     for source, index, binding in records:
         if snapshot.binding_revisions.get(binding.id) != index.id or source.binding_id != binding.id:
@@ -76,7 +69,10 @@ async def load_wiki_pages(db: AsyncSession, snapshot: RetrievalSnapshot, blocks:
             continue
         same = [block for block in blocks if (block.binding_id, block.index_revision_id,
             block.source_revision_id, block.canonical_hash) == (binding.id, index.id, source.id, source.canonical_hash)]
-        units = {block.unit_id: block for block in same if block.unit_id and block.origin == "canonical"}
+        canonical = {unit.id: unit for unit in await asyncio.to_thread(source_units, source)}
+        units = {block.unit_id: block for block in same if block.unit_id in canonical and block.origin == "canonical"
+            and (block.start, block.end, block.text) == (canonical[block.unit_id].start,
+                canonical[block.unit_id].end, canonical[block.unit_id].text)}
         for page in bundle["pages"]:
             sections = [section for section in page["sections"] if section_matches(section, plan)
                 and all(ref["unit_id"] in units for ref in section_references(section))]
@@ -88,6 +84,10 @@ async def load_wiki_pages(db: AsyncSession, snapshot: RetrievalSnapshot, blocks:
             result.append({"id": page["id"], "title": page["title"], "kind": page["kind"],
                 "markdown": render_page(view, identity), "block_ids": [units[uid].id for uid in sorted(refs)],
                 "binding_id": binding.id, "source_revision_id": source.id, "sections": sections,
+                "collection_id": snapshot.collection_id,
+                "index_revision_id": index.id, "canonical_hash": source.canonical_hash,
+                "reference_locations": {uid: {"start": units[uid].start, "end": units[uid].end,
+                    "quote": units[uid].text} for uid in refs},
                 "identity": identity, "reference_blocks": {uid: units[uid].id for uid in refs}})
     return result
 
@@ -194,6 +194,13 @@ def block_seal(block: EvidenceBlock) -> str:
     return hashlib.sha256(block.model_dump_json().encode()).hexdigest()
 
 
+def link_scope_matches(page: dict, plan: QueryPlan) -> bool:
+    requested = {"data": plan.years, "publication": plan.document_years, "event": plan.event_years}
+    return all(not years or any(scope["role"] == role and set(scope["years"]) & set(years)
+        for section in page["sections"] for scope in section["temporal"])
+        for role, years in requested.items())
+
+
 def allocate_pages(pages: list[dict], query: str, budget: int, by_id: dict,
                    max_total_chars: int | None = None) -> tuple[list[dict], list[str]]:
     """Spend the actual selected pages' budget, keeping each section and closure whole."""
@@ -240,17 +247,36 @@ async def read_wiki_context(db: AsyncSession, req: AskRequest, snapshot: Retriev
         req._wiki_context.clear()
         return []
     policy = policy.model_copy(update={"max_page_chars": max(0, min(policy.max_page_chars, max_navigation_chars))})
-    key = json.dumps([snapshot.cache_fingerprint(), plan.model_dump(), candidate_mode], sort_keys=True)
     by_id = {block.id: block for block in blocks if block.origin == "canonical" and
              (not snapshot.binding_revisions or snapshot.binding_revisions.get(block.binding_id) == block.index_revision_id)}
     trace = req._retrieval_diagnostics.setdefault("knowledge_wiki", {"calls": 0, "actions": []})
+    request_scope = json.dumps([snapshot.cache_fingerprint(), plan.model_dump(), candidate_mode,
+        req.assistant_revision, req.preferred_provider_id, req.preferred_model_name,
+        policy.max_link_depth, policy.max_link_nodes, policy.max_link_edges], sort_keys=True)
+    if trace["calls"] >= policy.max_calls and req._wiki_context.get("request_scope") != request_scope:
+        req._wiki_context.clear()
+        return []
+    # Recheck publication/binding/revision even on a request-local cache hit.
+    scope_state: dict = {}
+    pages = complete_pages(await load_wiki_pages(db, snapshot, blocks, plan, candidate_mode,
+                                                scope_state=scope_state), by_id)
+    cached = req._wiki_context.get("selected_pages", [])
+    if (req._wiki_context.get("request_scope") == request_scope and cached
+            and {page["id"] for page in cached} - {page["id"] for page in pages}):
+        req._wiki_context.clear()
+        allowed = scope_state.get("binding_revisions")
+        if allowed is not None and any(allowed.get(page["binding_id"]) !=
+                snapshot.binding_revisions.get(page["binding_id"]) for page in cached):
+            raise AppException("Bằng chứng hoặc quyền phục vụ đã thay đổi; cần tra cứu lại.",
+                               code="KNOWLEDGE_WIKI_SCOPE_CHANGED", status_code=409)
+        return []  # A narrower current block budget cannot reuse an incomplete cached section.
+    graph = await asyncio.to_thread(build_page_links, pages, snapshot.cache_fingerprint())
+    key = json.dumps([request_scope, graph["sha256"]], sort_keys=True)
     if req._wiki_context.get("key") == key:
         return cache_view(req, req._wiki_context['selected_pages'], plan, policy, by_id, max_total_chars)
     req._wiki_context.clear()
     if trace["calls"] >= policy.max_calls:
         return []
-    pages = await load_wiki_pages(db, snapshot, blocks, plan, candidate_mode)
-    pages = complete_pages(pages, by_id)
     if not pages:
         return []
     ids, opened, repair = [], {}, None
@@ -289,11 +315,22 @@ async def read_wiki_context(db: AsyncSession, req: AskRequest, snapshot: Retriev
                 if any(pid not in {p['id'] for p in ranked} for pid in action.page_ids):
                     raise AppException('Trang không có trong catalog hiện tại.', code='KNOWLEDGE_WIKI_READ_SCOPE', status_code=502)
                 selected_pages = [available[pid] for pid in dict.fromkeys(action.page_ids)]
+                terms = set(tokens(plan.query))
+                eligible = [page for page in pages if page in selected_pages or
+                    (link_scope_matches(page, plan) and terms & set(tokens(page["title"])))]
+                eligible_ids = {page["id"] for page in eligible}
+                scoped_graph = {**graph, "links": [link for link in graph["links"]
+                    if link["source"] in eligible_ids and link["target"] in eligible_ids]}
+                selected_pages = expand_linked_pages(selected_pages, eligible, scoped_graph,
+                    max_depth=policy.max_link_depth, max_nodes=policy.max_link_nodes,
+                    max_edges=policy.max_link_edges)
+                trace["linked_pages"] = max(0, len(selected_pages) - len(set(action.page_ids)))
+                trace["link_policy"] = graph["version"]
                 groups = dependency_groups(list(by_id.values()))
                 selected_pages = [{**page, '_block_seals': {member.id:block_seal(member)
                     for bid in page['block_ids'] for member in groups.get(bid, [by_id[bid]])}}
                     for page in selected_pages]
-                req._wiki_context.update(key=key, selected_pages=selected_pages)
+                req._wiki_context.update(key=key, request_scope=request_scope, selected_pages=selected_pages)
                 result = cache_view(req, selected_pages, plan, policy, by_id, max_total_chars)
                 trace['actions'].append({'action':action.action, 'page_ids':action.page_ids,
                     'evidence_blocks':len(result), 'budget_rejected':not result})
@@ -306,7 +343,7 @@ async def read_wiki_context(db: AsyncSession, req: AskRequest, snapshot: Retriev
             if added:
                 break  # References are already canonical evidence; verification owns completeness.
     ids = list(dict.fromkeys(ids))
-    req._wiki_context.update(key=key, selected_pages=[], block_ids=ids, pages=[
+    req._wiki_context.update(key=key, request_scope=request_scope, selected_pages=[], block_ids=ids, pages=[
         {"page_id": page["id"], "markdown": page["markdown"], "usage": "navigation_only"}
         for page in opened.values()])
     trace.update(opened_pages=len(opened), evidence_blocks=len(ids), navigation_chars=policy.max_page_chars - remaining)

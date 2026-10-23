@@ -7,6 +7,13 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [18 — Biên soạn chủ đề nhiều nguồn](./18_bien_soan_chu_de_nhieu_nguon.md): compiler
+  có proof/review ledger, intent/idempotency, Storage bất biến, decision có quyền và
+  stale/revocation; không tự áp dụng vào RAG hoặc publication.
+
+- [17 — Liên kết, revision và đối chiếu Trang tri thức](./17_lien_ket_revision_va_doi_chieu_wiki.md):
+  liên quan/backlinks theo snapshot, reuse nguồn tương thích và Advanced Review có quyền.
+
 - [16 — Trang tri thức và đọc nguồn có giới hạn](./16_trang_tri_thuc_va_doc_nguon.md):
   biên soạn nguồn/thực thể/khái niệm, vai trò năm, nguồn nguyên văn và điều hướng
   theo snapshot đã xuất bản; model động, budget, cache và trạng thái lỗi.

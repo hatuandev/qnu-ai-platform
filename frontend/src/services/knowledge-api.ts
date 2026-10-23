@@ -1831,6 +1831,55 @@ export const knowledgeApi = {
     return view;
   },
 
+  async getKnowledgeMap(
+    collectionId: string,
+    review = false,
+  ): Promise<import("@/types/knowledge-wiki").KnowledgeWikiMap> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/knowledge-map${review ? "/review" : ""}`,
+      { headers: getAuthHeaders() },
+    );
+    if (!res.ok)
+      throw new Error(
+        extractErrorMessage(
+          await res.json().catch(() => ({})),
+          "Không đọc được liên kết tri thức.",
+        ),
+      );
+    const view: import("@/types/knowledge-wiki").KnowledgeWikiMap =
+      await res.json();
+    if (view.collection_id !== collectionId)
+      throw new Error("Liên kết không khớp kho tri thức.");
+    return view;
+  },
+
+  async getSourceKnowledgeReview(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+  ): Promise<import("@/types/knowledge-wiki").KnowledgeWikiReview> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/knowledge-pages/review`,
+      { headers: getAuthHeaders() },
+    );
+    if (!res.ok)
+      throw new Error(
+        extractErrorMessage(
+          await res.json().catch(() => ({})),
+          "Không đọc được kết quả đối chiếu.",
+        ),
+      );
+    const view: import("@/types/knowledge-wiki").KnowledgeWikiReview =
+      await res.json();
+    if (
+      view.collection_id !== collectionId ||
+      view.binding_id !== sourceId ||
+      view.source_revision_id !== revisionId
+    )
+      throw new Error("Kết quả đối chiếu không khớp bản nguồn.");
+    return view;
+  },
+
   async editSourceContext(
     collectionId: string,
     sourceId: string,

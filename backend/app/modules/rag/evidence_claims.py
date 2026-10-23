@@ -16,6 +16,8 @@ from app.modules.rag.evidence_passages import (
     resolve_proposal,
     source_grounded_claims,
 )
+from app.modules.rag.evidence_recovery import canonical_selection_blocks, sentence_envelope
+from app.modules.rag.evidence_rule_selection import offer_native_list_groups
 from app.modules.rag.evidence_schemas import AnswerProposal, EvidenceBlock, QuoteReference
 from app.modules.rag.evidence_validation import (
     YEAR,
@@ -39,10 +41,10 @@ def restore_condition_claims(conditions: dict[str, str], blocks: list[EvidenceBl
         if not re.fullmatch(r'e\d+\.c\d+', key) or key.split('.c')[0] not in catalog:
             raise ValueError('Unknown source condition passage')
         body = catalog[key.split('.c')[0]]
-        reference = bind_quote(QuoteReference(block_id=body.block_id, quote=quote), by_id)
-        restored.append({'id': f'__source_condition_{index}', 'text': quote, 'references': [reference]})
+        reference = bind_quote(sentence_envelope(QuoteReference(block_id=body.block_id, quote=quote), by_id), by_id)
+        restored.append({'id': f'__source_condition_{index}', 'text': reference['quote'], 'references': [reference]})
     for index, qualifier in enumerate(qualifiers or []):
-        reference = bind_quote(qualifier, by_id)
+        reference = bind_quote(sentence_envelope(qualifier, by_id), by_id)
         restored.append({'id': f'__source_qualifier_{index}', 'text': reference['quote'], 'references': [reference]})
     return source_grounded_claims(restored, blocks, primary_only=True)
 
@@ -89,7 +91,11 @@ def bind_claims(proposal: AnswerProposal, blocks: list[EvidenceBlock]) -> tuple[
 
 async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
                                blocks: list[EvidenceBlock]) -> tuple[AnswerProposal, list[dict], list[dict], bool]:
-    catalog = passage_catalog(blocks)
+    selection_blocks = canonical_selection_blocks(blocks)
+    catalog = passage_catalog(selection_blocks)
+    trace = req._retrieval_diagnostics.setdefault('source_selection', [])
+    trace.append({'canonical_duplicates_removed': len(blocks) - len(selection_blocks),
+                  'offered_blocks': len(selection_blocks), 'offered_passages': len(catalog)})
     contract = proposal_contract(catalog)
     instruction = PROPOSE_INSTRUCTION + (
         "\nSelect evidence_ids from passages. Do NOT generate quotes or source/block IDs. "
@@ -120,7 +126,7 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
     if compact:
         # Same catalog/IDs/quotes, metadata once per block rather than once per
         # sentence. No evidence loss and no guessed character-to-token ratio.
-        payload["passages"] = compact_passage_payload(blocks, catalog)
+        payload["passages"] = compact_passage_payload(selection_blocks, catalog)
         instruction += "\nWithin each group, whole_passage_id selects whole_text if present, otherwise ALL its passage texts in source order."
         instruction += (" evidence_ids selects ONLY sentences that directly answer the question and will be public. "
             "Put supporting season/subject headings in context_ids instead: those are proof only, NOT displayed. "
@@ -129,10 +135,14 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
             "Choose a complete sentence, not a lowercase continuation without its preceding sentence. "
             "The total number of selected public sentences across all claims must not exceed twelve.")
     else:
-        payload["passages"] = passage_payload(blocks, catalog)
+        payload["passages"] = passage_payload(selection_blocks, catalog)
     draft = await structured_call(db, req, contract, instruction, payload, max_tokens=4000)
     proposal = resolve_proposal(draft, catalog, blocks, separate_context=compact)
     claims, rejected = bind_claims(proposal, blocks)
+    trace[-1].update(selected_claims=len(proposal.claims), bound_claims=len(claims),
+                     proposal_status=proposal.status,
+                     selected_block_ids=sorted({ref.block_id for claim in proposal.claims for ref in claim.references}),
+                     binding_rejections=[r['reason'] for r in rejected])
     repaired = False
     requested = payload.get("requested", {})
     coverage_missing = uncovered_list_members(blocks, claims,
@@ -149,6 +159,7 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
         claims, rejected = bind_claims(proposal, blocks)
     projected = source_grounded_claims(claims, blocks, primary_only=compact,
         allow_primary_heading=requested.get('question_scope') == 'source_content')
+    projected = offer_native_list_groups(projected, blocks)
     by_block = {block.id: block for block in blocks}
     for claim in projected:
         body = by_block[claim["references"][0]["block_id"]]

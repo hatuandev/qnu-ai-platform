@@ -1,0 +1,383 @@
+{
+  "$defs": {
+    "CompilationAssertion": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "entity_id": {
+          "title": "Entity Id",
+          "type": "string"
+        },
+        "attribute": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Attribute",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "value_state": {
+          "enum": [
+            "present",
+            "unknown",
+            "conflict"
+          ],
+          "title": "Value State",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "temporal": {
+          "items": {
+            "$ref": "#/$defs/CompilationTime"
+          },
+          "maxItems": 8,
+          "title": "Temporal",
+          "type": "array"
+        },
+        "scope": {
+          "items": {
+            "$ref": "#/$defs/CompilationScope"
+          },
+          "maxItems": 12,
+          "title": "Scope",
+          "type": "array"
+        },
+        "condition_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "title": "Condition Ids",
+          "type": "array"
+        },
+        "exception_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "title": "Exception Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "entity_id",
+        "attribute",
+        "value_state",
+        "evidence_ids"
+      ],
+      "title": "CompilationAssertion",
+      "type": "object"
+    },
+    "CompilationEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "evidence_ids"
+      ],
+      "title": "CompilationEntity",
+      "type": "object"
+    },
+    "CompilationRelation": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "same_entity",
+            "alias",
+            "supports",
+            "contradicts",
+            "supersedes",
+            "prerequisite",
+            "exception"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "temporal": {
+          "items": {
+            "$ref": "#/$defs/CompilationTime"
+          },
+          "maxItems": 8,
+          "title": "Temporal",
+          "type": "array"
+        },
+        "scope": {
+          "items": {
+            "$ref": "#/$defs/CompilationScope"
+          },
+          "maxItems": 12,
+          "title": "Scope",
+          "type": "array"
+        },
+        "condition_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "title": "Condition Ids",
+          "type": "array"
+        },
+        "exception_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "title": "Exception Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "source_id",
+        "target_id",
+        "kind",
+        "evidence_ids"
+      ],
+      "title": "CompilationRelation",
+      "type": "object"
+    },
+    "CompilationScope": {
+      "additionalProperties": false,
+      "properties": {
+        "dimension": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Dimension",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "dimension",
+        "value",
+        "evidence_ids"
+      ],
+      "title": "CompilationScope",
+      "type": "object"
+    },
+    "CompilationSection": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Heading",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 3000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "assertion_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 24,
+          "minItems": 1,
+          "title": "Assertion Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "heading",
+        "text",
+        "assertion_ids"
+      ],
+      "title": "CompilationSection",
+      "type": "object"
+    },
+    "CompilationTime": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "data",
+            "publication",
+            "effective",
+            "event",
+            "unknown"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "years": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 10,
+          "title": "Years",
+          "type": "array"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "title": "CompilationTime",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "qnu-knowledge-compilation/v1",
+      "default": "qnu-knowledge-compilation/v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "snapshot_hash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Snapshot Hash",
+      "type": "string"
+    },
+    "entities": {
+      "items": {
+        "$ref": "#/$defs/CompilationEntity"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "title": "Entities",
+      "type": "array"
+    },
+    "assertions": {
+      "items": {
+        "$ref": "#/$defs/CompilationAssertion"
+      },
+      "maxItems": 128,
+      "minItems": 1,
+      "title": "Assertions",
+      "type": "array"
+    },
+    "relations": {
+      "items": {
+        "$ref": "#/$defs/CompilationRelation"
+      },
+      "maxItems": 128,
+      "title": "Relations",
+      "type": "array"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/CompilationSection"
+      },
+      "maxItems": 64,
+      "title": "Sections",
+      "type": "array"
+    }
+  },
+  "required": [
+    "snapshot_hash",
+    "entities",
+    "assertions"
+  ],
+  "title": "CompilationDraft",
+  "type": "object"
+}

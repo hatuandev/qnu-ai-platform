@@ -27,6 +27,7 @@ import type {
   KnowledgeWikiReference,
   KnowledgeWikiResponse,
 } from "@/types/knowledge-wiki";
+import { KnowledgeWikiNavigation } from "./knowledge-wiki-navigation";
 
 const kindLabels = { source: "Nguồn", entity: "Đối tượng", concept: "Chủ đề" };
 
@@ -107,7 +108,7 @@ export function KnowledgeWikiContent({
       </p>
       <Accordion type="single" collapsible defaultValue={data.pages[0]?.id}>
         {data.pages.map((page) => (
-          <AccordionItem key={page.id} value={page.id}>
+          <AccordionItem key={page.id} value={page.id} id={`wiki-${page.id}`}>
             <AccordionTrigger>
               <span className="flex flex-wrap items-center gap-2 text-left">
                 <Badge variant="secondary">{kindLabels[page.kind]}</Badge>
@@ -187,6 +188,17 @@ export function KnowledgeWikiPanel({
             </Alert>
           )}
           {query.data && <KnowledgeWikiContent data={query.data} />}
+          {query.data?.source_revision_no && (
+            <p className="text-xs text-muted-foreground">
+              Đang xem bản nguồn {query.data.source_revision_no}
+            </p>
+          )}
+          <KnowledgeWikiNavigation
+            collectionId={collectionId}
+            sourceId={sourceId}
+            revisionId={revisionId}
+            canReview={rbac.can("ai.knowledge.review")}
+          />
         </CardContent>
       )}
     </Card>

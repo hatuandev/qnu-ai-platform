@@ -10,6 +10,7 @@ from app.modules.rag.evidence_schemas import EvidenceBlock, QueryPlan, QuoteRefe
 
 VERSION = "evidence-claims-v1"
 YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
+REQUEST_YEAR = re.compile(r"(?<![\d_./-])(?:19|20)\d{2}(?![\w./])")
 NUMBER = re.compile(r"(?<![\w.,])\d+(?:[.,]\d+)*(?!\d)(?![.,]\d)")
 
 
@@ -183,22 +184,42 @@ def bind_quote(reference: QuoteReference, blocks: dict[str, EvidenceBlock]) -> d
 
 
 def validate_plan_years(plan: QueryPlan, question: str, history: list, default_year: int | None) -> None:
-    explicit = {int(y) for y in YEAR.findall(question)}
-    for match in re.finditer(r"\b((?:19|20)\d{2})\s*[-–]\s*((?:19|20)\d{2})\b", question):
-        start, end = map(int, match.groups())
-        if 0 <= end - start < 10:
-            explicit.update(range(start, end + 1))
+    explicit = request_years(question)
     allowed = set(explicit)
     if not explicit and plan.uses_history:
-        allowed |= {int(y) for h in history[-4:] for y in YEAR.findall(str(h.get("content", "")))}
+        allowed |= {y for h in history[-4:] for y in request_years(str(h.get("content", "")))}
     if not explicit and default_year:
         allowed.add(default_year)
     planned = set(plan.years + plan.document_years + plan.event_years)
     if planned - allowed or (explicit and not explicit.issubset(planned)):
         raise ValueError("Planner changed the requested temporal scope")
-    query_years = {int(y) for text in [plan.query, *plan.search_queries] for y in YEAR.findall(text)}
+    query_years = {y for text in [plan.query, *plan.search_queries] for y in request_years(text)}
     if query_years - planned:
         raise ValueError("Search variant invented a year")
+
+
+def request_years(text: str) -> set[int]:
+    """Literal candidates, not year roles. Attached prose is allowed; codes are not.
+
+    An uppercase/alphanumeric prefix may be an identifier, so require clarification
+    rather than borrowing its digits. Source-year validation is intentionally unchanged.
+    """
+    result = {int(m[1]) for m in re.finditer(
+        r'(?<![\w./])\d{1,2}[/.-]\d{1,2}[/.-]((?:19|20)\d{2})(?![\w./])', text)}
+    for match in REQUEST_YEAR.finditer(text):
+        prefix = re.search(r'[\w-]+$', text[:match.start()])
+        if prefix and (any(c.isdigit() or c in '_-' for c in prefix[0]) or prefix[0].isupper()):
+            continue
+        result.add(int(match[0]))
+    for match in re.finditer(r'(?<![\d_./-])((?:19|20)\d{2})\s*([-–/])\s*((?:19|20)\d{2})(?![\w./])', text):
+        prefix = re.search(r'[\w-]+$', text[:match.start()])
+        if prefix and (any(c.isdigit() or c in '_-' for c in prefix[0]) or prefix[0].isupper()):
+            continue
+        start, end = int(match[1]), int(match[3])
+        result.update((start, end))
+        if match[2] != '/' and 0 <= end - start < 10:
+            result.update(range(start, end + 1))
+    return result
 
 
 def evidence_digest(bindings: list[dict]) -> str:

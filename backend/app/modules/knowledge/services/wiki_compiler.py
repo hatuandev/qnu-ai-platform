@@ -104,7 +104,8 @@ def source_units(source: Any) -> list[SourceUnit]:
 
 def packets(units: list[SourceUnit], policy: WikiPolicy, identity: dict | None = None,
             title: str = "x" * 180) -> list[list[SourceUnit]]:
-    if any(not 3 <= len(unit.text) <= WIKI_REFERENCE_MAX_CHARS for unit in units):
+    minimum = 1 if policy.render_mode == 'extractive' else 3
+    if any(not minimum <= len(unit.text) <= WIKI_REFERENCE_MAX_CHARS for unit in units):
         raise invalid("source_unit_exceeds_reference_capacity")
     if sum(len(unit.text) for unit in units) > policy.max_total_chars:
         raise AppException("Tài liệu vượt ngân sách biên soạn; giữ bản nguồn để tra cứu.",
@@ -444,8 +445,8 @@ async def compile_wiki(source: Any, collection_id: str, policy: WikiPolicy, gene
                     if policy.render_mode == "extractive":
                         sections = list({section.excerpt_unit_id: section for section in sections}.values())
                     compiled[key] = compiled[key].model_copy(update={"sections": sections})
-    pages = [{**page.model_dump(), "id": "wiki_" + digest([identity, *key])[:24],
-              "markdown": render_page(page, identity)} for key, page in compiled.items()]
+    from app.modules.knowledge.services.wiki_inventory import stored_pages
+    pages = stored_pages(compiled, identity)
     bundle = {"version": WIKI_VERSION, "status": "ready", "usage": "navigation_only",
         **identity, "policy": policy.model_dump(), "pages": pages, "calls": calls,
         "contract_retries": calls - len(groups) * (1 if policy.render_mode == "extractive" else 2),
@@ -465,17 +466,20 @@ def validate_wiki_bundle(bundle: dict, source: Any, collection_id: str) -> None:
     if bundle.get("status") == "ready":
         by_id = {unit.id: unit for unit in source_units(source)}
         ids = [page.get("id") for page in bundle.get("pages", [])]
-        if (not ids or len(set(ids)) != len(ids)
-                or sum(page.get("kind") == "source" for page in bundle["pages"]) != 1):
+        if not ids or len(set(ids)) != len(ids):
             raise invalid("bundle_page_ids")
+        from app.modules.knowledge.services.wiki_inventory import validate_inventory
+        extractive = bundle.get('policy', {}).get('render_mode') == 'extractive'
+        validate_inventory(bundle['pages'], expected, by_id, extractive)
         for stored in bundle["pages"]:
             page = WikiPage.model_validate({key: stored[key] for key in ("kind", "title", "sections")})
             if (bundle.get("policy", {}).get("render_mode") == "extractive"
                     and any(section.excerpt_unit_id is None for section in page.sections)):
                 raise invalid("extractive_section_required")
             validate_page(page, by_id)
-            if (stored["markdown"] != render_page(page, expected)
-                    or stored["id"] != "wiki_" + digest([expected, page.kind, page.title])[:24]):
+            if any(ref.literal_only for section in page.sections for ref in section.references) and not extractive:
+                raise invalid('literal_reference_outside_inventory')
+            if stored["markdown"] != render_page(page, expected):
                 raise invalid("page_render_changed")
     elif bundle.get("pages") != []:
         raise invalid("unavailable_contains_pages")

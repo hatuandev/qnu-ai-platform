@@ -1,5 +1,6 @@
 """Bounded semantic auditing shared by direct RAG and workflow answers."""
 
+import hashlib
 from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -89,7 +90,8 @@ async def complete_source_conditions(db: AsyncSession, req: AskRequest, payload:
         if (not (gaps or qualifiers) or not verified.claims or blocking_repair_errors(verified) or verified.verifier.conflict
                 or any(verified.verifier.topic_coverage.get(t) is not True for t in plan.requested_topics)):
             break
-        signature = {'clause_ids': sorted(gaps), 'qualifier_blocks': sorted(q.block_id for q in qualifiers)}
+        signature = {'clause_ids': sorted(gaps), 'qualifiers': sorted(
+            (q.block_id, hashlib.sha256(q.quote.encode()).hexdigest()) for q in qualifiers)}
         if signature in trace:
             break
         try:
@@ -235,5 +237,12 @@ async def verify_bound_answer(db: AsyncSession, req: AskRequest, payload: dict,
         qualifier_gaps = list({(ref.block_id, ref.quote): ref for ref in [*qualifier_gaps, *obligations]}.values())
     if unavailable:
         errors.append({'reason': 'SOURCE_CONDITION_CONTEXT_MISSING', 'block_ids': unavailable})
+    req._retrieval_diagnostics.setdefault('verification_outcomes', []).append({
+        'input_claim_count': len(claims), 'accepted_claim_count': len(accepted),
+        'complete': complete, 'audit_complete': audit.complete if audit else None,
+        'uncovered_topic_count': sum(verifier.topic_coverage.get(t) is not True for t in plan.requested_topics),
+        'condition_gap_ids': sorted(audit.source_condition_gaps) if audit else [],
+        'qualifier_gap_blocks': [q.block_id for q in qualifier_gaps],
+        'unavailable_obligation_blocks': unavailable})
     return VerifiedAnswer(accepted, complete, missing, errors, verifier, audit, uncovered,
                           audit.source_condition_gaps if audit else {}, qualifier_gaps)

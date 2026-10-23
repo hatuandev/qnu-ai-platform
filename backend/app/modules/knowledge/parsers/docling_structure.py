@@ -549,6 +549,9 @@ def build_qnu_structured_document(
         (index + 1, item, int(level or 0))
         for index, (item, level) in enumerate(document.iterate_items())
     ]
+    from app.modules.knowledge.parsers.docx_paragraphs import reconcile_paragraphs
+
+    indexed, paragraph_proofs = reconcile_paragraphs(indexed, (source_evidence or {}).get('paragraphs', []))
     native_lists = list_item_evidence(indexed, (source_evidence or {}).get('paragraphs', []))
     list_stack: list[dict] = []
     list_section = None
@@ -722,6 +725,8 @@ def build_qnu_structured_document(
                     id=builder.next_id("n" if block_type == "note" else "p"),
                     parent_id=builder.parent_id(),
                     type=block_type,
+                    source_data=({'native_paragraph_reconciliation': paragraph_proofs[block_index]}
+                                 if block_index in paragraph_proofs else None),
                     source_locations=_locations(block_index, pages),
                     section_path=builder.section_path(),
                     attributes={"role": label} if label in {"page_header", "page_footer"} else {},

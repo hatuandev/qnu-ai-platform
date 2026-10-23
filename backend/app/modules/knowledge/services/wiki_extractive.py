@@ -36,7 +36,8 @@ def excerpt_section(primary_id, by_id):
 
     units = sorted(structural_context([primary_id], by_id, source_headings(list(by_id.values()))),
                    key=lambda unit: (unit.start, unit.end, unit.id))
-    refs = [{"unit_id": unit.id, "quote": unit.text} for unit in units]
+    refs = [{"unit_id": unit.id, "quote": unit.text,
+             **({'literal_only': True} if len(unit.text) < 3 else {})} for unit in units]
     if len(refs) > WIKI_MAX_REFERENCES:
         raise invalid("excerpt_context_capacity")
     fragments = []

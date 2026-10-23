@@ -22,10 +22,11 @@ from app.modules.rag.evidence_context import model_context
 from app.modules.rag.evidence_model import structured_call
 from app.modules.rag.evidence_pipeline import decision_response
 from app.modules.rag.evidence_precedence import active_preferences
+from app.modules.rag.evidence_recovery import retain_recovered_conditions
 from app.modules.rag.evidence_repair import retain_safe_claims
 from app.modules.rag.evidence_retrieval import bounded_rerank
 from app.modules.rag.evidence_schemas import QueryPlan, StrictContract
-from app.modules.rag.evidence_validation import YEAR
+from app.modules.rag.evidence_validation import request_years
 from app.modules.rag.evidence_verification import blocking_repair_errors, verify_bound_answer
 from app.modules.rag.fusion import FusionCandidate
 from app.modules.rag.prose_selection import (
@@ -138,7 +139,7 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
                   policy: EvidencePolicy, trace: dict, started: float,
                   candidate_mode: bool) -> AskResponse | None:
     question = req.original_question or req.question
-    years = sorted({int(year) for year in YEAR.findall(question)})
+    years = sorted(request_years(question))
     blocks = await load_published_blocks(db, snapshot, candidate_mode=candidate_mode)
     # A table row rejected for metric/year must not be laundered through synthesis.
     prose = [block for block in blocks if not block.is_container and block.origin == "canonical"
@@ -305,8 +306,11 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
             'prefer its whole_passage_id over selecting only its permission sentence.'}
         gaps = getattr(verified, 'source_condition_gaps', {})
         qualifiers = getattr(verified, 'source_qualifier_gaps', [])
+        same_owner_progress = bool(qualifiers and repair_round and
+            {q.block_id for q in qualifiers}.issubset(
+                trace['condition_repair_rounds'][0]['qualifier_blocks']))
         if ((gaps or qualifiers) and verified.claims and not blocking_repair_errors(verified)
-                and (not repair_round or gaps)
+                and (not repair_round or gaps or same_owner_progress)
                 and all(verified.verifier.topic_coverage.get(t) is True for t in plan.requested_topics)):
             try:
                 restored = restore_condition_claims(gaps, selected, qualifiers)
@@ -333,6 +337,18 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
                 trace.update(reason='SEMANTIC_REPAIR_NO_BOUND_CLAIMS', stage='complete')
                 return None
             claims = retain_safe_claims(claims, verified.claims, selected)
+            if ((gaps or qualifiers) and verified.claims and not blocking_repair_errors(verified)
+                    and all(verified.verifier.topic_coverage.get(t) is True for t in plan.requested_topics)):
+                try:
+                    restored = restore_condition_claims(gaps, selected, qualifiers)
+                except ValueError as exc:
+                    raise AppException('Không đối chiếu được điều kiện nguồn sau chọn lại.',
+                        code='SOURCE_CONDITION_REPAIR_INVALID', status_code=503) from exc
+                claims = retain_recovered_conditions(claims, restored)
+                trace['retained_reselection_conditions'] = len(restored)
+            if len(claims) > 48:
+                trace.update(reason='SOURCE_CONDITION_REPAIR_BUDGET', stage='complete')
+                return None
         verified = await verify_bound_answer(db, bounded, repaired_payload, claims, selected, plan, rules)
     trace["stage"] = "complete"
     if verified.complete:

@@ -28,7 +28,12 @@ logger = logging.getLogger(__name__)
 
 
 def reject_rule_metadata(metadata: dict[str, Any] | None) -> None:
+    from app.modules.knowledge.compilation_runtime_schemas import REGISTRY
     from app.modules.knowledge.services.score_rule_service import PROTECTED_KEYS
+
+    if REGISTRY in (metadata or {}):
+        raise AppException('Bản biên soạn phải được quản lý qua luồng kiểm chứng riêng.',
+                           code='KNOWLEDGE_COMPILATION_MANAGED_METADATA', status_code=403)
 
     if PROTECTED_KEYS.intersection(metadata or {}):
         raise AppException("Quy tắc tính điểm phải được quản lý qua luồng duyệt riêng.",
