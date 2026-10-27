@@ -28,6 +28,7 @@ from app.modules.ocr.adapters.base import BaseOCRAdapter
 from app.modules.ocr.adapters.gemini_adapter import GeminiOCRAdapter
 from app.modules.ocr.adapters.mistral_adapter import MistralOCRAdapter
 from app.modules.ocr.adapters.mock_adapter import MockOCRAdapter
+from app.modules.ocr.adapters.nemotron_adapter import NemotronParseAdapter
 from app.modules.ocr.adapters.openai_vision_adapter import (
     OpenAIVisionOCRAdapter,
     QwenOCRAdapter,
@@ -57,6 +58,7 @@ class OCRService:
             "mistral_ocr": MistralOCRAdapter(),
             "qwen_ocr": QwenOCRAdapter(),
             "paddleocr_ocr": PaddleOCRVLAdapter(),
+            "nemotron_parse": NemotronParseAdapter(),
             "mock_ocr": MockOCRAdapter(),
         }
         self._adapters["gemini"] = self._adapters["gemini_ocr"]
@@ -77,6 +79,7 @@ class OCRService:
         catalog = [
             ("eng_pymupdf", "pymupdf_ocr", "pymupdf", ["pdf", "png", "jpg", "tables"], 0.95, True),
             ("eng_paddleocr", "paddleocr_ocr", "paddleocr", ["pdf", "png", "jpg", "scan", "tables", "vietnamese", "layout"], 0.98, False),
+            ("eng_nemotron", "nemotron_parse", "nemotron", ["pdf", "png", "jpg", "scan", "tables", "layout"], 0.0, False),
             ("eng_gemini", "gemini_ocr", "gemini", ["pdf", "png", "jpg", "scan", "tables", "vietnamese", "multimodal"], 0.99, False),
             ("eng_qwen", "qwen_ocr", "qwen", ["pdf", "png", "jpg", "scan", "tables", "vietnamese", "multimodal"], 0.98, False),
             ("eng_mistral", "mistral_ocr", "mistral", ["pdf", "png", "jpg", "scan", "tables", "vietnamese"], 0.98, False),
@@ -105,6 +108,8 @@ class OCRService:
     ) -> BaseOCRAdapter:
         """Resolve or dynamically instantiate the appropriate OCR adapter for a model name or engine name."""
         norm = (name_or_model or "").strip().lower()
+        if norm.startswith("nemotron"):
+            return NemotronParseAdapter(model_name=name_or_model, base_url=kwargs.get("base_url"))
         if norm in {"docling", "easyocr", "sentence_transformers", "ollama", "local_vllm"}:
             raise AppException(
                 f"Engine local '{name_or_model}' đã bị loại khỏi hệ thống.",
@@ -183,6 +188,10 @@ class OCRService:
             raise AppException("Provider OCR không tồn tại hoặc đã ngừng hoạt động.", code="OCR_PROVIDER_UNAVAILABLE", status_code=503)
 
         provider_type = provider.provider_type.strip().lower()
+        if provider_type == "nemotron" or model_name.lower().startswith("nemotron"):
+            from app.modules.ocr.adapters.nemotron_runtime import extract_nemotron
+
+            return await extract_nemotron(session, provider, model_name or provider.model_name, content, filename)
         if provider_type in {"paddleocr", "paddleocr_vl", "paddle"}:
             paddle_adapter = PaddleOCRVLAdapter(
                 base_url=provider.api_base_url,
@@ -316,17 +325,22 @@ class OCRService:
         if requested == "combo":
             return await self._extract_combo_chain(session, content, filename, tenant_id, start_time)
 
-        if requested in {"paddleocr", "paddleocr_vl", "paddle", "paddleocr-vl"}:
+        if requested.startswith("nemotron") or requested in {"paddleocr", "paddleocr_vl", "paddle", "paddleocr-vl"}:
+            is_nemotron = requested.startswith("nemotron")
+            model_filter = ModelProviderConfig.model_name.ilike("nemotron%")
+            if is_nemotron and requested not in {"nemotron", "nemotron_parse", "nemotron_ocr"}:
+                model_filter = ModelProviderConfig.model_name == requested
             stmt = select(ModelProviderConfig).where(
                 ModelProviderConfig.is_active.is_(True),
-                ModelProviderConfig.provider_type.in_({"paddleocr", "paddleocr_vl", "paddle"}),
+                (model_filter if is_nemotron else
+                 ModelProviderConfig.provider_type.in_({"paddleocr", "paddleocr_vl", "paddle"})),
             ).order_by(
                 (ModelProviderConfig.id == str(defaults.get("default_ocr_provider_id") or "")).desc(),
                 ModelProviderConfig.priority, ModelProviderConfig.id,
             ).limit(1)
             provider = (await session.execute(stmt)).scalar_one_or_none()
             if provider is None:
-                raise AppException("Chưa có provider PaddleOCR hoạt động trong ModelOps.",
+                raise AppException("Chưa có provider OCR được chọn hoạt động trong ModelOps.",
                                    code="OCR_PROVIDER_UNAVAILABLE", status_code=503)
             result = await self._extract_step_with_rotation(
                 session, {"provider_id": provider.id, "model_name": provider.model_name}, content, filename,
@@ -549,6 +563,17 @@ class OCRService:
             )
 
         # Scanned PDF or images or office files:
+        if str(default_ocr_model or "").lower().startswith("nemotron"):
+            if not default_ocr_provider_id:
+                raise AppException("Chưa chọn provider Nemotron trong ModelOps.",
+                                   code="OCR_PROVIDER_UNAVAILABLE", status_code=503)
+            result_dict = await self._extract_step_with_rotation(session, {
+                "provider_id": default_ocr_provider_id, "model_name": default_ocr_model,
+            }, content, filename)
+            return await self._build_response(session=session, result_dict=result_dict,
+                filename=filename, tenant_id=tenant_id, start_time=start_time,
+                fallback_triggered=False, fallback_engine=None,
+                cascade_trace=["Nemotron: Nhận dạng qua provider ModelOps đã chọn"], error_msg=None)
         # Loop through candidates in priority order:
         # Dynamic cloud models (Gemini / Mistral)
         gemini_adapter = (

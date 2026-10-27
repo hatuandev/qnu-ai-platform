@@ -1229,6 +1229,9 @@ class KnowledgeImportBatchCreateRequest(BaseModel):
     parser_profile: str = Field(
         "standard", description="Cấu hình bóc tách/OCR: standard, vision_ocr, layout_analysis"
     )
+    ocr_engine: str | None = Field(
+        None, description="Engine OCR cụ thể cho batch; ví dụ nemotron-parse. Bỏ trống giữ luồng tự động hiện tại."
+    )
     chunk_strategy: str = Field(
         "ClauseBasedChunker", description="Chiến lược chunking áp dụng cho batch"
     )

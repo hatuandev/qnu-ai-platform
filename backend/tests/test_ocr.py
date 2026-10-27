@@ -83,8 +83,9 @@ async def test_list_engines_reflects_real_availability():
     service = OCRService()
     engines = service.list_engines()
     by_name = {e.name: e for e in engines}
-    assert set(by_name) == {"pymupdf_ocr", "gemini_ocr", "mock_ocr", "mistral_ocr", "qwen_ocr", "paddleocr_ocr"}
+    assert set(by_name) == {"pymupdf_ocr", "gemini_ocr", "mock_ocr", "mistral_ocr", "qwen_ocr", "paddleocr_ocr", "nemotron_parse"}
     assert by_name["paddleocr_ocr"].is_active is False  # No implicit endpoint outside ModelOps.
+    assert by_name["nemotron_parse"].is_active is False
     assert by_name["pymupdf_ocr"].is_active is True
     assert by_name["gemini_ocr"].is_active is service._adapters["gemini_ocr"].is_available()
     assert by_name["mistral_ocr"].is_active is service._adapters["mistral_ocr"].is_available()

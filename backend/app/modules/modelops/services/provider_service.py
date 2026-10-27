@@ -1027,7 +1027,10 @@ class ProviderService:
                 config.model_name = extra["models"][0] if extra["models"] else None
             extra["model_capabilities"] = {name: cap for name, cap in extra.get("model_capabilities", {}).items() if name in extra["models"]}
         if data.model_capabilities is not None:
-            extra.setdefault("model_capabilities", {}).update({name: cap.model_dump() for name, cap in data.model_capabilities.items() if name in extra.get("models", [])})
+            from app.modules.modelops.services.token_limits import merge_model_capabilities
+
+            extra['model_capabilities'] = merge_model_capabilities(extra.get('model_capabilities', {}),
+                data.model_capabilities, extra.get('models', []))
         if data.provider_type is not None or data.api_base_url is not None:
             extra.pop("last_connection_test", None)
             extra.pop("chat_request_contracts", None)

@@ -1,0 +1,19 @@
+{
+  "context": 636,
+  "date": "2026-10-26",
+  "scope": "backendV1 workspace and ModelOps control plane",
+  "baseline_unit_passed": 21,
+  "auth_before": {"failed": 4, "passed": 1},
+  "full_final": {"passed": 60, "failed": 0, "skipped": 0, "warnings": 2, "seconds": 12.39, "exit_code": 0},
+  "ruff": "PASS",
+  "migration_orm_parity": "PASS",
+  "openapi_http_operations": 35,
+  "legacy_source_files_verified": 475,
+  "legacy_source_changed": false,
+  "application_database_migrated": false,
+  "test_databases_cleaned": true,
+  "legacy_sentinel_preserved": true,
+  "live_sso": "NOT RUN",
+  "live_inference_ocr": "NOT RUN",
+  "ui": "NOT RUN"
+}

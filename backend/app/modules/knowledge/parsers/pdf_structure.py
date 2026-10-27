@@ -16,6 +16,11 @@ from app.modules.knowledge.normalization.qnu_markdown import (
     QnuSourceLocation,
     QnuStructuredDocument,
 )
+from app.modules.knowledge.parsers.pdf_continuations import (
+    aligned_columns,
+    inherit_headers,
+    retain_native_projections,
+)
 from app.modules.knowledge.parsers.pdf_evidence import intersection_fraction, reading_order
 from app.modules.knowledge.parsers.pdf_headings import heading_decisions
 from app.modules.knowledge.parsers.pdf_reconciliation import (
@@ -31,7 +36,7 @@ from app.modules.knowledge.parsers.pdf_tables import (
     table_blocks,
 )
 
-PDF_STRUCTURE_VERSION = "pdf-evidence-structure/v5"
+PDF_STRUCTURE_VERSION = "pdf-evidence-structure/v6"
 # Anything no thicker than this carries a rule, not readable content, whatever painted it.
 _HAIRLINE_POINT = 2.0
 
@@ -473,17 +478,12 @@ def _link_continuations(blocks: list[QnuBlock]) -> None:
         between = blocks[blocks.index(previous) + 1:blocks.index(current)]
         intervening = [b for b in between if b.type != "table_row" and b.body.strip()
                        and b.attributes.get("source_role") not in {"header", "footer"}]
-        def axes(table):
-            raw = (table.source_data or {}).get("table", {}).get("raw_native", {})
-            box = raw.get("bbox")
-            cells = [c for row in raw.get("cell_boxes", []) for c in row if c]
-            return [(x-box[0])/(box[2]-box[0]) for x in sorted({c[i] for c in cells for i in (0,2)})] if box else []
-        ax, bx = axes(previous), axes(current)
-        aligned = ax and len(ax) == len(bx) and all(abs(x-y) <= .005 for x,y in zip(ax,bx,strict=True))
+        aligned = aligned_columns(previous, current)
         if (same_headers and aligned and not intervening and previous.attributes.get("native_literal_coverage")
                 and current.attributes.get("native_literal_coverage")):
             current.attributes["continuation"] = {"block_id":previous.id,
-                "basis":"adjacent_page_aligned_grid_identical_verified_headers", "status":"verified"}
+                "basis": current.attributes.get('inherited_header', {}).get('basis',
+                    'adjacent_page_aligned_grid_identical_verified_headers'), "status":"verified"}
             current.context_refs.append(previous.id)
             before = [b for b in blocks if b.type == "table_row" and b.parent_id == previous.id]
             after = [b for b in blocks if b.type == "table_row" and b.parent_id == current.id]
@@ -522,7 +522,8 @@ def _link_explicit_notes(blocks: list[QnuBlock]) -> None:
                 block.context_refs.append(note.id)
 
 
-def build_pdf_document(evidence: dict[str, Any], *, filename: str, sha256: str) -> QnuStructuredDocument:
+def build_pdf_document(evidence: dict[str, Any], *, filename: str, sha256: str,
+                       legacy_v5: bool = False) -> QnuStructuredDocument:
     pages = evidence["pages"]
     if any(page["native"].get("capture_error") for page in pages):
         raise ValueError("Native evidence capture incomplete")
@@ -632,6 +633,9 @@ def build_pdf_document(evidence: dict[str, Any], *, filename: str, sha256: str) 
                 quality_flags=[QnuQualityFlag(code="header_rescue_needs_review",
                     detail="Dòng số/ngày được OCR vùng đầu đề xuất; JSON giữ raw và phép biến đổi, chưa xác nhận đúng.")],
                 source_data=rescue, body="\n\n".join(audit["accepted_lines"])))
+    if not legacy_v5:
+        retain_native_projections(result.blocks)
+        inherit_headers(result.blocks)
     _link_continuations(result.blocks)
     _link_explicit_notes(result.blocks)
     _link_symbol_legends(result.blocks)

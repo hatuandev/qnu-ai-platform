@@ -50,7 +50,7 @@ async def load_sources(db, collection_id: str, ids: list[str], actor, *, lock: b
         if raw is None or hashlib.sha256(raw).hexdigest() != source.origin_file_hash:
             raise invalid('raw_source_hash')
         frozen = SimpleNamespace(**{column.key: getattr(source, column.key) for column in source.__table__.columns},
-                                 collection_id=collection_id)
+                                 collection_id=collection_id, _compiler_raw_bytes=raw)
         await asyncio.to_thread(source_units, frozen)
         sources.append(frozen)
         identities.append({'source_revision_id': source.id, 'binding_id': binding.id,
@@ -64,8 +64,8 @@ async def load_sources(db, collection_id: str, ids: list[str], actor, *, lock: b
     return collection, sources, catalog, fingerprint
 
 
-def dependency_catalog(sources: list, catalog: dict) -> dict:
-    """Only explicit native context/parent references; metadata is not semantic proof."""
+def dependency_catalog(sources: list, catalog: dict, structure=None) -> dict:
+    """Native links plus source-bound structural navigation; none is semantic approval."""
     by_source_unit = {(ref['source_revision_id'], ref['unit_id']): pid for pid, ref in catalog.items()}
     dependencies = {}
     for source in sources:
@@ -79,6 +79,24 @@ def dependency_catalog(sources: list, catalog: dict) -> dict:
                 linked.append(unit.parent_id)
             dependencies[pid] = sorted({by_source_unit[(source.id, uid)] for uid in linked
                 if (source.id, uid) in by_source_unit and uid != unit.id})
+    from app.modules.knowledge.services.compilation_structure import structural_catalog
+
+    structure = structural_catalog(sources, catalog) if structure is None else structure
+    for pid, node in structure.items():
+        refs = [*node.get('section_evidence_ids', []),
+                *(item['evidence_id'] for item in node.get('section_candidates', [])),
+                *node.get('table_preamble_evidence_ids', []), *node.get('header_evidence_ids', [])]
+        dependencies[pid] = sorted(set(dependencies.get(pid, []) + refs) - {pid})
+    # Resolve native/section chains once; never treat candidate headers as semantic dependencies.
+    for pid, linked in dependencies.items():
+        seen, pending = set(), list(linked)
+        while pending:
+            ref = pending.pop()
+            if ref == pid or ref in seen:
+                continue
+            seen.add(ref)
+            pending.extend(dependencies.get(ref, []))
+        dependencies[pid] = sorted(seen)
     return dependencies
 
 

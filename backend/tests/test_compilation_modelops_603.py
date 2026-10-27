@@ -29,11 +29,14 @@ def defaults():
 @pytest.mark.asyncio
 async def test_route_comes_from_modelops_and_rotation_changes_only_opaque_configuration_seal():
     item = SimpleNamespace(id='primary', created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        is_active=True,api_base_url='http://127.0.0.1:1/v1',extra_config={},
         api_key_encrypted='fake-encrypted-value', __table__=SimpleNamespace(columns=[
             SimpleNamespace(key='created_at'), SimpleNamespace(key='api_key_encrypted')]))
     db = SimpleNamespace(scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: [item])))
     with patch('app.modules.modelops.services.model_catalog_service.model_catalog_service.get_system_model_defaults',
-               AsyncMock(return_value=SimpleNamespace(defaults=defaults()))):
+               AsyncMock(return_value=SimpleNamespace(defaults=defaults()))), patch(
+               'app.modules.modelops.services.capacity_discovery.discover',AsyncMock(return_value={
+                   'context_window_tokens':128000,'max_output_tokens':64000,'basis':'provider_reported'})):
         route = await resolve_route(db)
         assert route['preferred_model_name'] == 'selected-model' and route['fallback_provider_id'] == 'backup'
         assert 'fake-encrypted-value' not in repr(route) and len(route['_configuration_hash']) == 64
@@ -51,6 +54,24 @@ async def test_missing_modelops_defaults_fails_without_constructing_an_inference
         with pytest.raises(AppException) as error:
             await resolve_route(None)
         assert error.value.code == 'KNOWLEDGE_COMPILATION_MODEL_REQUIRED'
+
+
+@pytest.mark.asyncio
+async def test_optional_fallback_discovery_does_not_block_or_probe_before_primary_dispatch():
+    from app.modules.knowledge.services.compilation_modelops import execution_policy
+
+    def provider(pid):
+        return SimpleNamespace(id=pid,is_active=True,api_base_url='http://127.0.0.1:1/v1',extra_config={},
+            __table__=SimpleNamespace(columns=[]))
+    db=SimpleNamespace(scalars=AsyncMock(return_value=SimpleNamespace(all=lambda:[provider('primary'),provider('backup')])))
+    discovery=AsyncMock(return_value={'context_window_tokens':128000,'max_output_tokens':64000,'basis':'provider_reported'})
+    with patch('app.modules.modelops.services.model_catalog_service.model_catalog_service.get_system_model_defaults',
+            AsyncMock(return_value=SimpleNamespace(defaults=defaults()))),patch(
+            'app.modules.modelops.services.capacity_discovery.discover',discovery):
+        route=await resolve_route(db)
+    assert discovery.await_count==1 and discovery.await_args.args[1]=='selected-model'
+    assert execution_policy(route).context_budget_tokens==128000
+    assert route['_token_limits'][1]['basis']=='discover_on_dispatch_unverified'
 
 
 @pytest.mark.parametrize('field', ['preferred_provider_id', 'preferred_model_name', 'actor_id', 'publication'])

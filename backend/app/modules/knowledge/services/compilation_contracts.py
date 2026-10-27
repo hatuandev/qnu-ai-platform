@@ -1,6 +1,6 @@
 """Pure proposal boundary; does not persist, verify semantics, index or publish."""
 from app.core.exceptions import AppException
-from app.modules.knowledge.compilation_schemas import CompilationDraft
+from app.modules.knowledge.compilation_schemas import proposal_contract
 from app.modules.knowledge.services.wiki_compiler import digest, source_identity, source_units
 from app.modules.rag.evidence_validation import YEAR
 
@@ -43,7 +43,7 @@ def bind_draft(payload: dict, sources: list, collection_id: str, actor) -> dict:
 
 def _bind_draft(payload: dict, sources: list, collection_id: str) -> dict:
     """Internal integrity validation only; callers separately authorize reads/writes."""
-    draft = CompilationDraft.model_validate(payload)
+    draft = proposal_contract(payload).model_validate(payload)
     catalog = evidence_catalog(sources, collection_id)
     snapshot_hash = digest(catalog)
     if draft.snapshot_hash != snapshot_hash:
@@ -86,6 +86,9 @@ def _bind_draft(payload: dict, sources: list, collection_id: str) -> dict:
     for section in draft.sections:
         if any(key not in assertions for key in section.assertion_ids):
             raise invalid('unknown_section_assertion')
+    from app.modules.knowledge.services.compilation_manifest import validate_groups
+
+    validate_groups(draft.model_dump(mode='json'), catalog)
     # This receipt certifies binding only. Independent entailment, role, condition
     # completeness and any necessary human decision still precede effective use.
     result = {'version': draft.version, 'state': 'evidence_bound', 'usage': 'review_only',

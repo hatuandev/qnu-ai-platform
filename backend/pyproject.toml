@@ -32,6 +32,7 @@ dependencies = [
     "cryptography>=50.0.1",
     "pdf-inspector>=1.22.1",
     "docling-slim[format-office,format-pdf-pypdfium2]>=2.127.0,<3",
+    "tiktoken>=0.14.0",
 ]
 
 [project.optional-dependencies]

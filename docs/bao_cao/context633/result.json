@@ -1,0 +1,269 @@
+{
+  "context": 633,
+  "date": "2026-10-25",
+  "overall": "NOT_ACCEPTED_END_TO_END",
+  "scope": "Synthetic one-page DOCX, native PDF and image-only PDF; real HTTP API, worker, S3 and internal OCR provider.",
+  "collection_id": "col_929f275c6229",
+  "group_id": "doc_grp_77dcea5a41db",
+  "documents": {
+    "ctx633.docx": {
+      "id": "rep_doc_0a2c87a5ad57",
+      "sha256": "7ed6af108606cfb789a7b5021be8405e582f07d57102d56ae518c0c5fc43c505"
+    },
+    "ctx633-native.pdf": {
+      "id": "rep_doc_2731e95fb673",
+      "sha256": "fc6d8a2c1b47209cad8fab882536437c13f203b4a7fb6c7121b1908c06d29b7a"
+    },
+    "ctx633-scan.pdf": {
+      "id": "rep_doc_990faa0d8e0c",
+      "sha256": "d999e55e9ffdd7aa4c7d2b577401e3e687d4f29538d57fd2e584baa534e0b0e0"
+    }
+  },
+  "downloads": [
+    {
+      "file": "ctx633.docx",
+      "http": 200,
+      "sha256_matches": true
+    },
+    {
+      "file": "ctx633-native.pdf",
+      "http": 200,
+      "sha256_matches": true
+    },
+    {
+      "file": "ctx633-scan.pdf",
+      "http": 200,
+      "sha256_matches": true
+    }
+  ],
+  "dedup": {
+    "http": 202,
+    "same_document": true,
+    "deduplicated": true
+  },
+  "initial_import": {
+    "batch_id": "imp_batch_686124ae7152",
+    "status": "completed",
+    "items": [
+      {
+        "file": "ctx633-native.pdf",
+        "status": "succeeded",
+        "revision_id": "ks_rev_64a3b81b3c71"
+      },
+      {
+        "file": "ctx633.docx",
+        "status": "succeeded",
+        "revision_id": "ks_rev_11cf22a1fa9f"
+      }
+    ]
+  },
+  "direct_ocr": {
+    "nemotron-live-probe.json": {
+      "expected_16_cells_match": true,
+      "row_count": 4,
+      "success": true,
+      "fallback": false,
+      "confidence_source": "unavailable"
+    },
+    "scan-pdf-nemotron.json": {
+      "expected_16_cells_match": true,
+      "row_count": 4,
+      "success": true,
+      "fallback": false,
+      "confidence_source": "unavailable"
+    }
+  },
+  "scan_pdf": {
+    "http": 200,
+    "engine": "nemotron_parse",
+    "pages": 1,
+    "success": true,
+    "fallback_triggered": false,
+    "elapsed_seconds": 1.51
+  },
+  "reparse": {
+    "ctx633-native.pdf": {
+      "status": "review_required",
+      "revision_id": "ks_rev_d7df34f892f1",
+      "failure_code": null,
+      "quality_report": {
+        "ocr_engine": "nemotron_parse",
+        "page_count": 1,
+        "total_chars": 703,
+        "total_words": 105,
+        "evaluated_at": "2026-10-25T12:38:06.935651+00:00",
+        "warning_flags": [
+          "tables_detected_but_missing_in_markdown"
+        ],
+        "chars_per_page": 703.0,
+        "overall_status": "warning",
+        "serving_format": "qnu-rag-projection/v1",
+        "structured_issues": [
+          {
+            "code": "TABLES_NOT_MATERIALIZED"
+          },
+          {
+            "code": "TABLES_NOT_MATERIALIZED",
+            "page_number": 1
+          }
+        ],
+        "detected_tables_count": 1,
+        "markdown_tables_count": 0,
+        "mojibake_artifacts_count": 0,
+        "structured_review_required": true
+      }
+    },
+    "ctx633.docx": {
+      "status": "failed",
+      "revision_id": "ks_rev_66c4c4ca2773",
+      "failure_code": "DOCX_LAYOUT_ALIGNMENT_FAILED",
+      "quality_report": {}
+    }
+  },
+  "storage_driver": "S3StorageDriver",
+  "defaults_unchanged": true,
+  "raw_provenance": {
+    "source_hash_matches": true,
+    "provider_response_retained": true,
+    "raw_latex_retained": true,
+    "raw_bbox_retained": true,
+    "source_span_retained": true,
+    "ocr_table": {
+      "expected_16_cells_match": true,
+      "row_count": 4
+    },
+    "page_map": [
+      {
+        "local": 1,
+        "physical": 1
+      }
+    ]
+  },
+  "artifact_checks": {
+    "ks_rev_64a3b81b3c71": {
+      "status": "ready",
+      "hash_checks": {
+        "markdown": {
+          "exists": true,
+          "hash_matches": true
+        },
+        "structured": {
+          "exists": true,
+          "hash_matches": true
+        },
+        "raw_evidence": {
+          "exists": true,
+          "hash_matches": true
+        }
+      },
+      "canonical_hash_matches": true
+    },
+    "ks_rev_11cf22a1fa9f": {
+      "status": "ready",
+      "hash_checks": {
+        "markdown": {
+          "exists": true,
+          "hash_matches": true
+        },
+        "structured": {
+          "exists": true,
+          "hash_matches": true
+        }
+      },
+      "canonical_hash_matches": true
+    },
+    "ks_rev_d7df34f892f1": {
+      "status": "review_required",
+      "hash_checks": {
+        "markdown": {
+          "exists": true,
+          "hash_matches": true
+        },
+        "structured": {
+          "exists": true,
+          "hash_matches": true
+        },
+        "raw_evidence": {
+          "exists": true,
+          "hash_matches": true
+        }
+      },
+      "canonical_hash_matches": true
+    },
+    "ks_rev_66c4c4ca2773": {
+      "status": "failed",
+      "hash_checks": {
+        "markdown": {
+          "exists": true,
+          "hash_matches": true
+        },
+        "structured": {
+          "exists": true,
+          "hash_matches": true
+        }
+      },
+      "canonical_hash_matches": false
+    }
+  },
+  "api_artifacts": [
+    {
+      "file": "ctx633-native.pdf",
+      "revision": "ks_rev_d7df34f892f1",
+      "revision_status": "review_required",
+      "http": 200,
+      "matches_saved_artifact": true
+    },
+    {
+      "file": "ctx633.docx",
+      "revision": "ks_rev_66c4c4ca2773",
+      "revision_status": "failed",
+      "http": 409,
+      "matches_saved_artifact": false
+    }
+  ],
+  "binding_guards": [
+    {
+      "id": "bnd_12aca9253359",
+      "active_source_revision_id": "ks_rev_11cf22a1fa9f",
+      "active_index_revision_id": null,
+      "status": "active"
+    },
+    {
+      "id": "bnd_4c5b2fba3b93",
+      "active_source_revision_id": "ks_rev_64a3b81b3c71",
+      "active_index_revision_id": null,
+      "status": "active"
+    }
+  ],
+  "index_revision_count": 0,
+  "alignment_replay": {
+    "native_alignment_text": {
+      "accepted": true
+    },
+    "real_ocr_html_merged": {
+      "accepted": false,
+      "code": "DOCX_LAYOUT_ALIGNMENT_FAILED"
+    },
+    "ocr_visible_text_only": {
+      "accepted": true
+    }
+  },
+  "offline_regression": {
+    "command": ".venv\\Scripts\\python.exe -m pytest tests/test_nemotron_ocr_631.py -vv -o faulthandler_timeout=30",
+    "cwd": "backend",
+    "exit_code": 0,
+    "passed": 29,
+    "failed": 0,
+    "seconds": 3.2,
+    "scope": "Mocked adapter/runtime contracts; live workflow recorded separately."
+  },
+  "not_run": [
+    "Browser UI",
+    "Initial scanned PDF import with explicit Nemotron: batch API does not expose engine and job payload omits it",
+    "Publication/vector indexing/retrieval/compiler",
+    "Full pytest: no application code changed in this test session"
+  ],
+  "approval_review": {
+    "global_ocr_defaults_update": "Rejected before execution; used per-source OCR requests instead. Global defaults unchanged."
+  }
+}

@@ -86,7 +86,7 @@ def check_lineage(state: dict, job_ids: list[str]) -> None:
             continue
         visited.add(job_id)
         record = state['jobs'].get(job_id)
-        if not record or record['status'] in {'rejected', 'revoked', 'uncertain', 'running'}:
+        if not record or record['status'] in {'rejected', 'revoked', 'uncertain', 'running', 'capacity_blocked'}:
             raise invalid('revoked_derivative_dependency')
         pending.extend((parent, ancestors | {job_id}) for parent in record.get('reused_job_ids', []))
 

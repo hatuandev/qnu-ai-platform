@@ -1,0 +1,78 @@
+{
+  "status": "PASS",
+  "scope": "all current backendV1 test files, disjoint full partitions; repaired partition rerun in full",
+  "passed": 540,
+  "failed": 0,
+  "skipped": 0,
+  "test_files": 61,
+  "partitions": [
+    {
+      "label": "full-1",
+      "tests": 67,
+      "pytest_exit": 0,
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "harness_seconds": 383.62
+    },
+    {
+      "label": "full-2-final",
+      "tests": 58,
+      "pytest_exit": 0,
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "harness_seconds": 277.95
+    },
+    {
+      "label": "full-3",
+      "tests": 84,
+      "pytest_exit": 0,
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "harness_seconds": 383.75
+    },
+    {
+      "label": "full-4",
+      "tests": 100,
+      "pytest_exit": 0,
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "harness_seconds": 383.89
+    },
+    {
+      "label": "full-5",
+      "tests": 231,
+      "pytest_exit": 0,
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "harness_seconds": 23.91
+    }
+  ],
+  "baseline_cases": 490,
+  "new_cases": 50,
+  "new_owned_cases": 48,
+  "new_concurrent_sso_cases": 2,
+  "lost_cases": 0,
+  "prior_full": {
+    "status": "FAIL",
+    "passed": 539,
+    "failed": 1,
+    "failure_id": "tests.integration.test_compiler_workflow_e2e_654::test_corrected_source_survives_review_edit_publish_index_and_citations",
+    "cause": "projection omitted documents text-version metadata; repaired code without weakening assertion"
+  },
+  "python_files_checked": 56,
+  "ruff": "PASS",
+  "format": "PASS",
+  "legacy_files_sealed": 475,
+  "legacy_byte_drift_count": 0,
+  "openapi": {
+    "paths": 92,
+    "operations": 119,
+    "prior_paths": 79,
+    "missing_prior_paths": []
+  },
+  "cleanup": {
+    "owned_database_names_checked": 37,
+    "owned_databases_remaining": [],
+    "observed_v1_vector_collections": 0
+  }
+}

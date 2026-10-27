@@ -1,0 +1,24 @@
+{
+  "context": 642,
+  "date": "2026-10-26",
+  "status": "changes_requested",
+  "application_modified": false,
+  "full_v1": {"passed": 248, "failed": 1, "skipped": 0, "seconds": 83.42, "exit_code": 1},
+  "independent_probes": {"passed": 0, "failed": 6, "errors": 0, "seconds": 11.57, "exit_code": 1},
+  "openxml_header_recheck": {"failed": 1, "seconds": 2.88, "exit_code": 1},
+  "findings": [
+    {"id": "F1", "priority": 1, "issue": "ARQ startup requires nonexistent settings context"},
+    {"id": "F2", "priority": 1, "issue": "OCR ignores registered capacity; sends 8192 against output limit 32"},
+    {"id": "F3", "priority": 1, "issue": "Resumed generation mixes endpoint/model and mislabels provenance"},
+    {"id": "F4", "priority": 1, "issue": "Reconciler never recovers expired dispatched running jobs"},
+    {"id": "F5", "priority": 1, "issue": "DOCX header omitted before OCR without warning"},
+    {"id": "F6", "priority": 2, "issue": "Raw response lost on layout parse failure"}
+  ],
+  "existing_full_failure": "tests/integration/test_knowledge_regressions_639.py::test_same_key_writers_do_not_fail_storage_under_contention",
+  "ruff": "PASS",
+  "source_files_unchanged": 640,
+  "legacy_files_unchanged": 475,
+  "owned_databases": 4,
+  "owned_databases_remaining": 0,
+  "live_nemotron": "NOT RUN"
+}

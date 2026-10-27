@@ -1,0 +1,102 @@
+{
+  "checked_utc": "2026-10-25T10:31:58.419113+00:00",
+  "fresh_infrastructure_authorized": true,
+  "minio_image_explicitly_authorized": "pgsty/minio:RELEASE.2026-06-18T00-00-00Z",
+  "minio_digest": "sha256:dacff8306a6e0a734518533992dbdcca26bc1ca47f77cf47cb9945725f92b29b",
+  "minio_version": "minio version RELEASE.2026-06-18T00-00-00Z (commit-id=3e61b1d3a55c67340214ed6dc4612a7e2abc877d)\nRuntime: go1.26.4 linux/amd64\nLicense: GNU AGPLv3 - https://www.gnu.org/licenses/agpl-3.0.html\nCopyright: 2015-2026 MinIO, Inc.",
+  "services": [
+    {
+      "Name": "qnu_gotenberg",
+      "Service": "gotenberg",
+      "Image": "gotenberg/gotenberg:8",
+      "State": "running",
+      "Health": "healthy",
+      "ID": "c27ee1d8dd9b"
+    },
+    {
+      "Name": "qnu_minio",
+      "Service": "minio",
+      "Image": "pgsty/minio:RELEASE.2026-06-18T00-00-00Z",
+      "State": "running",
+      "Health": "healthy",
+      "ID": "3492319cdef1"
+    },
+    {
+      "Name": "qnu_postgres",
+      "Service": "postgres",
+      "Image": "postgres:16",
+      "State": "running",
+      "Health": "healthy",
+      "ID": "5e6160acc3e4"
+    },
+    {
+      "Name": "qnu_qdrant",
+      "Service": "qdrant",
+      "Image": "qdrant/qdrant:latest",
+      "State": "running",
+      "Health": "healthy",
+      "ID": "d76f41d3e3f2"
+    },
+    {
+      "Name": "qnu_redis",
+      "Service": "redis",
+      "Image": "redis:7-alpine",
+      "State": "running",
+      "Health": "healthy",
+      "ID": "c96a90cbfa0a"
+    }
+  ],
+  "volumes": [
+    "qnu_minio_data",
+    "qnu_postgres_data",
+    "qnu_qdrant_data",
+    "qnu_redis_data"
+  ],
+  "checks": [
+    {
+      "name": "postgres_select_1",
+      "exit_code": 0,
+      "result": "1",
+      "ok": true
+    },
+    {
+      "name": "redis_ping",
+      "exit_code": 0,
+      "result": "PONG",
+      "ok": true
+    },
+    {
+      "name": "qdrant_ready",
+      "http_status": 200,
+      "ok": true
+    },
+    {
+      "name": "gotenberg_health",
+      "http_status": 200,
+      "ok": true
+    },
+    {
+      "name": "minio_live",
+      "http_status": 200,
+      "ok": true
+    },
+    {
+      "name": "minio_ready",
+      "http_status": 200,
+      "ok": true
+    },
+    {
+      "name": "minio_console",
+      "http_status": 200,
+      "ok": true
+    },
+    {
+      "name": "minio_authenticated_s3_list_buckets",
+      "http_status": 200,
+      "bucket_count": 0,
+      "ok": true
+    }
+  ],
+  "backend_frontend_worker": "not started by this task",
+  "application_migration_seed": "not run"
+}

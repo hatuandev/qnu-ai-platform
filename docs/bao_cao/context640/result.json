@@ -1,0 +1,50 @@
+{
+  "context": 640,
+  "date": "2026-10-26",
+  "status": "ocr_flow_implemented_full_pass_live_ocr_not_run",
+  "scope": "PDF/DOCX -> render -> Nemotron OCR via ModelOps -> canonical evidence -> read API",
+  "baseline_full": {"passed": 152, "failed": 2, "skipped": 0, "note": "Context641 snapshot; both failures closed in this batch"},
+  "focused_ocr_integration": {"passed": 14, "failed": 0, "skipped": 0},
+  "full_final": {
+    "passed": 249,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 83.39,
+    "exit_code": 0,
+    "database": "qnu_v1_test_73051dbf42c4467a",
+    "db_dropped": true,
+    "legacy_sentinel_preserved": true
+  },
+  "new_cases": 95,
+  "new_cases_unit": 81,
+  "new_cases_integration": 14,
+  "new_case_failures": 0,
+  "ruff": "PASS",
+  "openapi": {"paths": 39, "operations": 54, "new_paths": 8},
+  "migration": {
+    "revision": "0006_ocr_processing",
+    "down_revision": "0005_knowledge_collections",
+    "tables_added": ["ocr_processing_runs", "ocr_run_pages", "ocr_run_artifacts"],
+    "orm_parity": "PASS",
+    "downgrade": "refused_by_design",
+    "applied_to_serving_database": false
+  },
+  "closed_from_641": [
+    "regression test_downgrade_cannot_mark_success_and_block_next_upgrade now asserts the invariant instead of the 0005 message/version",
+    "local blob store PermissionError reproduced only outside the harness basetemp; 9 tests PASS inside it"
+  ],
+  "legacy_app_files_unchanged": 475,
+  "legacy_code_modified": false,
+  "main_database_migrated": false,
+  "restart_or_deploy": false,
+  "owned_test_databases_remaining": 0,
+  "live_ocr": "NOT RUN",
+  "live_ocr_reason": "no real Nemotron endpoint/credential and no data cleared for external sending; loopback provider is a mock",
+  "limits": [
+    "No Compiler, chunking, embedding, index, publication, RAG or frontend",
+    "Only .pdf and .docx are processable; other stored formats return 415",
+    "No automatic backfill of older revisions",
+    "DOCX layout is an HTML projection, not pixel-identical to Word",
+    "No repo-wide ruff format; gate is ruff check"
+  ]
+}

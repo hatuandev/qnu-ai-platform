@@ -1,0 +1,432 @@
+{
+  "context": 634,
+  "date": "2026-10-25",
+  "ocr_processing": "3/3 actual Nemotron OCR responses verified",
+  "publication_acceptance": "NOT_APPROVED: scanned PDF retains layout/heading blockers",
+  "live": {
+    "collection_id": "col_508128d4b99b",
+    "batch_id": "imp_batch_0cb3350c8684",
+    "batch_status": "review_required",
+    "sources": [
+      {
+        "file": "ctx633-native.pdf",
+        "revision_id": "ks_rev_1ac3960bbbd2",
+        "status": "ready",
+        "engine": "nemotron_parse",
+        "reused_artifact": false,
+        "canonical_hash_matches": true,
+        "quality_report": {
+          "ocr_engine": "nemotron_parse",
+          "page_count": 1,
+          "total_chars": 459,
+          "total_words": 111,
+          "evaluated_at": "2026-10-25T13:17:18.742969+00:00",
+          "warning_flags": [],
+          "chars_per_page": 459.0,
+          "overall_status": "passed",
+          "serving_format": "qnu-rag-projection/v1",
+          "detected_tables_count": 1,
+          "markdown_tables_count": 1,
+          "mojibake_artifacts_count": 0,
+          "structured_review_required": false
+        },
+        "artifact_checks": {
+          "markdown": true,
+          "structured": true
+        },
+        "raw_evidence_hash_matches": true,
+        "raw_ocr_16_cells_match": true,
+        "raw_ocr_engine": "nemotron_parse",
+        "raw_provider_response_saved": true,
+        "raw_source_hash_matches": true,
+        "ocr_page_map": [
+          {
+            "local": 1,
+            "physical": 1
+          }
+        ],
+        "raw_bbox_and_source_spans_retained": true,
+        "readiness": {
+          "status": "READY_WITH_LIMITATIONS",
+          "blockers": [],
+          "limitations_count": 16
+        },
+        "structured_issues": [
+          {
+            "code": "ambiguous_cell",
+            "block_id": "p0001_b0004_r0004",
+            "field_id": "c04"
+          }
+        ]
+      },
+      {
+        "file": "ctx633.docx",
+        "revision_id": "ks_rev_c5669f747a67",
+        "status": "ready",
+        "engine": "docling+nemotron_parse",
+        "reused_artifact": false,
+        "canonical_hash_matches": true,
+        "quality_report": {
+          "ocr_engine": "docling+nemotron_parse",
+          "page_count": 1,
+          "total_chars": 501,
+          "total_words": 104,
+          "evaluated_at": "2026-10-25T13:17:25.219852+00:00",
+          "warning_flags": [],
+          "chars_per_page": 501.0,
+          "overall_status": "passed",
+          "serving_format": "qnu-rag-projection/v1",
+          "detected_tables_count": 1,
+          "markdown_tables_count": 1,
+          "mojibake_artifacts_count": 0,
+          "structured_review_required": false
+        },
+        "artifact_checks": {
+          "markdown": true,
+          "structured": true
+        },
+        "raw_evidence_hash_matches": true,
+        "office_archive_members": [
+          "ocr/preview.json"
+        ],
+        "raw_ocr_16_cells_match": true,
+        "raw_ocr_engine": "nemotron_parse",
+        "raw_provider_response_saved": true,
+        "raw_source_hash_matches": true,
+        "ocr_page_map": [
+          {
+            "local": 1,
+            "physical": 1
+          }
+        ],
+        "raw_bbox_and_source_spans_retained": true,
+        "readiness": {
+          "status": "READY_WITH_LIMITATIONS",
+          "blockers": [],
+          "limitations_count": 1
+        },
+        "structured_issues": [
+          {
+            "code": "ambiguous_cell",
+            "table_id": "qnu:t001",
+            "row_index": 2,
+            "column_index": 3
+          }
+        ]
+      },
+      {
+        "file": "ctx633-scan.pdf",
+        "revision_id": "ks_rev_8a5ddf4e60b8",
+        "status": "review_required",
+        "engine": "nemotron_parse",
+        "reused_artifact": false,
+        "canonical_hash_matches": true,
+        "quality_report": {
+          "ocr_engine": "nemotron_parse",
+          "page_count": 1,
+          "total_chars": 409,
+          "total_words": 100,
+          "evaluated_at": "2026-10-25T13:17:21.672259+00:00",
+          "warning_flags": [],
+          "chars_per_page": 409.0,
+          "overall_status": "warning",
+          "serving_format": "qnu-rag-projection/v1",
+          "detected_tables_count": 0,
+          "markdown_tables_count": 1,
+          "mojibake_artifacts_count": 0,
+          "structured_review_required": true
+        },
+        "artifact_checks": {
+          "markdown": true,
+          "structured": true
+        },
+        "raw_evidence_hash_matches": true,
+        "raw_ocr_16_cells_match": true,
+        "raw_ocr_engine": "nemotron_parse",
+        "raw_provider_response_saved": true,
+        "raw_source_hash_matches": true,
+        "ocr_page_map": [
+          {
+            "local": 1,
+            "physical": 1
+          }
+        ],
+        "raw_bbox_and_source_spans_retained": true,
+        "readiness": {
+          "status": "NEEDS_ATTENTION",
+          "blockers": [
+            {
+              "target": {
+                "code": "visual_content_untranscribed",
+                "block_id": "p0001_b0001",
+                "field_id": null
+              },
+              "message": "Cảnh báo nguồn chưa có bằng chứng cho phép bỏ chặn.",
+              "reason_code": "visual_content_untranscribed"
+            },
+            {
+              "target": {
+                "code": "heading_level_unresolved",
+                "block_id": "p0001_b0002",
+                "field_id": null
+              },
+              "message": "Cảnh báo nguồn chưa có bằng chứng cho phép bỏ chặn.",
+              "reason_code": "heading_level_unresolved"
+            }
+          ],
+          "limitations_count": 1
+        },
+        "structured_issues": [
+          {
+            "code": "visual_content_untranscribed",
+            "block_id": "p0001_b0001",
+            "field_id": null
+          },
+          {
+            "code": "heading_level_unresolved",
+            "block_id": "p0001_b0002",
+            "field_id": null
+          },
+          {
+            "code": "ambiguous_cell",
+            "block_id": "p0001_b0005_r0004",
+            "field_id": "c04"
+          }
+        ]
+      }
+    ],
+    "defaults_unchanged": true,
+    "jobs": [
+      {
+        "id": "job_5f416e5a8312",
+        "status": "completed",
+        "payload": {
+          "item_id": "imp_item_b610439ef3f8",
+          "batch_id": "imp_batch_0cb3350c8684",
+          "ocr_engine": "nemotron-parse"
+        }
+      },
+      {
+        "id": "job_b34da5fa786d",
+        "status": "completed",
+        "payload": {
+          "item_id": "imp_item_fd1d29011d15",
+          "batch_id": "imp_batch_0cb3350c8684",
+          "ocr_engine": "nemotron-parse"
+        }
+      },
+      {
+        "id": "job_d8b3b5e142c0",
+        "status": "completed",
+        "payload": {
+          "item_id": "imp_item_66664b4cacab",
+          "batch_id": "imp_batch_0cb3350c8684",
+          "ocr_engine": "nemotron-parse"
+        }
+      }
+    ],
+    "bindings": [
+      {
+        "id": "bnd_a47e8e5d4545",
+        "active_source_revision_id": "ks_rev_1ac3960bbbd2",
+        "active_index_revision_id": null,
+        "status": "active"
+      },
+      {
+        "id": "bnd_2346019c47a7",
+        "active_source_revision_id": "ks_rev_c5669f747a67",
+        "active_index_revision_id": null,
+        "status": "active"
+      },
+      {
+        "id": "bnd_81701e756330",
+        "active_source_revision_id": null,
+        "active_index_revision_id": null,
+        "status": "pending"
+      }
+    ],
+    "index_revision_count": 0,
+    "idempotency": {
+      "same_http": 201,
+      "same_batch": true,
+      "changed_engine_http": 409,
+      "changed_engine_error": "IDEMPOTENCY_CONFLICT"
+    },
+    "original_downloads": [
+      {
+        "file": "ctx633.docx",
+        "http": 200,
+        "sha256_matches": true
+      },
+      {
+        "file": "ctx633-native.pdf",
+        "http": 200,
+        "sha256_matches": true
+      },
+      {
+        "file": "ctx633-scan.pdf",
+        "http": 200,
+        "sha256_matches": true
+      }
+    ]
+  },
+  "focused": {
+    "passed": 134,
+    "subtests_passed": 23,
+    "failed": 0,
+    "exit_code": 0,
+    "seconds": 49.81,
+    "new_regression_cases": 9
+  },
+  "ruff": {
+    "files": 7,
+    "exit_code": 0
+  },
+  "full_gate": {
+    "status": "FAIL",
+    "partial_before_raw_evidence": "Interrupted; not accepted",
+    "first_complete_attempt": {
+      "exit_code": 1,
+      "passed": 3613,
+      "failed": 16,
+      "skipped": 60,
+      "errors": 217,
+      "seconds": 324.19,
+      "setup_issue": "Windows default pytest temp ACL; two integration tests refused non-test DB. Not used as regression acceptance."
+    },
+    "isolation_preflight": [
+      "Guard refused engine pointing to application DB before schema writes; test DB dropped.",
+      "Metadata create_all hit duplicate index declaration; test DB dropped.",
+      "Final harness uses fresh subprocess env and schema-only dump, no rows/credentials copied."
+    ],
+    "final_command": "run_isolated_tests.py -> python -m pytest -v --tb=short --basetemp=<unique workspace temp> --junitxml=storage/context634/full-isolated.xml",
+    "final_counts": {
+      "SKIP": 57,
+      "PASS": 3835,
+      "FAIL": 14
+    },
+    "exit_code": 1,
+    "pytest_seconds": 439.24,
+    "runner_seconds": 447.41,
+    "existing_failure_ids_same_cause": 13,
+    "new_failure_recheck": {
+      "test_id": "tests.test_context548_patch::test_api_whole_actual_document_uses_same_deadline_and_preserves_pending_scope",
+      "result": "PASS",
+      "tests": 1,
+      "test_seconds": 15.76,
+      "runner": {
+        "database": "qnu_test_context634_d060a9a14a28",
+        "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context634\\isolated-d060a9a14a28\\objects",
+        "command": [
+          "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\.venv\\Scripts\\python.exe",
+          "-m",
+          "pytest",
+          "tests/test_context548_patch.py::test_api_whole_actual_document_uses_same_deadline_and_preserves_pending_scope",
+          "-v",
+          "--tb=short",
+          "--basetemp=D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context634\\isolated-d060a9a14a28\\pytest-temp",
+          "--junitxml=D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context634\\model-default-recheck.xml"
+        ],
+        "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+        "external_network": "loopback only; model/Qdrant defaults point to closed port",
+        "db_dropped": true,
+        "schema_source": "Schema-only dump; no application rows or protected credentials copied.",
+        "test_only_seed": "Standard ModelOps defaults in owned DB; no providers/keys copied; inference mocked by test.",
+        "exit_code": 0,
+        "seconds": 29.62
+      },
+      "explanation": "Fresh test DB lacked standard system defaults. Replayed with only standard ModelOps defaults seeded in owned DB; inference remains mocked and network guarded. No app/guard/assertion change."
+    },
+    "prior_passing_tests_now_skipped": 40,
+    "skip_limit": "Owned DB namespace guard in historical integration fixture does not whitelist context634. No guard changes made.",
+    "new_634_cases": {
+      "tests.test_ocr_ingestion_634::test_office_alignment_compares_html_cells_without_markup_tokens": "PASS",
+      "tests.test_ocr_ingestion_634::test_unrelated_html_is_still_rejected_by_office_alignment": "PASS",
+      "tests.test_ocr_ingestion_634::test_office_alignment_decodes_html_entities_without_changing_source": "PASS",
+      "tests.test_ocr_ingestion_634::test_pdf_ocr_derivative_has_table_but_raw_response_stays_unchanged": "PASS",
+      "tests.test_ocr_ingestion_634::test_batch_schema_accepts_explicit_ocr_selection": "PASS",
+      "tests.test_ocr_ingestion_634::test_import_job_keeps_ocr_selection_on_initial_dispatch_and_retry[0]": "PASS",
+      "tests.test_ocr_ingestion_634::test_import_job_keeps_ocr_selection_on_initial_dispatch_and_retry[1]": "PASS",
+      "tests.test_ocr_ingestion_634::test_old_import_job_payload_stays_compatible_without_ocr_override": "PASS",
+      "tests.test_ocr_ingestion_634::test_docx_resource_archive_preserves_raw_ocr_alongside_original_images": "PASS"
+    },
+    "source_seal_unchanged": true,
+    "test_databases_dropped": true
+  },
+  "scope": [
+    "Synthetic one-page DOCX, native PDF, image-only PDF",
+    "Repository originals reused from verified uploads Context633",
+    "Real API, worker, protected ModelOps credential and S3",
+    "No default model switch, vector build, publication, Compiler or UI test"
+  ],
+  "artifact_api_downloads": [
+    {
+      "file": "ctx633.docx",
+      "format": "md",
+      "http": 200,
+      "bytes": 3953
+    },
+    {
+      "file": "ctx633.docx",
+      "format": "json",
+      "http": 200,
+      "bytes": 11617
+    },
+    {
+      "file": "ctx633.docx",
+      "format": "reader",
+      "http": 200,
+      "bytes": 478
+    },
+    {
+      "file": "ctx633-scan.pdf",
+      "format": "md",
+      "http": 200,
+      "bytes": 9231
+    },
+    {
+      "file": "ctx633-scan.pdf",
+      "format": "json",
+      "http": 200,
+      "bytes": 23297
+    },
+    {
+      "file": "ctx633-scan.pdf",
+      "format": "reader",
+      "http": 200,
+      "bytes": 476
+    },
+    {
+      "file": "ctx633-native.pdf",
+      "format": "md",
+      "http": 200,
+      "bytes": 13244
+    },
+    {
+      "file": "ctx633-native.pdf",
+      "format": "json",
+      "http": 200,
+      "bytes": 65738
+    },
+    {
+      "file": "ctx633-native.pdf",
+      "format": "reader",
+      "http": 200,
+      "bytes": 695
+    }
+  ],
+  "catalog_regression": {
+    "passed": 1,
+    "failed": 0,
+    "seconds": 3.39,
+    "exit_code": 0
+  },
+  "runtime_final_audit": {
+    "collections": 7,
+    "repository_documents": 3,
+    "bindings": 5,
+    "test_bindings_unchanged": true,
+    "api_ready_http": 200,
+    "defaults_still_unchanged": true
+  }
+}

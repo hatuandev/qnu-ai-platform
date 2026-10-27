@@ -43,7 +43,7 @@ from tests.test_wiki_links_600 import compile_source, source
 @asynccontextmanager
 async def fixture():
     url = make_url(settings.DATABASE_URL)
-    if not (url.database or "").startswith(("qnu_test_context600_", "qnu_test_context601_", "qnu_test_context602_", "qnu_test_context603_", "qnu_test_context604_", "qnu_test_context606_")):
+    if not (url.database or "").startswith(("qnu_test_context600_", "qnu_test_context601_", "qnu_test_context602_", "qnu_test_context603_", "qnu_test_context604_", "qnu_test_context606_", "qnu_test_context608_", "qnu_test_context611_", "qnu_test_context613_", "qnu_test_context614_", "qnu_test_context616_")):
         pytest.skip("Requires this task's owned test database")
     assert settings.ENVIRONMENT == "test" and url.host in {"localhost", "127.0.0.1"}
     engine = create_async_engine(url, poolclass=NullPool, hide_parameters=True)

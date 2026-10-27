@@ -1,0 +1,60 @@
+{
+  "checked_utc": "2026-10-25T10:20:07.618648+00:00",
+  "fresh_infrastructure_authorized": true,
+  "services": [
+    {
+      "Name": "qnu_gotenberg",
+      "Service": "gotenberg",
+      "Image": "gotenberg/gotenberg:8",
+      "State": "running",
+      "Health": "healthy"
+    },
+    {
+      "Name": "qnu_postgres",
+      "Service": "postgres",
+      "Image": "postgres:16",
+      "State": "running",
+      "Health": "healthy"
+    },
+    {
+      "Name": "qnu_qdrant",
+      "Service": "qdrant",
+      "Image": "qdrant/qdrant:latest",
+      "State": "running",
+      "Health": "healthy"
+    },
+    {
+      "Name": "qnu_redis",
+      "Service": "redis",
+      "Image": "redis:7-alpine",
+      "State": "running",
+      "Health": "healthy"
+    }
+  ],
+  "checks": [
+    {
+      "name": "postgres_select_1",
+      "exit_code": 0,
+      "result": "1",
+      "ok": true
+    },
+    {
+      "name": "redis_ping",
+      "exit_code": 0,
+      "result": "PONG",
+      "ok": true
+    },
+    {
+      "name": "qdrant_ready",
+      "http_status": 200,
+      "ok": true
+    },
+    {
+      "name": "gotenberg_health",
+      "http_status": 200,
+      "ok": true
+    }
+  ],
+  "minio": "pending source approval",
+  "backend_frontend_worker": "not started"
+}

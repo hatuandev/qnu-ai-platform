@@ -213,6 +213,8 @@ class SourceIngestionService:
 
             # 5. Check artifact key reuse with tenant/workspace isolation ("parse once, embed many")
             parser_profile = batch.parser_profile or "standard"
+            if ocr_engine is None:
+                ocr_engine = (item.origin_metadata or {}).get("_ocr_engine")
             from app.modules.knowledge.services.parse_fingerprint import (
                 ocr_configuration_fingerprint,
             )

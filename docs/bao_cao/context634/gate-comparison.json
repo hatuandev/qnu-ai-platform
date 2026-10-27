@@ -1,0 +1,186 @@
+{
+  "counts": {
+    "SKIP": 57,
+    "PASS": 3835,
+    "FAIL": 14
+  },
+  "baseline_context": 630,
+  "baseline_counts": {
+    "SKIP": 17,
+    "PASS": 3833,
+    "FAIL": 18
+  },
+  "new_failure_ids": [
+    "tests.test_context548_patch::test_api_whole_actual_document_uses_same_deadline_and_preserves_pending_scope"
+  ],
+  "previous_failure_ids_resolved": [
+    "tests.test_configuration_seed_db::test_real_restore_roundtrip_refuses_overwrite_and_rolls_back_partial_import",
+    "tests.test_ingestion_resilience::test_live_recovery_only_reclaims_expired_lease_and_preserves_completed_item",
+    "tests.test_ingestion_resilience::test_shared_capacity_bounds_twenty_simultaneous_requests",
+    "tests.test_ocr_modelops_safety::test_paddle_does_not_fabricate_confidence_or_shift_blank_page",
+    "tests.test_vllm_reranker::test_vllm_embedding_generation"
+  ],
+  "previous_failure_ids_skipped": [],
+  "current_failures": {
+    "tests.test_consulting_dispatcher::test_dispatch_admissions_with_export": {
+      "status": "FAIL",
+      "reason": "app.core.exceptions.EntityNotFoundError: Không tìm thấy bộ sưu tập 'col_admissions'"
+    },
+    "tests.test_consulting_dispatcher::test_dispatch_regulations_with_export": {
+      "status": "FAIL",
+      "reason": "app.core.exceptions.EntityNotFoundError: Không tìm thấy bộ sưu tập 'col_regulations'"
+    },
+    "tests.test_context548_patch::test_api_whole_actual_document_uses_same_deadline_and_preserves_pending_scope": {
+      "status": "FAIL",
+      "reason": "app.core.exceptions.DomainException: Cấu hình mặc định mô hình hệ thống chưa được khởi tạo trong CSDL."
+    },
+    "tests.test_publishing_v2_cutover_and_gc::test_canary_policy_get_and_update_api": {
+      "status": "FAIL",
+      "reason": "assert 403 == 200"
+    },
+    "tests.test_publishing_v2_cutover_and_gc::test_gc_api_endpoint": {
+      "status": "FAIL",
+      "reason": "assert 403 == 200"
+    },
+    "tests.test_publishing_v2_decommissioning_and_system_gc::test_direct_upload_allowed_when_flag_enabled": {
+      "status": "FAIL",
+      "reason": "assert 403 == 201"
+    },
+    "tests.test_publishing_v2_decommissioning_and_system_gc::test_direct_upload_blocked_when_flag_disabled": {
+      "status": "FAIL",
+      "reason": "assert 403 == 400"
+    },
+    "tests.test_publishing_v2_decommissioning_and_system_gc::test_rest_api_system_wide_gc_and_decommissioning_audit": {
+      "status": "FAIL",
+      "reason": "assert 403 == 200"
+    },
+    "tests.test_publishing_v2_e2e_canary::test_api_routes_canary_and_rollback": {
+      "status": "FAIL",
+      "reason": "assert 403 == 200"
+    },
+    "tests.test_rag_data_truth_and_lifecycle::test_reconciliation_detects_discrepancies": {
+      "status": "FAIL",
+      "reason": "AssertionError: assert 'legacy_payload_schema' in []"
+    },
+    "tests.test_tools::test_fact_layer_lookup_tool_found": {
+      "status": "FAIL",
+      "reason": "assert False is True"
+    },
+    "tests.test_trust_boundary_and_hitl::test_auth_session_cookie_actor_claims": {
+      "status": "FAIL",
+      "reason": "AssertionError: assert 'AI.Admin' == 'admin'"
+    },
+    "tests.test_universal_tools::test_dispatch_admissions_with_dynamic_facts": {
+      "status": "FAIL",
+      "reason": "app.core.exceptions.EntityNotFoundError: Không tìm thấy bộ sưu tập 'col_admissions'"
+    },
+    "tests.test_universal_tools::test_fact_layer_lookup_tool": {
+      "status": "FAIL",
+      "reason": "assert False is True"
+    }
+  },
+  "changed_existing_failure_reasons": {},
+  "new_634_cases": {
+    "tests.test_ocr_ingestion_634::test_office_alignment_compares_html_cells_without_markup_tokens": "PASS",
+    "tests.test_ocr_ingestion_634::test_unrelated_html_is_still_rejected_by_office_alignment": "PASS",
+    "tests.test_ocr_ingestion_634::test_office_alignment_decodes_html_entities_without_changing_source": "PASS",
+    "tests.test_ocr_ingestion_634::test_pdf_ocr_derivative_has_table_but_raw_response_stays_unchanged": "PASS",
+    "tests.test_ocr_ingestion_634::test_batch_schema_accepts_explicit_ocr_selection": "PASS",
+    "tests.test_ocr_ingestion_634::test_import_job_keeps_ocr_selection_on_initial_dispatch_and_retry[0]": "PASS",
+    "tests.test_ocr_ingestion_634::test_import_job_keeps_ocr_selection_on_initial_dispatch_and_retry[1]": "PASS",
+    "tests.test_ocr_ingestion_634::test_old_import_job_payload_stays_compatible_without_ocr_override": "PASS",
+    "tests.test_ocr_ingestion_634::test_docx_resource_archive_preserves_raw_ocr_alongside_original_images": "PASS"
+  },
+  "source_seal_unchanged": true,
+  "owned_database_dropped": true,
+  "runner": {
+    "database": "qnu_test_context634_3bd0b6a90d95",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context634\\isolated-3bd0b6a90d95\\objects",
+    "command": [
+      "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-v",
+      "--tb=short",
+      "--basetemp=D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context634\\isolated-3bd0b6a90d95\\pytest-temp",
+      "--junitxml=D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context634\\full-isolated.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "external_network": "loopback only; model/Qdrant defaults point to closed port",
+    "db_dropped": true,
+    "schema_source": "Schema-only dump; no application rows or protected credentials copied.",
+    "exit_code": 1,
+    "seconds": 447.41
+  },
+  "baseline_pass_now_skipped": [
+    "tests.test_compilation_checkpoint_611::test_handler_pauses_then_resumes_completed_phases_and_keeps_idempotency",
+    "tests.test_compilation_checkpoint_611::test_persisted_resume_rejects_stale_or_untrusted_state_without_inference[source]",
+    "tests.test_compilation_checkpoint_611::test_persisted_resume_rejects_stale_or_untrusted_state_without_inference[config]",
+    "tests.test_compilation_checkpoint_611::test_persisted_resume_rejects_stale_or_untrusted_state_without_inference[uncertain]",
+    "tests.test_compilation_checkpoint_611::test_persisted_resume_rejects_stale_or_untrusted_state_without_inference[checksum]",
+    "tests.test_compilation_checkpoint_611::test_persisted_resume_rejects_stale_or_untrusted_state_without_inference[permission]",
+    "tests.test_compilation_checkpoint_611::test_concurrent_resume_has_one_owner_and_no_duplicate_model_calls[False]",
+    "tests.test_compilation_checkpoint_611::test_concurrent_resume_has_one_owner_and_no_duplicate_model_calls[True]",
+    "tests.test_compilation_checkpoint_611::test_failure_before_any_uncertain_call_can_resume_the_known_complete_prefix",
+    "tests.test_compilation_checkpoint_611::test_new_packet_cache_entries_do_not_change_the_resumed_stage_sequence",
+    "tests.test_compilation_groups_613::test_capacity_failure_through_handler_has_explicit_stage_and_no_retry_or_publication",
+    "tests.test_compilation_groups_613::test_provider_update_persists_capacity_and_old_forms_cannot_silently_clear_it",
+    "tests.test_compilation_lifecycle_603::test_handler_persists_readback_idempotent_human_review_without_publication_or_fact_writes",
+    "tests.test_compilation_lifecycle_603::test_concurrent_creation_has_one_inference_owner_and_both_keys_are_idempotent",
+    "tests.test_compilation_lifecycle_603::test_concurrent_review_uses_occ_and_does_not_duplicate_or_overwrite_audit",
+    "tests.test_compilation_lifecycle_603::test_source_change_or_removal_blocks_review_and_returns_no_stale_derived_text[canonical]",
+    "tests.test_compilation_lifecycle_603::test_source_change_or_removal_blocks_review_and_returns_no_stale_derived_text[raw]",
+    "tests.test_compilation_lifecycle_603::test_source_change_or_removal_blocks_review_and_returns_no_stale_derived_text[binding]",
+    "tests.test_compilation_lifecycle_603::test_source_change_or_removal_blocks_review_and_returns_no_stale_derived_text[epoch]",
+    "tests.test_compilation_lifecycle_603::test_revocation_propagates_to_reused_derivative_and_never_reactivates_on_read",
+    "tests.test_compilation_lifecycle_603::test_unresolved_semantics_cannot_be_approved_even_by_admin",
+    "tests.test_compilation_lifecycle_603::test_provider_failure_has_durable_uncertain_receipt_and_does_not_resend_same_intent",
+    "tests.test_compilation_lifecycle_603::test_handler_permissions_hash_foreign_source_and_generic_metadata_cannot_bypass_compiler",
+    "tests.test_compilation_lifecycle_603::test_storage_corruption_never_becomes_approved_or_model_fallback",
+    "tests.test_compilation_lifecycle_603::test_cancellation_keeps_a_durable_receipt_and_cannot_auto_resend",
+    "tests.test_compilation_lifecycle_603::test_source_change_while_inference_runs_does_not_commit_ready_artifact",
+    "tests.test_compilation_lifecycle_603::test_changed_idempotency_payload_and_wrong_proposal_hash_cannot_override_review",
+    "tests.test_compilation_lifecycle_603::test_failed_storage_write_is_visible_and_no_unconfirmed_artifact_pointer_is_saved",
+    "tests.test_compilation_metadata_603::test_existing_put_handler_rejects_registry_injection_before_any_metadata_write",
+    "tests.test_compilation_semantics_604::test_handler_blocks_admin_approval_when_scope_is_literal_unproved_despite_positive_model",
+    "tests.test_compilation_semantics_604::test_legacy_policy_remains_readable_but_cannot_gain_new_v3_approval[v1]",
+    "tests.test_compilation_semantics_604::test_legacy_policy_remains_readable_but_cannot_gain_new_v3_approval[v2]",
+    "tests.test_wiki_snapshot_integration_600::test_handler_auth_backlinks_source_scope_and_get_never_writes_or_calls_model",
+    "tests.test_wiki_snapshot_integration_600::test_update_remove_rollback_and_foreign_or_draft_never_mix_snapshots",
+    "tests.test_wiki_snapshot_integration_600::test_cached_navigation_rechecks_revocation_even_with_stale_blocks",
+    "tests.test_wiki_snapshot_integration_600::test_concurrent_retry_and_late_old_revision_job_preserve_new_pointer",
+    "tests.test_wiki_snapshot_integration_600::test_publication_change_during_map_read_returns_stale_instead_of_partial_graph",
+    "tests.test_wiki_snapshot_integration_600::test_canonical_text_and_span_must_match_before_a_page_can_be_ranked",
+    "tests.test_wiki_snapshot_integration_600::test_cross_source_reader_uses_original_spans_and_filters_year_before_expansion[years0-numbers0]",
+    "tests.test_wiki_snapshot_integration_600::test_cross_source_reader_uses_original_spans_and_filters_year_before_expansion[years1-numbers1]"
+  ],
+  "new_failure_recheck": {
+    "test_id": "tests.test_context548_patch::test_api_whole_actual_document_uses_same_deadline_and_preserves_pending_scope",
+    "result": "PASS",
+    "tests": 1,
+    "test_seconds": 15.76,
+    "runner": {
+      "database": "qnu_test_context634_d060a9a14a28",
+      "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context634\\isolated-d060a9a14a28\\objects",
+      "command": [
+        "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/test_context548_patch.py::test_api_whole_actual_document_uses_same_deadline_and_preserves_pending_scope",
+        "-v",
+        "--tb=short",
+        "--basetemp=D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context634\\isolated-d060a9a14a28\\pytest-temp",
+        "--junitxml=D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context634\\model-default-recheck.xml"
+      ],
+      "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+      "external_network": "loopback only; model/Qdrant defaults point to closed port",
+      "db_dropped": true,
+      "schema_source": "Schema-only dump; no application rows or protected credentials copied.",
+      "test_only_seed": "Standard ModelOps defaults in owned DB; no providers/keys copied; inference mocked by test.",
+      "exit_code": 0,
+      "seconds": 29.62
+    },
+    "explanation": "Fresh test DB lacked standard system defaults. Replayed with only standard ModelOps defaults seeded in owned DB; inference remains mocked and network guarded. No app/guard/assertion change."
+  },
+  "new_631_cases_count": 29
+}

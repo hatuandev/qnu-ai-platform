@@ -38,6 +38,9 @@ async def save_chat_capabilities(
         return  # A run must not attach old-endpoint observations to new config.
     extra = deepcopy(provider.extra_config or {})
     contracts = extra.setdefault("chat_request_contracts", {})
+    current = contracts.get(model, {})
+    if current.get("endpoint") == endpoint and current.get("capabilities") == capabilities:
+        return  # Re-observing the same contract must not rotate configuration identity.
     contracts[model] = {
         "endpoint": endpoint,
         "capabilities": capabilities,

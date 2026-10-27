@@ -159,9 +159,10 @@ async def build_qnu_markdown_artifact(
         return artifact
     artifact["schema_version"] = document.schema_version
     document = document.model_copy(deep=True)
-    if extraction.office_resources:
+    if extraction.office_resources or extraction.office_ocr_evidence:
         try:
-            artifact["raw_evidence"] = await _save_office_resources(document, extraction.office_resources, snapshot_path)
+            artifact["raw_evidence"] = await _save_office_resources(
+                document, extraction.office_resources, snapshot_path, ocr_evidence=extraction.office_ocr_evidence)
             document.document_meta["raw_evidence"] = artifact["raw_evidence"]
         except Exception as exc:
             artifact.update(status="failed", reason="office_resource_save_failed", error=type(exc).__name__)
@@ -176,8 +177,9 @@ async def build_qnu_markdown_artifact(
     )
 
 
-async def _save_office_resources(document: QnuStructuredDocument, resources: list[dict], snapshot_path: str) -> dict:
-    """Store only verified original bytes; no external URI or filesystem reference is fetched."""
+async def _save_office_resources(document: QnuStructuredDocument, resources: list[dict], snapshot_path: str,
+                                 *, ocr_evidence: dict[str, Any] | None = None) -> dict:
+    """Store verified Office resources and raw OCR; no external URI is fetched."""
     members = {}
     for resource in resources:
         payload = resource["data"]
@@ -189,6 +191,8 @@ async def _save_office_resources(document: QnuStructuredDocument, resources: lis
         if member in members and members[member] != payload:
             raise ValueError("Conflicting Office resource member")
         members[member] = payload
+    if ocr_evidence is not None:
+        members["ocr/preview.json"] = _evidence_bytes(ocr_evidence)
     stream = BytesIO()
     with ZipFile(stream, "w", compression=ZIP_DEFLATED) as archive:
         for member, payload in sorted(members.items()):

@@ -34,6 +34,24 @@
       "isSensitive": true
     },
     {
+      "name": "ai.workspaces.view",
+      "displayName": "Xem đơn vị (workspace)",
+      "description": "Xem workspace, thành viên và audit trong phạm vi được cấp",
+      "resource": "workspaces",
+      "action": "view",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.workspaces.manage",
+      "displayName": "Quản trị đơn vị (workspace)",
+      "description": "Quyền nền tảng: tạo, tạm dừng workspace và quản lý thành viên của mọi đơn vị",
+      "resource": "workspaces",
+      "action": "manage",
+      "isEnabled": true,
+      "isSensitive": true
+    },
+    {
       "name": "ai.dashboard.view",
       "displayName": "Xem Dashboard & KPI",
       "description": "Xem tổng quan chỉ số hoạt động, lưu lượng chat và tài nguyên AI",

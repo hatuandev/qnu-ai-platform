@@ -1,0 +1,139 @@
+{
+  "context": 671,
+  "created_at": "2026-10-27T16:27:50.651898+07:00",
+  "status": "FUNCTIONAL_FIXES_PASS_WITH_REPOSITORY_LINT_FAILURE",
+  "findings": {
+    "F1": "fixed",
+    "F2": "Compiler downloads already fixed by Context668; review download fixed here",
+    "F3": "fixed",
+    "F4": "fixed",
+    "F5": "fixed",
+    "F6": "fixed",
+    "F7": "fixed",
+    "new_publication_finding_display": "fixed"
+  },
+  "checks": [
+    {
+      "command": "npm test -- --reporter=json --outputFile=../storage/artifacts/context671-fe-fixes/full-compatible.json",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "passed": 134,
+      "failed": 0,
+      "skipped": 0,
+      "old_tests_preserved": 123,
+      "new_tests": 11,
+      "missing_old_test_ids": []
+    },
+    {
+      "command": "npm run build",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "includes": "TypeScript noEmit",
+      "warnings": [
+        "chunk >500 kB"
+      ]
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS"
+    },
+    {
+      "command": "biome check scoped files",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "files": 25
+    },
+    {
+      "command": "npm run lint -- --reporter=json",
+      "cwd": "frontendV1",
+      "exit_code": 1,
+      "status": "FAIL",
+      "summary": {
+        "changed": 0,
+        "unchanged": 468,
+        "matches": 0,
+        "duration": 976185700,
+        "errors": 61,
+        "warnings": 12,
+        "infos": 6,
+        "skipped": 0,
+        "suggestedFixesSkipped": 0,
+        "diagnosticsNotPrinted": 0,
+        "scannerDuration": 11410400
+      },
+      "errors_in_scoped_files": 0
+    },
+    {
+      "command": "npm ls --depth=0",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS"
+    }
+  ],
+  "source_sha256": {
+    "frontendV1/src/features/conversations/chat-view.tsx": "a78b2e819b90b18789522e0fd7a5847c7d2b27c20fa844ba2d5f96d70952cd8c",
+    "frontendV1/src/features/conversations/queries.ts": "9f0619549ea0ea6418fffed87da14645231992aeaeb355d44e206259ad381f0b",
+    "frontendV1/src/features/knowledge/compilation-detail-page.tsx": "15070d34a2dd63857f3fdf88587bd05d38b1034751bc6a93fcce4b21ca78b1fb",
+    "frontendV1/src/features/knowledge/compilation-editor-tab.tsx": "4a48d74d6730cdc65bde02c771a0f46306700121b2fcebf456cbd7a27c32b6a9",
+    "frontendV1/src/features/knowledge/compilation-queries.ts": "e4e6c9ebea3808d44f1478a04e79de5a37bc82ee81a185fc1a2f5f9449d53b12",
+    "frontendV1/src/features/knowledge/compilation-requests.ts": "f7f2c633f43e43c590b851e96c041152d93043483454137443eb4aa1b896b3a8",
+    "frontendV1/src/features/knowledge/compilation-review-tab.tsx": "dea7866ee0443cb546e3ed46a62204abc9259111d8c9dfe3e902377a86d92830",
+    "frontendV1/src/features/knowledge/publication-types.ts": "82ba408b9aeb6defc9f3fcd1e35363cb5350b11c04857aeb145252515c12e8a7",
+    "frontendV1/src/features/knowledge/review-gate-dialog.tsx": "7a5fa3ad95b6c3197a65b24bb1901cfb98f5fc1c288b34262396ded69545fd80",
+    "frontendV1/tests/template-boundary.test.ts": "31e4f4651b31ae05d6591e848439f6da70262123ef217ece40c5fea6ea950999",
+    "frontendV1/tests/v1-assistants.test.ts": "0282efba4ee84077a515ed9bbbe7b455abb7043b024bad669eaaa41682ca34ab",
+    "frontendV1/tests/v1-compilation.test.ts": "b39dd3a2034083407d7b95f5e2e2476a012f7036c1e7324c53264708363931c6",
+    "frontendV1/tests/v1-contract.test.ts": "d117ead5d9600eaba8fa17844b0d563d320a3feaaf2c0b49abc205213d7b2be4",
+    "frontendV1/tests/v1-conversations.test.ts": "d30f305b1407a71cae520cb2715eac7df9d100247f745160ad2d0861ceb25dd3",
+    "frontendV1/tests/v1-knowledge.test.ts": "dc45125eb5b2e9deb69013485d06341a6ac50810bd564cba679e554379880741",
+    "frontendV1/tests/v1-ocr.test.ts": "cdcdb2f7f12845c9dee8cdfe3512a0674896abd999e33d84bbdf6d3acca9db66",
+    "frontendV1/tests/v1-publication.test.ts": "3b5d4a869dc2d0b31c20cb94c7230838d573fa5f4ea62b3e9d93d1bfd5f05b25",
+    "frontendV1/tests/v1-session-secret-regression.test.ts": "eaacb5e2f703769d528b7e90dd6c7b213b980d47dd49682e919125f2b4745757",
+    "frontendV1/tests/v1-sso.test.ts": "febf444eadc1247a8c7b48414d276d8818c8f04dea20b4e46707330d2d036a09",
+    "frontendV1/package.json": "6313b82ead0b1db496455cbbf2adb2d76cacb161978553fc7634fc259c884d64",
+    "frontendV1/package-lock.json": "1b2ebb93d1b91e7ee325de09dd6ac854447210abe23c9c07308513fc80d82b89",
+    "frontendV1/tests/chat-history-671.test.tsx": "192e915cba5e7ed03a7ef61f4a845eb7a60e81d8330529c1d6a0dadf951690ea",
+    "frontendV1/tests/compilation-queries-671.test.tsx": "b8faf0454cbe57698119df3a20de0aa198fafddea63a06843762c834f42de64c",
+    "frontendV1/tests/compilation-ui-671.test.tsx": "b9d81a539043e7e7c2b100fbde5c593d44673dbaec200d8b34ff8fe8fc874d77",
+    "frontendV1/vitest.config.ts": "2c35011f9d619ac971e804200e1fcf147cdff6510560af56f65204949d3ef362",
+    "frontendV1/README.md": "48775133b2d855e4515812ae8940eef5b0ba083a3b3c05aeaf7c69b120348e29",
+    "frontendV1/tsconfig.json": "53fd0a9fb09c78146f4440856f3a753524deafd22ed34c40ec555d6030ab1b40"
+  },
+  "rag_sha256_unchanged": {
+    "backendV1/qnu/domains/knowledge/index/search.py": "3cafd4adb2ba5bf6a57101ea63537037a794610ad13aa99f7cf63b67ef8708e9",
+    "backendV1/qnu/domains/knowledge/index/hybrid.py": "6b2ccf9225d888caef9ee42ca2ba16f336361040045bd8d6203ffafa9058e92f",
+    "backendV1/qnu/domains/knowledge/index/chunking.py": "2ffac287bf57320f358388734c862e7c9205582131080a9927836596dd1e82f0",
+    "backendV1/qnu/domains/knowledge/index/schemas.py": "4cf091cd34de615dd2c6cc7abc8d290f928b4dbe486c4ce5438b66da8292fb67",
+    "backendV1/qnu/domains/rag/answer/drafting.py": "b0cb27e00e429321daa2ad8cf313bbb0dd273a59dba0a34d1286da6883f2bc65",
+    "backendV1/qnu/domains/rag/answer/schemas.py": "c76875b5fdaa0492fd647b098f4320d15f43fe87768f6ea106e202b4805a7735",
+    "backendV1/qnu/domains/rag/answer/service.py": "bbacf56e1e02eb296e947eb66ebe0ce4872070edb7ce09e9bdbaa1bf473e352e",
+    "backendV1/qnu/domains/conversations/execution.py": "1118e769127ce657e12b9f2ea49d6e71011760b7831e1867b9511a49c2778d75",
+    "backendV1/qnu/domains/conversations/rewriting.py": "4fb941f4e038133d0f5af327c5823f0f22349587135e1abfb33a641aa1f524c0",
+    "backendV1/qnu/domains/assistants/schemas.py": "558f8307911548eae3bfca375c9e3cff56c1493034d6bdada22e8d9ba1c5f4a8",
+    "backendV1/qnu/domains/evaluation/service.py": "1a3c69942d09bde87ea551526e4ed0b3fb813cbe3c8da0c5358d04cf283194cb"
+  },
+  "limits": [
+    "React DOM/jsdom tests use synthetic query/API data; no live SSO/backend/model acceptance",
+    "router blocker tested through mocked router port; real browser navigation not exercised",
+    "No backend/worker/config/migration/reindex/restart/deploy changes",
+    "Full repository lint still FAIL"
+  ],
+  "test_artifacts": "storage/artifacts/context671-fe-fixes (ignored)",
+  "initial_failures": [
+    "Configured Node runner failed to load six test files",
+    "DOM test fixture lacked ResizeObserver and used unstable mock data; fixed fixtures before genuine repro",
+    "Existing problem.type-only 404 fixture initially failed after narrowing error classification; exact suffix compatibility added",
+    "Initial npm run issued from repository root returned ENOENT; reran in frontendV1"
+  ],
+  "development_dependencies": {
+    "vitest": "5.0.5",
+    "@testing-library/react": "16.3.3",
+    "jsdom": "26.1.0"
+  },
+  "cleanup": "No node command for context671/Vitest observed after completion"
+}

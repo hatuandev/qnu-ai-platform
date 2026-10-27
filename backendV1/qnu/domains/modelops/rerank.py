@@ -1,0 +1,56 @@
+"""Resolve rerank through grants, encrypted keys and configured model capacity."""
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from qnu.domains.modelops.capacity.service import read_capacity
+from qnu.domains.modelops.catalog.service import catalog_service
+from qnu.domains.modelops.public_api import OcrRuntime, _active_key
+from qnu.platform.crypto import decrypt
+from qnu.platform.errors import Conflict, DependencyUnavailable
+from qnu.ports.reranker import RerankRequest
+
+
+async def resolve(
+    db: AsyncSession, workspace_id: str, provider_id: str | None = None
+) -> OcrRuntime:
+    provider = await catalog_service.resolve_workspace_provider(
+        db, workspace_id, "rerank", provider_id
+    )
+    if provider.provider_type not in {"openai_compatible", "local"}:
+        raise Conflict("Loại provider rerank chưa hỗ trợ.", code="rerank_provider_unsupported")
+    key = await _active_key(db, provider.id)
+    if key is None:
+        raise DependencyUnavailable("Thiếu credential rerank.", code="rerank_credentials_missing")
+    capacity = read_capacity(provider)
+    return OcrRuntime(
+        provider_id=provider.id,
+        provider_name=provider.name,
+        provider_type=provider.provider_type,
+        model_name=provider.model_name,
+        base_url=provider.base_url,
+        timeout_seconds=provider.timeout_seconds,
+        api_key=decrypt(key.secret_encrypted),
+        token_limits=capacity.token_limits,
+        capacity_status=capacity.status,
+    )
+
+
+def budget(runtime: OcrRuntime, query: str, documents: list[str]) -> int:
+    limits = runtime.token_limits
+    bounds = [len(query.encode()) + len(d.encode()) + 64 for d in documents]
+    available = (
+        [v for v in (limits.max_input_tokens, limits.context_window_tokens) if v is not None]
+        if limits
+        else []
+    )
+    if runtime.capacity_status != "configured" or not available:
+        raise Conflict("Cần cấu hình capacity rerank.", code="rerank_capacity_required")
+    if any(n > min(available) for n in bounds):
+        raise Conflict("Ứng viên vượt capacity rerank.", code="rerank_input_limit_exceeded")
+    return max(1, sum(bounds))
+
+
+def request(runtime: OcrRuntime) -> RerankRequest:
+    return RerankRequest(
+        runtime.base_url, runtime.model_name, runtime.timeout_seconds, runtime.api_key
+    )

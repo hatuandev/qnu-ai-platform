@@ -1,0 +1,63 @@
+{
+  "context": 670,
+  "created_at": "2026-10-27T15:53:32.017809+07:00",
+  "status": "ANALYSIS_ONLY",
+  "application_changes": false,
+  "checks": {
+    "local_probe": {
+      "exit_code": 0,
+      "method": "Python stdin, no DB/API/model calls",
+      "observations": {
+        "citation_parser": {
+          "source_number": 100,
+          "claimed_number": 900,
+          "valid_citation": "E1",
+          "status": "answered",
+          "interpretation": "citation membership only, not semantic support"
+        },
+        "assistant_retrieval_fields": [],
+        "data_year_search_filter": "extra_forbidden",
+        "paragraph_structures": [
+          null,
+          null
+        ],
+        "heading_retained": true
+      }
+    },
+    "full_tests": "NOT RUN",
+    "new_live_benchmark": "NOT RUN",
+    "document_validation": "PASS"
+  },
+  "historical_results": {
+    "context": 658,
+    "queries": 3,
+    "label_status": "draft_needs_human_check",
+    "metric": "annotated Recall@3",
+    "dense": 1.0,
+    "hybrid": 0.833,
+    "hybrid_rerank": 0.833,
+    "quality_acceptance": "not established"
+  },
+  "source_sha256": {
+    "backendV1/qnu/domains/knowledge/index/search.py": "3cafd4adb2ba5bf6a57101ea63537037a794610ad13aa99f7cf63b67ef8708e9",
+    "backendV1/qnu/domains/knowledge/index/hybrid.py": "6b2ccf9225d888caef9ee42ca2ba16f336361040045bd8d6203ffafa9058e92f",
+    "backendV1/qnu/domains/knowledge/index/chunking.py": "2ffac287bf57320f358388734c862e7c9205582131080a9927836596dd1e82f0",
+    "backendV1/qnu/domains/knowledge/index/schemas.py": "4cf091cd34de615dd2c6cc7abc8d290f928b4dbe486c4ce5438b66da8292fb67",
+    "backendV1/qnu/domains/rag/answer/drafting.py": "b0cb27e00e429321daa2ad8cf313bbb0dd273a59dba0a34d1286da6883f2bc65",
+    "backendV1/qnu/domains/rag/answer/schemas.py": "c76875b5fdaa0492fd647b098f4320d15f43fe87768f6ea106e202b4805a7735",
+    "backendV1/qnu/domains/rag/answer/service.py": "bbacf56e1e02eb296e947eb66ebe0ce4872070edb7ce09e9bdbaa1bf473e352e",
+    "backendV1/qnu/domains/conversations/execution.py": "1118e769127ce657e12b9f2ea49d6e71011760b7831e1867b9511a49c2778d75",
+    "backendV1/qnu/domains/conversations/rewriting.py": "4fb941f4e038133d0f5af327c5823f0f22349587135e1abfb33a641aa1f524c0",
+    "backendV1/qnu/domains/assistants/schemas.py": "558f8307911548eae3bfca375c9e3cff56c1493034d6bdada22e8d9ba1c5f4a8",
+    "backendV1/qnu/domains/evaluation/service.py": "1a3c69942d09bde87ea551526e4ed0b3fb813cbe3c8da0c5358d04cf283194cb"
+  },
+  "references": [
+    "https://docs.haystack.deepset.ai/docs/sentencewindowretriever",
+    "https://docs.haystack.deepset.ai/docs/automergingretriever",
+    "https://docs.haystack.deepset.ai/docs/faithfulnessevaluator",
+    "https://haystack.deepset.ai/blog/query-decomposition",
+    "https://www.langchain.com/blog/query-transformations",
+    "https://github.com/vanna-ai/vanna"
+  ],
+  "source_access_limit": "GitHub notebook rendered only shell; raw fetch timed out; notebook contents not relied on"
+}

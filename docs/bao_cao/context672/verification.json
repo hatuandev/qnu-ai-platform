@@ -1,0 +1,225 @@
+{
+  "context": 672,
+  "created_at": "2026-10-27T17:15:00+07:00",
+  "status": "PASS_ALL_CHECKS_WITH_CONCURRENT_RAG_DRIFT",
+  "scope": "frontendV1 only; no backendV1 write in this session",
+  "baseline_before_changes": {
+    "tests": { "passed": 134, "failed": 0, "files": 13, "status": "PASS" },
+    "build": { "exit_code": 0, "status": "PASS" },
+    "typecheck": { "exit_code": 0, "status": "PASS" },
+    "lint": {
+      "command": "npx biome check .",
+      "exit_code": 1,
+      "status": "FAIL",
+      "files_checked": 468,
+      "errors": 61,
+      "warnings": 12,
+      "infos": 6,
+      "note": "Matches the figures recorded by Context671"
+    }
+  },
+  "checks": [
+    {
+      "command": "npm test",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "files": 16,
+      "passed": 156,
+      "failed": 0,
+      "skipped": 0,
+      "pre_existing_tests_preserved": 134,
+      "new_tests": 22,
+      "new_test_files": {
+        "tests/dev-auto-login-672.test.ts": 8,
+        "tests/dev-auto-login-ui-672.test.tsx": 8,
+        "tests/dev-auto-login-bundle-672.test.ts": 6
+      },
+      "artifact": "storage/artifacts/context672/full-test.json"
+    },
+    {
+      "command": "npm run lint",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "files_checked": 472,
+      "errors": 0,
+      "warnings": 0,
+      "infos": 0,
+      "artifact": "storage/artifacts/context672/lint.json"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "includes": "vite build + tsc --noEmit",
+      "warnings": ["chunk > 500 kB (pre-existing, not introduced here)"]
+    },
+    {
+      "command": "scan dist/ for bridge markers",
+      "cwd": "frontendV1",
+      "status": "PASS",
+      "markers_checked": [
+        "QNU_DEV_ACCESS_KEY=",
+        "createDevAutoLoginHandler",
+        "devAutoLoginPlugin",
+        "sec-fetch-site"
+      ],
+      "occurrences": 0
+    },
+    {
+      "command": "build with a temporary canary QNU_DEV_ACCESS_KEY, then scan dist/ and the build log",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "canary": "dev-only-canary-672-not-a-real-key (fake value, written to an uncommitted .env.local and removed afterwards)",
+      "occurrences_in_dist": 0,
+      "occurrences_in_build_log": 0
+    },
+    {
+      "command": "npm run dev, then curl the bridge",
+      "cwd": "frontendV1",
+      "status": "PASS",
+      "observations": {
+        "POST same-origin": "502 with {\"code\":\"backend_unreachable\"} because backendV1 on 8002 is not running; response carries Cache-Control: no-store",
+        "GET": "405",
+        "foreign Origin": "403",
+        "missing Origin": "403",
+        "foreign Host (192.168.1.20:3001)": "403"
+      },
+      "proves": "the plugin is registered only in the dev server, reads the key, and enforces its guards",
+      "cleanup": "dev server stopped (port 3001 closed), .env.local deleted, dist rebuilt clean"
+    },
+    {
+      "command": "npm ls --depth=0",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "dependency_tree_changed": false
+    }
+  ],
+  "auto_login_design": {
+    "default_state": "off unless QNU_DEV_AUTO_LOGIN=true in frontendV1/.env.local",
+    "credential_location": "Node process of the Vite dev server only",
+    "browser_receives": ["access_token"],
+    "bridge_path": "/__qnu_dev/auto-login",
+    "plugin_registered_when": "command === 'serve' && !isPreview && mode !== 'production'",
+    "plugin_apply": "serve",
+    "guards": [
+      "POST only (405)",
+      "loopback Host header (403)",
+      "same-origin Origin header, missing header rejected (403)",
+      "sec-fetch-site must be same-origin",
+      "access key must exist in config (500 dev_bridge_misconfigured)",
+      "backend target must be loopback (500 dev_bridge_misconfigured)"
+    ],
+    "reuses_existing_backend_endpoint": "POST /platform/v1alpha1/auth/login",
+    "token_verification": "GET /platform/v1alpha1/auth/me before any protected page renders",
+    "logout_behaviour": "sessionStorage boolean qnu.dev-auto-login.suppressed + in-memory latch; retryAutoLogin() clears it explicitly",
+    "backend_changes": "none; get_actor and workspace permission checks untouched"
+  },
+  "guard_test_change": {
+    "file": "frontendV1/tests/template-boundary.test.ts",
+    "rule": "the v1 bearer token is never persisted by the client",
+    "before": "any sessionStorage.setItem/localStorage.setItem/document.cookie in a v1 file fails",
+    "after": "exactly one allowlisted key (qnu.dev-auto-login.suppressed) with literal value \"1\" is accepted; constants are resolved so a key cannot hide behind a variable; document.cookie and any other key or value still fail",
+    "weakened": false
+  },
+  "source_sha256": {
+    "frontendV1/vite.config.ts": "d1bc448f993d56d53b8aede39936d1e13edac441dca4ee02e6eb1d48fcabe758",
+    "frontendV1/dev/dev-auto-login.ts": "1a7472ec44dc861c16a23f2424df245f3c26f4981438f5674086bfbb73d50b74",
+    "frontendV1/src/app/auth/v1/dev-auto-login.ts": "e8dddbd81fec6910b1e4898341e997a3c29fd0daf90612168f2b305d7ff40bbb",
+    "frontendV1/src/app/auth/v1/auto-login-errors.ts": "de139d8fad06f068c4da525939defa0a750f78f83a95cd6eb97cf9eaca421ffb",
+    "frontendV1/src/app/auth/v1/provider.tsx": "a31d31a3621574549499babadf7d2ccb8c14bbb576d69a65a7a3363c3eb31942",
+    "frontendV1/src/app/auth/v1/gate.tsx": "a2c8a83af4bda7d574ec19bca9036dfb2f833b044c3ac8df1023822117ff433d",
+    "frontendV1/src/app/auth/v1/index.ts": "cc83987b3d38523151d9c38617dcabeb0bab3fd285b77af57546892b26228174",
+    "frontendV1/src/components/admin/data-table/row-interaction.tsx": "6092489b36fe0d2430b1bb0bc0da5a2b09a0bbf675c75dd5c65d7f233bbbf65e",
+    "frontendV1/src/components/admin/data-table/data-table-pagination.tsx": "a4d3cb7f37f8b8bc6c50cefa29a04334e6375e31a67de8961f973f9df00aa3db",
+    "frontendV1/src/components/admin/debounced-search-input.tsx": "ecc0b4152719d36fce7134e3de7a28234d566194db78b4d532d1f2a4b8a0e4c8",
+    "frontendV1/src/lib/excel-export.ts": "89417f0304d0418c33a3788543e1050c28aff198ae493547edfcc41a8964f85a",
+    "frontendV1/src/main.tsx": "b4c2bafc44145372b601c0c65f0e0b7baffebcc2237ec6ced8540100c9fd1f09",
+    "frontendV1/src/features/applications/applications-page.tsx": "42b6d3e9509b645a49bed3acd88595ccdab3e94e6b51225f1d1ac1c78d493ac5",
+    "frontendV1/src/features/applications/import-applications-dialog.tsx": "376da4757a69daece8ebdf871f4ebf94b54409ff5ceab22319be5525ce148996",
+    "frontendV1/src/features/assignments/assign-dialog.tsx": "4d2004c707d789051c23df2020e3df3885a04fdb7b4cf34f0f68d1f465630122",
+    "frontendV1/src/features/assignments/assignments-page.tsx": "b4c311bc93dc337bb6cd28c16efa194d7194c9d52a3564de25096a3a8058575f",
+    "frontendV1/src/features/invoices/invoice-detail.tsx": "a15062b5e5c71dd010e164498fa6c6bd1f2aa5aeead039c8a14f3d9ef5970ba1",
+    "frontendV1/src/features/priority-objects/priority-objects-page.tsx": "704717808a604a2feafe7fb89c4896d042c1b6b0080e702dd2252b2ce1a12636",
+    "frontendV1/src/features/priority-objects/eligible-areas-dialog.tsx": "687473beb8fa0d7eca402f087f01f4e6bb6d85afb97c8409716f81101cb4f87d",
+    "frontendV1/src/features/payments/student-payment-page.tsx": "385617797ecd8c8aa0dc7d5a971ca34786505beb10c440cbae0ef574b3639be0",
+    "frontendV1/src/features/payments/payment-submissions-page.tsx": "016e9d00a2664da66dfa77c4c7f51d680d66089c6eb4cf57083f04a02897796d",
+    "frontendV1/src/features/payments/api.ts": "47de189a0183264b733bb9a0e683447c6ebe65220523928f404174096bddc3fa",
+    "frontendV1/src/features/registration-periods/registration-periods-page.tsx": "136604ff18369cf017f7657140a7ef4be5c4c2193818a1f91f7483ce4e95a3ae",
+    "frontendV1/src/features/registration-periods/room-rules-dialog.tsx": "c10a341e433e327422ca0fd9191bf30de2b8f15ed62f7a50e6ab06b769b2323d",
+    "frontendV1/src/features/difficult-areas/difficult-areas-page.tsx": "8b209fc95d745f32a64669ec7481be132da7159d24c28158d2e25b292d6d8494",
+    "frontendV1/src/features/difficult-areas/difficult-area-form-dialog.tsx": "37c4ba0881986079ab4aefb8d986f06da91491ccaf87d6625b637c0ba7bb46f2",
+    "frontendV1/src/features/residences/residence-detail.tsx": "b6c789b9a3c8a26d447b4b7200ba64282fb7243ae95e211c938aa7346a207f0b",
+    "frontendV1/src/features/students/students-table.tsx": "dc59573043583e574d3ad90b49d2b37f458558ca305be1ff36c210517cf3da4e",
+    "frontendV1/src/features/academic-years/academic-years-table.tsx": "557fefcefbb76f64e9f748e557d7206ee5b67a1ecc85ca5883b2a56bb969dd4c",
+    "frontendV1/src/features/buildings/buildings-table.tsx": "d0b109446e43cf95c2652fa4bc7b17b6e95a03cce2d8989cafd88672de67ab7c",
+    "frontendV1/src/features/floors/floors-table.tsx": "8f16be037eebf5bf629e54b717369a2913beb3445fdcbe220f213ec8ef8b325b",
+    "frontendV1/src/features/room-types/room-types-table.tsx": "e76dda4477db1584db7294478c61c1d5775590371de7726b2f579896e2d91bba",
+    "frontendV1/src/features/rooms/rooms-table.tsx": "a59f71c3f9d3f4b59d84019a813e4b4f2840e4f263b8c3136c3ebab31963a430",
+    "frontendV1/src/features/knowledge/compiled-document-detail-page.tsx": "6dfc36ca935e16e9f9d07db8528ac7f3ec33f03f272c9351fa6982a9708525fa",
+    "frontendV1/src/features/knowledge/compiled-version-detail-page.tsx": "9564455c77f3a3cda3eebffbc30e9adcd4fe4071428e81f20aafffb60009f351",
+    "frontendV1/tests/dev-auto-login-672.test.ts": "44a0296e0d44454a0ebe4e70f372c6cbad193e3a47ee57f06b981d6678b73375",
+    "frontendV1/tests/dev-auto-login-ui-672.test.tsx": "585e7565b62d0af3b99b1625b18d0080c36b7e05389f803a5f2a9599ca3355a6",
+    "frontendV1/tests/dev-auto-login-bundle-672.test.ts": "c6aa8d327e622174058e210ca54c700a049d3f6a5c234a6160893b7e85b93d8c",
+    "frontendV1/tests/template-boundary.test.ts": "ff6d4043c8296bf2495c4b03b72f27b652df21ba8e550f89ab008508cb74a74e",
+    "frontendV1/biome.json": "90ca28f8b2dcada1130bcbc1f86e4731869ca053453f5e6b9d05e355d1be5c4d",
+    "frontendV1/.gitignore": "add7b365f5f468b853ea0804b52b657904bc304296565611d59de6172115a187",
+    "frontendV1/.env.example": "ac8be6fe9baf758bf4293be8956ec46ebd4c65f7db7dfc6b35bca653349ac545",
+    "frontendV1/README.md": "e2f1bf80cfab147dc6ad1fbe9178990ec1bd8aa36e6f9e897ac31b8a2e41c4b7"
+  },
+  "rag_hash_drift": {
+    "compared_against": "docs/bao_cao/context671/verification.json -> rag_sha256_unchanged",
+    "files_compared": 11,
+    "unchanged": 2,
+    "changed": 9,
+    "changed_files": [
+      "backendV1/qnu/domains/knowledge/index/search.py",
+      "backendV1/qnu/domains/knowledge/index/hybrid.py",
+      "backendV1/qnu/domains/knowledge/index/chunking.py",
+      "backendV1/qnu/domains/knowledge/index/schemas.py",
+      "backendV1/qnu/domains/rag/answer/drafting.py",
+      "backendV1/qnu/domains/rag/answer/schemas.py",
+      "backendV1/qnu/domains/rag/answer/service.py",
+      "backendV1/qnu/domains/conversations/execution.py",
+      "backendV1/qnu/domains/assistants/schemas.py"
+    ],
+    "new_files_observed": [
+      "backendV1/qnu/domains/knowledge/index/scope.py",
+      "backendV1/qnu/domains/rag/answer/context.py",
+      "backendV1/qnu/domains/rag/answer/verification.py"
+    ],
+    "line_ending_explanation_ruled_out": true,
+    "modified_by_this_session": false,
+    "explanation": "backendV1 is untracked in Git, so no diff is available. mtimes fall between 16:52 and 17:13 on 2026-10-27 and new modules appeared, which indicates a concurrent session editing RAG. This session issued no write command against backendV1. Hashes are intentionally not pinned here because those files were still changing.",
+    "conclusion": "RAG must not be reported as unchanged for this context"
+  },
+  "limits": [
+    "UI tests use jsdom with stubbed fetch and a synthetic actor; no live SSO or backend acceptance",
+    "The dev bridge was exercised live against `npm run dev` for registration and all guards, but the success path (a real token) is unverified because backendV1 on port 8002 is not running",
+    "No model call, no document upload, no browser end-to-end run",
+    "Chunk > 500 kB warning remains from earlier contexts",
+    "RAG backend is being modified by another session; this report makes no claim about its behaviour"
+  ],
+  "test_artifacts": "frontendV1/storage/artifacts/context672 (Git ignored)",
+  "qa_artifact_relocation": {
+    "from": "frontendV1/storage/qa",
+    "to": "frontendV1/storage/artifacts/qa-context650",
+    "reason": "Generated output, not source; kept as historical evidence and excluded from Biome through the storage/artifacts ignore, without excluding any real source file",
+    "git_ignore_added": "frontendV1/.gitignore now ignores storage/ (verified with git check-ignore -v)"
+  },
+  "not_done": [
+    "no commit, push, deploy",
+    "no data reset",
+    "no change to running configuration and no service restart"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "context": 638,
+  "date": "2026-10-26",
+  "verdict": "CHANGES_REQUESTED",
+  "existing_suite": {"passed": 104, "failed": 0, "skipped": 0, "seconds": 31.24, "exit_code": 0},
+  "independent_probes": {"passed": 0, "failed": 3, "seconds": 7.81, "exit_code": 1},
+  "findings": [
+    {"id": "F1", "priority": 1, "issue": "Concurrent failed local writer truncates a committed original", "reproduced": true},
+    {"id": "F2", "priority": 2, "issue": "Upload idempotency fingerprint omits persisted title", "reproduced": true},
+    {"id": "F3", "priority": 2, "issue": "No-op downgrade advances history backward and next upgrade fails", "reproduced": true}
+  ],
+  "ruff": "PASS",
+  "application_and_migration_files_unchanged": 141,
+  "owned_review_databases_dropped": true,
+  "application_database_migrated": false,
+  "production_fixes_applied": false
+}

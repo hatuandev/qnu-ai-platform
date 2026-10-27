@@ -89,3 +89,37 @@ class CompilationDraft(CompilationContract):
     assertions: list[CompilationAssertion] = Field(min_length=1, max_length=128)
     relations: list[CompilationRelation] = Field(default_factory=list, max_length=128)
     sections: list[CompilationSection] = Field(default_factory=list, max_length=64)
+
+
+class CompilationGroup(CompilationContract):
+    id: str = Field(pattern=r'^group_[a-f0-9]{24}$')
+    source_revision_ids: list[str] = Field(min_length=1, max_length=16)
+    entity_ids: list[str] = Field(min_length=1, max_length=64)
+    assertion_ids: list[str] = Field(min_length=1, max_length=128)
+    relation_ids: list[str] = Field(default_factory=list, max_length=64)
+    section_indices: list[int] = Field(default_factory=list, max_length=32)
+    kind: Literal['source_summary', 'relations'] = Field(default='source_summary',
+        exclude_if=lambda value: value == 'source_summary')
+
+    @model_validator(mode='after')
+    def group_role(self):
+        if self.kind == 'source_summary' and not self.section_indices:
+            raise ValueError('A source-summary group requires sections')
+        if self.kind == 'relations' and (self.section_indices or not self.relation_ids):
+            raise ValueError('A relation group requires relations and cannot introduce sections')
+        return self
+
+
+class CompilationManifest(CompilationContract):
+    """Server-side inventory; only bounded group fragments are sent to a model."""
+    version: Literal['qnu-knowledge-compilation/v2'] = 'qnu-knowledge-compilation/v2'
+    snapshot_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
+    entities: list[CompilationEntity] = Field(min_length=1)
+    assertions: list[CompilationAssertion] = Field(min_length=1)
+    relations: list[CompilationRelation] = Field(default_factory=list)
+    sections: list[CompilationSection] = Field(default_factory=list)
+    groups: list[CompilationGroup] = Field(default_factory=list)
+
+
+def proposal_contract(payload: dict):
+    return CompilationManifest if payload.get('version') == 'qnu-knowledge-compilation/v2' else CompilationDraft

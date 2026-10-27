@@ -7,6 +7,46 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [38 — Hướng dẫn chạy QNU V1](./38_huong_dan_chay_qnu_v1.md): ba tiến trình API/worker/FE, cấu hình, migration, admin local, ModelOps và xử lý lỗi.
+
+- [37 — Frontend hỏi đáp thử, review gốc và dashboard QNU](./37_frontend_hoi_dap_thu_review_goc_va_dashboard_qnu.md): POST answers theo kho, tải phản hồi review nguyên trạng và dashboard dữ liệu thật theo workspace/quyền.
+
+- [36 — Frontend phân trang, phạm vi tài liệu và chính tả](./36_frontend_phan_trang_pham_vi_tai_lieu_va_chinh_ta.md): danh sách/lịch sử qua URL, document_ids cùng snapshot và mở lại check hậu OCR bằng GET.
+
+- [35 — Frontend sao lưu, dọn tệp và đánh giá RAG](./35_frontend_sao_luu_don_tep_va_danh_gia_rag.md): retention/verify/preview/receipt, đọc nguồn tìm kiếm và gán nhãn/so sánh/xuất báo cáo cùng snapshot.
+
+- [34 — Frontend vòng đời, thay tài liệu và vận hành](./34_frontend_vong_doi_thay_the_va_van_hanh.md): preview/xác nhận/biên nhận, thùng rác, staged revision và trung tâm tác vụ/readiness theo quyền.
+
+- [33 — RAG policy, metadata, context và kiểm chứng backendV1](./33_rag_policy_metadata_context_va_kiem_chung_backendv1.md): retrieval vào chat, metadata có duyệt, context cùng bản xuất bản và judge tùy chọn.
+
+- [32 — Duyệt review, dọn dẫn xuất, phục hồi và nghiệm thu backendV1](./32_duyet_don_du_lieu_va_phuc_hoi_backendv1.md): xác nhận của con người, xóa có điều kiện, restore vào đích mới và trạng thái sẵn sàng có bằng chứng.
+
+- [31 — Vòng đời ngược backendV1](./31_vong_doi_nguoc_backendv1.md): dừng/hủy, thùng rác/khôi phục, thay publication cùng index và dọn generation cũ có xác nhận.
+
+- [30 — Vận hành và hybrid retrieval backendV1](./30_van_hanh_va_hybrid_backendv1.md): job/usage thật, phục hồi có preview, evidence backup và so sánh retrieval cùng snapshot.
+
+- [29 — Nối hậu OCR, review và sửa Compiler backendV1](./29_noi_hau_ocr_review_va_sua_compiler_backendv1.md): chọn text version, review bền vững và lưu bản sửa có preview thành run con.
+
+- [28 — Review ngữ nghĩa Compiler backendV1](./28_review_ngu_nghia_compiler_backendv1.md): nguồn/bản nháp ghim, review hai chiều và báo cáo nguyên văn trước quyết định duyệt.
+
+- [27 — Rà soát văn bản hậu OCR backendV1](./27_ra_soat_van_ban_hau_ocr_backendv1.md): gợi ý chính tả, sửa đoạn/ô và lưu hai tệp đồng bộ có lịch sử.
+
+- [26 — Trợ lý và hội thoại backendV1](./26_tro_ly_va_hoi_thoai_backendv1.md): assistant config/revision, owner/history/sequence, follow-up và source revalidation.
+
+- [25 — Hỏi đáp có trích dẫn backendV1](./25_hoi_dap_co_trich_dan_backendv1.md): search → evidence → ModelOps chat → kiểm citation/nguồn → câu trả lời.
+
+- [24 — Index và tìm kiếm dense backendV1](./24_index_va_tim_kiem_dense_backendv1.md): publication → chunk/bảng có nguồn → ModelOps embedding → Qdrant generation → search/citation.
+
+- [23 — Phiên bản và xuất bản backendV1](./23_phien_ban_va_xuat_ban_backendv1.md): document/version, preview, duyệt/xuất bản/thay thế/thu hồi, nguồn và receipt được ghim.
+
+- [22 — Compiler backendV1](./22_compiler_backendv1.md): chat qua ModelOps, job bền vững, bản nháp có citation và bảng nguồn bất biến.
+
+- [21 — Xử lý OCR backendV1](./21_xu_ly_ocr_backendv1.md): capacity, raw response, identity, heartbeat/fencing và phục hồi job.
+
+- [20 — Kho tri thức backendV1](./20_kho_tri_thuc_backendv1.md): upload trực tiếp, ghi file nguyên vẹn, idempotency có title, revision và rollback bảo toàn chứng cứ.
+
+- [19 — Workspace và ModelOps backendV1](./19_workspaces_modelops_backendv1.md): membership/role, grant/default theo capability, quota/usage; ngoại lệ chỉ v1, giữ backend cũ.
+
 - [18 — Biên soạn chủ đề nhiều nguồn](./18_bien_soan_chu_de_nhieu_nguon.md): compiler
   có proof/review ledger, intent/idempotency, Storage bất biến, decision có quyền và
   stale/revocation; không tự áp dụng vào RAG hoặc publication.

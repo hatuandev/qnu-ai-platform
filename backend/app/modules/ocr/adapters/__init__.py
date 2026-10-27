@@ -4,6 +4,7 @@ from app.modules.ocr.adapters.base import BaseOCRAdapter
 from app.modules.ocr.adapters.gemini_adapter import GeminiOCRAdapter
 from app.modules.ocr.adapters.mistral_adapter import MistralOCRAdapter
 from app.modules.ocr.adapters.mock_adapter import MockOCRAdapter
+from app.modules.ocr.adapters.nemotron_adapter import NemotronParseAdapter
 from app.modules.ocr.adapters.openai_vision_adapter import (
     OpenAIVisionOCRAdapter,
     QwenOCRAdapter,
@@ -16,6 +17,7 @@ __all__ = [
     "GeminiOCRAdapter",
     "MistralOCRAdapter",
     "MockOCRAdapter",
+    "NemotronParseAdapter",
     "OpenAIVisionOCRAdapter",
     "PaddleOCRVLAdapter",
     "PyMuPDFOCRAdapter",

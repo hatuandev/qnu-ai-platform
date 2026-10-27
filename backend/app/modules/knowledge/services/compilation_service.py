@@ -8,9 +8,11 @@ from datetime import UTC, datetime
 from app.core.exceptions import AppException
 from app.modules.knowledge.compilation_runtime_schemas import COMPILER, POLICY, CompilerPolicy
 from app.modules.knowledge.services.compilation_catalog import invalid, load_sources, require
+from app.modules.knowledge.services.compilation_checkpoint import StageCheckpoints, known_prefix
 from app.modules.knowledge.services.compilation_engine import compile_topic
 from app.modules.knowledge.services.compilation_modelops import (
     configuration_hash,
+    execution_policy,
     generator,
     resolve_route,
 )
@@ -45,16 +47,17 @@ async def preview(db, collection_id: str, ids: list[str], actor) -> dict:
         'usage': 'review_only', 'publication': 'unpublished'}
 
 
-async def reserve(db, collection_id: str, request, actor, config: str) -> tuple:
+async def reserve(db, collection_id: str, request, actor, config: str, policy=None) -> tuple:
     collection, sources, _, fingerprint = await load_sources(db, collection_id, request.source_revision_ids, actor, lock=True)
     if fingerprint != request.expected_source_set_hash:
         raise invalid('stale_source_set')
     state = registry(collection)
     token = digest([actor.actor_id, actor.username, request.idempotency_key])
-    signature = digest({**request.model_dump(exclude={'idempotency_key'}), 'config': config})
+    signature = digest({**request.model_dump(exclude={'idempotency_key', 'resume_from_job_id', 'expected_resume_version'}), 'config': config})
+    intent = digest({**request.model_dump(exclude={'idempotency_key'}), 'config': config})
     if token in state['requests']:
         old = state['jobs'][state['requests'][token]]
-        if old['request_hash'] != signature:
+        if old.get('intent_hash', old['request_hash']) != intent:
             raise invalid('idempotency_conflict')
         await db.rollback()
         return deepcopy(old), None, None
@@ -62,19 +65,41 @@ async def reserve(db, collection_id: str, request, actor, config: str) -> tuple:
         raise invalid('request_ledger_capacity', 422)
     if len(state['jobs']) >= 1000:
         raise invalid('registry_capacity', 422)
+    parent = None
+    if request.resume_from_job_id:
+        parent = state['jobs'].get(request.resume_from_job_id)
+        if (not parent or parent['status'] not in {'paused', 'uncertain'} or parent['version'] != request.expected_resume_version
+                or parent.get('resumed_by_job_id') or parent['request_hash'] != signature
+                or parent['source_set_hash'] != fingerprint or parent['configuration_hash'] != config):
+            raise invalid('stale_or_incompatible_checkpoint')
+        if not known_prefix(parent):
+            raise invalid('checkpoint_uncertain_no_resend')
+        if parent.get('model_calls_count', 0) >= (policy or CompilerPolicy()).max_total_calls:
+            raise invalid('total_model_call_budget', 422)
     # Only one request may own inference for the same exact build, even with a new key.
     for old in state['jobs'].values():
         if old['request_hash'] == signature and old['status'] == 'running':
+            if old.get('intent_hash', old['request_hash']) != intent:
+                raise invalid('build_running_with_different_intent')
             state['requests'][token] = old['id']
             assign(collection, state)
             await db.commit()
             return deepcopy(old), None, None
-    record = {'id': 'kc_' + uuid.uuid4().hex, 'request_hash': signature, 'status': 'running',
+    record = {'id': 'kc_' + uuid.uuid4().hex, 'request_hash': signature, 'intent_hash': intent, 'status': 'running',
         'version': 1, 'created_at': now(), 'topic': request.topic,
         'source_revision_ids': sorted(request.source_revision_ids), 'source_set_hash': fingerprint,
-        'configuration_hash': config, 'events': [], 'action_receipts': {}}
+        'configuration_hash': config, 'events': [], 'action_receipts': {},
+        'execution_policy': (policy or CompilerPolicy()).model_dump(),
+        'cache_keys': list(parent.get('cache_keys', [])) if parent else sorted(await available_packets(collection_id, state)),
+        'checkpoints': deepcopy(parent.get('checkpoints', {})) if parent else {},
+        'model_calls_count': parent.get('model_calls_count', 0) if parent else 0,
+        'resumed_from_job_id': parent['id'] if parent else None}
+    if parent:
+        parent.update(resumed_by_job_id=record['id'], version=parent['version'] + 1)
+        await append_event(collection_id, parent, {'type': 'checkpoint_resumed', 'actor_id': actor.actor_id,
+                                                 'resumed_by_job_id': record['id']})
     await append_event(collection_id, record, {'type': 'compilation_requested', 'actor_id': actor.actor_id,
-        'request_hash': signature, 'source_set_hash': fingerprint})
+        'request_hash': signature, 'source_set_hash': fingerprint, 'resumed_from_job_id': record['resumed_from_job_id']})
     state['jobs'][record['id']] = record
     state['requests'][token] = record['id']
     assign(collection, state)
@@ -88,7 +113,7 @@ async def finish(db, collection_id: str, record: dict, bundle: dict, actor) -> d
         raise invalid('source_changed_during_build')
     state = registry(collection)
     current = state['jobs'][record['id']]
-    if current['version'] != 1 or current['status'] != 'running':
+    if current['version'] != record['version'] or current['status'] != 'running':
         raise invalid('build_ownership_lost')
     await asyncio.to_thread(validate_result, bundle, sources, collection_id, actor)
     check_lineage(state, bundle.get('reused_job_ids', []))
@@ -97,7 +122,7 @@ async def finish(db, collection_id: str, record: dict, bundle: dict, actor) -> d
         if packet.get('kind') == 'topic' or packet['review']['complete']:
             state['packets'][packet['key']] = {'job_id': record['id'], 'reference': await save_object(collection_id, packet)}
     current.update(status='ready_for_review' if bundle['machine_complete'] else 'needs_attention',
-        artifact=reference, proposal_hash=bundle['binding']['proposal_hash'], version=2,
+        artifact=reference, proposal_hash=bundle['binding']['proposal_hash'], version=current['version'] + 1,
         reused_job_ids=bundle.get('reused_job_ids', []))
     await append_event(collection_id, current, {'type': 'automated_verification', 'policy_version': POLICY,
         'machine_complete': bundle['machine_complete'], 'artifact_sha256': reference['sha256'],
@@ -107,15 +132,17 @@ async def finish(db, collection_id: str, record: dict, bundle: dict, actor) -> d
     return deepcopy(current)
 
 
-async def fail(db, collection_id: str, job_id: str, actor, code: str, metrics: list | None = None) -> None:
+async def fail(db, collection_id: str, job_id: str, actor, code: str, metrics: list | None = None, details=None) -> None:
     await db.rollback()
     collection = await get_scoped_collection(db, collection_id, actor=actor, for_update=True)
     state = registry(collection)
     current = state['jobs'][job_id]
     if current['status'] == 'running':
-        current.update(status='uncertain', failure_code=code, version=current['version'] + 1)
+        capacity = code == 'KNOWLEDGE_COMPILATION_CAPACITY'
+        current.update(status='capacity_blocked' if capacity else 'uncertain', failure_code=code,
+                       failure_details=details if capacity else None, version=current['version'] + 1)
         await append_event(collection_id, current, {'type': 'execution_incomplete', 'code': code,
-            'automatic_retry': False, 'model_calls': metrics or []})
+            'automatic_retry': False, 'model_calls': metrics or [], **({'details': details} if capacity else {})})
         assign(collection, state)
         await db.commit()
 
@@ -125,35 +152,63 @@ async def create(db, collection_id: str, request, actor) -> dict:
     require(actor, 'ai.knowledge.view')
     clean_transaction(db)
     route = await resolve_route(db)
-    config = configuration_hash(route, CompilerPolicy().model_dump())
-    record, sources, context = await reserve(db, collection_id, request, actor, config)
+    policy = execution_policy(route)
+    config = configuration_hash(route, policy.model_dump())
+    record, sources, context = await reserve(db, collection_id, request, actor, config, policy)
     if sources is None:
         return public_record(record)
     metrics = []
+    async def verify_config():
+        configured = await resolve_route(db)
+        if configuration_hash(configured, execution_policy(configured).model_dump()) != config:
+            raise invalid('model_configuration_changed_during_build')
+    checkpoints = StageCheckpoints(db, collection_id, record, actor, verify_config, policy)
     try:
         tenant_id, state = context
         cached = await available_packets(collection_id, state)
+        expected_cache = set(record.get('cache_keys', []))
+        if not expected_cache <= set(cached):
+            raise invalid('checkpoint_cached_dependency_unavailable')
+        cached = {key: value for key, value in cached.items() if key in expected_cache}
         bundle = await compile_topic(sources, collection_id, request.topic, actor,
             generator(route, tenant_id, metrics), config, cached,
-            read_cache=lambda reference: read_object(collection_id, reference))
+            read_cache=lambda reference: read_object(collection_id, reference), policy=policy, checkpoints=checkpoints)
         bundle['reused_job_ids'] = sorted({state['packets'][p['key']]['job_id']
             for p in [*bundle['packet_results'], *bundle['topic_results']] if p['key'] in cached})
         bundle['model_calls'] = metrics
         bundle['sha256'] = digest({k: v for k, v in bundle.items() if k != 'sha256'})
-        if configuration_hash(await resolve_route(db), CompilerPolicy().model_dump()) != config:
-            raise invalid('model_configuration_changed_during_build')
+        await verify_config()
         return public_record(await finish(db, collection_id, record, bundle, actor))
     except (Exception, asyncio.CancelledError) as exc:
         code = getattr(exc, 'code', 'KNOWLEDGE_COMPILATION_CANCELLED' if isinstance(exc, asyncio.CancelledError)
                        else 'KNOWLEDGE_COMPILATION_FAILED')
+        if code == 'KNOWLEDGE_COMPILATION_PAUSED':
+            return await pause(db, collection_id, record, actor, metrics)
         try:
-            await asyncio.shield(fail(db, collection_id, record['id'], actor, code, metrics))
+            await asyncio.shield(fail(db, collection_id, record['id'], actor, code, metrics, getattr(exc, 'details', None)))
         except Exception:
             logger.error('compilation_receipt_unconfirmed job=%s code=%s', record['id'], code)
         if isinstance(exc, (AppException, asyncio.CancelledError)):
             raise
         raise AppException('Biên soạn chưa hoàn tất; xem biên nhận, không gửi lại tự động.',
             code='KNOWLEDGE_COMPILATION_FAILED', status_code=502) from exc
+
+
+async def pause(db, collection_id, record, actor, metrics):
+    await db.rollback()
+    collection, _, _, fingerprint = await load_sources(db, collection_id, record['source_revision_ids'], actor, lock=True)
+    state = registry(collection)
+    current = state['jobs'][record['id']]
+    if (current['status'] != 'running' or current['version'] != record['version']
+            or fingerprint != record['source_set_hash']
+            or not known_prefix(current)):
+        raise invalid('checkpoint_pause_not_safe')
+    current.update(status='paused', version=current['version'] + 1)
+    await append_event(collection_id, current, {'type': 'execution_checkpointed', 'reason': 'execution_call_budget',
+                                               'model_calls': metrics, 'automatic_retry': False})
+    assign(collection, state)
+    await db.commit()
+    return public_record(current)
 
 
 def public_record(record: dict) -> dict:
@@ -163,7 +218,14 @@ def public_record(record: dict) -> dict:
         status = 'uncertain'
     return ({key: record[key] for key in ('id', 'version', 'topic', 'source_revision_ids', 'source_set_hash')}
         | {'status': status, 'proposal_hash': record.get('proposal_hash'), 'failure_code': record.get('failure_code'),
-           'usage': 'review_only', 'publication': 'unpublished'})
+           'usage': 'review_only', 'publication': 'unpublished',
+           'failure_details': record.get('failure_details'),
+           'token_budget_basis': record.get('execution_policy', {}).get('token_budget_basis', 'legacy_unverified'),
+           'resumable': record['status'] in {'paused', 'uncertain'} and not record.get('resumed_by_job_id') and known_prefix(record)
+               and record.get('model_calls_count', 0) < record.get('execution_policy', {}).get('max_total_calls', 64),
+           'completed_stages': sum(s['status'] == 'completed' for s in record.get('checkpoints', {}).values()),
+           'model_calls_count': record.get('model_calls_count', 0),
+           'resumed_from_job_id': record.get('resumed_from_job_id')})
 
 
 async def list_compilations(db, collection_id: str, actor) -> dict:
@@ -203,7 +265,8 @@ async def read(db, collection_id: str, job_id: str, actor) -> dict:
         _, _, _, fresh = await load_sources(db, collection_id, record['source_revision_ids'], actor)
         if fresh != fingerprint:
             return {**result, 'status': 'stale', 'bundle': None, 'stale_reason': 'changed_during_read'}
-    return {**result, 'bundle': bundle, 'audit': events}
+    checkpoint_events = await audit_events(collection_id, {'id': record['id'], 'events': record.get('checkpoint_events', [])})
+    return {**result, 'bundle': bundle, 'audit': events, 'checkpoint_audit': checkpoint_events}
 
 
 async def decide(db, collection_id: str, job_id: str, request, actor) -> dict:

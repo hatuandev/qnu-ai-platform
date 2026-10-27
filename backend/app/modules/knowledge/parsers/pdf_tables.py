@@ -157,6 +157,10 @@ def table_blocks(table: dict[str, Any], *, block_id: str, parent_id: str | None,
     grid, depth = table["grid"], table["header_depth"]
     if not grid:
         return []
+    inherited = table.get('inherited_header') or {}
+    inherited_columns = inherited.get('columns', []) if inherited.get('status') == 'verified' else []
+    inherited_roles = bool(inherited_columns) and len(inherited_columns) == len(grid[0]) and all(
+        c.get('header_path') for c in inherited_columns)
     columns = []
     for c in range(len(grid[0])):
         path = []
@@ -165,6 +169,8 @@ def table_blocks(table: dict[str, Any], *, block_id: str, parent_id: str | None,
             if value and (not path or path[-1] != value):
                 path.append(value)
         external = table.get("external_headers") or []
+        if not path and inherited_roles:
+            path = inherited_columns[c]['header_path']
         columns.append({"id": f"c{c + 1:02d}", "header_path": path or external[c:c + 1]})
     flags = []
     if table.get("raw_native", {}).get("cell_text_conflicts"):
@@ -172,21 +178,23 @@ def table_blocks(table: dict[str, Any], *, block_id: str, parent_id: str | None,
             detail="Nội dung ô không khớp các glyph trong vùng nguồn; giữ cả hai bản, chưa cho dùng như dữ liệu đã kiểm chứng."))
     literal_verified = literal_table(table)
     role_status = "confirmed" if literal_verified else "unresolved"
-    if table.get("raw_native") and not depth:
+    if table.get("raw_native") and not depth and not inherited_roles:
         flags.append(QnuQualityFlag(code="native_header_needs_review", status=role_status,
             detail="Không nhận đề xuất engine làm header; lưới nguồn đủ chỉ cho phép giữ literal khi chưa rõ vai trò cột."))
-    elif not depth and table.get("header_proposal"):
+    elif not depth and not inherited_roles and table.get("header_proposal"):
         flags.append(QnuQualityFlag(code="native_header_needs_review",
             detail="Lớp chữ gốc của trang lặp lại mọi nhãn ở dòng đầu bảng OCR; parser đề xuất header, chưa phải xác nhận của người duyệt."))
-    if not depth and not table.get("external_headers"):
+    if not depth and not table.get("external_headers") and not inherited_roles:
         flags.append(QnuQualityFlag(code="table_header_unresolved", status=role_status, detail="Không suy dòng đầu thành header; giữ mọi dòng và không tạo fact từ cột chưa rõ vai trò."))
     container = QnuBlock(id=block_id, parent_id=parent_id, type="table", source_locations=[location],
                          section_path=section_path, attributes={"representation": "records", "columns": columns,
                                                                "engine_used": engine},
                          quality_flags=flags, source_data=table)
+    if inherited_roles:
+        container.attributes['inherited_header'] = inherited
     if literal_verified:
         container.attributes["native_literal_coverage"] = {"status":"verified", "semantic_roles_verified":False}
-        if not depth:
+        if not depth and not inherited_roles:
             container.attributes["column_roles"] = "unknown"
     if depth >= len(grid):
         container.attributes["representation"] = "gfm"
@@ -234,7 +242,7 @@ def table_blocks(table: dict[str, Any], *, block_id: str, parent_id: str | None,
         if spanning:
             row_flags.append(QnuQualityFlag(code="spanning_row_needs_review", detail="Dòng gộp có thể là nhãn nhóm hoặc ghi chú; chưa suy vai trò."))
         body = "\n\n".join(lines)
-        if literal_verified and (spanning or not depth):
+        if literal_verified and (spanning or (not depth and not inherited_roles)):
             attributes["interpretation"] = "literal_only"
             for field in fields.values():
                 if field["state"] == "present":

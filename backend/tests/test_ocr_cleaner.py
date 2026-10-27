@@ -96,7 +96,7 @@ def test_merge_ocr_orphan_table_rows_with_br():
     assert "chức năng đang sử dụng. Không làm mất dữ liệu" in merged
 
 
-def test_clean_ocr_table_syntax_and_typos():
+def test_clean_ocr_table_syntax_preserves_provider_spelling():
     raw = (
         "| A | B |\n"
         "| :--- | :--- |\n"
@@ -107,9 +107,9 @@ def test_clean_ocr_table_syntax_and_typos():
     cleaned = clean_ocr_table_syntax(raw)
     # Duplicate separator removed
     assert cleaned.count("| :--- | :--- |") == 1
-    # Typos corrected
-    assert "chỉ số hiệu năng" in cleaned
-    assert "ký hợp đồng" in cleaned
+    # Wording belongs to the OCR provider; syntax cleanup cannot rewrite it.
+    assert "số chỉ hiệu năng" in cleaned
+    assert "kí hợp đồng" in cleaned
 
 
 def test_post_process_ocr_output_end_to_end():

@@ -1,0 +1,144 @@
+{
+  "scope": "isolated API and worker-entry smoke; real document and models; queue transport covered separately by integration tests",
+  "source": {
+    "file_name": "Muc hoc phi 2024.pdf",
+    "sha256": "6f4ec683b0579f4ceffb42e56fa09e6fcfb3ddb240f05278a43dca7b4494e147",
+    "bytes": 1351383
+  },
+  "models": {
+    "ocr": "nemotron-parse",
+    "chat": "qwen3.5-9b",
+    "embedding": "bge-m3",
+    "rerank": "bge-reranker-v2-m3"
+  },
+  "observed_context_limits": {
+    "nemotron-parse": 16384,
+    "qwen3.5-9b": 131072,
+    "bge-m3": 8192,
+    "bge-reranker-v2-m3": 8192
+  },
+  "stages": [
+    {
+      "stage": "ocr",
+      "status": "completed",
+      "seconds": 4.875
+    },
+    {
+      "stage": "compiler",
+      "status": "completed",
+      "seconds": 19.266
+    },
+    {
+      "stage": "review",
+      "status": "completed",
+      "seconds": 39.25
+    },
+    {
+      "stage": "index",
+      "status": "completed",
+      "seconds": 1.375
+    },
+    {
+      "stage": "backup",
+      "status": "completed",
+      "seconds": 0.812
+    }
+  ],
+  "status": "PASS",
+  "review": {
+    "verdict": "needs_attention",
+    "summary": {
+      "draft_status_counts": {
+        "supported": 19,
+        "uncertain": 1
+      },
+      "draft_units_checked": 20,
+      "finding_count": 6,
+      "source_status_counts": {
+        "covered": 16,
+        "omitted": 5
+      },
+      "source_units_checked": 21
+    },
+    "observed_usage": {
+      "prompt_tokens": 15112,
+      "total_tokens": 19718,
+      "completion_tokens": 4606,
+      "prompt_tokens_details": null
+    },
+    "human_accuracy_acceptance": false
+  },
+  "searches": {
+    "dense": {
+      "hits": 5,
+      "seconds": 0.547,
+      "citations_pinned": true
+    },
+    "hybrid": {
+      "hits": 5,
+      "seconds": 0.641,
+      "citations_pinned": true
+    },
+    "hybrid_rerank": {
+      "hits": 5,
+      "seconds": 1.297,
+      "citations_pinned": true
+    }
+  },
+  "answer": {
+    "status": "answered",
+    "source_count": 3,
+    "observed_tokens": 4590,
+    "stage_ms": {
+      "retrieval": 1265.0,
+      "generation": 1343.0,
+      "validation": 218.0
+    },
+    "correctness": "NOT RUN"
+  },
+  "evaluation": {
+    "summary": {
+      "dense": {
+        "expected": 3,
+        "completed": 3,
+        "errors": 0,
+        "completed_only_metrics": {
+          "hit_at_k": 1.0,
+          "annotated_recall_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "annotated_precision_at_k": 0.5555555555555555
+        },
+        "acceptance": "not_determined"
+      },
+      "hybrid": {
+        "expected": 3,
+        "completed": 3,
+        "errors": 0,
+        "completed_only_metrics": {
+          "hit_at_k": 1.0,
+          "annotated_recall_at_k": 0.8333333333333334,
+          "mrr_at_k": 1.0,
+          "annotated_precision_at_k": 0.4444444444444444
+        },
+        "acceptance": "not_determined"
+      },
+      "hybrid_rerank": {
+        "expected": 3,
+        "completed": 3,
+        "errors": 0,
+        "completed_only_metrics": {
+          "hit_at_k": 1.0,
+          "annotated_recall_at_k": 0.8333333333333334,
+          "mrr_at_k": 1.0,
+          "annotated_precision_at_k": 0.4444444444444444
+        },
+        "acceptance": "not_determined"
+      }
+    },
+    "label_status": "draft_needs_human_check",
+    "scope": "literal lookup proxy only, not semantic quality acceptance"
+  },
+  "backup_verified": true,
+  "db_dropped": true,
+  "vectors_removed": 1
+}

@@ -1,0 +1,117 @@
+{
+  "status": "PASS",
+  "baseline": {
+    "receipt": {
+      "database": "qnu_v1_test_7ae451b4f24c4d8a",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 1,
+      "seconds": 31.27
+    },
+    "failed": 2,
+    "deselected": 8
+  },
+  "focused": {
+    "receipt": {
+      "database": "qnu_v1_test_7ccfd71a73a243bd",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 0,
+      "seconds": 591.3
+    },
+    "passed": 50,
+    "failed": 0,
+    "skipped": 0
+  },
+  "full_tests": {
+    "passed": 575,
+    "failed": 0,
+    "skipped": 0,
+    "previous": 565,
+    "missing_prior_tests": [],
+    "added": [
+      "tests.integration.test_chat_stop_updates_664::test_active_update_keeps_running_turn[assistant]",
+      "tests.integration.test_chat_stop_updates_664::test_active_update_keeps_running_turn[conversation]",
+      "tests.integration.test_chat_stop_updates_664::test_failed_update_rolls_back_turn_cancellation[assistant]",
+      "tests.integration.test_chat_stop_updates_664::test_failed_update_rolls_back_turn_cancellation[conversation]",
+      "tests.integration.test_chat_stop_updates_664::test_forbidden_stop_cannot_cancel_running_turn[assistant]",
+      "tests.integration.test_chat_stop_updates_664::test_forbidden_stop_cannot_cancel_running_turn[conversation]",
+      "tests.integration.test_chat_stop_updates_664::test_stop_and_resume_discards_late_answer_and_allows_new_turn[assistant]",
+      "tests.integration.test_chat_stop_updates_664::test_stop_and_resume_discards_late_answer_and_allows_new_turn[conversation]",
+      "tests.integration.test_chat_stop_updates_664::test_stop_update_only_cancels_related_running_turns[assistant]",
+      "tests.integration.test_chat_stop_updates_664::test_stop_update_only_cancels_related_running_turns[conversation]"
+    ],
+    "groups": [
+      {
+        "group": 0,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_2123e9ffcba24dfb",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 544.11
+        }
+      },
+      {
+        "group": 1,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_3b7c07dd1f064093",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 605.42
+        }
+      },
+      {
+        "group": 2,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_468b6c40b03b4baf",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 543.77
+        }
+      },
+      {
+        "group": 3,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_ae974acb2c194e44",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 543.25
+        }
+      }
+    ]
+  },
+  "quality": {
+    "ruff": {
+      "exit_code": 0,
+      "output": "All checks passed!\n"
+    },
+    "format": {
+      "exit_code": 0,
+      "output": "4 files already formatted\n"
+    }
+  },
+  "openapi": {
+    "paths": 96,
+    "operations": 123
+  },
+  "schema_head": [
+    "0001_initial_schema"
+  ],
+  "protected_files_unchanged": 487,
+  "cleanup": {
+    "remaining_owned_test_databases": [],
+    "observed_v1_vector_collections": []
+  },
+  "limits": [
+    "Synthetic HTTP inference with real local PostgreSQL/Qdrant; no live AI/quality benchmark",
+    "No migration, restart, deployment, serving data mutation or frontend changes"
+  ]
+}

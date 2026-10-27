@@ -1,0 +1,219 @@
+{
+  "context": 675,
+  "created_at": "2026-10-27T12:16:56.220Z",
+  "verdict": "CHANGES_APPLIED",
+  "application_changes": true,
+  "scope": "frontendV1 — fix Context674 F1–F4 and wire RAG G1–G3 against backendV1 Context673 contracts",
+  "baseline_from": "docs/bao_cao/context674/verification.json",
+  "checks": {
+    "tests": {
+      "status": "PASS",
+      "exit_code": 0,
+      "files": 20,
+      "passed": 190,
+      "failed": 0,
+      "skipped": 0
+    },
+    "tests_preserved": {
+      "status": "PASS",
+      "previous_total": 156,
+      "current_total": 190,
+      "added": 34,
+      "note": "all 156 baseline cases kept; no assertion weakened"
+    },
+    "lint": {
+      "status": "PASS",
+      "exit_code": 0,
+      "files": 489,
+      "errors": 0,
+      "warnings": 0,
+      "infos": 0
+    },
+    "build_including_typescript": {
+      "status": "PASS",
+      "exit_code": 0,
+      "warning": "chunk larger than 500kB (pre-existing)"
+    },
+    "bundle_guards_after_build": {
+      "status": "PASS",
+      "exit_code": 0,
+      "files": 3,
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0
+    },
+    "dist_bridge_markers": {
+      "status": "PASS",
+      "patterns": [
+        "createDevAutoLoginHandler",
+        "devAutoLoginPlugin",
+        "sec-fetch-site",
+        "QNU_DEV_ACCESS_KEY=",
+        "DEV_AUTO_LOGIN_ENV_KEY",
+        "AI.Admin",
+        "act_dev_admin"
+      ],
+      "matching_files": 0,
+      "note": "client-side request helper is bundled but gated at runtime; no bridge code, no credential, no dev actor/role string"
+    },
+    "independent_review_probes": {
+      "status": "PASS",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "baseline": {
+        "status": "FAIL_CONFIRMS_FINDINGS",
+        "passed": 1,
+        "failed": 10
+      },
+      "note": "same probe files, assertions unchanged; only the probe's router mock gained the useBlocker export the production code now uses"
+    }
+  },
+  "fixed": [
+    {
+      "id": "F1",
+      "priority": "P1",
+      "file": "frontendV1/src/app/auth/v1/provider.tsx",
+      "fix": "auto-login result re-checked at write time against epoch, attempt, mounted, suppression and token-store sessionId; SSO callback defers auto-login",
+      "regressions": [
+        "tests/auth-auto-login-race-674.test.tsx",
+        "tests/dev-auto-login-ui-672.test.tsx"
+      ]
+    },
+    {
+      "id": "F2",
+      "priority": "P2",
+      "file": "frontendV1/src/features/knowledge/ocr-tab-container.tsx",
+      "fix": "draft moved to a session-scoped external store keyed by resource+OCR run+base version; run switch and page leave confirm; explicit rebase on conflict",
+      "regressions": [
+        "tests/ocr-draft-674.test.tsx"
+      ]
+    },
+    {
+      "id": "F3",
+      "priority": "P2",
+      "file": "frontendV1/src/features/knowledge/publication-requests.ts",
+      "fix": "only HTTP 404 + published_compilation_not_found yields null; detail page has its own error + retry branch",
+      "regressions": [
+        "tests/v1-rag-contracts-674.test.ts",
+        "tests/rag-ui-674.test.tsx"
+      ]
+    },
+    {
+      "id": "F4",
+      "priority": "P2",
+      "file": "frontendV1/src/features/conversations/chat-message-item.tsx",
+      "fix": "terminal cancelled state with its own explanation, no resend-as-new-request hint",
+      "regressions": [
+        "tests/rag-ui-674.test.tsx"
+      ]
+    }
+  ],
+  "rag_wired": {
+    "G1": {
+      "status": "PASS",
+      "items": [
+        "rag_policy in types, assistant form (collapsible advanced section), detail summary and every create/update/toggle payload",
+        "index generation tab with real endpoints, real idempotency and real run states",
+        "search test form with mode/candidate/rrf/rerank/metadata filter",
+        "explicit per-turn metadata_filter with pre-send conflict warning and conflict-driven panel reopen",
+        "provider catalog filtered by capability (rerank/embedding/chat) from the workspace ModelOps catalog"
+      ]
+    },
+    "G2": {
+      "status": "PASS",
+      "items": [
+        "retrieval_metadata declared on document/version registration with target + values + source evidence",
+        "metadata and evidence shown on the version page with the backend digest",
+        "approval requires its own metadata confirmation and sends the backend retrieval_metadata_sha256 verbatim"
+      ]
+    },
+    "G3": {
+      "status": "PASS",
+      "items": [
+        "verification/context/metadata-scope traces typed and rendered",
+        "unsupported/uncertain warn with reason and quotes; enforce blocking shows the verification cause",
+        "generation usage and judge usage kept apart; missing usage stays unknown"
+      ]
+    }
+  },
+  "not_run": [
+    {
+      "item": "real API/SSO/model smoke (login, upload→OCR→compile→approve→index→chat)",
+      "reason": "no listener on 8000/8002/5173 during this session and starting services is out of scope",
+      "required": "backendV1 on :8002, QNU SSO reachable, real ModelOps providers, allowed test corpus"
+    },
+    {
+      "item": "desktop/mobile, keyboard and light/dark checks on the changed screens",
+      "reason": "no browser available; only jsdom/DOM assertions were executed",
+      "required": "real browser session against a running backend"
+    },
+    {
+      "item": "vite preview runtime check of the dev bridge",
+      "reason": "preview server not started (would need a running service)",
+      "required": "npm run preview plus a manual request to /__qnu_dev/auto-login"
+    },
+    {
+      "item": "per-provider RAG permission gate for rerank/verification",
+      "reason": "provider lists are capability-filtered from the workspace ModelOps catalog, but the backend exposes no separate per-provider RAG right yet; deriving one in the UI would be invented",
+      "required": "backend contract exposing provider-level RAG rights, then read it instead of inferring"
+    }
+  ],
+  "limitations": [
+    "RAG flow proven only at request-contract and DOM level, not on real data",
+    "no per-provider RAG permission gate exists to enforce (capability filter only)",
+    "conversation-level pinned scope is only visible through the per-turn scope line",
+    "metadata editor needs paragraph/row indices; no visual picker from the compiled draft",
+    "Vite chunk > 500kB warning remains"
+  ],
+  "source_sha256": {
+    "src/features/rag/types.ts": "eb4ba1cd33b5a412770d8cf21e7580de7734ab13baef5bf774c0bc8b1ce00299",
+    "src/features/rag/schemas.ts": "a0efdb8e34d231dbc1236ad30952011033d30ef0521ef5817ffc58f6d4d33f21",
+    "src/features/rag/verification-panel.tsx": "d8c64d1912b3e1ad1bb9d599699a59176d7e58e53d87d1f3a330b0223bc2df59",
+    "src/features/rag/rag-policy-summary.tsx": "0933939cdcb9316e95a04995d72df4c8beb1daad5fa7c89a157073655cf6a9ad",
+    "src/features/rag/metadata-filter-fields.tsx": "7a2ca084d336741c4ec1fbcbb294f55ddc54e4f3e2e10c0307532e5642e51333",
+    "src/features/knowledge/index-types.ts": "10fb761e95b6e5b2a6fbc5183cee77d648ee4745afc3b8268d3ba8d6c6749c22",
+    "src/features/knowledge/index-requests.ts": "463850c947555072f6736137026e0e94a63d3898d9999fda66b8d97c9cc9452e",
+    "src/features/knowledge/index-queries.ts": "fd0d07760adaeb1a9e08c4c5df123eb8e99cc865e7fd083258330dcd0380a88c",
+    "src/features/knowledge/index-panel.tsx": "2b9399244b05d2eb9583bf3d41b2ec632e8f8a6e313808d9cbe4c7736d6bfdf5",
+    "src/features/knowledge/ocr-draft-store.ts": "84db64a62e6d8fed9f4b7ec0c95306ec14933c074c4bd4e69ab0de7064539b27",
+    "src/features/knowledge/retrieval-metadata-editor.tsx": "40a52b724932181f15a298bb28c563b2264921f69c274b754afd7ef0b74303e3",
+    "src/features/knowledge/retrieval-metadata-view.tsx": "8a6e6e92035e2dcf76e16fc848d7f3493b8109c6cb4ecf75e608cb27382b6578",
+    "src/lib/idempotency-key.ts": "e9ba1e265d79302ef8b96c59168e40689c038b2d1c19750eb6b74aef5df4c3e4",
+    "tests/ocr-draft-674.test.tsx": "a9491be945bfc63ed837eafe4feaebe7cba72f3499f121d6506b0536645a4faf",
+    "tests/auth-auto-login-race-674.test.tsx": "91eded4106b14394822f3accfafd575b32c044a6f134a35dfc39a66f1331264b",
+    "tests/rag-ui-674.test.tsx": "f82ac9fc23e90fca717964b6c8c7f6de175a2251c462b9dba4cd51612b47403d",
+    "tests/v1-rag-contracts-674.test.ts": "51286e95849cf3001d7fb82afe43bc671ae9ba0bd0d864841f1be2f282978e08",
+    "src/app/auth/v1/provider.tsx": "5c33d091be783cfbed87d1ced078e26b3866143e6c1736614b69df8035fe3ec6",
+    "src/app/auth/v1/dev-auto-login.ts": "e53b68c9c2c6e09b3a581694616234ac2896f9816c0c28adefffc6181a98e639",
+    "src/app/auth/v1/index.ts": "f6f86eaf93729a2fc6526de79ca06eb396e3cebfb1fc68f53cca2a1a575d983d",
+    "src/routes/signin-oidc.tsx": "0da5fbf46e715b4c44469455d97971f13362b2f691ff2c66e5675e31e198f286",
+    "src/app/api/v1/endpoints.ts": "2a5176c67f3ad1ab524b6b9698b7d52333b843d85d01c61b336b318b71f34e82",
+    "src/app/api/v1/index.ts": "27ab553aa17f4d737de6790e5f94ccda8d48876c10ba734c4a933f0dd79257ca",
+    "src/features/conversations/types.ts": "e862af31dfc1bee777000124ebcaf817a01b0c24b1ab6097b0426745837a26ca",
+    "src/features/conversations/requests.ts": "c006d50206446ea83528c6b5838aaadbf3b83d4d9ed642b16d34589aae86a2cd",
+    "src/features/conversations/schemas.ts": "cf9bf07209f674611999dddc222ce5b100b33f37e54f7b8b44e4f399eedf2e4a",
+    "src/features/conversations/chat-view.tsx": "dc17743e12ec9fc258f2af86c0102c4171ab5827bea5aa10c925a21d912103b7",
+    "src/features/conversations/chat-message-item.tsx": "5ebdaee23562ae65b0ad796ae57f9cd35bbdf808ede9fe4bc1045139d0a8972f",
+    "src/features/knowledge/publication-types.ts": "0d990502cf3e51e3739fb04033dd3bb8aee342f4f4b25082a1dfbf099d98e175",
+    "src/features/knowledge/publication-schemas.ts": "9507e21c874300a57dc7d4963db5541f02437bcc0054f96e19286b0a8a51b68c",
+    "src/features/knowledge/publication-requests.ts": "a085473e84a4b60c0e204e35feb70c3013d0456a68a8a3d4de9102399eccf919",
+    "src/features/knowledge/register-document-dialog.tsx": "383580672ac6e615b768188f29c7da3e5806ae90192a294c53a847845176a3fd",
+    "src/features/knowledge/review-gate-dialog.tsx": "ba0634c8414cd8fbcd5bb9b3396203880478966a0ac56a740a411d05768e5e2a",
+    "src/features/knowledge/compiled-version-detail-page.tsx": "0919098a29599e76a83ac63865ae3e77c0058f0c8ee318d83ee1a0860d8ca3e3",
+    "src/features/knowledge/compiled-document-detail-page.tsx": "bdc1cc21d4d59c827e7ceacbb4402adb25331cee2e30737eb33360725033b576",
+    "src/features/knowledge/collection-detail-page.tsx": "a804fd52302f1a06481be22e65df059b26ac5afdec64af0a59c4499aacfafed2",
+    "src/features/knowledge/ocr-tab-container.tsx": "adbfc55427826fe9057a57edd8de764ab634d3c40786e8df168f0989f89972b8",
+    "src/features/knowledge/ocr-text-review-panel.tsx": "68ad81d81f9d81561b42014255987b48159d0ee3b572840c1b237a252d790728",
+    "src/features/assistants/types.ts": "c1ac2824a1384fa2ad442879cd2a2941aef056488d13ee218999a951d83fe0b4",
+    "src/features/assistants/requests.ts": "05ea6a46fb6e0aa222ec8f8f832d6afe3326c56bffaa3f24ea35b5db30138d8d",
+    "src/features/assistants/schemas.ts": "2cc364e4e3e11a8090d69533d6dd4702587fac5a5b1c2d3cfd69478e9eab61ab",
+    "src/features/assistants/assistant-form-dialog.tsx": "d91bff5c41870a79e8e3eb3583dbbbd416ffdd467bb672a26dad6ac461612b95",
+    "src/features/assistants/assistant-detail-page.tsx": "7c2d8b3f930af6681c0867e5271f22cac9ef227349283a1b1635f66feac14d78",
+    "src/features/assistants/assistants-panel.tsx": "d0e1dceab1703957373b3ccef74fdff6f8be71f2cb565492dd882f924cadcd1e",
+    "src/routes/workspaces.$workspaceId.collections.$collectionId.index.tsx": "45a393f5a80a032ee0ba8ac2509bb673a826bd918afafefa765cb370d622a0bb",
+    "tests/compilation-ui-671.test.tsx": "9b1e419ef7c132f0b9e43c007d3e55a9b0e6ebe61bc381a98eb73ce2d1916f2a",
+    "README.md": "75ec3e5f717edb1e53c2bf456690a68acd9c206f9f72397cf636c60cb30b4658"
+  }
+}

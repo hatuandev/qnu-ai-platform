@@ -1,0 +1,91 @@
+{
+  "status": "CHANGES_REQUESTED",
+  "scope": "backendV1 review, focus reverse lifecycle and existing update routes",
+  "existing_tests": {
+    "passed": 23,
+    "failed": 0,
+    "skipped": 0
+  },
+  "independent_probes": {
+    "passed": 0,
+    "failed": 2,
+    "skipped": 0,
+    "observed": {
+      "http_status": 200,
+      "turn_status": "completed",
+      "has_result": true
+    },
+    "expected": {
+      "http_status": 409,
+      "turn_status": "cancelled",
+      "has_result": false
+    }
+  },
+  "runs": [
+    {
+      "label": "existing_lifecycle",
+      "receipt": {
+        "database": "qnu_v1_test_710f189da87240af",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 0,
+        "seconds": 126.05
+      },
+      "tests": 23,
+      "failures": []
+    },
+    {
+      "label": "initial_probes",
+      "receipt": {
+        "database": "qnu_v1_test_35a73934ce9448ea",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 1,
+        "seconds": 28.22
+      },
+      "tests": 2,
+      "failures": [
+        {
+          "test_id": "test_existing_update_routes_fence_turn_after_stop_and_resume[assistant_put]",
+          "message": "pydantic_core._pydantic_core.ValidationError: 6 validation errors for AssistantConfig\nid\n  Extra inputs are not permitted [type=extra_forbidden, input_value='ast_a0e9b47156d7', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden\nworkspace_id\n  Extra inputs are not permitted [type=extra_forbidden, input_value='ws_42a4bb9cfdaa', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden\nrevision\n  Extra inputs are not permitted [type=extra_forbidden, input_value=1, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden\ncreated_by\n  Extra inputs are not permitted [type=extra_forbidden, input_value='root', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden\ncreated_at\n  Extra inputs are not permitted [type=extra_forbidden, input_value='2026-10-27T04:26:22.559963Z', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden\nupdated_at\n  Extra inputs are not permitted [type=extra_forbidden, input_value='2026-10-27T04:26:22.558864Z', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden"
+        },
+        {
+          "test_id": "test_existing_update_routes_fence_turn_after_stop_and_resume[conversation_put]",
+          "message": "AssertionError: {'http_status': 200, 'turn_status': 'completed', 'has_result': True}\nassert {'http_status...result': True} == {'http_status...esult': False}\n  \n  Differing items:\n  {'turn_status': 'completed'} != {'turn_status': 'cancelled'}\n  {'has_result': True} != {'has_result': False}\n  {'http_status': 200} != {'http_status': 409}\n  Use -v to get more diff"
+        }
+      ]
+    },
+    {
+      "label": "corrected_probes",
+      "receipt": {
+        "database": "qnu_v1_test_22143f948d05466f",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 1,
+        "seconds": 33.25
+      },
+      "tests": 2,
+      "failures": [
+        {
+          "test_id": "test_existing_update_routes_fence_turn_after_stop_and_resume[assistant_put]",
+          "message": "AssertionError: {'http_status': 200, 'turn_status': 'completed', 'has_result': True}\nassert {'http_status...result': True} == {'http_status...esult': False}\n  \n  Differing items:\n  {'http_status': 200} != {'http_status': 409}\n  {'has_result': True} != {'has_result': False}\n  {'turn_status': 'completed'} != {'turn_status': 'cancelled'}\n  Use -v to get more diff"
+        },
+        {
+          "test_id": "test_existing_update_routes_fence_turn_after_stop_and_resume[conversation_put]",
+          "message": "AssertionError: {'http_status': 200, 'turn_status': 'completed', 'has_result': True}\nassert {'http_status...result': True} == {'http_status...esult': False}\n  \n  Differing items:\n  {'http_status': 200} != {'http_status': 409}\n  {'has_result': True} != {'has_result': False}\n  {'turn_status': 'completed'} != {'turn_status': 'cancelled'}\n  Use -v to get more diff"
+        }
+      ]
+    }
+  ],
+  "probe_sha256": "00fd36ada091d36a61afdf9dcbc43a617f6e7dca1a1dd7624fb3357bc0807174",
+  "cleanup": {
+    "remaining_owned_test_databases": [],
+    "observed_v1_vector_collections": []
+  },
+  "limits": [
+    "Application code unchanged; no serving database migration, restart or deployment",
+    "Focused review only; full suite not rerun (historical 565 PASS belongs to Context662)",
+    "Real local PostgreSQL/Qdrant with synthetic HTTP model providers; no live AI or quality acceptance",
+    "First assistant probe failed in request construction (extra fields), corrected before final reproduction"
+  ]
+}

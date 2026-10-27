@@ -1,0 +1,94 @@
+{
+  "scope": "authorized isolated functional smoke; no semantic accuracy approval",
+  "source": {
+    "name": "Muc hoc phi 2024.pdf",
+    "sha256": "6f4ec683b0579f4ceffb42e56fa09e6fcfb3ddb240f05278a43dca7b4494e147",
+    "bytes": 1351383
+  },
+  "stages": [
+    {
+      "stage": "ocr_real_arq",
+      "status": "completed",
+      "seconds": 7.391
+    },
+    {
+      "stage": "compiler_real_arq",
+      "status": "completed",
+      "seconds": 13.485
+    },
+    {
+      "stage": "automatic_review_real_arq",
+      "status": "completed"
+    },
+    {
+      "stage": "embedding_index_real_arq",
+      "status": "completed",
+      "seconds": 2.141
+    }
+  ],
+  "review": {
+    "verdict": "no_issues_detected",
+    "findings": 0,
+    "accuracy_acceptance": false,
+    "test_approval_scope": "previous explicit user authorization to run full flow on this PDF; isolated functional test only"
+  },
+  "answer": {
+    "status": "answered",
+    "sources": 5,
+    "tokens": 4413,
+    "semantic_accuracy": "NOT RUN"
+  },
+  "readiness": {
+    "ready": true,
+    "checks": {
+      "database": {
+        "ok": true,
+        "schema_head": "0002_operational_readiness"
+      },
+      "queue": {
+        "ok": true,
+        "worker_schema_head": "0002_operational_readiness"
+      },
+      "vector": {
+        "ok": true
+      },
+      "worker": {
+        "ok": true
+      },
+      "ocr": {
+        "ok": true,
+        "provider_id": "prv_9e86f88342f9",
+        "model": "nemotron-parse",
+        "inference_verified": false
+      },
+      "chat": {
+        "ok": true,
+        "provider_id": "prv_f78ec20a1495",
+        "model": "qwen3.5-9b",
+        "inference_verified": false
+      },
+      "embedding": {
+        "ok": true,
+        "provider_id": "prv_3ff256a8f3c4",
+        "model": "bge-m3",
+        "inference_verified": false
+      },
+      "storage": {
+        "ok": true,
+        "probe": "pinned_source_read"
+      }
+    },
+    "live_inference_verified": false,
+    "production_auth_configured": false
+  },
+  "restore": {
+    "status": "restored",
+    "objects_verified": 18,
+    "search_hits": 5,
+    "credential_decryption_and_live_embedding": true
+  },
+  "status": "PASS",
+  "production_auth": "NOT RUN: development authentication in isolated environment",
+  "test_databases_dropped": true,
+  "owned_vectors_removed": true
+}

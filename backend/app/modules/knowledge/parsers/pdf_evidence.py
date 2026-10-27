@@ -21,7 +21,7 @@ def _geometry_json(value: Any) -> Any:
     return value
 
 
-def capture_native_page(page: Any) -> dict[str, Any]:
+def capture_native_page(page: Any, *, allow_unshaded_headers: bool = True) -> dict[str, Any]:
     """Keep raw strings and real geometry; never turn table boxes into cell boxes."""
     layout = _geometry_json(page.get_text("dict", flags=pymupdf.TEXTFLAGS_DICT & ~pymupdf.TEXT_PRESERVE_IMAGES))
     tables: list[dict[str, Any]] = []
@@ -43,7 +43,8 @@ def capture_native_page(page: Any) -> dict[str, Any]:
                            "bbox": list(header.bbox) if header and header.bbox else None},
             })
             tables[-1]["geometry"] = getattr(table, "qnu_geometry", {})
-            tables[-1]["header_evidence"] = (header_role_evidence(tables[-1], layout, drawings)
+            tables[-1]["header_evidence"] = (header_role_evidence(tables[-1], layout, drawings,
+                allow_unshaded=allow_unshaded_headers)
                 if tables[-1]["geometry"].get("status") != "unresolved" else {})
     except Exception as exc:
         # Text remains available, but table completeness is explicitly not certified.

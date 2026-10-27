@@ -344,7 +344,10 @@ async def test_failed_storage_write_is_visible_and_no_unconfirmed_artifact_point
         async def broken(path, value):
             nonlocal count
             count += 1
-            if count == 2:  # Durable intent succeeds; bundle write fails; failure receipt can still be stored.
+            # Target the final bundle semantically; checkpoints add earlier durable writes.
+            import json
+            body = json.loads(value)
+            if isinstance(body, dict) and 'binding' in body and 'markdown' in body:
                 raise OSError('fixture Storage unavailable')
             return await actual(path, value)
         with patch.object(storage_service, 'save', side_effect=broken):

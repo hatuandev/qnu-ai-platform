@@ -1,0 +1,387 @@
+{
+  "context": 679,
+  "date": "2026-10-27",
+  "scope": "Four frontend phases, existing backendV1 APIs",
+  "status": "PASS for frontend checks; live acceptance NOT RUN",
+  "checks": [
+    {
+      "command": "vitest run tests/maintenance-contracts-679.test.ts tests/maintenance-evaluation-ui-679.test.tsx",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "passed": 43,
+      "failed": 0,
+      "skipped": 0,
+      "artifact": "storage/artifacts/context679-fe-maintenance-evaluation/focused-final.json"
+    },
+    {
+      "command": "vitest run tests/regression-677-index-scope.test.tsx tests/maintenance-evaluation-ui-679.test.tsx tests/maintenance-contracts-679.test.ts",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "passed": 51,
+      "failed": 0,
+      "skipped": 0,
+      "artifact": "storage/artifacts/context679-fe-maintenance-evaluation/regression.json"
+    },
+    {
+      "command": "npm test -- --reporter=json --outputFile=.../tests-final-pass.json",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "passed": 287,
+      "failed": 0,
+      "skipped": 0,
+      "artifact": "storage/artifacts/context679-fe-maintenance-evaluation/tests-final-pass.json"
+    },
+    {
+      "command": "vitest run tests/maintenance-evaluation-ui-679.test.tsx tests/lifecycle-operations-ui-678.test.tsx",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "passed": 48,
+      "failed": 0,
+      "skipped": 0,
+      "artifact": "storage/artifacts/context679-fe-maintenance-evaluation/status-regression.json"
+    },
+    {
+      "command": "vitest run --config storage/artifacts/context674-review/vitest.review.config.ts",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "artifact": "storage/artifacts/context679-fe-maintenance-evaluation/review674.json"
+    },
+    {
+      "command": "vitest run --config storage/artifacts/context676-review/vitest.review.config.ts",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "artifact": "storage/artifacts/context679-fe-maintenance-evaluation/review676.json"
+    },
+    {
+      "command": "vitest run tests/template-boundary.test.ts tests/dev-auto-login-bundle-672.test.ts",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "artifact": "storage/artifacts/context679-fe-maintenance-evaluation/bundle-final-status.json"
+    },
+    {
+      "command": "node_modules/.bin/biome.cmd check . --reporter=json",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "summary": {
+        "changed": 0,
+        "unchanged": 542,
+        "matches": 0,
+        "duration": 765768300,
+        "errors": 0,
+        "warnings": 0,
+        "infos": 0,
+        "skipped": 0,
+        "suggestedFixesSkipped": 0,
+        "diagnosticsNotPrinted": 0,
+        "scannerDuration": 3906300
+      },
+      "artifact": "storage/artifacts/context679-fe-maintenance-evaluation/lint-final-status.json"
+    },
+    {
+      "command": "node_modules/.bin/tsc.cmd --noEmit",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "artifact": "storage/artifacts/context679-fe-maintenance-evaluation/typecheck.log"
+    },
+    {
+      "command": "npm.cmd run build",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "includes": "vite build && tsc --noEmit",
+      "warning": "Existing chunk >500kB",
+      "artifact": "storage/artifacts/context679-fe-maintenance-evaluation/build-final-status.log"
+    }
+  ],
+  "test_id_comparison": {
+    "retained": 244,
+    "missing": [],
+    "added": [
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "CSV neutralizes formula cell \" \\t=1\""
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "CSV neutralizes formula cell \"+1\""
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "CSV neutralizes formula cell \"-1\""
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "CSV neutralizes formula cell \"=SUM(A1)\""
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "CSV neutralizes formula cell \"@link\""
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "CSV neutralizes formula cell \"\\u0000=1\""
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "CSV preserves quotes, lines, empty metrics and explicit answer NOT RUN"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "backup deletion uses operation preview and exact operation acceptance"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "backup retries preserve the explicit retention and idempotency key"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "backups use server pagination and protected verification/download routes"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "evaluation carries one pinned snapshot and labels without inventing a history endpoint"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "maintenance URLs validate bounded identifiers and survive reload parsing"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-contracts-679.test.ts",
+        "storage cleanup is separate from index cleanup and replay preserves approved hash"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "ambiguous cleanup retry freezes approval and reuses same hash and key"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "backup create retries reuse the original retention and key after network loss"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "backup deletion uses its protected preview and does not claim synchronous removal"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "backup unknown size stays unknown and integrity failure never becomes success"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "cleanup requires valid age, concrete preview and explicit confirmation"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "evaluation budget validation blocks invalid K and retains query text"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "evaluation caps the editable question list at twenty"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "evaluation permission is checked before snapshot or model catalog reads"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "evaluation permits explicit empty gold but shows unmeasured quality"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "evaluation takes selected readable gold IDs and the pinned hash without manual IDs"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "evidence inspector hides stale content when source is replaced"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "evidence inspector hides stale content when source is withdrawn"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "evidence inspector shows full text and exact version route after publication verification"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "expired backups absent from retention eligibility do not expose deletion"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "expired preview and empty inventory cannot be accepted"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "gold controls have distinct accessible IDs for the same hit across questions"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "gold picker rejects candidates from a different index snapshot"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "human reviewed labels require explicit acknowledgement and changing a label clears it"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "late backup result cannot update a logged out session"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "late evaluation response does not install a report after logout"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "pending cleanup resumes the previously accepted action after remount"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "permission errors in source inspection do not render cached passage"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "permission failure during cleanup acceptance stays an error with no success callback"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "rerank selection carries the catalog provider id rather than a display label"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "reviewer cannot mount backups queries even via a direct URL"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "reviewer cannot mount storage queries even via a direct URL"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "search shows individual skipped reasons and rank trace without percentage claims"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "snapshot conflict is an error and produces no success report"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "stale cleanup preview clears approval and demands another preview"
+      ],
+      [
+        "D:/DuAnPhanMem/qnu-ai-platform/frontendV1/tests/maintenance-evaluation-ui-679.test.tsx",
+        "structured table preserves spans and unknown page without inventing page zero"
+      ]
+    ]
+  },
+  "final_label_only_change": "Full287 pass before final status-label copy; final UI48 + lint + build rerun after labels. No previous assertion removed.",
+  "source_integrity": {
+    "baseline_files": 796,
+    "final_files": 818,
+    "changed": [
+      "frontendV1/src/routeTree.gen.ts",
+      "frontendV1/src/app/api/v1/endpoints.ts",
+      "frontendV1/src/features/knowledge/collection-detail-page.tsx",
+      "frontendV1/src/features/knowledge/index-panel.tsx",
+      "frontendV1/src/features/knowledge/source-tables-view.tsx",
+      "frontendV1/src/features/operations/operation-receipt.tsx",
+      "frontendV1/src/features/operations/operations-page.tsx",
+      "frontendV1/src/features/operations/search.ts",
+      "frontendV1/src/features/operations/types.ts",
+      "frontendV1/tests/template-boundary.test.ts"
+    ],
+    "added": [
+      "frontendV1/src/features/evaluation/evaluation-form.tsx",
+      "frontendV1/src/features/evaluation/evaluation-page.tsx",
+      "frontendV1/src/features/evaluation/evaluation-report.tsx",
+      "frontendV1/src/features/evaluation/gold-picker.tsx",
+      "frontendV1/src/features/evaluation/report-export.ts",
+      "frontendV1/src/features/evaluation/requests.ts",
+      "frontendV1/src/features/evaluation/types.ts",
+      "frontendV1/src/features/knowledge/evidence-fields.tsx",
+      "frontendV1/src/features/knowledge/search-evidence.tsx",
+      "frontendV1/src/features/operations/backup-create.tsx",
+      "frontendV1/src/features/operations/backup-details.tsx",
+      "frontendV1/src/features/operations/backups-panel.tsx",
+      "frontendV1/src/features/operations/cleanup-inventory.tsx",
+      "frontendV1/src/features/operations/maintenance-dialog.tsx",
+      "frontendV1/src/features/operations/maintenance-queries.ts",
+      "frontendV1/src/features/operations/maintenance-requests.ts",
+      "frontendV1/src/features/operations/maintenance-types.ts",
+      "frontendV1/src/features/operations/storage-panel.tsx",
+      "frontendV1/src/lib/download-blob.ts",
+      "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.evaluations.tsx",
+      "frontendV1/tests/maintenance-contracts-679.test.ts",
+      "frontendV1/tests/maintenance-evaluation-ui-679.test.tsx"
+    ],
+    "removed": [],
+    "encoding_issues": [],
+    "backend_unchanged": true,
+    "auth_unchanged": true
+  },
+  "browser": {
+    "environment": "Isolated loopback fixture with actual components/CSS and synthetic auth/API",
+    "desktop": "default viewport",
+    "mobile": "390x844",
+    "screenshots": [
+      "backups-desktop-light.png",
+      "backups-mobile-dark.png",
+      "cleanup-desktop-light.png",
+      "cleanup-mobile-dark.png",
+      "evaluation-desktop-light.png",
+      "evaluation-mobile-dark.png",
+      "report-desktop-light.png",
+      "report-mobile-dark.png",
+      "source-desktop-dark.png",
+      "source-mobile-light.png"
+    ],
+    "exports": {
+      "csv_bom": true,
+      "json_keys": [
+        "request",
+        "result"
+      ]
+    },
+    "overflow": {
+      "source_mobile_client_and_scroll_width": 389,
+      "source_desktop_client_and_scroll_width": 670,
+      "report_mobile_client_and_scroll_width": 390
+    },
+    "cleanup": "Tab closed, viewport reset, task-only Vite3019 helper stopped"
+  },
+  "not_run": [
+    "Live BE/SSO/worker/storage/model/corpus",
+    "Human labelled retrieval quality benchmark",
+    "Answer correctness/groundedness evaluation",
+    "Whole-system restore",
+    "Full browser/device/keyboard matrix"
+  ],
+  "out_of_scope": [
+    "BE code/API additions",
+    "Runtime config/provider/credentials",
+    "Migrations/reindex/restart/deploy/push"
+  ],
+  "docs_verification": {
+    "status": "PASS",
+    "new_utf8_lf_files": 5,
+    "local_links_checked": 22,
+    "index_insertions": 4,
+    "history_preserved": "Existing bytes retained; index insertions verified before writes",
+    "application_hash_drift_after_checks": []
+  }
+}

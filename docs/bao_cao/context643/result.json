@@ -1,0 +1,18 @@
+{
+  "context": 643,
+  "date": "2026-10-26",
+  "status": "six_findings_fixed_and_verified",
+  "baseline": {"passed": 0, "failed": 6, "seconds": 10.92, "exit_code": 1},
+  "focused": {"passed": 76, "failed": 0, "skipped": 0, "seconds": 45.61, "exit_code": 0},
+  "full_v1": {"passed": 265, "failed": 0, "skipped": 0, "seconds": 98.51, "exit_code": 0},
+  "new_official_cases": 16,
+  "user_response_replay": {"passed": 1, "seconds": 4.26, "raw_bytes_equal": true, "blocks": 10, "table_columns": 6, "table_rows_including_header": 6, "usage_tokens": 4077, "live_inference": false},
+  "ruff": "PASS",
+  "format_changed_files": "PASS",
+  "openapi": "PASS",
+  "owned_databases": 5,
+  "owned_databases_remaining": 0,
+  "legacy_app_files_unchanged": 475,
+  "main_database_migrated": false,
+  "limits": ["DOCX section headers/footers rejected explicitly; full Word rendering not implemented", "OCR requires configured model capacity and supported input-accounting envelope", "No new live Nemotron call", "Source-image recognition accuracy not checked", "Intermittent local-writer cause not changed in this task"]
+}

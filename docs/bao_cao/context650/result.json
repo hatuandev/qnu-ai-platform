@@ -1,0 +1,80 @@
+{
+  "context": 650,
+  "requested_mode": "full_ktx_reference",
+  "destination": "frontendV1",
+  "source_files": 324,
+  "route_files": 78,
+  "install": {
+    "status": "PASS",
+    "packages": 484,
+    "dependency_scripts": false
+  },
+  "build": {
+    "status": "PASS",
+    "exit_code": 0,
+    "includes_typescript": true,
+    "warnings": [
+      "main chunk 667.97 kB"
+    ]
+  },
+  "typecheck": {
+    "status": "PASS",
+    "exit_code": 0
+  },
+  "boundary_tests": {
+    "status": "PASS",
+    "pass": 2,
+    "fail": 0,
+    "skip": 0
+  },
+  "adaptation_lint": {
+    "status": "PASS",
+    "files": 17,
+    "exit_code": 0
+  },
+  "full_lint": {
+    "status": "FAIL",
+    "errors": 56,
+    "warnings": 12,
+    "infos": 6,
+    "exit_code": 1
+  },
+  "browser": {
+    "sample_routes": [
+      "/design-system",
+      "/users",
+      "/rooms"
+    ],
+    "desktop": "1440x900",
+    "mobile": "390x844",
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "search_url_reload": "PASS",
+    "invite_form_open_cancel": "PASS",
+    "mobile_navigation": "PASS",
+    "page_overflow": "none observed on tested pages",
+    "console_errors_warnings": 0,
+    "all_routes_tested": false
+  },
+  "preservation": {
+    "source_files": 324,
+    "source_files_unchanged": true,
+    "source_changed": [],
+    "missing_copy_files": [],
+    "route_files": 78,
+    "route_set_equal": true,
+    "existing_code_files_sealed": 1902,
+    "existing_code_changed": [],
+    "locked_dependencies_unchanged": true,
+    "utf8_lf_text_files": 328,
+    "encoding_errors": [],
+    "source_env_copied": false,
+    "links_checked": 7,
+    "status": "PASS"
+  },
+  "live_api_integration": "NOT RUN; blocked intentionally in reference",
+  "backend_tests": "NOT RUN; no backend changes",
+  "preview_url": "http://127.0.0.1:3001/design-system"
+}

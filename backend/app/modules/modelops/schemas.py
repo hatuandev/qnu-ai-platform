@@ -7,7 +7,7 @@ from typing import Any, Literal
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.core.single_application import SingleApplicationModel
 from app.modules.modelops.services.output_contract import OutputContract
@@ -29,9 +29,12 @@ class LLMGenerateRequest(SingleApplicationModel):
     )
     conversation_id: str | None = Field(None, description="Mã phiên hội thoại")
     temperature: float = Field(0.2, ge=0.0, le=2.0, description="Độ sáng tạo")
-    max_tokens: int = Field(2000, ge=50, le=8192, description="Giới hạn số token đầu ra")
+    max_tokens: int = Field(2000, ge=50, le=2147483647, description="Ngân sách đầu ra; giới hạn thực theo provider/model")
+    automatic_output_budget: bool = False
+    minimum_output_tokens: int = Field(1,ge=1)
     stream: bool = Field(False, description="Bật chế độ Streaming SSE")
-    thinking_budget: int = Field(0, ge=0, le=4096, description="Ngân sách token suy nghĩ ngầm (0 = tắt)")
+    thinking_budget: int = Field(0, ge=0, le=4096, description="Tham số suy luận tương thích cũ; 0 không gửi yêu cầu bật, không bảo đảm tắt mặc định provider.")
+    reasoning_effort: Literal['low', 'medium', 'high'] | None = None
     preferred_provider_id: str | None = Field(
         None, description="Mã nhà cung cấp được Trợ lý AI ưu tiên chỉ định"
     )
@@ -139,11 +142,34 @@ class ProviderKeyTestResponse(BaseModel):
 # ---------------- Provider Config Schemas ----------------
 
 
+class ModelTokenLimits(BaseModel):
+    endpoint: str = Field(min_length=1)
+    context_window_tokens: int = Field(ge=1024)
+    max_output_tokens: int | None = Field(default=None,ge=50)
+    basis: Literal['operator_configured', 'provider_reported'] = 'operator_configured'
+    reasoning_in_output_budget: bool = True
+    tokenizer_encoding: Literal['o200k_harmony','o200k_base','cl100k_base'] | None = None
+    chat_overhead_tokens: int = Field(0,ge=0)
+    capacity_source: str | None = Field(default=None,max_length=1000)
+
+    @field_validator('endpoint')
+    @classmethod
+    def safe_capacity_endpoint(cls, value: str) -> str:
+        return ProviderConfigValidation.validate_base_url(value)
+
+    @model_validator(mode='after')
+    def output_fits_context(self):
+        if self.max_output_tokens is not None and self.max_output_tokens > self.context_window_tokens:
+            raise ValueError('Reported output capacity cannot exceed total context capacity')
+        return self
+
+
 class ModelCapabilityConfig(BaseModel):
     probe_role: Literal["chat", "embedding", "reranker", "ocr"] = "chat"
     vision: bool = False
     reasoning: bool = False
     embedding_dimension: int | None = Field(None, gt=0)
+    token_limits: ModelTokenLimits | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class ProviderConfigValidation(BaseModel):

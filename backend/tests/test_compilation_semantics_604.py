@@ -3,7 +3,7 @@ from copy import deepcopy
 
 import pytest
 
-from app.modules.knowledge.compilation_runtime_schemas import PacketCheck, SynthesisCheck
+from app.modules.knowledge.compilation_runtime_schemas import POLICY, PacketCheck, SynthesisCheck
 from app.modules.knowledge.services.compilation_validation import check_packet, check_synthesis
 
 
@@ -197,7 +197,7 @@ async def test_missed_evidence_reconciles_without_changing_original_review_or_fa
 @pytest.mark.parametrize('mutation', ['foreign_source', 'missing', 'duplicate', 'unknown_assertion', 'unsupported_context', 'unrelated_with_assertion'])
 def test_coverage_requires_exact_ledger_and_same_source_association(mutation):
     from app.core.exceptions import AppException
-    from app.modules.knowledge.compilation_runtime_schemas import CoverageAudit
+    from app.modules.knowledge.compilation_runtime_schemas import CoverageAudit, CoverageItem
     from app.modules.knowledge.services.compilation_coverage import validate_audit
     entry = {'evidence_id': 'p2', 'role': 'supporting_context', 'assertion_ids': ['a1'], 'reason': 'Fixture.'}
     entries = [entry]
@@ -208,8 +208,10 @@ def test_coverage_requires_exact_ledger_and_same_source_association(mutation):
     if mutation == 'unknown_assertion': entry['assertion_ids'] = ['unknown']
     if mutation == 'unsupported_context': entry['assertion_ids'] = []
     if mutation == 'unrelated_with_assertion': entry['role'] = 'unrelated'
+    # Exercise the server backstop for persisted/untyped input as well as the new JSON boundary guard.
+    audit = CoverageAudit.model_construct(items=[CoverageItem.model_validate(item) for item in entries])
     with pytest.raises(AppException):
-        validate_audit(CoverageAudit(items=entries), ['p2'], {'assertions': [item()]}, evidence)
+        validate_audit(audit, ['p2'], {'assertions': [item()]}, evidence)
 
 
 @pytest.mark.asyncio
@@ -235,7 +237,7 @@ async def test_handler_blocks_admin_approval_when_scope_is_literal_unproved_desp
         path = f'/knowledge/collections/{cid}/compilations/{record["id"]}'
         fetched = await client.get(path)
         bundle = fetched.json()['bundle']
-        assert not bundle['machine_complete'] and bundle['policy_version'] == 'qnu-compilation-review/v3'
+        assert not bundle['machine_complete'] and bundle['policy_version'] == POLICY
         assert bundle['packet_results'][0]['review']['mechanical_issues']
         denied = await client.post(path + '/decisions', json=action(record))
         assert denied.status_code == 409 and denied.json()['details']['reason'] == 'unresolved_evidence'

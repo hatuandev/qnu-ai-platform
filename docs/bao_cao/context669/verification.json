@@ -1,0 +1,129 @@
+{
+  "context": 669,
+  "created_at": "2026-10-27T15:29:40.076037+07:00",
+  "verdict": "CHANGES_REQUESTED",
+  "scope": "frontendV1 QNU modules present before concurrent publication implementation",
+  "application_source_modified_by_review": false,
+  "checks": [
+    {
+      "command": "npm test",
+      "cwd": "frontendV1",
+      "exit_code": 1,
+      "status": "FAIL",
+      "pass": 42,
+      "failed_test_files": 6,
+      "skip": 0,
+      "reason": "Vite aliases and TSX not supported by configured plain Node test runner"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "frontendV1",
+      "exit_code": 0,
+      "status": "PASS",
+      "includes": "vite build and tsc --noEmit",
+      "warning": "chunk >500 kB",
+      "limitation": "before concurrently added publication files; does not establish UI behavior"
+    },
+    {
+      "command": "npm run lint",
+      "cwd": "frontendV1",
+      "exit_code": 1,
+      "status": "FAIL",
+      "files": 450,
+      "errors": 64,
+      "warnings": 14,
+      "infos": 6
+    },
+    {
+      "command": "npm exec -- biome check src/app/api/v1 src/app/auth/v1 src/features/workspaces src/features/modelops src/features/knowledge src/features/assistants src/features/conversations --max-diagnostics=100",
+      "cwd": "frontendV1",
+      "exit_code": 1,
+      "status": "FAIL",
+      "files": 96,
+      "errors": 5,
+      "warnings": 2
+    },
+    {
+      "command": "node storage/artifacts/context668-fe-review/probes.cjs",
+      "cwd": ".",
+      "exit_code": 1,
+      "status": "FAIL",
+      "probes_failed": 7,
+      "method": "real TS/TSX handlers and hooks, synthetic in-memory hook/data ports, real QueryClient for invalidation",
+      "limitations": [
+        "not browser DOM",
+        "no backend request",
+        "no persistent writes",
+        "not live inference"
+      ]
+    },
+    {
+      "check": "browser",
+      "status": "PARTIAL",
+      "result": "login rendered on review-only Vite port 3009; backend port 8002 not listening; protected flows NOT RUN"
+    }
+  ],
+  "failed_test_files": [
+    "v1-assistants.test.ts",
+    "v1-conversations.test.ts",
+    "v1-knowledge.test.ts",
+    "v1-ocr.test.ts",
+    "v1-session-secret-regression.test.ts",
+    "v1-sso.test.ts"
+  ],
+  "source_sha256_at_handoff": {
+    "frontendV1/package.json": "d32f1ae012b6c9e9e1a2e25b93922c75fa4eef55ff8bd3b127ab4b5bedeb5fd8",
+    "frontendV1/src/main.tsx": "feed3d7ac448108f6da9a58d749f9e93d1c52f05f272309da82a5e4118b3ba1e",
+    "frontendV1/src/app/query-client.ts": "6cbaf1ce729dbdd8f132ad04cfc96cf85af64d093a7bbf586fb5e7108e202507",
+    "frontendV1/src/features/conversations/chat-view.tsx": "e0a6e1b60d0b6bcc7b83d98de552b24b9c1ec0e8dcc0a5dd8ff7a0e08395544c",
+    "frontendV1/src/features/knowledge/compilation-detail-page.tsx": "4ca47acb7c5a95031c10d41c32950c94c6d5567d881dd4bd83972aeb8d88df0b",
+    "frontendV1/src/features/knowledge/compilation-editor-tab.tsx": "e20e9bba11eb25e41b1a11693d55c34da089bc99a55d57eb6271a2b815e3e000",
+    "frontendV1/src/features/knowledge/compilation-review-tab.tsx": "2064fbd1b3e06c0f4022bafb2f5c89a9f116106172f3e2f88ddc71ede69fb5f6",
+    "frontendV1/src/features/knowledge/compilation-queries.ts": "c0b733c839905d9b285c4faf8cb427f313b4fec9cfba275d4314e8b6c1dd01de",
+    "frontendV1/src/features/knowledge/compilation-requests.ts": "ab377aff578d9ded09f911924672182ac336ea2b373ea89391bba56bbb877885",
+    "frontendV1/src/features/knowledge/ocr-text-review-panel.tsx": "e5f43b810bca38dbbf6c8c8f8cbd84ec8fb824b35ffc886b1c9c35a1959cd2fb",
+    "frontendV1/src/features/knowledge/ocr-queries.ts": "31099b3f7c09b0c58ffd8fb0ddb1591d1a84a2db5e445b152e5a44e335258279",
+    "backendV1/qnu/domains/conversations/history.py": "33033db8287c7ceb1572bb2687f9a9d6e34fcb272592938be5286b52dc529c3b"
+  },
+  "probe_results": {
+    "method": "real TS/TSX with in-memory hook/data ports; no browser DOM, API, DB or live inference",
+    "results": [
+      {
+        "id": "R1_compiler_downloads_use_client",
+        "status": "FAIL",
+        "reason": "both actions must reach authenticated requestBlob; actual errors: [{\"kind\":\"error\",\"message\":\"Không thể tải tập tin Markdown.\"},{\"kind\":\"error\",\"message\":\"Không thể tải phản hồi raw LLM.\"}]\n\n0 !== 2\n"
+      },
+      {
+        "id": "R1b_review_markdown_uses_client",
+        "status": "FAIL",
+        "reason": "review download never calls requestBlob; errors: [{\"kind\":\"error\",\"message\":\"Không thể tải Markdown báo cáo review.\"}]\n\n0 !== 1\n"
+      },
+      {
+        "id": "R2_chat_history_can_reach_turn_51",
+        "status": "FAIL",
+        "reason": "after three clicks requested offsets remain [0,0,0,0]; backend returns turn_no ascending"
+      },
+      {
+        "id": "R3_heading_edit_keeps_section_identity",
+        "status": "FAIL",
+        "reason": "typing changes React section key and remounts the focused input\n+ actual - expected\n\n+ 'section-0-Section AX'\n- 'section-0-Section A'\n                      ^\n"
+      },
+      {
+        "id": "R4_switch_compilation_resets_draft",
+        "status": "FAIL",
+        "reason": "new bundle hash is b but title is Document A edited\n+ actual - expected\n\n+ 'Document A edited'\n- 'Document B'\n            ^\n"
+      },
+      {
+        "id": "R5_auto_review_preserves_not_scheduled",
+        "status": "FAIL",
+        "reason": "request returns notScheduled=true; hook overwrites it to false\n\nfalse !== true\n"
+      },
+      {
+        "id": "R6_new_compilation_invalidates_visible_list",
+        "status": "FAIL",
+        "reason": "cached list key limit=20 does not match invalidation key limit=undefined\n\nfalse !== true\n"
+      }
+    ]
+  },
+  "cleanup": "No listener on review-only port 3009 or node command for the review server observed after intentional interruption; no backend/runtime config changed."
+}

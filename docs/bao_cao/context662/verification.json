@@ -1,0 +1,102 @@
+{
+  "status": "PASS",
+  "migration_files_before": 15,
+  "migration_files_after": 1,
+  "head": "0001_initial_schema",
+  "tables": 42,
+  "schema_catalog_equal": true,
+  "collision_protected": true,
+  "retired_revision_protected": true,
+  "downgrade_protected": true,
+  "archive_sha256": "8e7ead7f15b3c485f3a551859bba691339abd4e1f0d4d73c1ba3e1e492050639",
+  "original_migration_hashes": {
+    "0001_baseline.py": "f96a191f5540186632e97f92e800dcfd69b9701a64a06db0930dddaff190eb0f",
+    "0002_workspaces.py": "8e19cfe88b41771e91e5cefd007079af714cf4d87120485c59613e10f38e8efd",
+    "0003_modelops.py": "94962c590c6b8672297f6957693b208514f6981165086b81baa08be9379ea2c9",
+    "0004_workspace_model_policy.py": "0f07bf4bd574973890b9b8097c2c290ba7a5fb259eaf846d0189fea36b419dc6",
+    "0005_knowledge_collections.py": "1aeeabd4a6e459f714ca4977d10c8006c93f35dd7f8a3f232106755e6a8101f0",
+    "0006_ocr_processing.py": "bc2062e3e3f1dbf77341b12786d09fe0607a0ae928cfb3b988b8a0748c3b4eb4",
+    "0007_compilation.py": "eb81fc7711f2360c3b1ce6888170a129a2feee9861e04d2a410e2d5441242d91",
+    "0008_publication.py": "ceeb83934fe5d402f884f4b04c497073e5e4bf7c0905de8dd47f817ca639195e",
+    "0009_dense_index.py": "6af31b72a9e45265f8502b0d3606963f99f74ca6cba64d76a55e83b223478779",
+    "0010_conversations.py": "a2d802247e24754c5a2ee16f0c633731f98e73821d24ab406b9a1d6080888b12",
+    "0011_ocr_text_review.py": "4957d8f932a9cf10ac1a4c47c1493076b33b1cc2b26133e55f68ca7745e68908",
+    "0012_compiler_review.py": "40628995563cbfdf2b1055cf69b77300be83c0f11fc0ac93734f39fee89d8f72",
+    "0013_compiler_workflow.py": "a8fd38a4b939f1ce75ea7339704d1206102bb94248c6885bf9079e55755d4a2e",
+    "0014_operations.py": "f092592cd08c2af18538569885597624d572e6b7f1dd36847cf5ef734bde4a82",
+    "0015_resource_lifecycle.py": "dee1ebf66174eaeb424077e401e5f7689bbeb255695fab7932e7c659f3566f79"
+  },
+  "checks": {
+    "ruff": {
+      "exit_code": 0,
+      "output": "All checks passed!\n"
+    },
+    "format": {
+      "exit_code": 0,
+      "output": "4 files already formatted\n"
+    }
+  },
+  "full_tests": {
+    "passed": 565,
+    "failed": 0,
+    "skipped": 0,
+    "prior_tests": 563,
+    "missing_prior_tests": [],
+    "groups": [
+      {
+        "group": 0,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_f43a36241db64c98",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 447.59
+        }
+      },
+      {
+        "group": 1,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_724644076971443d",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 465.61
+        }
+      },
+      {
+        "group": 2,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_1679853583ba47cf",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 393.06
+        }
+      },
+      {
+        "group": 3,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_c9265371d88b4d0d",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 449.34
+        }
+      }
+    ]
+  },
+  "cleanup": {
+    "remaining_test_databases": [],
+    "observed_v1_vector_collections": []
+  },
+  "legacy_files_preserved": 475,
+  "limits": [
+    "No serving database migration, stamping, restart or deployment",
+    "Old revision databases require an explicit separate transition",
+    "Test inference only; no live AI model calls"
+  ]
+}

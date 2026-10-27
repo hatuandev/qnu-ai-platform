@@ -29,10 +29,14 @@ def verify_pdf_source(document: QnuStructuredDocument, content: bytes, evidence:
         for index, page in enumerate(pdf):
             if replay["pages"][index]["page"] != index + 1:
                 raise ValueError("PDF_PAGE_ORDER_MISMATCH")
-            fresh = capture_native_page(page)
+            # A new header policy invalidates new extraction caches, but does not
+            # reinterpret a previously saved v5 document during integrity checks.
+            fresh = capture_native_page(page, allow_unshaded_headers=
+                document.document_meta.get('builder_version') != 'pdf-evidence-structure/v5')
             if fresh != replay["pages"][index]["native"]:
                 raise ValueError("PDF_NATIVE_EVIDENCE_MISMATCH")
-    expected = build_pdf_document(replay, filename=document.source.filename, sha256=source_hash)
+    expected = build_pdf_document(replay, filename=document.source.filename, sha256=source_hash,
+        legacy_v5=document.document_meta.get('builder_version') == 'pdf-evidence-structure/v5')
     if len(expected.blocks) != len(document.blocks):
         raise ValueError("PDF_BLOCK_INVENTORY_MISMATCH")
     for actual, checked in zip(document.blocks, expected.blocks, strict=True):

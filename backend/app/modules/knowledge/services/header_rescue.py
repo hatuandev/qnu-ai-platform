@@ -1,6 +1,7 @@
 """Selective OCR for visibly incomplete administrative fields, not table replacement."""
 
 import logging
+import math
 import re
 import unicodedata
 from typing import Any
@@ -70,6 +71,29 @@ def _field_lines(text: str) -> dict[str, str]:
     return result
 
 
+def _located_header_block(block: dict[str, Any]) -> bool:
+    if block.get('type') not in {'header', 'text', 'paragraph'} or not isinstance(block.get('text'), str):
+        return False
+    coords = block.get('coordinates') or {}
+    if (not isinstance(coords, dict) or coords.get('is_valid') is not True
+            or coords.get('coordinate_system') not in {None, 'normalized_percent'}):
+        return False
+    values = [coords.get(k) for k in ('left', 'top', 'width', 'height')]
+    if any(type(v) not in {int, float} or not math.isfinite(v) for v in values):
+        return False
+    left, top, width, height = values
+    return left >= 0 and top >= 0 and width > 0 and height > 0 and left + width <= 100 and top + height <= 100
+
+
+def _header_observations(page: Any) -> list[dict[str, Any]]:
+    observations = [{'text': page.extracted_text, 'source': {'kind': 'ocr_markdown'}}]
+    for index, block in enumerate(getattr(page, 'blocks', []) or []):
+        if isinstance(block, dict) and _located_header_block(block):
+            observations.append({'text': block['text'], 'source': {'kind': 'ocr_block',
+                'block_id': block.get('id', f'block-{index}'), 'coordinates': block['coordinates']}})
+    return observations
+
+
 async def rescue_header(_db: AsyncSession, page: dict[str, Any], prepared: dict[str, Any],
                         engine: str | None, tenant_id: str) -> None:
     audit = {"version": "header-rescue-v1", "status": "unavailable", "bbox": prepared["bbox"],
@@ -86,7 +110,12 @@ async def rescue_header(_db: AsyncSession, page: dict[str, Any], prepared: dict[
         # Transient internal evidence; source_extraction moves it into the protected PDF sidecar.
         page["_header_raw_evidence"] = getattr(response, "raw_evidence", None)
         audit["ocr_text"] = response.pages[0].extracted_text
-        found = _field_lines(response.pages[0].extracted_text)
+        observations = _header_observations(response.pages[0])
+        # Aggregate candidates before deciding uniqueness. A Markdown/raw conflict
+        # must remain incomplete rather than preferring whichever arrived last.
+        found = _field_lines('\n'.join(item['text'] for item in observations))
+        audit['field_sources'] = {field: [item['source'] for item in observations
+            if _field_lines(item['text']).get(field) == line] for field, line in found.items()}
         # Compare only standalone header fields. A date inside a cited legal basis
         # is not the issuing date of this document and must not cause false conflict.
         original = {field: extract_administrative_metadata(line).get(field) for field, line in

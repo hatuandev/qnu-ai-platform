@@ -1,0 +1,151 @@
+{
+  "scope": "backendV1 resource lifecycle",
+  "full_partitions": [
+    {
+      "group": 0,
+      "exit_code": 1,
+      "receipt": {
+        "database": "qnu_v1_test_9cddc70b7682404a",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 1,
+        "seconds": 466.47
+      }
+    },
+    {
+      "group": 1,
+      "exit_code": 0,
+      "receipt": {
+        "database": "qnu_v1_test_8462e0d6c5804ec1",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 0,
+        "seconds": 439.48
+      }
+    },
+    {
+      "group": 2,
+      "exit_code": 0,
+      "receipt": {
+        "database": "qnu_v1_test_0b114cc468d8409f",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 0,
+        "seconds": 444.5
+      }
+    },
+    {
+      "group": 3,
+      "exit_code": 0,
+      "receipt": {
+        "database": "qnu_v1_test_9d0c439a00124c33",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 0,
+        "seconds": 389.8
+      }
+    }
+  ],
+  "initial_full_nonpass": {
+    "tests/integration/test_compiler_review_652.py::test_changes_during_review_reject_results_and_keep_durable_failure[source]": "FAIL",
+    "tests/integration/test_compiler_review_652.py::test_corrupted_report_is_an_error_and_old_review_does_not_match_new_source": "FAIL",
+    "tests/unit/test_redaction.py::test_redacts_email_and_phone": "FAIL",
+    "tests/integration/test_ocr_queue_transport_644.py::test_real_queue_delivers_persisted_run_once": "SKIP",
+    "tests/integration/test_compiler_queue_645.py::test_compiler_reconcile_delivers_durable_run_on_real_arq": "SKIP"
+  },
+  "rechecks_after_fix": [
+    {
+      "group": 0,
+      "exit_code": 0,
+      "receipt": {
+        "database": "qnu_v1_test_01855e93a90e48b8",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 0,
+        "seconds": 355.38
+      },
+      "files": [
+        "tests/integration/test_index_api_647.py",
+        "tests/integration/test_compiler_review_652.py",
+        "tests/integration/test_workspace_model_boundaries.py",
+        "tests/integration/test_compiler_edits_654.py",
+        "tests/integration/test_knowledge_regressions_639.py",
+        "tests/integration/test_compiler_source_versions_654.py",
+        "tests/integration/test_ocr_observability_644.py",
+        "tests/integration/test_evaluation_655.py",
+        "tests/unit/test_local_blob_store.py",
+        "tests/unit/test_model_capacity_641.py",
+        "tests/unit/test_sso.py",
+        "tests/unit/test_ocr_observability_644.py",
+        "tests/unit/test_backup_archive_655.py",
+        "tests/unit/test_redaction.py"
+      ]
+    },
+    {
+      "group": 1,
+      "exit_code": 0,
+      "receipt": {
+        "database": "qnu_v1_test_29985562d568494e",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 0,
+        "seconds": 230.03
+      },
+      "files": [
+        "tests/integration/test_lifecycle_runtime_659.py",
+        "tests/integration/test_publication_646.py",
+        "tests/integration/test_compiler_automatic_654.py",
+        "tests/integration/test_compiler_queue_645.py",
+        "tests/integration/test_ocr_queue_transport_644.py"
+      ]
+    }
+  ],
+  "full_partition_tests": 562,
+  "post_full_regression": {
+    "test": "tests/integration/test_lifecycle_runtime_659.py::test_cancel_auto_review_between_claim_and_child_creation_never_calls_model",
+    "result": "PASS",
+    "database_dropped": true
+  },
+  "final_unique_tests": 563,
+  "passed": 563,
+  "failed": 0,
+  "skipped": 0,
+  "baseline_unique": 540,
+  "missing_prior_tests": [],
+  "quality": {
+    "ruff": {
+      "exit_code": 0,
+      "output": "All checks passed!\n"
+    },
+    "format": {
+      "exit_code": 0,
+      "output": "49 files already formatted\n"
+    }
+  },
+  "owned_python_files": 49,
+  "openapi": {
+    "paths": 96,
+    "operations": 123,
+    "prior_paths": 92,
+    "missing_prior_paths": []
+  },
+  "legacy_seal": {
+    "sealed": 475,
+    "raw_drift": []
+  },
+  "cleanup": {
+    "databases_checked": 28,
+    "interrupted_database_dropped": [],
+    "remaining_owned_databases": [],
+    "interrupted_vectors_deleted": [],
+    "observed_v1_vector_collections": []
+  },
+  "limits": [
+    "No deployment, serving database migration or restart",
+    "No real AI-server inference for this batch; synthetic HTTP inference with real isolated PostgreSQL and local Qdrant",
+    "Delete is reversible; original/raw and derived evidence are retained",
+    "No upstream abort guarantee",
+    "Replacement covers one compiled document; shared-source conflicts are rejected",
+    "Cleanup is inactive vector collection and chunk cleanup, not arbitrary original/derived-file purge"
+  ]
+}

@@ -215,6 +215,12 @@ class InferenceService:
         return failure.state
 
     async def generate(self, db: AsyncSession, req: LLMGenerateRequest) -> LLMGenerateResponse:
+        if req.automatic_output_budget and 'max_tokens' in req.model_fields_set and req.max_tokens<req.minimum_output_tokens:
+            raise AppException('Giới hạn đầu ra được yêu cầu nhỏ hơn đầu ra tối thiểu.',
+                code='MODEL_OUTPUT_LIMIT_TOO_SMALL',status_code=422)
+        if req.automatic_output_budget and req.output_contract is not None:
+            raise AppException('Chưa đo phần schema bổ sung cho ngân sách tự động.',
+                code='MODEL_TOKEN_ENVELOPE_UNVERIFIED',status_code=422)
         if req.output_contract is not None and req.stream:
             raise AppException("Hợp đồng selector chỉ hỗ trợ non-streaming.", code="MODEL_OUTPUT_STREAM_UNSUPPORTED", status_code=422)
         with transient_retry_scope():
@@ -261,6 +267,34 @@ class InferenceService:
             stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == p["id"])
             res = await db.execute(stmt)
             cfg_obj = res.scalar_one_or_none()
+            from app.modules.modelops.services.token_limits import validate_output_budget
+
+            effective_output=req.max_tokens
+            route_budget=None
+            if req.automatic_output_budget:
+                from app.modules.modelops.services.request_token_budget import automatic_budget
+                from app.modules.modelops.services.token_limits import configured_token_limits
+
+                limits=configured_token_limits(cfg_obj.extra_config if cfg_obj else {},chosen_model,p['api_base_url'])
+                if limits is None:
+                    from app.modules.modelops.services.capacity_discovery import discover
+
+                    limits=await discover(cfg_obj,chosen_model,db)
+                route_budget=await asyncio.to_thread(automatic_budget,[m.model_dump() for m in req.messages],limits,
+                                                     req.minimum_output_tokens)
+                if not route_budget['fits']:
+                    fallback_reasons.append(f"{p['id']}: request_does_not_fit_model_capacity")
+                    attempt_trace.append({'provider_id':p['id'],'model':chosen_model,'status':'capacity_rejected',
+                                          'request_budget':route_budget})
+                    attempted_overflow=True
+                    continue
+                effective_output=route_budget['reserved_output_tokens']
+                if 'max_tokens' in req.model_fields_set:
+                    effective_output=min(effective_output,req.max_tokens)
+                estimated_tokens=route_budget['input_upper_bound']+effective_output
+                await self._call_check_quota_available(db,req.tenant_id,estimated_tokens=estimated_tokens)
+            validate_output_budget(cfg_obj.extra_config if cfg_obj else {}, chosen_model,
+                                   p['api_base_url'], effective_output)
             if cfg_obj and isinstance(cfg_obj.extra_config, dict):
                 keys_pool = cfg_obj.extra_config.get("api_keys", [])
             elif p.get("api_keys"):
@@ -335,16 +369,22 @@ class InferenceService:
                         supports_chat_schema=getattr(adapter, "supports_output_contract", False)) if req.output_contract else None
                     parameters = inspect.signature(adapter.generate).parameters
                     extra_kwargs = any(param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters.values())
-                    arguments = {"messages": req.messages, "temperature": req.temperature, "max_tokens": req.max_tokens}
+                    arguments = {"messages": req.messages, "temperature": req.temperature, "max_tokens": effective_output}
                     if "thinking_budget" in parameters or extra_kwargs:
                         arguments["thinking_budget"] = req.thinking_budget
+                    if req.reasoning_effort is not None:
+                        if not getattr(adapter, 'supports_reasoning_effort', False):
+                            raise AppException('Adapter chưa hỗ trợ mức suy luận được yêu cầu.',
+                                code='MODEL_REASONING_UNSUPPORTED', status_code=422)
+                        arguments['reasoning_effort'] = req.reasoning_effort
                     if effective_contract and getattr(adapter, "supports_output_contract", False):
                         if "output_contract" not in parameters and not extra_kwargs:
                             raise AppException("Adapter không nhận hợp đồng đầu ra.", code="MODEL_OUTPUT_CONTRACT_UNSUPPORTED", status_code=422)
                         arguments["output_contract"] = effective_contract
                     resp = await adapter.generate(**arguments)
                     attempt_trace.append({"provider_id": p["id"], "model": chosen_model, "status": "response",
-                        "output_contract": effective_contract, "transport_attempts": getattr(resp, "attempt_trace", [])})
+                        "output_contract": effective_contract, "transport_attempts": getattr(resp, "attempt_trace", []),
+                        **({'request_budget':route_budget,'effective_output_tokens':effective_output} if route_budget else {})})
 
                     lease = active_key_entry.get("_lease")
                     if isinstance(lease, LeasedProviderKey):
@@ -439,6 +479,11 @@ class InferenceService:
                         attempt_trace.append({"provider_id": p["id"], "model": chosen_model, "status": "failed",
                             "error_type": type(exc).__name__, "transport_attempts": getattr(exc, "output_attempt_trace", [])})
                     if is_context_overflow_error(exc):
+                        from app.modules.modelops.services.capacity_discovery import (
+                            observe_context_error,
+                        )
+
+                        observe_context_error(p['id'],p['api_base_url'],chosen_model,exc)
                         # Our request exceeds the serving window: retrying the
                         # same prompt on sibling keys cannot succeed. Fall
                         # through to the next route, but never charge the
@@ -538,6 +583,9 @@ class InferenceService:
     async def generate_stream(
         self, db: AsyncSession, req: LLMGenerateRequest
     ) -> AsyncIterator[str]:
+        if req.automatic_output_budget:
+            raise AppException('Ngân sách tự động hiện dùng cho compiler non-streaming.',
+                code='MODEL_AUTO_BUDGET_STREAM_UNSUPPORTED',status_code=422)
         if req.output_contract is not None:
             raise AppException("Hợp đồng selector chỉ hỗ trợ non-streaming.", code="MODEL_OUTPUT_STREAM_UNSUPPORTED", status_code=422)
         with transient_retry_scope():
@@ -580,6 +628,10 @@ class InferenceService:
             stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == p["id"])
             res = await db.execute(stmt)
             cfg_obj = res.scalar_one_or_none()
+            from app.modules.modelops.services.token_limits import validate_output_budget
+
+            validate_output_budget(cfg_obj.extra_config if cfg_obj else {}, chosen_model,
+                                   p['api_base_url'], req.max_tokens)
             if cfg_obj and isinstance(cfg_obj.extra_config, dict):
                 keys_pool = cfg_obj.extra_config.get("api_keys", [])
             elif p.get("api_keys"):
@@ -649,12 +701,19 @@ class InferenceService:
                         request_capabilities=load_chat_capabilities(
                             cfg_obj.extra_config if cfg_obj else {}, chosen_model, p['api_base_url']),
                     )
+                    effort = {}
+                    if req.reasoning_effort is not None:
+                        if not getattr(adapter, 'supports_reasoning_effort', False):
+                            raise AppException('Adapter chưa hỗ trợ mức suy luận được yêu cầu.',
+                                code='MODEL_REASONING_UNSUPPORTED', status_code=422)
+                        effort['reasoning_effort'] = req.reasoning_effort
                     try:
                         token_stream = adapter.stream(
                             messages=req.messages,
                             temperature=req.temperature,
                             max_tokens=req.max_tokens,
                             thinking_budget=getattr(req, "thinking_budget", 0),
+                            **effort,
                         )
                     except TypeError as te:
                         if "thinking_budget" in str(te):
@@ -662,6 +721,7 @@ class InferenceService:
                                 messages=req.messages,
                                 temperature=req.temperature,
                                 max_tokens=req.max_tokens,
+                                **effort,
                             )
                         else:
                             raise

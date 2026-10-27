@@ -1,0 +1,292 @@
+{
+  "context": 673,
+  "created_at": "2026-10-27T18:05:21.655533+07:00",
+  "status": "PASS_FUNCTIONAL_WITH_QUALITY_LIMITS",
+  "scope": "backendV1 RAG items 1-4; no frontend, serving migration/config/index or deployment changes",
+  "tests": {
+    "passed": 652,
+    "failed": 0,
+    "skipped": 0,
+    "historical_baseline": 604,
+    "retained": 604,
+    "added": [
+      "tests.integration.test_rag_scope_context_672::test_context_stays_in_same_section_publication_and_metadata_scope",
+      "tests.integration.test_rag_scope_context_672::test_metadata_requires_explicit_human_acknowledgement_of_its_hash",
+      "tests.integration.test_rag_scope_context_672::test_registration_rejects_untraceable_or_overbroad_metadata[global_data_year]",
+      "tests.integration.test_rag_scope_context_672::test_registration_rejects_untraceable_or_overbroad_metadata[quote]",
+      "tests.integration.test_rag_scope_context_672::test_registration_rejects_untraceable_or_overbroad_metadata[target]",
+      "tests.integration.test_rag_scope_context_672::test_registration_rejects_untraceable_or_overbroad_metadata[value]",
+      "tests.integration.test_rag_scope_context_672::test_scope_is_applied_before_topk_in_all_modes_on_same_snapshot",
+      "tests.integration.test_rag_scope_context_672::test_version_metadata_tampering_invalidates_published_receipt",
+      "tests.integration.test_rag_verification_policy_672::test_assistant_chat_uses_persisted_hybrid_rerank_policy_and_checks_provider_access",
+      "tests.integration.test_rag_verification_policy_672::test_judge_and_source_failures_are_errors_even_in_observe_mode[bad_quote]",
+      "tests.integration.test_rag_verification_policy_672::test_judge_and_source_failures_are_errors_even_in_observe_mode[http_error]",
+      "tests.integration.test_rag_verification_policy_672::test_judge_and_source_failures_are_errors_even_in_observe_mode[missing]",
+      "tests.integration.test_rag_verification_policy_672::test_judge_and_source_failures_are_errors_even_in_observe_mode[withdraw]",
+      "tests.integration.test_rag_verification_policy_672::test_turn_scope_is_pinned_and_inherited_without_promoting_history_answers_to_evidence",
+      "tests.integration.test_rag_verification_policy_672::test_verification_mode_controls_release_without_silently_rewriting[enforce-supported-answered-None]",
+      "tests.integration.test_rag_verification_policy_672::test_verification_mode_controls_release_without_silently_rewriting[enforce-uncertain-insufficient_evidence-answer_verification_uncertain]",
+      "tests.integration.test_rag_verification_policy_672::test_verification_mode_controls_release_without_silently_rewriting[enforce-unsupported-insufficient_evidence-answer_not_supported]",
+      "tests.integration.test_rag_verification_policy_672::test_verification_mode_controls_release_without_silently_rewriting[observe-supported-answered-None]",
+      "tests.integration.test_rag_verification_policy_672::test_verification_mode_controls_release_without_silently_rewriting[observe-unsupported-answered-None]",
+      "tests.unit.test_rag_policy_metadata_672::test_annotation_target_must_exist[anything]",
+      "tests.unit.test_rag_policy_metadata_672::test_annotation_target_must_exist[paragraph:99:0]",
+      "tests.unit.test_rag_policy_metadata_672::test_annotation_target_must_exist[table:ocr-example:ev-table:row:1:column:99]",
+      "tests.unit.test_rag_policy_metadata_672::test_annotation_target_must_exist[table:ocr-example:ev-table:row:99]",
+      "tests.unit.test_rag_policy_metadata_672::test_cell_annotations_do_not_leak_to_unselected_table_fragments",
+      "tests.unit.test_rag_policy_metadata_672::test_combined_scope_must_match_one_annotated_unit",
+      "tests.unit.test_rag_policy_metadata_672::test_composite_documents_cannot_inherit_global_metadata_from_one_source",
+      "tests.unit.test_rag_policy_metadata_672::test_effective_filter_requires_both_known_boundaries",
+      "tests.unit.test_rag_policy_metadata_672::test_global_metadata_proof_is_retained_on_its_own_and_when_inherited",
+      "tests.unit.test_rag_policy_metadata_672::test_hybrid_candidate_budget_is_validated_at_assistant_boundary",
+      "tests.unit.test_rag_policy_metadata_672::test_invalid_policy_is_rejected[policy0]",
+      "tests.unit.test_rag_policy_metadata_672::test_invalid_policy_is_rejected[policy1]",
+      "tests.unit.test_rag_policy_metadata_672::test_invalid_policy_is_rejected[policy2]",
+      "tests.unit.test_rag_policy_metadata_672::test_invalid_policy_is_rejected[policy3]",
+      "tests.unit.test_rag_policy_metadata_672::test_invalid_policy_is_rejected[policy4]",
+      "tests.unit.test_rag_policy_metadata_672::test_judge_cannot_self_validate_invented_or_incomplete_evidence[duplicate]",
+      "tests.unit.test_rag_policy_metadata_672::test_judge_cannot_self_validate_invented_or_incomplete_evidence[foreign_id]",
+      "tests.unit.test_rag_policy_metadata_672::test_judge_cannot_self_validate_invented_or_incomplete_evidence[invented_quote]",
+      "tests.unit.test_rag_policy_metadata_672::test_judge_cannot_self_validate_invented_or_incomplete_evidence[missing]",
+      "tests.unit.test_rag_policy_metadata_672::test_judge_cannot_self_validate_invented_or_incomplete_evidence[no_quotes]",
+      "tests.unit.test_rag_policy_metadata_672::test_judge_cannot_self_validate_invented_or_incomplete_evidence[wrong_index]",
+      "tests.unit.test_rag_policy_metadata_672::test_metadata_never_infers_data_year_from_document_metadata",
+      "tests.unit.test_rag_policy_metadata_672::test_old_policy_is_compatible_and_new_policy_is_explicit",
+      "tests.unit.test_rag_policy_metadata_672::test_paragraph_relationships_are_stable_and_do_not_use_global_ordinal",
+      "tests.unit.test_rag_policy_metadata_672::test_supported_report_requires_resolving_quotes_and_numeric_support",
+      "tests.unit.test_rag_worker_schema_672::test_worker_requires_matching_database_and_code_schema[0002_operational_readiness-0003_rag_policy_metadata-False]",
+      "tests.unit.test_rag_worker_schema_672::test_worker_requires_matching_database_and_code_schema[0003_rag_policy_metadata-0002_operational_readiness-False]",
+      "tests.unit.test_rag_worker_schema_672::test_worker_requires_matching_database_and_code_schema[0003_rag_policy_metadata-0003_rag_policy_metadata-True]",
+      "tests.unit.test_rag_worker_schema_672::test_worker_requires_matching_database_and_code_schema[0003_rag_policy_metadata-None-False]"
+    ],
+    "missing": [],
+    "groups": [
+      {
+        "group": 0,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_25464dee59754759",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 101.5
+        },
+        "passed": 272,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "group": 1,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_7fd76cfb8f0e45f4",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 575.42
+        },
+        "passed": 118,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "group": 2,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_7ee4918210c14f8d",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 640.19
+        },
+        "passed": 125,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "group": 3,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_7255f3fbe9ae4da1",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 657.47
+        },
+        "passed": 137,
+        "failed": 0,
+        "skipped": 0
+      }
+    ]
+  },
+  "checks": {
+    "ruff": "PASS",
+    "ruff_format": "PASS",
+    "source_utf8_lf": true,
+    "openapi_paths": 101,
+    "openapi_operations": 128,
+    "old_migration_bytes": {
+      "0001_initial_schema.py": true,
+      "0002_operational_readiness.py": true
+    },
+    "docs_local_links": "PASS",
+    "docs_utf8_lf": "PASS",
+    "final_source_hashes_match_tested_code": true
+  },
+  "controlled_retrieval": {
+    "kind": "controlled_functional_comparison",
+    "quality_claim": false,
+    "embedding": "synthetic_sha256_4d",
+    "reranker": "synthetic_reverse_order",
+    "index_run_id": "idx_8b2b0f91373c",
+    "gold_ids": [
+      "ich_7b880d4f8c05",
+      "ich_7ec89a813a26"
+    ],
+    "scope": {
+      "data_year": 2024
+    },
+    "comparisons": [
+      {
+        "mode": "dense",
+        "ranked_ids": [
+          "ich_7ec89a813a26",
+          "ich_7b880d4f8c05"
+        ],
+        "annotated_recall_at_2": 1.0,
+        "generation": 1
+      },
+      {
+        "mode": "hybrid",
+        "ranked_ids": [
+          "ich_7b880d4f8c05",
+          "ich_7ec89a813a26"
+        ],
+        "annotated_recall_at_2": 1.0,
+        "generation": 1
+      },
+      {
+        "mode": "hybrid_rerank",
+        "ranked_ids": [
+          "ich_7ec89a813a26",
+          "ich_7b880d4f8c05"
+        ],
+        "annotated_recall_at_2": 1.0,
+        "generation": 1
+      }
+    ]
+  },
+  "prior_attempts": {
+    "focused_baseline": "49 passed; isolated DB cleaned",
+    "first_new_suite": "FAIL: 4 fixture failures / 3 fixture errors, 11 pass",
+    "retry": "FAIL: 1 invalid permission assertion, 43 pass",
+    "retry_final": "FAIL: 1 real context budget bug, 44 pass",
+    "boundaries_after_fix": "6 passed",
+    "first_full": "650 passed before two final unit boundary additions",
+    "interrupted_final": "INCOMPLETE after turn interruption; never counted PASS",
+    "interrupted_cleanup": [
+      {
+        "database": "qnu_v1_test_46ea2d80713140ff",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "test_vector_names_cleaned": 1
+      },
+      {
+        "database": "qnu_v1_test_f1b50a5d86c342bd",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "test_vector_names_cleaned": 0
+      },
+      {
+        "database": "qnu_v1_test_a470cf57e5e44b44",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "test_vector_names_cleaned": 0
+      },
+      {
+        "database": "qnu_v1_test_86ec2270735f4e93",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "test_vector_names_cleaned": 0
+      }
+    ]
+  },
+  "commands": [
+    {
+      "cwd": "backendV1",
+      "command": "python scripts/run_isolated_tests.py <disjoint test file group> -v",
+      "exit_code": 0
+    },
+    {
+      "cwd": "repo",
+      "command": "python -m ruff check <39 changed Python files>",
+      "exit_code": 0
+    },
+    {
+      "cwd": "repo",
+      "command": "python -m ruff format --check <39 changed Python files>",
+      "exit_code": 0
+    },
+    {
+      "cwd": "repo",
+      "command": "python storage/artifacts/context672-rag/verify_sources.py",
+      "exit_code": 0
+    }
+  ],
+  "source_sha256": {
+    "backendV1/alembic/versions/0003_rag_policy_metadata.py": "ee98c9225f897dbe4196b8c06338e23743a254c6a13291bde2066eaca126dd15",
+    "backendV1/qnu/adapters/queue/arq_queue.py": "351f1776fb0f658d71490920f1f92225181e14eb3d0e3537df8e57d5d48b70c2",
+    "backendV1/qnu/domains/assistants/models.py": "4b9df656e04f5772ae681a9638f28eee13a1d4088e9b2d771aaeb279de438010",
+    "backendV1/qnu/domains/assistants/schemas.py": "761bc07de1e7bea56b587e41bc5429805b8a7f113598db2b199c1081285fc81d",
+    "backendV1/qnu/domains/assistants/service.py": "3c29c658192eddeb8375d6465b0b2c6341db9c46d3926b90977bef3ca99db865",
+    "backendV1/qnu/domains/conversations/execution.py": "694cee234acd28fb9d4b59f117414a76f8f8760e994f262ff9a15f663e9c3180",
+    "backendV1/qnu/domains/conversations/models.py": "b21ceb6dc3c4b473450d4ff39029065607f6be2238e2104ab004a9d7805095da",
+    "backendV1/qnu/domains/conversations/router.py": "827d2550e81d4ec2a7bf702327600a4903f35c8b3405220dcd8fc82dad99cffe",
+    "backendV1/qnu/domains/conversations/schemas.py": "3464a4974fe723718d0eff2060652415f9daa9623d349aa4e7e44d3f11071fde",
+    "backendV1/qnu/domains/conversations/service.py": "f5f1839fe9f101853559755d7a2f4f9bb623a09808fc89fdfea42f03a876c71e",
+    "backendV1/qnu/domains/knowledge/index/chunking.py": "5b5411bc2328073ab2fd16ab07a8065ea4969c3ba9ef5f11b1a81fd098d14c70",
+    "backendV1/qnu/domains/knowledge/index/hybrid.py": "a742896bd2435c5b5033f00bbb772330b5cedd1e4ad86daa25273f5080a18cf8",
+    "backendV1/qnu/domains/knowledge/index/schemas.py": "ce34377f51eceac127eba67657e6c8bf585633f06ffaa4708a84834791e78f4c",
+    "backendV1/qnu/domains/knowledge/index/scope.py": "1d382173ae8e3d47784d1bb4693a92bb712e65c8b4086d61fdea525a21a01c40",
+    "backendV1/qnu/domains/knowledge/index/search.py": "41518d3b93cb0d3f7bbfbd36ac54910fe59d9ee34af4024176df16fa7cd0b5bc",
+    "backendV1/qnu/domains/knowledge/index/service.py": "d0d7f88d6ecb3cee1ed35c781cf53dc16d7ff57597c3592de0767bd912591670",
+    "backendV1/qnu/domains/knowledge/metadata.py": "57a33b1185df7e71d3602a43b7ec8a63701fb41920605f36195090e4920e782d",
+    "backendV1/qnu/domains/knowledge/publication/evidence.py": "1b2e4095ffb509a1d32d071ee0a5185c913011c36d97cecd7aa93df7c92aac43",
+    "backendV1/qnu/domains/knowledge/publication/models.py": "411dd0ddfc4beb1e25c0c81d9ba43eac780cedc09606ab0ed6769d71160a79f2",
+    "backendV1/qnu/domains/knowledge/publication/review_gate.py": "04728db7c274af7c5ca5ebd982d103381371919ba92e34a6ebf5707da29fbb8b",
+    "backendV1/qnu/domains/knowledge/publication/schemas.py": "7e7392c0d2e606fc6454ab1518dee58c7bf02da54b3d86c029b4e5c6e8e4a30a",
+    "backendV1/qnu/domains/knowledge/publication/service.py": "287d70d0824b8d6241ae0e21b684b5b8434b8524c5fc437cf730c17e7f96bc06",
+    "backendV1/qnu/domains/operations/recovery/service.py": "71d47057ff71ec1c5c3bf8dd3051b55b6c6ae18d0476b77b973a0d3bbbdfb304",
+    "backendV1/qnu/domains/rag/answer/context.py": "38ce4b59b55c461a869db336de641cf8dc259e8430eddf98ba237ef5fe5584ca",
+    "backendV1/qnu/domains/rag/answer/drafting.py": "473d62599d519315ec0fa732e19c70d5e0fb1392eaac1f64e7d5b7189015f6c0",
+    "backendV1/qnu/domains/rag/answer/schemas.py": "fc6993c2e929eb0a083109ae1e621431dfe525c721cf8905a8bbabb07c1d6cac",
+    "backendV1/qnu/domains/rag/answer/service.py": "ec81085e6b9d3cbaa29a22f89d5b1d0f292229c4027cb0256630e8bbee5f3b67",
+    "backendV1/qnu/domains/rag/answer/verification.py": "71264b0757056e8f845e8a7565b75357d450824b7b701152a70bd082502ca953",
+    "backendV1/qnu/domains/rag/policy.py": "67e1a6f2fa7f4f55d035ea04f6b0d53303a5141322e79c0f8776cf351537b5c0",
+    "backendV1/qnu/platform/schema.py": "9d1b9a776aa48d5c1eebe338f8f1386fab14b54067a248edcfce8052b3a6c7fa",
+    "backendV1/tests/integration/rag_support_672.py": "668d681c237d273fed5e33dbfb5da76850c31befd4a0bd764e7408d25ffcd0b0",
+    "backendV1/tests/integration/test_knowledge_regressions_639.py": "e8b3246e4396692986a52b7caee5787713f9e10b6e0b7fbc09d2a204fd90f933",
+    "backendV1/tests/integration/test_rag_scope_context_672.py": "a419ae5425a5eb90e42297bba4d9eb7b3e7b80d2cbead3e561c3edb5c60db73d",
+    "backendV1/tests/integration/test_rag_verification_policy_672.py": "69c9352be7771c27e43974dbf24bb4cf3d9fef65cea48ecff51341db3dd437dd",
+    "backendV1/tests/integration/test_readiness_666.py": "f326cc272a419027ce261ccbd91b82edb6a42017c3245e666924782ed4566d11",
+    "backendV1/tests/migrations/test_workspace_model_schema.py": "ee8ecf3ad55581e2b8d5747a111a535590c030ddf30589188a97427c7e038bdf",
+    "backendV1/tests/unit/test_migration_baseline_661.py": "6b74edd2ae0946ed53614402060e668d8429ae72f7def62182f796ff289e0544",
+    "backendV1/tests/unit/test_rag_policy_metadata_672.py": "c20027dcd5d520e34fbc4fc71d245aa9fe87acef0f0075e67150cb902fc039ef",
+    "backendV1/tests/unit/test_rag_worker_schema_672.py": "eef00b872c25453144d331edcd4b8ec18b313c5f8fdb386c6fc237f6d3212549"
+  },
+  "not_run": [
+    "Real AI server inference",
+    "Human-labeled QNU corpus quality benchmark",
+    "Production deployment/readiness",
+    "p50/p95 load benchmark",
+    "Frontend integration of new policy/metadata/judge controls"
+  ],
+  "limitations": [
+    "Provider HTTP responses are synthetic; PostgreSQL/Qdrant/Redis and API boundaries are real",
+    "Scope is explicit in policy/API; no automatic natural-language metadata extraction",
+    "Judge can be wrong; observe is available before enforce",
+    "Defaults remain dense/context0/verification off",
+    "New metadata/context need approved version and new index generation",
+    "Meilisearch not installed; no fuzzy or field-ranking changes"
+  ]
+}

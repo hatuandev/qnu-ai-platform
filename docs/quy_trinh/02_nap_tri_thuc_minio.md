@@ -349,3 +349,30 @@ flowchart TD
     2. **Tầng Vector DB (Qdrant)**: Đếm tổng số points, kiểm tra schema version v1, phát hiện `orphan_qdrant_point` (point tham chiếu chunk không còn trong DB), `scope_mismatch` (tenant/workspace lệch pha), `unretrievable_point_active` (point thuộc doc chưa sẵn sàng nhưng vẫn mở `is_retrievable=True`).
     3. **Tầng Lưu trữ Đối tượng (MinIO/Local Storage)**: Kiểm tra sự tồn tại của tệp tin vật lý gốc `storage_path` thông qua `storage_service.exists()`.
     4. **Tầng Bộ nhớ Đệm (Redis Semantic Cache)**: Hỗ trợ xóa cache phân vùng theo collection (`invalidate_collection`) bao quát cả tiền tố v1 lẫn legacy.
+
+## PDF có lớp văn bản — parser v6 (Context630)
+
+Giữ schema QNU RAG Markdown/JSON v1.0. `pdf-evidence-structure/v6` tham gia fingerprint extraction riêng PDF; không đổi cache DOCX/XLSX hoặc tự nâng cấp revision đang phục vụ. Khi kiểm integrity artifact v5, dùng chính sách header và dựng block v5, không diễn giải lại bằng quy tắc mới.
+
+1. Header nền trắng cần một dải chữ đậm có ranh giới: hoặc ô cha/con gộp được chứng minh bằng lưới, hoặc các ô căn giữa có khác biệt hình học/căn chữ với thân bảng. Hai dòng thân bảng xác minh giới hạn; dòng dữ liệu đầu in đậm không được bị hấp thụ vào nhiều tầng header. Thiếu căn cứ thì giữ mọi dòng và vai trò cột chưa xác định, không dùng từ điển tên header.
+2. Bản chiếu native trùng nội dung ô chỉ chuyển vào provenance khi nằm trong vùng bảng và khớp duy nhất một chuỗi nguyên ô. Cho phép bỏ qua nguyên ô thuộc block khác, không khớp một phần giá trị hoặc suy từ text giống nhau ở vùng khác. Raw layout, source locations và danh sách ô khớp vẫn được giữ.
+3. Bảng không lặp header qua trang chỉ kế thừa từ phần trước đã có header xác định khi cùng scope, lưới đầy đủ và căn cột, sát biên hai trang, không có nội dung mở phạm vi mới, hai dòng cuối/đầu tạo chuỗi số thứ tự nguyên liên tục. Mã có số 0 đầu không được biến thành thứ tự. Header kế thừa có lineage, source locations và witness; `header_depth` vẫn bằng 0 tại phần không in header. Mỗi hàng/ô vẫn thuộc đúng trang gốc.
+4. OCR bổ sung số/ngày đọc cả Markdown và block header/text có tọa độ phần trăm hợp lệ. Gộp ứng viên trước khi kiểm tính duy nhất; mâu thuẫn giữa các quan sát hoặc native text phải giữ chặn. Chỉ bổ sung dòng trường được chọn, kèm raw evidence, crop bbox và block ID; đây vẫn là đề xuất cần đối soát, không thay toàn native text.
+5. Giữ nguyên Quality Gate và các cảnh báo thật: chữ ký, hình, công thức hoặc vai trò chưa chứng minh không tự thành dữ kiện đã duyệt. Nạp vector, publication và biên soạn Compiler là các bước riêng, không chạy chỉ vì cú pháp MD/JSON hợp lệ.
+
+[Báo cáo Context630](../bao_cao/context630/REVIEW.md) ghi các trường hợp đã kiểm và giới hạn còn lại. Không áp dụng lại dữ liệu cũ hoặc restart dịch vụ chỉ để tài liệu vượt gate.
+
+## OCR được chọn riêng cho đợt nạp (Context634)
+
+API `POST /platform/v1alpha1/knowledge/collections/{collection_id}/imports` nhận trường tùy chọn `ocr_engine`, ví dụ `nemotron-parse`, cùng `parser_profile=vision_ocr`. Engine được giữ trong item/job và retry; bỏ trống giữ hành vi tự động hiện có. Chọn engine cụ thể buộc OCR các trang, kể cả PDF có lớp chữ; DOCX được chuyển thành PDF preview để OCR và đối soát với cấu trúc nguồn.
+
+Bảng HTML của OCR chỉ chuyển sang GFM ở bản dẫn xuất. Raw response PDF giữ trong evidence JSON; raw OCR DOCX nằm tại `ocr/preview.json` trong archive tài nguyên Office có checksum, kèm source/preview hash và mapping trang. Không thay key/provider mặc định hoặc ghi credential vào request mẫu.
+
+OCR thành công không tự xác nhận ngữ nghĩa/vùng hình/heading, xuất bản hoặc tạo vector. `review_required` vẫn cần xử lý căn cứ được chỉ ra; không hạ Quality Gate để đủ ba file ready. [Báo cáo634](../bao_cao/context634/REVIEW.md).
+
+
+## Giữ chữ OCR từ provider (Context635)
+
+Luồng Nemotron không chạy thư viện sửa chính tả hậu OCR. Giữ chữ/số do provider trả về, không tự đổi “kí” thành “ký” hoặc đảo “số chỉ” thành “chỉ số”. Vẫn xử lý cú pháp/định dạng bảng và nối trang trong bản dẫn xuất; raw OCR và provenance được giữ để đối chiếu. Không coi chữ chưa qua sửa chính tả là đã được xác minh đúng.
+
+Fingerprint `layout-v25-ocr-literal-words` áp dụng cho lần parse mới; các revision đã lưu không tự chạy lại. [Báo cáo635](../bao_cao/context635/REVIEW.md) ghi giới hạn kiểm thử khi hạ tầng đang dừng.

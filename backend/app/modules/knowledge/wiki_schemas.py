@@ -20,8 +20,11 @@ class WikiPolicy(WikiContract):
     packet_chars: int = Field(24000, ge=1000, le=48000)
     max_total_chars: int = Field(180000, ge=100, le=500000)
     max_calls: int = Field(32, ge=2, le=32)
-    context_budget_tokens: int = Field(24000, ge=8000, le=32000)
-    max_output_tokens: int = Field(2500, ge=1000, le=8192)
+    context_budget_tokens: int = Field(24000, ge=1024)
+    max_output_tokens: int = Field(2500, ge=50)
+    automatic_output_budget: bool = False
+    tokenizer_encoding: Literal['o200k_harmony','o200k_base','cl100k_base'] | None = None
+    chat_overhead_tokens: int = Field(0,ge=0)
     generation_retries: int = Field(2, ge=0, le=2)
     timeout_seconds: int = Field(600, ge=10, le=600)
 

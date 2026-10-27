@@ -1,0 +1,17 @@
+{
+  "context": 639,
+  "date": "2026-10-26",
+  "scope": "backendV1 knowledge review findings F1-F3",
+  "status": "fixed_and_verified",
+  "baseline_regressions": {"passed": 0, "failed": 3, "exit_code": 1},
+  "focused": {"passed": 24, "failed": 0, "skipped": 0, "seconds": 13.9, "exit_code": 0},
+  "full_v1": {"passed": 121, "failed": 0, "skipped": 0, "seconds": 40.58, "exit_code": 0},
+  "new_test_cases": 17,
+  "ruff": "PASS",
+  "format_changed_files": "PASS",
+  "openapi": {"status": "PASS", "paths": 31, "revision_title_accepted": false},
+  "source_seal": {"files_checked": 616, "v1_app_migration_changed": 4, "legacy_app_unchanged": 475},
+  "owned_test_databases": {"count": 10, "remaining": 0, "all_legacy_sentinels_preserved": true},
+  "main_database_migrated": false,
+  "limits": ["No live S3/OCR/inference", "No power-loss durability claim", "Source state remains stored"]
+}

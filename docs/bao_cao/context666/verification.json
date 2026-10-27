@@ -1,0 +1,309 @@
+{
+  "status": "PASS_WITH_DOCUMENTED_WINDOWS_TEST_WORKAROUND",
+  "tests": {
+    "initial_full_status": "FAIL: Windows Proactor teardown incomplete",
+    "final_groups": [
+      {
+        "group": 0,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_f8220629a7c746fa",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 497.72
+        }
+      },
+      {
+        "group": 1,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_011285fb80554e19",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 591.06
+        }
+      },
+      {
+        "group": 2,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_897e9e3a65554de2",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 496.38
+        }
+      },
+      {
+        "group": 3,
+        "exit_code": 0,
+        "receipt": {
+          "database": "qnu_v1_test_4d495eaffd9c48f2",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 358.05
+        },
+        "rerun_reason": "same Windows Proactor stall reproduced; TCP group uses opt-in Selector; production app code unchanged"
+      }
+    ],
+    "extra": [
+      {
+        "log": "cli-boundary-final.log",
+        "receipt": {
+          "database": "qnu_v1_test_34c715946b534dd9",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 46.61
+        },
+        "case_count": 2
+      },
+      {
+        "log": "readiness-final-corrected.log",
+        "receipt": {
+          "database": "qnu_v1_test_ed78acfcc9cb4a12",
+          "db_dropped": true,
+          "legacy_sentinel_preserved": true,
+          "pytest_exit": 0,
+          "seconds": 20.81
+        },
+        "case_count": 3
+      }
+    ],
+    "passed": 604,
+    "failed": 0,
+    "skipped": 0,
+    "prior": 575,
+    "added": [
+      "tests.integration.test_readiness_666::test_readiness_distinguishes_missing_zero_unlimited_and_blocked_quota",
+      "tests.integration.test_readiness_666::test_readiness_reports_missing_configuration_and_does_not_claim_live_inference",
+      "tests.integration.test_readiness_666::test_worker_heartbeat_is_queue_scoped_and_removed_on_shutdown",
+      "tests.integration.test_recovery_666::test_full_recovery_into_new_targets_keeps_originals_credentials_and_search",
+      "tests.integration.test_recovery_666::test_operator_cli_backup_and_preview_use_authenticated_complete_schema",
+      "tests.integration.test_recovery_666::test_recovery_backup_refuses_active_jobs_and_missing_sources",
+      "tests.integration.test_recovery_666::test_recovery_rejects_serving_target_wrong_confirmation_and_non_admin",
+      "tests.integration.test_review_gate_666::test_approval_requires_review_acknowledgement",
+      "tests.integration.test_review_gate_666::test_findings_require_explicit_human_resolutions_pinned_in_approval",
+      "tests.integration.test_review_gate_666::test_new_review_between_preview_and_commit_requires_new_ack",
+      "tests.integration.test_review_gate_666::test_no_findings_still_requires_confirmation_and_uses_exact_report_hash",
+      "tests.integration.test_review_gate_666::test_review_ack_cannot_omit_forge_or_self_claim_a_fix[claims_fixed-422]",
+      "tests.integration.test_review_gate_666::test_review_ack_cannot_omit_forge_or_self_claim_a_fix[duplicate-409]",
+      "tests.integration.test_review_gate_666::test_review_ack_cannot_omit_forge_or_self_claim_a_fix[foreign-409]",
+      "tests.integration.test_review_gate_666::test_review_ack_cannot_omit_forge_or_self_claim_a_fix[hash-409]",
+      "tests.integration.test_review_gate_666::test_review_ack_cannot_omit_forge_or_self_claim_a_fix[missing-409]",
+      "tests.integration.test_review_gate_666::test_review_ack_cannot_omit_forge_or_self_claim_a_fix[unconfirmed-422]",
+      "tests.integration.test_storage_cleanup_666::test_gc_deletes_only_old_unreferenced_derivative_and_replay_is_stable",
+      "tests.integration.test_storage_cleanup_666::test_gc_rechecks_bytes_references_and_expiry[bytes]",
+      "tests.integration.test_storage_cleanup_666::test_gc_rechecks_bytes_references_and_expiry[expiry]",
+      "tests.integration.test_storage_cleanup_666::test_gc_rechecks_bytes_references_and_expiry[reference]",
+      "tests.integration.test_storage_cleanup_666::test_gc_requires_admin_and_the_original_approver",
+      "tests.integration.test_storage_cleanup_666::test_gc_storage_outage_keeps_pending_intent_for_same_key_retry",
+      "tests.unit.test_recovery_archive_666::test_bundle_is_encrypted_authenticated_and_preserves_exact_bytes",
+      "tests.unit.test_recovery_archive_666::test_bundle_refuses_weak_key_and_oversized_objects",
+      "tests.unit.test_recovery_archive_666::test_recovery_cli_registers_every_owned_table_in_a_fresh_process",
+      "tests.unit.test_storage_maintenance_666::test_local_conditional_delete_preserves_changed_bytes",
+      "tests.unit.test_storage_maintenance_666::test_s3_delete_is_conditional_and_rejects_concurrent_change",
+      "tests.unit.test_storage_maintenance_666::test_s3_outage_is_not_reported_as_missing_object"
+    ],
+    "missing_prior": []
+  },
+  "quality": {
+    "ruff": {
+      "exit_code": 0,
+      "output": "All checks passed!\n"
+    },
+    "format": {
+      "exit_code": 0,
+      "output": "37 files already formatted\n"
+    }
+  },
+  "scoped_python_files": 37,
+  "protected_legacy_and_baseline_files": 487,
+  "openapi": {
+    "paths": 101,
+    "operations": 128,
+    "prior_paths_preserved": true
+  },
+  "schema": {
+    "head": "0002_operational_readiness",
+    "tables": 43,
+    "frozen_baseline_preserved": true
+  },
+  "source_changes_after_initial_gate": {
+    "paths": [
+      "qnu/domains/operations/readiness.py",
+      "tests/integration/conftest.py",
+      "tests/integration/test_readiness_666.py",
+      "tests/integration/test_recovery_666.py",
+      "tests/unit/test_recovery_archive_666.py",
+      "scripts/recovery_bundle.py"
+    ],
+    "verification": "complete Selector group plus CLI boundary and final readiness/quota tests"
+  },
+  "minio": {
+    "driver": "s3_minio",
+    "status": "PASS",
+    "conditional_change_preserved": true,
+    "conditional_delete_verified": true,
+    "owned_test_bucket_removed": true
+  },
+  "cleanup": {
+    "checked_owned_database_count": 22,
+    "remaining_owned_databases": [],
+    "observed_restore_databases": [],
+    "observed_v1_vector_collections": [],
+    "test_bucket_removed": true
+  },
+  "test_database_receipts": [
+    {
+      "database": "qnu_v1_test_34c715946b534dd9",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 0,
+      "seconds": 46.61
+    },
+    {
+      "database": "qnu_v1_test_f8220629a7c746fa",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 0,
+      "seconds": 497.72
+    },
+    {
+      "database": "qnu_v1_test_011285fb80554e19",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 0,
+      "seconds": 591.06
+    },
+    {
+      "database": "qnu_v1_test_897e9e3a65554de2",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 0,
+      "seconds": 496.38
+    },
+    {
+      "database": "qnu_v1_test_e0952e0c987b48e2",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 4294967295,
+      "seconds": 1375.69
+    },
+    {
+      "database": "qnu_v1_test_53224f0cd18843bd",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 4294967295,
+      "seconds": 545.76
+    },
+    {
+      "database": "qnu_v1_test_4d495eaffd9c48f2",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 0,
+      "seconds": 358.05
+    },
+    {
+      "database": "qnu_v1_test_b3a9b112cd0942bb",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 0,
+      "seconds": 80.89
+    },
+    {
+      "database": "qnu_v1_test_46bee55e93044f22",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 0,
+      "seconds": 24.75
+    },
+    {
+      "database": "qnu_v1_test_ed78acfcc9cb4a12",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 0,
+      "seconds": 20.81
+    },
+    {
+      "database": "qnu_v1_test_ee0bd937db184ebe",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 0,
+      "seconds": 139.98
+    },
+    {
+      "database": "qnu_v1_test_22e3fd1dab89496d",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 1,
+      "seconds": 16.47
+    },
+    {
+      "database": "qnu_v1_test_51d89da619914802",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 1,
+      "seconds": 20.39
+    },
+    {
+      "database": "qnu_v1_test_3cafc61815d54dd0",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 0,
+      "seconds": 34.01
+    },
+    {
+      "database": "qnu_v1_test_bca92430e7784d72",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 1,
+      "seconds": 19.55
+    },
+    {
+      "database": "qnu_v1_test_5dbc4103671b4b83",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 0,
+      "seconds": 35.02
+    },
+    {
+      "database": "qnu_v1_test_be6560305b1f4f42",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 1,
+      "seconds": 22.33
+    },
+    {
+      "database": "qnu_v1_test_1e2ff51ed7274dcb",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 1,
+      "seconds": 15.62
+    },
+    {
+      "database": "qnu_v1_test_98e9274270224136",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 1,
+      "seconds": 66.16
+    },
+    {
+      "database": "qnu_v1_test_52e032d8109e4803",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 1,
+      "seconds": 13.31
+    }
+  ],
+  "limits": [
+    "Initial full command and first retry failed to finish Windows Proactor/TestClient teardown; those runs remain FAIL/INCOMPLETE",
+    "Opt-in Selector used for TCP/Redis TestClient group only; recovery async subprocess tests retain default Proactor",
+    "Production app event-loop policy unchanged; deep Windows Proactor cause unresolved",
+    "Live PDF/model test is functional only; semantic answer/review quality and real QNU SSO NOT RUN",
+    "No serving schema migration, configuration change, restart, deployment or source reindex"
+  ]
+}

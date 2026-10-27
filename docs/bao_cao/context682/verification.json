@@ -1,0 +1,230 @@
+{
+  "context": 682,
+  "status": "PASS_FRONTEND_FUNCTIONAL_WITH_LIVE_LIMITS",
+  "scope": "Inventory680 F4-F6, frontendV1 only; backendV1 reused unchanged",
+  "tests": {
+    "full": {
+      "numTotalTests": 348,
+      "numPassedTests": 348,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    "focused": {
+      "numTotalTests": 37,
+      "numPassedTests": 37,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    "old_focused": {
+      "numTotalTests": 54,
+      "numPassedTests": 54,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    "probe674": {
+      "numTotalTests": 11,
+      "numPassedTests": 11,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    "probe676": {
+      "numTotalTests": 8,
+      "numPassedTests": 8,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    "bundle_after_build": {
+      "numTotalTests": 11,
+      "numPassedTests": 11,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    "retention": {
+      "old": 311,
+      "new": 348,
+      "missing": [],
+      "added": [
+        "tests/final-functions-ui-682.test.tsx::a member can view collections but never requests operational summary or readiness",
+        "tests/final-functions-ui-682.test.tsx::a summary outage shows an error instead of zero job counters",
+        "tests/final-functions-ui-682.test.tsx::an editor gets operations summary without the admin-only readiness request",
+        "tests/final-functions-ui-682.test.tsx::an explicit inaccessible workspace 403 is not replaced by the first allowed one",
+        "tests/final-functions-ui-682.test.tsx::an explicit inaccessible workspace 404 is not replaced by the first allowed one",
+        "tests/final-functions-ui-682.test.tsx::answers HTTP 403 remains an error with zero automatic retry",
+        "tests/final-functions-ui-682.test.tsx::answers HTTP 409 remains an error with zero automatic retry",
+        "tests/final-functions-ui-682.test.tsx::answers HTTP 503 remains an error with zero automatic retry",
+        "tests/final-functions-ui-682.test.tsx::completed review Markdown uses the same pinned review endpoint",
+        "tests/final-functions-ui-682.test.tsx::dashboard uses real scoped totals and preserves unknown costs instead of KTX or invented trends",
+        "tests/final-functions-ui-682.test.tsx::dashboard workspace chooser is paged and sends the new URL selection through the callback",
+        "tests/final-functions-ui-682.test.tsx::direct answers calls the exact collection endpoint with default policy, no fake conversation or retry key",
+        "tests/final-functions-ui-682.test.tsx::double submit sends one request and a late answer cannot land under another collection",
+        "tests/final-functions-ui-682.test.tsx::empty workspace list is an honest empty state with no synthetic counters",
+        "tests/final-functions-ui-682.test.tsx::explicit ModelOps provider and hybrid settings are preserved",
+        "tests/final-functions-ui-682.test.tsx::failed review raw output downloads exact bytes even when no completed report exists",
+        "tests/final-functions-ui-682.test.tsx::inconsistent evidence and raw HTML are not promoted to trusted answer markup",
+        "tests/final-functions-ui-682.test.tsx::insufficient evidence shows the server reason without claiming infrastructure failed",
+        "tests/final-functions-ui-682.test.tsx::invalid explicit year blocks answering instead of silently broadening the scope",
+        "tests/final-functions-ui-682.test.tsx::late raw download does not save under a different review selection",
+        "tests/final-functions-ui-682.test.tsx::logout and new session discard a late answer",
+        "tests/final-functions-ui-682.test.tsx::opening a citation verifies publication and retains full evidence text",
+        "tests/final-functions-ui-682.test.tsx::raw review HTTP 403 never saves a fake error file",
+        "tests/final-functions-ui-682.test.tsx::raw review HTTP 404 never saves a fake error file",
+        "tests/final-functions-ui-682.test.tsx::review queued cannot be downloaded as a completed report",
+        "tests/final-functions-ui-682.test.tsx::review running cannot be downloaded as a completed report",
+        "tests/final-functions-ui-682.test.tsx::suspended workspace stays suspended without loading its collections or operations",
+        "tests/final-functions-ui-682.test.tsx::switching workspace removes the previous workspace data and ignores a late summary",
+        "tests/final-functions-ui-682.test.tsx::the document picker scope and exact year are submitted to answers",
+        "tests/final-functions-ui-682.test.tsx::unconfirmed role none does not start catalog or answer requests",
+        "tests/final-functions-ui-682.test.tsx::unconfirmed role unknown does not start catalog or answer requests",
+        "tests/final-functions-ui-682.test.tsx::withdrawn source is blocked in the citation inspector",
+        "tests/qnu-dashboard-boundary-682.test.ts::QNU dashboard must use the backendV1 session gate",
+        "tests/qnu-dashboard-boundary-682.test.ts::template route /applications must stay outside the v1 boundary",
+        "tests/qnu-dashboard-boundary-682.test.ts::template route /dashboard-other must stay outside the v1 boundary",
+        "tests/qnu-dashboard-boundary-682.test.ts::template route /reference-dashboard must stay outside the v1 boundary",
+        "tests/qnu-dashboard-boundary-682.test.ts::template route /student must stay outside the v1 boundary"
+      ]
+    }
+  },
+  "commands": {
+    "cwd": "frontendV1",
+    "full": "npm test -- --maxWorkers=2 --reporter=json --outputFile=../storage/artifacts/context682-fe-final-functions/fe-full-verified.json",
+    "focused": "vitest run tests/final-functions-ui-682.test.tsx tests/qnu-dashboard-boundary-682.test.ts --reporter=json",
+    "old_focused": "vitest run tests/knowledge-completion-681.test.tsx tests/maintenance-evaluation-ui-679.test.tsx --reporter=json",
+    "probes": [
+      "vitest run --config storage/artifacts/context674-review/vitest.review.config.ts",
+      "vitest run --config storage/artifacts/context676-review/vitest.review.config.ts"
+    ],
+    "bundle": "vitest run tests/template-boundary.test.ts tests/dev-auto-login-bundle-672.test.ts --reporter=json",
+    "lint": "npm run lint",
+    "build": "npm run build (Vite build and TypeScript noEmit)",
+    "exit_codes_final": {
+      "full": 0,
+      "focused": 0,
+      "probe674": 0,
+      "probe676": 0,
+      "bundle": 0,
+      "lint": 0,
+      "build": 0
+    },
+    "test_timeout_changed": false
+  },
+  "lint": {
+    "status": "PASS",
+    "files": 557,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 0
+  },
+  "build_typescript": {
+    "status": "PASS",
+    "warning": "Existing bundle larger than500kB warning"
+  },
+  "backend": {
+    "status": "NOT RUN",
+    "reason": "No server behavior or contract change; all baseline BE source/test bytes retained",
+    "baseline_tests_681": "historical655, not rerun in682"
+  },
+  "source_integrity": {
+    "baseline": 917,
+    "current": 928,
+    "changed": [
+      "frontendV1/src/routeTree.gen.ts",
+      "frontendV1/src/navigation/config.ts",
+      "frontendV1/src/navigation/types.ts",
+      "frontendV1/src/navigation/utils.ts",
+      "frontendV1/src/routes/dashboard.tsx",
+      "frontendV1/src/app/api/v1/endpoints.ts",
+      "frontendV1/src/features/knowledge/collection-detail-page.tsx",
+      "frontendV1/src/features/knowledge/compilation-review-tab.tsx"
+    ],
+    "new": [
+      "frontendV1/src/routes/reference-dashboard.tsx",
+      "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.answers.tsx",
+      "frontendV1/src/features/knowledge/answer-request.ts",
+      "frontendV1/src/features/knowledge/answer-result.tsx",
+      "frontendV1/src/features/knowledge/answer-settings.tsx",
+      "frontendV1/src/features/knowledge/answers-page.tsx",
+      "frontendV1/src/features/knowledge/review-downloads.tsx",
+      "frontendV1/src/features/workspaces/qnu-dashboard-operations.tsx",
+      "frontendV1/src/features/workspaces/qnu-dashboard-page.tsx",
+      "frontendV1/tests/final-functions-ui-682.test.tsx",
+      "frontendV1/tests/qnu-dashboard-boundary-682.test.ts"
+    ],
+    "deleted": [],
+    "encoding_issues": []
+  },
+  "final_changed_sha256": {
+    "frontendV1/src/routeTree.gen.ts": "b2400d06c1635844c4b210ea0bf2731ea2372a020dbd691b85de844d34d9ec56",
+    "frontendV1/src/navigation/config.ts": "ae5e43a46ee76e600931d3ad0453856fefd9d835444cb093c061d61029dc047c",
+    "frontendV1/src/navigation/types.ts": "b38de2579b20d3f01b1e6327ee98a873a8ef424600d4ad9202f70ad11ab1779e",
+    "frontendV1/src/navigation/utils.ts": "3f9ff3a1d44061abfa74f2f5e7468da6b7f216514cd840cba21f54b1bdc86e77",
+    "frontendV1/src/routes/dashboard.tsx": "270a0f19afdd6e546b90e356c7a99cdd3b082a3f3ed1cd69f431de00b6bed646",
+    "frontendV1/src/app/api/v1/endpoints.ts": "3306da718e1364af2e9f4fc50ae71c6a778bd99566edf2f8898902195788dc89",
+    "frontendV1/src/features/knowledge/collection-detail-page.tsx": "059b1bd538a2d3be13700730f916fcc5659931fb86b2a16e876dac57a4ea6386",
+    "frontendV1/src/features/knowledge/compilation-review-tab.tsx": "a8b64590af2e3a9f7b23a9ad2b2df888305a0bbdf0f8f71a0d3520e58455a524",
+    "frontendV1/src/routes/reference-dashboard.tsx": "6f06ae58138bc86db4f0b7d5558a95ee4487eae88ab8af8fdaec397542c5dba7",
+    "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.answers.tsx": "b253b58060abd39071db422f4ea37e0b6f39f8f91afb6491963ad1f78ab4d9d0",
+    "frontendV1/src/features/knowledge/answer-request.ts": "380d87b65a0ba8718409143fc7411bbb9d08e9b2d9261369c984f71df4d83b90",
+    "frontendV1/src/features/knowledge/answer-result.tsx": "ff10f6c3954466ecab0b0ab4d9fbc12d17720345985822e0509e38e84a8b9e1b",
+    "frontendV1/src/features/knowledge/answer-settings.tsx": "54f4bc4a8eff03f2670eb78b65759c3c9ef891e1c58bf586c0907b238a916f43",
+    "frontendV1/src/features/knowledge/answers-page.tsx": "a35fb2f9fcffb5ec7e6b29094ac0e3d19928225d0adbf3d6053b2cbf4e068ac7",
+    "frontendV1/src/features/knowledge/review-downloads.tsx": "ed31c7f8b8b565dc80fdea3b23beb6d49d8cc0273ef3a22269ab7a493ccba489",
+    "frontendV1/src/features/workspaces/qnu-dashboard-operations.tsx": "e4a986456751ee60d2217fed60f46f0f108001751a24c6aa5a68b806be02c7b5",
+    "frontendV1/src/features/workspaces/qnu-dashboard-page.tsx": "af7bea23cc9a44864bed6127cec88fc7b7a1aa4fd5c85202743466695f332e5b",
+    "frontendV1/tests/final-functions-ui-682.test.tsx": "e3be20467bccc4bc6364fc44f3fbe7df7f410e8e7cba7b52650ea4ec90aa20f9",
+    "frontendV1/tests/qnu-dashboard-boundary-682.test.ts": "036e0d3343e4e2820e15c92bdbc98ccb119b3f71d806a9cf6f35806f781d2dae"
+  },
+  "browser": {
+    "fixture_only": true,
+    "real_components": true,
+    "helper_port": 3021,
+    "helper_stopped": true,
+    "created_tab_closed": true,
+    "temporary_viewport_override": false,
+    "mobile_iframe_width": 390,
+    "measured_content_client_scroll_width": {
+      "dashboard": [
+        375,
+        375
+      ],
+      "answers": [
+        375,
+        375
+      ]
+    },
+    "images": [
+      "answer-source-desktop.png",
+      "answers-desktop.png",
+      "answers-mobile-dark.png",
+      "dashboard-desktop.png",
+      "dashboard-empty.png",
+      "dashboard-error.png",
+      "dashboard-member.png",
+      "dashboard-mobile-dark.png",
+      "dashboard-usage-mobile-dark.png",
+      "review-raw-desktop.png",
+      "review-raw-mobile-dark.png"
+    ],
+    "download": {
+      "status": "PASS",
+      "bytes": 155,
+      "sha256": "6ac96f95ff867c9f82e74864a9bb4b8a3f1b46d5a03e6e9158ed11d136da0728",
+      "exact_fixture_bytes": true,
+      "synthetic_only": true
+    },
+    "helper_console_limit": "createRoot warning on fixture HMR; not a production-app console audit"
+  },
+  "prior_failures_retained": [
+    "boundary-before.json:1FAIL/4PASS proves dashboard previously outside v1 gate",
+    "focused-initial: test fixture parse failure; no skipped source assertion",
+    "focused-retry:35PASS/2FAIL; numeric-input fixture corrected to202, Blob read with FileReader instead of absent jsdom Blob.text",
+    "build-initial.log: missing route search defaults; corrected typed links",
+    "format-initial/lint-initial: ARIA/key/orphan and new-test lint corrected within scope",
+    "fe-full.json:346PASS/2FAIL; restored old Markdown accessible label; reran full with2workers after competing build, no timeout or old-test changes"
+  ],
+  "not_run": [
+    "Live API/SSO/model/corpus E2E",
+    "RAG semantic quality/latency benchmark",
+    "Serving migration/reindex/restart/deploy",
+    "Git commit/push"
+  ]
+}

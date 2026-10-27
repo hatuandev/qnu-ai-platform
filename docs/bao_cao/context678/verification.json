@@ -1,0 +1,193 @@
+{
+  "context": 678,
+  "created_at": "2026-10-27T13:52:32.203811+00:00",
+  "verdict": "IMPLEMENTED_VERIFIED",
+  "scope": "FrontendV1 groups2-4: lifecycle, staged replacement and operations; existing backendV1 APIs",
+  "application_changes": true,
+  "checks": {
+    "focused_regressions": {
+      "status": "PASS",
+      "exit_code": 0,
+      "passed": 56,
+      "failed": 0,
+      "skipped": 0
+    },
+    "application_suite": {
+      "status": "PASS",
+      "exit_code": 0,
+      "passed": 244,
+      "failed": 0,
+      "skipped": 0,
+      "retained_test_ids": 211,
+      "new_test_ids": 33,
+      "lost_test_ids": 0
+    },
+    "lint": {
+      "status": "PASS",
+      "exit_code": 0,
+      "files": 520,
+      "errors": 0,
+      "warnings": 0,
+      "infos": 0
+    },
+    "typecheck": {
+      "status": "PASS",
+      "exit_code": 0
+    },
+    "build_with_typescript": {
+      "status": "PASS",
+      "exit_code": 0,
+      "warning": "Existing chunk size >500kB"
+    },
+    "independent_review674": {
+      "status": "PASS",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    "independent_review676": {
+      "status": "PASS",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    "bundle_after_build": {
+      "status": "PASS",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    "visual_fixture_absent_from_dist": {
+      "status": "PASS",
+      "matching_files": [],
+      "patterns": [
+        "synthetic-visual-session",
+        "synthetic-review",
+        "context678-visual",
+        "Non-API egress forbidden in synthetic QA"
+      ]
+    },
+    "source_integrity": {
+      "status": "PASS",
+      "baseline_files": 779,
+      "changed_existing_files": [
+        "frontendV1/src/routeTree.gen.ts",
+        "frontendV1/src/app/api/v1/endpoints.ts",
+        "frontendV1/src/app/api/v1/index.ts",
+        "frontendV1/src/features/assistants/assistant-detail-page.tsx",
+        "frontendV1/src/features/assistants/assistants-panel.tsx",
+        "frontendV1/src/features/conversations/chat-view.tsx",
+        "frontendV1/src/features/knowledge/collection-detail-page.tsx",
+        "frontendV1/src/features/knowledge/compiled-document-detail-page.tsx",
+        "frontendV1/src/features/knowledge/index-panel.tsx",
+        "frontendV1/src/features/knowledge/queries.ts",
+        "frontendV1/src/features/knowledge/requests.ts",
+        "frontendV1/src/features/knowledge/revision-upload-dialog.tsx",
+        "frontendV1/src/features/knowledge/source-detail-page.tsx",
+        "frontendV1/src/features/knowledge/types.ts",
+        "frontendV1/src/features/workspaces/workspace-detail-layout.tsx",
+        "frontendV1/tests/template-boundary.test.ts"
+      ],
+      "new_files": [
+        "frontendV1/src/routes/workspaces.$workspaceId.operations.tsx",
+        "frontendV1/src/routes/workspaces.$workspaceId.resources.tsx",
+        "frontendV1/src/features/lifecycle/action-dialog.tsx",
+        "frontendV1/src/features/lifecycle/action-receipt.tsx",
+        "frontendV1/src/features/lifecycle/action-scope.ts",
+        "frontendV1/src/features/lifecycle/document-replacement.tsx",
+        "frontendV1/src/features/lifecycle/impact-view.tsx",
+        "frontendV1/src/features/lifecycle/lifecycle-actions.tsx",
+        "frontendV1/src/features/lifecycle/permissions.ts",
+        "frontendV1/src/features/lifecycle/queries.ts",
+        "frontendV1/src/features/lifecycle/requests.ts",
+        "frontendV1/src/features/lifecycle/resources-page.tsx",
+        "frontendV1/src/features/lifecycle/retry-action.tsx",
+        "frontendV1/src/features/lifecycle/types.ts",
+        "frontendV1/src/features/operations/job-details.tsx",
+        "frontendV1/src/features/operations/operation-receipt.tsx",
+        "frontendV1/src/features/operations/operations-page.tsx",
+        "frontendV1/src/features/operations/queries.ts",
+        "frontendV1/src/features/operations/readiness-panel.tsx",
+        "frontendV1/src/features/operations/recovery-dialog.tsx",
+        "frontendV1/src/features/operations/requests.ts",
+        "frontendV1/src/features/operations/search.ts",
+        "frontendV1/src/features/operations/types.ts",
+        "frontendV1/tests/lifecycle-operations-ui-678.test.tsx",
+        "frontendV1/tests/replacement-ui-678.test.tsx",
+        "frontendV1/tests/v1-lifecycle-678.test.ts"
+      ],
+      "protected_changes": [],
+      "encoding_errors": [],
+      "backend_unchanged": true,
+      "retained_test_ids": 211,
+      "lost_test_ids": 0,
+      "new_test_ids": 33
+    },
+    "browser_spot_check": {
+      "status": "PASS_SCOPED",
+      "engine": "Codex in-app browser",
+      "data": "Synthetic API/auth/role fixture, real components and CSS",
+      "screenshots": [
+        "action-desktop-dark.png",
+        "action-mobile-light.png",
+        "ops-desktop-light.png",
+        "ops-mobile-dark.png",
+        "replacement-desktop-light.png",
+        "trash-mobile-dark.png"
+      ],
+      "mobile": "390 CSS px iframe",
+      "scope": "Static layout/readability for observed views; not all screens/states or real navigation",
+      "unsupported_attempt": "AX scroll on iframe failed; no PASS claimed",
+      "qa_tab_closed": true,
+      "qa_helper_stopped": true
+    },
+    "live_be_sso_model_corpus": {
+      "status": "NOT_RUN"
+    },
+    "backend_suite": {
+      "status": "NOT_RUN",
+      "reason": "No server behavior/contract changes"
+    },
+    "documentation_and_final_scope": {
+      "status": "PASS",
+      "new_documents": 5,
+      "updated_indexes": 4,
+      "problems": [],
+      "source_changes_after_final_gates": [],
+      "unexpected_source_changes": [],
+      "protected_backend_auth_modelops_styles_unchanged": true,
+      "application_files_sealed": 42
+    }
+  },
+  "initial_checks_resolved": {
+    "focused_initial": {
+      "passed": 15,
+      "failed": 7,
+      "skipped": 0
+    },
+    "reason": "7 jsdom cases lacked matchMedia fixture; added browser API mock",
+    "typecheck_initial": "2 missing pageSize links and then 1 unused import; fixed, final pass"
+  },
+  "existing_test_change": "Only template-boundary V1 directory allowlist gains lifecycle/operations, explicitly authorized modules; assertions retained, KTX boundary unchanged",
+  "generated_file": "frontendV1/src/routeTree.gen.ts generated by Vite/TanStack, no manual edits",
+  "artifact_directory": "storage/artifacts/context678-fe-lifecycle",
+  "commands_cwd": "frontendV1",
+  "commands": [
+    "node_modules/.bin/vitest.cmd run tests/v1-lifecycle-678.test.ts tests/lifecycle-operations-ui-678.test.tsx tests/replacement-ui-678.test.tsx tests/chat-history-671.test.tsx tests/rag-ui-674.test.tsx tests/regression-677-index-scope.test.tsx tests/regression-677-chat-scope.test.tsx tests/template-boundary.test.ts --reporter=json --outputFile=../storage/artifacts/context678-fe-lifecycle/focused-final.json",
+    "npm.cmd --silent test -- --reporter=json --outputFile=../storage/artifacts/context678-fe-lifecycle/tests.json",
+    "npm.cmd --silent run lint -- --reporter=json",
+    "npm.cmd --silent run typecheck",
+    "npm.cmd --silent run build",
+    "vitest run --config storage/artifacts/context674-review/vitest.review.config.ts",
+    "vitest run --config storage/artifacts/context676-review/vitest.review.config.ts",
+    "vitest run tests/dev-auto-login-bundle-672.test.ts tests/template-boundary.test.ts"
+  ],
+  "limitations": [
+    "No real backend/SSO/model or corpus smoke; no semantic benchmark",
+    "Replacement uses existing manual OCR/compiler/review stages and backend single-document switch contract",
+    "Browser fixture is a layout spot-check, not a full device/keyboard/E2E matrix"
+  ]
+}

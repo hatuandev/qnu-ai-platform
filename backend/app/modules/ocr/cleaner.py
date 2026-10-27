@@ -4,7 +4,7 @@ Specialized in:
 1. Multi-page Table Stitching across page dividers (--- / <!-- Trang X -->).
 2. Merging orphan continuation rows into single semantic parent records (<br>).
 3. Repairing Vietnamese compound words split across page boundaries.
-4. Correcting common OCR typo artifacts without touching DOCX or PDF Text pipelines.
+4. Preserving provider wording while cleaning OCR layout artifacts.
 """
 
 from __future__ import annotations
@@ -338,7 +338,7 @@ def merge_ocr_orphan_table_rows(markdown: str) -> str:
 
 
 def clean_ocr_table_syntax(markdown: str) -> str:
-    """Clean duplicate separators, standardize column alignments and fix OCR typos."""
+    """Clean table syntax without replacing words or changing spelling."""
     text = markdown
 
     # 1. Remove duplicate adjacent table separator rows
@@ -347,19 +347,6 @@ def clean_ocr_table_syntax(markdown: str) -> str:
         re.MULTILINE,
     )
     text = dup_sep.sub(r"\1", text)
-
-    # 2. Fix Vietnamese administrative & tech OCR typos
-    # 'số chỉ' -> 'chỉ số' when describing metrics/indicators
-    text = re.sub(
-        r"\b(số\s+chỉ)\s+(hiệu\s+năng|đo\s+lường|kỹ\s+thuật|đánh\s+giá|phát\s+triển|then\s+chốt)\b",
-        r"chỉ số \2",
-        text,
-        flags=re.IGNORECASE,
-    )
-
-    # Standardize 'kí kết' -> 'ký kết'
-    text = re.sub(r"\bkí\s+kết\b", "ký kết", text, flags=re.IGNORECASE)
-    text = re.sub(r"\bkí\s+hợp\s+đồng\b", "ký hợp đồng", text, flags=re.IGNORECASE)
 
     # 3. Clean trailing empty spaces inside table pipes
     text = re.sub(r"\|\s*\|\s*\|\s*\|\s*\|\s*\|$", "||||||", text, flags=re.MULTILINE)
@@ -592,7 +579,7 @@ def post_process_ocr_output(
     # Step 4: Merge orphan continuation rows into parent rows
     cleaned = merge_ocr_orphan_table_rows(cleaned)
 
-    # Step 5: Clean syntax & typos
+    # Step 5: Clean syntax while preserving provider wording
     cleaned = clean_ocr_table_syntax(cleaned)
 
     # Step 6: Final check on any remaining HTML layout table artifacts

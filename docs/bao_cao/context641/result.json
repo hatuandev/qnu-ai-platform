@@ -1,0 +1,17 @@
+{
+  "context": 641,
+  "date": "2026-10-26",
+  "status": "capacity_implemented_focused_pass_full_fail",
+  "baseline_api": {"passed": 0, "failed": 3, "exit_code": 1},
+  "baseline_ocr_setting": {"passed": 0, "failed": 1, "exit_code": 1},
+  "focused_final": {"passed": 44, "failed": 0, "skipped": 0, "seconds": 15.33, "exit_code": 0},
+  "full_snapshot": {"passed": 152, "failed": 2, "skipped": 0, "seconds": 51.7, "exit_code": 1},
+  "new_cases": 33,
+  "new_case_failures": 0,
+  "ruff_scoped": "PASS",
+  "openapi_capacity_contract": "PASS",
+  "owned_test_databases_remaining": 0,
+  "legacy_app_files_unchanged": 475,
+  "main_database_migrated": false,
+  "limits": ["OCR execution has not yet called capacity guard", "No live inference or image tokenizer", "No automatic capacity discovery", "Full suite has two failures outside capacity changes"]
+}

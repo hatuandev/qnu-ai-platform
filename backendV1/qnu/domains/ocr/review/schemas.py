@@ -1,0 +1,90 @@
+"""Readable text, exact changes and model suggestions are separate contracts."""
+
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class TextUnit(BaseModel):
+    evidence_id: str
+    page: int
+    kind: str
+    text: str
+    original_text: str
+    bbox: dict
+    row: int | None = None
+    column: int | None = None
+
+
+class ReviewDocument(BaseModel):
+    run_id: str
+    version: int
+    version_id: str | None
+    canonical_sha256: str
+    original_sha256: str
+    markdown_sha256: str
+    units: list[TextUnit]
+    saved_at: datetime | None = None
+
+
+class TextChange(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    evidence_id: str = Field(min_length=1, max_length=128)
+    before: str = Field(max_length=100000)
+    after: str = Field(max_length=100000)
+
+
+class SaveReview(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    expected_version: int = Field(ge=0)
+    expected_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    changes: list[TextChange] = Field(min_length=1, max_length=1000)
+
+    @model_validator(mode="after")
+    def unique_changes(self):
+        if len({c.evidence_id for c in self.changes}) != len(self.changes):
+            raise ValueError("Mỗi đoạn hoặc ô chỉ được sửa một lần trong yêu cầu.")
+        return self
+
+
+class DetectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    expected_version: int = Field(ge=0)
+    expected_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_ids: list[str] = Field(min_length=1, max_length=100)
+    provider_id: str | None = Field(None, min_length=1, max_length=64)
+    max_output_tokens: int = Field(4096, gt=0)
+
+    @model_validator(mode="after")
+    def unique_units(self):
+        if len(set(self.evidence_ids)) != len(self.evidence_ids):
+            raise ValueError("Không lặp đoạn kiểm tra.")
+        return self
+
+
+class Suggestion(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    evidence_id: str = Field(min_length=1, max_length=128)
+    start: int = Field(ge=0)
+    end: int = Field(gt=0)
+    original: str = Field(min_length=1, max_length=2000)
+    replacement: str = Field(min_length=1, max_length=2000)
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class SuggestedText(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    suggestions: list[Suggestion] = Field(max_length=500)
+
+
+class DetectionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    status: str
+    version: int
+    canonical_sha256: str
+    suggestions: list[Suggestion]
+    checked_evidence_ids: list[str]
+    error_code: str | None
+    usage_id: str | None
+    created_at: datetime

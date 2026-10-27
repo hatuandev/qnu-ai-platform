@@ -1,0 +1,23 @@
+{
+  "context": 637,
+  "date": "2026-10-26",
+  "scope": "backendV1 knowledge collections and direct document upload",
+  "full_final": {"passed": 104, "failed": 0, "skipped": 0, "warnings": 2, "seconds": 32.49, "exit_code": 0},
+  "focused_knowledge_migration": {"passed": 33, "failed": 0, "seconds": 18.9, "exit_code": 0},
+  "unit_only": {"passed": 45, "failed": 0},
+  "previous_batch_tests": 60,
+  "new_tests": 44,
+  "ruff": "PASS",
+  "migration_orm_parity": "PASS",
+  "migration_revision": "0005_knowledge_collections",
+  "openapi_paths": 31,
+  "new_dependency": "python-multipart==0.0.32",
+  "test_database": "qnu_v1_test_6ab100000863450c",
+  "test_databases_cleaned": true,
+  "legacy_sentinel_preserved": true,
+  "application_database_migrated": false,
+  "legacy_backend_source_changed": false,
+  "api_or_worker_restarted": false,
+  "parser_ocr_index_rag_ui": "NOT RUN",
+  "git_commit": false
+}

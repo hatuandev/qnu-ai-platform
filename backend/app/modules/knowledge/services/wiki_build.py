@@ -1,5 +1,6 @@
 """ModelOps adapter for new-source wiki builds; existing revisions remain unchanged."""
 
+import asyncio
 import json
 import logging
 import re
@@ -28,7 +29,7 @@ from app.modules.knowledge.wiki_schemas import (
 logger = logging.getLogger(__name__)
 
 
-def contract_errors(exc: ValidationError, contract: type[BaseModel], reverse: dict) -> list[dict]:
+def contract_errors(exc: ValidationError, contract: type[BaseModel], reverse: dict, *, span_choices: dict | None=None) -> list[dict]:
     fields = set()
     def visit(node):
         if isinstance(node, dict):
@@ -45,7 +46,13 @@ def contract_errors(exc: ValidationError, contract: type[BaseModel], reverse: di
                     else "[unknown-field]" for part in error["loc"]]
         constraints = {key: value for key, value in (error.get("ctx") or {}).items()
                        if isinstance(value, (int, float, bool))}
+        span_feedback={}
+        if span_choices is not None:
+            from app.modules.knowledge.services.compilation_span_menu import span_error_feedback
+
+            span_feedback=span_error_feedback(error,span_choices)
         result.append({"field": location, "type": error["type"],
+            **span_feedback,
             **({"constraints": constraints} if constraints else {}),
             **({"supplied_handle": error["input"]} if isinstance(error.get("input"), str)
                and error["input"] in reverse else {})})
@@ -112,19 +119,20 @@ async def model_generator(db: AsyncSession, tenant_id: str, policy: WikiPolicy, 
 
 async def generate_object(db: AsyncSession, tenant_id: str, route: dict, policy: WikiPolicy,
                           metrics: list[dict], contract: type[BaseModel], instruction: str,
-                          payload: dict) -> BaseModel:
+                          payload: dict, *, reasoning_effort: str | None = None) -> BaseModel:
     from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
     from app.modules.modelops.service import modelops_service
     from app.modules.modelops.services.inference_policy import preserve_structured_output
     from app.modules.rag.evidence_contracts import validate_data_instance
 
-    budget = request_usage(contract, instruction, payload, policy)
+    budget = await asyncio.to_thread(request_usage, contract, instruction, payload, policy)
     if not budget["fits"]:
         raise AppException("Gói biên soạn vượt ngân sách toàn request; chưa gọi mô hình.",
                            code="KNOWLEDGE_WIKI_BUDGET", status_code=422)
     with preserve_structured_output():
         result = await modelops_service.generate(db, LLMGenerateRequest(tenant_id=tenant_id,
-            **route, temperature=0, thinking_budget=0, max_tokens=policy.max_output_tokens,
+            **route, temperature=0, thinking_budget=0, max_tokens=budget['reserved_output_tokens'], reasoning_effort=reasoning_effort,
+            automatic_output_budget=policy.automatic_output_budget,minimum_output_tokens=budget.get('minimum_output_tokens',1),
             messages=[ChatMessage(**message) for message in request_messages(contract, instruction, payload)]))
     budget["observed_input_tokens"] = result.prompt_tokens
     metrics.append({"provider": result.provider, "model": result.model,
@@ -143,7 +151,7 @@ async def generate_object(db: AsyncSession, tenant_id: str, route: dict, policy:
         output = validate_data_instance(parse_contract, fence[1] if fence else content)
         return restore_source_ids(parse_contract if contract is WikiPacketGeneration else contract, output, reverse)
     except ValidationError as exc:
-        errors = contract_errors(exc, wire_contract, reverse)
+        errors = contract_errors(exc, wire_contract, reverse,span_choices=payload.get('source_spans'))
         metrics[-1]["contract_errors"] = errors
         raise AppException("Đầu ra trang tri thức sai cấu trúc.", code="KNOWLEDGE_WIKI_INVALID",
             status_code=502, details={"reason": "json_contract", "validation_errors": errors}) from exc

@@ -27,6 +27,7 @@ from app.modules.modelops.services.inference_policy import retry_transient_respo
 
 class OpenAIAdapter(BaseLLMAdapter):
     supports_output_contract = True
+    supports_reasoning_effort = True
     def __init__(
         self,
         model_name: str,
@@ -80,6 +81,8 @@ class OpenAIAdapter(BaseLLMAdapter):
         )
         if kwargs.get("enable_thinking") or kwargs.get("thinking_budget"):
             payload["chat_template_kwargs"] = {"enable_thinking": True}
+        if kwargs.get('reasoning_effort') is not None:
+            payload['reasoning_effort'] = kwargs['reasoning_effort']
         contract = kwargs.get("output_contract")
         if contract is not None:
             if stream:

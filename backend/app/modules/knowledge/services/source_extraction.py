@@ -20,12 +20,13 @@ from app.modules.knowledge.parsers import get_document_parser
 from app.modules.knowledge.parsers.base import ParsedContent
 from app.modules.knowledge.services.blank_pages import inspect_empty_pdf_page
 from app.modules.knowledge.services.header_rescue import prepare_header_rescue, rescue_header
+from app.modules.knowledge.services.html_tables import normalize_html_tables
 from app.modules.knowledge.services.layout_text import reconstruct_layout_text
 from app.modules.knowledge.services.page_visuals import visual_coverage
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.ocr.service import OCRService
 
-EXTRACTION_VERSION = "layout-v22-document-structure"
+EXTRACTION_VERSION = "layout-v25-ocr-literal-words"
 _native_pdf_lock = asyncio.Lock()
 
 
@@ -54,6 +55,7 @@ class SourceExtraction:
     pdf_evidence: dict[str, Any] | None = None
     qnu_build_error: str | None = None
     office_resources: list[dict[str, Any]] = field(default_factory=list)
+    office_ocr_evidence: dict[str, Any] | None = None
 
 
 def merge_evidenced_text(primary: str, secondary: str) -> str:
@@ -168,6 +170,8 @@ async def extract_pdf(db: AsyncSession, content: bytes, filename: str, profile: 
                     ocr_dimensions=record.get("dimensions"), engine_used=response.engine_used,
                     raw_ocr_available=bool(raw_ocr),
                 )
+            # Project explicit cells for downstream Markdown consumers; raw OCR remains above.
+            record["extracted_text"] = normalize_html_tables(record["extracted_text"])
             if not record["extracted_text"].strip():
                 async with _native_pdf_lock:
                     evidence = await asyncio.to_thread(inspect_empty_pdf_page, content, original)
@@ -199,6 +203,12 @@ async def extract_pdf(db: AsyncSession, content: bytes, filename: str, profile: 
                            code="EMPTY_EXTRACTED_TEXT", status_code=422)
     raw_text = "\n\n".join(f"<!-- Trang {p['page_number']} -->\n{p['extracted_text']}" for p in pages)
     result = SourceExtraction(raw_text, len(pages), pages, parsed.tables or [], used)
+    if not build_standard and raw_ocr:
+        result.office_ocr_evidence = {
+            "version": "office-preview-ocr/v1", "preview_sha256": hashlib.sha256(content).hexdigest(),
+            "ocr": raw_ocr,
+            "ocr_page_map": [{"local": local, "physical": number} for local, number in enumerate(selected, 1)],
+        }
     if parsed.canonical_document:
         result.canonical_tables = [t.model_dump(mode="json") for t in parsed.canonical_document.tables]
     if build_standard:
@@ -229,7 +239,8 @@ def align_office_markdown(markdown: str, pages: list[dict[str, Any]]) -> list[tu
     tokens = list(re.finditer(r"\w+", markdown))
     native_tokens, native_pages = [], []
     for page in pages:
-        values = re.findall(r"\w+", page.get("alignment_text", page["extracted_text"]))
+        visible_text = normalize_html_tables(page.get("alignment_text", page["extracted_text"]))
+        values = re.findall(r"\w+", visible_text)
         native_tokens.extend(word.casefold() for word in values)
         native_pages.extend([page["page_number"]] * len(values))
     matcher = SequenceMatcher(None, [t.group().casefold() for t in tokens], native_tokens, autojunk=False)
@@ -273,6 +284,8 @@ async def extract_source(db: AsyncSession, content: bytes, filename: str, file_t
         parsed.raw_text = unicodedata.normalize("NFC", parsed.raw_text)
         preview = await IngestionService()._convert_office_to_pdf(content, filename)
         result = await extract_pdf(db, preview, "preview.pdf", profile, engine, tenant_id, build_standard=False)
+        if result.office_ocr_evidence is not None:
+            result.office_ocr_evidence["source_sha256"] = hashlib.sha256(content).hexdigest()
         page_ranges = await asyncio.to_thread(align_office_markdown, parsed.raw_text, result.pages)
         for page in result.pages:
             accepted = (page.get("metadata_rescue") or {}).get("accepted_lines", [])

@@ -83,6 +83,14 @@ def test_styling_without_independent_header_evidence_keeps_every_row(bold, shadi
     with shaded_table(bold=bold, shading=shading) as pdf:
         _, doc = build(pdf[0])
     table = next(b for b in doc.blocks if b.type == "table")
+    if bold and not shading:
+        # White fill is no longer required when independent merged parent/child
+        # boundaries plus the bounded typography contrast establish both levels.
+        assert [c['header_path'] for c in table.attributes['columns']] == [
+            ['Ref'], ['2031', 'Measure 1'], ['2031', 'Measure 2']]
+        assert [b.attributes['fields']['c01']['raw'] for b in doc.blocks if b.type == 'table_row'] == [
+            '0012', 'AM-0070', 'Z9']
+        return
     assert len([b for b in doc.blocks if b.type == "table_row"]) == 5
     assert all(not c["header_path"] for c in table.attributes["columns"])
     assert any(f.code == "table_header_unresolved" for f in table.quality_flags)

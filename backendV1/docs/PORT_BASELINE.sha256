@@ -1,0 +1,3 @@
+# SHA-256 của tệp legacy đã port sang backendV1.
+# Định dạng: <sha256>  <đường dẫn tương đối từ gốc repo>
+# Chưa có tệp nào được port trong Phase 0.

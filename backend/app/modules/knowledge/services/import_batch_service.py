@@ -69,8 +69,9 @@ class ImportBatchService:
                 detail=f"Không tìm thấy kho tri thức {collection_id}",
             )
 
+        request_data = payload.model_dump(mode="json", exclude={"ocr_engine"} if payload.ocr_engine is None else set())
         request_hash = hashlib.sha256(json.dumps({
-            **payload.model_dump(mode="json"),
+            **request_data,
             "document_ids": sorted(set(payload.document_ids)),
         }, sort_keys=True).encode("utf-8")).hexdigest()
 
@@ -197,6 +198,8 @@ class ImportBatchService:
                 "issuing_authority": doc.issuing_authority,
                 "issued_date": str(doc.issued_date) if doc.issued_date else None,
             }
+            if payload.ocr_engine is not None:
+                origin_metadata["_ocr_engine"] = payload.ocr_engine
             item = KnowledgeImportItem(
                 id=f"imp_item_{uuid.uuid4().hex[:12]}",
                 batch_id=batch_id,
@@ -234,7 +237,9 @@ class ImportBatchService:
                 tenant_id=batch.tenant_id, workspace_id=batch.workspace_id,
                 document_id=item.origin_document_id,
                 idempotency_key=f"ingest_{item.id}_{item.retry_count}",
-                payload={"item_id": item.id, "batch_id": batch.id},
+                payload={"item_id": item.id, "batch_id": batch.id,
+                         **({"ocr_engine": item.origin_metadata["_ocr_engine"]}
+                            if (item.origin_metadata or {}).get("_ocr_engine") is not None else {})},
                 dispatch_status="pending",
             ) for item in items
         ]

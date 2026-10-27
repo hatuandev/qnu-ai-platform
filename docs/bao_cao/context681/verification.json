@@ -1,0 +1,2938 @@
+{
+  "context": 681,
+  "status": "PASS_FUNCTIONAL_WITH_LIVE_LIMITS",
+  "scope": "Inventory680 F1-F3; frontendV1 and Compiler list offset in backendV1",
+  "frontend": {
+    "fe-final-verified": {
+      "numTotalTests": 311,
+      "numPassedTests": 311,
+      "numFailedTests": 0
+    },
+    "fe-focused-verified": {
+      "numTotalTests": 24,
+      "numPassedTests": 24,
+      "numFailedTests": 0
+    },
+    "probe674": {
+      "numTotalTests": 11,
+      "numPassedTests": 11,
+      "numFailedTests": 0
+    },
+    "probe676": {
+      "numTotalTests": 8,
+      "numPassedTests": 8,
+      "numFailedTests": 0
+    },
+    "bundle-complete": {
+      "numTotalTests": 11,
+      "numPassedTests": 11,
+      "numFailedTests": 0
+    }
+  },
+  "frontend_retention": {
+    "old": 287,
+    "new": 311,
+    "missing": [],
+    "added": [
+      "tests/knowledge-completion-681.test.tsx::100-document limit prevents adding beyond the request contract",
+      "tests/knowledge-completion-681.test.tsx::a failed Compiler page still allows returning to the previous page",
+      "tests/knowledge-completion-681.test.tsx::a hash mismatch blocks saved suggestions",
+      "tests/knowledge-completion-681.test.tsx::a valid saved suggestion is dismissed only after the parent accepts it into draft",
+      "tests/knowledge-completion-681.test.tsx::a version mismatch blocks saved suggestions",
+      "tests/knowledge-completion-681.test.tsx::all six list hooks send real page offsets, including Compiler beyond 100",
+      "tests/knowledge-completion-681.test.tsx::check status failed never exposes correction actions",
+      "tests/knowledge-completion-681.test.tsx::check status running never exposes correction actions",
+      "tests/knowledge-completion-681.test.tsx::check status uncertain never exposes correction actions",
+      "tests/knowledge-completion-681.test.tsx::document chooser loads subsequent server pages and retains choices across page changes",
+      "tests/knowledge-completion-681.test.tsx::evaluation picker offers only documents in its manifest and prevents duplicate choices",
+      "tests/knowledge-completion-681.test.tsx::evaluation sends the same document filter as gold search; changing scope clears previous gold",
+      "tests/knowledge-completion-681.test.tsx::gold search uses exact document filter and rejects a hit from outside that filter",
+      "tests/knowledge-completion-681.test.tsx::lookahead size 100 reaches next page without exceeding server limit",
+      "tests/knowledge-completion-681.test.tsx::lookahead size 20 reaches next page without exceeding server limit",
+      "tests/knowledge-completion-681.test.tsx::pagination has no invented total, disables final Next, allows return from an empty deep page",
+      "tests/knowledge-completion-681.test.tsx::picker HTTP 403 does not discard explicit selected scope",
+      "tests/knowledge-completion-681.test.tsx::picker HTTP 404 does not discard explicit selected scope",
+      "tests/knowledge-completion-681.test.tsx::reader cannot apply a saved correction",
+      "tests/knowledge-completion-681.test.tsx::reopening a saved check after remount uses its scoped GET, without rerunning the model",
+      "tests/knowledge-completion-681.test.tsx::saved check HTTP 403 is an error, never treated as completed or auto-rerun",
+      "tests/knowledge-completion-681.test.tsx::saved check HTTP 404 is an error, never treated as completed or auto-rerun",
+      "tests/knowledge-completion-681.test.tsx::search sends exact document scope and rejects an in-flight result after the scope changes",
+      "tests/knowledge-completion-681.test.tsx::stale-span cannot apply a saved correction"
+    ]
+  },
+  "backend_unique_passed": 655,
+  "backend_uncovered_skips": [],
+  "backend_failures": [],
+  "earlier_failed_attempt": {
+    "database": "qnu_v1_test_c1a17ccbd3754cb4",
+    "passed": 313,
+    "failed": 1,
+    "test_id": "tests/integration/test_readiness_666.py::test_worker_heartbeat_is_queue_scoped_and_removed_on_shutdown",
+    "cause": "TEST_REDIS_URL absent in test process, KeyError before application behavior",
+    "receipt": {
+      "database": "qnu_v1_test_c1a17ccbd3754cb4",
+      "db_dropped": true,
+      "legacy_sentinel_preserved": true,
+      "pytest_exit": 1,
+      "seconds": 186.2
+    },
+    "resolution": "Retry readiness test then all314 remaining IDs with existing loopback Redis setting, no application/test changes",
+    "failure_log_sanitized": true
+  },
+  "backend_full_run_status": "INTERRUPTED_THEN_COMPLETED_REMAINING_IDS; aggregate unique coverage, no single uninterrupted full exit code",
+  "backend_runs": [
+    {
+      "name": "interrupted_prefix",
+      "receipt": {
+        "database": "qnu_v1_test_01f1fc4f6f3d49dc",
+        "interrupted": true,
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "owned_index_rows_remaining": 0,
+        "completed_from_log": 337,
+        "pytest_exit": null
+      },
+      "results": [
+        {
+          "id": "tests/contract/test_problem_contract.py::test_problem_type_uses_error_base_url",
+          "status": "passed"
+        },
+        {
+          "id": "tests/contract/test_problem_contract.py::test_problem_payload_has_required_fields",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_answer_returns_only_server_bound_sources",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_invalid_answer_is_an_error_not_no_data[foreign_citation-answer_citation_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_invalid_answer_is_an_error_not_no_data[uncited-answer_response_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_invalid_answer_is_an_error_not_no_data[schema-answer_response_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_invalid_answer_is_an_error_not_no_data[inline_citation-answer_response_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_invalid_answer_is_an_error_not_no_data[truncated-chat_output_truncated]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_invalid_answer_is_an_error_not_no_data[http_error-chat_provider_unavailable]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_model_can_abstain_without_fabricated_answer",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_withdrawn_content_does_not_call_chat",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_answer_requires_membership_and_preserves_document_scope",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_withdrawal_during_generation_discards_answer",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_runtime_changes_during_chat_do_not_return_answer[membership-404]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_runtime_changes_during_chat_do_not_return_answer[provider_disabled-409]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_runtime_changes_during_chat_do_not_return_answer[provider_identity-409]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_runtime_changes_during_chat_do_not_return_answer[index-409]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_invalid_document_list_is_422_before_inference",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_chat_budget_limit_is_enforced_before_chat",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_ungiven_chat_provider_is_not_a_fallback",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_no_search_hits_does_not_call_chat",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_answers_api_648.py::test_change_after_reservation_before_chat_releases_unused_budget",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_chat_stop_updates_664.py::test_stop_and_resume_discards_late_answer_and_allows_new_turn[assistant]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_chat_stop_updates_664.py::test_stop_and_resume_discards_late_answer_and_allows_new_turn[conversation]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_chat_stop_updates_664.py::test_stop_update_only_cancels_related_running_turns[assistant]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_chat_stop_updates_664.py::test_stop_update_only_cancels_related_running_turns[conversation]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_chat_stop_updates_664.py::test_forbidden_stop_cannot_cancel_running_turn[assistant]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_chat_stop_updates_664.py::test_forbidden_stop_cannot_cancel_running_turn[conversation]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_chat_stop_updates_664.py::test_active_update_keeps_running_turn[assistant]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_chat_stop_updates_664.py::test_active_update_keeps_running_turn[conversation]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_chat_stop_updates_664.py::test_failed_update_rolls_back_turn_cancellation[assistant]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_chat_stop_updates_664.py::test_failed_update_rolls_back_turn_cancellation[conversation]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_request_is_durable_and_idempotent",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_draft_retains_tables_citations_raw_and_single_delivery",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_invalid_draft_never_succeeds_and_raw_is_preserved[bad_citation-compilation_citation_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_invalid_draft_never_succeeds_and_raw_is_preserved[bad_schema-compilation_draft_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_invalid_draft_never_succeeds_and_raw_is_preserved[truncated-chat_output_truncated]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_invalid_draft_never_succeeds_and_raw_is_preserved[http_error-chat_provider_unavailable]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_access_is_checked_at_api_and_worker",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_rejects_ocr_from_another_collection",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_rechecks_provider_and_quota_before_http",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_expired_inflight_request_is_not_resent",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_pins_model_before_http",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_model_timeout_stays_uncertain",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_concurrent_idempotency_creates_one_run",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_invalid_client_options_and_incomplete_ocr_are_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_checksum_failure_stops_before_http",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_recovers_saved_raw_without_another_llm_request",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_api_645.py::test_compiler_stale_worker_cannot_commit_model_response",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_automatic_654.py::test_auto_review_runs_once_on_its_own_job",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_automatic_654.py::test_review_error_keeps_compiler_complete_and_does_not_resend[http_error]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_automatic_654.py::test_review_error_keeps_compiler_complete_and_does_not_resend[schema]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_automatic_654.py::test_recovery_observes_existing_review_without_new_model_call",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_automatic_654.py::test_revoked_provider_fails_only_review_before_http",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_automatic_654.py::test_outbox_reconciles_after_queue_failure_without_recompiling",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_automatic_654.py::test_uncertain_review_stays_uncertain_after_expired_job_recovery",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_edits_654.py::test_new_immutable_version_has_own_review_without_recompiling",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_edits_654.py::test_accept_rejects_stale_or_unowned_preview[hash]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_edits_654.py::test_accept_rejects_stale_or_unowned_preview[expired]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_edits_654.py::test_accept_rejects_stale_or_unowned_preview[tampered]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_edits_654.py::test_accept_rejects_stale_or_unowned_preview[stale_sibling]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_edits_654.py::test_accept_rejects_stale_or_unowned_preview[actor]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_edits_654.py::test_rejects_protected_tables_and_foreign_citation",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_edits_654.py::test_workflow_scope_blocks_outsiders",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_edits_654.py::test_storage_failure_exposes_no_partial_child_and_same_preview_can_retry",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_edits_654.py::test_concurrent_accept_is_idempotent_and_different_preview_conflicts",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_edits_654.py::test_source_revision_changed_after_preview_blocks_accept",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_pagination_681.py::test_compiler_offset_reaches_beyond_first_hundred_without_duplicates",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_pagination_681.py::test_compiler_offset_keeps_workspace_membership_and_collection_scope",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_pagination_681.py::test_compiler_offset_rejects_negative_and_out_of_budget_requests",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_queue_645.py::test_compiler_reconcile_delivers_durable_run_on_real_arq",
+          "status": "skipped"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_completed_compiler_exposes_independent_reviews",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_review_has_readable_exact_sources_and_draft_without_changing_compiler",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_no_findings_is_not_approval_and_includes_every_unit",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_incomplete_or_invalid_reviews_fail_with_raw_and_never_resend[missing_source]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_incomplete_or_invalid_reviews_fail_with_raw_and_never_resend[missing_draft]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_incomplete_or_invalid_reviews_fail_with_raw_and_never_resend[duplicate_source]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_incomplete_or_invalid_reviews_fail_with_raw_and_never_resend[duplicate_draft]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_incomplete_or_invalid_reviews_fail_with_raw_and_never_resend[foreign_source]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_incomplete_or_invalid_reviews_fail_with_raw_and_never_resend[foreign_draft]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_incomplete_or_invalid_reviews_fail_with_raw_and_never_resend[unsupported_reference]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_incomplete_or_invalid_reviews_fail_with_raw_and_never_resend[covered_without_reference]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_incomplete_or_invalid_reviews_fail_with_raw_and_never_resend[schema]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_incomplete_or_invalid_reviews_fail_with_raw_and_never_resend[truncated]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_incomplete_or_invalid_reviews_fail_with_raw_and_never_resend[http_error]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_idempotency_body_scope_and_permissions_are_server_checked",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_review_requires_completed_current_sources_and_real_model_quota",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_report_storage_failure_keeps_raw_but_exposes_no_partial_report",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_same_key_during_quota_commit_uses_one_review_model_call",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_changes_during_review_reject_results_and_keep_durable_failure[membership]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_changes_during_review_reject_results_and_keep_durable_failure[provider]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_changes_during_review_reject_results_and_keep_durable_failure[source]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_changes_during_review_reject_results_and_keep_durable_failure[expiry]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_explicit_review_provider_is_used_without_changing_compiler_model",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_uncertain_request_preserves_unknown_usage_and_never_retries",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_review_652.py::test_corrupted_report_is_an_error_and_old_review_does_not_match_new_source",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_source_versions_654.py::test_exact_saved_text_is_pinned_despite_newer_saved_text",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_source_versions_654.py::test_selection_rejects_invalid_or_missing_versions[foreign-422]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_source_versions_654.py::test_selection_rejects_invalid_or_missing_versions[negative-422]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_source_versions_654.py::test_selection_rejects_invalid_or_missing_versions[bool-422]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_source_versions_654.py::test_selection_rejects_invalid_or_missing_versions[missing-404]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_source_versions_654.py::test_default_uses_raw_even_after_text_save_and_can_disable_auto_review",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_source_versions_654.py::test_legacy_idempotency_replays_without_changing_old_workflow",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_source_versions_654.py::test_corrupt_selected_markdown_blocks_compile_before_model",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_workflow_654.py::test_three_workflow_boundaries[text_version]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_workflow_654.py::test_three_workflow_boundaries[auto_review]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_workflow_654.py::test_three_workflow_boundaries[edit_context]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_workflow_e2e_654.py::test_corrected_source_survives_review_edit_publish_index_and_citations",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_assistant_binding_and_owned_conversation_are_persistent",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_saved_answer_replay_and_followup_use_new_evidence",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_key_conflict_and_sequence_conflict_never_call_model",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_failed_turn_is_persisted_and_not_resent[http_error-chat_provider_unavailable-503]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_failed_turn_is_persisted_and_not_resent[foreign_citation-answer_citation_invalid-502]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_old_source_content_is_hidden_after_withdrawal",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_unclear_or_bad_rewrite_never_reaches_answer[clarify-conversation_clarification_required]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_conversation_owner_is_not_bypassed_by_platform_admin",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_assistant_revision_change_blocks_existing_conversation",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_concurrent_turn_is_rejected_while_first_is_running",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_expired_turn_becomes_uncertain_without_resend",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_changes_during_generation_discard_persisted_answer[assistant-conversation_assistant_changed]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_changes_during_generation_discard_persisted_answer[archive-conversation_archived]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_changes_during_generation_discard_persisted_answer[membership-workspace_not_found]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_history_limit_blocks_rewrite_without_extra_model_call",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_conversations_649.py::test_assistant_admin_and_collection_scope_enforced",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_evaluation_655.py::test_evaluation_freezes_snapshot_and_uses_same_fusion_candidates",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_hybrid_655.py::test_hybrid_uses_same_index_and_scoped_lexical_candidates",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_hybrid_655.py::test_rerank_protocol_is_strict_and_citations_stay_server_bound[normal]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_hybrid_655.py::test_rerank_protocol_is_strict_and_citations_stay_server_bound[duplicate]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_hybrid_655.py::test_rerank_protocol_is_strict_and_citations_stay_server_bound[foreign]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_hybrid_655.py::test_rerank_protocol_is_strict_and_citations_stay_server_bound[missing]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_hybrid_655.py::test_rerank_protocol_is_strict_and_citations_stay_server_bound[auth]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_hybrid_655.py::test_withdrawal_excludes_both_branches_before_rerank",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_hybrid_655.py::test_withdrawal_during_rerank_never_returns_stale_text",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_hybrid_655.py::test_withdrawal_after_quota_commit_blocks_rerank_egress",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_index_request_is_durable_and_idempotent",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_real_qdrant_index_and_search_return_pinned_sources",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_withdrawn_content_is_excluded_before_query_embedding",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_bad_embedding_cannot_activate_generation[wrong_dimension-embedding_dimension_mismatch]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_bad_embedding_cannot_activate_generation[malformed-embedding_count_mismatch]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_bad_embedding_cannot_activate_generation[auth_error-embedding_auth_failed]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_index_and_search_require_server_membership_and_roles",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_model_identity_change_stops_old_generation",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_source_revision_change_excludes_content_without_model_call",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_out_of_scope_document_filter_is_not_widened",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_provider_error_during_query_is_not_no_match",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_quota_blocks_index_before_embedding_http",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_publication_change_before_worker_is_not_indexed",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_expired_embedding_marker_becomes_uncertain_without_resend",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_cross_scope_vector_payload_is_error_and_filter_precedes_topk",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_failed_replacement_generation_keeps_previous_active",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_withdrawal_during_query_embedding_is_rechecked",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_provider_disabled_during_embedding_is_rechecked",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_index_api_647.py::test_table_structure_tampering_is_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_collections_api.py::test_collection_endpoints_require_authentication",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_collections_api.py::test_editor_creates_collection_with_server_owned_owner",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_collections_api.py::test_collection_list_is_paginated_and_scoped",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_collections_api.py::test_collection_detail_and_metadata_update",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_collections_api.py::test_duplicate_collection_name_conflicts",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_collections_api.py::test_reviewer_and_member_read_but_cannot_write",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_collections_api.py::test_non_member_cannot_see_the_workspace",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_collections_api.py::test_collection_id_from_another_workspace_is_not_found",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_collections_api.py::test_suspended_workspace_blocks_content_access",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_collections_api.py::test_workspace_id_cannot_be_supplied_in_the_body",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_concurrency.py::test_same_idempotency_key_concurrently_creates_one_source",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_concurrency.py::test_same_content_different_keys_concurrently_creates_one_source",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_concurrency.py::test_database_rejects_duplicate_content_without_the_service",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_concurrency.py::test_database_rejects_a_reused_idempotency_key",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_concurrency.py::test_unknown_workspace_is_not_reachable_from_the_service",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_concurrency.py::test_idempotency_key_length_is_enforced[short]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_concurrency.py::test_idempotency_key_length_is_enforced[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_regressions_639.py::test_changed_title_is_a_different_idempotent_request",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_regressions_639.py::test_failed_concurrent_writer_cannot_damage_committed_original",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_regressions_639.py::test_downgrade_cannot_mark_success_and_block_next_upgrade",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_regressions_639.py::test_title_fingerprint_uses_effective_persisted_metadata[None-de-an.pdf]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_regressions_639.py::test_old_fingerprint_replays_matching_title_without_rewriting_ledger",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_regressions_639.py::test_revision_endpoint_rejects_title_instead_of_silently_ignoring_it",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_regressions_639.py::test_same_key_writers_do_not_fail_storage_under_contention",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_upload_requires_authentication",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_reviewer_cannot_upload",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_upload_stores_bytes_and_metadata",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_download_returns_the_original_bytes",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_new_revision_keeps_the_previous_version_readable",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_duplicate_content_in_a_collection_is_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_unchanged_revision_is_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_idempotency_replays_the_same_result",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_idempotency_key_reused_for_another_request_conflicts",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_created_by_cannot_be_forged",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_unsupported_and_mismatched_files_are_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_source_from_another_workspace_or_collection_is_not_found",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_storage_failure_does_not_create_a_source",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_missing_blob_is_reported_instead_of_an_empty_file",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_sources_api.py::test_tampered_blob_fails_the_checksum_check",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_659.py::test_delete_source_is_reversible_and_original_bytes_are_unchanged",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_659.py::test_preview_is_bound_to_actor_and_state",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_659.py::test_member_cannot_mutate_lifecycle_and_trash_does_not_leak_other_owners",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_659.py::test_collection_lifecycle_blocks_children_and_can_restore[archive]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_659.py::test_collection_lifecycle_blocks_children_and_can_restore[delete]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_659.py::test_modified_or_expired_preview_cannot_delete_anything[hash]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_659.py::test_modified_or_expired_preview_cannot_delete_anything[expired]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_659.py::test_concurrent_acceptance_has_one_effect_and_one_receipt",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_659.py::test_deleted_restore_requires_admin",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_archive_excludes_evidence_and_restore_preserves_original_index[source]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_archive_excludes_evidence_and_restore_preserves_original_index[document]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_pause_resume_and_delete_assistant_keep_owned_conversations",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_deleted_conversation_is_private_and_cannot_be_reopened_through_old_api",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_cancel_queued_index_is_durable_and_worker_never_calls_model",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_late_answer_after_pause_is_discarded_and_turn_stays_cancelled",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_replacement_keeps_old_serving_until_index_completes[False]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_replacement_keeps_old_serving_until_index_completes[True]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_cleanup_rejects_active_index_and_retries_only_owned_inactive_generation",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_cancellation_during_embedding_accounts_for_usage_and_never_activates",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_cancellation_during_compiler_retains_cancelled_status_and_usage",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_last_source_can_retire_and_clean_index_but_restore_needs_reindex",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_replacement_rolls_back_publication_on_manifest_failure_and_reuses_embeddings",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_lifecycle_runtime_659.py::test_cancel_auto_review_between_claim_and_child_creation_never_calls_model",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_model_capacity_641.py::test_capacity_above_old_global_defaults_persists_and_roundtrips",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_model_capacity_641.py::test_unconfigured_capacity_stays_unknown_instead_of_assuming_8192",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_model_capacity_641.py::test_endpoint_change_invalidates_capacity_until_explicit_reconfiguration",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_model_capacity_641.py::test_model_change_cannot_reuse_previous_capacity_even_if_name_changed_back",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_model_capacity_641.py::test_unrelated_patch_preserves_limits_and_explicit_null_clears_them",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_model_capacity_641.py::test_invalid_capacity_patch_leaves_saved_profile_unchanged[limits0]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_model_capacity_641.py::test_invalid_capacity_patch_leaves_saved_profile_unchanged[limits1]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_model_capacity_641.py::test_invalid_capacity_patch_leaves_saved_profile_unchanged[limits2]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_model_capacity_641.py::test_public_runtime_budget_resolves_workspace_and_rechecks_provider",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_model_capacity_641.py::test_runtime_capacity_requires_configuration_and_rejects_stale_binding",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_observability_644.py::test_stages_correlate_worker_and_api_without_document_content[pdf]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_observability_644.py::test_stages_correlate_worker_and_api_without_document_content[docx]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_observability_644.py::test_raw_api_returns_original_bytes_even_when_processing_fails[ok]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_observability_644.py::test_raw_api_returns_original_bytes_even_when_processing_fails[invalid_layout]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_observability_644.py::test_raw_api_returns_original_bytes_even_when_processing_fails[truncated]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_observability_644.py::test_raw_api_returns_original_bytes_even_when_processing_fails[malformed]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_observability_644.py::test_failed_layout_has_failed_parse_but_successful_raw_storage",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_observability_644.py::test_quota_failure_is_visible_before_any_provider_request",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_processing_requires_authentication",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_reviewer_cannot_request_processing",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_unsupported_format_is_reported_explicitly",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_pdf_flow_produces_pinned_evidence",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_docx_table_keeps_spans_values_and_footnote",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_new_generation_keeps_previous_run_and_revision",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_old_run_stays_pinned_after_a_new_revision",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_cross_workspace_and_collection_are_not_reachable",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_queue_outage_leaves_a_durable_queued_run",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_disabled_provider_fails_with_its_own_code",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_provider_without_ocr_capability_is_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_quota_blocks_processing_before_any_call",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_timeout_is_uncertain_and_never_retried",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_processing_api.py::test_malformed_response_is_a_failed_page_not_a_success",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_queue_transport_644.py::test_real_queue_delivers_persisted_run_once",
+          "status": "skipped"
+        },
+        {
+          "id": "tests/integration/test_ocr_regressions_643.py::test_arq_worker_startup_accepts_the_context_arq_actually_supplies",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_regressions_643.py::test_ocr_runtime_blocks_output_above_registered_model_capacity",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_regressions_643.py::test_resumed_run_blocks_a_changed_endpoint_and_model",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_regressions_643.py::test_reconcile_requeues_an_expired_dispatched_worker_run",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_regressions_643.py::test_layout_failure_preserves_the_raw_provider_response",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_regressions_643.py::test_docx_header_is_preserved_or_reported_as_missing",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_safety_643.py::test_expired_owner_cannot_commit_after_another_worker_claims",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_safety_643.py::test_heartbeat_renews_a_live_claim",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_safety_643.py::test_lost_claim_does_not_publish_a_provider_result",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_safety_643.py::test_every_received_error_keeps_raw_bytes[truncated]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_safety_643.py::test_every_received_error_keeps_raw_bytes[malformed]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_safety_643.py::test_every_received_error_keeps_raw_bytes[http_error]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_safety_643.py::test_unknown_multimodal_input_is_blocked_before_http",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_safety_643.py::test_quota_covers_image_input_and_output_instead_of_a_fixed_output_number",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_safety_643.py::test_reconcile_recovers_old_delivery_without_replaying_a_live_worker",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_safety_643.py::test_capacity_change_creates_new_generation_instead_of_reusing_old_result",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_readable_ocr_review",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_save_updates_both_files_preserves_original_and_replays",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_table_cell_save_keeps_structure_numbers_and_updates_projection",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_conflicts_do_not_overwrite_newer_edits",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_invalid_edits_rejected[foreign]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_invalid_edits_rejected[before]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_invalid_edits_rejected[empty]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_invalid_edits_rejected[duplicate]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_invalid_edits_rejected[extra]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_members_cannot_save_or_call_model_and_other_workspace_cannot_read",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_failed_second_file_does_not_make_partial_version_visible",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_suggestions_are_exact_readable_and_only_applied_on_save",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_bad_suggestions_and_provider_errors_never_change_files_or_resend[foreign]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_bad_suggestions_and_provider_errors_never_change_files_or_resend[span]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_bad_suggestions_and_provider_errors_never_change_files_or_resend[number]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_bad_suggestions_and_provider_errors_never_change_files_or_resend[overlap]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_bad_suggestions_and_provider_errors_never_change_files_or_resend[http_error]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_change_during_model_call_rejects_stale_or_unauthorized_suggestions[text]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_change_during_model_call_rejects_stale_or_unauthorized_suggestions[membership]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_change_during_model_call_rejects_stale_or_unauthorized_suggestions[provider]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_concurrent_saves_only_one_wins",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_text_review_651.py::test_concurrent_checks_share_one_durable_request_and_quota",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_655.py::test_jobs_filters_scope_counts_and_actual_progress",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_655.py::test_backup_contains_original_raw_and_pinned_metadata_without_keys",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_655.py::test_recovery_requires_current_preview_and_queue_outage_remains_pending",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_655.py::test_backup_delete_needs_expiry_preview_and_never_deletes_source",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_boundaries_655.py::test_operations_boundary[jobs]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_boundaries_655.py::test_operations_boundary[backups]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_boundaries_655.py::test_operations_boundary[retention]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_boundaries_655.py::test_hybrid_request_boundary",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_guards_655.py::test_recovery_never_resubmits_terminal_or_leased_model_jobs[failed]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_guards_655.py::test_recovery_never_resubmits_terminal_or_leased_model_jobs[uncertain]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_guards_655.py::test_recovery_never_resubmits_terminal_or_leased_model_jobs[running]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_guards_655.py::test_recovery_accept_rejects_stale_or_foreign_approval[hash]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_guards_655.py::test_recovery_accept_rejects_stale_or_foreign_approval[state]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_guards_655.py::test_recovery_accept_rejects_stale_or_foreign_approval[expiry]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_guards_655.py::test_recovery_accept_rejects_stale_or_foreign_approval[actor]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_guards_655.py::test_revoked_backup_creator_cannot_publish_archive",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_guards_655.py::test_backup_includes_both_saved_post_ocr_artifacts",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_guards_655.py::test_answer_retrieval_options_fail_as_request_validation[body0]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_operations_guards_655.py::test_answer_retrieval_options_fail_as_request_validation[body1]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_register_approve_publish_withdraw_keeps_original_draft",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_replacement_is_atomic_and_keeps_both_versions",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_publication_roles_scope_and_preview_actor_are_enforced",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_revoked_reviewer_cannot_commit_preview",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_preview_hash_expiry_and_idempotent_decision",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_preview_stale_after_registering_new_version",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_concurrent_publish_uses_one_preview_snapshot_once",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_changed_source_stops_serving_but_can_still_be_withdrawn",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_tampered_artifact_blocks_commit_without_state_change",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_registration_checks_scope_and_does_not_accept_status_overrides",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_new_source_between_preview_and_publish_requires_fresh_compile",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_status_flag_alone_is_not_approval",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_missing_source_blocks_publication_but_withdrawal_still_works",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_publication_646.py::test_restore_previous_version_requires_new_approval_and_publication",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_scope_context_672.py::test_registration_rejects_untraceable_or_overbroad_metadata[quote]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_scope_context_672.py::test_registration_rejects_untraceable_or_overbroad_metadata[target]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_scope_context_672.py::test_registration_rejects_untraceable_or_overbroad_metadata[value]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_scope_context_672.py::test_registration_rejects_untraceable_or_overbroad_metadata[global_data_year]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_scope_context_672.py::test_scope_is_applied_before_topk_in_all_modes_on_same_snapshot",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_scope_context_672.py::test_context_stays_in_same_section_publication_and_metadata_scope",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_scope_context_672.py::test_version_metadata_tampering_invalidates_published_receipt",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_scope_context_672.py::test_metadata_requires_explicit_human_acknowledgement_of_its_hash",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_verification_policy_672.py::test_verification_mode_controls_release_without_silently_rewriting[observe-supported-answered-None]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_verification_policy_672.py::test_verification_mode_controls_release_without_silently_rewriting[observe-unsupported-answered-None]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_verification_policy_672.py::test_verification_mode_controls_release_without_silently_rewriting[enforce-supported-answered-None]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_verification_policy_672.py::test_verification_mode_controls_release_without_silently_rewriting[enforce-unsupported-insufficient_evidence-answer_not_supported]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_verification_policy_672.py::test_verification_mode_controls_release_without_silently_rewriting[enforce-uncertain-insufficient_evidence-answer_verification_uncertain]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_verification_policy_672.py::test_judge_and_source_failures_are_errors_even_in_observe_mode[http_error]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_verification_policy_672.py::test_judge_and_source_failures_are_errors_even_in_observe_mode[bad_quote]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_verification_policy_672.py::test_judge_and_source_failures_are_errors_even_in_observe_mode[missing]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_verification_policy_672.py::test_judge_and_source_failures_are_errors_even_in_observe_mode[withdraw]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_verification_policy_672.py::test_assistant_chat_uses_persisted_hybrid_rerank_policy_and_checks_provider_access",
+          "status": "passed"
+        }
+      ],
+      "limitation": "No completed full-run exit code/JUnit; only explicit PASSED lines count. Remaining IDs ran in a fresh DB."
+    },
+    {
+      "name": "resumed",
+      "receipt": {
+        "database": "qnu_v1_test_b97e57cf4c294408",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 0,
+        "seconds": 179.25
+      },
+      "results": [
+        {
+          "id": "tests/integration/test_conversations_649.py::test_unclear_or_bad_rewrite_never_reaches_answer[rewrite_bad-conversation_rewrite_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_knowledge_regressions_639.py::test_title_fingerprint_uses_effective_persisted_metadata[  Original  -Original]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_rag_verification_policy_672.py::test_turn_scope_is_pinned_and_inherited_without_promoting_history_answers_to_evidence",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_readiness_666.py::test_readiness_reports_missing_configuration_and_does_not_claim_live_inference",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_readiness_666.py::test_worker_heartbeat_is_queue_scoped_and_removed_on_shutdown",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_readiness_666.py::test_readiness_distinguishes_missing_zero_unlimited_and_blocked_quota",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_gate_666.py::test_approval_requires_review_acknowledgement",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_gate_666.py::test_findings_require_explicit_human_resolutions_pinned_in_approval",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_gate_666.py::test_review_ack_cannot_omit_forge_or_self_claim_a_fix[missing-409]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_gate_666.py::test_review_ack_cannot_omit_forge_or_self_claim_a_fix[duplicate-409]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_gate_666.py::test_review_ack_cannot_omit_forge_or_self_claim_a_fix[foreign-409]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_gate_666.py::test_review_ack_cannot_omit_forge_or_self_claim_a_fix[hash-409]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_gate_666.py::test_review_ack_cannot_omit_forge_or_self_claim_a_fix[unconfirmed-422]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_gate_666.py::test_review_ack_cannot_omit_forge_or_self_claim_a_fix[claims_fixed-422]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_gate_666.py::test_new_review_between_preview_and_commit_requires_new_ack",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_gate_666.py::test_no_findings_still_requires_confirmation_and_uses_exact_report_hash",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_schema_655.py::test_structured_review_keeps_server_coverage_guard_and_idempotency[normal]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_schema_655.py::test_structured_review_keeps_server_coverage_guard_and_idempotency[missing_draft]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_review_schema_655.py::test_automatic_review_inherits_explicit_schema_option",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_storage_cleanup_666.py::test_gc_deletes_only_old_unreferenced_derivative_and_replay_is_stable",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_storage_cleanup_666.py::test_gc_rechecks_bytes_references_and_expiry[bytes]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_storage_cleanup_666.py::test_gc_rechecks_bytes_references_and_expiry[reference]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_storage_cleanup_666.py::test_gc_rechecks_bytes_references_and_expiry[expiry]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_storage_cleanup_666.py::test_gc_requires_admin_and_the_original_approver",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_storage_cleanup_666.py::test_gc_storage_outage_keeps_pending_intent_for_same_key_retry",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspace_model_boundaries.py::test_unit_admin_selects_defaults_but_cannot_grant_provider",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspace_model_boundaries.py::test_catalog_and_runtime_do_not_union_memberships",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspace_model_boundaries.py::test_grants_defaults_and_disabled_workspace_are_rechecked",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspace_model_boundaries.py::test_system_defaults_partial_update_preserves_other_capabilities",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspace_model_boundaries.py::test_key_rotation_keeps_secrets_encrypted_and_audited",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspace_model_boundaries.py::test_concurrent_reservations_cannot_overspend_workspace_quota",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspace_model_boundaries.py::test_unknown_usage_retains_reservation_and_retry_is_idempotent",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspace_model_boundaries.py::test_concurrent_admin_departures_preserve_at_least_one_admin",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspace_model_boundaries.py::test_unconfigured_month_does_not_implicitly_grant_unlimited_quota",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspace_model_boundaries.py::test_revoked_membership_immediately_removes_workspace_and_model_access",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspace_model_boundaries.py::test_subjects_differing_by_case_do_not_share_membership",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspaces_modelops_api.py::test_unauthenticated_request_is_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspaces_modelops_api.py::test_workspace_admin_cannot_create_workspace",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspaces_modelops_api.py::test_duplicate_workspace_code_conflicts",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspaces_modelops_api.py::test_member_of_a_cannot_manage_b",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspaces_modelops_api.py::test_swapping_workspace_id_in_body_does_not_escalate",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspaces_modelops_api.py::test_duplicate_membership_then_revoke_and_restore",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspaces_modelops_api.py::test_suspended_workspace_blocks_members_but_not_platform",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspaces_modelops_api.py::test_last_admin_cannot_be_revoked",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspaces_modelops_api.py::test_workspace_audit_records_actions",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspaces_modelops_api.py::test_provider_and_key_lifecycle_never_returns_plaintext",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspaces_modelops_api.py::test_allowlist_controls_catalog_and_stays_workspace_scoped",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_workspaces_modelops_api.py::test_defaults_reject_provider_without_capability",
+          "status": "passed"
+        },
+        {
+          "id": "tests/invariants/test_no_fake_fallback.py::test_unimplemented_provider_raises",
+          "status": "passed"
+        },
+        {
+          "id": "tests/migrations/test_workspace_model_schema.py::test_migrations_match_models_and_exclude_legacy",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_backup_archive_655.py::test_archive_rejects_inconsistent_contents[object]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_backup_archive_655.py::test_archive_rejects_inconsistent_contents[source_hash]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_backup_archive_655.py::test_archive_rejects_inconsistent_contents[tables]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_backup_archive_655.py::test_archive_rejects_inconsistent_contents[extra_entry]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_backup_archive_655.py::test_archive_rejects_inconsistent_contents[credentials]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_backup_archive_655.py::test_archive_source_hash_mismatch_fails_before_publish",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_endpoint_normalized_once[http://x]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_endpoint_normalized_once[http://x/v1]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_endpoint_normalized_once[http://x/v1/chat/completions]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_contract_unknown_usage_and_secret_repr",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_error_retains_raw_and_never_retries[401-body0-chat_provider_auth_failed]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_error_retains_raw_and_never_retries[429-body1-chat_provider_rate_limited]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_error_retains_raw_and_never_retries[503-body2-chat_provider_unavailable]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_error_retains_raw_and_never_retries[302-body3-chat_provider_rejected]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_error_retains_raw_and_never_retries[200-body4-chat_response_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_error_retains_raw_and_never_retries[200-body5-chat_output_truncated]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_error_retains_raw_and_never_retries[200-body6-chat_response_empty]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_error_retains_raw_and_never_retries[200-body7-chat_response_incomplete]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_chat_timeout_is_uncertain_and_does_not_leak_exception",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_chat_adapter_645.py::test_explicit_output_schema_is_sent_without_fallback",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_endpoint_suffix_once[http://host]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_endpoint_suffix_once[http://host/v1]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_endpoint_suffix_once[http://host/v1/embeddings]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_embedding_order_is_index_order_and_missing_usage_is_unknown",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_bad_embedding_vectors_are_not_accepted[rows0-embedding_count_mismatch]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_bad_embedding_vectors_are_not_accepted[rows1-embedding_dimension_mismatch]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_bad_embedding_vectors_are_not_accepted[rows2-embedding_vector_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_bad_embedding_vectors_are_not_accepted[rows3-embedding_vector_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_bad_embedding_vectors_are_not_accepted[rows4-embedding_vector_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_bad_embedding_vectors_are_not_accepted[rows5-embedding_response_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_bad_embedding_vectors_are_not_accepted[rows6-embedding_response_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_adapter_uses_bearer_model_and_float_protocol_once",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_http_error_is_not_empty_vectors_or_retry[401-embedding_auth_failed]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_http_error_is_not_empty_vectors_or_retry[429-embedding_rate_limited]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_http_error_is_not_empty_vectors_or_retry[503-embedding_unavailable]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_http_error_is_not_empty_vectors_or_retry[302-embedding_rejected]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_embedding_adapter_647.py::test_read_timeout_is_uncertain_without_provider_details",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_health.py::test_health_live_returns_service_identity",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_health.py::test_openapi_exposes_identity_routes",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_identity_boundary.py::test_missing_token_does_not_implicitly_become_admin",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_identity_boundary.py::test_disabled_dev_gate_rejects_previously_signed_token[development]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_identity_boundary.py::test_disabled_dev_gate_rejects_previously_signed_token[production]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_identity_boundary.py::test_missing_roles_never_grants_admin",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_identity_boundary.py::test_login_and_authenticated_identity",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_index_chunking_647.py::test_table_fragments_repeat_headers_keep_values_notes_and_all_rows",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_index_chunking_647.py::test_rowspan_group_is_kept_or_rejected_never_split_silently",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_index_chunking_647.py::test_long_paragraph_keeps_heading_and_all_words_with_original_citations",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_knowledge_files.py::test_sanitize_strips_directories_and_control_characters",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_knowledge_files.py::test_sanitize_rejects_empty_and_dot_names",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_knowledge_files.py::test_sanitize_truncates_but_keeps_extension",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_knowledge_files.py::test_pdf_signature_is_proven_from_bytes",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_knowledge_files.py::test_pdf_extension_with_other_bytes_is_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_knowledge_files.py::test_docx_requires_word_part_inside_the_zip",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_knowledge_files.py::test_text_formats_must_be_utf8_and_free_of_nul_bytes",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_knowledge_files.py::test_unsupported_extension_is_rejected_before_reading_bytes",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_knowledge_files.py::test_empty_and_oversized_payloads_are_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_knowledge_files.py::test_storage_key_is_content_addressed_and_rejects_unsafe_ids",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_knowledge_files.py::test_content_disposition_encodes_non_ascii_names",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_knowledge_files.py::test_read_limited_stops_at_the_ceiling",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_local_blob_store.py::test_local_key_cannot_escape_to_sibling_with_same_prefix",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_local_blob_store.py::test_local_key_accepts_windows_path_casing",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_local_blob_store.py::test_extended_windows_key_inside_root_is_accepted",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_local_blob_store.py::test_extended_windows_key_outside_root_is_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_local_blob_store.py::test_successful_local_write_publishes_complete_bytes",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_local_blob_store.py::test_partial_staging_write_preserves_old_blob_and_removes_temp",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_local_blob_store.py::test_failed_publish_preserves_old_blob_and_removes_temp",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_local_blob_store.py::test_denied_replace_only_succeeds_if_destination_matches[same-payload]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_local_blob_store.py::test_denied_replace_only_succeeds_if_destination_matches[different-payload]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_local_storage_retry_646.py::test_denied_replace_rechecks_matching_bytes_after_transient_read_denial",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_local_storage_retry_646.py::test_permanent_read_denial_does_not_report_success",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_local_storage_retry_646.py::test_separate_local_adapters_publish_identical_bytes_concurrently",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_migration_baseline_661.py::test_single_initial_revision_has_no_dependencies",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_migration_baseline_661.py::test_initial_schema_offline_sql_creates_v1_without_touching_legacy",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_ocr_workflow_configuration_accepts_output_above_32768",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_large_context_and_output_do_not_inherit_a_small_global_cap",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_output_uses_remaining_shared_context_and_exact_boundary",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_independent_input_output_limits_are_not_added_into_a_fake_shared_context",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_explicit_lower_workflow_output_budget_is_respected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_invalid_or_forged_capacity_declarations_are_rejected[raw0]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_invalid_or_forged_capacity_declarations_are_rejected[raw1]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_invalid_or_forged_capacity_declarations_are_rejected[raw2]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_invalid_or_forged_capacity_declarations_are_rejected[raw3]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_invalid_or_forged_capacity_declarations_are_rejected[raw4]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_invalid_or_forged_capacity_declarations_are_rejected[raw5]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_invalid_or_forged_capacity_declarations_are_rejected[raw6]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_invalid_or_forged_capacity_declarations_are_rejected[raw7]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_invalid_or_forged_capacity_declarations_are_rejected[raw8]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_unsafe_budget_fails_without_cropping_or_silent_clamping[limits0-options0-model_input_budget_unknown]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_unsafe_budget_fails_without_cropping_or_silent_clamping[limits1-options1-model_capacity_required]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_unsafe_budget_fails_without_cropping_or_silent_clamping[limits2-options2-model_output_capacity_required]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_unsafe_budget_fails_without_cropping_or_silent_clamping[limits3-options3-model_input_limit_exceeded]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_unsafe_budget_fails_without_cropping_or_silent_clamping[limits4-options4-model_context_limit_exceeded]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_unsafe_budget_fails_without_cropping_or_silent_clamping[limits5-options5-model_output_limit_exceeded]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_unsafe_budget_fails_without_cropping_or_silent_clamping[limits6-options6-model_token_budget_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_unsafe_budget_fails_without_cropping_or_silent_clamping[limits7-options7-model_token_budget_invalid]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_model_capacity_641.py::test_unsafe_budget_fails_without_cropping_or_silent_clamping[limits8-options8-model_output_limit_exceeded]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_modelops_policy.py::test_secret_is_masked_to_last_four_characters",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_modelops_policy.py::test_key_secret_is_not_exposed_in_repr",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_modelops_policy.py::test_provider_capabilities_must_be_unique_and_known",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_modelops_policy.py::test_workspace_allowlist_rejects_duplicates",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_modelops_policy.py::test_endpoint_policy_blocks_metadata_and_bad_schemes",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_modelops_policy.py::test_modelops_tables_never_collide_with_legacy_names",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_modelops_policy.py::test_endpoint_never_carries_credentials_or_metadata_addresses[https://user:password@example.test/v1]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_modelops_policy.py::test_endpoint_never_carries_credentials_or_metadata_addresses[https://example.test/v1?api_key=anything]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_modelops_policy.py::test_endpoint_never_carries_credentials_or_metadata_addresses[http://[::]/v1]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_modelops_policy.py::test_endpoint_never_carries_credentials_or_metadata_addresses[http://169.254.1.2/v1]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_modelops_policy.py::test_structured_logging_redacts_key_and_prompt_fields",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_acceptance_report_644.py::test_complete_technical_evidence_never_claims_live_ocr_quality",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_acceptance_report_644.py::test_incomplete_or_invalid_evidence_cannot_pass[omitted-NOT RUN]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_acceptance_report_644.py::test_incomplete_or_invalid_evidence_cannot_pass[skipped-NOT RUN]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_acceptance_report_644.py::test_incomplete_or_invalid_evidence_cannot_pass[failed-FAIL]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_acceptance_report_644.py::test_incomplete_or_invalid_evidence_cannot_pass[duplicate-FAIL]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_acceptance_report_644.py::test_failure_outside_required_cases_is_not_hidden",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_acceptance_report_644.py::test_unconfirmed_database_cleanup_cannot_pass",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_canonical.py::test_canonical_pins_identity_processing_and_limits",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_canonical.py::test_bbox_units_and_block_order_are_explicit",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_canonical.py::test_evidence_ids_are_stable_and_cover_every_cell",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_canonical.py::test_evidence_ids_are_deterministic_across_rebuilds",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_canonical.py::test_missing_page_is_detected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_canonical.py::test_failed_page_is_an_error_and_blank_page_is_not",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_canonical.py::test_page_with_ink_but_no_text_is_an_error",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_canonical.py::test_uncertain_page_wins_over_a_clean_report",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_canonical.py::test_manifest_checksums_match_the_payloads",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_canonical.py::test_markdown_keeps_literal_values_and_points_back_to_pages",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_canonical.py::test_canonical_survives_a_json_round_trip_unchanged",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_config.py::test_fingerprint_is_stable_for_the_same_config",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_config.py::test_fingerprint_changes_with_any_byte_shaping_setting[change0]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_config.py::test_fingerprint_changes_with_any_byte_shaping_setting[change1]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_config.py::test_fingerprint_changes_with_any_byte_shaping_setting[change2]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_config.py::test_fingerprint_changes_with_any_byte_shaping_setting[change3]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_config.py::test_fingerprint_changes_with_any_byte_shaping_setting[change4]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_config.py::test_fingerprint_changes_with_any_byte_shaping_setting[change5]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_config.py::test_fingerprint_changes_with_any_byte_shaping_setting[change6]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_config.py::test_payload_round_trips_through_a_stored_run",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_config.py::test_a_stored_run_without_the_pinned_keys_is_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_config.py::test_a_stored_run_never_falls_back_to_todays_defaults",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_docx_html.py::test_headings_and_paragraphs_keep_their_text",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_docx_html.py::test_bold_and_italic_runs_are_marked",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_docx_html.py::test_table_spans_header_cells_and_literal_values",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_docx_html.py::test_footnote_reference_becomes_a_marker_and_a_note",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_docx_html.py::test_drawing_is_embedded_as_a_data_uri",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_docx_html.py::test_a_non_docx_package_is_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_docx_html.py::test_a_package_without_document_xml_is_rejected",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_docx_html.py::test_projection_is_deterministic",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_layout.py::test_blocks_keep_document_order_and_bbox",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_layout.py::test_table_header_marks_every_thead_cell",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_layout.py::test_empty_zero_dash_and_units_survive_verbatim",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_layout.py::test_multicolumn_and_multirow_spans_are_recorded",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_layout.py::test_unreconstructable_table_is_unsupported_and_keeps_raw_text",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_layout.py::test_table_without_tabular_wrapper_is_unsupported",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_layout.py::test_inline_latex_is_unescaped_without_rewriting_words",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_layout.py::test_stray_text_outside_a_block_is_invalid",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_layout.py::test_bbox_outside_unit_range_is_invalid",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_layout.py::test_empty_response_yields_an_empty_layout_not_an_error",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_observability_644.py::test_stage_reports_error_without_serializing_exception_or_config[ocr_provider_timeout-uncertain]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_observability_644.py::test_stage_reports_error_without_serializing_exception_or_config[ocr_layout_invalid-failed]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_observability_644.py::test_stage_reports_error_without_serializing_exception_or_config[bad code with private text-failed]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_observability_644.py::test_cancellation_is_recorded_and_propagated",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_observability_644.py::test_missing_usage_remains_unknown",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_base_url_is_normalised_to_chat_completions",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_payload_sends_the_image_as_a_data_uri_without_a_storage_path",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_successful_call_returns_text_and_measured_tokens",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_missing_usage_is_null_not_zero",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_the_credential_is_sent_as_a_bearer_header",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_http_status_maps_to_a_distinct_code[401-ocr_provider_auth_failed]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_http_status_maps_to_a_distinct_code[403-ocr_provider_auth_failed]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_http_status_maps_to_a_distinct_code[429-ocr_provider_rate_limited]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_http_status_maps_to_a_distinct_code[500-ocr_provider_unavailable]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_http_status_maps_to_a_distinct_code[503-ocr_provider_unavailable]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_http_status_maps_to_a_distinct_code[400-ocr_provider_rejected]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_timeout_is_uncertain_and_not_retried_blindly",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_transport_failure_is_unreachable",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_malformed_bodies_are_invalid_responses[not json]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_malformed_bodies_are_invalid_responses[{\"choices\": []}]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_malformed_bodies_are_invalid_responses[{\"choices\": [{\"message\": {}}]}]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_malformed_bodies_are_invalid_responses[{\"choices\": [\"nope\"]}]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_malformed_bodies_are_invalid_responses[[1, 2, 3]]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_truncated_output_is_refused_instead_of_partial_text",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_empty_content_is_refused",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_missing_credential_is_a_configuration_error",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_empty_image_is_refused_before_any_call",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_provider_adapter.py::test_logs_never_contain_the_credential_or_the_image",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_render.py::test_pdf_pages_are_rasterised_with_stable_hashes",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_render.py::test_a_title_only_page_is_not_blank",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_render.py::test_a_page_without_ink_is_blank_and_keeps_zero_ratio",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_render.py::test_docx_is_paginated_into_a_stored_fixed_layout_pdf",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_render.py::test_docx_table_is_rendered_without_losing_rows",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_render.py::test_encrypted_pdf_is_refused_with_its_own_code",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_render.py::test_pdf_over_the_page_limit_is_refused",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_render.py::test_unsupported_extension_is_refused",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_render.py::test_corrupt_pdf_is_refused",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_validate.py::test_a_clean_document_has_no_errors",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_validate.py::test_page_order_must_be_contiguous_from_one",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_validate.py::test_a_block_without_evidence_id_is_an_error",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_validate.py::test_duplicate_evidence_id_is_an_error",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_validate.py::test_evidence_without_a_mapping_is_an_error",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_validate.py::test_invalid_bbox_is_an_error",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_validate.py::test_inconsistent_table_grid_is_an_error",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_validate.py::test_unreconstructable_table_is_a_warning_with_raw_kept",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_ocr_validate.py::test_blank_page_that_returned_text_is_a_warning",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_permissions.py::test_exact_permission_is_granted",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_permissions.py::test_access_admin_grants_any_ai_permission_only",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_qdrant_adapter_647.py::test_unconfirmed_vector_write_is_not_success",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_qdrant_adapter_647.py::test_vector_infrastructure_error_is_not_missing_collection",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_qdrant_adapter_647.py::test_legacy_vector_collection_cannot_be_written",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_old_policy_is_compatible_and_new_policy_is_explicit",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_invalid_policy_is_rejected[policy0]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_invalid_policy_is_rejected[policy1]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_invalid_policy_is_rejected[policy2]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_invalid_policy_is_rejected[policy3]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_invalid_policy_is_rejected[policy4]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_hybrid_candidate_budget_is_validated_at_assistant_boundary",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_metadata_never_infers_data_year_from_document_metadata",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_global_metadata_proof_is_retained_on_its_own_and_when_inherited",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_composite_documents_cannot_inherit_global_metadata_from_one_source",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_combined_scope_must_match_one_annotated_unit",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_effective_filter_requires_both_known_boundaries",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_annotation_target_must_exist[paragraph:99:0]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_annotation_target_must_exist[table:ocr-example:ev-table:row:99]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_annotation_target_must_exist[table:ocr-example:ev-table:row:1:column:99]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_annotation_target_must_exist[anything]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_paragraph_relationships_are_stable_and_do_not_use_global_ordinal",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_cell_annotations_do_not_leak_to_unselected_table_fragments",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_supported_report_requires_resolving_quotes_and_numeric_support",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_judge_cannot_self_validate_invented_or_incomplete_evidence[missing]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_judge_cannot_self_validate_invented_or_incomplete_evidence[duplicate]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_judge_cannot_self_validate_invented_or_incomplete_evidence[foreign_id]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_judge_cannot_self_validate_invented_or_incomplete_evidence[invented_quote]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_judge_cannot_self_validate_invented_or_incomplete_evidence[no_quotes]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_policy_metadata_672.py::test_judge_cannot_self_validate_invented_or_incomplete_evidence[wrong_index]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_worker_schema_672.py::test_worker_requires_matching_database_and_code_schema[0003_rag_policy_metadata-0003_rag_policy_metadata-True]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_worker_schema_672.py::test_worker_requires_matching_database_and_code_schema[0003_rag_policy_metadata-0002_operational_readiness-False]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_worker_schema_672.py::test_worker_requires_matching_database_and_code_schema[0002_operational_readiness-0003_rag_policy_metadata-False]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_rag_worker_schema_672.py::test_worker_requires_matching_database_and_code_schema[0003_rag_policy_metadata-None-False]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_recovery_archive_666.py::test_recovery_cli_registers_every_owned_table_in_a_fresh_process",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_recovery_archive_666.py::test_bundle_is_encrypted_authenticated_and_preserves_exact_bytes",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_recovery_archive_666.py::test_bundle_refuses_weak_key_and_oversized_objects",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_redaction.py::test_redacts_bearer_and_api_keys",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_redaction.py::test_redacts_email_and_phone",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_retrieval_metrics_655.py::test_metrics_keep_annotated_and_unknown_distinct",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_retrieval_metrics_655.py::test_rerank_response_rejects_bad_indices_scores[True-1.0]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_retrieval_metrics_655.py::test_rerank_response_rejects_bad_indices_scores[0-nan]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_retrieval_metrics_655.py::test_rerank_response_rejects_bad_indices_scores[0-1.0]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_retrieval_metrics_655.py::test_rerank_response_rejects_bad_indices_scores[-1-1.0]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_review_keyed_655.py::test_keyed_review_rejects_missing_duplicate_or_model_owned_identity[{\"source_assessments\":{\"s\":{},\"s\":{}},\"draft_assessments\":{\"d\":{}}}]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_review_keyed_655.py::test_keyed_review_rejects_missing_duplicate_or_model_owned_identity[{\"source_assessments\":{},\"draft_assessments\":{\"d\":{}}}]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_review_keyed_655.py::test_keyed_review_rejects_missing_duplicate_or_model_owned_identity[{\"source_assessments\":{\"s\":{\"source_id\":\"other\"}},\"draft_assessments\":{\"d\":{}}}]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_review_keyed_655.py::test_keyed_review_rejects_missing_duplicate_or_model_owned_identity[{\"source_assessments\":{\"s\":{}},\"draft_assessments\":{\"d\":{}},\"approved\":true}]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_sso.py::test_valid_sso_is_not_reinterpreted_as_dev_token",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_sso.py::test_sso_invalid_claims_are_rejected[claims0]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_sso.py::test_sso_invalid_claims_are_rejected[claims1]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_sso.py::test_sso_invalid_claims_are_rejected[claims2]",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_sso.py::test_sso_infrastructure_error_stays_503",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_sso.py::test_sso_singular_role_permission_and_user_type_mapping",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_sso.py::test_sso_array_claims_and_admin_role_mapping",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_storage_maintenance_666.py::test_s3_outage_is_not_reported_as_missing_object",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_storage_maintenance_666.py::test_local_conditional_delete_preserves_changed_bytes",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_storage_maintenance_666.py::test_s3_delete_is_conditional_and_rejects_concurrent_change",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_workspace_policy.py::test_platform_admin_detected_by_workspace_permission",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_workspace_policy.py::test_actor_ref_preserves_case_sensitive_subject",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_workspace_policy.py::test_workspace_code_rejects_uppercase_and_spaces",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_workspace_policy.py::test_member_role_is_limited",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_workspace_policy.py::test_alembic_filter_never_touches_legacy_tables",
+          "status": "passed"
+        },
+        {
+          "id": "tests/unit/test_workspace_policy.py::test_v1_models_do_not_collide_with_legacy_tables",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "recovery",
+      "receipt": {
+        "database": "qnu_v1_test_23216f22b9294467",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 0,
+        "seconds": 57.19
+      },
+      "results": [
+        {
+          "id": "tests/integration/test_recovery_666.py::test_full_recovery_into_new_targets_keeps_originals_credentials_and_search",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_recovery_666.py::test_recovery_rejects_serving_target_wrong_confirmation_and_non_admin",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_recovery_666.py::test_recovery_backup_refuses_active_jobs_and_missing_sources",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_recovery_666.py::test_operator_cli_backup_and_preview_use_authenticated_complete_schema",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "redis",
+      "receipt": {
+        "database": "qnu_v1_test_5b68d8784f0b4f80",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 0,
+        "seconds": 24.02
+      },
+      "results": [
+        {
+          "id": "tests/integration/test_compiler_queue_645.py::test_compiler_reconcile_delivers_durable_run_on_real_arq",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_ocr_queue_transport_644.py::test_real_queue_delivers_persisted_run_once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "focused",
+      "receipt": {
+        "database": "qnu_v1_test_3dd9cb1ade66466b",
+        "db_dropped": true,
+        "legacy_sentinel_preserved": true,
+        "pytest_exit": 0,
+        "seconds": 19.12
+      },
+      "results": [
+        {
+          "id": "tests/integration/test_compiler_pagination_681.py::test_compiler_offset_reaches_beyond_first_hundred_without_duplicates",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_pagination_681.py::test_compiler_offset_keeps_workspace_membership_and_collection_scope",
+          "status": "passed"
+        },
+        {
+          "id": "tests/integration/test_compiler_pagination_681.py::test_compiler_offset_rejects_negative_and_out_of_budget_requests",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "commands": {
+    "frontend_cwd": "frontendV1",
+    "frontend": [
+      "npm test -- --reporter=json --outputFile=.../fe-complete.json",
+      "npm run lint",
+      "npm run build",
+      "vitest run --config storage/artifacts/context674-review/vitest.review.config.ts",
+      "vitest run --config storage/artifacts/context676-review/vitest.review.config.ts",
+      "vitest run tests/template-boundary.test.ts tests/dev-auto-login-bundle-672.test.ts"
+    ],
+    "backend_cwd": ".",
+    "backend": [
+      "backendV1/.venv/Scripts/python.exe -X utf8 backendV1/scripts/run_isolated_tests.py tests -v --ignore=tests/integration/test_recovery_666.py (interrupted)",
+      "run_isolated_tests.py @remaining-pytest-args.txt (337 already-reported passed/skipped IDs deselected)",
+      "run_isolated_tests.py tests/integration/test_recovery_666.py -v",
+      "run_isolated_tests.py tests/integration/test_compiler_queue_645.py tests/integration/test_ocr_queue_transport_644.py -v",
+      "run_isolated_tests.py tests/integration/test_compiler_pagination_681.py -q",
+      "ruff check/format --check: compilation/router.py, compilation/service.py, test_compiler_pagination_681.py"
+    ],
+    "environment_names_only": [
+      "QNU_TEST_WINDOWS_SELECTOR_LOOP=true for main/Redis; false for subprocess recovery",
+      "TEST_REDIS_URL from existing loopback infrastructure settings for Redis-only run",
+      "DB/storage/test secret isolation and external-network guard from existing harness"
+    ]
+  },
+  "lint": {
+    "status": "PASS",
+    "files": 546,
+    "errors": 0,
+    "warnings": 0
+  },
+  "build_typescript": {
+    "status": "PASS",
+    "warning": "Existing large bundle warning"
+  },
+  "ruff": {
+    "status": "PASS",
+    "files": 3
+  },
+  "source_integrity": {
+    "baseline": 912,
+    "current": 917,
+    "changed": [
+      "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.compilations.$runId.tsx",
+      "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.compilations.index.tsx",
+      "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.documents.$documentId.index.tsx",
+      "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.documents.index.tsx",
+      "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.index.tsx",
+      "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.sources.$sourceId.tsx",
+      "frontendV1/src/features/evaluation/evaluation-form.tsx",
+      "frontendV1/src/features/evaluation/gold-picker.tsx",
+      "frontendV1/src/features/evaluation/report-export.ts",
+      "frontendV1/src/features/evaluation/types.ts",
+      "frontendV1/src/features/knowledge/collection-detail-page.tsx",
+      "frontendV1/src/features/knowledge/compilation-detail-page.tsx",
+      "frontendV1/src/features/knowledge/compilation-queries.ts",
+      "frontendV1/src/features/knowledge/compilation-requests.ts",
+      "frontendV1/src/features/knowledge/compilation-review-tab.tsx",
+      "frontendV1/src/features/knowledge/compilation-runs-list.tsx",
+      "frontendV1/src/features/knowledge/compiled-document-detail-page.tsx",
+      "frontendV1/src/features/knowledge/compiled-documents-list.tsx",
+      "frontendV1/src/features/knowledge/index-panel.tsx",
+      "frontendV1/src/features/knowledge/index-queries.ts",
+      "frontendV1/src/features/knowledge/ocr-queries.ts",
+      "frontendV1/src/features/knowledge/ocr-tab-container.tsx",
+      "frontendV1/src/features/knowledge/ocr-text-review-panel.tsx",
+      "frontendV1/src/features/knowledge/publication-queries.ts",
+      "frontendV1/src/features/knowledge/source-detail-page.tsx",
+      "backendV1/qnu/domains/knowledge/compilation/router.py",
+      "backendV1/qnu/domains/knowledge/compilation/service.py"
+    ],
+    "new": [
+      "frontendV1/src/features/knowledge/document-scope-picker.tsx",
+      "frontendV1/src/features/knowledge/list-pagination.tsx",
+      "frontendV1/src/features/knowledge/spelling-result-panel.tsx",
+      "frontendV1/tests/knowledge-completion-681.test.tsx",
+      "backendV1/tests/integration/test_compiler_pagination_681.py"
+    ],
+    "deleted": [],
+    "encoding_issues": []
+  },
+  "changed_file_sha256": {
+    "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.compilations.$runId.tsx": "46f6fa35606e4b123a358b857fc2d4bce5e6f33373007e12da50fc67a7bf52b0",
+    "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.compilations.index.tsx": "4468a8f799706b06abd5509b04af9a925124c9cde7b87d7c5196ea753d4fa2d7",
+    "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.documents.$documentId.index.tsx": "efb0982a976bd0b750ee34223637e49958c5c4da118acf2dd8fe2fb4a4b11867",
+    "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.documents.index.tsx": "a88ff18383faddee40d632c5be05b5873159820514a0058c9ab47745e454f504",
+    "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.index.tsx": "f8d34055d06041acb73a9f832d231f83e009779b3065e8694f35b748e71dc331",
+    "frontendV1/src/routes/workspaces.$workspaceId.collections.$collectionId.sources.$sourceId.tsx": "685c15454e459ad48fddb34c7b27932d3b95d4a76d84a5e51dabd8776ee84a6d",
+    "frontendV1/src/features/evaluation/evaluation-form.tsx": "99e440fa60674a8159cbea4749c140a743ceb5d76792ac6b9dc9e5b68acf0874",
+    "frontendV1/src/features/evaluation/gold-picker.tsx": "b02b3ba8d07ee3dee104cb04d2bf8ba65a4667eae3e1d9fdb3ecd2541f1c8228",
+    "frontendV1/src/features/evaluation/report-export.ts": "e22c4faeea14eec8b9454a17bc70b252ae8c8c22265833daf8afb646abad308c",
+    "frontendV1/src/features/evaluation/types.ts": "f4a5546abc3664cc70c5a166d4b73bef3e6e4abb8d951e4524c60564fbd69516",
+    "frontendV1/src/features/knowledge/collection-detail-page.tsx": "03e2ff926fedf477970a7faf4efc5ec723dae6eafa5f611fa96ce54ae2025d55",
+    "frontendV1/src/features/knowledge/compilation-detail-page.tsx": "4a4011d108375e74bffb749aa70293f69c83d63b405580241c3c486737307c4c",
+    "frontendV1/src/features/knowledge/compilation-queries.ts": "150fb0a1b79596be93495de1182f8b4896dec805938f949d68e4874c03fbc990",
+    "frontendV1/src/features/knowledge/compilation-requests.ts": "d6cdb6488060d7156ea4e10462a90833d6f72df674052aa2baf4b5bc8b5fb058",
+    "frontendV1/src/features/knowledge/compilation-review-tab.tsx": "74050afc9333338d13173e35ef0ce1eea5d5529f843f6b70b334394a97cfebb9",
+    "frontendV1/src/features/knowledge/compilation-runs-list.tsx": "d1de23c743452bcd5adade22bb3054739176647cadd826ce39b7367d0da6d827",
+    "frontendV1/src/features/knowledge/compiled-document-detail-page.tsx": "58be1b119bcd85b7e08acbfe5e908c9e387024e8a6071f45a4342cc4f3fcbbc8",
+    "frontendV1/src/features/knowledge/compiled-documents-list.tsx": "341e9f41da69daf86ac15f06ac8d0b45de6cdc4e24bf7f783dce743564408558",
+    "frontendV1/src/features/knowledge/index-panel.tsx": "29c7daa67214ae6cb1199beca2098a59eac0bc8b0a8faff453f7f310b3343553",
+    "frontendV1/src/features/knowledge/index-queries.ts": "a456604f8b3993c2791486a9bf9648017db0f9810a17a8acded09b19658cc1e3",
+    "frontendV1/src/features/knowledge/ocr-queries.ts": "2525438bce2e985cade5cbc82cd7e9661c606b59ded23981fd2896dd0a72a525",
+    "frontendV1/src/features/knowledge/ocr-tab-container.tsx": "ac5416344bd6a931f859d112a7f237436840443d73d97db01bb4f473ee15721a",
+    "frontendV1/src/features/knowledge/ocr-text-review-panel.tsx": "7a6d1796c53af33ef6018184562c0843eb01fb80472ee7312e94877d8a8c2925",
+    "frontendV1/src/features/knowledge/publication-queries.ts": "a9c543d63d0de706264ad08d929288711e1218777dd5726ed79f62ec9fe51fba",
+    "frontendV1/src/features/knowledge/source-detail-page.tsx": "fc4d7952658926c0e83d68c287c5261153dda64bebff300c72e28019aa6a66cf",
+    "backendV1/qnu/domains/knowledge/compilation/router.py": "53c63c09431fcdd08fb8551e460839a477f0b04c47ee645a1898ab7037917478",
+    "backendV1/qnu/domains/knowledge/compilation/service.py": "a89371692f280025e81487cd7c5acc09ac830890a6cdcb4114910f6ca1c545e9",
+    "frontendV1/src/features/knowledge/document-scope-picker.tsx": "875c2b62214d4597403bb6c2d3bbc252f8ecd5dfc639526d99bfcd7bcea386e6",
+    "frontendV1/src/features/knowledge/list-pagination.tsx": "fc385e85a7f290c884bfba9e874c00a68f9b535be180819f022fb1fbc22956fb",
+    "frontendV1/src/features/knowledge/spelling-result-panel.tsx": "e2712ea700a16409c2209801b7c7869116afe0c2cdd73726ae1a4a40d1d4a28d",
+    "frontendV1/tests/knowledge-completion-681.test.tsx": "4b899fcc626c7222b20a32f8d5288cd83fb976170d70161e68b98a0502c5b91d",
+    "backendV1/tests/integration/test_compiler_pagination_681.py": "b4512aaafd3279a14da565068ce8434196fab7842a7012429434353b146b9911"
+  },
+  "browser": {
+    "synthetic": true,
+    "real_components": true,
+    "desktop": "1280x720",
+    "mobile": "390px iframe, 700px height",
+    "images": [
+      "document-long-title-mobile.png",
+      "documents-last-desktop.png",
+      "documents-last-mobile-dark.png",
+      "picker-mobile-dark.png",
+      "picker-page2-desktop.png",
+      "spelling-applied-desktop.png",
+      "spelling-mismatch-desktop.png",
+      "spelling-mobile-dark.png",
+      "spelling-result-desktop.png"
+    ],
+    "helper_port": 3020,
+    "helper_stopped": true,
+    "tab_closed": true
+  },
+  "not_run": [
+    "Live SSO/provider/model/corpus E2E",
+    "RAG semantic quality or latency benchmark",
+    "Production deployment/migration/reindex"
+  ],
+  "retained_failure_logs": [
+    "backend-focused.log: wrong test cwd infrastructure credentials",
+    "backend-focused-retry.log: fixture incorrectly expected403; existing privacy contract is404",
+    "backend-full-main.log: interrupted at52%; no full exit code",
+    "backend-resumed.log: Windows command-line length206; test DB cleaned, retried with pytest @argfile",
+    "backend-resumed-final.log:313PASS/1FAIL due missing TEST_REDIS_URL; environment dump redacted",
+    "fe-focused.json: one test used wrong review hook signature",
+    "fe-full.json: boundary guard rejected local callback named fetch; callback renamed, guard preserved",
+    "format-initial.log / format-final.log / ruff-format.log: formatting and new test component name corrected"
+  ]
+}

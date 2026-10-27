@@ -1,0 +1,51 @@
+export type FeeRate = {
+  id: string;
+  academicYearId: string;
+  academicYearCode: string;
+  roomTypeId: string;
+  roomTypeCode: string;
+  roomTypeName: string;
+  roomId?: string | null;
+  roomCode?: string | null;
+  roomName?: string | null;
+  floorId?: string | null;
+  floorNumber?: number | null;
+  buildingId?: string | null;
+  buildingCode?: string | null;
+  buildingName?: string | null;
+  amount: number;
+  currency: string;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  isActive: boolean;
+  created: string;
+  lastModified: string;
+};
+export type FeeRatesPage = {
+  items: FeeRate[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+export type FeeRatesListParams = {
+  search?: string;
+  academicYearId?: string;
+  roomTypeId?: string;
+  buildingId?: string;
+  floorId?: string;
+  roomId?: string;
+  isActive?: boolean;
+  page: number;
+  pageSize: number;
+};
+export type FeeRateInput = {
+  academicYearId: string;
+  roomTypeId: string;
+  roomId?: string;
+  amount: number;
+  currency: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  isActive: boolean;
+};

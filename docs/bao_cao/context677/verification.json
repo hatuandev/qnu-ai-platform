@@ -1,0 +1,125 @@
+{
+  "context": 677,
+  "created_at": "2026-10-27T12:49:05.296271+00:00",
+  "verdict": "FIXED_VERIFIED",
+  "application_changes": true,
+  "scope": "Fix Context676 R1-R4 in frontendV1; no backend/runtime/data changes",
+  "checks": {
+    "regression_baseline": {
+      "status": "FAIL_CONFIRMS_FINDINGS",
+      "exit_code": 1,
+      "passed": 2,
+      "failed": 6,
+      "skipped": 0
+    },
+    "focused_regressions": {
+      "status": "PASS",
+      "exit_code": 0,
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0
+    },
+    "application_suite": {
+      "status": "PASS",
+      "exit_code": 0,
+      "passed": 211,
+      "failed": 0,
+      "skipped": 0,
+      "retained_test_ids": 190,
+      "new_test_ids": 21,
+      "lost_test_ids": 0
+    },
+    "lint": {
+      "status": "PASS",
+      "exit_code": 0,
+      "files": 494,
+      "errors": 0,
+      "warnings": 0,
+      "infos": 0,
+      "initial_warning": "One unused test import removed; final lint rerun clean"
+    },
+    "build_including_typescript": {
+      "status": "PASS",
+      "exit_code": 0,
+      "warning": "Existing chunk size >500kB"
+    },
+    "independent_review676": {
+      "status": "PASS",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    "independent_review674": {
+      "status": "PASS",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    "bundle_template_after_build": {
+      "status": "PASS",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    "source_integrity": {
+      "status": "PASS",
+      "baseline_files": 774,
+      "changed_application_files": [
+        "frontendV1/src/app/auth/v1/provider.tsx",
+        "frontendV1/src/features/conversations/chat-view.tsx",
+        "frontendV1/src/features/knowledge/index-panel.tsx",
+        "frontendV1/src/features/knowledge/ocr-draft-store.ts",
+        "frontendV1/src/features/knowledge/ocr-text-review-panel.tsx",
+        "frontendV1/src/features/rag/metadata-filter-fields.tsx"
+      ],
+      "unexpected_changes": [],
+      "new_test_files": [
+        "frontendV1/tests/regression-677-auth-overlap.test.tsx",
+        "frontendV1/tests/regression-677-chat-scope.test.tsx",
+        "frontendV1/tests/regression-677-draft-base.test.tsx",
+        "frontendV1/tests/regression-677-index-scope.test.tsx",
+        "frontendV1/tests/regression-677-ocr-conflict-ui.test.tsx"
+      ],
+      "encoding_errors": [],
+      "backend_qnu_unchanged": true
+    },
+    "live_api_sso_models_browser_layout": {
+      "status": "NOT_RUN"
+    },
+    "documentation_and_final_scope": {
+      "status": "PASS",
+      "documentation_problems": [],
+      "unexpected_source_changes": [],
+      "changed_source_files": 6,
+      "new_test_files": 5,
+      "new_documents": 4,
+      "index_entries": 3,
+      "original_tests_and_backend_unchanged": true
+    }
+  },
+  "fixed": {
+    "R1": "Preserve pinned OCR base across updates; explicit rebase and guarded save; reject stale session callbacks",
+    "R2": "Accessible year validation blocks search/chat click and Enter; invalid scope cannot convert to unset",
+    "R3": "Search state keyed by session/workspace/collection; ignore stale responses and prefer newest attempt",
+    "R4": "SSO callback invalidates local dev tickets synchronously; phase idle and guards at retry/commit"
+  },
+  "commands_cwd": "frontendV1",
+  "commands": [
+    "node_modules/.bin/vitest.cmd run tests/regression-677-draft-base.test.tsx tests/regression-677-index-scope.test.tsx tests/regression-677-auth-overlap.test.tsx tests/regression-677-ocr-conflict-ui.test.tsx --reporter=json --outputFile=../storage/artifacts/context677-fe-fixes/baseline.json",
+    "node_modules/.bin/vitest.cmd run tests/regression-677-draft-base.test.tsx tests/regression-677-index-scope.test.tsx tests/regression-677-auth-overlap.test.tsx tests/regression-677-ocr-conflict-ui.test.tsx tests/regression-677-chat-scope.test.tsx tests/auth-auto-login-race-674.test.tsx tests/ocr-draft-674.test.tsx --reporter=json --outputFile=../storage/artifacts/context677-fe-fixes/focused.json",
+    "npm --silent test -- --reporter=json --outputFile=../storage/artifacts/context677-fe-fixes/tests.json",
+    "npm --silent run lint -- --reporter=json",
+    "npm --silent run build",
+    "vitest run --config storage/artifacts/context676-review/vitest.review.config.ts",
+    "vitest run --config storage/artifacts/context674-review/vitest.review.config.ts",
+    "vitest run tests/dev-auto-login-bundle-672.test.ts tests/template-boundary.test.ts"
+  ],
+  "artifacts": "storage/artifacts/context677-fe-fixes",
+  "limits": [
+    "Synthetic DOM/ports; no browser acceptance, actual SSO or inference",
+    "Full suite ran once; afterward only an unused test import was removed and lint rerun"
+  ]
+}

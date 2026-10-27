@@ -43,6 +43,12 @@ def request_messages(contract: type[BaseModel], instruction: str, payload: dict)
 def request_usage(contract: type[BaseModel], instruction: str, payload: dict, policy: WikiPolicy,
                   *, feedback_reserve: int = 0) -> dict:
     messages = request_messages(contract, instruction, payload)
+    if policy.automatic_output_budget:
+        from app.modules.modelops.services.request_token_budget import automatic_budget
+
+        return automatic_budget(messages,{'context_window_tokens':policy.context_budget_tokens,
+            'max_output_tokens':policy.max_output_tokens,'tokenizer_encoding':policy.tokenizer_encoding,
+            'chat_overhead_tokens':policy.chat_overhead_tokens},minimum_output=50,feedback_reserve=feedback_reserve)
     # No exact tokenizer is installed/configured. Byte-level vocabularies cannot
     # need more text tokens than UTF-8 bytes. Reserve framing separately and call
     # this a conservative bound, never an observed provider token measurement.

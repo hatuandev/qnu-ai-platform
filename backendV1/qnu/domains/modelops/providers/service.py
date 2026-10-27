@@ -1,0 +1,163 @@
+"""Provider registry: endpoint + model + capabilities."""
+
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from qnu.domains.identity.actor import AuthActor
+from qnu.domains.modelops.access import require_model_admin
+from qnu.domains.modelops.audit import record_event
+from qnu.domains.modelops.capacity.service import invalidate_capacity, read_capacity, set_capacity
+from qnu.domains.modelops.embedding.configuration import read_dimension, set_dimension
+from qnu.domains.modelops.models import Provider
+from qnu.domains.modelops.schemas import ProviderCreateRequest, ProviderUpdateRequest
+from qnu.domains.workspaces.access import actor_ref
+from qnu.platform.errors import Conflict, EntityNotFound
+from qnu.platform.network_policy import assert_allowed_endpoint
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+class ProviderService:
+    async def create(
+        self, db: AsyncSession, req: ProviderCreateRequest, actor: AuthActor
+    ) -> Provider:
+        require_model_admin(actor)
+        assert_allowed_endpoint(req.base_url, allow_private=True)
+        existing = (
+            (await db.execute(select(Provider.id).where(Provider.name == req.name)))
+            .scalars()
+            .first()
+        )
+        if existing is not None:
+            raise Conflict(f"Provider '{req.name}' đã tồn tại.", code="provider_name_exists")
+        provider = Provider(
+            id=_new_id("prv"),
+            name=req.name,
+            provider_type=req.provider_type,
+            base_url=req.base_url,
+            model_name=req.model_name,
+            capabilities=list(req.capabilities),
+            is_active=True,
+            priority=req.priority,
+            timeout_seconds=req.timeout_seconds,
+            created_by=actor_ref(actor) or None,
+        )
+        if req.token_limits is not None:
+            set_capacity(provider, req.token_limits)
+        if req.embedding_dimension is not None:
+            set_dimension(provider, req.embedding_dimension)
+        db.add(provider)
+        record_event(db, actor, "provider.created", provider.id, list(req.model_fields_set))
+        try:
+            await db.commit()
+        except IntegrityError as exc:
+            await db.rollback()
+            raise Conflict("Tên provider đã tồn tại.", code="provider_name_exists") from exc
+        await db.refresh(provider)
+        return provider
+
+    async def get(self, db: AsyncSession, provider_id: str) -> Provider:
+        provider = await db.get(Provider, provider_id)
+        if provider is None:
+            raise EntityNotFound("Không tìm thấy provider.", code="provider_not_found")
+        return provider
+
+    async def list(self, db: AsyncSession, *, active_only: bool = False) -> list[Provider]:
+        stmt = select(Provider).order_by(Provider.priority.asc(), Provider.created_at.asc())
+        if active_only:
+            stmt = stmt.where(Provider.is_active.is_(True))
+        return list((await db.execute(stmt)).scalars().all())
+
+    async def update(
+        self, db: AsyncSession, provider: Provider, req: ProviderUpdateRequest, actor: AuthActor
+    ) -> Provider:
+        require_model_admin(actor)
+        provider = (
+            await db.execute(
+                select(Provider)
+                .where(Provider.id == provider.id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one()
+        identity = (provider.base_url.rstrip("/"), provider.model_name)
+        if req.base_url is not None:
+            assert_allowed_endpoint(req.base_url, allow_private=True)
+            provider.base_url = req.base_url
+        if req.name is not None and req.name != provider.name:
+            clash = (
+                (await db.execute(select(Provider.id).where(Provider.name == req.name)))
+                .scalars()
+                .first()
+            )
+            if clash is not None:
+                raise Conflict(f"Provider '{req.name}' đã tồn tại.", code="provider_name_exists")
+            provider.name = req.name
+        if req.model_name is not None:
+            provider.model_name = req.model_name
+        if req.capabilities is not None:
+            provider.capabilities = list(req.capabilities)
+        if req.is_active is not None:
+            provider.is_active = req.is_active
+        if req.priority is not None:
+            provider.priority = req.priority
+        if req.timeout_seconds is not None:
+            provider.timeout_seconds = req.timeout_seconds
+        if identity != (provider.base_url.rstrip("/"), provider.model_name):
+            invalidate_capacity(provider)
+        if "token_limits" in req.model_fields_set:
+            set_capacity(provider, req.token_limits)
+        if "embedding_dimension" in req.model_fields_set:
+            set_dimension(provider, req.embedding_dimension)
+        record_event(db, actor, "provider.updated", provider.id, list(req.model_fields_set))
+        await db.commit()
+        await db.refresh(provider)
+        return provider
+
+    async def require_capability(
+        self, db: AsyncSession, provider_id: str, capability: str
+    ) -> Provider:
+        provider = await self.get(db, provider_id)
+        if not provider.is_active:
+            raise Conflict(f"Provider '{provider.name}' đang tắt.", code="provider_inactive")
+        if capability not in (provider.capabilities or []):
+            raise Conflict(
+                f"Provider '{provider.name}' không có capability '{capability}'.",
+                code="provider_capability_mismatch",
+            )
+        return provider
+
+
+def provider_payload(provider: Provider) -> dict[str, Any]:
+    """Serialize a provider without leaking configuration secrets."""
+    capacity = read_capacity(provider)
+    dimension, dimension_status = read_dimension(provider)
+    return {
+        "id": provider.id,
+        "name": provider.name,
+        "provider_type": provider.provider_type,
+        "base_url": provider.base_url,
+        "model_name": provider.model_name,
+        "capabilities": list(provider.capabilities or []),
+        "is_active": provider.is_active,
+        "priority": provider.priority,
+        "timeout_seconds": provider.timeout_seconds,
+        "token_limits": capacity.token_limits.model_dump() if capacity.token_limits else None,
+        "capacity_status": capacity.status,
+        "capacity_basis": capacity.basis,
+        "embedding_dimension": dimension,
+        "embedding_dimension_status": dimension_status,
+        "created_at": provider.created_at,
+        "updated_at": provider.updated_at,
+    }
+
+
+provider_service = ProviderService()

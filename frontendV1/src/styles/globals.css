@@ -1,0 +1,129 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "./tokens.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: var(--radius-micro);
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-surface);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    font-family:
+      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", sans-serif;
+    font-size: var(--font-size-body);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer utilities {
+  .type-page-title {
+    font-size: var(--font-size-page-title);
+    line-height: 1.15;
+    font-weight: 650;
+    letter-spacing: -0.025em;
+  }
+
+  .type-section-title {
+    font-size: var(--font-size-section-title);
+    line-height: 1.35;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .type-control {
+    font-size: var(--font-size-control);
+    line-height: 1.35rem;
+  }
+
+  .type-table {
+    font-size: var(--font-size-table);
+    line-height: 1.35rem;
+  }
+
+  .type-table-header {
+    font-size: var(--font-size-table-header);
+    line-height: 1.35rem;
+  }
+
+  .type-caption {
+    font-size: var(--font-size-caption);
+    line-height: 1.2rem;
+  }
+
+  .type-supporting {
+    font-size: var(--font-size-supporting);
+    line-height: 1.2rem;
+  }
+
+  .type-metadata {
+    font-size: var(--font-size-metadata);
+    line-height: 1rem;
+  }
+
+  @media (max-width: 767px) {
+    .type-page-title {
+      font-size: var(--font-size-page-title-mobile);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    scroll-behavior: auto;
+    transition-duration: 0.01ms;
+  }
+}

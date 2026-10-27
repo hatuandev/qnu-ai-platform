@@ -1,0 +1,18 @@
+{
+  "context": 635,
+  "date": "2026-10-25",
+  "requested_behavior": "Remove post-OCR spelling library; retain Nemotron wording",
+  "package_removed": true,
+  "dictionary_and_hooks_removed": true,
+  "legacy_lexical_substitutions_removed": true,
+  "raw_ocr_preserved": true,
+  "extraction_version": "layout-v25-ocr-literal-words",
+  "focused": {"passed": 128, "subtests_passed": 23, "seconds": 55.04, "exit_code": 0},
+  "ruff": {"files": 4, "exit_code": 0},
+  "full_pytest": {"status": "NOT RUN", "harness_exit_code": 1, "reason": "PostgreSQL connection refused before pytest; Docker engine unavailable"},
+  "runtime": {"openapi_http": 200, "post_correction_schema_field_absent": true, "ready_http": 503, "worker_running": false},
+  "live_ocr_after_final_change": "NOT RUN",
+  "aborted_test_database_dropped": true,
+  "automatic_backfill": false,
+  "publish_or_index": false
+}

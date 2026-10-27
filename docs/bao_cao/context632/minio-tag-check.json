@@ -1,0 +1,13 @@
+{
+  "checked_utc": "2026-10-25T10:28:00.302614+00:00",
+  "requested_image": "minio/minio:RELEASE.2025-04-22T22-12-26Z",
+  "docker_pull": "access denied",
+  "dockerhub_tag_api_status": 404,
+  "anonymous_pull_scope": [],
+  "official_manifest_status": 401,
+  "docker_registry_mirrors": [],
+  "docker_credentials_changed": false,
+  "four_other_services": "running healthy",
+  "third_party_mirror_authorized": false,
+  "local_source_build_authorized": "pending user reply"
+}
