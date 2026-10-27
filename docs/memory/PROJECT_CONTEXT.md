@@ -7,6 +7,8 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-10-28 — Context684: nhánh v1.0.2 trên Gitea.** Commit mã nguồn e112ac5 (1394 tệp) đã push Gitea và xác nhận SHA. Người dùng chỉ cần Gitea; tiến trình GitHub trước đó kết thúc exit1 sau Ctrl+C, không gửi lại. Quét staged/fixture có đối chiếu; diff-check FAIL khoảng trắng cũ, test/build/runtime NOT RUN. [Nhật ký684](../nhat_ky/2026-10-28_phien_684_push_nhanh_v1_0_2_gitea.md).
+
 - **2026-10-27 — Context683: hướng dẫn chạy V1.** Tài liệu chạy API/worker/FE, giữ đúng .env/storage, cài mới/migration, admin local và ModelOps. Parser 14 khối PowerShell và kiểm tra tĩnh/link/encoding đạt; 1980 tệp ứng dụng giữ hash. Không chạy dịch vụ, migration, test/build hoặc model thật. [Hướng dẫn38](../quy_trinh/38_huong_dan_chay_qnu_v1.md), [nhật ký683](../nhat_ky/2026-10-27_phien_683_huong_dan_chay_qnu_v1.md).
 
 - **2026-10-27 — Context682: FE mục4–6.** Hỏi đáp thử theo kho với model/policy/document scope và nguồn kiểm publication; tải raw review kể cả failed/uncertain; dashboard QNU theo workspace/quyền, mẫu KTX giữ riêng. Full348PASS giữ311ID+37mới, lint557tệp/build+TS/probes19/bundle11PASS. BE giữ hash, không chạy lại;11ảnh fixture và raw155byte khớp. Chưa live API/model/SSO/corpus hoặc quality benchmark. [Báo cáo682](../bao_cao/context682/REPORT.md), [nhật ký682](../nhat_ky/2026-10-27_phien_682_frontend_hoi_dap_review_goc_va_dashboard.md).
