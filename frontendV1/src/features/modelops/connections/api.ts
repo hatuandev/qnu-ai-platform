@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { v1Client } from "@/app/api/v1";
 import { useV1Auth } from "@/app/auth/v1";
-import type { Capability, Provider } from "../types";
+import type { Capability, Provider, ProviderKey } from "../types";
 
-export type ConnectionFamily = "openai" | "gemini" | "qnu" | "custom";
+export type ConnectionFamily = "openai" | "gemini" | "qnu" | "custom" | "anthropic";
+
 export type Connection = {
   id: string;
   name: string;
@@ -12,6 +13,8 @@ export type Connection = {
   timeout_seconds: number;
   is_active: boolean;
   is_connection: true;
+  prefix?: string | null;
+  api_type?: string | null;
   model_count: number;
   active_model_count: number;
   active_keys_count: number;
@@ -26,25 +29,48 @@ export type Connection = {
   created_at: string;
   updated_at: string;
 };
+
 export type ConnectionInput = {
   name: string;
   family: ConnectionFamily;
   base_url: string;
   timeout_seconds: number;
+  prefix?: string | null;
+  api_type?: string | null;
   is_active?: boolean;
 };
+
+export type ConnectionTestResult = {
+  ok: boolean;
+  latency_ms?: number | null;
+  detail: string;
+  models?: string[];
+};
+
 export const FAMILIES: Record<ConnectionFamily, string> = {
-  openai: "OpenAI / ChatGPT",
+  openai: "OpenAI Compatible",
+  anthropic: "Anthropic Compatible",
   gemini: "Google Gemini",
   qnu: "Server AI QNU",
-  custom: "Nhà cung cấp khác",
+  custom: "Custom / Khác",
 };
+
 export const PRESET_URLS: Record<ConnectionFamily, string> = {
   openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
   gemini: "https://generativelanguage.googleapis.com/v1beta/openai",
   qnu: "http://100.105.13.53:8000/v1",
   custom: "",
 };
+
+export const PRESET_PREFIXES: Record<ConnectionFamily, string> = {
+  openai: "openai",
+  anthropic: "anthropic",
+  gemini: "google",
+  qnu: "qnu",
+  custom: "",
+};
+
 const path = "/modelops/connections";
 
 export function useConnections() {
@@ -54,6 +80,7 @@ export function useConnections() {
     queryFn: ({ signal }) => v1Client.get<Connection[]>(path, { signal }),
   });
 }
+
 export function useConnection(id: string) {
   const { sessionId } = useV1Auth();
   return useQuery({
@@ -63,6 +90,7 @@ export function useConnection(id: string) {
     enabled: Boolean(id),
   });
 }
+
 export function useConnectionModels(id: string) {
   const { sessionId } = useV1Auth();
   return useQuery({
@@ -72,6 +100,17 @@ export function useConnectionModels(id: string) {
     enabled: Boolean(id),
   });
 }
+
+export function useConnectionKeys(connectionId: string) {
+  const { sessionId } = useV1Auth();
+  return useQuery({
+    queryKey: ["v1", sessionId, "modelops", "connections", connectionId, "keys"],
+    queryFn: ({ signal }) =>
+      v1Client.get<ProviderKey[]>(`/modelops/providers/${connectionId}/keys`, { signal }),
+    enabled: Boolean(connectionId),
+  });
+}
+
 export function useSaveConnection(id?: string) {
   const cache = useQueryClient();
   const { sessionId } = useV1Auth();
@@ -85,7 +124,20 @@ export function useSaveConnection(id?: string) {
     },
   });
 }
-export function useAddConnectionModel(id: string) {
+
+export function useDeleteConnection() {
+  const cache = useQueryClient();
+  const { sessionId } = useV1Auth();
+  return useMutation({
+    mutationFn: (connectionId: string) =>
+      v1Client.delete(`${path}/${connectionId}`),
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: ["v1", sessionId, "modelops"] });
+    },
+  });
+}
+
+export function useAddConnectionModel(connectionId: string) {
   const cache = useQueryClient();
   const { sessionId } = useV1Auth();
   return useMutation({
@@ -93,9 +145,56 @@ export function useAddConnectionModel(id: string) {
       model_name: string;
       capabilities: Capability[];
       embedding_dimension?: number;
-    }) => v1Client.post<Provider>(`${path}/${id}/models`, input),
+    }) => v1Client.post<Provider>(`${path}/${connectionId}/models`, input),
     onSuccess: () => {
       void cache.invalidateQueries({ queryKey: ["v1", sessionId, "modelops"] });
     },
+  });
+}
+
+export function useDeleteConnectionModel(connectionId: string) {
+  const cache = useQueryClient();
+  const { sessionId } = useV1Auth();
+  return useMutation({
+    mutationFn: (modelId: string) =>
+      v1Client.delete(`${path}/${connectionId}/models/${modelId}`),
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: ["v1", sessionId, "modelops"] });
+    },
+  });
+}
+
+export function useAddConnectionKey(connectionId: string) {
+  const cache = useQueryClient();
+  const { sessionId } = useV1Auth();
+  return useMutation({
+    mutationFn: (input: {
+      name: string;
+      secret: string;
+      priority: number;
+      default_model?: string;
+    }) => v1Client.post<ProviderKey>(`/modelops/providers/${connectionId}/keys`, input),
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: ["v1", sessionId, "modelops"] });
+    },
+  });
+}
+
+export function useDeleteConnectionKey(connectionId: string) {
+  const cache = useQueryClient();
+  const { sessionId } = useV1Auth();
+  return useMutation({
+    mutationFn: (keyId: string) =>
+      v1Client.delete(`${path}/${connectionId}/keys/${keyId}`),
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: ["v1", sessionId, "modelops"] });
+    },
+  });
+}
+
+export function useTestConnection(connectionId: string) {
+  return useMutation({
+    mutationFn: (input: { api_key?: string; model_name?: string }) =>
+      v1Client.post<ConnectionTestResult>(`${path}/${connectionId}/test`, input),
   });
 }

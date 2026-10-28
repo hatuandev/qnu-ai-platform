@@ -8,7 +8,7 @@ from qnu.domains.conversations.models import Conversation, ConversationTurn
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import CompilationInput
 from qnu.domains.knowledge.index.models import IndexInput, IndexRun
-from qnu.domains.knowledge.models import KBCollection, KBSource
+from qnu.domains.knowledge.models import KBCollection, KBFolder, KBSource
 from qnu.domains.knowledge.publication.models import CompiledDocument, CompiledVersion
 from qnu.domains.lifecycle.models import ResourceState
 from qnu.domains.ocr.models import OcrProcessingRun
@@ -19,6 +19,7 @@ from qnu.platform.errors import Conflict, EntityNotFound
 
 MODELS = {
     "collection": KBCollection,
+    "folder": KBFolder,
     "source": KBSource,
     "document": CompiledDocument,
     "assistant": Assistant,

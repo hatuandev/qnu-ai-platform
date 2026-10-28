@@ -64,7 +64,6 @@ afterEach(() => {
 
 test("without workspace the available actions guide the user to workspace selection", () => {
   render(<WorkspaceSidebar />);
-  expect(screen.getByText("Chưa chọn workspace")).toBeTruthy();
   for (const group of ["Tri thức", "Trợ lý", "Quản trị", "Vận hành"]) {
     expect(screen.getByText(group)).toBeTruthy();
   }

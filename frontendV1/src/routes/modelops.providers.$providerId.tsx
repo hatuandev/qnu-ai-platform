@@ -1,18 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ConnectionDetail } from "@/features/modelops/connections/connection-detail";
-import { ProviderDetail } from "@/features/modelops/provider-detail";
-import { useProviderQuery } from "@/features/modelops/queries";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/modelops/providers/$providerId")({
-  component: ProviderOrConnection,
+  beforeLoad: ({ params }) => {
+    throw redirect({ to: "/providers/$providerId", params });
+  },
 });
-
-function ProviderOrConnection() {
-  const { providerId } = Route.useParams();
-  const query = useProviderQuery(providerId);
-  return query.data?.is_connection ? (
-    <ConnectionDetail connectionId={providerId} />
-  ) : (
-    <ProviderDetail providerId={providerId} />
-  );
-}

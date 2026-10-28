@@ -15,6 +15,7 @@ from qnu.domains.knowledge.collections.router import router as knowledge_collect
 from qnu.domains.knowledge.compilation.review.router import router as compilation_review_router
 from qnu.domains.knowledge.compilation.router import router as compilation_router
 from qnu.domains.knowledge.compilation.workflow.router import router as compilation_workflow_router
+from qnu.domains.knowledge.folders.router import router as knowledge_folders_router
 from qnu.domains.knowledge.index.router import router as indexing_router
 from qnu.domains.knowledge.publication.router import router as publication_router
 from qnu.domains.knowledge.sources.router import router as knowledge_sources_router
@@ -41,6 +42,7 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(assistants_router, prefix=settings.API_PREFIX)
     app.include_router(conversations_router, prefix=settings.API_PREFIX)
     app.include_router(knowledge_collections_router, prefix=settings.API_PREFIX)
+    app.include_router(knowledge_folders_router, prefix=settings.API_PREFIX)
     app.include_router(knowledge_sources_router, prefix=settings.API_PREFIX)
     app.include_router(ocr_processing_router, prefix=settings.API_PREFIX)
     app.include_router(ocr_review_router, prefix=settings.API_PREFIX)

@@ -27,6 +27,7 @@ from qnu.domains.knowledge.artifacts.files import (
 )
 from qnu.domains.knowledge.ids import new_id
 from qnu.domains.knowledge.models import (
+    KBFolder,
     KBSource,
     KBSourceRevision,
     KBUploadRequest,
@@ -36,7 +37,7 @@ from qnu.domains.lifecycle.guards import visible
 from qnu.domains.workspaces.access import actor_ref
 from qnu.domains.workspaces.models import Workspace
 from qnu.domains.workspaces.public_api import record_workspace_event
-from qnu.platform.errors import AppException, Conflict, DependencyUnavailable
+from qnu.platform.errors import AppException, Conflict, DependencyUnavailable, EntityNotFound
 from qnu.ports.blob_store import BlobStore
 
 
@@ -105,6 +106,7 @@ class SourceService:
         idempotency_key: str | None = None,
         source_id: str | None = None,
         staged: bool = False,
+        folder_id: str | None = None,
     ) -> UploadOutcome:
         ref = actor_ref(actor)
         workspace_id = workspace.id
@@ -142,6 +144,17 @@ class SourceService:
         scoped_collection_id = collection.id
         if source_id is not None:
             await load_source(db, workspace_id, scoped_collection_id, source_id)
+        if folder_id is not None:
+            target_folder = await db.scalar(
+                select(KBFolder).where(
+                    KBFolder.id == folder_id,
+                    KBFolder.collection_id == scoped_collection_id,
+                    KBFolder.workspace_id == workspace_id,
+                    visible("folder", KBFolder.id),
+                )
+            )
+            if target_folder is None:
+                raise EntityNotFound("Không tìm thấy thư mục đích.", code="folder_not_found")
         owner = await self._content_owner(db, scoped_collection_id, stored.sha256)
         if owner is not None:
             raise self._duplicate_content(owner, source_id)
@@ -168,6 +181,7 @@ class SourceService:
                     ref=ref,
                     idempotency_key=idempotency_key,
                     request_hash=request_hash,
+                    folder_id=folder_id,
                 )
             else:
                 source, revision = await self._append_revision(
@@ -213,13 +227,22 @@ class SourceService:
         collection_id: str,
         page: int,
         page_size: int,
+        *,
+        folder_id: str | None = None,
+        all_folders: bool = False,
     ) -> tuple[list[tuple[KBSource, KBSourceRevision]], int]:
         collection = await load_collection(db, workspace.id, collection_id)
-        condition = and_(
+        conditions = [
             KBSource.collection_id == collection.id,
             KBSource.workspace_id == workspace.id,
             visible("source", KBSource.id),
-        )
+        ]
+        if not all_folders:
+            if folder_id is not None and folder_id != "root":
+                conditions.append(KBSource.folder_id == folder_id)
+            else:
+                conditions.append(KBSource.folder_id.is_(None))
+        condition = and_(*conditions)
         total = int(
             (await db.execute(select(func.count(KBSource.id)).where(condition))).scalar_one()
         )
@@ -239,6 +262,64 @@ class SourceService:
         )
         rows = (await db.execute(stmt)).all()
         return [(row[0], row[1]) for row in rows], total
+
+    async def move(
+        self,
+        db: AsyncSession,
+        workspace: Workspace,
+        collection_id: str,
+        source_id: str,
+        target_folder_id: str | None,
+        actor: AuthActor,
+    ) -> tuple[KBSource, KBSourceRevision]:
+        source = await load_source(db, workspace.id, collection_id, source_id, for_update=True)
+        if target_folder_id is not None:
+            folder = await db.scalar(
+                select(KBFolder).where(
+                    KBFolder.id == target_folder_id,
+                    KBFolder.collection_id == collection_id,
+                    KBFolder.workspace_id == workspace.id,
+                    visible("folder", KBFolder.id),
+                )
+            )
+            if folder is None:
+                raise EntityNotFound("Không tìm thấy thư mục đích.", code="target_folder_not_found")
+        source.folder_id = target_folder_id
+        await record_workspace_event(
+            db,
+            workspace_id=workspace.id,
+            actor=actor,
+            action="source.moved",
+            detail={"source_id": source.id, "target_folder_id": target_folder_id},
+        )
+        await db.commit()
+        await db.refresh(source)
+        return source, await self._current_revision(db, source)
+
+    async def rename(
+        self,
+        db: AsyncSession,
+        workspace: Workspace,
+        collection_id: str,
+        source_id: str,
+        title: str,
+        actor: AuthActor,
+    ) -> tuple[KBSource, KBSourceRevision]:
+        clean_title = title.strip()
+        if not clean_title:
+            raise AppException("Tiêu đề không được để trống.", code="invalid_title", status_code=422)
+        source = await load_source(db, workspace.id, collection_id, source_id, for_update=True)
+        source.title = clean_title[:255]
+        await record_workspace_event(
+            db,
+            workspace_id=workspace.id,
+            actor=actor,
+            action="source.renamed",
+            detail={"source_id": source.id, "title": source.title},
+        )
+        await db.commit()
+        await db.refresh(source)
+        return source, await self._current_revision(db, source)
 
     async def get(
         self, db: AsyncSession, workspace: Workspace, collection_id: str, source_id: str
@@ -310,11 +391,13 @@ class SourceService:
         ref: str,
         idempotency_key: str | None,
         request_hash: str,
+        folder_id: str | None = None,
     ) -> tuple[KBSource, KBSourceRevision]:
         source = KBSource(
             id=new_id("src"),
             workspace_id=workspace_id,
             collection_id=collection_id,
+            folder_id=folder_id,
             title=title[:255],
             status="stored",
             latest_revision_no=1,

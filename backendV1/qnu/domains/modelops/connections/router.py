@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.api.dependencies import get_db
@@ -9,6 +9,8 @@ from qnu.domains.modelops.connections.schemas import (
     ConnectionCreate,
     ConnectionModelCreate,
     ConnectionResponse,
+    ConnectionTestRequest,
+    ConnectionTestResponse,
     ConnectionUpdate,
 )
 from qnu.domains.modelops.providers.service import provider_payload
@@ -47,6 +49,23 @@ async def update(
     return await service.save_connection(db, actor, req, connection_id)
 
 
+@router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete(
+    connection_id: str, db: AsyncSession = Depends(get_db), actor: AuthActor = Depends(admin)
+):
+    await service.delete_connection(db, actor, connection_id)
+
+
+@router.post("/{connection_id}/test", response_model=ConnectionTestResponse)
+async def test(
+    connection_id: str,
+    req: ConnectionTestRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(admin),
+):
+    return await service.test_connection(db, actor, connection_id, req)
+
+
 @router.get("/{connection_id}/models", response_model=list[ProviderResponse])
 async def models(
     connection_id: str, db: AsyncSession = Depends(get_db), actor: AuthActor = Depends(admin)
@@ -67,3 +86,23 @@ async def register(
     return ProviderResponse(
         **provider_payload(await service.add_model(db, actor, connection_id, req))
     )
+
+
+@router.delete("/{connection_id}/models/{model_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_model(
+    connection_id: str,
+    model_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(admin),
+):
+    await service.delete_model(db, actor, connection_id, model_id)
+
+
+@router.delete("/{connection_id}/keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_key(
+    connection_id: str,
+    key_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(admin),
+):
+    await service.delete_key(db, actor, connection_id, key_id)

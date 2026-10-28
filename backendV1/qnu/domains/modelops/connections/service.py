@@ -1,7 +1,9 @@
 """Admin provider onboarding, independent from executable model/grant IDs."""
 
+import time
 import uuid
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +14,8 @@ from qnu.domains.modelops.connections.schemas import (
     ConnectionCreate,
     ConnectionModelCreate,
     ConnectionResponse,
+    ConnectionTestRequest,
+    ConnectionTestResponse,
     ConnectionUpdate,
 )
 from qnu.domains.modelops.diagnostics.schemas import DiagnosticCheck
@@ -20,6 +24,7 @@ from qnu.domains.modelops.models import Provider, ProviderKey
 from qnu.domains.modelops.providers.service import provider_service
 from qnu.domains.modelops.schemas import ProviderCreateRequest
 from qnu.domains.workspaces.access import actor_ref
+from qnu.platform.crypto import decrypt
 from qnu.platform.errors import Conflict, EntityNotFound
 from qnu.platform.network_policy import assert_allowed_endpoint
 
@@ -67,7 +72,12 @@ async def output(db: AsyncSession, rows: list[Provider]) -> list[ConnectionRespo
                 else ("success" if check.outcome == "ok" else check.outcome)
             )
             tested_at = check.tested_at
-        family = (row.extra_config or {}).get("connection_family", "custom")
+        extra = row.extra_config or {}
+        family = extra.get("connection_family", "custom")
+        prefix = extra.get("prefix")
+        api_type = extra.get("api_type") or (
+            "anthropic" if family == "anthropic" else "openai_compatible"
+        )
         result.append(
             ConnectionResponse(
                 id=row.id,
@@ -76,6 +86,8 @@ async def output(db: AsyncSession, rows: list[Provider]) -> list[ConnectionRespo
                 base_url=row.base_url,
                 timeout_seconds=row.timeout_seconds,
                 is_active=row.is_active,
+                prefix=prefix,
+                api_type=api_type,
                 model_count=len(children),
                 active_model_count=sum(m.is_active for m in children),
                 active_keys_count=len(active),
@@ -101,15 +113,20 @@ async def list_connections(db: AsyncSession) -> list[ConnectionResponse]:
 
 
 async def save_connection(
-    db: AsyncSession, actor: AuthActor, req: ConnectionCreate, connection_id: str | None = None
+    db: AsyncSession,
+    actor: AuthActor,
+    req: ConnectionCreate | ConnectionUpdate,
+    connection_id: str | None = None,
 ) -> ConnectionResponse:
     require_model_admin(actor)
-    assert_allowed_endpoint(req.base_url, allow_private=True)
+    if req.base_url:
+        assert_allowed_endpoint(req.base_url, allow_private=True)
     row = await get_connection(db, connection_id, lock=True) if connection_id else None
-    duplicate = await db.scalar(select(Provider.id).where(Provider.name == req.name))
-    if duplicate and (row is None or duplicate != row.id):
-        raise Conflict("Tên nhà cung cấp đã tồn tại.", code="provider_name_exists")
-    if row is not None and row.base_url.rstrip("/") != req.base_url.rstrip("/"):
+    if req.name is not None:
+        duplicate = await db.scalar(select(Provider.id).where(Provider.name == req.name))
+        if duplicate and (row is None or duplicate != row.id):
+            raise Conflict("Tên nhà cung cấp đã tồn tại.", code="provider_name_exists")
+    if row is not None and req.base_url is not None and row.base_url.rstrip("/") != req.base_url.rstrip("/"):
         child = await db.scalar(select(Provider.id).where(Provider.parent_id == row.id).limit(1))
         if child:
             raise Conflict(
@@ -117,6 +134,8 @@ async def save_connection(
                 code="connection_endpoint_bound",
             )
     if row is None:
+        if req.name is None or req.base_url is None:
+            raise Conflict("Tên và địa chỉ API không được để trống.", code="invalid_input")
         row = Provider(
             id="conn_" + uuid.uuid4().hex[:16],
             is_connection=True,
@@ -127,26 +146,56 @@ async def save_connection(
             extra_config={},
         )
         db.add(row)
-    row.name, row.base_url, row.timeout_seconds = (
-        req.name,
-        req.base_url.rstrip("/"),
-        req.timeout_seconds,
-    )
-    row.extra_config = {**(row.extra_config or {}), "connection_family": req.family}
-    if isinstance(req, ConnectionUpdate):
-        if req.is_active is not None:
-            row.is_active = req.is_active
-    else:
+
+    if req.name is not None:
+        row.name = req.name
+    if req.base_url is not None:
+        row.base_url = req.base_url.rstrip("/")
+    if req.timeout_seconds is not None:
+        row.timeout_seconds = req.timeout_seconds
+
+    current_extra = dict(row.extra_config or {})
+    if req.family is not None:
+        current_extra["connection_family"] = req.family
+    if req.prefix is not None:
+        current_extra["prefix"] = req.prefix
+    if req.api_type is not None:
+        current_extra["api_type"] = req.api_type
+    row.extra_config = current_extra
+
+    if isinstance(req, ConnectionUpdate) and req.is_active is not None:
+        row.is_active = req.is_active
+    elif connection_id is None:
         row.is_active = True
+
     record_event(
         db,
         actor,
         "connection.updated" if connection_id else "connection.created",
         row.id,
-        ["name", "family", "base_url", "is_active"],
+        ["name", "family", "base_url", "is_active", "prefix", "api_type"],
     )
     await db.commit()
     return (await output(db, [row]))[0]
+
+
+async def delete_connection(db: AsyncSession, actor: AuthActor, connection_id: str) -> None:
+    require_model_admin(actor)
+    row = await get_connection(db, connection_id, lock=True)
+    # Delete child models
+    child_ids = list((await db.scalars(select(Provider.id).where(Provider.parent_id == connection_id))).all())
+    for cid in child_ids:
+        child = await db.get(Provider, cid)
+        if child:
+            await db.delete(child)
+    # Delete keys
+    keys = list((await db.scalars(select(ProviderKey).where(ProviderKey.provider_id == connection_id))).all())
+    for k in keys:
+        await db.delete(k)
+    # Delete connection itself
+    await db.delete(row)
+    record_event(db, actor, "connection.deleted", connection_id, ["deleted"])
+    await db.commit()
 
 
 async def add_model(
@@ -195,6 +244,36 @@ async def add_model(
     return model
 
 
+async def delete_model(
+    db: AsyncSession, actor: AuthActor, connection_id: str, model_id: str
+) -> None:
+    require_model_admin(actor)
+    await get_connection(db, connection_id, lock=True)
+    model = (await db.scalars(
+        select(Provider).where(Provider.id == model_id, Provider.parent_id == connection_id)
+    )).first()
+    if model is None:
+        raise EntityNotFound("Không tìm thấy model trong nhà cung cấp này.", code="model_not_found")
+    await db.delete(model)
+    record_event(db, actor, "model.deleted", model_id, ["deleted"])
+    await db.commit()
+
+
+async def delete_key(
+    db: AsyncSession, actor: AuthActor, connection_id: str, key_id: str
+) -> None:
+    require_model_admin(actor)
+    await get_connection(db, connection_id, lock=True)
+    key = (await db.scalars(
+        select(ProviderKey).where(ProviderKey.id == key_id, ProviderKey.provider_id == connection_id)
+    )).first()
+    if key is None:
+        raise EntityNotFound("Không tìm thấy API key.", code="key_not_found")
+    await db.delete(key)
+    record_event(db, actor, "key.deleted", key_id, ["deleted"])
+    await db.commit()
+
+
 async def list_models(db: AsyncSession, connection_id: str):
     await get_connection(db, connection_id)
     return list(
@@ -204,3 +283,78 @@ async def list_models(db: AsyncSession, connection_id: str):
             )
         ).all()
     )
+
+
+async def test_connection(
+    db: AsyncSession, actor: AuthActor, connection_id: str, req: ConnectionTestRequest
+) -> ConnectionTestResponse:
+    require_model_admin(actor)
+    parent = await get_connection(db, connection_id)
+    api_key = req.api_key
+    if not api_key:
+        active_key = (
+            await db.scalars(
+                select(ProviderKey)
+                .where(ProviderKey.provider_id == parent.id, ProviderKey.status == "active")
+                .order_by(ProviderKey.priority, ProviderKey.created_at)
+                .limit(1)
+            )
+        ).first()
+        if active_key:
+            try:
+                api_key = decrypt(active_key.secret_encrypted)
+            except Exception:
+                return ConnectionTestResponse(ok=False, detail="Không giải mã được API key đã lưu.")
+        else:
+            return ConnectionTestResponse(ok=False, detail="Chưa có API key nào để kiểm tra kết nối.")
+
+    endpoint = parent.base_url.rstrip("/")
+    family = (parent.extra_config or {}).get("connection_family", "custom")
+    headers = {"Accept": "application/json"}
+    if family == "anthropic":
+        headers["x-api-key"] = api_key
+        headers["anthropic-version"] = "2023-06-01"
+    else:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    start = time.monotonic()
+    models_target = endpoint if endpoint.endswith("/models") else f"{endpoint}/models"
+    try:
+        async with httpx.AsyncClient(timeout=10, verify=False) as client:
+            resp = await client.get(models_target, headers=headers)
+            latency = int((time.monotonic() - start) * 1000)
+            if resp.status_code in (200, 201):
+                try:
+                    data = resp.json()
+                    raw_models = data.get("data", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                    model_ids = [m.get("id") or m.get("name") for m in raw_models if isinstance(m, dict) and (m.get("id") or m.get("name"))]
+                    return ConnectionTestResponse(
+                        ok=True,
+                        latency_ms=latency,
+                        detail=f"Kết nối thành công ({latency}ms). Tìm thấy {len(model_ids)} models.",
+                        models=model_ids[:50],
+                    )
+                except Exception:
+                    return ConnectionTestResponse(
+                        ok=True,
+                        latency_ms=latency,
+                        detail=f"Kết nối thành công ({latency}ms).",
+                    )
+            elif resp.status_code in (401, 403):
+                return ConnectionTestResponse(
+                    ok=False,
+                    latency_ms=latency,
+                    detail=f"Xác thực thất bại (HTTP {resp.status_code}): Vui lòng kiểm tra lại API Key.",
+                )
+            else:
+                return ConnectionTestResponse(
+                    ok=True,
+                    latency_ms=latency,
+                    detail=f"Máy chủ phản hồi HTTP {resp.status_code} ({latency}ms).",
+                )
+    except httpx.ConnectError:
+        return ConnectionTestResponse(ok=False, detail=f"Không thể kết nối đến máy chủ: {endpoint}")
+    except httpx.TimeoutException:
+        return ConnectionTestResponse(ok=False, detail="Kết nối quá hạn (Timeout sau 10 giây).")
+    except Exception as exc:
+        return ConnectionTestResponse(ok=False, detail=f"Lỗi kiểm tra kết nối: {str(exc)[:200]}")

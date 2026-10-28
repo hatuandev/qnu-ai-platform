@@ -58,6 +58,45 @@ class KBCollection(Base):
     )
 
 
+class KBFolder(Base):
+    """A directory inside one collection and workspace.
+
+    Folders are hierarchical (parent_id is null for root-level folders).
+    Folder permissions are inherited from the collection.
+    """
+
+    __tablename__ = "kb_folders"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["collection_id", "workspace_id"],
+            ["kb_collections.id", "kb_collections.workspace_id"],
+            ondelete="CASCADE",
+            name="fk_kb_folder_collection",
+        ),
+        ForeignKeyConstraint(
+            ["parent_id"],
+            ["kb_folders.id"],
+            ondelete="CASCADE",
+            name="fk_kb_folder_parent",
+        ),
+        UniqueConstraint("id", "collection_id", "workspace_id", name="uq_kb_folder_scope"),
+        CheckConstraint("char_length(name) >= 1", name="ck_kb_folder_name_len"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    collection_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    parent_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+
 class KBSource(Base):
     """Logical document. Bytes and evidence metadata live only on its revisions."""
 
@@ -81,6 +120,12 @@ class KBSource(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     workspace_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     collection_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    folder_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("kb_folders.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="stored")
     latest_revision_no: Mapped[int] = mapped_column(Integer, nullable=False)

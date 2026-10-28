@@ -14,16 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   type Connection,
   type ConnectionFamily,
-  FAMILIES,
+  PRESET_PREFIXES,
   PRESET_URLS,
   useSaveConnection,
 } from "./api";
@@ -32,95 +25,88 @@ export function ConnectionForm({
   open,
   onOpenChange,
   connection,
+  initialFamily = "custom",
   onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   connection?: Connection;
+  initialFamily?: ConnectionFamily;
   onCreated?: (connection: Connection) => void;
 }) {
   const form = useForm({
     defaultValues: {
-      family: connection?.family ?? ("custom" as ConnectionFamily),
+      family: connection?.family ?? initialFamily,
       name: connection?.name ?? "",
-      url: connection?.base_url ?? "",
+      prefix: connection?.prefix ?? (connection ? "" : PRESET_PREFIXES[initialFamily]),
+      apiType: connection?.api_type ?? "",
+      url: connection?.base_url ?? (connection ? "" : PRESET_URLS[initialFamily]),
     },
   });
+
   const family = useStore(form.store, (state) => state.values.family);
   const name = useStore(form.store, (state) => state.values.name);
+  const prefix = useStore(form.store, (state) => state.values.prefix);
+  const apiType = useStore(form.store, (state) => state.values.apiType);
   const url = useStore(form.store, (state) => state.values.url);
-  const setFamily = (value: ConnectionFamily) =>
-    form.setFieldValue("family", value);
+
   const setName = (value: string) => form.setFieldValue("name", value);
+  const setPrefix = (value: string) => form.setFieldValue("prefix", value);
   const setUrl = (value: string) => form.setFieldValue("url", value);
+
   const mutation = useSaveConnection(connection?.id);
+
   useEffect(() => {
     if (open) {
+      const activeFamily = connection?.family ?? initialFamily;
       form.reset({
-        family: connection?.family ?? "custom",
-        name: connection?.name ?? "",
-        url: connection?.base_url ?? "",
+        family: activeFamily,
+        name: connection?.name ?? (connection ? "" : (activeFamily === "custom" ? "" : (activeFamily === "qnu" ? "QNU Server" : "OpenAI Compatible"))),
+        prefix: connection?.prefix ?? (connection ? "" : PRESET_PREFIXES[activeFamily]),
+        apiType: connection?.api_type ?? "",
+        url: connection?.base_url ?? (connection ? "" : PRESET_URLS[activeFamily]),
       });
       mutation.reset();
     }
-  }, [open, connection, mutation.reset, form]);
+  }, [open, connection, initialFamily, mutation.reset, form]);
+
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent className="flex max-h-[min(820px,calc(100vh-2rem))] max-w-lg flex-col gap-0 overflow-hidden p-0">
         <ResponsiveDialogHeader className="border-b bg-muted/20 p-5">
           <ResponsiveDialogTitle>
-            {connection ? "Sửa nhà cung cấp" : "Thêm nhà cung cấp"}
+            {connection ? "Chỉnh sửa nhà cung cấp" : "Thêm nhà cung cấp mới"}
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-xs">
-            Tạo kết nối trước. API key và các model sẽ được thêm trong trang chi
-            tiết.
+            Thiết lập kết nối với nhà cung cấp mô hình AI (OpenAI Compatible). Sau khi lưu, bạn có thể thêm API Key và cấu hình Model LLM trong trang chi tiết.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
+
         <form
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 text-xs"
           onSubmit={async (e) => {
             e.preventDefault();
             try {
-              const saved = await mutation.mutateAsync({
+              const payload: any = {
                 name: name.trim(),
                 family,
                 base_url: url.trim(),
                 timeout_seconds: connection?.timeout_seconds ?? 30,
-              });
+              };
+              if (prefix.trim()) payload.prefix = prefix.trim();
+              if (apiType.trim()) payload.api_type = apiType.trim();
+
+              const saved = await mutation.mutateAsync(payload);
               onOpenChange(false);
               onCreated?.(saved);
-              toast.success("Đã lưu nhà cung cấp.");
+              toast.success(`Đã lưu nhà cung cấp ${saved.name}.`);
             } catch {
-              /* ErrorState shows the server response. */
+              /* ErrorState shows server error */
             }
           }}
         >
-          <div className="space-y-2">
-            <Label htmlFor="connection-family">Nhà cung cấp</Label>
-            <Select
-              value={family}
-              onValueChange={(value) => {
-                const next = value as ConnectionFamily;
-                setFamily(next);
-                if (!connection) {
-                  setUrl(PRESET_URLS[next]);
-                  setName(FAMILIES[next]);
-                }
-              }}
-            >
-              <SelectTrigger id="connection-family">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(FAMILIES).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
+          {/* Tên hiển thị */}
+          <div className="space-y-1.5">
             <Label htmlFor="connection-name">Tên hiển thị</Label>
             <Input
               id="connection-name"
@@ -129,10 +115,27 @@ export function ConnectionForm({
               minLength={2}
               maxLength={120}
               required
-              placeholder="Ví dụ: Server AI QNU"
+              placeholder="Ví dụ: QNU Server, OpenAI, NaraRouter..."
             />
           </div>
-          <div className="space-y-2">
+
+          {/* Tiền tố (Prefix) */}
+          <div className="space-y-1.5">
+            <Label htmlFor="connection-prefix">Tiền tố (Prefix)</Label>
+            <Input
+              id="connection-prefix"
+              value={prefix}
+              onChange={(e) => setPrefix(e.target.value)}
+              maxLength={32}
+              placeholder="Ví dụ: qnu, openai"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Định danh tiền tố trước model (ví dụ: qnu/qwen...)
+            </p>
+          </div>
+
+          {/* Base URL */}
+          <div className="space-y-1.5">
             <Label htmlFor="connection-url">Địa chỉ API</Label>
             <Input
               id="connection-url"
@@ -140,14 +143,15 @@ export function ConnectionForm({
               onChange={(e) => setUrl(e.target.value)}
               required
               type="url"
-              placeholder="https://server/v1"
+              placeholder="http://100.105.13.53:8000/v1 hoặc https://api.openai.com/v1"
             />
-            <p className="text-xs text-muted-foreground">
-              Địa chỉ API tương thích OpenAI. Với Gemini, dùng endpoint OpenAI
-              compatibility.
+            <p className="text-[11px] text-muted-foreground">
+              Địa chỉ Base URL endpoint /chat/completions hoặc /models
             </p>
           </div>
+
           {mutation.isError && <ErrorState error={mutation.error} />}
+
           <ResponsiveDialogFooter className="grid grid-cols-2 gap-2 border-t bg-card p-4 sm:flex sm:justify-end">
             <Button
               type="button"

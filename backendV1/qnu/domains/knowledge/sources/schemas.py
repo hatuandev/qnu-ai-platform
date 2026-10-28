@@ -25,6 +25,7 @@ class SourceResponse(BaseModel):
     id: str
     workspace_id: str
     collection_id: str
+    folder_id: str | None = None
     title: str
     status: str
     revision_count: int
@@ -42,3 +43,11 @@ class SourceResponse(BaseModel):
 class SourceUploadResponse(BaseModel):
     source: SourceResponse
     revision: RevisionResponse
+
+
+class SourceMoveRequest(BaseModel):
+    target_folder_id: str | None = None
+
+
+class SourceRenameRequest(BaseModel):
+    title: str

@@ -18,6 +18,8 @@ from qnu.domains.knowledge.models import KBSource, KBSourceRevision
 from qnu.domains.knowledge.policies.access import READ_ROLES, WRITE_ROLES
 from qnu.domains.knowledge.sources.schemas import (
     RevisionResponse,
+    SourceMoveRequest,
+    SourceRenameRequest,
     SourceResponse,
     SourceUploadResponse,
 )
@@ -52,6 +54,7 @@ def _source_out(source: KBSource, revision: KBSourceRevision) -> SourceResponse:
         id=source.id,
         workspace_id=source.workspace_id,
         collection_id=source.collection_id,
+        folder_id=source.folder_id,
         title=source.title,
         status=source.status,
         revision_count=source.latest_revision_no,
@@ -79,6 +82,7 @@ async def upload_source(
     response: Response,
     file: UploadFile = File(..., description="Tệp gốc cần lưu"),
     title: str | None = Form(None, max_length=255),
+    folder_id: str | None = Form(None, description="Thư mục lưu trữ"),
     idempotency_key: str | None = Depends(idempotency_key_dep),
     db: AsyncSession = Depends(get_db),
     blob_store: BlobStore = Depends(get_blob_store),
@@ -100,6 +104,7 @@ async def upload_source(
         max_bytes=settings.MAX_UPLOAD_BYTES,
         actor=actor,
         idempotency_key=idempotency_key,
+        folder_id=folder_id,
     )
     if outcome.replayed:
         response.status_code = status.HTTP_200_OK
@@ -119,15 +124,63 @@ async def list_sources(
     collection_id: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
+    folder_id: str | None = Query(None, description="Mã thư mục, hoặc 'root' để lấy tài liệu ở gốc"),
+    all_folders: bool = Query(False, description="Nếu true, lấy toàn bộ tài liệu bất kể thư mục"),
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(get_actor),
 ) -> Page[SourceResponse]:
     workspace = await resolve_workspace_access(db, actor, workspace_id, required_roles=READ_ROLES)
-    rows, total = await source_service.list_page(db, workspace, collection_id, page, page_size)
+    rows, total = await source_service.list_page(
+        db, workspace, collection_id, page, page_size, folder_id=folder_id, all_folders=all_folders
+    )
     return Page[SourceResponse](
         items=[_source_out(source, revision) for source, revision in rows],
         meta=PageMeta(page=page, page_size=page_size, total=total),
     )
+
+
+@router.post(
+    "/{source_id}/move",
+    response_model=SourceResponse,
+    summary="Di chuyển tài liệu sang thư mục khác (hoặc về gốc)",
+)
+async def move_source(
+    workspace_id: str,
+    collection_id: str,
+    source_id: str,
+    req: SourceMoveRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+) -> SourceResponse:
+    workspace = await resolve_workspace_access(
+        db, actor, workspace_id, required_roles=WRITE_ROLES, for_update=True
+    )
+    source, revision = await source_service.move(
+        db, workspace, collection_id, source_id, req.target_folder_id, actor
+    )
+    return _source_out(source, revision)
+
+
+@router.patch(
+    "/{source_id}",
+    response_model=SourceResponse,
+    summary="Đổi tên / tiêu đề tài liệu",
+)
+async def rename_source(
+    workspace_id: str,
+    collection_id: str,
+    source_id: str,
+    req: SourceRenameRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+) -> SourceResponse:
+    workspace = await resolve_workspace_access(
+        db, actor, workspace_id, required_roles=WRITE_ROLES, for_update=True
+    )
+    source, revision = await source_service.rename(
+        db, workspace, collection_id, source_id, req.title, actor
+    )
+    return _source_out(source, revision)
 
 
 @router.get(

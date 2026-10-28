@@ -18,6 +18,7 @@ export interface KBSource {
   id: string;
   workspace_id: string;
   collection_id: string;
+  folder_id?: string | null;
   title: string;
   status: string;
   revision_count: number;
@@ -31,6 +32,62 @@ export interface KBSource {
   created_by: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface KBFolder {
+  id: string;
+  workspace_id: string;
+  collection_id: string;
+  parent_id: string | null;
+  name: string;
+  source_count: number;
+  subfolder_count: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FolderBreadcrumbItem {
+  id: string;
+  name: string;
+}
+
+export interface KBFolderDetail extends KBFolder {
+  breadcrumbs: FolderBreadcrumbItem[];
+}
+
+export interface FolderImpact {
+  folder_id: string;
+  folder_name: string;
+  subfolder_count: number;
+  source_count: number;
+  descendant_folder_ids: string[];
+}
+
+export interface FolderCreateInput {
+  name: string;
+  parent_id?: string | null;
+}
+
+export interface FolderUpdateInput {
+  name: string;
+}
+
+export interface FolderMoveInput {
+  target_parent_id?: string | null;
+}
+
+export interface SourceMoveInput {
+  target_folder_id?: string | null;
+}
+
+export interface SourceRenameInput {
+  title: string;
+}
+
+export interface SourceListParams extends PageParams {
+  folderId?: string | null;
+  allFolders?: boolean;
 }
 
 export interface KBRevision {
@@ -79,6 +136,7 @@ export interface CollectionUpdateInput {
 export interface SourceUploadInput {
   file: File;
   title?: string;
+  folder_id?: string | null;
 }
 
 export interface RevisionUploadInput {

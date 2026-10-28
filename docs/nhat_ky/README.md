@@ -7,6 +7,8 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+- **2026-10-28 — Context703: review Kho tri thức/thư mục.** CHANGES REQUESTED10nhóm: build27TSerror, OCR router, folder lifecycle/scope, upload identity/form, Compiler picker, URL và download. FE411cũPASS/probe2FAIL; handlerBE6FAIL/2PASS, unit5PASS/schema1FAIL, fixturegốc1ERROR; RuffPASS/BiomeFAIL. DB thử dọn; chỉ review/docs, chưa sửa app hoặc migrate/restart/push. [Nhật ký703](./2026-10-28_phien_703_review_kho_tri_thuc_thu_muc.md).
+
 - **2026-10-28 — Context702: ModelOps nhà cung cấp và model.** Tạo kết nối → thêm khóa → discovery → thêm nhiều model; migration0005 giữ ID/grants/index và phạm vi khóa cũ, shared key/pool có owner cha. BE765PASS +recovery4PASS (ca có chuyển dữ liệu chạy lại1PASS); FE411PASS, lint/build+TS và UI desktop/mobile đã kiểm bằng dữ liệu riêng. DB thử dọn; chưa migrate DB phục vụ/live inference/restart/push. [Nhật ký702](./2026-10-28_phien_702_modelops_nha_cung_cap_va_model.md).
 
 - **2026-10-28 — Context701: cấu hình URL API tích hợp local.** Thêm PUBLIC_BASE_URL=http://127.0.0.1:8002 vào .env root theo runner V1; giữ nguyên cấu hình khác. Theo yêu cầu không test/build/restart. [Nhật ký701](./2026-10-28_phien_701_cau_hinh_public_base_url_local.md).

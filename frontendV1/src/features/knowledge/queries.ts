@@ -4,23 +4,40 @@ import { useV1Auth } from "@/app/auth/v1";
 import {
   addRevision,
   createCollection,
+  createFolder,
+  deleteFolder,
   downloadRevisionContent,
   getCollection,
+  getFolder,
+  getFolderImpact,
   getSource,
   listCollections,
+  listFolders,
   listRevisions,
   listSources,
+  moveFolder,
+  moveSource,
+  renameSource,
+  restoreFolder,
   updateCollection,
+  updateFolder,
   uploadSource,
 } from "@/features/knowledge/requests";
 import type {
   CollectionCreateInput,
   CollectionUpdateInput,
+  FolderCreateInput,
+  FolderImpact,
+  FolderMoveInput,
+  FolderUpdateInput,
   KBCollection,
+  KBFolder,
+  KBFolderDetail,
   KBRevision,
   KBSource,
   PageParams,
   PageResponse,
+  SourceListParams,
   SourceUploadResult,
 } from "@/features/knowledge/types";
 
@@ -67,11 +84,78 @@ export const knowledgeKeys = {
         ] as const)
       : (["v1", "knowledge", "collection"] as const),
 
+  folders: (
+    sessionId?: number,
+    workspaceId?: string,
+    collectionId?: string,
+  ) =>
+    sessionId !== undefined &&
+    workspaceId !== undefined &&
+    collectionId !== undefined
+      ? ([
+          "v1",
+          sessionId,
+          "workspaces",
+          workspaceId,
+          "knowledge",
+          "collections",
+          collectionId,
+          "folders",
+        ] as const)
+      : (["v1", "knowledge", "folders"] as const),
+
+  folder: (
+    sessionId?: number,
+    workspaceId?: string,
+    collectionId?: string,
+    folderId?: string,
+  ) =>
+    sessionId !== undefined &&
+    workspaceId !== undefined &&
+    collectionId !== undefined &&
+    folderId !== undefined
+      ? ([
+          "v1",
+          sessionId,
+          "workspaces",
+          workspaceId,
+          "knowledge",
+          "collections",
+          collectionId,
+          "folders",
+          folderId,
+        ] as const)
+      : (["v1", "knowledge", "folder"] as const),
+
+  folderImpact: (
+    sessionId?: number,
+    workspaceId?: string,
+    collectionId?: string,
+    folderId?: string,
+  ) =>
+    sessionId !== undefined &&
+    workspaceId !== undefined &&
+    collectionId !== undefined &&
+    folderId !== undefined
+      ? ([
+          "v1",
+          sessionId,
+          "workspaces",
+          workspaceId,
+          "knowledge",
+          "collections",
+          collectionId,
+          "folders",
+          folderId,
+          "impact",
+        ] as const)
+      : (["v1", "knowledge", "folderImpact"] as const),
+
   sources: (
     sessionId?: number,
     workspaceId?: string,
     collectionId?: string,
-    params?: PageParams,
+    params?: SourceListParams,
   ) =>
     sessionId !== undefined &&
     workspaceId !== undefined &&
@@ -87,6 +171,8 @@ export const knowledgeKeys = {
           "sources",
           params?.page ?? 1,
           params?.pageSize ?? 20,
+          params?.folderId ?? "root",
+          Boolean(params?.allFolders),
         ] as const)
       : (["v1", "knowledge", "sources"] as const),
 
@@ -209,10 +295,164 @@ export function useUpdateCollection(workspaceId: string, collectionId: string) {
   });
 }
 
+export function useFoldersQuery(workspaceId: string, collectionId: string) {
+  const { sessionId } = useV1Auth();
+  return useQuery<KBFolder[]>({
+    queryKey: knowledgeKeys.folders(sessionId, workspaceId, collectionId),
+    queryFn: () => listFolders(v1Client, workspaceId, collectionId),
+    enabled: Boolean(workspaceId && collectionId),
+  });
+}
+
+export function useFolderQuery(
+  workspaceId: string,
+  collectionId: string,
+  folderId: string,
+) {
+  const { sessionId } = useV1Auth();
+  return useQuery<KBFolderDetail>({
+    queryKey: knowledgeKeys.folder(sessionId, workspaceId, collectionId, folderId),
+    queryFn: () => getFolder(v1Client, workspaceId, collectionId, folderId),
+    enabled: Boolean(workspaceId && collectionId && folderId),
+  });
+}
+
+export function useFolderImpactQuery(
+  workspaceId: string,
+  collectionId: string,
+  folderId: string,
+) {
+  const { sessionId } = useV1Auth();
+  return useQuery<FolderImpact>({
+    queryKey: knowledgeKeys.folderImpact(
+      sessionId,
+      workspaceId,
+      collectionId,
+      folderId,
+    ),
+    queryFn: () => getFolderImpact(v1Client, workspaceId, collectionId, folderId),
+    enabled: Boolean(workspaceId && collectionId && folderId),
+  });
+}
+
+export function useCreateFolder(workspaceId: string, collectionId: string) {
+  const queryClient = useQueryClient();
+  const { sessionId } = useV1Auth();
+
+  return useMutation<KBFolder, Error, FolderCreateInput>({
+    mutationFn: (input) => createFolder(v1Client, workspaceId, collectionId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: knowledgeKeys.folders(sessionId, workspaceId, collectionId),
+      });
+    },
+  });
+}
+
+export function useUpdateFolder(
+  workspaceId: string,
+  collectionId: string,
+  folderId: string,
+) {
+  const queryClient = useQueryClient();
+  const { sessionId } = useV1Auth();
+
+  return useMutation<KBFolder, Error, FolderUpdateInput>({
+    mutationFn: (input) =>
+      updateFolder(v1Client, workspaceId, collectionId, folderId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: knowledgeKeys.folders(sessionId, workspaceId, collectionId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: knowledgeKeys.folder(
+          sessionId,
+          workspaceId,
+          collectionId,
+          folderId,
+        ),
+      });
+    },
+  });
+}
+
+export function useMoveFolder(
+  workspaceId: string,
+  collectionId: string,
+  folderId: string,
+) {
+  const queryClient = useQueryClient();
+  const { sessionId } = useV1Auth();
+
+  return useMutation<KBFolder, Error, FolderMoveInput>({
+    mutationFn: (input) =>
+      moveFolder(v1Client, workspaceId, collectionId, folderId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: knowledgeKeys.folders(sessionId, workspaceId, collectionId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [
+          "v1",
+          sessionId,
+          "workspaces",
+          workspaceId,
+          "knowledge",
+          "collections",
+          collectionId,
+          "sources",
+        ],
+      });
+    },
+  });
+}
+
+export function useDeleteFolder(workspaceId: string, collectionId: string) {
+  const queryClient = useQueryClient();
+  const { sessionId } = useV1Auth();
+
+  return useMutation<FolderImpact, Error, string>({
+    mutationFn: (folderId) =>
+      deleteFolder(v1Client, workspaceId, collectionId, folderId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: knowledgeKeys.folders(sessionId, workspaceId, collectionId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [
+          "v1",
+          sessionId,
+          "workspaces",
+          workspaceId,
+          "knowledge",
+          "collections",
+          collectionId,
+          "sources",
+        ],
+      });
+    },
+  });
+}
+
+export function useRestoreFolder(workspaceId: string, collectionId: string) {
+  const queryClient = useQueryClient();
+  const { sessionId } = useV1Auth();
+
+  return useMutation<KBFolder, Error, string>({
+    mutationFn: (folderId) =>
+      restoreFolder(v1Client, workspaceId, collectionId, folderId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: knowledgeKeys.folders(sessionId, workspaceId, collectionId),
+      });
+    },
+  });
+}
+
 export function useSourcesQuery(
   workspaceId: string,
   collectionId: string,
-  params: PageParams = {},
+  params: SourceListParams = {},
 ) {
   const { sessionId } = useV1Auth();
   return useQuery<PageResponse<KBSource>>({
@@ -270,9 +510,9 @@ export function useUploadSource(workspaceId: string, collectionId: string) {
   return useMutation<
     SourceUploadResult,
     Error,
-    { file: File; title?: string; idempotencyKey?: string }
+    { file: File; title?: string; idempotencyKey?: string; folder_id?: string | null }
   >({
-    mutationFn: ({ file, title, idempotencyKey }) =>
+    mutationFn: ({ file, title, idempotencyKey, folder_id }) =>
       uploadSource(
         v1Client,
         workspaceId,
@@ -280,6 +520,7 @@ export function useUploadSource(workspaceId: string, collectionId: string) {
         file,
         title,
         idempotencyKey,
+        folder_id,
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -295,11 +536,91 @@ export function useUploadSource(workspaceId: string, collectionId: string) {
         ],
       });
       void queryClient.invalidateQueries({
+        queryKey: knowledgeKeys.folders(sessionId, workspaceId, collectionId),
+      });
+      void queryClient.invalidateQueries({
         queryKey: knowledgeKeys.collection(
           sessionId,
           workspaceId,
           collectionId,
         ),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [
+          "v1",
+          sessionId,
+          "workspaces",
+          workspaceId,
+          "knowledge",
+          "collections",
+        ],
+      });
+    },
+  });
+}
+
+export function useMoveSource(workspaceId: string, collectionId: string) {
+  const queryClient = useQueryClient();
+  const { sessionId } = useV1Auth();
+
+  return useMutation<
+    KBSource,
+    Error,
+    { sourceId: string; targetFolderId: string | null }
+  >({
+    mutationFn: ({ sourceId, targetFolderId }) =>
+      moveSource(v1Client, workspaceId, collectionId, sourceId, targetFolderId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: [
+          "v1",
+          sessionId,
+          "workspaces",
+          workspaceId,
+          "knowledge",
+          "collections",
+          collectionId,
+          "sources",
+        ],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: knowledgeKeys.folders(sessionId, workspaceId, collectionId),
+      });
+    },
+  });
+}
+
+export function useRenameSource(workspaceId: string, collectionId: string) {
+  const queryClient = useQueryClient();
+  const { sessionId } = useV1Auth();
+
+  return useMutation<
+    KBSource,
+    Error,
+    { sourceId: string; title: string }
+  >({
+    mutationFn: ({ sourceId, title }) =>
+      renameSource(v1Client, workspaceId, collectionId, sourceId, title),
+    onSuccess: (_, vars) => {
+      void queryClient.invalidateQueries({
+        queryKey: knowledgeKeys.source(
+          sessionId,
+          workspaceId,
+          collectionId,
+          vars.sourceId,
+        ),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [
+          "v1",
+          sessionId,
+          "workspaces",
+          workspaceId,
+          "knowledge",
+          "collections",
+          collectionId,
+          "sources",
+        ],
       });
     },
   });

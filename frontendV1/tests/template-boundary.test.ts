@@ -51,6 +51,7 @@ const V1_DIRECTORIES = [
 const V1_ROUTE_PREFIXES = [
   "routes/workspaces",
   "routes/modelops",
+  "routes/providers",
   "routes/signin-oidc",
 ];
 

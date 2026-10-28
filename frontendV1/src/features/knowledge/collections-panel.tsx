@@ -1,8 +1,12 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ChevronRight,
+  Database,
+  FileText,
+  FileUp,
   FolderOpen,
   FolderPlus,
+  MoreVertical,
   Pencil,
   Search,
 } from "lucide-react";
@@ -13,6 +17,12 @@ import { ErrorState } from "@/components/admin/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -23,10 +33,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ViewModeToggle } from "@/components/ui/view-mode-toggle";
 import { CollectionFormDialog } from "@/features/knowledge/collection-form-dialog";
 import { canManageKnowledge } from "@/features/knowledge/permissions";
 import { useCollectionsQuery } from "@/features/knowledge/queries";
+import { SourceUploadDialog } from "@/features/knowledge/source-upload-dialog";
 import type { KBCollection } from "@/features/knowledge/types";
+import { LifecycleActions } from "@/features/lifecycle/lifecycle-actions";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { formatDateTimeValue } from "@/lib/date-utils";
 
@@ -43,11 +56,14 @@ export function CollectionsPanel({
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
 }) {
+  const navigate = useNavigate();
   const { role, isPending: rolePending } = useCallerWorkspaceRole(workspaceId);
   const collectionsQuery = useCollectionsQuery(workspaceId, { page, pageSize });
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [createOpen, setCreateOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [editingCollection, setEditingCollection] =
     useState<KBCollection | null>(null);
 
@@ -69,70 +85,104 @@ export function CollectionsPanel({
   }, [rawItems, searchQuery]);
 
   return (
-    <div className="space-y-4">
-      {/* Compact Toolbar */}
-      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 sm:max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-8 text-xs h-8"
-            placeholder="Tìm theo tên bộ sưu tập..."
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-          />
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Database className="size-4" />
+            </span>
+            Kho tri thức
+          </h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            Quản lý các kho dữ liệu, thư mục và tài liệu phục vụ huấn luyện và phản hồi của trợ lý AI.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Primary and Secondary Action Buttons */}
+        <div className="flex items-center gap-2.5 shrink-0">
           <Button
             size="sm"
-            className="gap-1.5 text-xs h-8"
+            variant="outline"
+            className="gap-1.5 text-xs h-9"
             disabled={!canManage}
             onClick={() => setCreateOpen(true)}
             title={
               canManage
                 ? undefined
-                : "Cần vai trò admin hoặc editor để tạo bộ sưu tập"
+                : "Cần vai trò admin hoặc editor để tạo kho tri thức"
             }
           >
-            <FolderPlus className="size-3.5" />
-            <span>Tạo bộ sưu tập</span>
+            <FolderPlus className="size-4 text-muted-foreground" />
+            <span>Tạo kho</span>
           </Button>
+
+          <Button
+            size="sm"
+            className="gap-1.5 text-xs h-9 shadow-xs"
+            disabled={!canManage}
+            onClick={() => setUploadOpen(true)}
+            title={
+              canManage
+                ? undefined
+                : "Cần vai trò admin hoặc editor để tải tài liệu"
+            }
+          >
+            <FileUp className="size-4" />
+            <span>Tải tài liệu</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Left-Right Split Filter Bar Pattern */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        <div className="relative w-full sm:w-72 lg:w-80">
+          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-8 text-xs h-9"
+            placeholder="Tìm theo tên kho tri thức..."
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-2">
+          <ViewModeToggle value={viewMode} onChange={setViewMode} />
         </div>
       </div>
 
       {/* Query state handling */}
       {collectionsQuery.isLoading ? (
-        <Card className="rounded-xl shadow-2xs">
-          <div className="space-y-3 p-4">
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
-          </div>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
+        </div>
       ) : collectionsQuery.isError ? (
         <ErrorState
           error={collectionsQuery.error}
           onRetry={() => void collectionsQuery.refetch()}
         />
       ) : items.length === 0 ? (
-        <Card className="rounded-xl shadow-2xs">
+        <Card className="rounded-xl shadow-2xs border-border/70">
           <CardContent className="py-12">
             <EmptyState
               icon={FolderOpen}
               title={
                 searchQuery.trim()
-                  ? "Không tìm thấy bộ sưu tập phù hợp"
-                  : "Chưa có bộ sưu tập nào"
+                  ? "Không tìm thấy kho tri thức phù hợp"
+                  : "Chưa có kho tri thức nào"
               }
               description={
                 searchQuery.trim()
-                  ? `Không có bộ sưu tập nào khớp với từ khóa "${searchQuery}".`
-                  : "Tạo bộ sưu tập đầu tiên để bắt đầu lưu trữ tài liệu tri thức cho workspace này."
+                  ? `Không có kho tri thức nào khớp với từ khóa "${searchQuery}".`
+                  : "Tạo kho đầu tiên để bắt đầu tải lên và tổ chức tài liệu cho workspace này."
               }
               action={
                 canManage && !searchQuery.trim()
                   ? {
-                      label: "Tạo bộ sưu tập ngay",
+                      label: "Tạo kho ngay",
                       onClick: () => setCreateOpen(true),
                     }
                   : undefined
@@ -140,214 +190,218 @@ export function CollectionsPanel({
             />
           </CardContent>
         </Card>
+      ) : viewMode === "grid" ? (
+        /* Grid Cards View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {items.map((item) => (
+            <Card
+              key={item.id}
+              className="group relative rounded-xl border-border/70 transition-all hover:border-primary/40 hover:shadow-xs flex flex-col justify-between"
+            >
+              <CardContent className="p-4 flex flex-col justify-between h-full">
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <Link
+                      to="/workspaces/$workspaceId/collections/$collectionId"
+                      params={{ workspaceId, collectionId: item.id }}
+                      search={{ page: 1, pageSize: 20 }}
+                      className="flex items-center gap-2.5 min-w-0 flex-1 hover:text-primary transition-colors"
+                    >
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <FolderOpen className="size-4" />
+                      </span>
+                      <span className="font-semibold text-sm truncate text-foreground group-hover:text-primary">
+                        {item.name}
+                      </span>
+                    </Link>
+
+                    {canManage ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="size-7 p-0 text-muted-foreground hover:text-foreground shrink-0"
+                          >
+                            <MoreVertical className="size-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40 text-xs">
+                          <DropdownMenuItem
+                            className="gap-2"
+                            onClick={() => setEditingCollection(item)}
+                          >
+                            <Pencil className="size-3.5" />
+                            <span>Sửa thông tin</span>
+                          </DropdownMenuItem>
+                          <LifecycleActions
+                            workspaceId={workspaceId}
+                            kind="collection"
+                            resourceId={item.id}
+                            label={item.name}
+                            role={role?.kind}
+                          />
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
+                  </div>
+
+                  <p className="text-xs text-muted-foreground line-clamp-2 min-h-8 mb-3">
+                    {item.description || "Chưa có mô tả chi tiết."}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-border/50 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <FileText className="size-3.5 text-primary/70" />
+                    <span>
+                      <strong className="text-foreground">{item.source_count}</strong> tài liệu
+                    </span>
+                  </div>
+                  <Link
+                    to="/workspaces/$workspaceId/collections/$collectionId"
+                    params={{ workspaceId, collectionId: item.id }}
+                    search={{ page: 1, pageSize: 20 }}
+                    className="flex items-center gap-1 text-primary font-medium hover:underline"
+                  >
+                    <span>Mở kho</span>
+                    <ChevronRight className="size-3" />
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : (
-        <Card className="rounded-xl shadow-2xs overflow-hidden">
-          {/* Desktop Table View */}
-          <div className="hidden sm:block overflow-x-auto">
+        /* Table View */
+        <Card className="rounded-xl shadow-2xs overflow-hidden border-border/70">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[30%]">Tên bộ sưu tập</TableHead>
-                  <TableHead className="w-[30%]">Mô tả</TableHead>
-                  <TableHead className="w-[12%] text-center">
-                    Số nguồn
-                  </TableHead>
-                  <TableHead className="w-[13%]">Người tạo</TableHead>
-                  <TableHead className="w-[15%]">Ngày tạo</TableHead>
-                  <TableHead className="w-[100px] text-right">
-                    Thao tác
-                  </TableHead>
+                  <TableHead className="w-[35%]">Tên kho tri thức</TableHead>
+                  <TableHead className="w-[35%]">Mô tả</TableHead>
+                  <TableHead className="w-[12%] text-center">Tài liệu</TableHead>
+                  <TableHead className="w-[18%]">Cập nhật</TableHead>
+                  <TableHead className="w-[60px] text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((collection) => (
-                  <TableRow key={collection.id} className="group">
-                    <TableCell>
+                {items.map((item) => (
+                  <TableRow key={item.id} className="group hover:bg-muted/40">
+                    <TableCell className="font-medium">
                       <Link
                         to="/workspaces/$workspaceId/collections/$collectionId"
-                        params={{
-                          workspaceId,
-                          collectionId: collection.id,
-                        }}
+                        params={{ workspaceId, collectionId: item.id }}
                         search={{ page: 1, pageSize: 20 }}
-                        className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
+                        className="flex items-center gap-2 text-foreground hover:text-primary transition-colors"
                       >
-                        <FolderOpen className="size-4 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
-                        <span className="truncate">{collection.name}</span>
+                        <FolderOpen className="size-4 shrink-0 text-primary" />
+                        <span className="truncate">{item.name}</span>
                       </Link>
                     </TableCell>
-
-                    <TableCell className="text-xs text-muted-foreground">
-                      <span
-                        className="line-clamp-2"
-                        title={collection.description ?? ""}
-                      >
-                        {collection.description || "—"}
-                      </span>
+                    <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
+                      {item.description || "—"}
                     </TableCell>
-
                     <TableCell className="text-center">
-                      <Badge variant="secondary" className="font-mono text-xs">
-                        {collection.source_count}
+                      <Badge variant="secondary" className="text-xs font-normal">
+                        {item.source_count}
                       </Badge>
                     </TableCell>
-
-                    <TableCell className="font-mono text-xs text-muted-foreground truncate">
-                      {collection.created_by}
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {formatDateTimeValue(item.updated_at || item.created_at)}
                     </TableCell>
-
-                    <TableCell className="text-xs text-muted-foreground">
-                      {formatDateTimeValue(collection.created_at)}
-                    </TableCell>
-
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="size-7 p-0"
-                          disabled={!canManage}
-                          title={
-                            canManage
-                              ? "Sửa bộ sưu tập"
-                              : "Cần vai trò admin/editor"
-                          }
-                          onClick={() => setEditingCollection(collection)}
-                        >
-                          <Pencil className="size-3.5 text-muted-foreground" />
-                          <span className="sr-only">Sửa</span>
-                        </Button>
-
-                        <Button
-                          asChild
-                          size="sm"
-                          variant="ghost"
-                          className="size-7 p-0"
-                        >
-                          <Link
-                            to="/workspaces/$workspaceId/collections/$collectionId"
-                            params={{
-                              workspaceId,
-                              collectionId: collection.id,
-                            }}
-                            search={{ page: 1, pageSize: 20 }}
-                            title="Xem chi tiết bộ sưu tập"
-                          >
-                            <ChevronRight className="size-3.5 text-muted-foreground" />
-                            <span className="sr-only">Chi tiết</span>
-                          </Link>
-                        </Button>
-                      </div>
+                      {canManage ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="size-7 p-0 text-muted-foreground hover:text-foreground"
+                            >
+                              <MoreVertical className="size-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40 text-xs">
+                            <DropdownMenuItem
+                              className="gap-2"
+                              onClick={() => setEditingCollection(item)}
+                            >
+                              <Pencil className="size-3.5" />
+                              <span>Sửa thông tin</span>
+                            </DropdownMenuItem>
+                            <LifecycleActions
+                              workspaceId={workspaceId}
+                              kind="collection"
+                              resourceId={item.id}
+                              label={item.name}
+                              role={role?.kind}
+                            />
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
-
-          {/* Mobile Card View */}
-          <div className="divide-y sm:hidden">
-            {items.map((collection) => (
-              <div key={collection.id} className="p-4 space-y-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <Link
-                    to="/workspaces/$workspaceId/collections/$collectionId"
-                    params={{
-                      workspaceId,
-                      collectionId: collection.id,
-                    }}
-                    search={{ page: 1, pageSize: 20 }}
-                    className="font-medium text-sm text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
-                  >
-                    <FolderOpen className="size-4 shrink-0 text-primary" />
-                    <span>{collection.name}</span>
-                  </Link>
-
-                  <Badge
-                    variant="secondary"
-                    className="font-mono text-xs shrink-0"
-                  >
-                    {collection.source_count} nguồn
-                  </Badge>
-                </div>
-
-                {collection.description ? (
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {collection.description}
-                  </p>
-                ) : null}
-
-                <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground border-t">
-                  <span>{formatDateTimeValue(collection.created_at)}</span>
-                  <div className="flex items-center gap-1">
-                    {canManage ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 px-2 text-[11px]"
-                        onClick={() => setEditingCollection(collection)}
-                      >
-                        <Pencil className="size-3 mr-1" />
-                        Sửa
-                      </Button>
-                    ) : null}
-
-                    <Button
-                      asChild
-                      size="sm"
-                      variant="outline"
-                      className="h-6 px-2 text-[11px]"
-                    >
-                      <Link
-                        to="/workspaces/$workspaceId/collections/$collectionId"
-                        params={{
-                          workspaceId,
-                          collectionId: collection.id,
-                        }}
-                        search={{ page: 1, pageSize: 20 }}
-                      >
-                        Xem
-                        <ChevronRight className="size-3 ml-0.5" />
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Pagination */}
-          {total > 0 ? (
-            <div className="border-t px-3">
-              <DataTablePagination
-                page={page}
-                pageSize={pageSize}
-                pageCount={pageCount}
-                total={total}
-                onPageChange={onPageChange}
-                onPageSizeChange={onPageSizeChange}
-              />
-            </div>
-          ) : null}
         </Card>
       )}
 
-      {/* Dialog for Create */}
+      {/* Pagination */}
+      {total > 0 ? (
+        <DataTablePagination
+          pageIndex={page - 1}
+          pageSize={pageSize}
+          pageCount={pageCount}
+          totalItems={total}
+          canPreviousPage={page > 1}
+          canNextPage={page < pageCount}
+          onPageChange={(idx) => onPageChange(idx + 1)}
+          onPageSizeChange={onPageSizeChange}
+        />
+      ) : null}
+
+      {/* Upload Dialog: Selects destination collection or creates one */}
+      <SourceUploadDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        workspaceId={workspaceId}
+        onSuccess={() => {
+          void collectionsQuery.refetch();
+        }}
+      />
+
+      {/* Create Dialog */}
       <CollectionFormDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
         workspaceId={workspaceId}
+        onSuccess={(created) => {
+          void collectionsQuery.refetch();
+          void navigate({
+            to: "/workspaces/$workspaceId/collections/$collectionId",
+            params: { workspaceId, collectionId: created.id },
+            search: { page: 1, pageSize: 20 },
+          });
+        }}
       />
 
-      {/* Dialog for Edit */}
-      <CollectionFormDialog
-        open={Boolean(editingCollection)}
-        onOpenChange={(open) => {
-          if (!open) setEditingCollection(null);
-        }}
-        workspaceId={workspaceId}
-        collection={editingCollection}
-      />
+      {/* Edit Dialog */}
+      {editingCollection ? (
+        <CollectionFormDialog
+          open={Boolean(editingCollection)}
+          onOpenChange={(open) => !open && setEditingCollection(null)}
+          workspaceId={workspaceId}
+          collectionToEdit={editingCollection}
+          onSuccess={() => {
+            void collectionsQuery.refetch();
+            setEditingCollection(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

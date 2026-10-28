@@ -127,6 +127,10 @@ export const knowledgePaths = {
     `/workspaces/${workspaceId}/collections/${collectionId}/sources`,
   source: (workspaceId: string, collectionId: string, sourceId: string) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}`,
+  sourceMove: (workspaceId: string, collectionId: string, sourceId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/move`,
+  sourceRename: (workspaceId: string, collectionId: string, sourceId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}`,
   revisions: (workspaceId: string, collectionId: string, sourceId: string) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions`,
   revisionContent: (
@@ -136,6 +140,16 @@ export const knowledgePaths = {
     revisionId: string,
   ) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/content`,
+  folders: (workspaceId: string, collectionId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/folders`,
+  folder: (workspaceId: string, collectionId: string, folderId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/folders/${folderId}`,
+  folderMove: (workspaceId: string, collectionId: string, folderId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/folders/${folderId}/move`,
+  folderImpact: (workspaceId: string, collectionId: string, folderId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/folders/${folderId}/impact`,
+  folderRestore: (workspaceId: string, collectionId: string, folderId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/folders/${folderId}/restore`,
 } as const;
 
 export const assistantPaths = {
@@ -398,6 +412,7 @@ export const V1_ROUTE_PREFIXES = [
   "/workspaces",
   "/modelops",
   "/dashboard",
+  "/providers",
 ] as const;
 
 export function isV1Route(pathname: string): boolean {

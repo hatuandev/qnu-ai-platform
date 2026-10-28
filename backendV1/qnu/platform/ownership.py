@@ -84,6 +84,7 @@ V1_TABLES = frozenset(
         "model_usage_records",
         "modelops_events",
         "kb_collections",
+        "kb_folders",
         "kb_sources",
         "kb_source_revisions",
         "kb_upload_requests",
