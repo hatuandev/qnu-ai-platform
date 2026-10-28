@@ -7,10 +7,19 @@
  */
 
 import type { V1Client } from "../../app/api/v1/client.ts";
-import { modelopsPaths } from "../../app/api/v1/endpoints.ts";
+import { integrationPaths, modelopsPaths } from "../../app/api/v1/endpoints.ts";
 import type {
+  AppApiKey,
+  AppApiKeyCreateInput,
+  AppApiKeyRevokeInput,
+  AppApiKeyRotateInput,
+  AppApiKeySecretResponse,
+  AppApiKeyStatusUpdateInput,
+  AppClient,
+  AppRequestLog,
   CatalogItem,
   DefaultsUpdateInput,
+  IntegrationConfig,
   KeyAudit,
   KeyCreateInput,
   KeyRevokeInput,
@@ -20,6 +29,7 @@ import type {
   Provider,
   ProviderCreateInput,
   ProviderKey,
+  ProviderSummaryItem,
   ProviderUpdateInput,
 } from "./types.ts";
 
@@ -182,4 +192,99 @@ export function clearDefaultFor(
     case "ocr":
       return { ocr_provider_id: null, ocr_model: null };
   }
+}
+
+export function listProvidersSummary(
+  client: V1Client,
+  options?: { signal?: AbortSignal },
+): Promise<ProviderSummaryItem[]> {
+  return client.get<ProviderSummaryItem[]>(
+    modelopsPaths.providersSummary,
+    options,
+  );
+}
+
+export function getIntegrationConfig(
+  client: V1Client,
+  options?: { signal?: AbortSignal },
+): Promise<IntegrationConfig> {
+  return client.get<IntegrationConfig>(integrationPaths.config, options);
+}
+
+export function listAppClients(
+  client: V1Client,
+  workspaceId: string,
+  options?: { signal?: AbortSignal },
+): Promise<AppClient[]> {
+  return client.get<AppClient[]>(integrationPaths.apps(workspaceId), options);
+}
+
+export function listAppApiKeys(
+  client: V1Client,
+  workspaceId: string,
+  options?: { signal?: AbortSignal },
+): Promise<AppApiKey[]> {
+  return client.get<AppApiKey[]>(integrationPaths.keys(workspaceId), options);
+}
+
+export function createAppApiKey(
+  client: V1Client,
+  workspaceId: string,
+  input: AppApiKeyCreateInput,
+): Promise<AppApiKeySecretResponse> {
+  return client.post<AppApiKeySecretResponse>(
+    integrationPaths.keys(workspaceId),
+    input,
+  );
+}
+
+export function updateAppApiKeyStatus(
+  client: V1Client,
+  workspaceId: string,
+  keyId: string,
+  input: AppApiKeyStatusUpdateInput,
+): Promise<AppApiKey> {
+  return client.put<AppApiKey>(
+    integrationPaths.keyStatus(workspaceId, keyId),
+    input,
+  );
+}
+
+export function rotateAppApiKey(
+  client: V1Client,
+  workspaceId: string,
+  keyId: string,
+  input: AppApiKeyRotateInput,
+): Promise<AppApiKeySecretResponse> {
+  return client.post<AppApiKeySecretResponse>(
+    integrationPaths.keyRotate(workspaceId, keyId),
+    input,
+  );
+}
+
+export function revokeAppApiKey(
+  client: V1Client,
+  workspaceId: string,
+  keyId: string,
+  input: AppApiKeyRevokeInput,
+): Promise<AppApiKey> {
+  return client.request<AppApiKey>(
+    integrationPaths.keyRevoke(workspaceId, keyId),
+    {
+      method: "DELETE",
+      body: input,
+    },
+  );
+}
+
+export function listAppRequestLogs(
+  client: V1Client,
+  workspaceId: string,
+  limit = 50,
+  options?: { signal?: AbortSignal },
+): Promise<AppRequestLog[]> {
+  return client.get<AppRequestLog[]>(integrationPaths.logs(workspaceId), {
+    searchParams: { limit },
+    signal: options?.signal,
+  });
 }

@@ -43,6 +43,11 @@ async def identity(db: AsyncSession, provider: Provider) -> str:
             .limit(1)
         )
     ).first()
+    return configuration_identity(provider, key)
+
+
+def configuration_identity(provider: Provider, key: ProviderKey | None) -> str:
+    """Shared fingerprint for batched summaries and detailed diagnostics."""
     capacity = read_capacity(provider)
     dimension, dimension_status = read_dimension(provider)
     material = [

@@ -10,6 +10,7 @@ from arq.connections import RedisSettings
 
 from qnu.adapters.queue.arq_queue import ArqJobQueue
 from qnu.platform.config import get_settings
+from qnu.platform.schema import SCHEMA_HEAD
 from qnu.workers import heartbeat
 from tests.integration.compiler_support import processed_input
 from tests.integration.knowledge_support import API, EDITOR, OUTSIDER, PLATFORM, as_actor
@@ -52,7 +53,7 @@ def test_worker_heartbeat_is_queue_scoped_and_removed_on_shutdown(client, monkey
                 if (await queue.health())["worker_schema_head"]:
                     break
                 await asyncio.sleep(0.02)
-            assert (await queue.health())["worker_schema_head"] == "0003_rag_policy_metadata"
+            assert (await queue.health())["worker_schema_head"] == SCHEMA_HEAD
             assert (await other.health())["worker_schema_head"] is None
             await heartbeat.stop(ctx)
             assert (await queue.health())["worker_schema_head"] is None
@@ -75,7 +76,7 @@ def test_readiness_distinguishes_missing_zero_unlimited_and_blocked_quota(
     from qnu.platform.database import AsyncSessionFactory
 
     async def worker_healthy():
-        return {"ok": True, "worker_schema_head": "0003_rag_policy_metadata"}
+        return {"ok": True, "worker_schema_head": SCHEMA_HEAD}
 
     monkeypatch.setattr(app.state.container.job_queue, "health", worker_healthy)
     as_actor(PLATFORM)

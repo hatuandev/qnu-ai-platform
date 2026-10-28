@@ -159,3 +159,102 @@ export type KeyCreateInput = {
 
 export type KeyRotateInput = KeyCreateInput & { reason?: string | null };
 export type KeyRevokeInput = { reason?: string | null };
+
+export type ProviderSummaryItem = Provider & {
+  active_keys_count: number;
+  total_keys_count: number;
+  last_probe_status:
+    | "success"
+    | "failed"
+    | "unsupported"
+    | "untested"
+    | "stale";
+  last_probe_at: string | null;
+  last_probe_latency_ms?: number | null;
+  last_probe_error?: string | null;
+};
+
+export type AppClient = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  status: "active" | "suspended" | "revoked";
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AppApiKey = {
+  id: string;
+  app_id: string;
+  app_name: string;
+  workspace_id: string;
+  name: string;
+  key_prefix: string;
+  status: "active" | "suspended" | "revoked";
+  allowed_assistant_ids: string[];
+  rate_limit_rpm: number;
+  rate_limit_rpd: number;
+  expires_at: string | null;
+  last_used_at: string | null;
+  rotated_from_key_id: string | null;
+  revoked_at: string | null;
+  revoked_reason: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type AppApiKeySecretResponse = AppApiKey & {
+  secret_key: string;
+};
+
+export type AppApiKeyCreateInput = {
+  app_id?: string;
+  app_name: string;
+  name: string;
+  allowed_assistant_ids?: string[];
+  allow_all_assistants?: boolean;
+  rate_limit_rpm?: number;
+  rate_limit_rpd?: number;
+  expires_in_days?: number | null;
+  idempotency_key?: string;
+};
+
+export type AppApiKeyRotateInput = {
+  expires_in_days?: number | null;
+  idempotency_key?: string;
+};
+
+export type AppApiKeyStatusUpdateInput = {
+  status: "active" | "suspended";
+  reason?: string;
+};
+
+export type AppApiKeyRevokeInput = {
+  reason: string;
+};
+
+export type AppRequestLog = {
+  id: string;
+  app_id: string;
+  key_id: string;
+  workspace_id: string;
+  assistant_id: string | null;
+  endpoint: string;
+  status_code: number;
+  latency_ms: number;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  error_code: string | null;
+  created_at: string;
+};
+
+export type IntegrationConfig = {
+  base_url: string;
+  openai_endpoint: string;
+  supported_protocols: string[];
+  capabilities: string[];
+  version: string;
+};

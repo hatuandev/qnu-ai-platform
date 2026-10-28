@@ -1,7 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import {
+  Activity,
   ArrowLeft,
   CirclePower,
+  Cpu,
+  History,
   Pencil,
   ShieldAlert,
   TriangleAlert,
@@ -16,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CapacityBadge } from "@/features/modelops/capacity-badge";
 import { ProviderDiagnosticsPanel } from "@/features/modelops/diagnostics-panel";
 import { KeyEventsPanel } from "@/features/modelops/key-events-panel";
@@ -296,11 +300,53 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
         </p>
       ) : null}
 
-      <ProviderDiagnosticsPanel provider={provider} />
-      <ProviderResiliencePanel provider={provider} />
-      <CapacityPanel provider={provider} />
+      {/* 1. AI Server Keys block placed near top for fast access */}
       <KeysPanel providerId={providerId} />
-      <KeyEventsPanel providerId={providerId} />
+
+      {/* 2. Connection Diagnostics & Functional Probing block */}
+      <ProviderDiagnosticsPanel provider={provider} />
+
+      {/* 3. Advanced Configuration Tabs: Resilience, Declared Capacity, and Event History */}
+      <div className="space-y-4 pt-2">
+        <div className="border-b pb-2">
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">
+            Cấu hình nâng cao & Lịch sử
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Các chính sách phục hồi, giới hạn token đã khai báo và nhật ký kiểm
+            toán khóa.
+          </p>
+        </div>
+
+        <Tabs defaultValue="resilience" className="w-full">
+          <TabsList className="w-full justify-start">
+            <TabsTrigger value="resilience" className="gap-1.5 text-xs">
+              <Activity className="size-3.5" />
+              <span>Dự phòng & Phục hồi</span>
+            </TabsTrigger>
+            <TabsTrigger value="capacity" className="gap-1.5 text-xs">
+              <Cpu className="size-3.5" />
+              <span>Năng lực đã khai báo</span>
+            </TabsTrigger>
+            <TabsTrigger value="events" className="gap-1.5 text-xs">
+              <History className="size-3.5" />
+              <span>Lịch sử sự kiện khóa</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="resilience">
+            <ProviderResiliencePanel provider={provider} />
+          </TabsContent>
+
+          <TabsContent value="capacity">
+            <CapacityPanel provider={provider} />
+          </TabsContent>
+
+          <TabsContent value="events">
+            <KeyEventsPanel providerId={providerId} />
+          </TabsContent>
+        </Tabs>
+      </div>
 
       <ProviderFormDialog
         open={editOpen}

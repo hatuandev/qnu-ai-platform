@@ -11,6 +11,9 @@ from fastapi.testclient import TestClient
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "").strip()
 
 TABLES = (
+    "app_request_logs",
+    "app_api_keys",
+    "app_clients",
     "ops_storage_cleanup_actions",
     "resource_lifecycle_actions",
     "resource_lifecycle_states",

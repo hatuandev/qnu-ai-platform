@@ -240,3 +240,20 @@ class ModelOpsEventResponse(BaseModel):
     provider_id: str | None
     detail: dict[str, Any]
     created_at: datetime
+
+
+class ProviderSummaryItem(ProviderResponse):
+    id: str
+    name: str
+    provider_type: str
+    base_url: str
+    model_name: str
+    capabilities: list[str]
+    is_active: bool
+    priority: int
+    timeout_seconds: int
+    active_keys_count: int = 0
+    total_keys_count: int = 0
+    last_probe_status: Literal["success", "failed", "unsupported", "untested", "stale"] = "untested"
+    last_probe_at: datetime | None = None
+    last_probe_latency_ms: int | None = None

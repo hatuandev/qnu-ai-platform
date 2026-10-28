@@ -70,6 +70,12 @@ export const navigationGroups: NavGroup[] = [
             scope: "v1",
           },
           {
+            id: "modelops-endpoints",
+            title: "API tích hợp",
+            to: "/modelops/endpoints",
+            scope: "v1",
+          },
+          {
             id: "modelops-defaults",
             title: "Model mặc định",
             to: "/modelops/defaults",

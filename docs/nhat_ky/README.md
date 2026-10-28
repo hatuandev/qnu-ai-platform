@@ -7,6 +7,12 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+- **2026-10-28 — Context700: sửa10lỗi Providers/API tích hợp.** Key lifecycle/quyền/limiter, giữ policy trợ lý, strict single-turn, URL tin cậy và diagnostics đã sửa. Full BE755PASS +recovery4PASS; FE406+1PASS, regression44/schema7/pipeline1PASS; build/lint PASS. Browser desktop sáng/mobile sáng-tối đã kiểm; DB thử dọn. Cần cấu hình PUBLIC_BASE_URL; không live model/env/restart/push. [Nhật ký700](./2026-10-28_phien_700_sua_10_loi_api_tich_hop.md).
+
+- **2026-10-28 — Context699: seed Phòng Công tác sinh viên.** Workspace/kho trống +3membership admin/editor/member; khóa dev riêng trong local registry hash, không cấp admin nền tảng. Focused8PASS/integration1PASS; seed lặp không trùng và API ASGI DB local kiểm quyền đạt. Full bị ngắt/có1FAIL upload concurrency, riêng1PASS; DB test đã dọn. Không frontend/env/model/migration/restart/push. [Nhật ký699](./2026-10-28_phien_699_seed_phong_cong_tac_sinh_vien.md).
+
+- **2026-10-28 — Context697: review Providers/API tích hợp sau prompt.** Tái hiện10lỗi về policy trợ lý, quyền/lifecycle khóa, limiter, history, error và URL/diagnostics. BE batch+review3PASS/8FAIL, FE batch4PASS/review2FAIL; build+TS/Ruff PASS, Biome FAIL1format. DB thử đã dọn; chỉ review/docs, chưa sửa app hoặc gọi AI/restart/push. [Nhật ký697](./2026-10-28_phien_697_review_provider_va_api_tich_hop.md).
+
 - **2026-10-28 — Context696: bổ sung nguyên tắc thiết kế frontend.** Cập nhật skill QNU và skill cá nhân admin-frontend-design: bố cục theo tác vụ, hierarchy/nhãn/lỗi/trống và tự rà soát; giữ design system, sửa nhỏ không ép thiết kế lại. Hai validator PASS; chỉ đổi skill/docs, không cài skill ngoài hoặc chạy app test/build/restart/push. [Nhật ký696](./2026-10-28_phien_696_bo_sung_nguyen_tac_thiet_ke_frontend.md).
 
 - **2026-10-28 — Context695: ModelOps nhóm khóa, dự phòng và registry V1.** Pool PostgreSQL có fencing/cooldown401/429, max3lượt/gateway1; dự phòng trước tác vụ giữ grants/quota và model đã ghim, không đổi embedding. Runtime theo DB người gọi, audit gắn usage; FE có chính sách/trạng thái khóa/lịch sử và registry. BE tổng715PASS +recovery1PASS; sau fix OCR reuse có61regressionPASS. FE400PASS, Ruff44/Biome10/build+TS và browser desktop/mobile đạt. Không migration/.env/live inference/đổi cấu hình/restart người dùng hoặc push. [Nhật ký695](./2026-10-28_phien_695_modelops_nhom_khoa_du_phong_va_registry.md).

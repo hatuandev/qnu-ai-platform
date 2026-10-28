@@ -109,6 +109,9 @@ V1_TABLES = frozenset(
         "chat_assistants",
         "chat_conversations",
         "chat_turns",
+        "app_clients",
+        "app_api_keys",
+        "app_request_logs",
     }
 )
 

@@ -56,6 +56,31 @@ tiếp riêng, không tự `stamp head`. Các migration tiếp theo bắt đầu
 
 Dev login cần DEV_AUTH_ENABLED=true và DEV_ACCESS_PASSWORD. Production tắt dev gate và cấu hình SSO_ENABLED, SSO_AUTHORITY, SSO_AUDIENCE, SSO_JWKS_URL (endpoint HTTPS tin cậy của quản trị). Signing key và master encryption key là bí mật hạ tầng, không phải credential LLM. Không có cơ chế tự seed provider/key.
 
+## Dữ liệu thử nghiệm Phòng Công tác sinh viên
+
+Từ `backendV1`, dùng đúng cấu hình DB local đang chạy:
+
+```powershell
+# Nếu ứng dụng dùng .env ở gốc repo:
+uv run --frozen --env-file ../.env python -X utf8 -m scripts.seed_student_affairs
+# Nếu ứng dụng dùng backendV1/.env:
+uv run --frozen python -X utf8 -m scripts.seed_student_affairs
+```
+
+Seed tạo workspace `cong-tac-sinh-vien`, một kho trống và ba membership:
+`ctsv.admin` (quản trị workspace), `ctsv.editor` (biên tập), `ctsv.user` (thành viên).
+Admin nền tảng `dev.admin` tiếp tục dùng dev gate hiện có. Chạy lại không tạo trùng,
+không đổi vai trò/trạng thái hiện có, không đặt lại khóa và không cấp provider/model.
+Chỉ chạy với dev gate được bật, PostgreSQL loopback; không dùng cho production.
+
+Khóa ngẫu nhiên lưu riêng trong `backendV1/.local/ctsv-test-accounts.json`, bị Git bỏ qua;
+registry xác thực chỉ lưu SHA-256 của khóa. Không chép khóa vào log hoặc tài liệu.
+Trong frontendV1: đăng xuất → mở **Sử dụng Dev Access Key (kiểm thử cục bộ)** →
+dán giá trị khóa tương ứng từ tệp local. Tên tài khoản được máy chủ xác định từ khóa;
+quyền phòng ban vẫn lấy từ membership DB. Chọn **Tự đăng nhập bằng cấu hình local**
+để trở lại admin nền tảng nếu cầu nối local đã được cấu hình.
+Các tài khoản thử nghiệm không phải tài khoản SSO hay tài khoản nhân sự thực.
+
 ## Kiểm thử
 
 [Review ngữ nghĩa sau Compiler](docs/compiler-review.md): API kiểm hai chiều

@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 import jwt
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.identity.dev_accounts import resolve_seed_actor
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException
 
@@ -27,14 +28,16 @@ def issue_dev_token(access_key: str) -> tuple[str, AuthActor]:
         raise AppException(
             "Cần cấu hình SECRET_KEY ít nhất 32 byte.", code="SIGNING_KEY_MISSING", status_code=503
         )
-    if not settings.DEV_ACCESS_PASSWORD or not hmac.compare_digest(
-        access_key, settings.DEV_ACCESS_PASSWORD
-    ):
+    is_admin_key = bool(settings.DEV_ACCESS_PASSWORD) and hmac.compare_digest(
+        access_key.encode(), settings.DEV_ACCESS_PASSWORD.encode()
+    )
+    actor = None if is_admin_key else resolve_seed_actor(access_key)
+    if not is_admin_key and actor is None:
         raise AppException(
             "Mật khẩu truy cập dev không đúng.", code="invalid_credentials", status_code=401
         )
 
-    actor = AuthActor(
+    actor = actor or AuthActor(
         username="dev.admin",
         actor_id="act_dev_admin",
         display_name="Quản trị dev",
@@ -46,6 +49,7 @@ def issue_dev_token(access_key: str) -> tuple[str, AuthActor]:
     payload = {
         "sub": actor.username,
         "actor_id": actor.actor_id,
+        "display_name": actor.display_name,
         "email": actor.email,
         "roles": actor.roles,
         "permissions": actor.permissions,
@@ -84,6 +88,7 @@ def decode_dev_token(token: str) -> AuthActor:
     return AuthActor(
         username=payload["sub"],
         actor_id=payload["actor_id"],
+        display_name=payload.get("display_name", "Người dùng"),
         email=payload.get("email"),
         roles=list(payload.get("roles") or []),
         permissions=list(payload.get("permissions") or []),

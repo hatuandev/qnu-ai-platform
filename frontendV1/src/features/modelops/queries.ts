@@ -2,21 +2,35 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { v1Client } from "@/app/api/v1";
 import { useV1Auth } from "@/app/auth/v1";
 import {
+  createAppApiKey,
   createProvider,
   createProviderKey,
   getCatalog,
   getDefaults,
+  getIntegrationConfig,
   getProvider,
+  listAppApiKeys,
+  listAppClients,
+  listAppRequestLogs,
   listKeyEvents,
   listModelOpsEvents,
   listProviderKeys,
   listProviders,
+  listProvidersSummary,
   putDefaults,
+  revokeAppApiKey,
   revokeProviderKey,
+  rotateAppApiKey,
   rotateProviderKey,
+  updateAppApiKeyStatus,
   updateProvider,
 } from "@/features/modelops/requests";
 import type {
+  AppApiKeyCreateInput,
+  AppApiKeyRevokeInput,
+  AppApiKeyRotateInput,
+  AppApiKeySecretResponse,
+  AppApiKeyStatusUpdateInput,
   DefaultsUpdateInput,
   KeyCreateInput,
   KeyRevokeInput,
@@ -58,6 +72,48 @@ export const modelopsKeys = {
     sessionId !== undefined
       ? (["v1", sessionId, "modelops", "catalog", workspaceId] as const)
       : ([...ROOT, "catalog", workspaceId] as const),
+  providersSummary: (sessionId?: number) =>
+    sessionId !== undefined
+      ? (["v1", sessionId, "modelops", "providers-summary"] as const)
+      : ([...ROOT, "providers-summary"] as const),
+  integrationConfig: (sessionId?: number) =>
+    sessionId !== undefined
+      ? (["v1", sessionId, "modelops", "integration", "config"] as const)
+      : ([...ROOT, "integration", "config"] as const),
+  integrationApps: (workspaceId: string, sessionId?: number) =>
+    sessionId !== undefined
+      ? ([
+          "v1",
+          sessionId,
+          "modelops",
+          "integration",
+          "apps",
+          workspaceId,
+        ] as const)
+      : ([...ROOT, "integration", "apps", workspaceId] as const),
+  integrationKeys: (workspaceId: string, sessionId?: number) =>
+    sessionId !== undefined
+      ? ([
+          "v1",
+          sessionId,
+          "modelops",
+          "integration",
+          "keys",
+          workspaceId,
+        ] as const)
+      : ([...ROOT, "integration", "keys", workspaceId] as const),
+  integrationLogs: (workspaceId: string, limit?: number, sessionId?: number) =>
+    sessionId !== undefined
+      ? ([
+          "v1",
+          sessionId,
+          "modelops",
+          "integration",
+          "logs",
+          workspaceId,
+          limit,
+        ] as const)
+      : ([...ROOT, "integration", "logs", workspaceId, limit] as const),
 };
 
 export function useProvidersQuery(options?: { enabled?: boolean }) {
@@ -85,6 +141,9 @@ export function useCreateProvider() {
     mutationFn: (input: ProviderCreateInput) => createProvider(v1Client, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.providersSummary(sessionId),
+      });
+      void queryClient.invalidateQueries({
         queryKey: modelopsKeys.providers(sessionId),
       });
       void queryClient.invalidateQueries({
@@ -110,6 +169,9 @@ export function useUpdateProvider(providerId: string) {
     mutationFn: (patch: ProviderUpdateInput) =>
       updateProvider(v1Client, providerId, patch),
     onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.providersSummary(sessionId),
+      });
       void queryClient.invalidateQueries({
         queryKey: modelopsKeys.providers(sessionId),
       });
@@ -163,6 +225,9 @@ function invalidateKeys(
   providerId: string,
   sessionId?: number,
 ) {
+  void queryClient.invalidateQueries({
+    queryKey: modelopsKeys.providersSummary(sessionId),
+  });
   void queryClient.invalidateQueries({
     queryKey: [...modelopsKeys.provider(providerId, sessionId), "diagnostics"],
   });
@@ -280,6 +345,154 @@ export function useCatalogQuery(
   return useQuery({
     queryKey: modelopsKeys.catalog(workspaceId, sessionId),
     queryFn: ({ signal }) => getCatalog(v1Client, workspaceId, { signal }),
+    enabled: Boolean(workspaceId) && (options?.enabled ?? true),
+  });
+}
+
+export function useProvidersSummaryQuery(options?: { enabled?: boolean }) {
+  const { sessionId } = useV1Auth();
+  return useQuery({
+    queryKey: modelopsKeys.providersSummary(sessionId),
+    queryFn: ({ signal }) => listProvidersSummary(v1Client, { signal }),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useIntegrationConfigQuery(options?: { enabled?: boolean }) {
+  const { sessionId } = useV1Auth();
+  return useQuery({
+    queryKey: modelopsKeys.integrationConfig(sessionId),
+    queryFn: ({ signal }) => getIntegrationConfig(v1Client, { signal }),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useIntegrationAppsQuery(
+  workspaceId: string,
+  options?: { enabled?: boolean },
+) {
+  const { sessionId } = useV1Auth();
+  return useQuery({
+    queryKey: modelopsKeys.integrationApps(workspaceId, sessionId),
+    queryFn: ({ signal }) => listAppClients(v1Client, workspaceId, { signal }),
+    enabled: Boolean(workspaceId) && (options?.enabled ?? true),
+  });
+}
+
+export function useIntegrationKeysQuery(
+  workspaceId: string,
+  options?: { enabled?: boolean },
+) {
+  const { sessionId } = useV1Auth();
+  return useQuery({
+    queryKey: modelopsKeys.integrationKeys(workspaceId, sessionId),
+    queryFn: ({ signal }) => listAppApiKeys(v1Client, workspaceId, { signal }),
+    enabled: Boolean(workspaceId) && (options?.enabled ?? true),
+  });
+}
+
+export function useCreateAppApiKeyMutation(
+  workspaceId: string,
+  onSecret: (data: AppApiKeySecretResponse) => void,
+) {
+  const queryClient = useQueryClient();
+  const { sessionId } = useV1Auth();
+  return useMutation({
+    gcTime: 0,
+    mutationFn: async (input: AppApiKeyCreateInput) => {
+      const response = await createAppApiKey(v1Client, workspaceId, input);
+      onSecret(response); // Only the one-time modal owns plaintext; mutation result is void.
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.integrationKeys(workspaceId, sessionId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.integrationApps(workspaceId, sessionId),
+      });
+    },
+  });
+}
+
+export function useUpdateAppApiKeyStatusMutation(workspaceId: string) {
+  const queryClient = useQueryClient();
+  const { sessionId } = useV1Auth();
+  return useMutation({
+    mutationFn: ({
+      keyId,
+      input,
+    }: {
+      keyId: string;
+      input: AppApiKeyStatusUpdateInput;
+    }) => updateAppApiKeyStatus(v1Client, workspaceId, keyId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.integrationKeys(workspaceId, sessionId),
+      });
+    },
+  });
+}
+
+export function useRotateAppApiKeyMutation(
+  workspaceId: string,
+  onSecret: (data: AppApiKeySecretResponse) => void,
+) {
+  const queryClient = useQueryClient();
+  const { sessionId } = useV1Auth();
+  return useMutation({
+    gcTime: 0,
+    mutationFn: async ({
+      keyId,
+      input,
+    }: {
+      keyId: string;
+      input: AppApiKeyRotateInput;
+    }) => {
+      const response = await rotateAppApiKey(
+        v1Client,
+        workspaceId,
+        keyId,
+        input,
+      );
+      onSecret(response);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.integrationKeys(workspaceId, sessionId),
+      });
+    },
+  });
+}
+
+export function useRevokeAppApiKeyMutation(workspaceId: string) {
+  const queryClient = useQueryClient();
+  const { sessionId } = useV1Auth();
+  return useMutation({
+    mutationFn: ({
+      keyId,
+      input,
+    }: {
+      keyId: string;
+      input: AppApiKeyRevokeInput;
+    }) => revokeAppApiKey(v1Client, workspaceId, keyId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.integrationKeys(workspaceId, sessionId),
+      });
+    },
+  });
+}
+
+export function useIntegrationLogsQuery(
+  workspaceId: string,
+  limit = 50,
+  options?: { enabled?: boolean },
+) {
+  const { sessionId } = useV1Auth();
+  return useQuery({
+    queryKey: modelopsKeys.integrationLogs(workspaceId, limit, sessionId),
+    queryFn: ({ signal }) =>
+      listAppRequestLogs(v1Client, workspaceId, limit, { signal }),
     enabled: Boolean(workspaceId) && (options?.enabled ?? true),
   });
 }

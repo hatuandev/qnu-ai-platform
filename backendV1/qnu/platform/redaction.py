@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\bqnu_live_[A-Za-z0-9_\-]+"), "[REDACTED_KEY]"),
     (re.compile(r"(?:Bearer\s+)[\w.\-+/=]+", re.IGNORECASE), "Bearer [REDACTED]"),
     (re.compile(r"\b(?:sk|pk|rk)[-_][A-Za-z0-9_\-]{8,}"), "[REDACTED_KEY]"),
     (re.compile(r"\bAIza[0-9A-Za-z_\-]{20,}"), "[REDACTED_KEY]"),

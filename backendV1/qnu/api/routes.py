@@ -9,6 +9,8 @@ from qnu.domains.assistants.router import router as assistants_router
 from qnu.domains.conversations.router import router as conversations_router
 from qnu.domains.evaluation.router import router as evaluation_router
 from qnu.domains.identity.router import router as identity_router
+from qnu.domains.integration.router import admin_router as integration_admin_router
+from qnu.domains.integration.router import gateway_router as integration_gateway_router
 from qnu.domains.knowledge.collections.router import router as knowledge_collections_router
 from qnu.domains.knowledge.compilation.review.router import router as compilation_review_router
 from qnu.domains.knowledge.compilation.router import router as compilation_router
@@ -54,3 +56,5 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(operations_router, prefix=settings.API_PREFIX)
     app.include_router(lifecycle_router, prefix=settings.API_PREFIX)
     app.include_router(evaluation_router, prefix=settings.API_PREFIX)
+    app.include_router(integration_admin_router, prefix=settings.API_PREFIX)
+    app.include_router(integration_gateway_router, prefix=settings.API_PREFIX)

@@ -9,6 +9,7 @@ from qnu.api.dependencies import get_actor, get_db
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.identity.permissions import require_permission
 from qnu.domains.modelops.catalog.service import catalog_service
+from qnu.domains.modelops.diagnostics.summary import provider_summaries
 from qnu.domains.modelops.keys.service import key_service
 from qnu.domains.modelops.models import ModelDefaults, Provider, ProviderKey
 from qnu.domains.modelops.providers.service import provider_payload, provider_service
@@ -27,6 +28,7 @@ from qnu.domains.modelops.schemas import (
     ModelOpsEventResponse,
     ProviderCreateRequest,
     ProviderResponse,
+    ProviderSummaryItem,
     ProviderUpdateRequest,
     WorkspaceDefaultsRequest,
 )
@@ -151,6 +153,14 @@ async def list_providers(
 ) -> list[ProviderResponse]:
     providers = await provider_service.list(db)
     return [_provider_out(item) for item in providers]
+
+
+@router.get("/providers-summary", response_model=list[ProviderSummaryItem], summary="Tổng hợp providers kèm số lượng keys và diagnostics")
+async def list_providers_summary(
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.models.manage")),
+) -> list[ProviderSummaryItem]:
+    return await provider_summaries(db)
 
 
 @router.get(

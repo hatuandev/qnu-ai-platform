@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Depends
 
 from qnu.api.dependencies import get_actor
@@ -19,7 +21,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/login", response_model=TokenResponse, summary="Đăng nhập dev gate")
 async def login(body: DevLoginRequest) -> TokenResponse:
-    token, _actor = issue_dev_token(body.access_key)
+    token, _actor = await asyncio.to_thread(issue_dev_token, body.access_key)
     return TokenResponse(access_token=token)
 
 

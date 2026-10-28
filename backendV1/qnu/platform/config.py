@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import AnyHttpUrl, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/platform/v1alpha1"
     HOST: str = "0.0.0.0"
     PORT: int = 8002
+    # Browser-visible URL, never inferred from request headers or frontend origin.
+    PUBLIC_BASE_URL: AnyHttpUrl | None = None
     LOG_LEVEL: str = "INFO"
     ALLOWED_ORIGINS: str = "http://localhost:3000"
 

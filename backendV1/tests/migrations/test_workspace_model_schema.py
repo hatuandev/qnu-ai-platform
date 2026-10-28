@@ -15,6 +15,7 @@ from sqlalchemy.pool import NullPool
 
 from qnu.domains.assistants import models as assistant_models  # noqa: F401
 from qnu.domains.conversations import models as conversation_models  # noqa: F401
+from qnu.domains.integration import models as integration_models  # noqa: F401
 from qnu.domains.knowledge import models as knowledge_models  # noqa: F401
 from qnu.domains.knowledge.compilation import models as compilation_models  # noqa: F401
 from qnu.domains.knowledge.compilation.review import models as review_models  # noqa: F401
@@ -56,6 +57,6 @@ async def test_migrations_match_models_and_exclude_legacy():
         )
         assert (
             await connection.scalar(text("SELECT version_num FROM alembic_version_backendv1"))
-            == "0003_rag_policy_metadata"
+            == "0004_application_api_keys"
         )
     await engine.dispose()
