@@ -81,6 +81,7 @@ class AnswerTrace(BaseModel):
     model_name: str | None = None
     configuration_hash: str | None = None
     usage_id: str | None = None
+    routing: list[dict] = Field(default_factory=list)
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
     total_tokens: int | None = None

@@ -49,19 +49,11 @@ import {
   CAPABILITIES,
   CAPABILITY_LABELS,
   type Capability,
-  PROVIDER_TYPE_LABELS,
   type Provider,
   type ProviderType,
 } from "@/features/modelops/types";
 import { getFormErrorMessage } from "@/lib/form-errors";
-
-const PROVIDER_TYPES: ProviderType[] = [
-  "openai_compatible",
-  "gemini",
-  "local",
-  "nemotron",
-  "paddleocr",
-];
+import { useTransportRegistry } from "./resilience-queries";
 
 function fieldError(errors: unknown[]) {
   return getFormErrorMessage(errors[0]);
@@ -94,11 +86,16 @@ export function ProviderFormDialog({
   suggestedModel?: string;
 }) {
   const isEdit = Boolean(provider);
+  const registry = useTransportRegistry();
   const createMutation = useCreateProvider();
   const updateMutation = useUpdateProvider(provider?.id ?? "");
   const [serverError, setServerError] = useState<string | null>(null);
   const [providerType, setProviderType] = useState<ProviderType>(
     provider?.provider_type ?? "openai_compatible",
+  );
+
+  const transport = registry.data?.find(
+    (item) => item.provider_type === providerType,
   );
 
   const initialCapacity = provider
@@ -279,15 +276,23 @@ export function ProviderFormDialog({
                   onValueChange={(value) =>
                     setProviderType(value as ProviderType)
                   }
-                  disabled={isEdit || isSubmitting}
+                  disabled={isEdit || isSubmitting || !registry.data}
                 >
                   <SelectTrigger id="provider-type" className="h-9 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROVIDER_TYPES.map((type) => (
-                      <SelectItem key={type} value={type} className="text-xs">
-                        {PROVIDER_TYPE_LABELS[type]}
+                    {(
+                      registry.data ?? [
+                        { provider_type: providerType, label: providerType },
+                      ]
+                    ).map((item) => (
+                      <SelectItem
+                        key={item.provider_type}
+                        value={item.provider_type}
+                        className="text-xs"
+                      >
+                        {item.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -300,6 +305,20 @@ export function ProviderFormDialog({
               </Field>
             </div>
 
+            {registry.isError && (
+              <p role="alert" className="text-sm text-destructive">
+                Không lấy được thông tin giao thức. Hãy thử mở lại cấu hình.
+              </p>
+            )}
+            {transport && (
+              <p className="text-xs text-muted-foreground">
+                Adapter hỗ trợ:{" "}
+                {Object.keys(transport.protocols).join(", ") ||
+                  "chưa có runtime"}
+                . Responses API:{" "}
+                {transport.responses_api ? "có" : "chưa hỗ trợ"}.
+              </p>
+            )}
             <form.Field name="baseUrl">
               {(field) => {
                 const error = fieldError(field.state.meta.errors);
@@ -637,7 +656,12 @@ export function ProviderFormDialog({
                   type="submit"
                   size="sm"
                   className="gap-1.5 text-xs font-semibold"
-                  disabled={!canSubmit || formSubmitting || isSubmitting}
+                  disabled={
+                    !canSubmit ||
+                    formSubmitting ||
+                    isSubmitting ||
+                    (!isEdit && !registry.data)
+                  }
                 >
                   {isSubmitting ? (
                     <>

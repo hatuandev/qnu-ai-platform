@@ -17,6 +17,7 @@ from qnu.domains.modelops.usage.service import usage_service
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException, Conflict
 from qnu.ports.chat_model import ChatMessage, ChatModel, ChatResponseError
+from qnu.ports.provider_execution import bind_usage
 
 REWRITE_VERSION = "qnu.conversation.resolve/v1"
 SYSTEM = """Viết lại current_question thành câu hỏi độc lập dựa vào previous_user_questions.
@@ -95,6 +96,7 @@ async def resolve_question(
         conversation.workspace_id,
         messages,
         provider_id=config["chat_provider_id"],
+        task="followup",
         max_output_tokens=get_settings().CONVERSATION_REWRITE_MAX_OUTPUT_TOKENS,
     )
     usage = await usage_service.reserve(
@@ -109,6 +111,7 @@ async def resolve_question(
     )
     turn.rewrite_trace = {
         "version": REWRITE_VERSION,
+        "routing": list(runtime.routing_trace),
         "usage_id": usage.id,
         "provider_id": runtime.provider_id,
         "model_name": runtime.model_name,
@@ -121,7 +124,7 @@ async def resolve_question(
         await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
         raise
     try:
-        result = await model.complete(messages, request)
+        result = await model.complete(messages, bind_usage(request, usage.id))
     except ChatResponseError as exc:
         await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
         raise

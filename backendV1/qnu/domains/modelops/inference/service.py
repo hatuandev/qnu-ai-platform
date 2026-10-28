@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.modelops.capacity.schemas import RequestTokenBudget
 from qnu.domains.modelops.public_api import ChatRuntime, plan_model_request, resolve_chat_runtime
+from qnu.domains.modelops.resilience.routing import choose_target
+from qnu.domains.modelops.resilience.schemas import Task
+from qnu.domains.workspaces.access import resolve_workspace_access
 from qnu.platform.errors import Conflict
 from qnu.ports.chat_model import ChatMessage, ChatRequest
 
@@ -35,7 +39,10 @@ async def prepare_chat_request(
     provider_id: str | None,
     max_output_tokens: int,
     output_schema: dict | None = None,
+    task: Task = "chat",
 ) -> tuple[ChatRuntime, ChatRequest, RequestTokenBudget]:
+    await resolve_workspace_access(db, actor, workspace_id)
+    provider_id, routing = await choose_target(db, workspace_id, task, provider_id)
     snapshot, budget = await plan_model_request(
         db,
         actor,
@@ -51,6 +58,7 @@ async def prepare_chat_request(
         requested_output_tokens=max_output_tokens,
     )
     runtime = await resolve_chat_runtime(db, workspace_id, provider_id)
+    runtime = replace(runtime, routing_trace=routing)
     material = {
         "provider_id": runtime.provider_id,
         "endpoint": runtime.base_url.rstrip("/"),
@@ -71,6 +79,7 @@ async def prepare_chat_request(
             timeout_seconds=runtime.timeout_seconds,
             api_key=runtime.api_key,
             output_schema=output_schema,
+            execution=runtime.execution_scope,
         ),
         budget,
     )

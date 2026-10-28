@@ -89,7 +89,7 @@ Search dense trả đoạn/citation; API RAG answer trả lời một câu hỏi
 Đã có hội thoại lưu bền vững với cửa sổ câu hỏi để làm rõ follow-up.
 Chưa chia sẻ/public hoặc streaming. Hybrid/rerank có ở search/answer API;
 cấu hình assistant hiện giữ dense. Giao diện các luồng tri thức/operations làm sau.
-Discovery/probe API, streaming, key lease/cooldown/fallback runtime chưa nối.
+Đã nối [discovery/probe](docs/modelops-diagnostics.md), [nhóm khóa có cooldown, dự phòng trước tác vụ và registry](docs/modelops-resilience.md). Mặc định chưa bật pool/dự phòng; model đã ghim giữ nguyên. Streaming/Responses/tools chưa triển khai.
 Đăng ký capability không đồng nghĩa model đã được kiểm định. Repository đã bỏ
 theo nghiệp vụ mới.
 

@@ -65,6 +65,7 @@ from qnu.platform.redaction import redact
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.job_queue import JobQueue
 from qnu.ports.ocr_engine import OcrEngine, OcrRequest, OcrResponseError
+from qnu.ports.provider_execution import ProviderExecution
 
 logger = get_logger(__name__)
 
@@ -401,7 +402,15 @@ async def _execute_claimed(
 
     requested = (run.config or {}).get("provider_requested")
     with observe_stage(run, "resolve_model", logger=logger):
-        runtime = await resolve_ocr_runtime(db, run.workspace_id, requested)
+        from dataclasses import replace
+
+        from qnu.domains.modelops.resilience.routing import choose_target
+
+        selected, routing = await choose_target(
+            db, run.workspace_id, "ocr", run.provider_id or requested
+        )
+        runtime = await resolve_ocr_runtime(db, run.workspace_id, selected)
+        runtime = replace(runtime, routing_trace=routing)
         pinned = (run.config or {}).get("provider")
         if run.provider_id is not None and (
             run.provider_id != runtime.provider_id
@@ -585,6 +594,12 @@ async def _ocr_pages(
                         timeout_seconds=float(runtime.timeout_seconds),
                         api_key=runtime.api_key,
                         auth_optional=runtime.auth_optional,
+                        execution=ProviderExecution(
+                            run.workspace_id,
+                            runtime.provider_id,
+                            usage.id,
+                            sessions=runtime.session_factory,
+                        ),
                     ),
                 )
                 observation.usage_tokens = call.usage_tokens

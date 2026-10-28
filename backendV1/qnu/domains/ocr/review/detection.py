@@ -28,6 +28,7 @@ from qnu.domains.workspaces.access import actor_ref
 from qnu.platform.errors import AppException, Conflict, EntityNotFound
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.chat_model import ChatMessage, ChatModel, ChatResponseError
+from qnu.ports.provider_execution import bind_usage
 
 PROMPT_VERSION = "qnu.ocr.spelling/v1"
 SYSTEM = """Rà soát lỗi chính tả tiếng Việt trong các đoạn OCR được cấp.
@@ -117,6 +118,7 @@ async def inspect(
         run.workspace_id,
         messages,
         provider_id=req.provider_id,
+        task="ocr_review",
         max_output_tokens=req.max_output_tokens,
     )
     check_id = new_id("spl")
@@ -139,6 +141,7 @@ async def inspect(
             "provider_id": runtime.provider_id,
             "model_name": runtime.model_name,
             "configuration_hash": runtime.configuration_hash,
+            "routing": list(runtime.routing_trace),
         },
         expires_at=utcnow() + timedelta(seconds=runtime.timeout_seconds + 60),
     )
@@ -171,7 +174,7 @@ async def inspect(
             await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
             raise
         try:
-            result = await chat.complete(messages, request)
+            result = await chat.complete(messages, bind_usage(request, usage.id))
         except ChatResponseError as exc:
             await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
             await retain_raw(blob, row, exc.raw_body)

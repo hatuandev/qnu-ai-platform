@@ -18,6 +18,7 @@ from qnu.platform.errors import AppException, Conflict
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.chat_model import ChatModel, ChatResponseError
+from qnu.ports.provider_execution import bind_usage
 
 logger = get_logger(__name__)
 
@@ -67,7 +68,7 @@ async def execute(
             await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
             raise
         try:
-            result = await chat.complete(messages, request)
+            result = await chat.complete(messages, bind_usage(request, usage.id))
         except ChatResponseError as exc:
             row.usage_tokens = exc.usage_tokens
             await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)

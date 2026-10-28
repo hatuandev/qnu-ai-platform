@@ -78,6 +78,11 @@ export const workspacePaths = {
 } as const;
 
 export const modelopsPaths = {
+  executions: (providerId: string) =>
+    `/modelops/providers/${encodeURIComponent(providerId)}/executions`,
+  registry: "/modelops/registry",
+  resilience: (providerId: string) =>
+    `/modelops/providers/${encodeURIComponent(providerId)}/resilience`,
   providers: "/modelops/providers",
   provider: (providerId: string) => `/modelops/providers/${providerId}`,
   diagnostics: (providerId: string) =>

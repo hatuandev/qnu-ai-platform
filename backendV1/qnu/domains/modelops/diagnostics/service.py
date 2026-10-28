@@ -20,9 +20,8 @@ from qnu.domains.modelops.audit import record_event
 from qnu.domains.modelops.capacity.service import read_capacity
 from qnu.domains.modelops.diagnostics.schemas import DiagnosticCheck, ProviderDiagnostics
 from qnu.domains.modelops.embedding.configuration import read_dimension
-from qnu.domains.modelops.models import Provider
+from qnu.domains.modelops.models import Provider, ProviderKey
 from qnu.domains.modelops.providers.service import provider_service
-from qnu.domains.modelops.public_api import _active_key
 from qnu.platform.crypto import decrypt
 from qnu.platform.errors import AppException, Conflict
 from qnu.ports.provider_diagnostics import (
@@ -36,7 +35,14 @@ HISTORY_KEY = "diagnostic_checks_v1"
 
 
 async def identity(db: AsyncSession, provider: Provider) -> str:
-    key = await _active_key(db, provider.id)
+    key = (
+        await db.scalars(
+            select(ProviderKey)
+            .where(ProviderKey.provider_id == provider.id, ProviderKey.status == "active")
+            .order_by(ProviderKey.priority, ProviderKey.created_at)
+            .limit(1)
+        )
+    ).first()
     capacity = read_capacity(provider)
     dimension, dimension_status = read_dimension(provider)
     material = [
@@ -51,7 +57,7 @@ async def identity(db: AsyncSession, provider: Provider) -> str:
         capacity.token_limits.model_dump() if capacity.token_limits else None,
         dimension,
         dimension_status,
-        [key.id, key.updated_at.isoformat()] if key else None,
+        [key.id, hashlib.sha256(key.secret_encrypted.encode()).hexdigest()] if key else None,
     ]
     return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
 
@@ -88,7 +94,14 @@ async def run_diagnostic(
             "Chức năng chưa được khai báo cho provider.", code="provider_capability_mismatch"
         )
     fingerprint = await identity(db, provider)
-    key = await _active_key(db, provider.id)
+    key = (
+        await db.scalars(
+            select(ProviderKey)
+            .where(ProviderKey.provider_id == provider.id, ProviderKey.status == "active")
+            .order_by(ProviderKey.priority, ProviderKey.created_at)
+            .limit(1)
+        )
+    ).first()
     capacity = read_capacity(provider)
     maximum = capacity.token_limits.max_output_tokens if capacity.token_limits else None
     dimension, _ = read_dimension(provider)

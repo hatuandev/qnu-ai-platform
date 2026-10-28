@@ -7,6 +7,7 @@ import time
 
 import httpx
 
+from qnu.adapters.providers.failures import tag_failure
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException
 from qnu.platform.logging import get_logger
@@ -92,13 +93,21 @@ class ModelOpsEmbeddingModel:
                 "embedding_uncertain", "Chưa xác định kết quả embedding; không tự gửi lại.", 504
             ) from exc
         if response.status_code in (401, 403):
-            raise _error("embedding_auth_failed", "Provider từ chối credential.")
+            raise tag_failure(
+                _error("embedding_auth_failed", "Provider từ chối credential."), response
+            )
         if response.status_code == 429:
-            raise _error("embedding_rate_limited", "Provider giới hạn tần suất.", 503)
+            raise tag_failure(
+                _error("embedding_rate_limited", "Provider giới hạn tần suất.", 503), response
+            )
         if response.status_code >= 500:
-            raise _error("embedding_unavailable", "Provider embedding không sẵn sàng.", 503)
+            raise tag_failure(
+                _error("embedding_unavailable", "Provider embedding không sẵn sàng.", 503), response
+            )
         if response.status_code != 200:
-            raise _error("embedding_rejected", "Provider từ chối yêu cầu embedding.")
+            raise tag_failure(
+                _error("embedding_rejected", "Provider từ chối yêu cầu embedding."), response
+            )
         try:
             data = response.json()
         except ValueError as exc:

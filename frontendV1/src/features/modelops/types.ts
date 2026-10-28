@@ -85,6 +85,9 @@ export type ProviderUpdateInput = Partial<
 > & { is_active?: boolean };
 
 export type ProviderKey = {
+  lease_until?: string | null;
+  cooldown_until?: string | null;
+  consecutive_failures?: number;
   id: string;
   provider_id: string;
   name: string;

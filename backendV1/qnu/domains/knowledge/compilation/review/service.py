@@ -197,6 +197,7 @@ async def prepare(
         workspace_id,
         messages,
         provider_id=req.provider_id,
+        task="compiler_review",
         max_output_tokens=req.max_output_tokens,
         output_schema=schema,
     )
@@ -220,6 +221,7 @@ async def prepare(
             "provider_id": runtime.provider_id,
             "model_name": runtime.model_name,
             "configuration_hash": runtime.configuration_hash,
+            "routing": list(runtime.routing_trace),
             "compiler_provider_id": run.provider_id,
             "source_unit_count": len(material.payload["source_units"]),
             "draft_unit_count": len(material.payload["draft_units"]),

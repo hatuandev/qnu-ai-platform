@@ -5,10 +5,11 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.modelops.capacity.schemas import ModelTokenLimits
@@ -19,8 +20,10 @@ from qnu.domains.modelops.capacity.service import (
 )
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.models import Provider, ProviderKey
+from qnu.domains.modelops.registry import transport_for
 from qnu.platform.crypto import decrypt
 from qnu.platform.errors import AppException, DependencyUnavailable
+from qnu.ports.provider_execution import ProviderExecution
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +41,17 @@ class OcrRuntime:
     extra: dict[str, Any] = field(default_factory=dict, repr=False)
     token_limits: ModelTokenLimits | None = None
     capacity_status: str = "unknown"
+    workspace_id: str | None = None
+    routing_trace: tuple[dict, ...] = ()
+    session_factory: Any = field(default=None, repr=False, compare=False)
+
+    @property
+    def execution_scope(self) -> ProviderExecution | None:
+        return (
+            ProviderExecution(self.workspace_id, self.provider_id, sessions=self.session_factory)
+            if self.workspace_id
+            else None
+        )
 
     @property
     def configuration_hash(self) -> str:
@@ -55,6 +69,7 @@ class OcrRuntime:
     def public_dict(self) -> dict[str, Any]:
         """Safe description for artifacts and audit: no credential, no full URL query."""
         return {
+            **({"routing": list(self.routing_trace)} if self.routing_trace else {}),
             "provider_id": self.provider_id,
             "provider_name": self.provider_name,
             "provider_type": self.provider_type,
@@ -89,7 +104,31 @@ async def _active_key(db: AsyncSession, provider_id: str) -> ProviderKey | None:
         .order_by(ProviderKey.priority.asc(), ProviderKey.created_at.asc())
         .limit(1)
     )
-    return (await db.execute(stmt)).scalars().first()
+    from qnu.domains.modelops.resilience.service import effective_policy
+
+    provider = await db.get(Provider, provider_id)
+    if provider is not None and effective_policy(provider).key_pool_enabled:
+        stmt = stmt.where(
+            or_(
+                ProviderKey.cooldown_until.is_(None),
+                ProviderKey.cooldown_until <= datetime.now(UTC),
+            )
+        )
+    key = (await db.execute(stmt)).scalars().first()
+    if key is None and provider is not None and effective_policy(provider).key_pool_enabled:
+        existing = await db.scalar(
+            select(ProviderKey.id)
+            .where(
+                ProviderKey.provider_id == provider_id,
+                ProviderKey.status == "active",
+            )
+            .limit(1)
+        )
+        if existing:
+            raise DependencyUnavailable(
+                "Các khóa đang tạm nghỉ; chưa gửi request.", code="provider_keys_unavailable"
+            )
+    return key
 
 
 async def resolve_ocr_runtime(
@@ -103,6 +142,12 @@ async def resolve_ocr_runtime(
     provider = await catalog_service.resolve_workspace_provider(
         db, workspace_id, "ocr", provider_id
     )
+    if "ocr" not in transport_for(provider.provider_type).protocols:
+        raise AppException(
+            "Loại provider OCR chưa có adapter.",
+            code="ocr_provider_type_unsupported",
+            status_code=422,
+        )
     extra = dict(provider.extra_config or {})
     capacity = read_capacity(provider)
     key = await _active_key(db, provider.id)
@@ -120,6 +165,8 @@ async def resolve_ocr_runtime(
             "Không giải mã được credential OCR.", code="ocr_credentials_unreadable"
         ) from exc
     return OcrRuntime(
+        workspace_id=workspace_id,
+        session_factory=async_sessionmaker(db.bind, expire_on_commit=False),
         provider_id=provider.id,
         provider_name=provider.name,
         provider_type=provider.provider_type,
@@ -146,7 +193,7 @@ async def resolve_chat_runtime(
     provider = await catalog_service.resolve_workspace_provider(
         db, workspace_id, "chat", provider_id
     )
-    if provider.provider_type not in {"openai_compatible", "local"}:
+    if "chat" not in transport_for(provider.provider_type).protocols:
         raise AppException(
             "Adapter chat chưa hỗ trợ loại provider đã chọn.",
             code="chat_provider_type_unsupported",
@@ -163,6 +210,8 @@ async def resolve_chat_runtime(
         ) from exc
     capacity = read_capacity(provider)
     return ChatRuntime(
+        workspace_id=workspace_id,
+        session_factory=async_sessionmaker(db.bind, expire_on_commit=False),
         provider_id=provider.id,
         provider_name=provider.name,
         provider_type=provider.provider_type,

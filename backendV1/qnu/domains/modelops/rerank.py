@@ -1,10 +1,11 @@
 """Resolve rerank through grants, encrypted keys and configured model capacity."""
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from qnu.domains.modelops.capacity.service import read_capacity
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.public_api import OcrRuntime, _active_key
+from qnu.domains.modelops.registry import transport_for
 from qnu.platform.crypto import decrypt
 from qnu.platform.errors import Conflict, DependencyUnavailable
 from qnu.ports.reranker import RerankRequest
@@ -13,16 +14,22 @@ from qnu.ports.reranker import RerankRequest
 async def resolve(
     db: AsyncSession, workspace_id: str, provider_id: str | None = None
 ) -> OcrRuntime:
+    from qnu.domains.modelops.resilience.routing import choose_target
+
+    provider_id, routing = await choose_target(db, workspace_id, "rerank", provider_id)
     provider = await catalog_service.resolve_workspace_provider(
         db, workspace_id, "rerank", provider_id
     )
-    if provider.provider_type not in {"openai_compatible", "local"}:
+    if "rerank" not in transport_for(provider.provider_type).protocols:
         raise Conflict("Loại provider rerank chưa hỗ trợ.", code="rerank_provider_unsupported")
     key = await _active_key(db, provider.id)
     if key is None:
         raise DependencyUnavailable("Thiếu credential rerank.", code="rerank_credentials_missing")
     capacity = read_capacity(provider)
     return OcrRuntime(
+        workspace_id=workspace_id,
+        session_factory=async_sessionmaker(db.bind, expire_on_commit=False),
+        routing_trace=routing,
         provider_id=provider.id,
         provider_name=provider.name,
         provider_type=provider.provider_type,
@@ -52,5 +59,9 @@ def budget(runtime: OcrRuntime, query: str, documents: list[str]) -> int:
 
 def request(runtime: OcrRuntime) -> RerankRequest:
     return RerankRequest(
-        runtime.base_url, runtime.model_name, runtime.timeout_seconds, runtime.api_key
+        runtime.base_url,
+        runtime.model_name,
+        runtime.timeout_seconds,
+        runtime.api_key,
+        runtime.execution_scope,
     )

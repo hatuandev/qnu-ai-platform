@@ -180,9 +180,10 @@ class HttpProviderDiagnosticClient:
         self.transport = transport
 
     async def check(self, kind: DiagnosticKind, target: DiagnosticTarget) -> DiagnosticResult:
-        supported = target.provider_type in {"openai_compatible", "local"} or (
-            target.provider_type == "nemotron" and kind in {"discovery", "ocr"}
-        )
+        from qnu.domains.modelops.registry import transport_for
+
+        metadata = transport_for(target.provider_type)
+        supported = metadata.discovery if kind == "discovery" else kind in metadata.protocols
         if not supported:
             return DiagnosticResult(
                 "unsupported",

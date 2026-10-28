@@ -25,6 +25,7 @@ from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.chat_model import ChatModel, ChatResponseError
 from qnu.ports.embedding_model import EmbeddingModel
+from qnu.ports.provider_execution import bind_usage
 from qnu.ports.reranker import Reranker
 from qnu.ports.vector_store import VectorStore
 
@@ -108,6 +109,7 @@ async def answer(
         workspace_id,
         messages,
         provider_id=req.provider_id,
+        task="answer",
         max_output_tokens=req.max_output_tokens or get_settings().RAG_MAX_OUTPUT_TOKENS,
     )
     usage = await usage_service.reserve(
@@ -131,6 +133,7 @@ async def answer(
     trace.evidence_sha256, trace.usage_id = proof, usage.id
     trace.provider_id, trace.model_name = runtime.provider_id, runtime.model_name
     trace.configuration_hash = runtime.configuration_hash
+    trace.routing = list(runtime.routing_trace)
     try:
         # Reservation commits. Recheck before HTTP, then release locks during inference.
         if proof != await validate_results(
@@ -149,7 +152,7 @@ async def answer(
         raise
     try:
         started = time.monotonic()
-        result = await chat.complete(messages, request)
+        result = await chat.complete(messages, bind_usage(request, usage.id))
     except ChatResponseError as exc:
         await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
         raise

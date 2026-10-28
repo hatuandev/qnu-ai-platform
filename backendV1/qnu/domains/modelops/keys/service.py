@@ -80,6 +80,9 @@ class KeyService:
         reason: str | None,
     ) -> ProviderKey:
         require_model_admin(actor)
+        # Same lock order as runtime leases; credential audit FK checks must not
+        # wait on a provider locked by a worker that is waiting for this key.
+        await db.execute(select(Provider.id).where(Provider.id == provider_id).with_for_update())
         key = (
             await db.execute(
                 select(ProviderKey)
@@ -116,6 +119,7 @@ class KeyService:
         actor: AuthActor,
     ) -> ProviderKey:
         require_model_admin(actor)
+        await db.execute(select(Provider.id).where(Provider.id == provider_id).with_for_update())
         old = (
             await db.execute(select(ProviderKey).where(ProviderKey.id == key_id).with_for_update())
         ).scalar_one_or_none()

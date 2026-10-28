@@ -3,6 +3,9 @@
 Chức năng dành cho quản trị ModelOps. “Lấy danh sách” là hỏi server có những
 model nào; không tải weights hoặc cài model vào máy.
 
+Nếu vừa cập nhật mã BE mà phiên V1 cũ vẫn mở, dừng đúng phiên đó bằng Ctrl+C
+rồi chạy lại `.\make.ps1 v1-dev`. API không tự nạp mã mới trong runner hiện tại.
+
 1. Vào **ModelOps → Providers**, thêm/chọn provider và lưu khóa tại API keys.
    Mỗi bản ghi gắn với một model và những chức năng đã khai báo.
 2. Tại **Kiểm tra provider**, bấm **Lấy danh sách model**. Có tên trong danh

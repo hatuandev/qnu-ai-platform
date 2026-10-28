@@ -12,6 +12,12 @@ from qnu.adapters.queue.arq_queue import ArqJobQueue
 from qnu.adapters.storage.local import LocalBlobStore
 from qnu.adapters.storage.s3 import S3BlobStore
 from qnu.adapters.vector.qdrant import QdrantVectorStore
+from qnu.domains.modelops.resilience.execution import (
+    ManagedChatModel,
+    ManagedEmbeddingModel,
+    ManagedOcrEngine,
+    ManagedReranker,
+)
 from qnu.platform.config import Settings
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.chat_model import ChatModel
@@ -46,11 +52,11 @@ def build_container(settings: Settings) -> Container:
         settings=settings,
         blob_store=blob_store,
         job_queue=queue,
-        ocr_engine=NemotronOcrEngine(),
-        chat_model=OpenAICompatibleChatModel(),
-        embedding_model=ModelOpsEmbeddingModel(),
+        ocr_engine=ManagedOcrEngine(NemotronOcrEngine()),
+        chat_model=ManagedChatModel(OpenAICompatibleChatModel()),
+        embedding_model=ManagedEmbeddingModel(ModelOpsEmbeddingModel()),
         vector_store=QdrantVectorStore(settings.QDRANT_URL),
-        reranker=ModelOpsReranker(),
+        reranker=ManagedReranker(ModelOpsReranker()),
     )
 
 

@@ -4,6 +4,7 @@ import math
 
 import httpx
 
+from qnu.adapters.providers.failures import tag_failure
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException
 from qnu.platform.network_policy import assert_allowed_endpoint
@@ -82,9 +83,9 @@ class ModelOpsReranker:
         except httpx.RequestError as exc:
             raise fail("rerank_uncertain", 504) from exc
         if response.status_code in (401, 403):
-            raise fail("rerank_auth_failed")
+            raise tag_failure(fail("rerank_auth_failed"), response)
         if response.status_code != 200:
-            raise fail("rerank_unavailable", 503)
+            raise tag_failure(fail("rerank_unavailable", 503), response)
         try:
             data = response.json()
         except ValueError as exc:

@@ -125,10 +125,26 @@ export function KeysPanel({ providerId }: { providerId: string }) {
                       {key.masked_hint}
                     </TableCell>
                     <TableCell>
-                      {key.status === "active" ? (
-                        <Badge variant="success">Đang dùng</Badge>
-                      ) : (
+                      {key.status === "revoked" ? (
                         <Badge variant="secondary">Đã thu hồi</Badge>
+                      ) : key.cooldown_until &&
+                        new Date(key.cooldown_until).getTime() > Date.now() ? (
+                        <div className="space-y-1">
+                          <Badge variant="warning">Tạm nghỉ</Badge>
+                          <p className="text-xs text-muted-foreground">
+                            Đến {formatDateTimeValue(key.cooldown_until)}
+                          </p>
+                        </div>
+                      ) : key.lease_until &&
+                        new Date(key.lease_until).getTime() > Date.now() ? (
+                        <Badge variant="outline">Đang gọi</Badge>
+                      ) : (
+                        <Badge variant="success">Sẵn sàng</Badge>
+                      )}
+                      {Boolean(key.consecutive_failures) && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {key.consecutive_failures} lỗi khóa liên tiếp
+                        </p>
                       )}
                     </TableCell>
                     <TableCell className="hidden text-xs md:table-cell">

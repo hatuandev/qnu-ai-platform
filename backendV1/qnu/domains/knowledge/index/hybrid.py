@@ -13,6 +13,7 @@ from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.modelops import rerank as runtime_service
 from qnu.domains.modelops.usage.service import usage_service
 from qnu.platform.errors import Conflict
+from qnu.ports.provider_execution import bind_usage
 from qnu.ports.vector_store import VectorHit
 
 
@@ -104,7 +105,10 @@ async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint):
         raise
     try:
         result = await model.rerank(
-            req.query, documents, min(req.top_k, len(hits)), runtime_service.request(runtime)
+            req.query,
+            documents,
+            min(req.top_k, len(hits)),
+            bind_usage(runtime_service.request(runtime), usage.id),
         )
     except BaseException:
         await usage_service.settle(db, usage.id, total_tokens=None, failed=True)

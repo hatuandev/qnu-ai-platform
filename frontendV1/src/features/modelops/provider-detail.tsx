@@ -25,6 +25,7 @@ import {
   useProviderQuery,
   useUpdateProvider,
 } from "@/features/modelops/queries";
+import { ProviderResiliencePanel } from "@/features/modelops/resilience-panel";
 import {
   CAPABILITY_LABELS,
   type Capability,
@@ -296,6 +297,7 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
       ) : null}
 
       <ProviderDiagnosticsPanel provider={provider} />
+      <ProviderResiliencePanel provider={provider} />
       <CapacityPanel provider={provider} />
       <KeysPanel providerId={providerId} />
       <KeyEventsPanel providerId={providerId} />

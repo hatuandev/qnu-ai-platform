@@ -184,6 +184,7 @@ async def request_run(
         workspace_id,
         messages_for(req.topic, documents),
         provider_id=req.provider_id,
+        task="compiler",
         max_output_tokens=req.max_output_tokens or get_settings().COMPILER_MAX_OUTPUT_TOKENS,
         output_schema=schema,
     )

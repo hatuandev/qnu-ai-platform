@@ -56,7 +56,7 @@ function Result({ check }: { check: DiagnosticCheck }) {
       </div>
       {stale && (
         <p className="text-warning">
-          Cấu hình hoặc khóa đã đổi; kết quả này không còn áp dụng.
+          Kết quả này cần được thử lại cho cấu hình hiện tại.
         </p>
       )}
       <p>{check.detail}</p>

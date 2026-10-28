@@ -6459,6 +6459,169 @@
         }
       }
     },
+    "/platform/v1alpha1/modelops/providers/{provider_id}/executions": {
+      "get": {
+        "tags": [
+          "ModelOps · Resilience"
+        ],
+        "summary": "Executions",
+        "operationId": "executions_platform_v1alpha1_modelops_providers__provider_id__executions_get",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExecutionObservation"
+                  },
+                  "title": "Response Executions Platform V1Alpha1 Modelops Providers  Provider Id  Executions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/v1alpha1/modelops/registry": {
+      "get": {
+        "tags": [
+          "ModelOps · Resilience"
+        ],
+        "summary": "Registry",
+        "operationId": "registry_platform_v1alpha1_modelops_registry_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderTransport"
+                  },
+                  "type": "array",
+                  "title": "Response Registry Platform V1Alpha1 Modelops Registry Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/v1alpha1/modelops/providers/{provider_id}/resilience": {
+      "get": {
+        "tags": [
+          "ModelOps · Resilience"
+        ],
+        "summary": "Get Policy",
+        "operationId": "get_policy_platform_v1alpha1_modelops_providers__provider_id__resilience_get",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "ModelOps · Resilience"
+        ],
+        "summary": "Put Policy",
+        "operationId": "put_policy_platform_v1alpha1_modelops_providers__provider_id__resilience_put",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResiliencePolicy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/platform/v1alpha1/workspaces/{workspace_id}/allowed-providers": {
       "get": {
         "tags": [
@@ -8773,6 +8936,14 @@
               }
             ],
             "title": "Usage Id"
+          },
+          "routing": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Routing"
           },
           "prompt_tokens": {
             "anyOf": [
@@ -11149,6 +11320,109 @@
         ],
         "title": "EvidenceSource"
       },
+      "ExecutionObservation": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "call_id": {
+            "type": "string",
+            "title": "Call Id"
+          },
+          "usage_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Id"
+          },
+          "capability": {
+            "type": "string",
+            "title": "Capability"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "key_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "upstream_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Status"
+          },
+          "attempt": {
+            "type": "integer",
+            "title": "Attempt"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "call_id",
+          "capability",
+          "model_name",
+          "key_id",
+          "code",
+          "upstream_status",
+          "attempt",
+          "latency_ms",
+          "total_tokens"
+        ],
+        "title": "ExecutionObservation"
+      },
       "FindingResolution": {
         "properties": {
           "finding_id": {
@@ -11627,6 +11901,35 @@
       },
       "KeyResponse": {
         "properties": {
+          "lease_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lease Until"
+          },
+          "cooldown_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Until"
+          },
+          "consecutive_failures": {
+            "type": "integer",
+            "title": "Consecutive Failures",
+            "default": 0
+          },
           "id": {
             "type": "string",
             "title": "Id"
@@ -12401,6 +12704,49 @@
         "type": "object",
         "title": "Page[WorkspaceResponse]"
       },
+      "PolicyResponse": {
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "default",
+              "configured",
+              "stale"
+            ],
+            "title": "Status"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/ResiliencePolicy"
+          },
+          "routing_phase": {
+            "type": "string",
+            "const": "before_dispatch",
+            "title": "Routing Phase",
+            "default": "before_dispatch"
+          },
+          "explicit_provider_is_pinned": {
+            "type": "boolean",
+            "title": "Explicit Provider Is Pinned",
+            "default": true
+          },
+          "embedding_model_fallback": {
+            "type": "boolean",
+            "title": "Embedding Model Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider_id",
+          "status",
+          "policy"
+        ],
+        "title": "PolicyResponse"
+      },
       "PreviewResponse": {
         "properties": {
           "id": {
@@ -13170,6 +13516,78 @@
         ],
         "title": "ProviderResponse"
       },
+      "ProviderTransport": {
+        "properties": {
+          "provider_type": {
+            "type": "string",
+            "title": "Provider Type"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "protocols": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Protocols"
+          },
+          "discovery": {
+            "type": "boolean",
+            "title": "Discovery"
+          },
+          "structured_output": {
+            "type": "string",
+            "title": "Structured Output",
+            "default": "not_supported"
+          },
+          "streaming": {
+            "type": "boolean",
+            "title": "Streaming",
+            "default": false
+          },
+          "responses_api": {
+            "type": "boolean",
+            "title": "Responses Api",
+            "default": false
+          },
+          "tools": {
+            "type": "boolean",
+            "title": "Tools",
+            "default": false
+          },
+          "image_input": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Image Input",
+            "default": []
+          },
+          "multi_item_input": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Multi Item Input",
+            "default": []
+          },
+          "metadata_basis": {
+            "type": "string",
+            "title": "Metadata Basis",
+            "default": "adapter_contract"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider_type",
+          "label",
+          "protocols",
+          "discovery"
+        ],
+        "title": "ProviderTransport"
+      },
       "ProviderUpdateRequest": {
         "properties": {
           "name": {
@@ -13550,6 +13968,70 @@
           "created"
         ],
         "title": "RegistrationResponse"
+      },
+      "ResiliencePolicy": {
+        "properties": {
+          "key_pool_enabled": {
+            "type": "boolean",
+            "title": "Key Pool Enabled",
+            "default": false
+          },
+          "retry_owner": {
+            "type": "string",
+            "enum": [
+              "qnu",
+              "gateway"
+            ],
+            "title": "Retry Owner",
+            "default": "qnu"
+          },
+          "max_key_attempts": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Max Key Attempts",
+            "default": 1
+          },
+          "auth_cooldown_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 1.0,
+            "title": "Auth Cooldown Seconds",
+            "default": 300
+          },
+          "rate_cooldown_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 1.0,
+            "title": "Rate Cooldown Seconds",
+            "default": 30
+          },
+          "fallbacks": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "enum": [
+                "chat",
+                "answer",
+                "followup",
+                "compiler",
+                "compiler_review",
+                "ocr_review",
+                "ocr",
+                "rerank"
+              ]
+            },
+            "type": "object",
+            "title": "Fallbacks"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ResiliencePolicy"
       },
       "RetrievalAnnotation": {
         "properties": {

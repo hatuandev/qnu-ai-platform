@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.public_api import RevisionScope
 from qnu.domains.modelops.public_api import resolve_ocr_runtime
+from qnu.domains.modelops.resilience.routing import choose_target
 from qnu.domains.ocr.config import (
     SUPPORTED_PROCESSING_EXTENSIONS,
     config_payload,
@@ -358,7 +359,8 @@ class ProcessingService:
         )
         for candidate in (await db.execute(stmt)).scalars():
             if (candidate.config or {}).get("provider_requested") == provider_id:
-                runtime = await resolve_ocr_runtime(db, workspace_id, provider_id)
+                selected, _ = await choose_target(db, workspace_id, "ocr", provider_id)
+                runtime = await resolve_ocr_runtime(db, workspace_id, selected)
                 pinned = (candidate.config or {}).get("provider") or {}
                 if pinned.get("configuration_hash") == runtime.configuration_hash:
                     return candidate

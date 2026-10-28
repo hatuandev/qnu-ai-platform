@@ -7,6 +7,8 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [40 — ModelOps nhóm khóa và model dự phòng](./40_modelops_khoa_va_du_phong.md): cấu hình pool/cooldown, gateway retry, dự phòng theo tác vụ và lịch sử gọi có sổ sử dụng.
+
 - [39 — ModelOps lấy danh sách và chạy thử](./39_modelops_lay_danh_sach_va_chay_thu.md): chọn model từ server, thử theo chức năng, đọc lỗi/độ trễ và trạng thái cấu hình cũ.
 
 - [38 — Hướng dẫn chạy QNU V1](./38_huong_dan_chay_qnu_v1.md): ba tiến trình API/worker/FE, cấu hình, migration, admin local, ModelOps và xử lý lỗi.

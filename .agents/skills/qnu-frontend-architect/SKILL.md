@@ -10,6 +10,15 @@ Tài liệu này là cẩm nang bắt buộc cho mọi kỹ sư Frontend và AI 
 
 ---
 
+## Thiết kế theo ngữ cảnh QNU
+
+- Trước thay đổi lớn, làm rõ tác vụ chính từ ngữ cảnh sẵn có: đọc/sửa OCR, duyệt Compiler, tìm nguồn hoặc cấu hình model. Phác thảo ngắn ngay trong trao đổi; lỗi nhỏ chỉ sửa phần cần thiết, không mặc định mở thêm vòng phê duyệt hay thiết kế lại cả trang.
+- Ưu tiên nội dung giúp hoàn thành tác vụ: đoạn văn và chỗ cần sửa ở màn OCR; nguồn và quyết định duyệt ở Compiler; cấu hình và lỗi có thể xử lý ở ModelOps. Chỉ thêm KPI hoặc card khi dữ liệu đó hỗ trợ quyết định thật.
+- Dùng font, màu Teal, semantic tokens và primitives của đúng `frontend/` hoặc `frontendV1/` đang sửa. Tạo thứ bậc bằng cách nhóm và khoảng cách trong hệ thống hiện có; không tự đổi nhận diện vì tham khảo phong cách mới.
+- Giữ thuật ngữ nhất quán từ nút đến toast/trạng thái. Khi sửa UI, tự đối chiếu ảnh chụp desktop/mobile và các trạng thái liên quan nếu có công cụ; báo phần chưa kiểm thay vì suy kết quả từ build. Kiểm chứng theo mục8, không chạy test ứng dụng cho task chỉ sửa skill/tài liệu.
+
+Tham khảo tư duy thiết kế từ [frontend-design của Anthropic](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md), áp dụng trong các giới hạn QNU dưới đây; giữ nguyên kiến trúc, luồng API và quy tắc dữ liệu thật.
+
 ## 1. Tôn Chỉ Thiết Kế & Hệ Thống Nhận Diện QNU
 
 1. **Đồng bộ 100% Hệ thống Thiết kế ĐH Quy Nhơn (`qnu-ktx`)**:

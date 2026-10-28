@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 from qnu.platform.errors import AppException
+from qnu.ports.provider_execution import ProviderExecution
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +24,7 @@ class ChatRequest:
     api_key: str = field(repr=False)
     json_mode: bool = True
     output_schema: dict | None = field(default=None, repr=False)
+    execution: ProviderExecution | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +46,7 @@ class ChatResponseError(AppException):
         super().__init__(
             error.detail, code=error.code, status_code=error.status_code, title=error.title
         )
+        self.provider_failure = getattr(error, "provider_failure", None)
         self.raw_body = raw_body
         self.usage_tokens = usage_tokens
 

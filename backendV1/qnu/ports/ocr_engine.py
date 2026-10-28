@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from qnu.platform.errors import AppException
+from qnu.ports.provider_execution import ProviderExecution
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +22,7 @@ class OcrRequest:
     timeout_seconds: float
     api_key: str | None = field(default=None, repr=False)
     auth_optional: bool = False
+    execution: ProviderExecution | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +41,7 @@ class OcrResponseError(AppException):
         super().__init__(
             error.detail, code=error.code, status_code=error.status_code, title=error.title
         )
+        self.provider_failure = getattr(error, "provider_failure", None)
         self.raw_body = raw_body
         self.usage_tokens = usage_tokens
 

@@ -119,6 +119,9 @@ class KeyAuditResponse(BaseModel):
 
 
 class KeyResponse(BaseModel):
+    lease_until: datetime | None = None
+    cooldown_until: datetime | None = None
+    consecutive_failures: int = 0
     id: str
     provider_id: str
     name: str

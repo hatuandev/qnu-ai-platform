@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
+from qnu.ports.provider_execution import ProviderExecution
+
 
 @dataclass(frozen=True, slots=True)
 class EmbeddingRequest:
@@ -13,6 +15,7 @@ class EmbeddingRequest:
     timeout_seconds: float
     api_key: str = field(repr=False)
     expected_dimension: int | None = None
+    execution: ProviderExecution | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)

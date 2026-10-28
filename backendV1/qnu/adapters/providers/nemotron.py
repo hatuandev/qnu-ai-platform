@@ -17,6 +17,7 @@ from typing import Any
 
 import httpx
 
+from qnu.adapters.providers.failures import tag_failure
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException
 from qnu.platform.logging import get_logger
@@ -135,6 +136,9 @@ class NemotronOcrEngine:
 
     name = "nemotron"
 
+    def __init__(self, *, transport: httpx.AsyncBaseTransport | None = None):
+        self._transport = transport
+
     async def extract_page(self, image_png: bytes, request: OcrRequest) -> OcrPageResponse:
         if not image_png:
             raise _error("Ảnh trang rỗng.", "ocr_input_empty", 422)
@@ -157,7 +161,10 @@ class NemotronOcrEngine:
         started = time.monotonic()
         try:
             async with httpx.AsyncClient(
-                timeout=httpx.Timeout(request.timeout_seconds), follow_redirects=False
+                timeout=httpx.Timeout(request.timeout_seconds),
+                follow_redirects=False,
+                trust_env=False,
+                transport=self._transport,
             ) as client:
                 response = await client.post(
                     url, json=build_payload(request, image_png), headers=headers
@@ -182,7 +189,7 @@ class NemotronOcrEngine:
                 usage = _usage_tokens(response.json())
             except (ValueError, AttributeError):
                 usage = None
-            raise OcrResponseError(exc, response.content, usage) from exc
+            raise OcrResponseError(tag_failure(exc, response), response.content, usage) from exc
 
         logger.info(
             "ocr_page_called",

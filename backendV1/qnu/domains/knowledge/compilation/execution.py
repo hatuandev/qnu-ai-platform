@@ -35,6 +35,7 @@ from qnu.platform.errors import AppException, Conflict
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.chat_model import ChatModel, ChatResponseError
+from qnu.ports.provider_execution import bind_usage
 
 logger = get_logger(__name__)
 
@@ -183,7 +184,7 @@ async def _call(
     run.usage_id, run.request_started_at = usage.id, utcnow()
     await commit_owned(db, run)
     try:
-        result = await model.complete(messages, request)
+        result = await model.complete(messages, bind_usage(request, usage.id))
     except ChatResponseError as exc:
         try:
             await assert_claim(db, run)

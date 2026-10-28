@@ -6,6 +6,12 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+- **2026-10-28 — Context696: bổ sung nguyên tắc thiết kế frontend.** Cập nhật skill QNU và skill cá nhân admin-frontend-design: bố cục theo tác vụ, hierarchy/nhãn/lỗi/trống và tự rà soát; giữ design system, sửa nhỏ không ép thiết kế lại. Hai validator PASS; chỉ đổi skill/docs, không cài skill ngoài hoặc chạy app test/build/restart/push. [Nhật ký696](./nhat_ky/2026-10-28_phien_696_bo_sung_nguyen_tac_thiet_ke_frontend.md).
+
+- **2026-10-28 — Context695: ModelOps nhóm khóa, dự phòng và registry V1.** Pool PostgreSQL có fencing/cooldown401/429, max3lượt/gateway1; dự phòng trước tác vụ giữ grants/quota và model đã ghim, không đổi embedding. Runtime theo DB người gọi, audit gắn usage; FE có chính sách/trạng thái khóa/lịch sử và registry. BE tổng715PASS +recovery1PASS; sau fix OCR reuse có61regressionPASS. FE400PASS, Ruff44/Biome10/build+TS và browser desktop/mobile đạt. Không migration/.env/live inference/đổi cấu hình/restart người dùng hoặc push. [Nhật ký695](./nhat_ky/2026-10-28_phien_695_modelops_nhom_khoa_du_phong_va_registry.md).
+
+- **2026-10-28 — Context694: ModelOps lấy danh sách và chẩn đoán.** Admin discovery/probe theo capability, lịch sử lỗi/latency/stale và chọn model qua dialog FE; thêm4provider/key mã hóa cho server QNU, cả4probe thật đạt. FE393PASS, BE33regressionPASS, lint/build PASS. Full BE đầu682PASS/2FAIL/2SKIP do môi trường;4ca chạy lại với Redis/loop phù hợp đều PASS. API8002 cũ cần chạy lại phiênv1-dev; không tự restart phiên người dùng/push. [Nhật ký694](./nhat_ky/2026-10-28_phien_694_modelops_discovery_va_chan_doan.md).
+
 - **2026-10-28 — Context693: nghiên cứu 9router cho ModelOps V1.** Đọc35tệp source/test tại commit3a978a6, đối chiếu QNU: đề xuất discovery/probe, trace, key cooldown, policy fallback và registry; giữ grants/quota/index pinning, tránh raw logger và SSE200 rỗng. Chỉ nghiên cứu/docs, test/benchmark NOT RUN, không sửa app/config hoặc gọi model. [Nhật ký693](./nhat_ky/2026-10-28_phien_693_nghien_cuu_9router_modelops.md).
 
 - **2026-10-28 — Context692: rà soát điều hướng V1.** Dùng chung danh mục/scope cho sidebar, chọn workspace/kho, Ctrl+K và breadcrumb; sửa active tab/view, OCR, thêm Xuất bản, tạo kho tại picker và bỏ header mẫu KTX. Full FE385PASS, regression37PASS, Biome/build+TS PASS; browser desktop/mobile đã kiểm, workspace live chưa có kho nên chưa chạy OCR/LLM. Không đổi BE/env/data hoặc push. [Nhật ký692](./nhat_ky/2026-10-28_phien_692_ra_soat_dieu_huong_v1.md).

@@ -31,6 +31,7 @@ from qnu.platform.errors import AppException, Conflict, DependencyUnavailable
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.embedding_model import EmbeddingModel
+from qnu.ports.provider_execution import bind_usage
 from qnu.ports.vector_store import VectorStore
 
 logger = get_logger(__name__)
@@ -94,7 +95,7 @@ async def _embed_pending(db, blob, run, actor, model: EmbeddingModel, vectors: V
         }
         await commit_owned(db, run)
         try:
-            result = await model.embed(texts, runtime.request())
+            result = await model.embed(texts, bind_usage(runtime.request(), usage.id))
         except AppException:
             await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
             raise

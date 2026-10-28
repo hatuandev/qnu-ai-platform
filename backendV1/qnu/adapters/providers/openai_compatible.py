@@ -6,6 +6,7 @@ import time
 
 import httpx
 
+from qnu.adapters.providers.failures import tag_failure
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException
 from qnu.platform.logging import get_logger
@@ -128,7 +129,7 @@ class OpenAICompatibleChatModel:
                 usage = _tokens(response.json().get("usage"), "total_tokens")
             except (ValueError, AttributeError):
                 usage = None
-            raise ChatResponseError(exc, response.content, usage) from exc
+            raise ChatResponseError(tag_failure(exc, response), response.content, usage) from exc
         logger.info(
             "chat_request_finished",
             model=request.model,

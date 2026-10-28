@@ -18,6 +18,7 @@ from qnu.domains.modelops.usage.service import usage_service
 from qnu.domains.rag.answer.schemas import AnswerRequest, EvidenceSource, Statement
 from qnu.platform.errors import AppException, Conflict
 from qnu.ports.chat_model import ChatMessage, ChatModel, ChatResponseError
+from qnu.ports.provider_execution import bind_usage
 
 VERSION = "qnu.answer.verification/v1"
 SYSTEM = """Kiểm chứng từng statement chỉ bằng evidence đã dẫn của chính statement đó.
@@ -144,6 +145,7 @@ async def verify(
         workspace_id,
         messages,
         provider_id=req.verification_provider_id or req.provider_id,
+        task="chat",
         max_output_tokens=req.verification_max_output_tokens,
     )
     usage = await usage_service.reserve(
@@ -179,7 +181,7 @@ async def verify(
         raise
     started = time.monotonic()
     try:
-        result = await chat.complete(messages, request)
+        result = await chat.complete(messages, bind_usage(request, usage.id))
     except ChatResponseError as exc:
         await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
         raise

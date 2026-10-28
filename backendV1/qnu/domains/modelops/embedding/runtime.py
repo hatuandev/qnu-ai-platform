@@ -6,12 +6,13 @@ import hashlib
 import json
 from dataclasses import dataclass
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from qnu.domains.modelops.capacity.service import read_capacity
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.embedding.configuration import read_dimension
 from qnu.domains.modelops.public_api import OcrRuntime, _active_key
+from qnu.domains.modelops.registry import transport_for
 from qnu.platform.crypto import decrypt
 from qnu.platform.errors import AppException, Conflict, DependencyUnavailable
 from qnu.ports.embedding_model import EmbeddingRequest
@@ -45,7 +46,12 @@ class EmbeddingRuntime(OcrRuntime):
 
     def request(self) -> EmbeddingRequest:
         return EmbeddingRequest(
-            self.base_url, self.model_name, self.timeout_seconds, self.api_key, self.dimension
+            self.base_url,
+            self.model_name,
+            self.timeout_seconds,
+            self.api_key,
+            self.dimension,
+            self.execution_scope,
         )
 
     def budget(self, texts: list[str]) -> int:
@@ -83,7 +89,7 @@ async def resolve_embedding_runtime(
     provider = await catalog_service.resolve_workspace_provider(
         db, workspace_id, "embedding", provider_id
     )
-    if provider.provider_type not in {"openai_compatible", "local"}:
+    if "embedding" not in transport_for(provider.provider_type).protocols:
         raise AppException(
             "Loại provider embedding chưa hỗ trợ.",
             code="embedding_provider_unsupported",
@@ -110,6 +116,8 @@ async def resolve_embedding_runtime(
         ) from exc
     capacity = read_capacity(provider)
     return EmbeddingRuntime(
+        workspace_id=workspace_id,
+        session_factory=async_sessionmaker(db.bind, expire_on_commit=False),
         provider_id=provider.id,
         provider_name=provider.name,
         provider_type=provider.provider_type,
