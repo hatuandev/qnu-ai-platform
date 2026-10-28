@@ -11,6 +11,21 @@ else
   PYTHON="python"
 fi
 
+# V1 delegates to the same runner used by GNU Make, CMD and PowerShell.
+if [[ "$CMD" == v1-* ]]; then
+  MAKE_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -f "$MAKE_ROOT/backendV1/.venv/Scripts/python.exe" ]]; then
+    V1_PYTHON="$MAKE_ROOT/backendV1/.venv/Scripts/python.exe"
+  elif [[ -f "$MAKE_ROOT/backendV1/.venv/bin/python" ]]; then
+    V1_PYTHON="$MAKE_ROOT/backendV1/.venv/bin/python"
+  elif command -v python3 >/dev/null 2>&1; then
+    V1_PYTHON=python3
+  else
+    V1_PYTHON=python
+  fi
+  exec "$V1_PYTHON" "$MAKE_ROOT/scripts/run_v1.py" "$@"
+fi
+
 case "$CMD" in
   # --- Cum ha tang Docker ---
   infra-up)
@@ -131,6 +146,7 @@ case "$CMD" in
     echo "=============================================================================="
     echo "           QNU AI Platform - Task Runner (Bash: ./make)                      "
     echo "=============================================================================="
+    echo "[V1] ./make v1-dev | ./make v1-help (legacy commands stay unchanged)"
     echo "[Ha tang Docker]"
     echo "  ./make infra-up     : Khoi dong cum ha tang Docker (Postgres, Qdrant, Redis, MinIO, Gotenberg)"
     echo "  ./make infra-down   : Dung cum ha tang Docker"

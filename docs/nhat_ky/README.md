@@ -7,6 +7,24 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+- **2026-10-28 — Context693: nghiên cứu 9router cho ModelOps V1.** Đọc35tệp source/test tại commit3a978a6, đối chiếu QNU: đề xuất discovery/probe, trace, key cooldown, policy fallback và registry; giữ grants/quota/index pinning, tránh raw logger và SSE200 rỗng. Chỉ nghiên cứu/docs, test/benchmark NOT RUN, không sửa app/config hoặc gọi model. [Nhật ký693](./2026-10-28_phien_693_nghien_cuu_9router_modelops.md).
+
+- **2026-10-28 — Context692: rà soát điều hướng V1.** Dùng chung danh mục/scope cho sidebar, chọn workspace/kho, Ctrl+K và breadcrumb; sửa active tab/view, OCR, thêm Xuất bản, tạo kho tại picker và bỏ header mẫu KTX. Full FE385PASS, regression37PASS, Biome/build+TS PASS; browser desktop/mobile đã kiểm, workspace live chưa có kho nên chưa chạy OCR/LLM. Không đổi BE/env/data hoặc push. [Nhật ký692](./2026-10-28_phien_692_ra_soat_dieu_huong_v1.md).
+
+- **2026-10-28 — Context691: nối router sidebar theo chức năng.** Chọn workspace/kho có ghi nhớ mục; OCR, Compiler, tìm kiếm, hỏi đáp, đánh giá tới đúng tab/page, server vẫn kiểm quyền. Router thật fixture10test/full358PASS, Biome/build+TS PASS; chưa live browser/model hoặc push. [Nhật ký691](./2026-10-28_phien_691_noi_router_sidebar.md).
+
+- **2026-10-28 — Context690: sắp xếp sidebar.** Nhãn gọn theo nhóm Tri thức, Trợ lý, Quản trị & vận hành; giữ workspace và URL hiện có. Biome2tệp,3test, build+TS PASS; chưa kiểm browser/full suite, không sửa BE/auth hoặc push. [Nhật ký690](./2026-10-28_phien_690_sap_xep_sidebar.md).
+
+- **2026-10-28 — Context689: lối vào chức năng workspace ở sidebar.** Hiện kho/OCR/Compiler/RAG, trợ lý/hội thoại và quản trị/vận hành; chọn workspace trước, chức năng tài liệu chọn thêm kho, quyền vẫn kiểm ở server. Biome3tệp/3test/build+TS PASS; chưa kiểm browser/full suite/backend hoặc push. [Nhật ký689](./2026-10-28_phien_689_loi_vao_sidebar_workspace.md).
+
+- **2026-10-28 — Context688: ẩn menu KTX khỏi sidebar.** Chỉ hiển thị nhóm QNU AI không phải template, vẫn áp kiểm quyền V1; giữ route và command menu mẫu. Biome PASS, build/TypeScript theo receipt phiên688; chưa kiểm browser/E2E, không sửa backend/auth hoặc push. [Nhật ký688](./2026-10-28_phien_688_an_sidebar_ktx.md).
+
+- **2026-10-28 — Context687: đăng nhập local.** Đồng bộ khóa FE theo backend .env gốc hiện có, không đổi backend/mã nguồn. Live bridge200/auth-me200 xác nhận dev.admin/AI.Admin; không log secret/token, không restart backend hoặc push. [Nhật ký687](./2026-10-28_phien_687_dong_bo_dang_nhap_local.md).
+
+- **2026-10-28 — Context686: sửa khởi động V1/schema mới.** Preflight trước dịch vụ,16lệnh chung, onesync/PORT/Node và uv env-file Windows. Xác nhận DB local trống rồi migrate0003;4checkOK, smoke API/FE200 và workerhealth0, tiến trình thử đã dọn.27test/54wrapper/Ruff/syntax đạt; chưa inference/login/fullsuite/GNU Make runtime hoặc push. [Nhật ký686](./2026-10-28_phien_686_sua_khoi_dong_v1_va_schema_moi.md).
+
+- **2026-10-28 — Context685: Make chạy V1.** Bốn runner có14lệnh v1-* chung, API/worker/FE foreground, env root/backend tường minh, không auto-migrate/restart. 12test và48kiểm wrapper đạt; Ruff/syntax/link/encoding/diff đạt. GNU Make runtime chưa chạy do thiếu binary; không chạy ứng dụng/DDL/model hoặc push. [Hướng dẫn38](../quy_trinh/38_huong_dan_chay_qnu_v1.md), [nhật ký685](./2026-10-28_phien_685_makefile_chay_v1.md).
+
 - **2026-10-28 — Context684: nhánh v1.0.2 trên Gitea.** Commit mã nguồn e112ac5 (1394 tệp) đã push Gitea và xác nhận SHA. Người dùng chỉ cần Gitea; tiến trình GitHub trước đó kết thúc exit1 sau Ctrl+C, không gửi lại. Quét staged/fixture có đối chiếu; diff-check FAIL khoảng trắng cũ, test/build/runtime NOT RUN. [Nhật ký684](./2026-10-28_phien_684_push_nhanh_v1_0_2_gitea.md).
 
 - **2026-10-27 — Context683: hướng dẫn chạy V1.** Tài liệu chạy API/worker/FE, giữ đúng .env/storage, cài mới/migration, admin local và ModelOps. Parser 14 khối PowerShell và kiểm tra tĩnh/link/encoding đạt; 1980 tệp ứng dụng giữ hash. Không chạy dịch vụ, migration, test/build hoặc model thật. [Hướng dẫn38](../quy_trinh/38_huong_dan_chay_qnu_v1.md), [nhật ký683](./2026-10-27_phien_683_huong_dan_chay_qnu_v1.md).

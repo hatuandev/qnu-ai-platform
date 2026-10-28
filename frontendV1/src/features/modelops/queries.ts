@@ -164,6 +164,9 @@ function invalidateKeys(
   sessionId?: number,
 ) {
   void queryClient.invalidateQueries({
+    queryKey: [...modelopsKeys.provider(providerId, sessionId), "diagnostics"],
+  });
+  void queryClient.invalidateQueries({
     queryKey: modelopsKeys.keys(providerId, sessionId),
   });
   void queryClient.invalidateQueries({

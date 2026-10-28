@@ -19,6 +19,7 @@ Prefix: `/platform/v1alpha1`. Nguồn OpenAPI là DTO/router thực tế; bản 
 | Thành viên | GET/POST `/workspaces/{id}/members`; PATCH/DELETE `/workspaces/{id}/members/{member_id}` |
 | Audit đơn vị | GET `/workspaces/{id}/events` |
 | Provider | POST/GET `/modelops/providers`; GET/PATCH `/modelops/providers/{id}` |
+| Diagnostics | GET `/modelops/providers/{id}/diagnostics`; POST `.../discover`; POST `.../probe` với capability; xem [contract](modelops-diagnostics.md) |
 | Credential | POST/GET `/modelops/providers/{id}/keys`; POST `.../keys/{key_id}/rotate`; POST `.../keys/{key_id}/revoke` |
 | Key audit | GET `/modelops/providers/{id}/key-events` |
 | Audit cấu hình | GET `/modelops/events` |

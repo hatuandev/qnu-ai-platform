@@ -94,6 +94,10 @@ tmp/drafting-document-qa.docx
 tmp/drafting-document-qa.pdf
 tmp/drafting-document-render/
 tmp/pdfs/
+tmp/
+
+# External AI tools & workspace local cache
+.workbuddy-ai/
 
 
 # Frontend test artifacts & build info (AGENTS.md 9.1: không commit)

@@ -92,7 +92,7 @@ export function Topbar({ onOpenCommand }: { onOpenCommand: () => void }) {
           </TooltipTrigger>
           <TooltipContent>{themeLabel}</TooltipContent>
         </Tooltip>
-        <NotificationsPopover />
+        {!isQnuV1 && <NotificationsPopover />}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Mở menu tài khoản">
@@ -103,7 +103,7 @@ export function Topbar({ onOpenCommand }: { onOpenCommand: () => void }) {
           </DropdownMenuTrigger>
           <AccountMenuContent side="bottom" align="end" />
         </DropdownMenu>
-        <QuickCreateMenu />
+        {!isQnuV1 && <QuickCreateMenu />}
       </div>
     </header>
   );

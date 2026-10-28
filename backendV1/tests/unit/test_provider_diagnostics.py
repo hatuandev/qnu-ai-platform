@@ -1,0 +1,179 @@
+"""Real HTTP adapter contract with scripted responses; never calls a model server."""
+
+import asyncio
+import json
+from dataclasses import replace
+
+import httpx
+import pytest
+
+from qnu.adapters.providers.diagnostics import HttpProviderDiagnosticClient, models_url
+from qnu.ports.provider_diagnostics import DiagnosticTarget
+
+TARGET = DiagnosticTarget(
+    "https://provider.example/v1",
+    "test-model",
+    "openai_compatible",
+    5,
+    api_key="sk-test-private-value",
+)
+
+
+@pytest.mark.parametrize("suffix", ["", "/", "/models", "/embeddings", "/chat/completions"])
+def test_discovery_uses_the_configured_runtime_origin(suffix):
+    assert models_url(TARGET.endpoint + suffix) == "https://provider.example/v1/models"
+
+
+async def call(kind, body, status=200, headers=None, target=TARGET):
+    requests = []
+
+    def upstream(request):
+        requests.append(request)
+        return httpx.Response(status, json=body, headers=headers)
+
+    result = await HttpProviderDiagnosticClient(transport=httpx.MockTransport(upstream)).check(
+        kind, target
+    )
+    return result, requests
+
+
+async def test_discovery_is_not_inference_and_does_not_reflect_secret():
+    result, requests = await call("discovery", {"data": [{"id": "a"}, {"id": "b"}]})
+    assert result.models == ["a", "b"] and result.outcome == "ok"
+    assert requests[0].method == "GET"
+    assert requests[0].headers["authorization"] == "Bearer " + TARGET.api_key
+    bad, _ = await call("discovery", {"data": [{"id": TARGET.api_key}]})
+    assert bad.outcome == "failed" and TARGET.api_key not in repr(bad)
+
+
+@pytest.mark.parametrize(
+    "status,code",
+    [
+        (401, "provider_auth_failed"),
+        (403, "provider_auth_failed"),
+        (429, "provider_rate_limited"),
+        (503, "provider_unavailable"),
+        (307, "provider_rejected"),
+        (404, "provider_rejected"),
+    ],
+)
+async def test_upstream_errors_are_safe_and_do_not_retry(status, code):
+    result, requests = await call(
+        "chat",
+        {"error": {"message": TARGET.api_key}},
+        status,
+        {"Retry-After": "5", "Location": "https://other.example"},
+    )
+    assert len(requests) == 1 and result.code == code
+    assert result.http_status == status and TARGET.api_key not in repr(result)
+    assert result.retry_after is not None
+
+
+async def test_chat_uses_runtime_shape_and_rejects_empty_content():
+    body = {
+        "model": "upstream-model",
+        "choices": [{"message": {"content": "OK"}, "finish_reason": "stop"}],
+        "usage": {"total_tokens": 9},
+    }
+    result, requests = await call("chat", body)
+    assert result.outcome == "ok" and result.observed_model == "upstream-model"
+    assert result.total_tokens == 9
+    assert json.loads(requests[0].content)["stream"] is False
+    body["choices"][0]["message"]["content"] = ""
+    result, _ = await call("chat", body)
+    assert result.code == "chat_response_empty"
+
+
+@pytest.mark.parametrize("vector", [[0, 0], [1, float("inf")], [True, 1], []])
+async def test_bad_embedding_does_not_become_verified(vector):
+    # Infinity deliberately uses a raw JSON response to exercise decoder validation.
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(
+            200,
+            content=json.dumps({"data": [{"index": 0, "embedding": vector}]}),
+            headers={"content-type": "application/json"},
+        )
+    )
+    result = await HttpProviderDiagnosticClient(transport=transport).check("embedding", TARGET)
+    assert result.outcome == "failed"
+
+
+async def test_dimension_is_observed_and_configured_dimension_is_enforced():
+    body = {"data": [{"index": 0, "embedding": [1.0, 2.0]}]}
+    result, _ = await call("embedding", body)
+    assert result.observed_dimension == 2
+    mismatch, _ = await call("embedding", body, target=replace(TARGET, expected_dimension=3))
+    assert mismatch.code == "embedding_dimension_mismatch"
+
+
+async def test_rerank_requires_valid_unique_indexes():
+    result, _ = await call(
+        "rerank",
+        {
+            "results": [
+                {"index": 0, "relevance_score": 0.9},
+                {"index": 0, "relevance_score": 0.3},
+            ]
+        },
+    )
+    assert result.code == "rerank_response_invalid"
+
+
+async def test_ocr_requires_located_layout_and_uses_a_generated_page():
+    result, requests = await call(
+        "ocr",
+        {
+            "choices": [
+                {
+                    "message": {"content": "<x_0.1><y_0.1>QNU TEST 123<x_0.9><y_0.8><class_Text>"},
+                    "finish_reason": "stop",
+                }
+            ]
+        },
+        target=replace(TARGET, provider_type="nemotron"),
+    )
+    assert result.outcome == "ok"
+    message = json.loads(requests[0].content)["messages"][0]["content"]
+    assert message[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    bad, _ = await call("ocr", {"choices": [{"message": {"content": "plain text"}}]})
+    assert bad.outcome == "failed"
+
+
+async def test_policy_and_missing_credentials_do_not_send_http():
+    def forbidden(_):
+        pytest.fail("HTTP must not be called")
+
+    client = HttpProviderDiagnosticClient(transport=httpx.MockTransport(forbidden))
+    blocked = await client.check("chat", replace(TARGET, endpoint="http://169.254.169.254/v1"))
+    assert blocked.code == "endpoint_blocked"
+    missing = await client.check("chat", replace(TARGET, api_key=None))
+    assert missing.code == "credentials_missing"
+    unsupported = await client.check("chat", replace(TARGET, provider_type="gemini"))
+    assert unsupported.outcome == "unsupported"
+
+
+async def test_timeout_is_unknown_not_an_empty_success():
+    def timeout(request):
+        raise httpx.ReadTimeout("unsafe private body", request=request)
+
+    result = await HttpProviderDiagnosticClient(transport=httpx.MockTransport(timeout)).check(
+        "chat", TARGET
+    )
+    assert result.code == "provider_timeout" and result.outcome == "failed"
+    assert "unsafe" not in repr(result)
+
+
+async def test_total_deadline_bounds_a_slow_upstream():
+    async def slow(_):
+        await asyncio.sleep(0.1)
+        return httpx.Response(200, json={"data": []})
+
+    result = await HttpProviderDiagnosticClient(transport=httpx.MockTransport(slow)).check(
+        "discovery", replace(TARGET, timeout_seconds=0.01)
+    )
+    assert result.code == "provider_timeout" and result.outcome == "failed"
+
+
+async def test_http_200_error_is_not_an_empty_model_list():
+    result, _ = await call("discovery", {"error": {"message": TARGET.api_key}, "data": []})
+    assert result.outcome == "failed" and TARGET.api_key not in repr(result)

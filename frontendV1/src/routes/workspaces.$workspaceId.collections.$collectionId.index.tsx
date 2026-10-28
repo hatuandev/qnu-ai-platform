@@ -4,6 +4,7 @@ import { CollectionDetailPage } from "@/features/knowledge/collection-detail-pag
 import { pageSearchSchema } from "@/features/workspaces/search";
 
 const collectionDetailSearchSchema = pageSearchSchema.extend({
+  sourceAction: z.enum(["ocr"]).optional(),
   tab: z
     .enum(["sources", "compilations", "documents", "index"])
     .optional()
@@ -29,6 +30,7 @@ function CollectionDetailRoute() {
       page={search.page}
       pageSize={search.pageSize}
       tab={search.tab ?? "sources"}
+      sourceAction={search.sourceAction}
       onPageChange={(page) =>
         void navigate({ search: (previous) => ({ ...previous, page }) })
       }

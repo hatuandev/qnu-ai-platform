@@ -57,6 +57,7 @@ export type CollectionTab = "sources" | "compilations" | "documents" | "index";
 export function CollectionDetailPage({
   workspaceId,
   collectionId,
+  sourceAction,
   page,
   pageSize,
   tab = "sources",
@@ -64,6 +65,7 @@ export function CollectionDetailPage({
   onPageSizeChange,
   onTabChange,
 }: {
+  sourceAction?: "ocr";
   workspaceId: string;
   collectionId: string;
   page: number;
@@ -390,6 +392,11 @@ export function CollectionDetailPage({
                         <TableCell>
                           <Link
                             to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
+                            search={
+                              sourceAction === "ocr"
+                                ? { tab: "ocr", subTab: "runs" }
+                                : {}
+                            }
                             params={{
                               workspaceId,
                               collectionId,
@@ -462,6 +469,11 @@ export function CollectionDetailPage({
                           >
                             <Link
                               to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
+                              search={
+                                sourceAction === "ocr"
+                                  ? { tab: "ocr", subTab: "runs" }
+                                  : {}
+                              }
                               params={{
                                 workspaceId,
                                 collectionId,
@@ -487,6 +499,11 @@ export function CollectionDetailPage({
                     <div className="flex items-start justify-between gap-2">
                       <Link
                         to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
+                        search={
+                          sourceAction === "ocr"
+                            ? { tab: "ocr", subTab: "runs" }
+                            : {}
+                        }
                         params={{
                           workspaceId,
                           collectionId,
@@ -523,6 +540,11 @@ export function CollectionDetailPage({
                       >
                         <Link
                           to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
+                          search={
+                            sourceAction === "ocr"
+                              ? { tab: "ocr", subTab: "runs" }
+                              : {}
+                          }
                           params={{
                             workspaceId,
                             collectionId,
@@ -627,6 +649,8 @@ export function CollectionDetailPage({
           void navigate({
             to: "/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId",
             params: { workspaceId, collectionId, sourceId },
+            search:
+              sourceAction === "ocr" ? { tab: "ocr", subTab: "runs" } : {},
           });
         }}
       />

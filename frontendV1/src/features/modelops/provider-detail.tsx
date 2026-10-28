@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CapacityBadge } from "@/features/modelops/capacity-badge";
+import { ProviderDiagnosticsPanel } from "@/features/modelops/diagnostics-panel";
 import { KeyEventsPanel } from "@/features/modelops/key-events-panel";
 import { KeysPanel } from "@/features/modelops/keys-panel";
 import { ProviderFormDialog } from "@/features/modelops/provider-form-dialog";
@@ -294,6 +295,7 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
         </p>
       ) : null}
 
+      <ProviderDiagnosticsPanel provider={provider} />
       <CapacityPanel provider={provider} />
       <KeysPanel providerId={providerId} />
       <KeyEventsPanel providerId={providerId} />

@@ -8,5 +8,7 @@ Compiler, [index/search](../../../docs/dense-indexing.md) và
 follow-up, có usage riêng và không tự fallback. Embedding dimension
 và capacity gắn với endpoint/model, credential lấy từ DB có mã hóa.
 
-Chưa có discovery/probe API, streaming hoặc key lease/cooldown/fallback runtime.
+Đã có [discovery/probe và lịch sử kiểm tra](../../../docs/modelops-diagnostics.md).
+Kết quả thử tách khỏi capacity/dimension/default/grant; đổi cấu hình/khóa làm
+kết quả cũ stale. Chưa có streaming hoặc key lease/cooldown/fallback runtime.
 Xem [Compiler v1](../../../docs/compiler-v1.md) và ma trận port trong `backendV1/docs/`.

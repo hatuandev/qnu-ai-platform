@@ -2,8 +2,8 @@
  * HTTP contract for ModelOps screens.
  *
  * One function per route in `backendV1/qnu/domains/modelops/router.py`. A
- * provider record is endpoint + one model: there is no `/models` sub-resource
- * and none is invented here.
+ * provider record remains endpoint + one model. Discovery/probe have dedicated,
+ * admin-only endpoints; listing models never silently updates configuration.
  */
 
 import type { V1Client } from "../../app/api/v1/client.ts";

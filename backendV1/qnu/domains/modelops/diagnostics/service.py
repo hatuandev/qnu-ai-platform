@@ -1,0 +1,156 @@
+"""Admin-only diagnostics, stored separately from declared capacity and runtime usage.
+
+Only generated samples leave QNU. No raw content/credentials enter the safe history.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import uuid
+from dataclasses import replace
+from datetime import UTC, datetime
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from qnu.domains.identity.actor import AuthActor
+from qnu.domains.modelops.access import require_model_admin
+from qnu.domains.modelops.audit import record_event
+from qnu.domains.modelops.capacity.service import read_capacity
+from qnu.domains.modelops.diagnostics.schemas import DiagnosticCheck, ProviderDiagnostics
+from qnu.domains.modelops.embedding.configuration import read_dimension
+from qnu.domains.modelops.models import Provider
+from qnu.domains.modelops.providers.service import provider_service
+from qnu.domains.modelops.public_api import _active_key
+from qnu.platform.crypto import decrypt
+from qnu.platform.errors import AppException, Conflict
+from qnu.ports.provider_diagnostics import (
+    DiagnosticKind,
+    DiagnosticResult,
+    DiagnosticTarget,
+    ProviderDiagnosticClient,
+)
+
+HISTORY_KEY = "diagnostic_checks_v1"
+
+
+async def identity(db: AsyncSession, provider: Provider) -> str:
+    key = await _active_key(db, provider.id)
+    capacity = read_capacity(provider)
+    dimension, dimension_status = read_dimension(provider)
+    material = [
+        "qnu-provider-diagnostics/v1",
+        provider.base_url.rstrip("/"),
+        provider.model_name,
+        provider.provider_type,
+        provider.capabilities,
+        provider.is_active,
+        provider.timeout_seconds,
+        bool((provider.extra_config or {}).get("ocr_auth_optional", False)),
+        capacity.token_limits.model_dump() if capacity.token_limits else None,
+        dimension,
+        dimension_status,
+        [key.id, key.updated_at.isoformat()] if key else None,
+    ]
+    return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
+
+
+async def read_diagnostics(
+    db: AsyncSession, provider_id: str, actor: AuthActor
+) -> ProviderDiagnostics:
+    require_model_admin(actor)
+    provider = await provider_service.get(db, provider_id)
+    fingerprint = await identity(db, provider)
+    checks = []
+    for row in (provider.extra_config or {}).get(HISTORY_KEY, [])[:20]:
+        check = DiagnosticCheck.model_validate(row)
+        check.configuration_status = "current" if row.get("identity") == fingerprint else "stale"
+        checks.append(check)
+    return ProviderDiagnostics(
+        provider_id=provider.id, configured_active=provider.is_active, checks=checks
+    )
+
+
+async def run_diagnostic(
+    db: AsyncSession,
+    provider_id: str,
+    kind: DiagnosticKind,
+    actor: AuthActor,
+    client: ProviderDiagnosticClient,
+) -> DiagnosticCheck:
+    require_model_admin(actor)
+    provider = await provider_service.get(db, provider_id)
+    if not provider.is_active:
+        raise Conflict("Provider đang tắt; bật lại trước khi kiểm tra.", code="provider_inactive")
+    if kind != "discovery" and kind not in provider.capabilities:
+        raise Conflict(
+            "Chức năng chưa được khai báo cho provider.", code="provider_capability_mismatch"
+        )
+    fingerprint = await identity(db, provider)
+    key = await _active_key(db, provider.id)
+    capacity = read_capacity(provider)
+    maximum = capacity.token_limits.max_output_tokens if capacity.token_limits else None
+    dimension, _ = read_dimension(provider)
+    target = DiagnosticTarget(
+        endpoint=provider.base_url,
+        model=provider.model_name,
+        provider_type=provider.provider_type,
+        timeout_seconds=min(provider.timeout_seconds, 60),
+        expected_dimension=dimension,
+        max_output_tokens=min(maximum or 1024, 1024),
+        auth_optional=kind == "ocr"
+        and bool((provider.extra_config or {}).get("ocr_auth_optional", False)),
+    )
+    credential_error = False
+    if key:
+        try:
+            target = replace(target, api_key=decrypt(key.secret_encrypted))
+        except AppException:
+            # Never attach cryptography/provider error strings to the public diagnostic.
+            credential_error = True
+    # No row locks/DB transaction held while waiting on upstream.
+    await db.commit()
+    result = (
+        DiagnosticResult("failed", "credentials_unreadable", "Không đọc được khóa đã lưu.")
+        if credential_error
+        else await client.check(kind, target)
+    )
+    current = (
+        await db.execute(
+            select(Provider)
+            .where(Provider.id == provider_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one()
+    if await identity(db, current) != fingerprint:
+        await db.rollback()
+        raise Conflict(
+            "Cấu hình đã đổi trong lúc thử; hãy chạy lại.", code="diagnostic_configuration_changed"
+        )
+    check = DiagnosticCheck(
+        id="diag_" + uuid.uuid4().hex[:16],
+        kind=kind,
+        outcome=result.outcome,
+        tested_at=datetime.now(UTC),
+        latency_ms=result.latency_ms,
+        code=result.code,
+        detail=result.detail,
+        http_status=result.http_status,
+        retry_after=result.retry_after,
+        requested_model=target.model,
+        observed_model=result.observed_model,
+        observed_dimension=result.observed_dimension,
+        total_tokens=result.total_tokens,
+        models=result.models,
+    )
+    config = dict(current.extra_config or {})
+    config[HISTORY_KEY] = [
+        {**check.model_dump(mode="json"), "identity": fingerprint},
+        *config.get(HISTORY_KEY, []),
+    ][:20]
+    current.extra_config = config
+    record_event(db, actor, "provider.diagnostic." + kind, provider_id, [check.code])
+    await db.commit()
+    return check

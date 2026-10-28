@@ -3448,6 +3448,17 @@
               "default": 20,
               "title": "Limit"
             }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
           }
         ],
         "responses": {
@@ -6312,6 +6323,142 @@
         }
       }
     },
+    "/platform/v1alpha1/modelops/providers/{provider_id}/diagnostics": {
+      "get": {
+        "tags": [
+          "ModelOps · Diagnostics"
+        ],
+        "summary": "Diagnostics",
+        "operationId": "diagnostics_platform_v1alpha1_modelops_providers__provider_id__diagnostics_get",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderDiagnostics"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/v1alpha1/modelops/providers/{provider_id}/discover": {
+      "post": {
+        "tags": [
+          "ModelOps · Diagnostics"
+        ],
+        "summary": "Discover",
+        "operationId": "discover_platform_v1alpha1_modelops_providers__provider_id__discover_post",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticCheck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/v1alpha1/modelops/providers/{provider_id}/probe": {
+      "post": {
+        "tags": [
+          "ModelOps · Diagnostics"
+        ],
+        "summary": "Probe",
+        "operationId": "probe_platform_v1alpha1_modelops_providers__provider_id__probe_post",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProbeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticCheck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/platform/v1alpha1/workspaces/{workspace_id}/allowed-providers": {
       "get": {
         "tags": [
@@ -8336,6 +8483,90 @@
       },
       "AnswerRequest": {
         "properties": {
+          "retrieval_mode": {
+            "type": "string",
+            "enum": [
+              "dense",
+              "hybrid",
+              "hybrid_rerank"
+            ],
+            "title": "Retrieval Mode",
+            "default": "dense"
+          },
+          "candidate_k": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Candidate K",
+            "default": 30
+          },
+          "rrf_k": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Rrf K",
+            "default": 60
+          },
+          "rerank_provider_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rerank Provider Id"
+          },
+          "metadata_filter": {
+            "$ref": "#/components/schemas/MetadataFilter"
+          },
+          "context_window": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Context Window",
+            "default": 0
+          },
+          "context_max_bytes": {
+            "type": "integer",
+            "maximum": 128000.0,
+            "minimum": 256.0,
+            "title": "Context Max Bytes",
+            "default": 16000
+          },
+          "verification_mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "observe",
+              "enforce"
+            ],
+            "title": "Verification Mode",
+            "default": "off"
+          },
+          "verification_provider_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Provider Id"
+          },
+          "verification_max_output_tokens": {
+            "type": "integer",
+            "maximum": 16000.0,
+            "minimum": 128.0,
+            "title": "Verification Max Output Tokens",
+            "default": 2048
+          },
           "question": {
             "type": "string",
             "maxLength": 8000,
@@ -8389,36 +8620,6 @@
               }
             ],
             "title": "Max Output Tokens"
-          },
-          "retrieval_mode": {
-            "type": "string",
-            "enum": [
-              "dense",
-              "hybrid",
-              "hybrid_rerank"
-            ],
-            "title": "Retrieval Mode",
-            "default": "dense"
-          },
-          "candidate_k": {
-            "type": "integer",
-            "maximum": 100.0,
-            "minimum": 1.0,
-            "title": "Candidate K",
-            "default": 30
-          },
-          "rerank_provider_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 64,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rerank Provider Id"
           }
         },
         "additionalProperties": false,
@@ -8449,7 +8650,9 @@
                 "enum": [
                   "no_eligible_content",
                   "no_match",
-                  "model_abstained"
+                  "model_abstained",
+                  "answer_not_supported",
+                  "answer_verification_uncertain"
                 ]
               },
               {
@@ -8610,6 +8813,16 @@
             },
             "type": "object",
             "title": "Stage Ms"
+          },
+          "context": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Context"
+          },
+          "verification": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Verification"
           }
         },
         "type": "object",
@@ -8681,6 +8894,9 @@
             "type": "boolean",
             "title": "Is Active",
             "default": true
+          },
+          "rag_policy": {
+            "$ref": "#/components/schemas/RagPolicy"
           }
         },
         "additionalProperties": false,
@@ -8754,6 +8970,9 @@
             "type": "boolean",
             "title": "Is Active",
             "default": true
+          },
+          "rag_policy": {
+            "$ref": "#/components/schemas/RagPolicy"
           },
           "id": {
             "type": "string",
@@ -8859,6 +9078,9 @@
             "type": "boolean",
             "title": "Is Active",
             "default": true
+          },
+          "rag_policy": {
+            "$ref": "#/components/schemas/RagPolicy"
           },
           "expected_revision": {
             "type": "integer",
@@ -9779,6 +10001,14 @@
             "minLength": 1,
             "title": "Compilation Run Id"
           },
+          "retrieval_metadata": {
+            "items": {
+              "$ref": "#/components/schemas/RetrievalAnnotation"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Retrieval Metadata"
+          },
           "document_key": {
             "type": "string",
             "maxLength": 120,
@@ -10241,6 +10471,145 @@
           "access_key"
         ],
         "title": "DevLoginRequest"
+      },
+      "DiagnosticCheck": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "discovery",
+              "chat",
+              "embedding",
+              "rerank",
+              "ocr"
+            ],
+            "title": "Kind"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "failed",
+              "unsupported"
+            ],
+            "title": "Outcome"
+          },
+          "configuration_status": {
+            "type": "string",
+            "enum": [
+              "current",
+              "stale"
+            ],
+            "title": "Configuration Status",
+            "default": "current"
+          },
+          "tested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Tested At"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Status"
+          },
+          "retry_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry After"
+          },
+          "requested_model": {
+            "type": "string",
+            "title": "Requested Model"
+          },
+          "observed_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Model"
+          },
+          "observed_dimension": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Dimension"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "outcome",
+          "tested_at",
+          "code",
+          "detail",
+          "requested_model"
+        ],
+        "title": "DiagnosticCheck"
       },
       "DocumentResponse": {
         "properties": {
@@ -11523,6 +11892,183 @@
         "type": "object",
         "title": "MemberUpdateRequest"
       },
+      "MetadataEvidence": {
+        "properties": {
+          "citation": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Citation"
+          },
+          "quote": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Quote"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "citation",
+          "quote"
+        ],
+        "title": "MetadataEvidence"
+      },
+      "MetadataFilter": {
+        "properties": {
+          "data_year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9999.0,
+                "minimum": 1000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Year"
+          },
+          "issued_year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9999.0,
+                "minimum": 1000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued Year"
+          },
+          "effective_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective On"
+          },
+          "program": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Program"
+          },
+          "intake": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intake"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MetadataFilter"
+      },
+      "MetadataValues": {
+        "properties": {
+          "data_year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9999.0,
+                "minimum": 1000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Year"
+          },
+          "issued_year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9999.0,
+                "minimum": 1000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued Year"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "effective_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Until"
+          },
+          "program": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Program"
+          },
+          "intake": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intake"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MetadataValues"
+      },
       "ModelOpsEventResponse": {
         "properties": {
           "id": {
@@ -11947,6 +12493,26 @@
           "expires_at"
         ],
         "title": "PreviewResponse"
+      },
+      "ProbeRequest": {
+        "properties": {
+          "capability": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "embedding",
+              "rerank",
+              "ocr"
+            ],
+            "title": "Capability"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "capability"
+        ],
+        "title": "ProbeRequest"
       },
       "ProcessingRunCreatedResponse": {
         "properties": {
@@ -12458,6 +13024,31 @@
         ],
         "title": "ProviderCreateRequest"
       },
+      "ProviderDiagnostics": {
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          },
+          "configured_active": {
+            "type": "boolean",
+            "title": "Configured Active"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider_id",
+          "configured_active"
+        ],
+        "title": "ProviderDiagnostics"
+      },
       "ProviderResponse": {
         "properties": {
           "id": {
@@ -12808,6 +13399,97 @@
         "type": "object",
         "title": "QuotaUpdateRequest"
       },
+      "RagPolicy": {
+        "properties": {
+          "retrieval_mode": {
+            "type": "string",
+            "enum": [
+              "dense",
+              "hybrid",
+              "hybrid_rerank"
+            ],
+            "title": "Retrieval Mode",
+            "default": "dense"
+          },
+          "candidate_k": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Candidate K",
+            "default": 30
+          },
+          "rrf_k": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Rrf K",
+            "default": 60
+          },
+          "rerank_provider_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rerank Provider Id"
+          },
+          "metadata_filter": {
+            "$ref": "#/components/schemas/MetadataFilter"
+          },
+          "context_window": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Context Window",
+            "default": 0
+          },
+          "context_max_bytes": {
+            "type": "integer",
+            "maximum": 128000.0,
+            "minimum": 256.0,
+            "title": "Context Max Bytes",
+            "default": 16000
+          },
+          "verification_mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "observe",
+              "enforce"
+            ],
+            "title": "Verification Mode",
+            "default": "off"
+          },
+          "verification_provider_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Provider Id"
+          },
+          "verification_max_output_tokens": {
+            "type": "integer",
+            "maximum": 16000.0,
+            "minimum": 128.0,
+            "title": "Verification Max Output Tokens",
+            "default": 2048
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RagPolicy"
+      },
       "RecoveryPreviewRequest": {
         "properties": {
           "reason": {
@@ -12831,6 +13513,14 @@
             "maxLength": 64,
             "minLength": 1,
             "title": "Compilation Run Id"
+          },
+          "retrieval_metadata": {
+            "items": {
+              "$ref": "#/components/schemas/RetrievalAnnotation"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Retrieval Metadata"
           }
         },
         "additionalProperties": false,
@@ -12861,6 +13551,36 @@
         ],
         "title": "RegistrationResponse"
       },
+      "RetrievalAnnotation": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "maxLength": 260,
+            "minLength": 1,
+            "title": "Target"
+          },
+          "values": {
+            "$ref": "#/components/schemas/MetadataValues"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/MetadataEvidence"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target",
+          "values",
+          "evidence"
+        ],
+        "title": "RetrievalAnnotation"
+      },
       "ReviewAcknowledgement": {
         "properties": {
           "review_id": {
@@ -12886,6 +13606,18 @@
             "type": "array",
             "maxItems": 10000,
             "title": "Resolutions"
+          },
+          "retrieval_metadata_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieval Metadata Sha256"
           }
         },
         "additionalProperties": false,
@@ -13338,6 +14070,9 @@
               }
             ],
             "title": "Rerank Provider Id"
+          },
+          "metadata_filter": {
+            "$ref": "#/components/schemas/MetadataFilter"
           }
         },
         "additionalProperties": false,
@@ -13697,6 +14432,16 @@
             "type": "integer",
             "minimum": 0.0,
             "title": "Expected Turn No"
+          },
+          "metadata_filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataFilter"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -13735,6 +14480,9 @@
               }
             ],
             "title": "Resolved Question"
+          },
+          "metadata_filter": {
+            "$ref": "#/components/schemas/MetadataFilter"
           },
           "history_turn_ids": {
             "items": {
@@ -13994,6 +14742,13 @@
             "type": "object",
             "title": "Provenance"
           },
+          "retrieval_metadata": {
+            "items": {
+              "$ref": "#/components/schemas/RetrievalAnnotation"
+            },
+            "type": "array",
+            "title": "Retrieval Metadata"
+          },
           "created_by": {
             "type": "string",
             "title": "Created By"
@@ -14002,6 +14757,11 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "retrieval_metadata_sha256": {
+            "type": "string",
+            "title": "Retrieval Metadata Sha256",
+            "readOnly": true
           }
         },
         "type": "object",
@@ -14020,7 +14780,8 @@
           "bundle_sha256",
           "provenance",
           "created_by",
-          "created_at"
+          "created_at",
+          "retrieval_metadata_sha256"
         ],
         "title": "VersionResponse"
       },

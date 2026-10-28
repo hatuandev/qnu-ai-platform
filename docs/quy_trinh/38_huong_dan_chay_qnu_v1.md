@@ -1,10 +1,98 @@
 # Hướng dẫn chạy QNU AI Platform V1
 
-Áp dụng cho `backendV1/` và `frontendV1/` trên Windows/PowerShell, đối chiếu mã ngày **27/10/2026**. Thư mục dự án trong các lệnh dưới đây là `D:\DuAnPhanMem\qnu-ai-platform`; thay đường dẫn nếu đặt ở nơi khác.
+Áp dụng cho `backendV1/` và `frontendV1/` trên Windows/PowerShell, đối chiếu mã ngày **28/10/2026**. Thư mục dự án trong các lệnh dưới đây là `D:\DuAnPhanMem\qnu-ai-platform`; thay đường dẫn nếu đặt ở nơi khác.
 
 ## 1. Chạy nhanh hằng ngày
 
 Nếu đã cài thư viện, có cấu hình V1 và database đã migration, chỉ cần hạ tầng đang chạy cùng **ba cửa sổ PowerShell**: API, worker và giao diện. Máy mới làm phần 2–5 trước.
+
+### Chạy bằng Make — cách gọn nhất
+
+Từ gốc dự án, dùng GNU Make hoặc `make.bat` trên CMD:
+
+```text
+make v1-help          # Xem các lệnh V1
+make v1-infra-up      # Khởi động PostgreSQL + Redis + Qdrant sau khi mở Docker Desktop
+make v1-check         # Kiểm tra kết nối, schema và dependency FE
+make v1-dev           # Chạy API + worker + FE trong cùng phiên
+make v1-be            # Hoặc chạy riêng API
+make v1-worker        # Hoặc chạy riêng worker
+make v1-fe            # Hoặc chạy riêng FE
+```
+
+Trong PowerShell, không cần cài GNU Make, dùng runner có sẵn:
+
+```powershell
+Set-Location D:\DuAnPhanMem\qnu-ai-platform
+.\make.ps1 v1-dev
+```
+
+`v1-dev` giữ tiến trình ở cửa sổ hiện tại, log ba thành phần hiển thị cùng nhau;
+**Ctrl+C** dừng các tiến trình con của phiên này. Một thành phần thoát thì hai
+thành phần còn lại cũng dừng và trả mã lỗi. Lệnh không tự restart phiên cũ;
+nếu đang có dịch vụ V1 thì dùng lại hoặc dừng đúng phiên đó trước khi mở mới.
+Muốn đọc log riêng, chạy `v1-be`, `v1-worker`, `v1-fe` trong ba cửa sổ.
+
+Trước khi mở ba thành phần, `v1-dev` kiểm tra Redis PING, kết nối PostgreSQL và
+revision V1, Qdrant cùng Vite đã cài. Có lỗi thì báo từng mục và dừng ngay;
+kiểm tra không gọi model hoặc tự migration. Môi trường Python được chuẩn bị
+một lần ở bước này; API/worker dùng `--no-sync` để tránh hai tiến trình cùng
+cập nhật `.venv`. FE gọi trực tiếp Vite qua Node, tránh câu hỏi kết thúc batch
+của `npm.cmd` khi dừng trên Windows. Khi chạy riêng API/worker, cài dependency
+bằng `v1-install-be` trước nếu chưa có môi trường.
+
+Nếu Docker vừa tạo volume PostgreSQL mới, container healthy chưa có nghĩa đã
+có bảng V1. Sau khi xác nhận đúng database cần khởi tạo, chạy:
+
+```powershell
+.\make.ps1 v1-migrate
+.\make.ps1 v1-check
+.\make.ps1 v1-dev
+```
+
+`v1-migrate` chỉ nâng schema, không tự tạo provider/credential, quota hoặc tài
+liệu; các cấu hình ModelOps vẫn thực hiện theo phần 7. Nếu database cũ có
+revision phát triển đã gộp, xem phần 4 thay vì stamp/reset để vượt lỗi.
+
+Mặc định API/worker đọc `.env` tại **gốc repo**, giữ cách phân giải storage
+của cách A bên dưới. Nếu dùng `backendV1/.env` (cách B), chọn rõ trong cùng phiên:
+
+```powershell
+$env:QNU_V1_ENV_DIR = "backend"
+.\make.ps1 v1-dev
+```
+
+Chuyển lại cách A bằng `$env:QNU_V1_ENV_DIR = "root"`. Không tự dò tệp để đổi
+môi trường hoặc sao chép `.env`. Có thể xem lệnh/thư mục mà không chạy dịch vụ:
+
+```powershell
+.\make.ps1 v1-dev --dry-run
+.\make.ps1 v1-migrate --dry-run --env-dir backend
+```
+
+Với GNU Make, dùng `make v1-dev V1_ARGS=--dry-run`; với Bash dùng
+`./make v1-dev --dry-run`; CMD dùng `make.bat v1-dev --dry-run`.
+
+Các lệnh thiết lập và kiểm tra bổ sung:
+
+| Lệnh | Thực hiện |
+| --- | --- |
+| `make v1-install-be` / `make v1-install-fe` | Cài thư viện theo lockfile; không tạo/ghi đè cấu hình |
+| `make v1-infra-up` | Chủ động khởi động ba dịch vụ local, chờ health; cần mở Docker Desktop trước, không tự khởi động API/worker/FE |
+| `make v1-check` | Đọc trạng thái Redis/PostgreSQL schema/Qdrant/Vite, không ghi DB hoặc gọi model |
+| `make v1-db-check` | Đọc Alembic revision hiện tại, không seed hoặc migration |
+| `make v1-migrate` | **Chủ động nâng schema** bằng Alembic; kiểm tra database và backup theo phần 4 trước |
+| `make v1-test-be` | Harness tạo DB thử riêng trên loopback, chạy test rồi dọn đúng DB đó; cần quyền tạo DB |
+| `make v1-test-fe` | Chạy Vitest FE |
+| `make v1-lint` | Ruff BE rồi Biome FE, dừng nếu có lỗi, không tự sửa |
+| `make v1-typecheck` / `make v1-build` | TypeScript / build FE; clone mới cần dev/build để sinh route tree trước khi typecheck riêng |
+
+PowerShell thay `make` bằng `.\make.ps1` cho mọi lệnh trên. Các lệnh cũ không có
+tiền tố `v1-` vẫn chạy legacy; `make dev` chưa chuyển sang V1. Runner chung là
+[`scripts/run_v1.py`](../../scripts/run_v1.py), cần Python có sẵn trên máy hoặc
+môi trường `.venv` V1 đã cài. Lệnh khởi động không tự migration/seed/reset DB.
+
+### Chạy thủ công từng thành phần
 
 | Thành phần | Địa chỉ / vai trò |
 | --- | --- |
@@ -216,6 +304,21 @@ Invoke-RestMethod -Uri http://127.0.0.1:8002/health/ready
 
 Sau đăng nhập, mở workspace → **Vận hành** → kiểm tra sẵn sàng bằng tài khoản admin. Màn này kiểm thêm schema, queue/worker, Qdrant, cấu hình model/quota và đọc tệp nguồn. Workspace mới chưa có nguồn có thể báo `no_source_to_probe`; upload một tài liệu rồi kiểm tra lại. Readiness không tự chạy inference model và không chứng nhận chất lượng câu trả lời.
 
+### Mở chức năng từ sidebar
+
+Sidebar chia thành **Tri thức, Trợ lý, Quản trị, Vận hành**. Khi chưa chọn
+workspace/kho, bấm chức năng sẽ mở màn chọn tương ứng. Lựa chọn đang dùng hiện
+ở mục **Đang làm việc**; dùng **Đổi workspace/Đổi kho** để chuyển. Trong cùng
+phiên, chuyển qua ModelOps hay đóng menu điện thoại vẫn giữ lựa chọn này.
+Tải lại trang lấy lựa chọn từ URL; đăng xuất không lưu lựa chọn sang phiên khác.
+
+Các mục tài liệu cần chọn kho. Nếu workspace mới chưa có kho, quản trị/editor
+có thể bấm **Tạo kho đầu tiên** ngay trên màn chọn. OCR cần chọn tiếp nguồn;
+Biên soạn, Xuất bản, Tìm kiếm, Hỏi đáp và Đánh giá RAG mở đúng tab hoặc trang
+của kho đã chọn. Các mục Tác vụ, Sao lưu, Dọn dữ liệu mở từng phần riêng của
+trang vận hành. **Ctrl+K** dùng cùng danh mục và lựa chọn với sidebar.
+Quyền thực hiện thao tác vẫn được backend kiểm tra.
+
 ## 7. Thiết lập ModelOps cho workspace mới
 
 Bỏ qua các bước đã cấu hình đúng; không tạo lại provider/key khi chỉ khởi động lại ứng dụng.
@@ -237,6 +340,10 @@ Các vai trò model trong luồng hiện tại:
 
 Tên trên dùng để nhận diện cấu hình từng trao đổi, không phải cấu hình tự nạp hoặc cam kết model hiện đang sẵn sàng. Endpoint/credential/capacity lấy từ cấu hình ModelOps thực tế; danh sách `/v1/models` chưa đủ chứng minh các API OCR/embedding/rerank hoạt động.
 
+Trên trang chi tiết provider, dùng **Lấy danh sách model** và **Thử** theo chức
+năng để đọc kết quả/độ trễ/lỗi. Kết quả thử không tự sửa capacity hay cấp quyền
+workspace. Xem [hướng dẫn ModelOps](39_modelops_lay_danh_sach_va_chay_thu.md).
+
 ## 8. Dùng thử một tài liệu từ đầu đến hỏi đáp
 
 1. Trong workspace, tạo **kho tri thức**, tải một PDF/DOCX nhỏ. Xác nhận có revision và tải lại được nguồn.
@@ -257,6 +364,7 @@ Tên trên dùng để nhận diện cấu hình từng trao đổi, không ph�
 | Không mở được cổng 8002 hoặc FE báo không kết nối | Xem cửa sổ API có chạy `qnu.main:app` hay không; kiểm tra cổng và `QNU_API_PROXY_TARGET` |
 | Vite báo cổng 3001 đã dùng | Dừng đúng tiến trình đang chiếm cổng nếu không còn dùng, hoặc đổi `FRONTEND_PORT`; Vite hiện không tự nhảy cổng |
 | PostgreSQL báo sai mật khẩu hoặc dùng tên tài khoản Windows | Kiểm tra thư mục chạy, `.env` thực sự được nạp và `DATABASE_URL`; không lấy mặc định làm cấu hình môi trường |
+| PostgreSQL connected nhưng V1 schema not initialized | Database đã kết nối nhưng chưa có bảng V1; xác nhận đúng database rồi chạy `v1-migrate`, kiểm lại bằng `v1-check` |
 | Thiếu bảng/revision hoặc readiness báo schema sai | Chạy `alembic current` đúng môi trường; đối chiếu phần 4 trước khi nâng cấp |
 | `SIGNING_KEY_MISSING`, `invalid_credentials`, `dev_gate_disabled` | Kiểm tra khóa ký ≥32 byte, dev gate, môi trường development và hai giá trị mật khẩu dev khớp nhau |
 | Tự đăng nhập không hoạt động | Dùng `npm run dev`, URL loopback và kiểm tra `.env.local`; build/preview không có cầu nối; sau logout dùng nút đăng nhập lại |
@@ -283,4 +391,8 @@ Nếu cần phục hồi toàn bộ từ backup, dùng [runbook recovery](../../
 - [FE package](../../frontendV1/package.json), [Vite config](../../frontendV1/vite.config.ts), [môi trường mẫu FE](../../frontendV1/.env.example), [cầu nối admin local](../../frontendV1/dev/dev-auto-login.ts).
 - [Môi trường mẫu BE](../../backendV1/.env.example), [migration](../../backendV1/docs/migrations.md), [quyền workspace/ModelOps](../../backendV1/docs/workspaces-modelops.md), [readiness](../../backendV1/docs/readiness.md).
 
-Tài liệu được kiểm tra tĩnh với mã/cấu hình hiện tại và liên kết nội bộ. Lượt viết hướng dẫn này không khởi động dịch vụ, áp migration hay gọi model thật; các lệnh thiết lập/chạy ở trên dành cho người vận hành thực hiện trên môi trường đã chọn.
+Hướng dẫn ban đầu được kiểm tra tĩnh ở phiên683. Khi xử lý log khởi động ở
+phiên686, đã xác nhận database local mới trống, áp dụng migration đến
+`0003_rag_policy_metadata` và kiểm tra thật API live/ready, FE cùng heartbeat
+worker, sau đó dừng đúng tiến trình thử. Không chạy inference hoặc nghiệm thu
+chất lượng câu trả lời; cấu hình và trạng thái môi trường khác cần kiểm lại.

@@ -8,10 +8,22 @@ param (
         "dev", "dev1", "dev2", "be", "fe", "fe2", "worker",
         "test", "test-be", "test-fe",
         "lint", "lint-fix", "typecheck", "build",
+        "v1-help", "v1-dev", "v1-be", "v1-worker", "v1-fe", "v1-check", "v1-infra-up",
+        "v1-install-be", "v1-install-fe", "v1-migrate", "v1-db-check",
+        "v1-test-be", "v1-test-fe", "v1-lint", "v1-typecheck", "v1-build",
         "help"
     )]
-    [string]$Command = "help"
+    [string]$Command = "help",
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$V1Arguments
 )
+
+if ($Command.StartsWith("v1-")) {
+    $V1Python = Join-Path $PSScriptRoot "backendV1/.venv/Scripts/python.exe"
+    if (-not (Test-Path -LiteralPath $V1Python)) { $V1Python = "python" }
+    & $V1Python (Join-Path $PSScriptRoot "scripts/run_v1.py") $Command @V1Arguments
+    exit $LASTEXITCODE
+}
 
 $BackendDir = "$PSScriptRoot\backend"
 $FrontendDir = "$PSScriptRoot\frontend"
@@ -165,6 +177,7 @@ switch ($Command) {
         Write-Host "==============================================================================" -ForegroundColor DarkCyan
         Write-Host "           QNU AI Platform - Task Runner (PowerShell: .\make.ps1)             " -ForegroundColor White
         Write-Host "==============================================================================" -ForegroundColor DarkCyan
+        Write-Host "[V1] .\make.ps1 v1-dev | .\make.ps1 v1-help (legacy commands stay unchanged)"
         Write-Host "[Ha tang Docker]" -ForegroundColor Yellow
         Write-Host "  .\make.ps1 infra-up     : Khoi dong cum ha tang Docker (Postgres, Qdrant, Redis, MinIO, Gotenberg)"
         Write-Host "  .\make.ps1 infra-down   : Dung cum ha tang Docker"

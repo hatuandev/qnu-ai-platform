@@ -1,6 +1,8 @@
 import { hiddenRouteMeta, navigationGroups } from "@/navigation/config";
 import type { NavGroup, NavItem } from "@/navigation/types";
 import { isStudentAccount } from "@/rbac/backend-role-map";
+import { workspaceFeatureKeys, workspaceFeatures } from "./config";
+import { isFeatureActive } from "./workspace-features";
 
 export type PermissionCheck = (permission?: string) => boolean;
 
@@ -82,7 +84,19 @@ function withoutDuplicateLabels(items: BreadcrumbItem[]): BreadcrumbItem[] {
   });
 }
 
-export function getBreadcrumbs(pathname: string) {
+export function getBreadcrumbs(
+  pathname: string,
+  search: Record<string, unknown> = {},
+) {
+  const feature = workspaceFeatureKeys.find((key) =>
+    isFeatureActive(key, pathname, search),
+  );
+  if (feature)
+    return [
+      { label: "QNU AI" },
+      { label: workspaceFeatures[feature].group },
+      { label: workspaceFeatures[feature].title },
+    ];
   // QNU AI detail routes carry ids, so they need explicit labels.
   if (pathname.startsWith("/workspaces/")) {
     return [

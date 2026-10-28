@@ -31,6 +31,7 @@ import { DEFAULT_PAGE_SEARCH } from "@/features/workspaces/search";
 import { WorkspaceFormDialog } from "@/features/workspaces/workspace-form-dialog";
 import { WorkspaceStatusHint } from "@/features/workspaces/workspaces-table";
 import { cn } from "@/lib/utils";
+import { workspaceFeatures } from "@/navigation/config";
 
 const TABS = [
   {
@@ -41,56 +42,56 @@ const TABS = [
   },
   {
     id: "collections",
-    label: "Kho tri thức",
-    to: "/workspaces/$workspaceId/collections",
+    label: workspaceFeatures.collections.title,
+    to: workspaceFeatures.collections.to,
     exact: false,
   },
   {
     id: "assistants",
-    label: "Trợ lý AI",
-    to: "/workspaces/$workspaceId/assistants",
+    label: workspaceFeatures.assistants.title,
+    to: workspaceFeatures.assistants.to,
     exact: false,
   },
   {
     id: "conversations",
-    label: "Hội thoại",
-    to: "/workspaces/$workspaceId/conversations",
+    label: workspaceFeatures.conversations.title,
+    to: workspaceFeatures.conversations.to,
     exact: false,
   },
   {
     id: "members",
-    label: "Thành viên",
-    to: "/workspaces/$workspaceId/members",
+    label: workspaceFeatures.members.title,
+    to: workspaceFeatures.members.to,
     exact: false,
   },
   {
     id: "models",
-    label: "Model được cấp",
-    to: "/workspaces/$workspaceId/models",
+    label: workspaceFeatures.models.title,
+    to: workspaceFeatures.models.to,
     exact: false,
   },
   {
     id: "quota",
-    label: "Quota & usage",
-    to: "/workspaces/$workspaceId/quota",
+    label: workspaceFeatures.quota.title,
+    to: workspaceFeatures.quota.to,
     exact: false,
   },
   {
     id: "operations",
     label: "Vận hành",
-    to: "/workspaces/$workspaceId/operations",
+    to: workspaceFeatures.jobs.to,
     exact: false,
   },
   {
     id: "resources",
-    label: "Thùng rác",
-    to: "/workspaces/$workspaceId/resources",
+    label: workspaceFeatures.resources.title,
+    to: workspaceFeatures.resources.to,
     exact: false,
   },
   {
     id: "audit",
-    label: "Nhật ký",
-    to: "/workspaces/$workspaceId/audit",
+    label: workspaceFeatures.audit.title,
+    to: workspaceFeatures.audit.to,
     exact: false,
   },
 ] as const;

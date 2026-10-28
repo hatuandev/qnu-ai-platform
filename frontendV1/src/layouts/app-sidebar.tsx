@@ -45,6 +45,7 @@ import { navigationGroups } from "@/navigation/config";
 import type { NavItem } from "@/navigation/types";
 import { filterNavigationGroups, isItemActive } from "@/navigation/utils";
 import { useRbac } from "@/rbac/context";
+import { WorkspaceSidebar } from "./workspace-sidebar";
 
 function NavLeaf({
   item,
@@ -59,7 +60,7 @@ function NavLeaf({
 }) {
   const { state, isMobile } = useSidebar();
   if (!item.to) return null;
-  const active = pathname === item.to;
+  const active = isItemActive(item, pathname);
   const Icon = item.icon;
   const compact = state === "collapsed" && !isMobile;
   const content = (
@@ -347,7 +348,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   const canV1 = (permission?: string) =>
     v1.isAuthenticated && hasV1Permission(v1.actor, permission);
   const groups = filterNavigationGroups(
-    navigationGroups,
+    navigationGroups.filter((group) => !group.template),
     isAccessVerified ? can : (permission) => permission === undefined,
     user?.userType,
     canV1,
@@ -364,14 +365,6 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
           <SidebarGroup key={group.id}>
             <SidebarGroupLabel className="flex items-center gap-1.5">
               <span className="truncate">{group.label}</span>
-              {group.template ? (
-                <Badge
-                  variant="secondary"
-                  className="h-4 px-1.5 text-[10px] font-medium leading-none text-muted-foreground"
-                >
-                  Mẫu
-                </Badge>
-              ) : null}
             </SidebarGroupLabel>
             <SidebarMenu>
               {group.items.map((item) =>
@@ -394,6 +387,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             </SidebarMenu>
           </SidebarGroup>
         ))}
+        <WorkspaceSidebar onNavigate={handleNavigate} />
       </SidebarContent>
       <SidebarFooter className={cn("px-3", compact && "px-0")}>
         <AccountMenu compact={compact} onNavigate={handleNavigate} />

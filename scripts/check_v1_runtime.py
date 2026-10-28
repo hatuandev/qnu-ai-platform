@@ -1,0 +1,137 @@
+"""Read-only V1 startup probes. Never calls models, migrates or seeds data."""
+
+from __future__ import annotations
+
+import asyncio
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+import httpx
+from redis.asyncio import Redis
+from redis.exceptions import RedisError
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import create_async_engine
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "backendV1"))
+
+if TYPE_CHECKING:
+    from qnu.platform.config import Settings
+
+
+async def check_redis(url: str) -> tuple[bool, str]:
+    client = Redis.from_url(url, socket_connect_timeout=2, socket_timeout=2)
+    try:
+        ok = await asyncio.wait_for(client.ping(), timeout=3)
+        return bool(ok), "Redis PING" if ok else "Redis did not return PONG"
+    except (RedisError, OSError, TimeoutError, ValueError):
+        return (
+            False,
+            "Redis unavailable; check REDIS_URL and start the configured Redis service",
+        )
+    finally:
+        await client.aclose()
+
+
+async def check_database(url: str, head: str) -> tuple[bool, str]:
+    engine = create_async_engine(url, connect_args={"timeout": 2, "command_timeout": 2})
+    try:
+        async with engine.connect() as connection:
+            version_exists = await connection.scalar(
+                text(
+                    "SELECT to_regclass('public.alembic_version_backendv1') IS NOT NULL"
+                )
+            )
+            if not version_exists:
+                return (
+                    False,
+                    "PostgreSQL connected; V1 schema not initialized. Run make v1-migrate to create V1 tables",
+                )
+            current = await connection.scalar(
+                text("SELECT version_num FROM alembic_version_backendv1")
+            )
+        if current != head:
+            return (
+                False,
+                "V1 schema is not current; check v1-db-check before explicitly running v1-migrate",
+            )
+        return True, "PostgreSQL connected and V1 schema current"
+    except (SQLAlchemyError, OSError, TimeoutError):
+        return (
+            False,
+            "PostgreSQL or V1 schema unavailable; check DATABASE_URL and v1-db-check",
+        )
+    finally:
+        await engine.dispose()
+
+
+async def check_qdrant(url: str) -> tuple[bool, str]:
+    try:
+        async with httpx.AsyncClient(timeout=2) as client:
+            response = await client.get(url.rstrip("/") + "/collections")
+        return response.status_code == 200, "Qdrant GET /collections"
+    except (httpx.HTTPError, httpx.InvalidURL, OSError, ValueError):
+        return (
+            False,
+            "Qdrant unavailable; check QDRANT_URL and the configured vector service",
+        )
+
+
+async def inspect(
+    settings: Settings, root: Path, head: str
+) -> dict[str, tuple[bool, str]]:
+    checks = await asyncio.gather(
+        check_redis(settings.REDIS_URL),
+        check_database(settings.DATABASE_URL, head),
+        check_qdrant(settings.QDRANT_URL),
+    )
+    results = dict(zip(("redis", "postgresql", "qdrant"), checks, strict=True))
+    vite_present = (root / "frontendV1/node_modules/vite/bin/vite.js").is_file()
+    results["frontend"] = (
+        vite_present,
+        "Vite installed" if vite_present else "Run make v1-install-fe first",
+    )
+    return results
+
+
+def main() -> int:
+    try:
+        from qnu.domains.operations.recovery.service import HEAD
+        from qnu.platform.config import get_settings
+
+        results = asyncio.run(inspect(get_settings(), ROOT, HEAD))
+    except (
+        SQLAlchemyError,
+        RedisError,
+        httpx.HTTPError,
+        OSError,
+        TimeoutError,
+        ValueError,
+        TypeError,
+        ImportError,
+    ):
+        # Do not print exceptions: URLs, credentials or provider data may be embedded.
+        print("V1 startup check failed; verify the selected .env configuration.")
+        return 1
+    for name, (ok, detail) in results.items():
+        print(f"[{'OK' if ok else 'FAIL'}] {name}: {detail}")
+    if not all(ok for ok, _ in results.values()):
+        print(
+            "No API/worker/FE started. Resolve the failed checks above before retrying."
+        )
+        if not results["redis"][0] or not results["qdrant"][0]:
+            print(
+                "For local Docker services: open Docker Desktop, then make v1-infra-up."
+            )
+        print(
+            "Remote infrastructure: check the selected configuration. No model inference was checked."
+        )
+        return 1
+    print("Dependency checks passed. This is not a live model or answer-quality check.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

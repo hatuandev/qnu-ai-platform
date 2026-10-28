@@ -80,6 +80,11 @@ export const workspacePaths = {
 export const modelopsPaths = {
   providers: "/modelops/providers",
   provider: (providerId: string) => `/modelops/providers/${providerId}`,
+  diagnostics: (providerId: string) =>
+    `/modelops/providers/${providerId}/diagnostics`,
+  discover: (providerId: string) =>
+    `/modelops/providers/${providerId}/discover`,
+  probe: (providerId: string) => `/modelops/providers/${providerId}/probe`,
   keys: (providerId: string) => `/modelops/providers/${providerId}/keys`,
   keyRotate: (providerId: string, keyId: string) =>
     `/modelops/providers/${providerId}/keys/${keyId}/rotate`,

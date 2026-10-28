@@ -1,6 +1,9 @@
 @echo off
 setlocal
 
+set "QNU_MAKE_COMMAND=%~1"
+if "%QNU_MAKE_COMMAND:~0,3%"=="v1-" goto do_v1
+
 set "PYTHON_EXE=backend\.venv\Scripts\python.exe"
 if not exist "%PYTHON_EXE%" (
     set "PYTHON_EXE=python"
@@ -38,6 +41,12 @@ if "%~1"=="build" goto do_build
 echo [QNU AI Platform] Lenh khong hop le: "%~1"
 echo Chay "make help" de xem danh sach lenh ho tro.
 goto end
+
+:do_v1
+set "V1_PYTHON=%~dp0backendV1\.venv\Scripts\python.exe"
+if not exist "%V1_PYTHON%" set "V1_PYTHON=python"
+"%V1_PYTHON%" "%~dp0scripts\run_v1.py" %*
+exit /b %errorlevel%
 
 :do_infra_up
 echo [QNU AI Platform] Dang khoi dong ha tang Docker (PostgreSQL, Qdrant, Redis, MinIO, Gotenberg)...
@@ -173,6 +182,7 @@ goto end
 echo ==============================================================================
 echo           QNU AI Platform - Task Runner (CMD: make.bat hoac make)
 echo ==============================================================================
+echo [V1] make v1-dev / make v1-help - legacy commands stay unchanged
 echo [Ha tang Docker]
 echo   make infra-up       : Khoi dong cum ha tang Docker (Postgres, Qdrant, Redis, MinIO, Gotenberg)
 echo   make infra-down     : Dung cum ha tang Docker

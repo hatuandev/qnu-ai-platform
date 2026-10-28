@@ -1,10 +1,29 @@
+.DEFAULT_GOAL := help
 .PHONY: help dev dev1 dev2 be fe fe2 test test-be test-fe lint lint-fix typecheck build migrate db-check db-ready seed reset-db reseed reconcile reindex infra-up infra-down infra-status infra-logs
+
+# Shared V1 runner; legacy targets below keep their original meaning.
+V1_PYTHON ?= python
+ifneq (,$(wildcard backendV1/.venv/Scripts/python.exe))
+V1_PYTHON := backendV1/.venv/Scripts/python.exe
+else ifneq (,$(wildcard backendV1/.venv/bin/python))
+V1_PYTHON := backendV1/.venv/bin/python
+endif
+V1_ARGS ?=
+V1_TARGETS := v1-help v1-dev v1-be v1-worker v1-fe v1-check v1-infra-up v1-install-be v1-install-fe v1-migrate v1-db-check v1-test-be v1-test-fe v1-lint v1-typecheck v1-build
+.PHONY: $(V1_TARGETS)
+
+$(V1_TARGETS):
+	"$(V1_PYTHON)" scripts/run_v1.py $@ $(V1_ARGS)
 
 # Mac dinh hien thi huong dan su dung
 help:
 	@echo ==============================================================================
 	@echo QNU AI Platform - Danh sach cac lenh Make
 	@echo ==============================================================================
+	@echo [V1 - Backend 8002 / Frontend 3001]
+	@echo   make v1-dev         : Chay API, worker va FE V1 trong cung phien
+	@echo   make v1-help        : Xem cac lenh V1 - lenh khong co v1- van la legacy
+	@echo.
 	@echo [Ha tang Docker]
 	@echo   make infra-up       : Khoi dong cum ha tang Docker (Postgres, Qdrant, Redis, MinIO, Gotenberg)
 	@echo   make infra-down     : Dung cum ha tang Docker

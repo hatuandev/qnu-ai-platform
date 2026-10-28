@@ -30,6 +30,12 @@ import {
 } from "lucide-react";
 import type { NavGroup } from "@/navigation/types";
 
+export {
+  workspaceFeatureGroups,
+  workspaceFeatureKeys,
+  workspaceFeatures,
+} from "./workspace-features";
+
 export const navigationGroups: NavGroup[] = [
   // 0. QNU AI — dữ liệu thật từ backendV1 (không phải màn hình mẫu)
   {

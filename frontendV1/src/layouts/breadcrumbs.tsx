@@ -3,10 +3,8 @@ import { ChevronRight } from "lucide-react";
 import { getBreadcrumbs } from "@/navigation/utils";
 
 export function Breadcrumbs() {
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  });
-  const items = getBreadcrumbs(pathname);
+  const location = useRouterState({ select: (state) => state.location });
+  const items = getBreadcrumbs(location.pathname, location.search);
 
   return (
     <nav aria-label="Điều hướng đường dẫn" className="hidden min-w-0 md:block">

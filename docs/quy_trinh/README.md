@@ -7,6 +7,8 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [39 — ModelOps lấy danh sách và chạy thử](./39_modelops_lay_danh_sach_va_chay_thu.md): chọn model từ server, thử theo chức năng, đọc lỗi/độ trễ và trạng thái cấu hình cũ.
+
 - [38 — Hướng dẫn chạy QNU V1](./38_huong_dan_chay_qnu_v1.md): ba tiến trình API/worker/FE, cấu hình, migration, admin local, ModelOps và xử lý lỗi.
 
 - [37 — Frontend hỏi đáp thử, review gốc và dashboard QNU](./37_frontend_hoi_dap_thu_review_goc_va_dashboard_qnu.md): POST answers theo kho, tải phản hồi review nguyên trạng và dashboard dữ liệu thật theo workspace/quyền.

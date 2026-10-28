@@ -86,10 +86,12 @@ export function ProviderFormDialog({
   open,
   onOpenChange,
   provider,
+  suggestedModel,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   provider?: Provider | null;
+  suggestedModel?: string;
 }) {
   const isEdit = Boolean(provider);
   const createMutation = useCreateProvider();
@@ -186,7 +188,7 @@ export function ProviderFormDialog({
       form.reset({
         name: provider?.name ?? "",
         baseUrl: provider?.base_url ?? "",
-        modelName: provider?.model_name ?? "",
+        modelName: suggestedModel ?? provider?.model_name ?? "",
         capabilities: (provider?.capabilities ?? []) as Capability[],
         priority: String(provider?.priority ?? 5),
         timeoutSeconds: String(provider?.timeout_seconds ?? 30),
@@ -194,7 +196,7 @@ export function ProviderFormDialog({
       });
       setServerError(null);
     }
-  }, [open, provider, form.reset]);
+  }, [open, provider, suggestedModel, form.reset]);
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
@@ -220,8 +222,8 @@ export function ProviderFormDialog({
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-xs">
             Một bản ghi provider là một endpoint gắn với đúng một
-            <code className="mx-1 font-mono">model_name</code>. Không có thao
-            tác dò model hay kiểm tra kết nối trong API v1alpha1.
+            <code className="mx-1 font-mono">model_name</code>. Có thể lấy danh
+            sách và chạy thử trên trang chi tiết sau khi lưu provider và khóa.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
@@ -349,8 +351,8 @@ export function ProviderFormDialog({
                       aria-invalid={Boolean(error)}
                     />
                     <FieldDescription className="text-[11px]">
-                      Giá trị gửi nguyên văn tới provider; không có danh mục
-                      model để chọn.
+                      Giá trị gửi nguyên văn tới provider. Bạn cũng có thể chọn
+                      từ danh sách model ở trang chi tiết provider.
                     </FieldDescription>
                     {error ? <FieldError>{error}</FieldError> : null}
                   </Field>
