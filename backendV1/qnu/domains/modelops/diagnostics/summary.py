@@ -20,7 +20,11 @@ async def provider_summaries(db: AsyncSession) -> list[ProviderSummaryItem]:
         grouped.setdefault(key.provider_id, []).append(key)
     items = []
     for provider in providers:
-        provider_keys = grouped.get(provider.id, [])
+        provider_keys = [
+            key
+            for key in grouped.get(provider.parent_id or provider.id, [])
+            if key.model_ids is None or provider.id in key.model_ids
+        ]
         active = [key for key in provider_keys if key.status == "active"]
         history = (provider.extra_config or {}).get(HISTORY_KEY, [])
         status, tested_at, latency = "untested", None, None

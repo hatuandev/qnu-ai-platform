@@ -109,7 +109,15 @@ export function getBreadcrumbs(
     return [
       { label: "QNU AI" },
       { label: "ModelOps" },
-      { label: "Providers" },
+      { label: "Nhà cung cấp" },
+      { label: "Chi tiết" },
+    ];
+  }
+  if (pathname.startsWith("/modelops/models/")) {
+    return [
+      { label: "QNU AI" },
+      { label: "ModelOps" },
+      { label: "Model" },
       { label: "Chi tiết" },
     ];
   }

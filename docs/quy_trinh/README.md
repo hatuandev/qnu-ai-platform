@@ -7,6 +7,9 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [42 — ModelOps nhà cung cấp và model](./42_modelops_nha_cung_cap_va_model.md): tạo nhà cung cấp → thêm khóa → thử kết nối → thêm nhiều model; giữ ID và phạm vi credential khi migration.
+
+
 - [41 — API tích hợp ứng dụng](./41_api_tich_hop_ung_dung.md): cấp khóa inbound, URL tin cậy, phạm vi trợ lý, giới hạn gateway và lỗi.
 
 - [40 — ModelOps nhóm khóa và model dự phòng](./40_modelops_khoa_va_du_phong.md): cấu hình pool/cooldown, gateway retry, dự phòng theo tác vụ và lịch sử gọi có sổ sử dụng.

@@ -51,6 +51,10 @@ class Provider(Base):
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    is_connection: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
+    parent_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("providers.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     provider_type: Mapped[str] = mapped_column(String(32), nullable=False)
     base_url: Mapped[str] = mapped_column(String(1024), nullable=False)
@@ -86,6 +90,8 @@ class ProviderKey(Base):
     masked_hint: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active", index=True)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    # NULL means all child models. Migrated model-specific keys keep their old scope.
+    model_ids: Mapped[list[str] | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

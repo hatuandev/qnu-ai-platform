@@ -58,6 +58,9 @@ export function useRunDiagnostic(providerId: string) {
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({
+        queryKey: ["v1", sessionId, "modelops", "connections"],
+      });
+      void queryClient.invalidateQueries({
         queryKey: modelopsKeys.providersSummary(sessionId),
       });
       void queryClient.invalidateQueries({

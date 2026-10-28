@@ -19,6 +19,7 @@ from qnu.domains.modelops.capacity.service import (
     resolve_model_capacity,
 )
 from qnu.domains.modelops.catalog.service import catalog_service
+from qnu.domains.modelops.keys.scope import key_scope
 from qnu.domains.modelops.models import Provider, ProviderKey
 from qnu.domains.modelops.registry import transport_for
 from qnu.platform.crypto import decrypt
@@ -98,9 +99,10 @@ async def assert_provider_allowed(
 
 
 async def _active_key(db: AsyncSession, provider_id: str) -> ProviderKey | None:
+    provider = await db.get(Provider, provider_id)
     stmt = (
         select(ProviderKey)
-        .where(ProviderKey.provider_id == provider_id, ProviderKey.status == "active")
+        .where(key_scope(provider), ProviderKey.status == "active")
         .order_by(ProviderKey.priority.asc(), ProviderKey.created_at.asc())
         .limit(1)
     )
@@ -119,7 +121,7 @@ async def _active_key(db: AsyncSession, provider_id: str) -> ProviderKey | None:
         existing = await db.scalar(
             select(ProviderKey.id)
             .where(
-                ProviderKey.provider_id == provider_id,
+                key_scope(provider),
                 ProviderKey.status == "active",
             )
             .limit(1)

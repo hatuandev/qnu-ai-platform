@@ -17,7 +17,7 @@ from qnu.domains.modelops.models import (
     WorkspaceAllowedProvider,
     WorkspaceModelDefault,
 )
-from qnu.domains.modelops.providers.service import provider_service
+from qnu.domains.modelops.providers.service import active_connection, provider_service
 from qnu.domains.modelops.schemas import AllowlistUpdateRequest, DefaultsUpdateRequest
 from qnu.domains.workspaces.access import actor_ref, is_platform_admin, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
@@ -74,7 +74,10 @@ class CatalogService:
             select(Provider)
             .join(WorkspaceAllowedProvider)
             .where(
-                WorkspaceAllowedProvider.workspace_id == workspace_id, Provider.is_active.is_(True)
+                WorkspaceAllowedProvider.workspace_id == workspace_id,
+                Provider.is_active.is_(True),
+                Provider.is_connection.is_(False),
+                active_connection(),
             )
             .order_by(Provider.priority, Provider.name)
         )
@@ -143,6 +146,8 @@ class CatalogService:
         providers = [
             await provider_service.get(db, provider_id) for provider_id in req.provider_ids
         ]
+        if any(provider.is_connection for provider in providers):
+            raise Conflict("Cấp quyền theo model cụ thể của nhà cung cấp.", code="model_required")
         defaults = dict(req.defaults)
         if req.default_provider_id:
             if defaults.get("chat", req.default_provider_id) != req.default_provider_id:

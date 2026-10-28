@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.modelops.catalog.service import catalog_service
+from qnu.domains.modelops.keys.scope import key_scope
 from qnu.domains.modelops.models import Provider, ProviderKey, WorkspaceAllowedProvider
 from qnu.domains.modelops.registry import transport_for
 from qnu.domains.modelops.resilience.key_pool import eligible
@@ -42,6 +43,11 @@ async def choose_target(
         if row is None or not row.is_active:
             trace.append({"provider_id": pid, "code": "provider_inactive"})
             continue
+        if row.parent_id:
+            parent = await db.get(Provider, row.parent_id)
+            if parent is None or not parent.is_active:
+                trace.append({"provider_id": pid, "code": "provider_inactive"})
+                continue
         if (
             capability not in row.capabilities
             or capability not in transport_for(row.provider_type).protocols
@@ -49,9 +55,7 @@ async def choose_target(
             raise Conflict(
                 "Cấu hình model dự phòng không còn phù hợp.", code="fallback_capability_mismatch"
             )
-        stmt = select(ProviderKey.id).where(
-            ProviderKey.provider_id == pid, ProviderKey.status == "active"
-        )
+        stmt = select(ProviderKey.id).where(key_scope(row), ProviderKey.status == "active")
         if effective_policy(row).key_pool_enabled:
             stmt = stmt.where(*eligible(datetime.now(UTC)))
         has_key = await db.scalar(stmt.limit(1)) is not None

@@ -13,6 +13,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.modelops.catalog.service import catalog_service
+from qnu.domains.modelops.keys.scope import credential_owner, key_scope
 from qnu.domains.modelops.models import ModelOpsEvent, ModelUsageRecord, Provider, ProviderKey
 from qnu.domains.modelops.resilience.schemas import ResiliencePolicy
 from qnu.domains.modelops.resilience.service import LEASES_KEY, effective_policy
@@ -48,6 +49,7 @@ async def acquire(
     timeout: float,
     excluded: set[str],
 ) -> KeyLease:
+    owner = await credential_owner(db, scope.provider_id, lock=True)
     provider = (
         await db.scalars(
             select(Provider)
@@ -86,7 +88,7 @@ async def acquire(
             raise Conflict("Reservation không khớp lượt gọi.", code="provider_reservation_mismatch")
     policy, now = effective_policy(provider), datetime.now(UTC)
     stmt = select(ProviderKey).where(
-        ProviderKey.provider_id == provider.id,
+        key_scope(provider),
         ProviderKey.status == "active",
         ProviderKey.id.not_in(excluded),
     )
@@ -116,11 +118,11 @@ async def acquire(
         key.lease_until = now + timedelta(seconds=timeout + 10)
         leases = {
             kid: data
-            for kid, data in (provider.extra_config or {}).get(LEASES_KEY, {}).items()
+            for kid, data in (owner.extra_config or {}).get(LEASES_KEY, {}).items()
             if data["expires"] > now.isoformat()
         }
         leases[key.id] = {"token": token, "expires": key.lease_until.isoformat()}
-        provider.extra_config = {**(provider.extra_config or {}), LEASES_KEY: leases}
+        owner.extra_config = {**(owner.extra_config or {}), LEASES_KEY: leases}
     await db.commit()
     return KeyLease(provider.id, model, key.id, token, secret, policy)
 
@@ -139,21 +141,14 @@ async def finish(
     total_tokens: int | None = None,
     usage_id: str | None = None,
 ) -> None:
-    provider = (
-        await db.scalars(
-            select(Provider)
-            .where(Provider.id == lease.provider_id)
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        )
-    ).one()
+    owner = await credential_owner(db, lease.provider_id, lock=True)
     if lease.token:
-        leases = dict((provider.extra_config or {}).get(LEASES_KEY, {}))
+        leases = dict((owner.extra_config or {}).get(LEASES_KEY, {}))
         if leases.get(lease.key_id, {}).get("token") != lease.token:
             return  # A newer worker owns this key now.
         key = await db.get(ProviderKey, lease.key_id, with_for_update=True)
         del leases[lease.key_id]
-        provider.extra_config = {**(provider.extra_config or {}), LEASES_KEY: leases}
+        owner.extra_config = {**(owner.extra_config or {}), LEASES_KEY: leases}
         key.lease_until = None
         if key.status == "active":
             if success:

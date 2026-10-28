@@ -5,9 +5,10 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import exists, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.modelops.access import require_model_admin
@@ -25,9 +26,28 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
+def active_connection():
+    parent = aliased(Provider)
+    return or_(
+        Provider.parent_id.is_(None),
+        exists(
+            select(parent.id).where(
+                parent.id == Provider.parent_id,
+                parent.is_connection.is_(True),
+                parent.is_active.is_(True),
+            )
+        ),
+    )
+
+
 class ProviderService:
     async def create(
-        self, db: AsyncSession, req: ProviderCreateRequest, actor: AuthActor
+        self,
+        db: AsyncSession,
+        req: ProviderCreateRequest,
+        actor: AuthActor,
+        *,
+        parent_id: str | None = None,
     ) -> Provider:
         require_model_admin(actor)
         assert_allowed_endpoint(req.base_url, allow_private=True)
@@ -39,6 +59,7 @@ class ProviderService:
         if existing is not None:
             raise Conflict(f"Provider '{req.name}' đã tồn tại.", code="provider_name_exists")
         provider = Provider(
+            parent_id=parent_id,
             id=_new_id("prv"),
             name=req.name,
             provider_type=req.provider_type,
@@ -71,9 +92,13 @@ class ProviderService:
         return provider
 
     async def list(self, db: AsyncSession, *, active_only: bool = False) -> list[Provider]:
-        stmt = select(Provider).order_by(Provider.priority.asc(), Provider.created_at.asc())
+        stmt = (
+            select(Provider)
+            .where(Provider.is_connection.is_(False))
+            .order_by(Provider.priority.asc(), Provider.created_at.asc())
+        )
         if active_only:
-            stmt = stmt.where(Provider.is_active.is_(True))
+            stmt = stmt.where(Provider.is_active.is_(True), active_connection())
         return list((await db.execute(stmt)).scalars().all())
 
     async def update(
@@ -89,6 +114,17 @@ class ProviderService:
             )
         ).scalar_one()
         identity = (provider.base_url.rstrip("/"), provider.model_name)
+        if provider.is_connection:
+            raise Conflict(
+                "Sửa nhà cung cấp qua API connections.", code="connection_update_required"
+            )
+        if provider.parent_id and req.base_url is not None:
+            parent = await self.get(db, provider.parent_id)
+            if req.base_url.rstrip("/") != parent.base_url.rstrip("/"):
+                raise Conflict(
+                    "Endpoint do nhà cung cấp quản lý; không đổi riêng trên model.",
+                    code="model_connection_mismatch",
+                )
         if req.base_url is not None:
             assert_allowed_endpoint(req.base_url, allow_private=True)
             provider.base_url = req.base_url
@@ -126,6 +162,15 @@ class ProviderService:
         self, db: AsyncSession, provider_id: str, capability: str
     ) -> Provider:
         provider = await self.get(db, provider_id)
+        if provider.is_connection:
+            raise Conflict(
+                "Chọn model của nhà cung cấp, không chọn nhà cung cấp trực tiếp.",
+                code="model_required",
+            )
+        if provider.parent_id:
+            parent = await self.get(db, provider.parent_id)
+            if not parent.is_connection or not parent.is_active:
+                raise Conflict("Nhà cung cấp đang tắt.", code="provider_inactive")
         if not provider.is_active:
             raise Conflict(f"Provider '{provider.name}' đang tắt.", code="provider_inactive")
         if capability not in (provider.capabilities or []):
@@ -141,6 +186,8 @@ def provider_payload(provider: Provider) -> dict[str, Any]:
     capacity = read_capacity(provider)
     dimension, dimension_status = read_dimension(provider)
     return {
+        "is_connection": provider.is_connection,
+        "parent_id": provider.parent_id,
         "id": provider.id,
         "name": provider.name,
         "provider_type": provider.provider_type,

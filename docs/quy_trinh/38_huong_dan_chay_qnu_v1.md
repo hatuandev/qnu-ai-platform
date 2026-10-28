@@ -50,8 +50,10 @@ có bảng V1. Sau khi xác nhận đúng database cần khởi tạo, chạy:
 .\make.ps1 v1-dev
 ```
 
-`v1-migrate` chỉ nâng schema, không tự tạo provider/credential, quota hoặc tài
-liệu; các cấu hình ModelOps vẫn thực hiện theo phần 7. Nếu database cũ có
+`v1-migrate` nâng schema và thực hiện các chuyển dữ liệu của revision tương ứng.
+Revision0005 gom model cũ vào nhà cung cấp theo endpoint, giữ ID và phạm vi khóa;
+không tự cấp credential mới, quota hoặc tài liệu. Các cấu hình ModelOps thực hiện
+theo phần 7 và [quy trình42](42_modelops_nha_cung_cap_va_model.md). Nếu database cũ có
 revision phát triển đã gộp, xem phần 4 thay vì stamp/reset để vượt lỗi.
 
 Mặc định API/worker đọc `.env` tại **gốc repo**, giữ cách phân giải storage
@@ -257,7 +259,7 @@ uv run --frozen --extra dev --env-file ..\.env alembic upgrade head
 uv run --frozen --extra dev --env-file ..\.env alembic current
 ```
 
-Chỉ chạy `upgrade` sau khi xác nhận đúng database cần nâng cấp và có bản sao lưu nếu đã có dữ liệu. Head hiện tại là **`0003_rag_policy_metadata`**, gồm baseline `0001_initial_schema` và `0002_operational_readiness`. Bảng quản lý revision V1 là `alembic_version_backendv1`.
+Chỉ chạy `upgrade` sau khi xác nhận đúng database cần nâng cấp và có bản sao lưu nếu đã có dữ liệu. Head hiện tại là **`0005_provider_connections`**, nối sau `0004_application_api_keys`; giữ baseline `0001_initial_schema` và các revision đã phát hành. Bảng quản lý revision V1 là `alembic_version_backendv1`.
 
 Nếu báo không tìm thấy revision phát triển cũ, xem [hướng dẫn migration](../../backendV1/docs/migrations.md). Cần chuyển tiếp schema/dữ liệu theo hiện trạng; không dùng `stamp head`, xóa database hoặc `run.ps1 reset-db` để vượt lỗi. CLI `qnu.cli.main` hiện là khung, chưa thực hiện migrate/preflight; dùng Alembic như trên.
 
@@ -324,7 +326,7 @@ Quyền thực hiện thao tác vẫn được backend kiểm tra.
 Bỏ qua các bước đã cấu hình đúng; không tạo lại provider/key khi chỉ khởi động lại ứng dụng.
 
 1. Vào **Workspaces**, tạo/chọn đơn vị. Workspace là biên giới quyền trong V1; mọi yêu cầu vẫn được server kiểm quyền.
-2. Vào **ModelOps → Providers**, thêm provider theo endpoint/model thực tế, capability và credential. Hiện một bản ghi provider gắn một `model_name`; nếu server phục vụ nhiều model, tạo các bản ghi tương ứng.
+2. Vào **ModelOps → Nhà cung cấp**, tạo kết nối theo tên/loại/endpoint. Trong chi tiết: thêm API key → thử kết nối → thêm các model và capability. Một server AI là một nhà cung cấp chứa nhiều model; xem [hướng dẫn42](42_modelops_nha_cung_cap_va_model.md).
 3. Khai báo capacity/input/output theo model và server đang dùng. Embedding cần `embedding_dimension`; OCR cần accounting ảnh/trang phù hợp. Không suy capacity từ tên model hoặc điền số giả để vượt kiểm tra. Xem [capacity ModelOps](../../backendV1/docs/model-capacity.md).
 4. Tại workspace, cấp danh sách provider được phép, rồi chọn default **OCR**, **chat**, **embedding**, và **rerank** nếu dùng. Default toàn hệ thống không thay thế bước cấp quyền cho workspace.
 5. Cấu hình **quota tháng hiện tại theo UTC** cho workspace. Thiếu bản ghi quota sẽ chặn inference; unlimited chỉ có hiệu lực khi được lưu tường minh, không phải khi bỏ qua cấu hình. Sang tháng cần cấu hình kỳ mới.
@@ -340,8 +342,8 @@ Các vai trò model trong luồng hiện tại:
 
 Tên trên dùng để nhận diện cấu hình từng trao đổi, không phải cấu hình tự nạp hoặc cam kết model hiện đang sẵn sàng. Endpoint/credential/capacity lấy từ cấu hình ModelOps thực tế; danh sách `/v1/models` chưa đủ chứng minh các API OCR/embedding/rerank hoạt động.
 
-Trên trang chi tiết provider, dùng **Lấy danh sách model** và **Thử** theo chức
-năng để đọc kết quả/độ trễ/lỗi. Kết quả thử không tự sửa capacity hay cấp quyền
+Trên trang nhà cung cấp, dùng **Thử kết nối** để lấy danh sách; trong chi tiết
+model, dùng **Thử** theo chức năng để đọc kết quả/độ trễ/lỗi. Kết quả thử không tự sửa capacity hay cấp quyền
 workspace. Xem [hướng dẫn ModelOps](39_modelops_lay_danh_sach_va_chay_thu.md).
 
 ## 8. Dùng thử một tài liệu từ đầu đến hỏi đáp

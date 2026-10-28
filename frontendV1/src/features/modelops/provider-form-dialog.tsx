@@ -332,7 +332,7 @@ export function ProviderFormDialog({
                       className="text-xs font-mono"
                       placeholder="http://127.0.0.1:11434/v1"
                       value={field.state.value}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || Boolean(provider?.parent_id)}
                       onBlur={field.handleBlur}
                       onChange={(event) =>
                         field.handleChange(event.target.value)

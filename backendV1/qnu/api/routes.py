@@ -19,6 +19,7 @@ from qnu.domains.knowledge.index.router import router as indexing_router
 from qnu.domains.knowledge.publication.router import router as publication_router
 from qnu.domains.knowledge.sources.router import router as knowledge_sources_router
 from qnu.domains.lifecycle.router import router as lifecycle_router
+from qnu.domains.modelops.connections.router import router as connections_router
 from qnu.domains.modelops.diagnostics.router import router as diagnostics_router
 from qnu.domains.modelops.resilience.router import router as resilience_router
 from qnu.domains.modelops.router import router as modelops_router
@@ -33,6 +34,7 @@ from qnu.platform.config import Settings
 
 
 def register_routes(app: FastAPI, settings: Settings) -> None:
+    app.include_router(connections_router, prefix=settings.API_PREFIX)
     app.include_router(health_router)
     app.include_router(identity_router, prefix=settings.API_PREFIX)
     app.include_router(workspaces_router, prefix=settings.API_PREFIX)

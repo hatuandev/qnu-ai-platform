@@ -20,7 +20,7 @@ def completions_url(base_url: str) -> str:
     cleaned = base_url.strip().rstrip("/")
     if cleaned.endswith("/chat/completions"):
         return cleaned
-    return cleaned + ("/chat/completions" if cleaned.endswith("/v1") else "/v1/chat/completions")
+    return cleaned + ("/chat/completions" if cleaned.endswith(("/v1", "/openai")) else "/v1/chat/completions")
 
 
 def _error(code: str, detail: str, status: int = 502) -> AppException:

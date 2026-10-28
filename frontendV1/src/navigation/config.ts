@@ -64,7 +64,7 @@ export const navigationGroups: NavGroup[] = [
         children: [
           {
             id: "modelops-providers",
-            title: "Providers",
+            title: "Nhà cung cấp",
             to: "/modelops/providers",
             permission: "ai.models.manage",
             scope: "v1",

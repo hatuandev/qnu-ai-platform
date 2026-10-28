@@ -21,7 +21,7 @@ def embeddings_url(endpoint: str) -> str:
     base = endpoint.strip().rstrip("/")
     if base.endswith("/embeddings"):
         return base
-    return base + ("/embeddings" if base.endswith("/v1") else "/v1/embeddings")
+    return base + ("/embeddings" if base.endswith(("/v1", "/openai")) else "/v1/embeddings")
 
 
 def _error(code: str, detail: str, status: int = 502) -> AppException:

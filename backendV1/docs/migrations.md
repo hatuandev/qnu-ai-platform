@@ -6,7 +6,11 @@ vẫn giữ nguyên. Chuỗi hiện hành thêm `0002_operational_readiness`: m�
 review acknowledgement và bảng `ops_storage_cleanup_actions`.
 `0003_rag_policy_metadata` thêm JSONB rag_policy ở chat_assistants,
 retrieval_metadata ở kb_compiled_versions và metadata_filter ở chat_turns.
-Không đổi baseline/0002; thay đổi schema tiếp theo dùng `0004_...`.
+`0004_application_api_keys` thêm ứng dụng, API key inbound và nhật ký request.
+`0005_provider_connections` thêm nhà cung cấp cha/model con và phạm vi credential,
+chuyển các model cũ theo endpoint nhưng giữ ID và ciphertext của khóa. Xem
+[quy trình chuyển dữ liệu](../../docs/quy_trinh/42_modelops_nha_cung_cap_va_model.md).
+Không đổi các revision cũ; thay đổi schema tiếp theo dùng revision mới.
 
 ## Tạo DB mới
 
@@ -17,8 +21,8 @@ uv run alembic upgrade head
 uv run alembic current
 ```
 
-Revision mong đợi: `0003_rag_policy_metadata`. DB đã ở0002 chỉ chạy0003;
-DB mới chạy baseline và hai revision bổ sung. Chạy lại upgrade là no-op ở head.
+Revision mong đợi: `0005_provider_connections`. DB cũ chạy các revision còn thiếu;
+DB mới chạy baseline và bốn revision bổ sung. Chạy lại upgrade là no-op ở head.
 Migration tạo bảng version riêng `alembic_version_backendv1`, giữ nguyên version
 và bảng của `backend/`. Nếu trùng bất kỳ tên bảng v1 ngoài lịch sử hiện hành,
 baseline dừng trước DDL; không tự nhận bảng đó hoặc sửa dữ liệu.

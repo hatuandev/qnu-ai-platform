@@ -49,6 +49,8 @@ export type TokenLimits = {
 };
 
 export type Provider = {
+  is_connection?: boolean;
+  parent_id?: string | null;
   id: string;
   name: string;
   provider_type: ProviderType;
@@ -85,6 +87,7 @@ export type ProviderUpdateInput = Partial<
 > & { is_active?: boolean };
 
 export type ProviderKey = {
+  model_ids?: string[] | null;
   lease_until?: string | null;
   cooldown_until?: string | null;
   consecutive_failures?: number;

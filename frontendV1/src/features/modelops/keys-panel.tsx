@@ -45,8 +45,8 @@ export function KeysPanel({ providerId }: { providerId: string }) {
         <div>
           <h2 className="text-sm font-semibold">API keys</h2>
           <p className="text-xs text-muted-foreground">
-            Chỉ hiển thị <code className="font-mono">masked_hint</code> do máy
-            chủ trả về. Secret không đọc lại được sau khi tạo hoặc xoay.
+            Khóa được lưu bảo mật; chỉ hiển thị phần cuối để nhận biết. Không
+            thể đọc lại toàn bộ khóa sau khi lưu.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -120,7 +120,14 @@ export function KeysPanel({ providerId }: { providerId: string }) {
               <TableBody>
                 {keys.map((key) => (
                   <TableRow key={key.id}>
-                    <TableCell className="text-sm">{key.name}</TableCell>
+                    <TableCell className="text-sm">
+                      {key.name}
+                      {key.model_ids && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Khóa riêng của {key.model_ids.length} model cũ
+                        </p>
+                      )}
+                    </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {key.masked_hint}
                     </TableCell>

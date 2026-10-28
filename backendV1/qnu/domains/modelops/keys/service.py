@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.modelops.access import require_model_admin
+from qnu.domains.modelops.keys.scope import credential_owner, key_scope
 from qnu.domains.modelops.models import Provider, ProviderKey, ProviderKeyAudit
 from qnu.domains.modelops.schemas import KeyCreateRequest, KeyRotateRequest
 from qnu.domains.workspaces.access import actor_ref
@@ -38,9 +39,11 @@ class KeyService:
         actor: AuthActor,
     ) -> ProviderKey:
         require_model_admin(actor)
+        owner = await credential_owner(db, provider.id, lock=True)
         key = ProviderKey(
             id=_new_id("key"),
-            provider_id=provider.id,
+            provider_id=owner.id,
+            model_ids=[provider.id] if provider.parent_id else None,
             name=req.name,
             secret_encrypted=encrypt(req.secret),
             masked_hint=mask_secret(req.secret),
@@ -52,7 +55,7 @@ class KeyService:
         db.add(
             ProviderKeyAudit(
                 id=_new_id("pka"),
-                provider_id=provider.id,
+                provider_id=owner.id,
                 key_id=key.id,
                 actor_ref=actor_ref(actor) or None,
                 action="created",
@@ -64,9 +67,12 @@ class KeyService:
         return key
 
     async def list_keys(self, db: AsyncSession, provider_id: str) -> list[ProviderKey]:
+        provider = await db.get(Provider, provider_id)
+        if provider is None:
+            raise EntityNotFound("Không tìm thấy nhà cung cấp.", code="provider_not_found")
         stmt = (
             select(ProviderKey)
-            .where(ProviderKey.provider_id == provider_id)
+            .where(key_scope(provider))
             .order_by(ProviderKey.created_at.asc())
         )
         return list((await db.execute(stmt)).scalars().all())
@@ -82,7 +88,7 @@ class KeyService:
         require_model_admin(actor)
         # Same lock order as runtime leases; credential audit FK checks must not
         # wait on a provider locked by a worker that is waiting for this key.
-        await db.execute(select(Provider.id).where(Provider.id == provider_id).with_for_update())
+        owner = await credential_owner(db, provider_id, lock=True)
         key = (
             await db.execute(
                 select(ProviderKey)
@@ -91,7 +97,7 @@ class KeyService:
                 .execution_options(populate_existing=True)
             )
         ).scalar_one_or_none()
-        if key is None or key.provider_id != provider_id:
+        if key is None or key.provider_id != owner.id:
             raise EntityNotFound("Không tìm thấy credential.", code="provider_key_not_found")
         if key.status == "revoked":
             return key
@@ -99,7 +105,7 @@ class KeyService:
         db.add(
             ProviderKeyAudit(
                 id=_new_id("pka"),
-                provider_id=provider_id,
+                provider_id=owner.id,
                 key_id=key.id,
                 actor_ref=actor_ref(actor) or None,
                 action="revoked",
@@ -119,17 +125,18 @@ class KeyService:
         actor: AuthActor,
     ) -> ProviderKey:
         require_model_admin(actor)
-        await db.execute(select(Provider.id).where(Provider.id == provider_id).with_for_update())
+        owner = await credential_owner(db, provider_id, lock=True)
         old = (
             await db.execute(select(ProviderKey).where(ProviderKey.id == key_id).with_for_update())
         ).scalar_one_or_none()
-        if old is None or old.provider_id != provider_id:
+        if old is None or old.provider_id != owner.id:
             raise EntityNotFound("Không tìm thấy credential.", code="provider_key_not_found")
         if old.status != "active":
             raise Conflict("Credential đã bị thu hồi.", code="provider_key_revoked")
         replacement = ProviderKey(
             id=_new_id("key"),
-            provider_id=provider_id,
+            provider_id=owner.id,
+            model_ids=old.model_ids,
             name=req.name,
             secret_encrypted=encrypt(req.secret),
             masked_hint=mask_secret(req.secret),
@@ -142,7 +149,7 @@ class KeyService:
         db.add(
             ProviderKeyAudit(
                 id=_new_id("pka"),
-                provider_id=provider_id,
+                provider_id=owner.id,
                 key_id=old.id,
                 actor_ref=actor_ref(actor),
                 action="rotated",
@@ -152,7 +159,7 @@ class KeyService:
         db.add(
             ProviderKeyAudit(
                 id=_new_id("pka"),
-                provider_id=provider_id,
+                provider_id=owner.id,
                 key_id=replacement.id,
                 actor_ref=actor_ref(actor),
                 action="created",
@@ -163,11 +170,12 @@ class KeyService:
         return replacement
 
     async def audit(self, db: AsyncSession, provider_id: str, limit: int) -> list[ProviderKeyAudit]:
+        owner = await credential_owner(db, provider_id)
         return list(
             (
                 await db.execute(
                     select(ProviderKeyAudit)
-                    .where(ProviderKeyAudit.provider_id == provider_id)
+                    .where(ProviderKeyAudit.provider_id == owner.id)
                     .order_by(ProviderKeyAudit.created_at.desc())
                     .limit(limit)
                 )

@@ -170,6 +170,9 @@ export function useUpdateProvider(providerId: string) {
       updateProvider(v1Client, providerId, patch),
     onSuccess: () => {
       void queryClient.invalidateQueries({
+        queryKey: ["v1", sessionId, "modelops", "connections"],
+      });
+      void queryClient.invalidateQueries({
         queryKey: modelopsKeys.providersSummary(sessionId),
       });
       void queryClient.invalidateQueries({
@@ -225,8 +228,15 @@ function invalidateKeys(
   providerId: string,
   sessionId?: number,
 ) {
+  // A connection owns credentials used by several model diagnostics.
+  void queryClient.invalidateQueries({
+    queryKey: modelopsKeys.providers(sessionId),
+  });
   void queryClient.invalidateQueries({
     queryKey: modelopsKeys.providersSummary(sessionId),
+  });
+  void queryClient.invalidateQueries({
+    queryKey: ["v1", sessionId, "modelops", "connections"],
   });
   void queryClient.invalidateQueries({
     queryKey: [...modelopsKeys.provider(providerId, sessionId), "diagnostics"],

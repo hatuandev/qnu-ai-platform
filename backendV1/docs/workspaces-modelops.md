@@ -6,7 +6,7 @@ Prefix: `/platform/v1alpha1`. Nguồn OpenAPI là DTO/router thực tế; bản 
 
 1. Xác thực actor bằng SSO hoặc dev login đã cấu hình.
 2. Platform admin tạo workspace và thêm SSO subject vào membership.
-3. ModelOps admin đăng ký provider/model/capability và credential qua API; secret chỉ lưu mã hóa trong DB.
+3. ModelOps admin tạo nhà cung cấp → thêm credential → thử kết nối → thêm các model/capability; secret chỉ lưu mã hóa trong DB. Xem [luồng nhà cung cấp–model](../../docs/quy_trinh/42_modelops_nha_cung_cap_va_model.md).
 4. Platform admin cấp provider cho workspace và cấu hình quota tháng UTC.
 5. Admin workspace chọn model mặc định theo capability trong danh sách được cấp.
 6. Thành viên đọc catalog bằng workspace_id cụ thể; domain khác gọi public API ModelOps với actor + workspace + capability + preferred provider nếu có.
@@ -18,6 +18,8 @@ Prefix: `/platform/v1alpha1`. Nguồn OpenAPI là DTO/router thực tế; bản 
 | Workspace | POST/GET `/workspaces`; GET/PATCH `/workspaces/{id}` |
 | Thành viên | GET/POST `/workspaces/{id}/members`; PATCH/DELETE `/workspaces/{id}/members/{member_id}` |
 | Audit đơn vị | GET `/workspaces/{id}/events` |
+| Nhà cung cấp | POST/GET `/modelops/connections`; GET/PATCH `/modelops/connections/{id}` |
+| Model thuộc nhà cung cấp | GET/POST `/modelops/connections/{id}/models` |
 | Provider | POST/GET `/modelops/providers`; GET/PATCH `/modelops/providers/{id}` |
 | Diagnostics | GET `/modelops/providers/{id}/diagnostics`; POST `.../discover`; POST `.../probe` với capability; xem [contract](modelops-diagnostics.md) |
 | Resilience / Registry | GET `/modelops/registry`; GET/PUT `/modelops/providers/{id}/resilience`; GET `.../executions`; [contract](modelops-resilience.md) |

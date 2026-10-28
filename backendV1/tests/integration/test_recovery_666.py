@@ -85,6 +85,24 @@ def test_full_recovery_into_new_targets_keeps_originals_credentials_and_search(
     original_vector_name = source_rows[data["index_run"]["id"]]
     source_vector_names = set(source_rows.values())
     quiesce(client, data)
+    # Exercise an upgraded installation: pre-existing model rows precede their
+    # newly created connection parents, while model IDs and keys stay unchanged.
+    import importlib.util
+    from pathlib import Path
+
+    from qnu.platform.database import engine
+
+    spec = importlib.util.spec_from_file_location(
+        "recovery_provider_migration", Path("alembic/versions/0005_provider_connections.py")
+    )
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    async def convert_connections():
+        async with engine.begin() as conn:
+            await conn.run_sync(migration.convert_legacy_providers)
+
+    client.portal.call(convert_connections)
     bundle = capture(client, data)
     _snapshot, objects = archive.unpack(bundle, KEY)
     assert b"embedding-test-secret" not in bundle

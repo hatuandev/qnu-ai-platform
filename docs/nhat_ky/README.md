@@ -7,6 +7,10 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+- **2026-10-28 — Context702: ModelOps nhà cung cấp và model.** Tạo kết nối → thêm khóa → discovery → thêm nhiều model; migration0005 giữ ID/grants/index và phạm vi khóa cũ, shared key/pool có owner cha. BE765PASS +recovery4PASS (ca có chuyển dữ liệu chạy lại1PASS); FE411PASS, lint/build+TS và UI desktop/mobile đã kiểm bằng dữ liệu riêng. DB thử dọn; chưa migrate DB phục vụ/live inference/restart/push. [Nhật ký702](./2026-10-28_phien_702_modelops_nha_cung_cap_va_model.md).
+
+- **2026-10-28 — Context701: cấu hình URL API tích hợp local.** Thêm PUBLIC_BASE_URL=http://127.0.0.1:8002 vào .env root theo runner V1; giữ nguyên cấu hình khác. Theo yêu cầu không test/build/restart. [Nhật ký701](./2026-10-28_phien_701_cau_hinh_public_base_url_local.md).
+
 - **2026-10-28 — Context700: sửa10lỗi Providers/API tích hợp.** Key lifecycle/quyền/limiter, giữ policy trợ lý, strict single-turn, URL tin cậy và diagnostics đã sửa. Full BE755PASS +recovery4PASS; FE406+1PASS, regression44/schema7/pipeline1PASS; build/lint PASS. Browser desktop sáng/mobile sáng-tối đã kiểm; DB thử dọn. Cần cấu hình PUBLIC_BASE_URL; không live model/env/restart/push. [Nhật ký700](./2026-10-28_phien_700_sua_10_loi_api_tich_hop.md).
 
 - **2026-10-28 — Context699: seed Phòng Công tác sinh viên.** Workspace/kho trống +3membership admin/editor/member; khóa dev riêng trong local registry hash, không cấp admin nền tảng. Focused8PASS/integration1PASS; seed lặp không trùng và API ASGI DB local kiểm quyền đạt. Full bị ngắt/có1FAIL upload concurrency, riêng1PASS; DB test đã dọn. Không frontend/env/model/migration/restart/push. [Nhật ký699](./2026-10-28_phien_699_seed_phong_cong_tac_sinh_vien.md).

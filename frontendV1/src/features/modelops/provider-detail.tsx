@@ -195,19 +195,31 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
     <div className="space-y-6">
       <div className="space-y-3">
         <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs">
-          <Link to="/modelops/providers">
-            <ArrowLeft className="size-3.5" />
-            Danh sách provider
-          </Link>
+          {provider.parent_id ? (
+            <Link
+              to="/modelops/providers/$providerId"
+              params={{ providerId: provider.parent_id }}
+            >
+              <ArrowLeft className="size-3.5" />
+              Nhà cung cấp
+            </Link>
+          ) : (
+            <Link to="/modelops/providers">
+              <ArrowLeft className="size-3.5" />
+              Nhà cung cấp
+            </Link>
+          )}
         </Button>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <p className="type-metadata mb-2 font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              QNU AI · ModelOps · Provider
+              QNU AI · ModelOps · Model
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="type-page-title m-0 truncate">{provider.name}</h1>
+              <h1 className="type-page-title m-0 truncate">
+                {provider.parent_id ? provider.model_name : provider.name}
+              </h1>
               {provider.is_active ? (
                 <Badge variant="success">Đang bật</Badge>
               ) : (
@@ -247,9 +259,7 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
               onClick={() => setToggleOpen(true)}
             >
               <CirclePower className="size-3.5" />
-              <span>
-                {provider.is_active ? "Tắt provider" : "Bật provider"}
-              </span>
+              <span>{provider.is_active ? "Tắt model" : "Bật model"}</span>
             </Button>
           </div>
         </div>
@@ -301,7 +311,18 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
       ) : null}
 
       {/* 1. AI Server Keys block placed near top for fast access */}
-      <KeysPanel providerId={providerId} />
+      {!provider.parent_id ? (
+        <KeysPanel providerId={providerId} />
+      ) : (
+        <Button asChild variant="outline">
+          <Link
+            to="/modelops/providers/$providerId"
+            params={{ providerId: provider.parent_id }}
+          >
+            Quản lý API key tại nhà cung cấp
+          </Link>
+        </Button>
+      )}
 
       {/* 2. Connection Diagnostics & Functional Probing block */}
       <ProviderDiagnosticsPanel provider={provider} />
@@ -359,13 +380,13 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
         onOpenChange={(open) => {
           if (!updateMutation.isPending) setToggleOpen(open);
         }}
-        title={provider.is_active ? "Tắt provider?" : "Bật lại provider?"}
+        title={provider.is_active ? "Tắt model?" : "Bật lại model?"}
         description={
           provider.is_active
-            ? "Provider bị tắt sẽ không còn trong catalog cấp cho workspace và không dùng cho request mới. Cấu hình, key và năng lực đã khai báo vẫn được giữ nguyên."
-            : "Provider trở lại trạng thái hoạt động và có thể được cấp cho workspace."
+            ? "Model bị tắt sẽ không còn trong catalog cấp cho workspace và không dùng cho request mới. Cấu hình, key và năng lực đã khai báo vẫn được giữ nguyên."
+            : "Model trở lại trạng thái hoạt động và có thể được cấp cho workspace."
         }
-        confirmLabel={provider.is_active ? "Tắt provider" : "Bật provider"}
+        confirmLabel={provider.is_active ? "Tắt model" : "Bật model"}
         confirmVariant={provider.is_active ? "destructive" : "default"}
         isLoading={updateMutation.isPending}
         onConfirm={() => {
@@ -374,16 +395,14 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
             .then(() => {
               setToggleOpen(false);
               toast.success(
-                provider.is_active
-                  ? "Đã tắt provider."
-                  : "Đã bật lại provider.",
+                provider.is_active ? "Đã tắt model." : "Đã bật lại model.",
               );
             })
             .catch((error: unknown) =>
               toast.error(
                 error instanceof ApiProblemError
                   ? error.message
-                  : "Không đổi được trạng thái provider.",
+                  : "Không đổi được trạng thái model.",
               ),
             );
         }}

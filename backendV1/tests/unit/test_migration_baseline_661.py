@@ -12,8 +12,8 @@ from alembic import command
 def test_single_initial_revision_has_no_dependencies():
     scripts = ScriptDirectory.from_config(Config("alembic.ini"))
     revisions = list(scripts.walk_revisions())
-    assert len(revisions) == 4
-    assert scripts.get_heads() == ["0004_application_api_keys"]
+    assert len(revisions) == 5
+    assert scripts.get_heads() == ["0005_provider_connections"]
     baseline = scripts.get_revision("0001_initial_schema")
     assert baseline.down_revision is None
     assert scripts.get_revision("0002_operational_readiness").down_revision == baseline.revision
@@ -24,6 +24,11 @@ def test_single_initial_revision_has_no_dependencies():
     assert (
         scripts.get_revision("0004_application_api_keys").down_revision
         == "0003_rag_policy_metadata"
+    )
+
+    assert (
+        scripts.get_revision("0005_provider_connections").down_revision
+        == "0004_application_api_keys"
     )
 
 
@@ -38,7 +43,7 @@ def test_initial_schema_offline_sql_creates_v1_without_touching_legacy():
     assert "CREATE TABLE alembic_version (" not in sql
     assert "DROP TABLE" not in sql
     assert "0001_initial_schema" in sql
-    assert len(list(Path("alembic/versions").glob("[0-9]*.py"))) == 4
+    assert len(list(Path("alembic/versions").glob("[0-9]*.py"))) == 5
     assert "CREATE TABLE app_api_keys" in sql
     assert "CREATE UNIQUE INDEX ix_app_api_keys_idempotency_key" in sql
     assert "ADD COLUMN rag_policy JSONB" in sql

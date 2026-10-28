@@ -41,7 +41,7 @@ def models_url(endpoint: str) -> str:
         if base.endswith(suffix):
             base = base[: -len(suffix)]
             break
-    return base + ("/models" if base.endswith("/v1") else "/v1/models")
+    return base + ("/models" if base.endswith(("/v1", "/openai")) else "/v1/models")
 
 
 def sample_page() -> bytes:

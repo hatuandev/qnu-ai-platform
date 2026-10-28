@@ -57,6 +57,7 @@ def _provider_out(provider: Provider) -> ProviderResponse:
 
 def _key_out(key: ProviderKey) -> KeyResponse:
     return KeyResponse(
+        model_ids=key.model_ids,
         id=key.id,
         provider_id=key.provider_id,
         name=key.name,

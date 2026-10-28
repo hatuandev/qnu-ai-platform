@@ -70,6 +70,8 @@ class ProviderUpdateRequest(BaseModel):
 
 
 class ProviderResponse(BaseModel):
+    is_connection: bool = False
+    parent_id: str | None = None
     id: str
     name: str
     provider_type: str
@@ -119,6 +121,7 @@ class KeyAuditResponse(BaseModel):
 
 
 class KeyResponse(BaseModel):
+    model_ids: list[str] | None = None
     lease_until: datetime | None = None
     cooldown_until: datetime | None = None
     consecutive_failures: int = 0

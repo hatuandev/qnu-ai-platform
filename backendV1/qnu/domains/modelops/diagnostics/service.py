@@ -20,6 +20,7 @@ from qnu.domains.modelops.audit import record_event
 from qnu.domains.modelops.capacity.service import read_capacity
 from qnu.domains.modelops.diagnostics.schemas import DiagnosticCheck, ProviderDiagnostics
 from qnu.domains.modelops.embedding.configuration import read_dimension
+from qnu.domains.modelops.keys.scope import key_scope
 from qnu.domains.modelops.models import Provider, ProviderKey
 from qnu.domains.modelops.providers.service import provider_service
 from qnu.platform.crypto import decrypt
@@ -38,7 +39,7 @@ async def identity(db: AsyncSession, provider: Provider) -> str:
     key = (
         await db.scalars(
             select(ProviderKey)
-            .where(ProviderKey.provider_id == provider.id, ProviderKey.status == "active")
+            .where(key_scope(provider), ProviderKey.status == "active")
             .order_by(ProviderKey.priority, ProviderKey.created_at)
             .limit(1)
         )
@@ -92,6 +93,12 @@ async def run_diagnostic(
 ) -> DiagnosticCheck:
     require_model_admin(actor)
     provider = await provider_service.get(db, provider_id)
+    if provider.parent_id:
+        parent = await provider_service.get(db, provider.parent_id)
+        if not parent.is_connection or not parent.is_active:
+            raise Conflict(
+                "Nhà cung cấp đang tắt; bật lại trước khi kiểm tra.", code="provider_inactive"
+            )
     if not provider.is_active:
         raise Conflict("Provider đang tắt; bật lại trước khi kiểm tra.", code="provider_inactive")
     if kind != "discovery" and kind not in provider.capabilities:
@@ -102,7 +109,7 @@ async def run_diagnostic(
     key = (
         await db.scalars(
             select(ProviderKey)
-            .where(ProviderKey.provider_id == provider.id, ProviderKey.status == "active")
+            .where(key_scope(provider), ProviderKey.status == "active")
             .order_by(ProviderKey.priority, ProviderKey.created_at)
             .limit(1)
         )
