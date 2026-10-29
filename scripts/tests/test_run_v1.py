@@ -64,9 +64,10 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(
                 Path(compose[compose.index("--env-file") + 1]), runtime / ".env"
             )
-            self.assertEqual(compose[-4:], ["postgres", "redis", "qdrant", "minio"])
+            self.assertEqual(
+                compose[-5:], ["postgres", "redis", "qdrant", "minio", "gotenberg"]
+            )
             self.assertIn("--wait", compose)
-            self.assertNotIn("gotenberg", compose)
             self.assertIn("--prepare-local", plan[2][1])
             self.assertEqual(plan[2][0], runtime)
 

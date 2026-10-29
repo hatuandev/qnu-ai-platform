@@ -1,16 +1,16 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  Archive,
   ChevronRight,
   Database,
   Eye,
   FileText,
   FolderOpen,
-  FolderTree,
   MoreHorizontal,
   Pencil,
   Plus,
   RotateCcw,
-  ScanLine,
+  Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { DataTablePagination } from "@/components/admin/data-table/data-table-pagination";
@@ -43,7 +43,9 @@ import { CollectionFormDialog } from "@/features/knowledge/collection-form-dialo
 import { canManageKnowledge } from "@/features/knowledge/permissions";
 import { useCollectionsQuery } from "@/features/knowledge/queries";
 import type { KBCollection } from "@/features/knowledge/types";
-import { LifecycleActions } from "@/features/lifecycle/lifecycle-actions";
+import { LifecycleActionDialog } from "@/features/lifecycle/action-dialog";
+import { canLifecycleAction } from "@/features/lifecycle/permissions";
+import type { LifecycleOperation } from "@/features/lifecycle/types";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { formatDateTimeValue } from "@/lib/date-utils";
 
@@ -69,8 +71,14 @@ export function CollectionsPanel({
   const [createOpen, setCreateOpen] = useState(false);
   const [editingCollection, setEditingCollection] =
     useState<KBCollection | null>(null);
+  const [lifecycleTarget, setLifecycleTarget] = useState<{
+    collection: KBCollection;
+    action: LifecycleOperation;
+  } | null>(null);
 
   const canManage = !rolePending && canManageKnowledge(role);
+  const canArchive = canLifecycleAction(role, "collection", "archive");
+  const canDelete = canLifecycleAction(role, "collection", "delete");
 
   const rawItems = collectionsQuery.data?.items ?? [];
   const total = collectionsQuery.data?.meta.total ?? 0;
@@ -93,13 +101,70 @@ export function CollectionsPanel({
     );
   }, [rawItems, searchQuery]);
 
+  const renderCollectionMenu = (item: KBCollection) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="size-7 p-0 text-muted-foreground hover:text-foreground shrink-0"
+          aria-label={`Thao tác với ${item.name}`}
+        >
+          <MoreHorizontal className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48 text-xs">
+        <DropdownMenuItem
+          onClick={() =>
+            void navigate({
+              to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
+              params: { workspaceId, knowledgeId: item.id },
+              search: { page: 1, pageSize: 20 },
+            })
+          }
+        >
+          <Eye className="size-3.5 mr-2 text-muted-foreground" />
+          <span>Mở kho tri thức</span>
+        </DropdownMenuItem>
+        {canManage ? (
+          <DropdownMenuItem onClick={() => setEditingCollection(item)}>
+            <Pencil className="size-3.5 mr-2 text-muted-foreground" />
+            <span>Sửa thông tin kho</span>
+          </DropdownMenuItem>
+        ) : null}
+        {canArchive || canDelete ? <DropdownMenuSeparator /> : null}
+        {canArchive ? (
+          <DropdownMenuItem
+            onClick={() =>
+              setLifecycleTarget({ collection: item, action: "archive" })
+            }
+          >
+            <Archive className="size-3.5 mr-2 text-muted-foreground" />
+            <span>Lưu trữ kho</span>
+          </DropdownMenuItem>
+        ) : null}
+        {canDelete ? (
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() =>
+              setLifecycleTarget({ collection: item, action: "delete" })
+            }
+          >
+            <Trash2 className="size-3.5 mr-2" />
+            <span>Xóa kho tri thức</span>
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div className="space-y-6">
-      {/* 1. Page Header (Tái dùng PageHeader chuẩn của Admin Design System) */}
+      {/* 1. Page Header */}
       <PageHeader
         eyebrow="QNU AI · TRI THỨC"
         title="Kho tri thức"
-        description="Quản lý các kho dữ liệu, thư mục và tài liệu phục vụ huấn luyện và phản hồi của trợ lý AI."
+        description="Quản lý các kho tài liệu, tổ chức thư mục, bóc tách và hiệu đính nội dung."
         actions={
           canManage ? (
             <Button
@@ -114,18 +179,17 @@ export function CollectionsPanel({
         }
       />
 
-      {/* 2. KPI Metrics Summary Cards (Chuẩn KpiMetric như các trang KTX) */}
+      {/* 2. KPI Metrics Summary Cards */}
       <Card className="overflow-hidden border bg-card shadow-xs">
         <CardContent className="grid p-0 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x">
           <KpiMetric
             icon={Database}
             label="Tổng số kho tri thức"
             value={total.toLocaleString("vi-VN")}
-            helper="Kho dữ liệu trong workspace này"
           />
           <KpiMetric
             icon={FileText}
-            label="Tài liệu trong các kho trên trang"
+            label="Tổng số tài liệu"
             value={totalDocuments.toLocaleString("vi-VN")}
           />
         </CardContent>
@@ -135,7 +199,7 @@ export function CollectionsPanel({
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
         <div className="w-full sm:w-80">
           <DebouncedSearchInput
-            placeholder="Tìm kho trong trang này..."
+            placeholder="Tìm kho tri thức..."
             value={searchQuery}
             onChange={setSearchQuery}
             className="text-xs h-9"
@@ -162,9 +226,9 @@ export function CollectionsPanel({
       {/* 4. Query State Handling: Skeleton / ErrorState / EmptyState */}
       {collectionsQuery.isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Skeleton className="h-44 rounded-xl" />
-          <Skeleton className="h-44 rounded-xl" />
-          <Skeleton className="h-44 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
         </div>
       ) : collectionsQuery.isError ? (
         <ErrorState
@@ -207,7 +271,7 @@ export function CollectionsPanel({
             >
               <CardContent className="p-4 flex flex-col justify-between h-full">
                 <div>
-                  <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-start justify-between gap-2 mb-2.5">
                     <Link
                       to="/workspaces/$workspaceId/knowledge/$knowledgeId"
                       params={{ workspaceId, knowledgeId: item.id }}
@@ -222,98 +286,12 @@ export function CollectionsPanel({
                       </span>
                     </Link>
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="size-7 p-0 text-muted-foreground hover:text-foreground shrink-0"
-                          aria-label={`Thao tác với ${item.name}`}
-                        >
-                          <MoreHorizontal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48 text-xs">
-                        <DropdownMenuItem
-                          onClick={() =>
-                            void navigate({
-                              to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
-                              params: { workspaceId, knowledgeId: item.id },
-                              search: { page: 1, pageSize: 20 },
-                            })
-                          }
-                        >
-                          <Eye className="size-3.5 mr-2 text-muted-foreground" />
-                          <span>Mở kho tri thức</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            void navigate({
-                              to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
-                              params: { workspaceId, knowledgeId: item.id },
-                              search: { page: 1, pageSize: 20, stage: "files" },
-                            })
-                          }
-                        >
-                          <FolderTree className="size-3.5 mr-2 text-muted-foreground" />
-                          <span>1. Quản lý Tài liệu & Thư mục</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            void navigate({
-                              to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
-                              params: { workspaceId, knowledgeId: item.id },
-                              search: { page: 1, pageSize: 20, stage: "ocr" },
-                            })
-                          }
-                        >
-                          <ScanLine className="size-3.5 mr-2 text-muted-foreground" />
-                          <span>2. OCR & Hiệu đính AI</span>
-                        </DropdownMenuItem>
-                        {canManage ? (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => setEditingCollection(item)}
-                            >
-                              <Pencil className="size-3.5 mr-2 text-muted-foreground" />
-                              <span>Sửa thông tin kho</span>
-                            </DropdownMenuItem>
-                          </>
-                        ) : null}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <LifecycleActions
-                      workspaceId={workspaceId}
-                      kind="collection"
-                      resourceId={item.id}
-                      label={item.name}
-                      role={role}
-                    />
+                    {renderCollectionMenu(item)}
                   </div>
 
                   <p className="text-xs text-muted-foreground line-clamp-2 min-h-8 mb-3">
                     {item.description || "Chưa có mô tả chi tiết."}
                   </p>
-
-                  <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                    <Link
-                      to="/workspaces/$workspaceId/knowledge/$knowledgeId"
-                      params={{ workspaceId, knowledgeId: item.id }}
-                      search={{ page: 1, pageSize: 20, stage: "files" }}
-                      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <span>1. Tài liệu & Thư mục</span>
-                    </Link>
-                    <Link
-                      to="/workspaces/$workspaceId/knowledge/$knowledgeId"
-                      params={{ workspaceId, knowledgeId: item.id }}
-                      search={{ page: 1, pageSize: 20, stage: "ocr" }}
-                      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <span>2. OCR & Hiệu đính</span>
-                    </Link>
-                  </div>
                 </div>
 
                 <div className="flex items-center justify-between pt-3 border-t border-border/50 text-[11px] text-muted-foreground">
@@ -341,7 +319,7 @@ export function CollectionsPanel({
           ))}
         </div>
       ) : (
-        /* 6. Table View (Chuẩn Table của Admin) */
+        /* 6. Table View */
         <Card className="rounded-xl shadow-2xs overflow-hidden border-border/70">
           <div className="overflow-x-auto">
             <Table>
@@ -391,81 +369,7 @@ export function CollectionsPanel({
                       {formatDateTimeValue(item.updated_at || item.created_at)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="size-7 p-0 text-muted-foreground hover:text-foreground"
-                            aria-label={`Thao tác với ${item.name}`}
-                          >
-                            <MoreHorizontal className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="end"
-                          className="w-48 text-xs"
-                        >
-                          <DropdownMenuItem
-                            onClick={() =>
-                              void navigate({
-                                to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
-                                params: { workspaceId, knowledgeId: item.id },
-                                search: { page: 1, pageSize: 20 },
-                              })
-                            }
-                          >
-                            <Eye className="size-3.5 mr-2 text-muted-foreground" />
-                            <span>Mở kho tri thức</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              void navigate({
-                                to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
-                                params: { workspaceId, knowledgeId: item.id },
-                                search: {
-                                  page: 1,
-                                  pageSize: 20,
-                                  stage: "files",
-                                },
-                              })
-                            }
-                          >
-                            <FolderTree className="size-3.5 mr-2 text-muted-foreground" />
-                            <span>1. Tài liệu & Thư mục</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              void navigate({
-                                to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
-                                params: { workspaceId, knowledgeId: item.id },
-                                search: { page: 1, pageSize: 20, stage: "ocr" },
-                              })
-                            }
-                          >
-                            <ScanLine className="size-3.5 mr-2 text-muted-foreground" />
-                            <span>2. OCR & Hiệu đính AI</span>
-                          </DropdownMenuItem>
-                          {canManage ? (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => setEditingCollection(item)}
-                              >
-                                <Pencil className="size-3.5 mr-2 text-muted-foreground" />
-                                <span>Sửa thông tin kho</span>
-                              </DropdownMenuItem>
-                            </>
-                          ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      <LifecycleActions
-                        workspaceId={workspaceId}
-                        kind="collection"
-                        resourceId={item.id}
-                        label={item.name}
-                        role={role}
-                      />
+                      {renderCollectionMenu(item)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -511,6 +415,22 @@ export function CollectionsPanel({
           onSuccess={() => {
             void collectionsQuery.refetch();
             setEditingCollection(null);
+          }}
+        />
+      ) : null}
+
+      {lifecycleTarget ? (
+        <LifecycleActionDialog
+          workspaceId={workspaceId}
+          label={lifecycleTarget.collection.name}
+          target={{
+            kind: "collection",
+            resource_id: lifecycleTarget.collection.id,
+            action: lifecycleTarget.action,
+          }}
+          onClose={() => {
+            setLifecycleTarget(null);
+            void collectionsQuery.refetch();
           }}
         />
       ) : null}

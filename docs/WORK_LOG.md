@@ -1,5 +1,15 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- **2026-10-29 — Context715: sửa P2 DOCX renderer.** Tách HTTP khỏi khóa MuPDF, log lọc và unit test offline; chỉ kiểm tĩnh/Ruff, không test/runtime/restart. [Nhật ký715](./nhat_ky/2026-10-29_phien_715_sua_p2_docx_renderer.md).
+
+- **2026-10-29 — Context714: sửa hai P1 DOCX renderer.** Settings/.env thống nhất, profile ghim và saved PDF recovery; legacy/PDF identity giữ. Chỉ kiểm tĩnh/Ruff, không test/runtime/restart. [Nhật ký714](./nhat_ky/2026-10-29_phien_714_sua_p1_docx_renderer.md).
+
+- **2026-10-29 — Context713: review tĩnh BE V1.**5finding về Gotenberg/config/recovery/lock/log/test isolation; chưa sửa app, không test/lint/build/runtime theo yêu cầu. [Nhật ký713](./nhat_ky/2026-10-29_phien_713_review_tinh_backend_v1.md).
+
+
+- **2026-10-29 — Context712: URL workspace và sidebar.** URL theo code, link nguồn rút gọn, resolver kiểm quyền/lifecycle; FE465PASS/build/TS, BE338PASS/60SKIP, lint toàn FE còn28lỗi ngoài phạm vi. User cho restartV1; browser F5/đổi workspace/Back đạt. [Nhật ký712](./nhat_ky/2026-10-29_phien_712_url_workspace_va_sidebar.md).
+- **2026-10-29 — Context711: Gotenberg trong Docker V1.** Bật qnu_gotenberg healthy tại127.0.0.1:3005, thêm vào v1-infra-up; bốn container cũ giữ ID/StartedAt. Scripts44PASS/Ruff/Compose đạt, health200 và DOCX tiếng Việt/HTML→PDF thật đạt. Chưa nối rendererV1, không sửa env/model hoặc restart app. [Nhật ký711](./nhat_ky/2026-10-29_phien_711_them_gotenberg_vao_ha_tang_v1.md).
+
 - **2026-10-29 — Context710: backend V1 tự bóc tách sau upload.** Native-first PDF/DOCX, OCR trang cần thiết, giữ ảnh/nguồn và xuất MD/JSON/ZIP; processing theo revision, migration/code head0007. Bao phủ835ID PASS (210call trước gián đoạn +625PASS/lệnh exit0), mất0/trùng0,28mới; Ruff26/OpenAPI/link/encoding đạt, DB thử/Redis riêng đã dọn. Chưa migrate/restart phục vụ/live OCR hoặc đổi FE/model/quota. [Nhật ký710](./nhat_ky/2026-10-29_phien_710_backend_v1_boc_tach_tu_dong.md).
 
 - **2026-10-29 — Context709: rút gọn xác nhận xóa kho tri thức.** Chỉ Hủy/Xóa, không lý do/checkbox; tự chuẩn bị preview, giữ quyền/hash/hạn sử dụng/chống lặp. FE450PASS, focused29PASS, build+TS và Biome2tệp PASS; browser desktop/mobile đã kiểm và hủy, không xóa tài liệu thật. Giữ cấu hình AI; không restart/push. [Nhật ký709](./nhat_ky/2026-10-29_phien_709_rut_gon_xac_nhan_xoa_kho_tri_thuc.md).

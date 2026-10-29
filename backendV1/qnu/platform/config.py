@@ -55,6 +55,10 @@ class Settings(BaseSettings):
 
     HTTP_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0)
     MAX_UPLOAD_BYTES: int = Field(default=60 * 1024 * 1024, gt=0)
+    GOTENBERG_URL: str = Field(default="http://127.0.0.1:3005")
+    DOCX_CONVERTER: Literal["gotenberg-libreoffice", "docx-story"] = "gotenberg-libreoffice"
+    # Change when deploying a different converter image/fonts/options to invalidate reuse.
+    DOCX_RENDERER_REVISION: str = Field(default="qnu-docx/v2", min_length=1, max_length=200)
 
     # OCR processing (Context640). Values are pinned into every run fingerprint.
     OCR_RENDER_DPI: int = Field(default=144, ge=72, le=300)

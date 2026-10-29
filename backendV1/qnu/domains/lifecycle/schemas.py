@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
 
 ResourceKind = Literal[
     "collection", "source", "document", "assistant", "conversation", "job", "index"
@@ -59,3 +59,7 @@ class ActionResponse(BaseModel):
     expires_at: datetime
     accepted_at: datetime | None
     finished_at: datetime | None
+
+    @field_serializer("result")
+    def public_result(self, value):
+        return {key: item for key, item in value.items() if not key.startswith("_")} if value else value

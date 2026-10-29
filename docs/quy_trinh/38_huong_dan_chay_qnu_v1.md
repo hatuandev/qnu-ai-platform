@@ -12,7 +12,7 @@ Từ gốc dự án, dùng GNU Make hoặc `make.bat` trên CMD:
 
 ```text
 make v1-help          # Xem các lệnh V1
-make v1-infra-up      # PostgreSQL + Redis + Qdrant + MinIO; chuẩn bị bucket local
+make v1-infra-up      # PostgreSQL + Redis + Qdrant + MinIO + Gotenberg; chuẩn bị bucket local
 make v1-check         # Kiểm tra kết nối, schema và dependency FE
 make v1-dev           # Chạy API + worker + FE trong cùng phiên
 make v1-be            # Hoặc chạy riêng API
@@ -82,7 +82,7 @@ Các lệnh thiết lập và kiểm tra bổ sung:
 | Lệnh | Thực hiện |
 | --- | --- |
 | `make v1-install-be` / `make v1-install-fe` | Cài thư viện theo lockfile; không tạo/ghi đè cấu hình |
-| `make v1-infra-up` | Khởi động PostgreSQL, Redis, Qdrant, MinIO và chờ health; chuẩn bị storage local, kiểm tra ghi/đọc/xóa tệp thử; không mở API/worker/FE hoặc migrate DB |
+| `make v1-infra-up` | Khởi động PostgreSQL, Redis, Qdrant, MinIO, Gotenberg và chờ health; chuẩn bị storage local, kiểm tra ghi/đọc/xóa tệp thử; không mở API/worker/FE hoặc migrate DB |
 | `make v1-check` | Đọc trạng thái Redis/PostgreSQL schema/Qdrant/storage/Vite, không ghi DB/storage hoặc gọi model |
 | `make v1-db-check` | Đọc Alembic revision hiện tại, không seed hoặc migration |
 | `make v1-migrate` | **Chủ động nâng schema** bằng Alembic; kiểm tra database và backup theo phần 4 trước |
@@ -175,7 +175,7 @@ docker compose -f .\docker-compose.infra.yml ps
 Runner truyền tệp `.env` đã chọn cho Compose; biến môi trường của phiên có thể ghi đè giá trị tệp. Cấu hình `POSTGRES_*` của Compose phải khớp database local trong `DATABASE_URL`; lệnh không thay tài khoản/database trong volume đã có. Nếu dịch vụ đã chạy ở máy/server khác, dùng địa chỉ thực tế trong cấu hình backend và bỏ bước khởi động Docker.
 
 `v1-infra-up` đọc đúng `.env` đã chọn bằng `QNU_V1_ENV_DIR`/`--env-dir`,
-kiểm tra cấu hình storage trước khi chạy Docker, khởi động đủ bốn dịch vụ
+kiểm tra cấu hình storage trước khi chạy Docker, khởi động đủ năm dịch vụ
 và chỉ báo thành công khi bước chuẩn bị storage cuối cùng đạt. MinIO dùng đúng
 image `pgsty/minio:RELEASE.2026-06-18T00-00-00Z`, dữ liệu nằm trong volume
 `qnu_minio_data`. Không cần chạy MinIO riêng sau lệnh này:
@@ -200,7 +200,31 @@ MinIO vẫn được bật như một thành phần của bộ hạ tầng local
 
 `v1-check` chỉ xác nhận S3 truy cập được bucket; đây không phải bằng chứng quyền
 ghi/đọc object. Phép thử ghi/đọc/xóa thực hiện trong `v1-infra-up` cho storage local.
-V1 render PDF/DOCX bằng PyMuPDF, không gọi Gotenberg nên không khởi động Gotenberg.
+Gotenberg được khởi động cùng bộ hạ tầng từ Context711, dùng image
+`gotenberg/gotenberg:8`. Từ máy host truy cập `http://127.0.0.1:3005`, kiểm tra
+`GET /health`; container trong cùng mạng Compose dùng `http://gotenberg:3000`.
+Cổng3005 chỉ bind loopback. Có thể bật riêng mà không chạy lại các dịch vụ khác:
+
+```powershell
+docker compose -f .\docker-compose.infra.yml --env-file .\.env up -d --no-deps --wait gotenberg
+```
+
+DOCX mới dùng Gotenberg LibreOffice theo `DOCX_CONVERTER=gotenberg-libreoffice`;
+`GOTENBERG_URL` được đọc từ Settings của `.env` đã chọn. Có thể chọn rõ
+`DOCX_CONVERTER=docx-story` để dùng Story cho các job mới. Job ghim lựa chọn,
+endpoint, `DOCX_RENDERER_REVISION` và phiên bản PyMuPDF; lỗi Gotenberg báo lỗi,
+không tự đổi converter. PDF trực tiếp vẫn dùng PyMuPDF.
+
+Khi đổi image/font/tùy chọn chuyển đổi, đổi `DOCX_RENDERER_REVISION` để phân biệt
+generation mới. Đây là revision triển khai do quản trị đặt, không phải phiên bản
+Gotenberg được đo tự động. Giá trị mặc định là `qnu-docx/v2`. Khi phục hồi DOCX,
+job dùng lại `render_pdf` đã lưu và kiểm hash thay vì gọi converter lần nữa.
+Job cũ chưa có profile mới giữ Story; nếu đã có PDF thì giữ PDF đó và ghi rõ
+metadata converter cũ không xác định. Không tự xử lý lại tài liệu đã xuất bản.
+Thời gian chờ Gotenberg không giữ khóa MuPDF dùng chung; chỉ bước xử lý PDF/ảnh
+giữ khóa. Log chuyển đổi chỉ ghi sự kiện, status hoặc loại lỗi, không ghi body
+phản hồi, nội dung tài liệu hoặc exception thô. Unit test render/native có chốt
+chặn client HTTP thật; ca kiểm Gotenberg phải cung cấp client giả tường minh.
 Model AI vẫn được cấu hình riêng qua ModelOps; lệnh này không tải/chạy model.
 
 Cài thư viện một lần, hoặc khi lockfile thay đổi:

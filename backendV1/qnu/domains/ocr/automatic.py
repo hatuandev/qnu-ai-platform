@@ -18,6 +18,7 @@ from qnu.domains.ocr.execution import (
     _assemble,
     _ocr_pages,
     _persist_render,
+    _render_for_run,
     _store_artifact,
     _sync_pages,
 )
@@ -69,12 +70,13 @@ async def execute_auto(db, blob, run, actor, engine, config, settings):
             status_code=409,
         )
     payload = await read_revision_bytes(blob, scope)
-    from qnu.domains.ocr.artifacts.render import render_async
-
-    rendered = await render_async(payload, scope.extension, config)
+    rendered = await _render_for_run(db, blob, run, payload, scope.extension, config)
     if scope.extension == ".docx":
         rendered = replace(
-            rendered, warnings=(*rendered.warnings, "docx_page_numbers_refer_to_render_pdf")
+            rendered,
+            warnings=tuple(
+                dict.fromkeys((*rendered.warnings, "docx_page_numbers_refer_to_render_pdf"))
+            ),
         )
     plan = await extract_native_async(payload, rendered)
     await resolve_workspace_access(db, actor, run.workspace_id, required_roles=WRITE_ROLES)

@@ -7,6 +7,16 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+- **2026-10-29 — Context715: sửa P2 DOCX renderer.** Tách HTTP khỏi khóa MuPDF, log lọc và unit test offline; chỉ kiểm tĩnh/Ruff, không test/runtime/restart. [Nhật ký715](./2026-10-29_phien_715_sua_p2_docx_renderer.md).
+
+- **2026-10-29 — Context714: sửa hai P1 DOCX renderer.** Settings/.env thống nhất, profile ghim và saved PDF recovery; legacy/PDF identity giữ. Chỉ kiểm tĩnh/Ruff, không test/runtime/restart. [Nhật ký714](./2026-10-29_phien_714_sua_p1_docx_renderer.md).
+
+- **2026-10-29 — Context713: review tĩnh BE V1.**5finding về Gotenberg/config/recovery/lock/log/test isolation; không test/lint/build/runtime hoặc sửa ứng dụng. [Nhật ký713](./2026-10-29_phien_713_review_tinh_backend_v1.md).
+
+- **2026-10-29 — Context712: URL workspace và sidebar.** Link ngắn theo mã, lookup có quyền, đổi workspace bỏ ngữ cảnh nguồn cũ; FE465PASS/BE338PASS60SKIP, restart được user duyệt. [Nhật ký712](./2026-10-29_phien_712_url_workspace_va_sidebar.md).
+
+- **2026-10-29 — Context711: Gotenberg trong Docker V1.** Thêm vào runner và bật container healthy cổng3005, scripts44PASS/health200/DOCX+HTML→PDF đạt. Chưa đổi rendererV1. [Nhật ký711](./2026-10-29_phien_711_them_gotenberg_vao_ha_tang_v1.md).
+
 - **2026-10-29 — Context710: backend V1 tự bóc tách sau upload.** Native-first PDF/DOCX, OCR khi cần, MD/JSON/ảnh/ZIP; schema0007. Bao phủ835ID PASS gồm210call trước gián đoạn+625PASS qua lệnh exit0, Ruff26 đạt; chưa kích hoạt trên DB phục vụ/đổi FE/model/quota. [Nhật ký710](./2026-10-29_phien_710_backend_v1_boc_tach_tu_dong.md).
 
 - **2026-10-29 — Context709: rút gọn xác nhận xóa kho tri thức.** Chỉ Hủy/Xóa, không lý do/checkbox; giữ preview và quyền server. FE450PASS, focused29PASS, build+TS/Biome PASS; browser desktop/mobile đạt. Giữ cấu hình AI. [Nhật ký709](./2026-10-29_phien_709_rut_gon_xac_nhan_xoa_kho_tri_thuc.md).

@@ -140,7 +140,7 @@ export const workspaceFeatures = {
 export type WorkspaceFeature = keyof typeof workspaceFeatures;
 export const workspaceFeatureKeys = Object.keys(
   workspaceFeatures,
-) as WorkspaceFeature[];
+).filter((key) => key !== "resources") as WorkspaceFeature[];
 export const workspaceFeatureGroups = [
   "Tri thức",
   "Trợ lý",
@@ -216,9 +216,10 @@ export function routeFeatureScope(
     return { workspaceId: id(search.workspaceId) };
   if (pathname === "/dashboard" && id(search.workspaceId))
     return { workspaceId: id(search.workspaceId) };
-  const match = /^\/workspaces\/([^/]+)(?:\/(?:collections|knowledge)\/([^/]+))?/.exec(
-    pathname,
-  );
+  const match =
+    /^\/workspaces\/([^/]+)(?:\/(?:collections|knowledge)\/([^/]+))?/.exec(
+      pathname,
+    );
   if (!match) return undefined;
   try {
     return {
@@ -247,6 +248,7 @@ export function isFeatureActive(
       return (
         suffix === "/collections" ||
         suffix === "/knowledge" ||
+        /^\/(?:collections|knowledge)\/[^/]+\/sources\/[^/]+$/.test(suffix) ||
         (/^\/knowledge\/[^/]+$/.test(suffix) &&
           (!search.stage || search.stage === "files"))
       );

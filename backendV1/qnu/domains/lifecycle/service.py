@@ -71,6 +71,9 @@ async def inspect(
     parameters: dict,
 ) -> tuple[object, str, dict]:
     row = await targets.target(db, actor, workspace_id, kind, resource_id, parameters)
+    from qnu.domains.lifecycle import purge
+
+    await purge.require_not_pending(db, workspace_id, kind, resource_id)
     resource = await targets.state(db, workspace_id, kind, resource_id)
     if action == "restore" and resource and resource.status == "deleted" and kind != "conversation":
         await resolve_workspace_access(
@@ -78,6 +81,10 @@ async def inspect(
         )
     targets.require_operation(kind, action, row, resource)
     current, impact = await targets.snapshot(db, workspace_id, kind, row, parameters)
+    if kind == "source" and action == "delete":
+        plan, permanent_impact = await purge.inspect_source(db, row, blob)
+        current["purge_graph_sha256"] = plan["graph_sha256"]
+        impact.update(permanent_impact)
     if action == "replace":
         from qnu.domains.lifecycle.replacement import inspect_replacement
 
@@ -186,6 +193,12 @@ async def accept(
         if previous.request_hash != request_hash:
             raise Conflict("Khóa thao tác đã dùng cho yêu cầu khác.", code="idempotency_conflict")
         row = await detail(db, actor, workspace_id, previous.id)
+        if row.status == "pending" and (row.result or {}).get("permanent"):
+            from qnu.domains.lifecycle.purge import dispatch
+
+            await db.commit()
+            await dispatch(row, queue)
+            return row
         if row.status == "completed" or row.action == "replace":
             await db.commit()
             if row.action == "replace" and row.result:
@@ -219,6 +232,13 @@ async def accept(
             from qnu.domains.lifecycle.replacement import prepare_replacement
 
             return await prepare_replacement(db, blob, vectors, queue, actor, row, target)
+        if row.kind == "source" and row.action == "delete":
+            from qnu.domains.lifecycle import purge
+
+            await purge.prepare(db, blob, vectors, actor, row, target)
+            await db.commit()
+            await purge.dispatch(row, queue)
+            return row
         if row.action != "cleanup":
             row.result = await effects.apply(db, row, target)
             row.status, row.finished_at = "completed", utcnow()

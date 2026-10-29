@@ -43,7 +43,7 @@ from qnu.domains.ocr.artifacts.canonical import (
     build_manifest,
     render_markdown,
 )
-from qnu.domains.ocr.artifacts.render import RenderedDocument, render_async
+from qnu.domains.ocr.artifacts.render import RenderedDocument, render_async, render_saved_pdf_async
 from qnu.domains.ocr.artifacts.validate import validate_document
 from qnu.domains.ocr.budget import page_request_budget
 from qnu.domains.ocr.config import (
@@ -459,7 +459,9 @@ async def _execute_claimed(
         observation.sha256 = scope.sha256
 
     with observe_stage(run, "render", logger=logger) as observation:
-        rendered = await render_async(payload_bytes, scope.extension, config)
+        rendered = await _render_for_run(
+            db, blob_store, run, payload_bytes, scope.extension, config
+        )
         observation.item_count = len(rendered.pages)
     await _persist_render(db, blob_store, run, rendered)
 
@@ -468,11 +470,55 @@ async def _execute_claimed(
     return await _assemble(db, blob_store, run, runtime, config, rendered)
 
 
+async def _render_for_run(
+    db: AsyncSession,
+    blob_store: BlobStore,
+    run: OcrProcessingRun,
+    payload: bytes,
+    extension: str,
+    config: ProcessingConfig,
+) -> RenderedDocument:
+    """Resume DOCX from verified saved bytes, never by reconverting the source."""
+    if extension == ".docx" and await _artifact(db, run.id, "render_pdf", 0) is not None:
+        _, pdf = await read_artifact_bytes(db, blob_store, run, "render_pdf", 0)
+        saved = (run.config or {}).get("render_result") or {}
+        renderer = saved.get("renderer") or {
+            "name": "legacy-saved",
+            "version": None,
+            "dpi": config.dpi,
+            "converter": "legacy-saved",
+            "source_artifact": "render_pdf",
+        }
+        warnings = tuple(saved.get("warnings", ()))
+        if not saved:
+            warnings = (*warnings, "legacy_converter_metadata_unavailable")
+        return await render_saved_pdf_async(pdf, config, renderer, warnings)
+    if extension == ".docx" and config.pin_renderer:
+        from qnu.platform.config import get_settings
+
+        if config.renderer_revision != get_settings().DOCX_RENDERER_REVISION:
+            raise AppException(
+                "Phiên bản bộ chuyển đổi đã thay đổi; cần tạo lượt xử lý mới.",
+                code="renderer_version_changed",
+                status_code=409,
+            )
+    return await render_async(payload, extension, config)
+
+
 async def _persist_render(
     db: AsyncSession, blob_store: BlobStore, run: OcrProcessingRun, rendered: RenderedDocument
 ) -> None:
     if rendered.fixed_layout_pdf is not None:
         await _store_artifact(db, blob_store, run, "render_pdf", 0, rendered.fixed_layout_pdf)
+        run.config = {
+            **(run.config or {}),
+            "render_result": {
+                "renderer": rendered.renderer,
+                "warnings": list(rendered.warnings),
+            },
+        }
+        # Commit the conversion before page processing so a retry reuses identical bytes.
+        await commit_owned(db, run)
     for page in rendered.pages:
         await _store_artifact(db, blob_store, run, "page_image", page.page_number, page.png)
     await commit_owned(db, run)

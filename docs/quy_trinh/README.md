@@ -7,6 +7,8 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [44 — Điều hướng workspace V1](./44_dieu_huong_workspace_v1.md): bộ chọn workspace, URL gọn và liên kết tài liệu có kiểm quyền.
+
 - [43 — Bóc tách tự động sau upload trong backendV1](./43_boc_tach_tu_dong_backend_v1.md): native-first PDF/DOCX, OCR khi cần, MD/JSON/ảnh, trạng thái và ZIP có kiểm quyền/hash.
 
 - [42 — ModelOps nhà cung cấp và model](./42_modelops_nha_cung_cap_va_model.md): tạo nhà cung cấp → thêm khóa → thử kết nối → thêm nhiều model; giữ ID và phạm vi credential khi migration.

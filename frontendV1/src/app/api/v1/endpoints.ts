@@ -1,3 +1,4 @@
+import { parseWorkspaceLink } from "../../../navigation/workspace-links";
 /**
  * Single source of truth for the QNU AI v1 API surface.
  *
@@ -148,7 +149,11 @@ export const knowledgePaths = {
     `/workspaces/${workspaceId}/collections/${collectionId}/folders/${folderId}/move`,
   folderImpact: (workspaceId: string, collectionId: string, folderId: string) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/folders/${folderId}/impact`,
-  folderRestore: (workspaceId: string, collectionId: string, folderId: string) =>
+  folderRestore: (
+    workspaceId: string,
+    collectionId: string,
+    folderId: string,
+  ) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/folders/${folderId}/restore`,
 } as const;
 
@@ -242,6 +247,14 @@ export const ocrPaths = {
     pageNumber: number,
   ) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/pages/${pageNumber}/image`,
+  renderedPdf: (
+    workspaceId: string,
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    runId: string,
+  ) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/pdf`,
   textReview: (
     workspaceId: string,
     collectionId: string,
@@ -283,6 +296,23 @@ export const ocrPaths = {
     checkId: string,
   ) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/text-review/checks/${checkId}`,
+  bundle: (
+    workspaceId: string,
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    runId: string,
+  ) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/bundle`,
+  image: (
+    workspaceId: string,
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    runId: string,
+    assetNo: number,
+  ) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/images/${assetNo}`,
 } as const;
 
 export const compilationPaths = {
@@ -416,6 +446,7 @@ export const V1_ROUTE_PREFIXES = [
 ] as const;
 
 export function isV1Route(pathname: string): boolean {
+  if (parseWorkspaceLink(pathname)) return true;
   return V1_ROUTE_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );

@@ -1,54 +1,98 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  AlertCircle,
+  Archive,
   ArrowLeft,
-  ArrowRight,
-  BookOpen,
-  Check,
+  ChevronDown,
   ChevronRight,
-  Copy,
-  Cpu,
+  ClipboardList,
   Download,
-  Eye,
   FilePlus2,
   FileText,
-  Info,
   Loader2,
+  MoreHorizontal,
+  Pencil,
+  Play,
+  RotateCcw,
+  Save,
+  Sparkles,
+  Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ApiProblemError } from "@/app/api/v1";
+import { ApiProblemError, v1Client } from "@/app/api/v1";
 import { ErrorState } from "@/components/admin/error-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CompilationDialog } from "@/features/knowledge/compilation-dialog";
+import { OcrComparisonView } from "@/features/knowledge/ocr-comparison-view";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { canManageKnowledge } from "@/features/knowledge/permissions";
+  type OcrDraftScope,
+  useOcrDraft,
+} from "@/features/knowledge/ocr-draft-store";
 import {
-  downloadSourceRevision,
+  useDetectCheckMutation,
+  useProcessingRunDetailQuery,
+  useProcessingRunsQuery,
+  useRequestProcessingRunMutation,
+  useSaveTextReviewMutation,
+  useTextReviewQuery,
+} from "@/features/knowledge/ocr-queries";
+import {
+  downloadReviewDocumentBlob,
+  downloadReviewMarkdownBlob,
+  downloadRunBundleBlob,
+  readRenderedPdfBlob,
+} from "@/features/knowledge/ocr-requests";
+import {
+  applySuggestionsToText,
+  formatOcrError,
+  generateIdempotencyKey,
+  isDocx,
+  validateSuggestionSpan,
+} from "@/features/knowledge/ocr-schemas";
+import type {
+  DetectionResponse,
+  Suggestion,
+  TextChange,
+} from "@/features/knowledge/ocr-types";
+import {
+  canCreateOrEditCompilation,
+  canManageKnowledge,
+} from "@/features/knowledge/permissions";
+import {
   useCollectionQuery,
   useRevisionsQuery,
   useSourceQuery,
 } from "@/features/knowledge/queries";
+import { downloadRevisionContent } from "@/features/knowledge/requests";
 import { RevisionUploadDialog } from "@/features/knowledge/revision-upload-dialog";
-import {
-  formatBytes,
-  formatSourceStatus,
-  isDocx,
-  isPdf,
-} from "@/features/knowledge/schemas";
+import { formatProcessingStatus } from "@/features/knowledge/schemas";
+import { SourceRenameDialog } from "@/features/knowledge/source-rename-dialog";
+import { SpellingResultPanel } from "@/features/knowledge/spelling-result-panel";
 import type { KBRevision } from "@/features/knowledge/types";
-import { LifecycleActions } from "@/features/lifecycle/lifecycle-actions";
+import { LifecycleActionDialog } from "@/features/lifecycle/action-dialog";
+import { canLifecycleAction } from "@/features/lifecycle/permissions";
+import type { LifecycleOperation } from "@/features/lifecycle/types";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
-import { formatDateTimeValue } from "@/lib/date-utils";
 
 export interface SourceDetailSearchParams {
   revisionId?: string;
@@ -74,167 +118,403 @@ export function SourceDetailPage({
 }) {
   const navigate = useNavigate();
   const { role, isPending: rolePending } = useCallerWorkspaceRole(workspaceId);
+
+  // Queries for Source and Collection
   const collectionQuery = useCollectionQuery(workspaceId, collectionId);
   const sourceQuery = useSourceQuery(workspaceId, collectionId, sourceId);
   const revisionsQuery = useRevisionsQuery(workspaceId, collectionId, sourceId);
 
-  const [uploadRevisionOpen, setUploadRevisionOpen] = useState(false);
-  const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(
-    search?.revisionId ?? null,
-  );
-  const [copiedHash, setCopiedHash] = useState<string | null>(null);
-
-  // PDF Preview Blob state
-  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const [downloadingRevisionId, setDownloadingRevisionId] = useState<
-    string | null
-  >(null);
-
   const canManage = !rolePending && canManageKnowledge(role);
+  const canCompile = !rolePending && canCreateOrEditCompilation(role);
+
   const collection = collectionQuery.data;
   const source = sourceQuery.data;
   const revisions = revisionsQuery.data ?? [];
 
-  // Deep-link migration: if old URL accessed ?tab=ocr, redirect immediately to dedicated OCR page
-  useEffect(() => {
-    if (search?.tab === "ocr") {
-      void navigate({
-        to: "/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId/ocr",
-        params: { workspaceId, collectionId, sourceId },
-        search: {
-          revisionId: search.revisionId,
-          runId: search.runId,
-          checkId: search.checkId,
-          page: search.page,
-          subTab: search.subTab,
-        },
-        replace: true,
-      });
-    }
-  }, [search, navigate, workspaceId, collectionId, sourceId]);
-
-  // Determine active revision for preview (defaults to selected or latest in list)
+  // Active Revision
   const activeRevision: KBRevision | undefined =
-    revisions.find((r) => r.id === selectedRevisionId) ?? revisions[0];
+    revisions.find((r) => r.id === search?.revisionId) ?? revisions[0];
 
-  const activeRevisionId = activeRevision?.id;
-  const activeRevisionContentType = activeRevision?.content_type;
-  const activeRevisionFileName = activeRevision?.file_name;
+  const activeRevisionId = activeRevision?.id ?? "";
+  const activeRevisionNo =
+    activeRevision?.revision_no ?? source?.current_revision_no ?? 1;
 
-  // Load PDF Blob preview when active revision changes (if PDF)
-  useEffect(() => {
-    if (!activeRevisionId) return;
+  // Active Run Queries
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(
+    search?.runId ?? null,
+  );
+  const [activePage, setActivePage] = useState<number>(search?.page ?? 1);
 
-    if (!isPdf(activeRevisionContentType, activeRevisionFileName)) {
-      setPreviewBlobUrl(null);
-      setPreviewLoading(false);
-      setPreviewError(null);
-      return;
-    }
+  // Modals & Dialogs
+  const [uploadRevisionOpen, setUploadRevisionOpen] = useState(false);
+  const [renameSourceOpen, setRenameSourceOpen] = useState(false);
+  const [reRunConfirmOpen, setReRunConfirmOpen] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [spellCheckModalOpen, setSpellCheckModalOpen] = useState(false);
+  const [compilationDialogOpen, setCompilationDialogOpen] = useState(false);
+  const [lifecycleOp, setLifecycleOp] = useState<LifecycleOperation | null>(
+    null,
+  );
 
-    let isSubscribed = true;
-    setPreviewLoading(true);
-    setPreviewError(null);
+  // Downloading derivative state
+  const [downloadingType, setDownloadingType] = useState<
+    "md" | "json" | "zip" | "raw" | "pdf" | null
+  >(null);
 
-    downloadSourceRevision(
-      workspaceId,
-      collectionId,
-      sourceId,
-      activeRevisionId,
-    )
-      .then((response) => {
-        if (!isSubscribed) return;
-        const objectUrl = URL.createObjectURL(response.blob);
-        setPreviewBlobUrl(objectUrl);
-        setPreviewLoading(false);
-      })
-      .catch((error) => {
-        if (!isSubscribed) return;
-        setPreviewLoading(false);
-        setPreviewError(
-          error instanceof ApiProblemError
-            ? error.message
-            : "Không tải được bản xem trước của tệp PDF này.",
-        );
-      });
+  // Spell checking state
+  const [localCheck, setLocalCheck] = useState<DetectionResponse | null>(null);
 
-    return () => {
-      isSubscribed = false;
-      setPreviewBlobUrl((previousUrl) => {
-        if (previousUrl) URL.revokeObjectURL(previousUrl);
-        return null;
-      });
-    };
-  }, [
+  // Fetch runs of current revision
+  const runsQuery = useProcessingRunsQuery(
     workspaceId,
     collectionId,
     sourceId,
     activeRevisionId,
-    activeRevisionContentType,
-    activeRevisionFileName,
-  ]);
+    1,
+    10,
+  );
 
-  const handleCopyHash = async (hash: string) => {
+  const runs = runsQuery.data?.items ?? [];
+
+  // Auto-select latest run if not specified
+  useEffect(() => {
+    if (!selectedRunId && runs.length > 0) {
+      const latest = runs[0];
+      setSelectedRunId(latest.id);
+      onSearchChange?.({ runId: latest.id });
+    }
+  }, [selectedRunId, runs, onSearchChange]);
+
+  // Fetch active run details (polling built-in for running/queued status)
+  const runDetailQuery = useProcessingRunDetailQuery(
+    workspaceId,
+    collectionId,
+    sourceId,
+    activeRevisionId,
+    selectedRunId,
+  );
+
+  const activeRun = runDetailQuery.data;
+
+  // Text review query for completed runs
+  const textReviewQuery = useTextReviewQuery(
+    workspaceId,
+    collectionId,
+    sourceId,
+    activeRevisionId,
+    selectedRunId,
+    null,
+    { enabled: Boolean(selectedRunId && activeRun?.status === "completed") },
+  );
+
+  const doc = textReviewQuery.data;
+
+  // Draft Store
+  const draftScope = useMemo<OcrDraftScope | null>(
+    () =>
+      selectedRunId
+        ? {
+            workspaceId,
+            collectionId,
+            sourceId,
+            revisionId: activeRevisionId,
+            runId: selectedRunId,
+          }
+        : null,
+    [collectionId, activeRevisionId, selectedRunId, sourceId, workspaceId],
+  );
+
+  const draft = useOcrDraft(
+    draftScope,
+    doc ? { version: doc.version, sha256: doc.canonical_sha256 } : null,
+  );
+  const draftChanges = draft.changes;
+  const draftCount = draftChanges.size;
+  const hasUnsavedDraft = draftCount > 0;
+
+  // Mutations
+  const requestRunMutation = useRequestProcessingRunMutation(
+    workspaceId,
+    collectionId,
+    sourceId,
+    activeRevisionId,
+  );
+
+  const saveMutation = useSaveTextReviewMutation(
+    workspaceId,
+    collectionId,
+    sourceId,
+    activeRevisionId,
+    selectedRunId ?? "",
+  );
+
+  const detectMutation = useDetectCheckMutation(
+    workspaceId,
+    collectionId,
+    sourceId,
+    activeRevisionId,
+    selectedRunId ?? "",
+  );
+
+  // Handle Page Change
+  const handlePageChange = (newPage: number) => {
+    setActivePage(newPage);
+    onSearchChange?.({
+      revisionId: activeRevisionId,
+      runId: selectedRunId ?? undefined,
+      page: newPage,
+    });
+  };
+
+  // Start extraction (native-first)
+  const handleStartExtraction = async (force = false) => {
     try {
-      await navigator.clipboard.writeText(hash);
-      setCopiedHash(hash);
-      toast.success("Đã sao chép SHA-256.");
-      setTimeout(() => setCopiedHash(null), 2000);
-    } catch {
-      toast.error("Không thể sao chép vào bộ nhớ tạm.");
+      const res = await requestRunMutation.mutateAsync({
+        strategy: "auto",
+        force,
+      });
+
+      setSelectedRunId(res.run.id);
+      onSearchChange?.({
+        revisionId: activeRevisionId,
+        runId: res.run.id,
+        page: 1,
+      });
+
+      toast.success(
+        res.created
+          ? "Đã gửi yêu cầu bóc tách tài liệu."
+          : "Đã mở tiến trình bóc tách hiện có.",
+      );
+      void runsQuery.refetch();
+      void sourceQuery.refetch();
+    } catch (err) {
+      toast.error(
+        err instanceof ApiProblemError
+          ? err.message
+          : "Không thể bắt đầu bóc tách tài liệu.",
+      );
     }
   };
 
-  const handleDownload = async (revision: KBRevision) => {
-    setDownloadingRevisionId(revision.id);
+  // Save Review Drafts to Server
+  const handleConfirmSave = async () => {
+    if (!doc || !selectedRunId) return;
+
+    const changesPayload: TextChange[] = Array.from(draftChanges.entries()).map(
+      ([evidence_id, after]) => {
+        const unit = doc.units.find((u) => u.evidence_id === evidence_id);
+        return { evidence_id, before: unit?.text ?? "", after };
+      },
+    );
+    if (changesPayload.length === 0) return;
+
     try {
-      const response = await downloadSourceRevision(
-        workspaceId,
-        collectionId,
-        sourceId,
-        revision.id,
-      );
+      const updated = await saveMutation.mutateAsync({
+        body: {
+          expected_version: doc.version,
+          expected_sha256: doc.canonical_sha256,
+          changes: changesPayload,
+        },
+        idempotencyKey: generateIdempotencyKey(),
+      });
 
-      const downloadUrl = URL.createObjectURL(response.blob);
-      const anchor = document.createElement("a");
-      anchor.href = downloadUrl;
-      anchor.download = response.fileName || revision.file_name;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-
-      setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
-      toast.success(`Đã tải xuống ${revision.file_name}.`);
-    } catch (error) {
+      draft.clear();
+      setSaveModalOpen(false);
+      toast.success(`Đã lưu phiên bản hiệu đính mới (v${updated.version}).`);
+      void textReviewQuery.refetch();
+    } catch (err) {
       toast.error(
-        error instanceof ApiProblemError
-          ? error.message
-          : "Không tải được tệp tài liệu.",
+        err instanceof ApiProblemError
+          ? err.message
+          : "Không thể lưu thay đổi hiệu đính.",
+      );
+    }
+  };
+
+  // Trigger Spell Check
+  const handleStartSpellCheck = async (unitIds: string[]) => {
+    if (!doc || !selectedRunId) return;
+    if (unitIds.length === 0) {
+      toast.error("Vui lòng chọn ít nhất một đoạn văn để kiểm tra.");
+      return;
+    }
+
+    try {
+      const checkRes = await detectMutation.mutateAsync({
+        body: {
+          expected_version: doc.version,
+          expected_sha256: doc.canonical_sha256,
+          evidence_ids: unitIds.slice(0, 50), // Respect API limit of 50
+        },
+        idempotencyKey: generateIdempotencyKey(),
+      });
+
+      setLocalCheck(checkRes);
+      setSpellCheckModalOpen(true);
+      toast.success("Đã hoàn tất kiểm tra chính tả các đoạn đã chọn.");
+    } catch (err) {
+      toast.error(
+        err instanceof ApiProblemError
+          ? err.message
+          : "Không thể thực hiện kiểm tra chính tả.",
+      );
+    }
+  };
+
+  // Apply suggestion from spell check into draft
+  const handleApplySuggestion = (s: Suggestion): boolean => {
+    const targetUnit = doc?.units.find((u) => u.evidence_id === s.evidence_id);
+    if (!targetUnit) return false;
+
+    const currentText = draftChanges.get(s.evidence_id) ?? targetUnit.text;
+    const validated = validateSuggestionSpan(currentText, s);
+    if (!validated) {
+      toast.error(
+        "Đoạn văn đã thay đổi so với khi kiểm tra. Không áp dụng tự động được.",
+      );
+      return false;
+    }
+
+    const result = applySuggestionsToText(currentText, [s]);
+    if (result.appliedCount === 0) {
+      toast.error(result.error ?? "Không thể áp dụng gợi ý cho từ này.");
+      return false;
+    }
+
+    draft.update((prev) => {
+      const next = new Map(prev);
+      next.set(s.evidence_id, result.updatedText);
+      return next;
+    });
+    toast.success(`Đã áp dụng thay đổi cho từ "${s.original}".`);
+    return true;
+  };
+
+  // Download Handler
+  const handleDownload = async (
+    type: "md" | "json" | "zip" | "raw" | "pdf",
+  ) => {
+    if (!selectedRunId) return;
+    setDownloadingType(type);
+
+    try {
+      let blob: Blob;
+      let filename = `${source?.title ?? "document"}`;
+
+      if (type === "md") {
+        const res = await downloadReviewMarkdownBlob(
+          v1Client,
+          workspaceId,
+          collectionId,
+          sourceId,
+          activeRevisionId,
+          selectedRunId,
+          doc?.version,
+        );
+        blob = res.blob;
+        filename += doc?.version ? `_v${doc.version}.md` : ".md";
+      } else if (type === "json") {
+        const res = await downloadReviewDocumentBlob(
+          v1Client,
+          workspaceId,
+          collectionId,
+          sourceId,
+          activeRevisionId,
+          selectedRunId,
+          doc?.version,
+        );
+        blob = res.blob;
+        filename += doc?.version ? `_v${doc.version}.json` : ".json";
+      } else if (type === "zip") {
+        const res = await downloadRunBundleBlob(
+          v1Client,
+          workspaceId,
+          collectionId,
+          sourceId,
+          activeRevisionId,
+          selectedRunId,
+        );
+        blob = res.blob;
+        filename += "_bundle.zip";
+      } else if (type === "pdf") {
+        const res = await readRenderedPdfBlob(
+          v1Client,
+          workspaceId,
+          collectionId,
+          sourceId,
+          activeRevisionId,
+          selectedRunId,
+        );
+        blob = res.blob;
+        filename += "_converted.pdf";
+      } else {
+        const res = await downloadRevisionContent(
+          v1Client,
+          workspaceId,
+          collectionId,
+          sourceId,
+          activeRevisionId,
+        );
+        blob = res.blob;
+        filename = res.fileName || activeRevision?.file_name || filename;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Đã tải xuống ${filename}`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Không tải được tệp tài liệu.",
       );
     } finally {
-      setDownloadingRevisionId(null);
+      setDownloadingType(null);
     }
   };
+
+  // Status computation
+  const activeProcessing = activeRun ?? source?.processing;
+  const statusInfo = formatProcessingStatus(activeProcessing);
+  const isDocxFile = isDocx(
+    activeRevision?.content_type ?? source?.content_type,
+    activeRevision?.file_name ?? source?.file_name,
+  );
 
   if (sourceQuery.isLoading || collectionQuery.isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
+      <div className="space-y-4 p-4">
+        <Skeleton className="h-6 w-64" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-96 w-full" />
       </div>
     );
   }
 
   if (sourceQuery.isError || !source) {
+    if (lifecycleOp) return (
+      <LifecycleActionDialog workspaceId={workspaceId}
+        target={{ kind: "source", resource_id: sourceId, action: lifecycleOp }} label="Tài liệu"
+        onClose={() => { setLifecycleOp(null); void navigate({
+          to: "/workspaces/$workspaceId/knowledge/$knowledgeId", params: { workspaceId, knowledgeId: collectionId },
+          search: { page: 1, pageSize: 20 },
+        }); }}
+        onCompleted={() => { toast.success("Thao tác tài liệu đã hoàn tất."); void navigate({
+          to: "/workspaces/$workspaceId/knowledge/$knowledgeId", params: { workspaceId, knowledgeId: collectionId },
+          search: { page: 1, pageSize: 20 },
+        }); }} />
+    );
     return (
       <div className="space-y-4">
         <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs">
           <Link
-            to="/workspaces/$workspaceId/collections/$collectionId"
-            params={{ workspaceId, collectionId }}
+            to="/workspaces/$workspaceId/knowledge"
+            params={{ workspaceId }}
             search={{ page: 1, pageSize: 20 }}
           >
             <ArrowLeft className="size-3.5" />
@@ -250,553 +530,480 @@ export function SourceDetailPage({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Breadcrumb Navigation */}
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
-        <Link
-          to="/workspaces/$workspaceId/collections"
-          params={{ workspaceId }}
-          search={{ page: 1, pageSize: 20 }}
-          className="hover:text-foreground transition-colors"
-        >
-          Kho tri thức
-        </Link>
-        <ChevronRight className="size-3 text-muted-foreground/60" />
-        <Link
-          to="/workspaces/$workspaceId/collections/$collectionId"
-          params={{ workspaceId, collectionId }}
-          search={{ page: 1, pageSize: 20 }}
-          className="hover:text-foreground transition-colors truncate max-w-[150px] sm:max-w-xs"
-        >
-          {collection?.name || collectionId}
-        </Link>
-        <ChevronRight className="size-3 text-muted-foreground/60" />
-        <span className="font-semibold text-foreground truncate max-w-[200px] sm:max-w-md">
-          {source.title}
-        </span>
-      </div>
-
-      {/* Source Overview & Action Card */}
-      <Card className="rounded-xl shadow-2xs border-border/80">
-        <CardContent className="p-4 sm:p-6 space-y-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-2 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <FileText className="size-5 text-primary shrink-0" />
-                <h1 className="type-page-title m-0 text-lg sm:text-xl font-bold truncate">
-                  {source.title}
-                </h1>
-                <Badge variant="success" className="text-xs">
-                  {formatSourceStatus(source.status)}
-                </Badge>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground font-mono">
-                <span>{source.file_name}</span>
-                <span>·</span>
-                <span>{formatBytes(source.size_bytes)}</span>
-                <span>·</span>
-                {isPdf(source.content_type, source.file_name) ? (
-                  <Badge variant="info" className="text-[10px] py-0">
-                    PDF
-                  </Badge>
-                ) : isDocx(source.content_type, source.file_name) ? (
-                  <Badge variant="secondary" className="text-[10px] py-0">
-                    DOCX
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-[10px] py-0">
-                    Khác
-                  </Badge>
-                )}
-                <span>·</span>
-                <span>
-                  Bản mới nhất: v{source.current_revision_no} ({source.revision_count} phiên bản)
-                </span>
-                <span>·</span>
-                <span>
-                  Bản đang phục vụ:{" "}
-                  {source.serving_revision_no == null
-                    ? "Chưa xuất bản"
-                    : `v${source.serving_revision_no}`}
-                </span>
-                {source.serving_revision_no != null &&
-                source.current_revision_no !== source.serving_revision_no ? (
-                  <Badge variant="warning">Có bản mới đang chuẩn bị</Badge>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Prominent Next Action & Secondary CTAs */}
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <LifecycleActions
-                workspaceId={workspaceId}
-                kind="source"
-                resourceId={sourceId}
-                label={source.title}
-                role={role}
-              />
-
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs h-9"
-                disabled={!canManage}
-                onClick={() => setUploadRevisionOpen(true)}
-                title={
-                  canManage
-                    ? undefined
-                    : "Cần quyền admin hoặc editor để tải lên phiên bản mới"
-                }
-              >
-                <FilePlus2 className="size-3.5" />
-                <span>Tải phiên bản mới</span>
-              </Button>
-
-              {/* PRIMARY PROMINENT ACTION */}
-              <Button
-                asChild
-                size="sm"
-                className="gap-1.5 text-xs h-9 font-semibold shadow-xs"
-              >
-                <Link
-                  to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId/ocr"
-                  params={{ workspaceId, collectionId, sourceId }}
-                  search={{ revisionId: activeRevisionId }}
-                >
-                  <Cpu className="size-4" />
-                  <span>Xử lý OCR & Hiệu đính</span>
-                  <ArrowRight className="size-3.5 ml-0.5" />
-                </Link>
-              </Button>
-            </div>
-          </div>
-
-          {/* Metadata Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t text-xs">
-            <div>
-              <p className="text-muted-foreground">Người tải lên</p>
-              <p className="font-mono font-medium text-foreground truncate mt-0.5">
-                {source.created_by}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-muted-foreground">Ngày tải lên</p>
-              <p className="font-medium text-foreground mt-0.5">
-                {formatDateTimeValue(source.created_at)}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-muted-foreground">Cập nhật gần nhất</p>
-              <p className="font-medium text-foreground mt-0.5">
-                {formatDateTimeValue(source.updated_at)}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-muted-foreground">SHA-256 (bản hiện tại)</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span
-                  className="font-mono text-foreground truncate text-[11px]"
-                  title={source.sha256}
-                >
-                  {source.sha256.slice(0, 16)}...
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="size-6 p-0 text-muted-foreground hover:text-foreground"
-                  onClick={() => handleCopyHash(source.sha256)}
-                  title="Sao chép toàn bộ SHA-256"
-                >
-                  {copiedHash === source.sha256 ? (
-                    <Check className="size-3 text-success" />
-                  ) : (
-                    <Copy className="size-3" />
-                  )}
-                  <span className="sr-only">Copy</span>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Document Workflow Next-Steps Guidance */}
-      <Card className="rounded-xl border-primary/20 bg-primary/5 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-xs">
-          <div className="flex items-start sm:items-center gap-2.5">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded bg-primary text-primary-foreground font-bold">
-              1
+    <div className="space-y-4">
+      {/* 1. Header trên cùng: Tên tài liệu, phiên bản, trạng thái & Hàng hành động */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-border/70">
+        <div className="min-w-0 space-y-1">
+          {/* Breadcrumbs */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
+            <Link
+              to="/workspaces/$workspaceId/knowledge"
+              params={{ workspaceId }}
+              search={{ page: 1, pageSize: 20 }}
+              className="hover:text-foreground transition-colors"
+            >
+              Kho tri thức
+            </Link>
+            <ChevronRight className="size-3 text-muted-foreground/60" />
+            <Link
+              to="/workspaces/$workspaceId/knowledge/$knowledgeId"
+              params={{ workspaceId, knowledgeId: collectionId }}
+              search={{ page: 1, pageSize: 20 }}
+              className="hover:text-foreground transition-colors truncate max-w-[180px]"
+            >
+              {collection?.name ?? collectionId}
+            </Link>
+            <ChevronRight className="size-3 text-muted-foreground/60" />
+            <span className="font-semibold text-foreground truncate max-w-[220px]">
+              {source.title}
             </span>
-            <div>
-              <p className="font-semibold text-foreground">
-                Tài liệu đã được tải lên và lưu trữ an toàn
-              </p>
-              <p className="text-muted-foreground">
-                Bước tiếp theo: Thực hiện nhận dạng OCR (tiếng Việt), đối chiếu văn bản và rà soát lỗi chính tả trước khi biên soạn.
-              </p>
-            </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-            <Button asChild size="sm" className="h-8 gap-1.5 text-xs">
-              <Link
-                to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId/ocr"
-                params={{ workspaceId, collectionId, sourceId }}
-                search={{ revisionId: activeRevisionId }}
-              >
-                <Cpu className="size-3.5" />
-                <span>Mở OCR & Hiệu đính</span>
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
-              <Link
-                to="/workspaces/$workspaceId/collections/$collectionId/compilations"
-                params={{ workspaceId, collectionId }}
-                search={{ page: 1, pageSize: 20 }}
-              >
-                <BookOpen className="size-3.5" />
-                <span>Biên soạn</span>
-              </Link>
-            </Button>
+          {/* Tiêu đề, phiên bản & badge trạng thái */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <FileText className="size-5 text-primary shrink-0" />
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate max-w-[400px]">
+              {source.title}
+            </h1>
+            <Badge variant="outline" className="text-xs font-mono h-5">
+              v{activeRevisionNo}
+            </Badge>
+
+            <Badge
+              variant={statusInfo.variant}
+              className="text-xs font-normal h-5"
+            >
+              {statusInfo.status === "running" ? (
+                <Loader2 className="size-3 animate-spin mr-1 inline" />
+              ) : null}
+              {statusInfo.label}
+            </Badge>
           </div>
         </div>
-      </Card>
 
-      {/* Original Document Preview Section */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">
-              Bản xem trước tệp gốc: Phiên bản v{activeRevision?.revision_no ?? 1}{" "}
-              ({activeRevision?.file_name})
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              Xem tệp tài liệu gốc trực tiếp trên trình duyệt hoặc tải về máy tính để mở bằng ứng dụng chuyên dụng.
-            </p>
-          </div>
-
-          {activeRevision ? (
+        {/* Hàng hành động tinh gọn: Lưu thay đổi · Kiểm tra chính tả · Tải xuống · Menu ⋯ */}
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          {statusInfo.status === "unprocessed" ? (
+            <Button
+              size="sm"
+              className="h-9 text-xs gap-1.5 shadow-xs"
+              disabled={requestRunMutation.isPending}
+              onClick={() => void handleStartExtraction(false)}
+            >
+              {requestRunMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Play className="size-3.5" />
+              )}
+              <span>Bắt đầu bóc tách</span>
+            </Button>
+          ) : statusInfo.status === "running" ? (
             <Button
               size="sm"
               variant="outline"
-              className="gap-1.5 text-xs h-8"
-              disabled={downloadingRevisionId === activeRevision.id}
-              onClick={() => handleDownload(activeRevision)}
+              disabled
+              className="h-9 text-xs gap-1.5"
             >
-              {downloadingRevisionId === activeRevision.id ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Download className="size-3.5" />
-              )}
-              <span>Tải bản gốc ({activeRevision.file_name})</span>
+              <Loader2 className="size-3.5 animate-spin text-primary" />
+              <span>
+                Đang xử lý ({activeRun?.pages_done ?? 0}/
+                {activeRun?.pages_total ?? "?"})
+              </span>
             </Button>
           ) : null}
-        </div>
 
-        {activeRevision &&
-        isPdf(activeRevision.content_type, activeRevision.file_name) ? (
-          <Card className="rounded-xl shadow-2xs overflow-hidden">
-            {previewLoading ? (
-              <div className="p-8 space-y-4 flex flex-col items-center justify-center min-h-[400px]">
-                <Loader2 className="size-8 animate-spin text-primary" />
-                <p className="text-xs text-muted-foreground">
-                  Đang tải nội dung bản xem trước PDF...
-                </p>
-              </div>
-            ) : previewError ? (
-              <div className="p-6">
-                <Alert variant="destructive">
-                  <AlertTitle>Không tải được bản xem trước</AlertTitle>
-                  <AlertDescription className="text-xs mt-1">
-                    {previewError}
-                  </AlertDescription>
-                </Alert>
-                <div className="mt-4 flex justify-end">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDownload(activeRevision)}
-                  >
-                    <Download className="size-3.5 mr-1.5" />
-                    Tải tệp PDF về máy
-                  </Button>
-                </div>
-              </div>
-            ) : previewBlobUrl ? (
-              <div className="flex flex-col">
-                <iframe
-                  src={previewBlobUrl}
-                  className="w-full h-[650px] border-0 bg-muted/20"
-                  title={`Xem trước ${activeRevision.file_name}`}
-                />
-                <div className="p-3 bg-muted/20 border-t flex items-center justify-between text-xs text-muted-foreground">
-                  <span>
-                    Nếu trình duyệt không hiển thị được PDF, vui lòng dùng nút tải xuống bản gốc.
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-xs"
-                    onClick={() => handleDownload(activeRevision)}
-                  >
-                    <Download className="size-3 mr-1" />
-                    Tải về máy
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </Card>
-        ) : activeRevision &&
-          isDocx(activeRevision.content_type, activeRevision.file_name) ? (
-          <Card className="rounded-xl shadow-2xs p-6">
-            <Alert className="border-info/30 bg-info/5 text-info">
-              <Info className="size-4" />
-              <AlertTitle className="text-sm font-semibold">
-                Định dạng Microsoft Word (.docx)
-              </AlertTitle>
-              <AlertDescription className="text-xs mt-1 text-muted-foreground">
-                Tệp tài liệu này ở định dạng Microsoft Word (.docx). Trình
-                duyệt không hỗ trợ kết xuất tệp Word trực tiếp. Vui lòng tải
-                xuống bản gốc để xem bằng Microsoft Word hoặc chuyển sang trang OCR để trích xuất nội dung văn bản.
-              </AlertDescription>
-            </Alert>
-
-            <div className="mt-6 flex flex-col items-center justify-center p-8 border rounded-lg bg-muted/10 space-y-3">
-              <FileText className="size-12 text-muted-foreground" />
-              <div className="text-center">
-                <p className="font-mono text-sm font-semibold text-foreground">
-                  {activeRevision.file_name}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Dung lượng: {formatBytes(activeRevision.size_bytes)} · Phiên
-                  bản: v{activeRevision.revision_no}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  disabled={downloadingRevisionId === activeRevision.id}
-                  onClick={() => handleDownload(activeRevision)}
+          {/* Lưu thay đổi (nổi bật khi có nháp hiệu đính) */}
+          {statusInfo.status === "completed" && (
+            <Button
+              size="sm"
+              variant={hasUnsavedDraft ? "default" : "outline"}
+              className="h-9 text-xs gap-1.5"
+              disabled={!hasUnsavedDraft || saveMutation.isPending}
+              onClick={() => setSaveModalOpen(true)}
+            >
+              <Save className="size-3.5" />
+              <span>Lưu thay đổi</span>
+              {hasUnsavedDraft ? (
+                <Badge
+                  variant="warning"
+                  className="ml-1 text-[10px] py-0 px-1 font-mono"
                 >
-                  {downloadingRevisionId === activeRevision.id ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Download className="size-3.5" />
-                  )}
-                  <span>Tải tệp DOCX gốc</span>
-                </Button>
-                <Button asChild size="sm" className="gap-1.5">
-                  <Link
-                    to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId/ocr"
-                    params={{ workspaceId, collectionId, sourceId }}
-                    search={{ revisionId: activeRevision.id }}
-                  >
-                    <Cpu className="size-3.5" />
-                    <span>Trích xuất nội dung bằng OCR</span>
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          </Card>
-        ) : (
-          <Card className="rounded-xl shadow-2xs p-6">
-            <div className="flex flex-col items-center justify-center p-8 space-y-3">
-              <FileText className="size-10 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">
-                Định dạng tệp này không hỗ trợ xem trước trên trình duyệt.
-              </p>
-              {activeRevision ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleDownload(activeRevision)}
-                >
-                  <Download className="size-3.5 mr-1.5" />
-                  Tải tệp gốc
-                </Button>
+                  {draftCount}
+                </Badge>
               ) : null}
-            </div>
-          </Card>
-        )}
+            </Button>
+          )}
+
+          {/* Kiểm tra chính tả (khi đã có kết quả) */}
+          {statusInfo.status === "completed" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 text-xs gap-1.5"
+              disabled={detectMutation.isPending}
+              onClick={() => {
+                const currentUnits = (doc?.units ?? []).filter(
+                  (u) => u.page === activePage,
+                );
+                void handleStartSpellCheck(
+                  currentUnits.map((u) => u.evidence_id),
+                );
+              }}
+            >
+              {detectMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin text-primary" />
+              ) : (
+                <Sparkles className="size-3.5 text-primary" />
+              )}
+              <span>Kiểm tra chính tả</span>
+            </Button>
+          )}
+
+          {/* Dropdown Tải xuống (Markdown, JSON, ZIP kèm ảnh, Tệp gốc) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                disabled={downloadingType !== null}
+              >
+                {downloadingType ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Download className="size-3.5" />
+                )}
+                <span>Tải xuống</span>
+                <ChevronDown className="size-3 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 text-xs">
+              <DropdownMenuItem
+                disabled={statusInfo.status !== "completed"}
+                onClick={() => void handleDownload("md")}
+              >
+                <span>Bản Markdown dẫn xuất (.md)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={statusInfo.status !== "completed"}
+                onClick={() => void handleDownload("json")}
+              >
+                <span>Bản JSON cấu trúc (.json)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={statusInfo.status !== "completed"}
+                onClick={() => void handleDownload("zip")}
+              >
+                <span>Gói ZIP kèm ảnh bóc tách (.zip)</span>
+              </DropdownMenuItem>
+              {isDocxFile && statusInfo.status === "completed" && (
+                <DropdownMenuItem onClick={() => void handleDownload("pdf")}>
+                  <span>Tệp PDF kết xuất từ Word (.pdf)</span>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => void handleDownload("raw")}>
+                <span>Tệp gốc tải lên ({source.file_name})</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Menu ⋯ gom toàn bộ tác vụ phụ: Dùng để biên soạn, Bóc tách lại, Tải phiên bản mới, Đổi tên, Lưu trữ, Xóa */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="size-9 p-0 text-muted-foreground hover:text-foreground"
+                aria-label="Thao tác tài liệu"
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52 text-xs">
+              {canCompile &&
+              statusInfo.status === "completed" &&
+              selectedRunId ? (
+                <DropdownMenuItem
+                  className="gap-2"
+                  onClick={() => setCompilationDialogOpen(true)}
+                >
+                  <ClipboardList className="size-3.5 text-primary" />
+                  <span>Dùng để biên soạn</span>
+                </DropdownMenuItem>
+              ) : null}
+
+              {statusInfo.status !== "unprocessed" &&
+              statusInfo.status !== "running" ? (
+                <DropdownMenuItem
+                  className="gap-2"
+                  onClick={() => setReRunConfirmOpen(true)}
+                >
+                  <RotateCcw className="size-3.5 text-muted-foreground" />
+                  <span>Bóc tách lại</span>
+                </DropdownMenuItem>
+              ) : null}
+
+              {(canCompile &&
+                statusInfo.status === "completed" &&
+                selectedRunId) ||
+              (statusInfo.status !== "unprocessed" &&
+                statusInfo.status !== "running") ? (
+                <DropdownMenuSeparator />
+              ) : null}
+
+              <DropdownMenuItem
+                className="gap-2"
+                onClick={() => setUploadRevisionOpen(true)}
+              >
+                <FilePlus2 className="size-3.5 text-muted-foreground" />
+                <span>Tải phiên bản mới</span>
+              </DropdownMenuItem>
+              {canManage && (
+                <DropdownMenuItem
+                  className="gap-2"
+                  onClick={() => setRenameSourceOpen(true)}
+                >
+                  <Pencil className="size-3.5 text-muted-foreground" />
+                  <span>Đổi tên tài liệu</span>
+                </DropdownMenuItem>
+              )}
+              {canLifecycleAction(role, "source", "archive") && (
+                <DropdownMenuItem
+                  className="gap-2"
+                  onClick={() => setLifecycleOp("archive")}
+                >
+                  <Archive className="size-3.5 text-muted-foreground" />
+                  <span>Lưu trữ tài liệu</span>
+                </DropdownMenuItem>
+              )}
+              {canLifecycleAction(role, "source", "delete") && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="gap-2 text-destructive focus:text-destructive"
+                    onClick={() => setLifecycleOp("delete")}
+                  >
+                    <Trash2 className="size-3.5" />
+                    <span>Xóa vĩnh viễn tài liệu</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      {/* Revision History Section */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">
-              Lịch sử phiên bản ({revisions.length})
-            </h2>
+      {/* Cảnh báo lỗi bóc tách nếu có */}
+      {activeRun && ["failed", "uncertain"].includes(activeRun.status) && (
+        <Alert variant="destructive" role="alert">
+          <AlertCircle className="size-4" />
+          <AlertTitle>Bóc tách chưa thành công</AlertTitle>
+          <AlertDescription className="text-xs mt-1">
+            {formatOcrError(activeRun.error_code, activeRun.error_detail)}
+            {activeRun.error_code && (
+              <span className="block font-mono text-xs mt-0.5">
+                Mã lỗi: {activeRun.error_code}
+              </span>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* 2. MÀN ĐỐI CHIẾU HAI CỘT: Cột trái: Bản gốc | Cột phải: Kết quả đúng trang */}
+      {activeRun ? (
+        <OcrComparisonView
+          workspaceId={workspaceId}
+          collectionId={collectionId}
+          sourceId={sourceId}
+          revisionId={activeRevisionId}
+          run={activeRun}
+          pages={activeRun.pages}
+          activePageNumber={activePage}
+          onPageChange={handlePageChange}
+          reviewDoc={doc}
+          isDocx={isDocxFile}
+          draftChanges={draftChanges}
+          onSaveDraftChange={(evidenceId, _before, after) => {
+            draft.update((prev) => {
+              const next = new Map(prev);
+              next.set(evidenceId, after);
+              return next;
+            });
+          }}
+          onStartSpellCheck={handleStartSpellCheck}
+        />
+      ) : (
+        /* Trạng thái chưa bóc tách: Giới thiệu & Kêu gọi bóc tách chủ động */
+        <Card className="rounded-xl border-dashed p-12 text-center space-y-4 bg-muted/10">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary mx-auto">
+            <Play className="size-7" />
+          </div>
+          <div className="space-y-1.5 max-w-md mx-auto">
+            <h3 className="text-base font-semibold text-foreground">
+              Tài liệu đã được lưu trữ an toàn
+            </h3>
             <p className="text-xs text-muted-foreground">
-              Tất cả các phiên bản tệp gốc được lưu trữ bất biến. Nhấn vào một phiên bản để xem hoặc xử lý OCR.
+              Tài liệu này chưa được bóc tách. Nhấn &ldquo;Bắt đầu bóc
+              tách&rdquo; để tự động trích xuất văn bản, cấu trúc bảng và ảnh
+              đối chiếu bằng phương pháp native-first.
             </p>
           </div>
-        </div>
+          <Button
+            size="sm"
+            className="gap-1.5 text-xs shadow-xs"
+            disabled={requestRunMutation.isPending}
+            onClick={() => void handleStartExtraction(false)}
+          >
+            {requestRunMutation.isPending ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Play className="size-3.5" />
+            )}
+            <span>Bắt đầu bóc tách ngay</span>
+          </Button>
+        </Card>
+      )}
 
-        {revisionsQuery.isLoading ? (
-          <Skeleton className="h-32 w-full" />
-        ) : revisionsQuery.isError ? (
-          <ErrorState
-            error={revisionsQuery.error}
-            onRetry={() => void revisionsQuery.refetch()}
-          />
-        ) : (
-          <Card className="rounded-xl shadow-2xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[12%]">Phiên bản</TableHead>
-                    <TableHead className="w-[28%]">Tên tệp</TableHead>
-                    <TableHead className="w-[12%]">Dung lượng</TableHead>
-                    <TableHead className="w-[20%]">SHA-256</TableHead>
-                    <TableHead className="w-[14%]">Người tải</TableHead>
-                    <TableHead className="w-[14%]">Thời điểm</TableHead>
-                    <TableHead className="w-[180px] text-right">
-                      Thao tác
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {revisions.map((rev) => {
-                    const isActive = activeRevision?.id === rev.id;
-                    const isDownloading = downloadingRevisionId === rev.id;
+      {/* 3. MODALS & DIALOGS */}
+      {/* Modal xác nhận Bóc tách lại */}
+      <Dialog open={reRunConfirmOpen} onOpenChange={setReRunConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold flex items-center gap-2">
+              <RotateCcw className="size-4 text-primary" />
+              <span>Xác nhận bóc tách lại</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Thao tác này sẽ tạo một lượt bóc tách mới (generation mới) cho
+              phiên bản tài liệu hiện hành. Kết quả và bằng chứng của các lượt
+              trước được bảo toàn bất biến trong lịch sử.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setReRunConfirmOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setReRunConfirmOpen(false);
+                void handleStartExtraction(true);
+              }}
+            >
+              Bắt đầu lượt mới
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-                    return (
-                      <TableRow
-                        key={rev.id}
-                        className={isActive ? "bg-muted/40 font-medium" : ""}
-                      >
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <Badge
-                              variant={isActive ? "default" : "outline"}
-                              className="font-mono text-xs"
-                            >
-                              v{rev.revision_no}
-                            </Badge>
-                            {rev.revision_no === source.current_revision_no ? (
-                              <span className="text-[10px] text-primary font-medium">
-                                (Mới nhất)
-                              </span>
-                            ) : null}
-                          </div>
-                        </TableCell>
+      {/* Modal Xác nhận Lưu thay đổi Hiệu đính */}
+      <Dialog open={saveModalOpen} onOpenChange={setSaveModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold flex items-center gap-2">
+              <Save className="size-4 text-primary" />
+              <span>Lưu phiên bản hiệu đính</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Bạn có {draftCount} thay đổi nháp đang chờ lưu. Hành động này sẽ
+              tạo một phiên bản hiệu đính mới trên máy chủ (v
+              {(doc?.version ?? 0) + 1}).
+            </DialogDescription>
+          </DialogHeader>
 
-                        <TableCell
-                          className="font-mono text-xs truncate max-w-[200px]"
-                          title={rev.file_name}
-                        >
-                          {rev.file_name}
-                        </TableCell>
+          <div className="max-h-48 overflow-y-auto space-y-2 p-3 bg-muted/20 rounded-lg border text-xs">
+            {Array.from(draftChanges.entries()).map(([evidence_id, after]) => {
+              const unit = doc?.units.find(
+                (u) => u.evidence_id === evidence_id,
+              );
+              return (
+                <div
+                  key={evidence_id}
+                  className="space-y-0.5 border-b pb-1.5 last:border-none"
+                >
+                  <span className="font-mono text-[10px] text-muted-foreground block">
+                    {evidence_id}
+                  </span>
+                  {unit ? (
+                    <p className="line-through text-destructive text-[11px] truncate">
+                      {unit.text}
+                    </p>
+                  ) : null}
+                  <p className="text-success text-[11px] truncate font-medium">
+                    {after}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
 
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {formatBytes(rev.size_bytes)}
-                        </TableCell>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSaveModalOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button
+              size="sm"
+              disabled={saveMutation.isPending}
+              onClick={() => void handleConfirmSave()}
+            >
+              {saveMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin mr-1" />
+              ) : null}
+              <span>Xác nhận lưu</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <span
-                              className="font-mono text-[11px] text-muted-foreground truncate max-w-[110px]"
-                              title={rev.sha256}
-                            >
-                              {rev.sha256.slice(0, 12)}...
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="size-6 p-0 text-muted-foreground hover:text-foreground"
-                              onClick={() => handleCopyHash(rev.sha256)}
-                              title="Sao chép SHA-256"
-                            >
-                              {copiedHash === rev.sha256 ? (
-                                <Check className="size-3 text-success" />
-                              ) : (
-                                <Copy className="size-3" />
-                              )}
-                            </Button>
-                          </div>
-                        </TableCell>
+      {/* Modal Kết quả Kiểm tra Chính tả */}
+      <Dialog open={spellCheckModalOpen} onOpenChange={setSpellCheckModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-4">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-sm font-semibold flex items-center gap-2">
+              <Sparkles className="size-4 text-primary" />
+              <span>Gợi ý sửa lỗi chính tả</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Rà soát các lỗi nghi ngờ sai chính tả theo mô hình AI. Bạn có thể
+              bấm Áp dụng hoặc Bỏ qua từng gợi ý.
+            </DialogDescription>
+          </DialogHeader>
 
-                        <TableCell className="font-mono text-xs text-muted-foreground truncate">
-                          {rev.created_by}
-                        </TableCell>
+          <div className="flex-1 overflow-y-auto py-2">
+            {doc && (
+              <SpellingResultPanel
+                workspaceId={workspaceId}
+                collectionId={collectionId}
+                sourceId={sourceId}
+                revisionId={activeRevisionId}
+                runId={selectedRunId ?? ""}
+                localCheck={localCheck}
+                doc={doc}
+                draftChanges={draftChanges}
+                canManage={canManage}
+                onApply={handleApplySuggestion}
+              />
+            )}
+          </div>
 
-                        <TableCell className="text-xs text-muted-foreground">
-                          {formatDateTimeValue(rev.created_at)}
-                        </TableCell>
+          <DialogFooter className="pt-2 border-t">
+            <Button size="sm" onClick={() => setSpellCheckModalOpen(false)}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="sm"
-                              variant={isActive ? "secondary" : "ghost"}
-                              className="h-7 px-2 text-xs gap-1"
-                              onClick={() => {
-                                setSelectedRevisionId(rev.id);
-                                onSearchChange?.({
-                                  revisionId: rev.id,
-                                });
-                              }}
-                              title="Chọn phiên bản này để xem trước"
-                            >
-                              <Eye className="size-3 text-muted-foreground" />
-                              <span className="hidden sm:inline">
-                                {isActive ? "Đang xem" : "Xem"}
-                              </span>
-                            </Button>
-
-                            <Button
-                              asChild
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 px-2 text-xs gap-1 text-primary hover:text-primary"
-                              title="Mở OCR với phiên bản này"
-                            >
-                              <Link
-                                to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId/ocr"
-                                params={{ workspaceId, collectionId, sourceId }}
-                                search={{ revisionId: rev.id }}
-                              >
-                                <Cpu className="size-3" />
-                                <span className="hidden sm:inline">OCR</span>
-                              </Link>
-                            </Button>
-
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 px-2 text-xs gap-1"
-                              disabled={isDownloading}
-                              onClick={() => handleDownload(rev)}
-                              title="Tải tệp gốc về máy tính"
-                            >
-                              {isDownloading ? (
-                                <Loader2 className="size-3 animate-spin" />
-                              ) : (
-                                <Download className="size-3" />
-                              )}
-                              <span className="hidden sm:inline">Tải</span>
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
-        )}
-      </div>
-
-      {/* Upload New Revision Dialog */}
+      {/* Modal Upload Phiên bản mới */}
       <RevisionUploadDialog
         open={uploadRevisionOpen}
         onOpenChange={setUploadRevisionOpen}
@@ -805,6 +1012,59 @@ export function SourceDetailPage({
         sourceId={sourceId}
         sourceTitle={source.title}
       />
+
+      {/* Modal Đổi tên Tài liệu */}
+      <SourceRenameDialog
+        open={renameSourceOpen}
+        onOpenChange={setRenameSourceOpen}
+        workspaceId={workspaceId}
+        collectionId={collectionId}
+        source={source}
+        onSuccess={() => void sourceQuery.refetch()}
+      />
+
+      {/* Compilation Dialog (để nối mượt sang Compiler) */}
+      {selectedRunId && (
+        <CompilationDialog
+          isOpen={compilationDialogOpen}
+          onClose={() => setCompilationDialogOpen(false)}
+          workspaceId={workspaceId}
+          collectionId={collectionId}
+          initialRun={{
+            runId: selectedRunId,
+            sourceId,
+            sourceTitle: source.title,
+            revisionId: activeRevisionId,
+            revisionNo: activeRevisionNo,
+            generation: activeRun?.generation ?? 1,
+          }}
+          onSuccess={(runId) => {
+            void navigate({
+              to: "/workspaces/$workspaceId/collections/$collectionId/compilations/$runId",
+              params: { workspaceId, collectionId, runId },
+            });
+          }}
+        />
+      )}
+
+      {/* Lifecycle Actions (Lưu trữ / Xóa) */}
+      {lifecycleOp && (
+        <LifecycleActionDialog
+          workspaceId={workspaceId}
+          target={{
+            kind: "source",
+            resource_id: source.id,
+            action: lifecycleOp,
+          }}
+          label={source.title}
+          onClose={() => setLifecycleOp(null)}
+          onCompleted={() => {
+            toast.success(lifecycleOp === "delete" ? "Đã xóa vĩnh viễn tài liệu." : "Đã lưu trữ tài liệu.");
+            void navigate({ to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
+              params: { workspaceId, knowledgeId: collectionId }, search: { page: 1, pageSize: 20 } });
+          }}
+        />
+      )}
     </div>
   );
 }

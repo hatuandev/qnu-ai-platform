@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ProcessingRunResponse } from "./ocr-types";
 
 /** Default upload ceiling in backendV1 (Settings.MAX_UPLOAD_BYTES). */
 export const MAX_UPLOAD_BYTES = 60 * 1024 * 1024; // 60 MiB
@@ -55,6 +56,88 @@ export function formatBytes(bytes: number): string {
 export function formatSourceStatus(status: string): string {
   if (status === "stored") return "Đã lưu tệp";
   return status;
+}
+
+export type ProcessingStatusDescriptor = {
+  label: string;
+  variant:
+    | "default"
+    | "secondary"
+    | "outline"
+    | "destructive"
+    | "warning"
+    | "success";
+  status:
+    | "unprocessed"
+    | "queued"
+    | "running"
+    | "completed"
+    | "failed"
+    | "uncertain";
+};
+
+export function formatProcessingStatus(
+  processing?: ProcessingRunResponse | null,
+): ProcessingStatusDescriptor {
+  if (!processing) {
+    return {
+      label: "Đã lưu · Chưa bóc tách",
+      variant: "secondary",
+      status: "unprocessed",
+    };
+  }
+
+  if (processing.status === "queued" || processing.dispatch_pending) {
+    return {
+      label: "Chờ xử lý",
+      variant: "outline",
+      status: "queued",
+    };
+  }
+
+  if (processing.status === "running") {
+    const pagesTotal = processing.pages_total;
+    const pagesDone = processing.pages_done ?? 0;
+    const label =
+      pagesTotal && pagesTotal > 0
+        ? `Đang bóc tách (${pagesDone}/${pagesTotal} trang)`
+        : "Đang bóc tách…";
+    return {
+      label,
+      variant: "default",
+      status: "running",
+    };
+  }
+
+  if (processing.status === "completed") {
+    return {
+      label: "Đã bóc tách",
+      variant: "success",
+      status: "completed",
+    };
+  }
+
+  if (processing.status === "failed") {
+    return {
+      label: "Xử lý lỗi",
+      variant: "destructive",
+      status: "failed",
+    };
+  }
+
+  if (processing.status === "uncertain") {
+    return {
+      label: "Chưa xác định kết quả",
+      variant: "warning",
+      status: "uncertain",
+    };
+  }
+
+  return {
+    label: "Đã lưu · Chưa bóc tách",
+    variant: "secondary",
+    status: "unprocessed",
+  };
 }
 
 export function isPdf(contentType?: string, fileName?: string): boolean {

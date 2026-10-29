@@ -384,3 +384,34 @@ async def read_page_image(
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+@router.get(
+    "/{run_id}/pdf",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}}},
+    summary="Tệp PDF kết xuất (render_pdf) từ DOCX của lượt xử lý",
+)
+async def read_rendered_pdf(
+    workspace_id: str,
+    collection_id: str,
+    source_id: str,
+    revision_id: str,
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+    blob_store: BlobStore = Depends(get_blob_store),
+) -> Response:
+    scope = await _scope(db, actor, workspace_id, collection_id, source_id, revision_id, READ_ROLES)
+    run = await processing_service.get_run(db, scope.workspace_id, scope.revision_id, run_id)
+    sha256, payload = await processing_service.read_rendered_pdf(db, blob_store, run)
+    return Response(
+        content=payload,
+        media_type="application/pdf",
+        headers={
+            "ETag": f'"{sha256}"',
+            "Content-Length": str(len(payload)),
+            "Content-Disposition": 'inline; filename="rendered.pdf"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

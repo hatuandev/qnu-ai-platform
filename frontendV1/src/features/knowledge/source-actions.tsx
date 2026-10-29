@@ -36,6 +36,7 @@ export function SourceActions({
   onRename,
   onMove,
   onOcr,
+  onLifecycle,
 }: {
   workspaceId: string;
   collectionId: string;
@@ -45,6 +46,7 @@ export function SourceActions({
   onRename: () => void;
   onMove: () => void;
   onOcr: () => void;
+  onLifecycle?: (operation: LifecycleOperation, source: KBSource) => void;
 }) {
   const navigate = useNavigate();
   const [operation, setOperation] = useState<LifecycleOperation | null>(null);
@@ -139,7 +141,7 @@ export function SourceActions({
             </>
           )}
           {canLifecycleAction(role, "source", "archive") && (
-            <DropdownMenuItem onSelect={() => setOperation("archive")}>
+            <DropdownMenuItem onSelect={() => onLifecycle ? onLifecycle("archive", source) : setOperation("archive")}>
               <Archive />
               Lưu trữ
             </DropdownMenuItem>
@@ -147,10 +149,10 @@ export function SourceActions({
           {canLifecycleAction(role, "source", "delete") && (
             <DropdownMenuItem
               className="text-destructive"
-              onSelect={() => setOperation("delete")}
+              onSelect={() => onLifecycle ? onLifecycle("delete", source) : setOperation("delete")}
             >
               <Trash2 />
-              Xóa
+              Xóa vĩnh viễn
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
@@ -161,6 +163,7 @@ export function SourceActions({
           target={{ kind: "source", resource_id: source.id, action: operation }}
           label={source.title}
           onClose={() => setOperation(null)}
+          onCompleted={() => { setOperation(null); toast.success(operation === "delete" ? "Đã xóa vĩnh viễn tài liệu." : "Đã lưu trữ tài liệu."); }}
         />
       )}
     </>

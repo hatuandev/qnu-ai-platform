@@ -75,7 +75,7 @@ class ProcessingService:
                 code="processing_unsupported_format",
             )
 
-        config = processing_config(get_settings())
+        config = processing_config(get_settings(), scope.extension)
         payload = config_payload(config)
         if provider_id:
             payload["provider_requested"] = provider_id
@@ -264,6 +264,12 @@ class ProcessingService:
     ) -> dict:
         _, payload = await self._require_artifact(db, blob_store, run, "manifest")
         return json.loads(payload)
+
+    async def read_rendered_pdf(
+        self, db: AsyncSession, blob_store: BlobStore, run: OcrProcessingRun
+    ) -> tuple[str, bytes]:
+        record, payload = await self._require_artifact(db, blob_store, run, "render_pdf", 0)
+        return record.sha256, payload
 
     async def read_page_image(
         self, db: AsyncSession, blob_store: BlobStore, run: OcrProcessingRun, page_number: int

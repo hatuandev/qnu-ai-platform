@@ -2,7 +2,6 @@ import {
   Award,
   BarChart3,
   Bell,
-  Boxes,
   Building2,
   CalendarClock,
   CheckCheck,
@@ -47,13 +46,6 @@ export const navigationGroups: NavGroup[] = [
         title: "Tổng quan",
         to: "/dashboard",
         icon: LayoutDashboard,
-        scope: "v1",
-      },
-      {
-        id: "workspaces",
-        title: "Workspaces",
-        to: "/workspaces",
-        icon: Boxes,
         scope: "v1",
       },
       {

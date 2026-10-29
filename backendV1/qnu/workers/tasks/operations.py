@@ -27,8 +27,10 @@ async def evidence_backup_delete(ctx: dict, backup_id: str, action_id: str) -> s
 
 
 async def operations_reconcile(ctx: dict) -> int:
+    from qnu.domains.lifecycle.purge import reconcile
+
     container, now = ctx["container"], utcnow()
-    cutoff, count = now - timedelta(seconds=execution.LEASE_SECONDS), 0
+    cutoff, count = now - timedelta(seconds=execution.LEASE_SECONDS), await reconcile(ctx)
     async with AsyncSessionFactory() as db:
         pending = list(
             (

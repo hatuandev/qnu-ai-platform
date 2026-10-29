@@ -75,7 +75,7 @@ services:
     container_name: qnu_gotenberg
     restart: unless-stopped
     ports:
-      - "3005:3000"
+      - "127.0.0.1:3005:3000"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:3000/health" ]
       interval: 10s

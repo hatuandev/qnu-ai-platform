@@ -7,6 +7,7 @@ description: >-
 # Hướng Dẫn Kiến Trúc & Quy Chuẩn Giao Diện Frontend QNU AI Platform
 
 Tài liệu này là cẩm nang bắt buộc cho mọi kỹ sư Frontend và AI Agent khi phát triển, chỉnh sửa và mở rộng giao diện người dùng trên nền tảng **`qnu-ai-platform`**.
+**Bắt buộc đọc kèm [Quy Chuẩn Thiết Kế & Vibe Giao Diện (`.agents/rules/ui-standards.md`)](../../rules/ui-standards.md)** để tuân thủ 6 quy tắc chống "Vibe UI lỗi" (Zero Button Sprawl, 1 Menu `⋯` duy nhất, Zero Box-in-Box, High Data-to-Ink Ratio, Document Sheet Canvas, và `<ViewModeToggle />`).
 
 ---
 

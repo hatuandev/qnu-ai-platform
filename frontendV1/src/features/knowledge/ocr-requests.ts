@@ -140,6 +140,27 @@ export async function readRunMarkdownBlob(
   );
 }
 
+export async function downloadRunBundleBlob(
+  client: V1Client,
+  workspaceId: string,
+  collectionId: string,
+  sourceId: string,
+  revisionId: string,
+  runId: string,
+  options?: V1RequestOptions,
+): Promise<BlobResponse> {
+  return client.requestBlob(
+    ocrPaths.bundle(workspaceId, collectionId, sourceId, revisionId, runId),
+    {
+      ...options,
+      headers: {
+        Accept: "application/zip",
+        ...options?.headers,
+      },
+    },
+  );
+}
+
 export async function readRunManifest(
   client: V1Client,
   workspaceId: string,
@@ -222,6 +243,33 @@ export async function readPageImageBlob(
       ...options,
       headers: {
         Accept: "image/png",
+        ...options?.headers,
+      },
+    },
+  );
+}
+
+export async function readRenderedPdfBlob(
+  client: V1Client,
+  workspaceId: string,
+  collectionId: string,
+  sourceId: string,
+  revisionId: string,
+  runId: string,
+  options?: V1RequestOptions,
+): Promise<BlobResponse> {
+  return client.requestBlob(
+    ocrPaths.renderedPdf(
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      runId,
+    ),
+    {
+      ...options,
+      headers: {
+        Accept: "application/pdf",
         ...options?.headers,
       },
     },

@@ -1,23 +1,24 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  Archive,
   ArrowLeft,
-  Bot,
+  ChevronDown,
   ChevronRight,
-  FileEdit,
   FileSpreadsheet,
   FileText,
   FileUp,
   Folder,
   FolderOpen,
   FolderPlus,
-  FolderTree,
   HardDrive,
-  MoreVertical,
+  Loader2,
   Pencil,
-  ScanLine,
-  ShieldCheck,
+  Play,
+  Settings2,
+  Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { DataTablePagination } from "@/components/admin/data-table/data-table-pagination";
 import { DebouncedSearchInput } from "@/components/admin/debounced-search-input";
 import { ErrorState } from "@/components/admin/error-state";
@@ -28,6 +29,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,6 +46,7 @@ import {
   ViewModeToggle,
 } from "@/components/ui/view-mode-toggle";
 import { CollectionFormDialog } from "@/features/knowledge/collection-form-dialog";
+import { ExtractDocumentDialog } from "@/features/knowledge/extract-document-dialog";
 import { FolderDeleteDialog } from "@/features/knowledge/folder-delete-dialog";
 import { FolderFormDialog } from "@/features/knowledge/folder-form-dialog";
 import { FolderMoveDialog } from "@/features/knowledge/folder-move-dialog";
@@ -56,20 +59,21 @@ import {
 } from "@/features/knowledge/queries";
 import {
   formatBytes,
-  formatSourceStatus,
+  formatProcessingStatus,
   isDocx,
   isPdf,
 } from "@/features/knowledge/schemas";
 import { SourceActions } from "@/features/knowledge/source-actions";
 import { SourceRenameDialog } from "@/features/knowledge/source-rename-dialog";
 import { SourceUploadDialog } from "@/features/knowledge/source-upload-dialog";
-import { StageOcrPanel } from "@/features/knowledge/stage-ocr-panel";
 import type {
   FolderBreadcrumbItem,
   KBFolder,
   KBSource,
 } from "@/features/knowledge/types";
-import { LifecycleActions } from "@/features/lifecycle/lifecycle-actions";
+import { LifecycleActionDialog } from "@/features/lifecycle/action-dialog";
+import { canLifecycleAction } from "@/features/lifecycle/permissions";
+import type { LifecycleOperation } from "@/features/lifecycle/types";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { formatDateTimeValue } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
@@ -87,11 +91,11 @@ export function KnowledgeDetailPage({
   page = 1,
   pageSize = 20,
   activeStage = "files",
-  selectedSourceId,
+  selectedSourceId: _selectedSourceId,
   onPageChange,
   onPageSizeChange,
-  onStageChange,
-  onSelectSourceId,
+  onStageChange: _onStageChange,
+  onSelectSourceId: _onSelectSourceId,
 }: {
   workspaceId: string;
   knowledgeId: string;
@@ -104,6 +108,8 @@ export function KnowledgeDetailPage({
   onStageChange?: (stage: KnowledgeStage) => void;
   onSelectSourceId?: (sourceId: string | null) => void;
 }) {
+  const navigate = useNavigate();
+
   // Queries
   const collectionQuery = useCollectionQuery(workspaceId, knowledgeId);
   const foldersQuery = useFoldersQuery(workspaceId, knowledgeId);
@@ -121,7 +127,14 @@ export function KnowledgeDetailPage({
 
   // Dialog States
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [extractDialogOpen, setExtractDialogOpen] = useState(false);
   const [editCollectionOpen, setEditCollectionOpen] = useState(false);
+  const [collectionLifecycleOp, setCollectionLifecycleOp] =
+    useState<LifecycleOperation | null>(null);
+  const [sourceLifecycle, setSourceLifecycle] = useState<{
+    source: KBSource; operation: LifecycleOperation;
+  } | null>(null);
+
   const [folderFormOpen, setFolderFormOpen] = useState(false);
   const [folderToEdit, setFolderToEdit] = useState<KBFolder | null>(null);
   const [folderParentForCreate, setFolderParentForCreate] = useState<{
@@ -240,7 +253,7 @@ export function KnowledgeDetailPage({
 
   return (
     <div className="min-w-0 space-y-6">
-      {/* 1. Header with Breadcrumb & Quick Actions */}
+      {/* 1. Header with Breadcrumb, Name & Action Toolbar: Tải tài liệu · Bóc tách · Quản lý */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -274,26 +287,9 @@ export function KnowledgeDetailPage({
           )}
         </div>
 
-        {/* Top Actions */}
+        {/* Thanh thao tác chính: Tải tài liệu · Bóc tách · Quản lý */}
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 text-xs h-9"
-            disabled={!canManage || foldersQuery.isError}
-            onClick={() => {
-              setFolderToEdit(null);
-              setFolderParentForCreate({
-                id: currentFolderId,
-                name: currentFolder?.name ?? "Gốc kho tri thức",
-              });
-              setFolderFormOpen(true);
-            }}
-          >
-            <FolderPlus className="size-4 text-muted-foreground" />
-            <span>Tạo thư mục</span>
-          </Button>
-
+          {/* Nút 1: Tải tài liệu */}
           <Button
             size="sm"
             className="gap-1.5 text-xs h-9 shadow-xs"
@@ -304,222 +300,100 @@ export function KnowledgeDetailPage({
             <span>Tải tài liệu</span>
           </Button>
 
+          {/* Nút 2: Bóc tách */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 text-xs h-9"
+            disabled={!canManage || collection.source_count === 0}
+            onClick={() => setExtractDialogOpen(true)}
+          >
+            <Play className="size-3.5 text-primary" />
+            <span>Bóc tách</span>
+          </Button>
+
+          {/* Nút 3: Quản lý (Gộp menu Sửa kho, Tạo thư mục, Lưu trữ, Xóa kho) */}
           {canManage && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  aria-label="Sửa thông tin kho"
-                  className="size-9 p-0 text-muted-foreground"
+                  className="gap-1.5 text-xs h-9 text-muted-foreground hover:text-foreground"
                 >
-                  <MoreVertical className="size-4" />
+                  <Settings2 className="size-3.5" />
+                  <span>Quản lý</span>
+                  <ChevronDown className="size-3 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 text-xs">
+              <DropdownMenuContent align="end" className="w-52 text-xs">
                 <DropdownMenuItem
                   className="gap-2"
                   onClick={() => setEditCollectionOpen(true)}
                 >
-                  <Pencil className="size-3.5" />
+                  <Pencil className="size-3.5 text-muted-foreground" />
                   <span>Sửa thông tin kho</span>
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="gap-2"
+                  onClick={() => {
+                    setFolderToEdit(null);
+                    setFolderParentForCreate({
+                      id: currentFolderId,
+                      name: currentFolder?.name ?? "Gốc kho tri thức",
+                    });
+                    setFolderFormOpen(true);
+                  }}
+                >
+                  <FolderPlus className="size-3.5 text-muted-foreground" />
+                  <span>Tạo thư mục mới</span>
+                </DropdownMenuItem>
+
+                {canLifecycleAction(role, "collection", "archive") && (
+                  <DropdownMenuItem
+                    className="gap-2"
+                    onClick={() => setCollectionLifecycleOp("archive")}
+                  >
+                    <Archive className="size-3.5 text-muted-foreground" />
+                    <span>Lưu trữ kho</span>
+                  </DropdownMenuItem>
+                )}
+
+                {canLifecycleAction(role, "collection", "delete") && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="gap-2 text-destructive focus:text-destructive"
+                      onClick={() => setCollectionLifecycleOp("delete")}
+                    >
+                      <Trash2 className="size-3.5" />
+                      <span>Xóa kho tri thức</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <LifecycleActions
-            workspaceId={workspaceId}
-            kind="collection"
-            resourceId={collection.id}
-            label={collection.name}
-            role={role}
-          />
+
+          {collectionLifecycleOp && (
+            <LifecycleActionDialog
+              workspaceId={workspaceId}
+              target={{
+                kind: "collection",
+                resource_id: collection.id,
+                action: collectionLifecycleOp,
+              }}
+              label={collection.name}
+              onClose={() => setCollectionLifecycleOp(null)}
+            />
+          )}
         </div>
       </div>
 
-      {/* 2. Pipeline Stepper (Thanh tiến trình 5 Chặng quy trình) */}
-      <div className="rounded-xl border bg-muted/20 p-2 sm:p-3">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-          {/* Chặng 1: Tài liệu & Thư mục (ACTIVE) */}
-          <Button
-            variant="ghost"
-            onClick={() => onStageChange?.("files")}
-            className={cn(
-              "h-auto whitespace-normal justify-start flex items-center gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer",
-              activeStage === "files"
-                ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                : "bg-card hover:bg-muted/50 border-border/80 text-foreground",
-            )}
-          >
-            <div
-              className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                activeStage === "files"
-                  ? "bg-primary-foreground/20 text-primary-foreground"
-                  : "bg-primary/10 text-primary",
-              )}
-            >
-              <FolderTree className="size-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold whitespace-normal">
-                  1. Tài liệu & Thư mục
-                </span>
-                <span
-                  className={cn(
-                    "text-[10px] px-1.5 py-0.2 rounded-full font-mono",
-                    activeStage === "files"
-                      ? "bg-primary-foreground/20 text-primary-foreground"
-                      : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {collection.source_count}
-                </span>
-              </div>
-              <p
-                className={cn(
-                  "text-[10px] truncate mt-0.5",
-                  activeStage === "files"
-                    ? "text-primary-foreground/80"
-                    : "text-muted-foreground",
-                )}
-              >
-                Quản lý tệp & cây thư mục
-              </p>
-            </div>
-          </Button>
-
-          {/* Chặng 2: OCR & Hiệu đính */}
-          <Button
-            variant="ghost"
-            onClick={() => onStageChange?.("ocr")}
-            className={cn(
-              "h-auto whitespace-normal justify-start flex items-center gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer",
-              activeStage === "ocr"
-                ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                : "bg-card hover:bg-muted/50 border-border/80 text-foreground",
-            )}
-          >
-            <div
-              className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                activeStage === "ocr"
-                  ? "bg-primary-foreground/20 text-primary-foreground"
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
-              <ScanLine className="size-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="text-xs font-semibold whitespace-normal block">
-                2. OCR & Hiệu đính
-              </span>
-              <p className="text-[10px] text-muted-foreground truncate mt-0.5">
-                Bóc tách & chính tả AI
-              </p>
-            </div>
-          </Button>
-
-          {/* Chặng 3: Biên soạn (Compiler) */}
-          <Button
-            variant="ghost"
-            onClick={() => onStageChange?.("compiler")}
-            className={cn(
-              "h-auto whitespace-normal justify-start flex items-center gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer",
-              activeStage === "compiler"
-                ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                : "bg-card hover:bg-muted/50 border-border/80 text-foreground",
-            )}
-          >
-            <div
-              className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                activeStage === "compiler"
-                  ? "bg-primary-foreground/20 text-primary-foreground"
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
-              <FileEdit className="size-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="text-xs font-semibold whitespace-normal block">
-                3. Biên soạn
-              </span>
-              <p className="text-[10px] text-muted-foreground truncate mt-0.5">
-                Compiler ghim dẫn chứng
-              </p>
-            </div>
-          </Button>
-
-          {/* Chặng 4: Rà soát & Xuất bản */}
-          <Button
-            variant="ghost"
-            onClick={() => onStageChange?.("publication")}
-            className={cn(
-              "h-auto whitespace-normal justify-start flex items-center gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer",
-              activeStage === "publication"
-                ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                : "bg-card hover:bg-muted/50 border-border/80 text-foreground",
-            )}
-          >
-            <div
-              className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                activeStage === "publication"
-                  ? "bg-primary-foreground/20 text-primary-foreground"
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
-              <ShieldCheck className="size-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="text-xs font-semibold whitespace-normal block">
-                4. Xuất bản
-              </span>
-              <p className="text-[10px] text-muted-foreground truncate mt-0.5">
-                Cổng rà soát Review Gate
-              </p>
-            </div>
-          </Button>
-
-          {/* Chặng 5: Đánh chỉ mục & Phục vụ AI */}
-          <Button
-            variant="ghost"
-            onClick={() => onStageChange?.("serving")}
-            className={cn(
-              "flex items-center gap-2.5 p-2.5 rounded-lg border text-left transition-all cursor-pointer col-span-2 md:col-span-1",
-              activeStage === "serving"
-                ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                : "bg-card hover:bg-muted/50 border-border/80 text-foreground",
-            )}
-          >
-            <div
-              className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                activeStage === "serving"
-                  ? "bg-primary-foreground/20 text-primary-foreground"
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
-              <Bot className="size-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="text-xs font-semibold whitespace-normal block">
-                5. Phục vụ AI
-              </span>
-              <p className="text-[10px] text-muted-foreground truncate mt-0.5">
-                Chỉ mục Qdrant & Chat
-              </p>
-            </div>
-          </Button>
-        </div>
-      </div>
-
-      {/* 3. CHẶNG 1: FILE EXPLORER HIỆN ĐẠI (Cột trái: Cây thư mục | Vùng phải: Tệp & Thư mục con) */}
+      {/* 2. KHU VỰC QUẢN LÝ TÀI LIỆU (Cột trái: Cây thư mục | Vùng phải: Danh sách tệp) */}
       {activeStage === "files" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-[540px]">
-          {/* CỘT TRÁI (3 cols): Cây thư mục (Windows 11 Explorer Sidebar) */}
+          {/* CỘT TRÁI (3 cols): Cây thư mục */}
           <div className="lg:col-span-3">
             <FolderTreePanel
               folders={folders}
@@ -566,11 +440,11 @@ export function KnowledgeDetailPage({
             />
           </div>
 
-          {/* VÙNG PHẢI (9 cols): Quản lý tệp và thư mục con */}
+          {/* VÙNG PHẢI (9 cols): Danh sách tài liệu */}
           <div className="lg:col-span-9 space-y-4">
-            {/* Breadcrumb đường dẫn thư mục hiện tại & Công cụ */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border bg-card p-3 shadow-2xs">
-              {/* Breadcrumb */}
+            {/* Toolbar phẳng: Breadcrumb đường dẫn thư mục hiện tại, Tìm kiếm & Chế độ xem */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-border/60">
+              {/* Breadcrumb đường dẫn thư mục */}
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
                 <button
                   type="button"
@@ -625,12 +499,12 @@ export function KnowledgeDetailPage({
 
               {/* Tìm kiếm & Chuyển chế độ xem */}
               <div className="flex items-center gap-2">
-                <div className="w-full sm:w-56">
+                <div className="w-full sm:w-64">
                   <DebouncedSearchInput
                     value={searchQuery}
                     onChange={setSearchQuery}
-                    placeholder="Tìm trong trang này..."
-                    className="text-xs h-8"
+                    placeholder="Tìm tài liệu..."
+                    className="text-xs h-9"
                   />
                 </div>
 
@@ -644,7 +518,8 @@ export function KnowledgeDetailPage({
                 onRetry={() => void foldersQuery.refetch()}
               />
             )}
-            {/* Danh sách Thư mục con (nếu có trong thư mục hiện tại) */}
+
+            {/* Danh sách Thư mục con (nếu có) */}
             {!allFoldersActive && directSubfolders.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -700,13 +575,13 @@ export function KnowledgeDetailPage({
                 <div className="space-y-1">
                   <p className="text-sm font-semibold text-foreground">
                     {searchQuery
-                      ? "Không tìm thấy tệp phù hợp"
+                      ? "Không tìm thấy tài liệu phù hợp"
                       : "Chưa có tài liệu nào trong thư mục này"}
                   </p>
                   <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                     {searchQuery
                       ? "Hãy thử tìm kiếm với từ khóa khác."
-                      : "Tải tài liệu PDF hoặc DOCX lên để bắt đầu quy trình bóc tách và huấn luyện trợ lý AI."}
+                      : "Tải tài liệu PDF hoặc Word (.docx) vào kho để lưu trữ an toàn và bóc tách nội dung."}
                   </p>
                 </div>
                 {canManage && !searchQuery && (
@@ -722,17 +597,19 @@ export function KnowledgeDetailPage({
               </div>
             ) : viewMode === "grid" ? (
               /* Chế độ Grid Card */
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
                 {sources.map((s) => {
                   const pdf = isPdf(s.content_type, s.file_name);
                   const docx = isDocx(s.content_type, s.file_name);
+                  const formatLabel = pdf ? "PDF" : docx ? "DOCX" : "XLSX";
+                  const statusInfo = formatProcessingStatus(s.processing);
 
                   return (
                     <Card
                       key={s.id}
-                      className="p-3.5 rounded-xl border-border/80 hover:border-primary/60 hover:bg-muted/10 transition-all cursor-pointer group shadow-2xs relative flex flex-col justify-between"
+                      className="p-4 rounded-xl border-border/70 hover:border-primary/40 hover:shadow-xs transition-all group relative flex flex-col justify-between"
                     >
-                      <div className="space-y-2">
+                      <div className="space-y-2.5">
                         <div className="flex items-start gap-2.5">
                           <div
                             className={cn(
@@ -744,9 +621,7 @@ export function KnowledgeDetailPage({
                                   : "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800",
                             )}
                           >
-                            {pdf ? (
-                              <FileText className="size-4" />
-                            ) : docx ? (
+                            {pdf || docx ? (
                               <FileText className="size-4" />
                             ) : (
                               <FileSpreadsheet className="size-4" />
@@ -762,12 +637,19 @@ export function KnowledgeDetailPage({
                                   collectionId: knowledgeId,
                                   sourceId: s.id,
                                 }}
+                                title={s.title}
                               >
                                 {s.title}
                               </Link>
                             </h4>
-                            <p className="text-[11px] text-muted-foreground truncate font-mono">
-                              {s.file_name}
+                            <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                              <span className="font-mono">{formatLabel}</span>
+                              <span> · </span>
+                              <span className="font-mono">
+                                v{s.current_revision_no}
+                              </span>
+                              <span> · </span>
+                              <span>{formatBytes(s.size_bytes)}</span>
                             </p>
                           </div>
 
@@ -775,11 +657,18 @@ export function KnowledgeDetailPage({
                             workspaceId={workspaceId}
                             collectionId={knowledgeId}
                             source={s}
+                            onLifecycle={(operation, source) => setSourceLifecycle({ source, operation })}
                             role={role}
                             canManage={canManage}
                             onOcr={() => {
-                              onSelectSourceId?.(s.id);
-                              onStageChange?.("ocr");
+                              void navigate({
+                                to: "/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId",
+                                params: {
+                                  workspaceId,
+                                  collectionId: knowledgeId,
+                                  sourceId: s.id,
+                                },
+                              });
                             }}
                             onRename={() => {
                               setSourceToRename(s);
@@ -796,22 +685,38 @@ export function KnowledgeDetailPage({
                             }}
                           />
                         </div>
+                      </div>
 
-                        {/* Thông tin phụ: Size, Revision, Trạng thái */}
-                        <div className="flex items-center gap-1.5 flex-wrap pt-1 text-[11px] text-muted-foreground">
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] py-0 px-1 font-mono font-normal"
-                          >
-                            v{s.current_revision_no}
-                          </Badge>
-                          <span>·</span>
-                          <span>{formatBytes(s.size_bytes)}</span>
-                          <span>·</span>
-                          <span className="truncate">
-                            {formatDateTimeValue(s.updated_at || s.created_at)}
+                      {/* Footer card thanh lịch: Trạng thái & Link điều hướng gọn */}
+                      <div className="pt-3 mt-3 border-t border-border/50 flex items-center justify-between gap-2 text-[11px]">
+                        <Badge
+                          variant={statusInfo.variant}
+                          className="text-[10px] py-0 px-1.5 font-normal truncate max-w-[65%]"
+                        >
+                          {statusInfo.status === "running" ? (
+                            <Loader2 className="size-3 animate-spin mr-1 inline" />
+                          ) : null}
+                          {statusInfo.label}
+                        </Badge>
+
+                        <Link
+                          to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
+                          params={{
+                            workspaceId,
+                            collectionId: knowledgeId,
+                            sourceId: s.id,
+                          }}
+                          className="flex items-center gap-0.5 text-primary font-medium hover:underline shrink-0"
+                        >
+                          <span>
+                            {statusInfo.status === "completed"
+                              ? "Đối chiếu"
+                              : statusInfo.status === "running"
+                                ? "Theo dõi"
+                                : "Chi tiết"}
                           </span>
-                        </div>
+                          <ChevronRight className="size-3" />
+                        </Link>
                       </div>
                     </Card>
                   );
@@ -819,51 +724,61 @@ export function KnowledgeDetailPage({
               </div>
             ) : (
               /* Chế độ Bảng Table */
-              <Card className="rounded-xl border overflow-hidden">
+              <Card className="rounded-xl shadow-2xs border-border/70 overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Tên tài liệu</TableHead>
-                      <TableHead>Định dạng</TableHead>
-                      <TableHead>Kích thước</TableHead>
-                      <TableHead>Phiên bản</TableHead>
-                      <TableHead>Trạng thái</TableHead>
-                      <TableHead>Cập nhật</TableHead>
-                      <TableHead className="text-right">Thao tác</TableHead>
+                    <TableRow className="bg-muted/40">
+                      <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                        Tên tài liệu
+                      </TableHead>
+                      <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                        Định dạng
+                      </TableHead>
+                      <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                        Kích thước
+                      </TableHead>
+                      <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                        Phiên bản
+                      </TableHead>
+                      <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                        Trạng thái bóc tách
+                      </TableHead>
+                      <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                        Cập nhật
+                      </TableHead>
+                      <TableHead className="w-[60px] text-right font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sources.map((s) => {
                       const pdf = isPdf(s.content_type, s.file_name);
                       const docx = isDocx(s.content_type, s.file_name);
+                      const statusInfo = formatProcessingStatus(s.processing);
 
                       return (
                         <TableRow
                           key={s.id}
-                          className="cursor-pointer hover:bg-muted/40"
+                          className="group hover:bg-muted/40"
                         >
-                          <TableCell className="font-semibold text-xs text-foreground max-w-xs truncate">
-                            <div className="flex items-center gap-2">
+                          <TableCell className="font-medium text-xs text-foreground max-w-xs truncate">
+                            <Link
+                              to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
+                              params={{
+                                workspaceId,
+                                collectionId: knowledgeId,
+                                sourceId: s.id,
+                              }}
+                              className="flex items-center gap-2 hover:text-primary transition-colors"
+                            >
                               {pdf ? (
-                                <FileText className="size-3.5 text-rose-500 shrink-0" />
+                                <FileText className="size-4 text-rose-500 shrink-0" />
                               ) : docx ? (
-                                <FileText className="size-3.5 text-blue-500 shrink-0" />
+                                <FileText className="size-4 text-blue-500 shrink-0" />
                               ) : (
-                                <FileSpreadsheet className="size-3.5 text-emerald-500 shrink-0" />
+                                <FileSpreadsheet className="size-4 text-emerald-500 shrink-0" />
                               )}
-                              <span className="truncate">
-                                <Link
-                                  to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
-                                  params={{
-                                    workspaceId,
-                                    collectionId: knowledgeId,
-                                    sourceId: s.id,
-                                  }}
-                                >
-                                  {s.title}
-                                </Link>
-                              </span>
-                            </div>
+                              <span className="truncate">{s.title}</span>
+                            </Link>
                           </TableCell>
                           <TableCell className="text-xs uppercase text-muted-foreground font-mono">
                             {pdf ? "PDF" : docx ? "DOCX" : "XLSX"}
@@ -875,8 +790,14 @@ export function KnowledgeDetailPage({
                             v{s.current_revision_no}
                           </TableCell>
                           <TableCell className="text-xs">
-                            <Badge variant="outline" className="text-[10px]">
-                              {formatSourceStatus(s.status)}
+                            <Badge
+                              variant={statusInfo.variant}
+                              className="text-[10px] font-normal"
+                            >
+                              {statusInfo.status === "running" ? (
+                                <Loader2 className="size-3 animate-spin mr-1 inline" />
+                              ) : null}
+                              {statusInfo.label}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
@@ -887,11 +808,18 @@ export function KnowledgeDetailPage({
                               workspaceId={workspaceId}
                               collectionId={knowledgeId}
                               source={s}
+                              onLifecycle={(operation, source) => setSourceLifecycle({ source, operation })}
                               role={role}
                               canManage={canManage}
                               onOcr={() => {
-                                onSelectSourceId?.(s.id);
-                                onStageChange?.("ocr");
+                                void navigate({
+                                  to: "/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId",
+                                  params: {
+                                    workspaceId,
+                                    collectionId: knowledgeId,
+                                    sourceId: s.id,
+                                  },
+                                });
                               }}
                               onRename={() => {
                                 setSourceToRename(s);
@@ -931,32 +859,9 @@ export function KnowledgeDetailPage({
         </div>
       )}
 
-      {/* CHẶNG 2: BÓC TÁCH OCR & HIỆU ĐÍNH VĂN BẢN */}
-      {activeStage === "ocr" && (
-        <StageOcrPanel
-          workspaceId={workspaceId}
-          collectionId={knowledgeId}
-          canManage={canManage}
-          selectedSourceId={selectedSourceId}
-          onSelectSourceId={onSelectSourceId}
-          onProceedToCompiler={() => onStageChange?.("compiler")}
-        />
-      )}
-
-      {/* CHẶNG 3: BIÊN SOẠN TRI THỨC (COMPILER) */}
+      {/* Legacy Stages Fallback (đáp ứng điều hướng link /compilations, /documents, /search) */}
       {activeStage === "compiler" && (
         <div className="rounded-xl border border-dashed p-12 text-center space-y-3 bg-muted/10">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mx-auto">
-            <FileEdit className="size-6" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-semibold text-foreground">
-              Chặng 3: Biên soạn tri thức (Compiler)
-            </h3>
-            <p className="text-xs text-muted-foreground max-w-md mx-auto">
-              Chọn kết quả OCR đã hiệu đính để tạo và theo dõi lượt biên soạn.
-            </p>
-          </div>
           <Button asChild size="sm">
             <Link
               to="/workspaces/$workspaceId/collections/$collectionId/compilations"
@@ -969,21 +874,8 @@ export function KnowledgeDetailPage({
         </div>
       )}
 
-      {/* CHẶNG 4: RÀ SOÁT & XUẤT BẢN */}
       {activeStage === "publication" && (
         <div className="rounded-xl border border-dashed p-12 text-center space-y-3 bg-muted/10">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mx-auto">
-            <ShieldCheck className="size-6" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-semibold text-foreground">
-              Chặng 4: Cổng rà soát & Xuất bản (Review Gate)
-            </h3>
-            <p className="text-xs text-muted-foreground max-w-md mx-auto">
-              Kiểm duyệt phiên bản tài liệu, đối chiếu tính toàn vẹn và cấp phép
-              xuất bản tri thức cho đơn vị.
-            </p>
-          </div>
           <Button asChild size="sm">
             <Link
               to="/workspaces/$workspaceId/collections/$collectionId/documents"
@@ -996,34 +888,21 @@ export function KnowledgeDetailPage({
         </div>
       )}
 
-      {/* CHẶNG 5: ĐÁNH CHỈ MỤC & PHỤC VỤ AI */}
       {activeStage === "serving" && (
         <div className="rounded-xl border border-dashed p-12 text-center space-y-3 bg-muted/10">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mx-auto">
-            <Bot className="size-6" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-semibold text-foreground">
-              Chặng 5: Đánh chỉ mục Qdrant & Phục vụ Trợ lý AI
-            </h3>
-            <p className="text-xs text-muted-foreground max-w-md mx-auto">
-              Vector hóa dữ liệu tri thức, theo dõi trạng thái đồng bộ vector
-              database và kiểm thử truy vấn RAG.
-            </p>
-          </div>
           <Button asChild size="sm">
             <Link
               to="/workspaces/$workspaceId/collections/$collectionId/search"
               params={{ workspaceId, collectionId: knowledgeId }}
               search={{ page: 1, pageSize: 20 }}
             >
-              Mở chỉ mục & tìm kiếm
+              Mở phục vụ AI
             </Link>
           </Button>
         </div>
       )}
 
-      {/* 4. MODALS & DIALOGS */}
+      {/* 3. MODALS & DIALOGS */}
       {/* Upload Dialog: Nhận diện đúng kho và thư mục đang chọn */}
       <SourceUploadDialog
         open={uploadOpen}
@@ -1036,6 +915,30 @@ export function KnowledgeDetailPage({
           void collectionQuery.refetch();
         }}
       />
+      {sourceLifecycle ? (
+        <LifecycleActionDialog
+          workspaceId={workspaceId}
+          target={{ kind: "source", resource_id: sourceLifecycle.source.id, action: sourceLifecycle.operation }}
+          label={sourceLifecycle.source.title}
+          onClose={() => setSourceLifecycle(null)}
+          onCompleted={() => {
+            toast.success(sourceLifecycle.operation === "delete" ? "Đã xóa vĩnh viễn tài liệu." : "Đã lưu trữ tài liệu.");
+            setSourceLifecycle(null);
+            void sourcesQuery.refetch();
+            void collectionQuery.refetch();
+          }}
+        />
+      ) : null}
+
+      {/* Quick Extract Dialog */}
+      {extractDialogOpen && (
+        <ExtractDocumentDialog
+          open={extractDialogOpen}
+          onOpenChange={setExtractDialogOpen}
+          workspaceId={workspaceId}
+          collectionId={knowledgeId}
+        />
+      )}
 
       {/* Tạo / Sửa Thư mục */}
       <FolderFormDialog
@@ -1048,11 +951,26 @@ export function KnowledgeDetailPage({
         folderToEdit={folderToEdit}
         onSuccess={() => {
           void foldersQuery.refetch();
+        }}
+      />
+
+      {/* Xóa Thư mục */}
+      <FolderDeleteDialog
+        open={folderDeleteOpen}
+        onOpenChange={setFolderDeleteOpen}
+        workspaceId={workspaceId}
+        collectionId={knowledgeId}
+        folder={folderToDelete}
+        onSuccess={() => {
+          if (folderToDelete?.id === currentFolderId) {
+            setCurrentFolderId(null);
+          }
+          void foldersQuery.refetch();
           void sourcesQuery.refetch();
         }}
       />
 
-      {/* Di chuyển Thư mục / Tệp */}
+      {/* Di chuyển Tệp hoặc Thư mục */}
       {itemToMove && (
         <FolderMoveDialog
           open={moveDialogOpen}
@@ -1069,30 +987,9 @@ export function KnowledgeDetailPage({
           onSuccess={() => {
             void foldersQuery.refetch();
             void sourcesQuery.refetch();
-            setItemToMove(null);
           }}
         />
       )}
-
-      {/* Xóa Thư mục (có kiểm tra tác động an toàn) */}
-      <FolderDeleteDialog
-        open={folderDeleteOpen}
-        onOpenChange={(open) => {
-          setFolderDeleteOpen(open);
-          if (!open) setFolderToDelete(null);
-        }}
-        workspaceId={workspaceId}
-        collectionId={knowledgeId}
-        folder={folderToDelete}
-        onSuccess={() => {
-          void foldersQuery.refetch();
-          void sourcesQuery.refetch();
-          if (folderToDelete && currentFolderId === folderToDelete.id) {
-            setCurrentFolderId(null);
-          }
-          setFolderToDelete(null);
-        }}
-      />
 
       {/* Đổi tên Tệp */}
       <SourceRenameDialog
@@ -1106,11 +1003,10 @@ export function KnowledgeDetailPage({
         source={sourceToRename}
         onSuccess={() => {
           void sourcesQuery.refetch();
-          setSourceToRename(null);
         }}
       />
 
-      {/* Sửa thông tin Kho */}
+      {/* Sửa Thông tin Kho */}
       <CollectionFormDialog
         open={editCollectionOpen}
         onOpenChange={setEditCollectionOpen}

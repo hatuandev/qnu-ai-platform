@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { isV1Route } from "@/app/api/v1/endpoints";
 import { TemplateNotice } from "@/components/admin/template-notice";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { WorkspaceCanonicalLink } from "@/features/workspaces/workspace-link-bridge";
 import { AppSidebar } from "@/layouts/app-sidebar";
 import { CommandMenu } from "@/layouts/command-menu";
 import { QnuCommandMenu } from "@/layouts/qnu-command-menu";
@@ -27,6 +28,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <FeatureScopeProvider>
+      {isQnuV1 && <WorkspaceCanonicalLink />}
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>

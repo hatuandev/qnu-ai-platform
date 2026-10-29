@@ -3,6 +3,8 @@
  * Matches backend schemas in backendV1/qnu/domains/knowledge.
  */
 
+import type { ProcessingRunResponse } from "./ocr-types";
+
 export interface KBCollection {
   id: string;
   workspace_id: string;
@@ -32,6 +34,8 @@ export interface KBSource {
   created_by: string;
   created_at: string;
   updated_at: string;
+  /** Active or latest OCR processing run info if present */
+  processing?: ProcessingRunResponse | null;
 }
 
 export interface KBFolder {

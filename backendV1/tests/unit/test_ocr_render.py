@@ -16,6 +16,8 @@ from qnu.domains.ocr.artifacts.render import render_document
 from qnu.domains.ocr.config import ProcessingConfig
 from qnu.platform.errors import AppException
 
+pytestmark = pytest.mark.usefixtures("offline_document_conversion")
+
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 CONFIG = ProcessingConfig(
     dpi=144,
@@ -78,7 +80,7 @@ def test_a_page_without_ink_is_blank_and_keeps_zero_ratio() -> None:
 
 def test_docx_is_paginated_into_a_stored_fixed_layout_pdf() -> None:
     body = (
-        "<w:p><w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr>"
+        '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
         "<w:r><w:t>PHỤ LỤC 01</w:t></w:r></w:p>"
         "<w:p><w:r><w:t>Chỉ tiêu tuyển sinh năm 2023</w:t></w:r></w:p>"
     )
@@ -103,6 +105,68 @@ def test_docx_table_is_rendered_without_losing_rows() -> None:
     rendered = render_document(_docx(f"<w:tbl>{rows}</w:tbl>"), ".docx", CONFIG)
     assert len(rendered.pages) >= 1
     assert rendered.pages[0].blank is False
+
+
+def test_docx_converted_with_gotenberg_when_available(monkeypatch) -> None:
+    from dataclasses import replace
+
+    fake_pdf = _pdf(["Gotenberg page 1", "Gotenberg page 2"])
+    called_urls = []
+
+    class FakeResponse:
+        status_code = 200
+        content = fake_pdf
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def post(self, *args, **kwargs):
+            called_urls.append(args[0])
+            return FakeResponse()
+
+    import httpx
+
+    monkeypatch.setattr(httpx, "Client", FakeClient)
+    pinned = replace(
+        CONFIG,
+        docx_converter="gotenberg-libreoffice",
+        gotenberg_url="http://converter.test:3000",
+        pin_renderer=True,
+    )
+    rendered = render_document(b"PK\x03\x04fake-docx", ".docx", pinned)
+    assert rendered.renderer["name"] == "gotenberg"
+    assert rendered.renderer["converter"] == "gotenberg-libreoffice"
+    assert len(rendered.pages) == 2
+    assert rendered.fixed_layout_pdf == fake_pdf
+    assert called_urls == ["http://converter.test:3000/forms/libreoffice/convert"]
+
+
+def test_gotenberg_connection_failure_does_not_switch_to_story(monkeypatch) -> None:
+    from dataclasses import replace
+    from unittest.mock import MagicMock
+
+    import httpx
+
+    client = MagicMock()
+    client.__enter__.return_value = client
+    client.post.side_effect = httpx.ConnectError("converter offline")
+    monkeypatch.setattr(httpx, "Client", lambda **kwargs: client)
+    pinned = replace(
+        CONFIG,
+        docx_converter="gotenberg-libreoffice",
+        gotenberg_url="http://converter.test:3000",
+        pin_renderer=True,
+    )
+    with pytest.raises(AppException) as caught:
+        render_document(b"invalid-docx-must-not-enter-story", ".docx", pinned)
+    assert caught.value.code == "docx_converter_unavailable"
 
 
 def test_encrypted_pdf_is_refused_with_its_own_code() -> None:

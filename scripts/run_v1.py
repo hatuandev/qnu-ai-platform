@@ -19,7 +19,7 @@ COMMANDS = {
     "v1-worker": "ARQ worker only, foreground, V1 queue",
     "v1-fe": "Frontend only, foreground, port from frontendV1/.env.local",
     "v1-check": "Read-only dependency/schema/frontend check before startup",
-    "v1-infra-up": "Start PostgreSQL/Redis/Qdrant/MinIO; prepare and verify local storage",
+    "v1-infra-up": "Start PostgreSQL/Redis/Qdrant/MinIO/Gotenberg; prepare and verify local storage",
     "v1-install-be": "Install backend dependencies from uv.lock",
     "v1-install-fe": "Install frontend dependencies from package-lock.json",
     "v1-migrate": "Explicit Alembic upgrade head; check target DB first",
@@ -87,6 +87,7 @@ def command_plan(
                     "redis",
                     "qdrant",
                     "minio",
+                    "gotenberg",
                 ],
             ),
             (

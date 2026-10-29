@@ -15,6 +15,20 @@ from qnu.ports.vector_store import VectorHit
 
 
 class QdrantVectorStore:
+    async def delete_points(self, collection: str, point_ids: list[str]) -> None:
+        import uuid
+
+        self._name(collection)
+        for value in point_ids:
+            uuid.UUID(value)
+        if not point_ids:
+            return
+        response = await self._request(
+            "POST", f"/collections/{collection}/points/delete?wait=true", body={"points": point_ids},
+        )
+        if response.status_code != 404 and response.json().get("result", {}).get("status") != "completed":
+            raise DependencyUnavailable("Qdrant chưa hoàn tất xóa vector.", code="purge_vector_pending")
+
     def __init__(
         self, base_url: str | None = None, *, transport: httpx.AsyncBaseTransport | None = None
     ) -> None:

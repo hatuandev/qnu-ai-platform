@@ -112,11 +112,13 @@ function DashboardSession({ workspaceId, page, onSearch }: Props) {
       {workspaceId ? (
         <WorkspaceDashboard key={workspaceId} workspaceId={workspaceId} />
       ) : (
-        <Card className="rounded-xl shadow-2xs">
-          <CardContent className="flex gap-3 p-6 text-sm">
+        <Card className="rounded-xl shadow-2xs border-border/70">
+          <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground">
             <Boxes className="size-5 shrink-0 text-primary" />
-            Chọn một workspace để xem dữ liệu. Đường dẫn sẽ giữ lựa chọn khi tải
-            lại trang.
+            <span>
+              Chọn một workspace để xem số liệu tổng quan và danh sách kho tri
+              thức.
+            </span>
           </CardContent>
         </Card>
       )}
@@ -179,36 +181,6 @@ function WorkspaceContents({
         workspaceId={workspaceId}
         memberCount={memberCount}
       />
-      <nav aria-label="Truy cập nhanh QNU" className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" asChild>
-          <Link
-            to="/workspaces/$workspaceId/assistants"
-            params={{ workspaceId }}
-            search={{ limit: 20, offset: 0 }}
-          >
-            Trợ lý
-          </Link>
-        </Button>
-        <Button size="sm" variant="outline" asChild>
-          <Link
-            to="/workspaces/$workspaceId/conversations"
-            params={{ workspaceId }}
-          >
-            Hội thoại
-          </Link>
-        </Button>
-        {canReadOperations(access.role) ? (
-          <Button size="sm" variant="outline" asChild>
-            <Link
-              to="/workspaces/$workspaceId/operations"
-              params={{ workspaceId }}
-              search={{ page: 1, pageSize: 20 }}
-            >
-              Vận hành
-            </Link>
-          </Button>
-        ) : null}
-      </nav>
       {canReadOperations(access.role) ? (
         <DashboardOperations workspaceId={workspaceId} />
       ) : (
@@ -231,10 +203,15 @@ function DashboardCollections({
 }) {
   const query = useCollectionsQuery(workspaceId, { page: 1, pageSize: 6 });
   return (
-    <Card className="rounded-xl shadow-2xs">
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-        <CardTitle className="text-sm">Kho tri thức</CardTitle>
-        <Button variant="outline" size="sm" asChild>
+    <Card className="rounded-xl shadow-2xs border-border/70">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-3">
+        <CardTitle className="text-sm font-semibold">Kho tri thức</CardTitle>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 text-xs text-primary"
+          asChild
+        >
           <Link
             to="/workspaces/$workspaceId/collections"
             params={{ workspaceId }}
@@ -254,7 +231,7 @@ function DashboardCollections({
           />
         ) : (
           <>
-            <div className="grid grid-cols-2 divide-x rounded-lg border">
+            <div className="grid grid-cols-2 divide-x rounded-xl border border-border/70 overflow-hidden">
               <KpiMetric
                 label="Kho tài liệu"
                 value={String(query.data.meta.total)}
@@ -269,18 +246,28 @@ function DashboardCollections({
             {query.data.items.length ? (
               <ul className="grid gap-3 md:grid-cols-2">
                 {query.data.items.map((item) => (
-                  <li key={item.id} className="min-w-0 rounded-lg border p-3">
-                    <Link
-                      to="/workspaces/$workspaceId/collections/$collectionId"
-                      params={{ workspaceId, collectionId: item.id }}
-                      search={{ page: 1, pageSize: 20, tab: "sources" }}
-                      className="font-medium text-primary break-words hover:underline"
-                    >
-                      {item.name}
-                    </Link>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {item.source_count} nguồn tài liệu
-                    </p>
+                  <li
+                    key={item.id}
+                    className="group min-w-0 rounded-xl border border-border/70 p-3.5 hover:border-primary/40 hover:bg-muted/20 transition-all flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <FolderOpen className="size-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <Link
+                          to="/workspaces/$workspaceId/collections/$collectionId"
+                          params={{ workspaceId, collectionId: item.id }}
+                          search={{ page: 1, pageSize: 20, tab: "sources" }}
+                          className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors truncate block"
+                        >
+                          {item.name}
+                        </Link>
+                        <p className="text-xs text-muted-foreground">
+                          {item.source_count} nguồn tài liệu
+                        </p>
+                      </div>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -289,12 +276,6 @@ function DashboardCollections({
                 Chưa có kho tài liệu trong workspace này.
               </p>
             )}
-            {query.data.meta.total > query.data.items.length ? (
-              <p className="text-xs text-muted-foreground">
-                Đang hiển thị {query.data.items.length} kho đầu tiên. Chọn Xem
-                tất cả để xem danh sách đầy đủ.
-              </p>
-            ) : null}
           </>
         )}
       </CardContent>

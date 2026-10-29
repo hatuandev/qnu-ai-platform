@@ -1,4 +1,4 @@
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Check, ChevronsUpDown, Plus, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { isPlatformWorkspaceAdmin, useV1Auth } from "@/app/auth/v1";
@@ -78,12 +78,11 @@ export function WorkspaceSwitcher({
   const workspaces = workspacesQuery.data?.items ?? [];
 
   // Active workspace id from scope, URL or first available workspace
-  const activeWorkspaceId = scope.workspaceId ?? workspaces[0]?.id ?? "";
+  const activeWorkspaceId = scope.workspaceId ?? "";
   const activeWorkspaceQuery = useWorkspaceQuery(activeWorkspaceId);
   const activeWorkspace =
     workspaces.find((w) => w.id === activeWorkspaceId) ??
-    activeWorkspaceQuery.data ??
-    workspaces[0];
+    activeWorkspaceQuery.data;
 
   // User role in the active workspace
   const { role, isPending: rolePending } =
@@ -104,13 +103,14 @@ export function WorkspaceSwitcher({
     if (match) {
       const subFeature = match[1];
       void navigate({
-        to: `/workspaces/${newWorkspaceId}${subFeature}` as any,
-        search: ((prev: Record<string, unknown>) => ({ ...prev, page: 1 })) as any,
+        to: `/workspaces/${newWorkspaceId}${subFeature}` as "/",
+        search: { page: 1, pageSize: 20 } as never,
       });
     } else {
       void navigate({
-        to: `/workspaces/${newWorkspaceId}/knowledge` as any,
-        search: { page: 1, pageSize: 20 } as any,
+        to: "/workspaces/$workspaceId/knowledge",
+        params: { workspaceId: newWorkspaceId },
+        search: { page: 1, pageSize: 20 },
       });
     }
   };
@@ -121,9 +121,7 @@ export function WorkspaceSwitcher({
     : activeWorkspace
       ? formatWorkspaceRole(role)
       : "v1alpha1 · backendV1";
-  const initials = activeWorkspace
-    ? getInitials(activeWorkspace.name)
-    : "QN";
+  const initials = activeWorkspace ? getInitials(activeWorkspace.name) : "QN";
 
   const triggerContent = (
     <SidebarMenuButton
@@ -233,6 +231,15 @@ export function WorkspaceSwitcher({
               {isPlatformAdmin ? (
                 <>
                   <DropdownMenuSeparator className="my-1" />
+                  <DropdownMenuItem asChild>
+                    <Link
+                      to="/workspaces"
+                      search={{ page: 1, pageSize: 20 }}
+                      onClick={onNavigate}
+                    >
+                      Quản lý workspace
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => setCreateOpen(true)}
                     className="flex items-center gap-2 p-2 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
@@ -249,10 +256,7 @@ export function WorkspaceSwitcher({
         </SidebarMenuItem>
       </SidebarMenu>
 
-      <WorkspaceFormDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-      />
+      <WorkspaceFormDialog open={createOpen} onOpenChange={setCreateOpen} />
     </>
   );
 }

@@ -64,3 +64,56 @@ def test_a_stored_run_never_falls_back_to_todays_defaults() -> None:
     # A run pinned at 72 dpi must replay at 72 dpi, whatever the current settings say.
     stored = config_payload(ProcessingConfig(**{**BASE.as_dict(), "dpi": 72}))
     assert config_from_run(stored).dpi == 72
+
+
+def test_docx_endpoint_from_env_file_is_pinned(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("GOTENBERG_URL", raising=False)
+    monkeypatch.delenv("DOCX_CONVERTER", raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text("GOTENBERG_URL=http://converter.test:3000\n", encoding="utf-8")
+    config = processing_config(Settings(_env_file=env_file), ".docx")
+    assert config.gotenberg_url == "http://converter.test:3000"
+    assert config_from_run(config_payload(config)) == config
+    assert config.docx_converter == "gotenberg-libreoffice"
+
+
+def test_docx_converter_endpoint_and_revision_change_identity() -> None:
+    from dataclasses import replace
+
+    config = processing_config(Settings(_env_file=None), ".docx")
+    for changes in (
+        {"docx_converter": "docx-story", "gotenberg_url": ""},
+        {"gotenberg_url": "http://different-converter.test:3000"},
+        {"renderer_revision": "new-deployment"},
+        {"pymupdf_version": "different-rasterizer"},
+    ):
+        assert replace(config, **changes).fingerprint != config.fingerprint
+
+
+def test_pdf_keeps_legacy_fingerprint() -> None:
+    import hashlib
+    import json
+
+    legacy = {
+        k: v
+        for k, v in BASE.as_dict().items()
+        if k
+        in {
+            "dpi",
+            "max_pages",
+            "max_page_bytes",
+            "max_output_tokens",
+            "prompt_version",
+            "processor_version",
+            "table_layout_version",
+        }
+    }
+    expected = hashlib.sha256(
+        json.dumps(
+            legacy,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode()
+    ).hexdigest()
+    assert processing_config(Settings(_env_file=None), ".pdf").fingerprint == expected

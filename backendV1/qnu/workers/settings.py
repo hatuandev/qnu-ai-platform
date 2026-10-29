@@ -6,6 +6,7 @@ from arq import cron
 from arq.connections import RedisSettings
 
 from qnu.platform.config import get_settings
+from qnu.domains.lifecycle.purge import source_purge_job
 from qnu.workers.tasks.compilation import (
     compilation_reconcile,
     compile_run,
@@ -38,6 +39,7 @@ class WorkerSettings:
         evidence_backup_job,
         evidence_backup_delete,
         operations_reconcile,
+        source_purge_job,
     ]
     # The reconcile cron only picks up v1 runs from the v1 table and enqueues them on the
     # v1 queue, so it can never touch a legacy job; the flag is the documented kill switch.

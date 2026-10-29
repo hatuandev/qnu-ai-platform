@@ -1,8 +1,7 @@
 """Render PDF/DOCX into fixed-layout page images, with measured hashes.
 
-PDF pages are rasterised directly. DOCX has no fixed layout of its own, so its body
-XML is projected to HTML and paginated into a real PDF before rasterising; the
-intermediate PDF is stored as an artifact, because it is what the OCR actually saw.
+PDF pages are rasterised directly. DOCX uses its pinned converter to produce a
+fixed-layout PDF; that intermediate artifact is what the OCR actually saw.
 
 MuPDF is not thread-safe: every call is serialised behind one lock, and the blocking
 work runs in a worker thread so the event loop stays free.
@@ -15,11 +14,15 @@ import hashlib
 import io
 from dataclasses import dataclass, field
 
+import httpx
 import pymupdf
 
 from qnu.domains.ocr.artifacts.docx_html import convert_docx_to_html
 from qnu.domains.ocr.config import ProcessingConfig
-from qnu.platform.errors import AppException
+from qnu.platform.errors import AppException, DependencyUnavailable
+from qnu.platform.logging import get_logger
+
+logger = get_logger(__name__)
 
 PAGE_MEDIA = "a4"
 PAGE_MARGIN = 36
@@ -146,7 +149,54 @@ def _open_pdf(payload: bytes, config: ProcessingConfig) -> pymupdf.Document:
     return document
 
 
+def _docx_to_pdf_gotenberg(
+    payload: bytes, config: ProcessingConfig
+) -> tuple[bytes, dict, list[str]]:
+    """Convert DOCX to PDF via Gotenberg LibreOffice endpoint in Docker."""
+    if not config.gotenberg_url:
+        raise AppException(
+            "Lượt xử lý thiếu endpoint Gotenberg đã ghim.",
+            code="processing_config_invalid",
+            status_code=409,
+        )
+    target_url = f"{config.gotenberg_url.rstrip('/')}/forms/libreoffice/convert"
+    try:
+        with httpx.Client(timeout=60.0) as client:
+            resp = client.post(
+                target_url,
+                files={"files": ("document.docx", payload)},
+            )
+            if resp.status_code == 200 and resp.content.startswith(b"%PDF-"):
+                pdf_bytes = resp.content
+                stats = {
+                    "converter": "gotenberg-libreoffice",
+                    "revision": config.renderer_revision,
+                    "bytes": len(pdf_bytes),
+                }
+                return pdf_bytes, stats, []
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("docx_converter_unavailable", error_type=type(exc).__name__)
+        raise DependencyUnavailable(
+            "Không kết nối được Gotenberg đã chọn; không tự đổi bộ chuyển đổi.",
+            code="docx_converter_unavailable",
+        ) from None
+    logger.warning("docx_conversion_failed", status_code=resp.status_code)
+    raise DependencyUnavailable(
+        "Gotenberg không trả về PDF hợp lệ; chưa tạo kết quả chuyển đổi.",
+        code="docx_conversion_failed",
+    )
+
+
 def _docx_to_pdf(payload: bytes, config: ProcessingConfig) -> tuple[bytes, dict, list[str]]:
+    if config.docx_converter == "gotenberg-libreoffice":
+        return _docx_to_pdf_gotenberg(payload, config)
+    if config.docx_converter != "docx-story":
+        raise AppException(
+            "Bộ chuyển đổi đã ghim không được hỗ trợ.",
+            code="processing_config_invalid",
+            status_code=409,
+        )
+
     conversion = convert_docx_to_html(payload)
     buffer = io.BytesIO()
     story = pymupdf.Story(html=conversion.html, user_css=STYLE_CSS)
@@ -175,7 +225,7 @@ def _docx_to_pdf(payload: bytes, config: ProcessingConfig) -> tuple[bytes, dict,
         writer.close()
 
     stats = {
-        "converter": "docx-xml-to-html",
+        "converter": "docx-story",
         "paragraphs": conversion.paragraphs,
         "tables": conversion.tables,
         "table_rows": conversion.table_rows,
@@ -209,24 +259,7 @@ def render_document(payload: bytes, extension: str, config: ProcessingConfig) ->
 
     if suffix == ".docx":
         pdf_bytes, stats, warnings = _docx_to_pdf(payload, config)
-        document = _open_pdf(pdf_bytes, config)
-        try:
-            pages = _rasterise(document, config)
-        finally:
-            document.close()
-        return RenderedDocument(
-            extension=suffix,
-            renderer={
-                "name": "pymupdf",
-                "version": pymupdf.version[0],
-                "dpi": config.dpi,
-                "converter": "docx-story",
-                "conversion": stats,
-            },
-            pages=tuple(pages),
-            fixed_layout_pdf=pdf_bytes,
-            warnings=tuple(warnings),
-        )
+        return _render_converted_docx(pdf_bytes, stats, warnings, config)
 
     raise AppException(
         f"Định dạng '{suffix or 'không rõ'}' chưa được hỗ trợ xử lý OCR.",
@@ -236,9 +269,75 @@ def render_document(payload: bytes, extension: str, config: ProcessingConfig) ->
     )
 
 
+def _render_converted_docx(
+    pdf_bytes: bytes, stats: dict, warnings: list[str], config: ProcessingConfig
+) -> RenderedDocument:
+    document = _open_pdf(pdf_bytes, config)
+    try:
+        pages = _rasterise(document, config)
+    finally:
+        document.close()
+    gotenberg = stats.get("converter") == "gotenberg-libreoffice"
+    return RenderedDocument(
+        extension=".docx",
+        renderer={
+            "name": "gotenberg" if gotenberg else "pymupdf",
+            "version": None if gotenberg else pymupdf.version[0],
+            "revision": config.renderer_revision,
+            "rasterizer_version": pymupdf.version[0],
+            "dpi": config.dpi,
+            "converter": stats.get("converter", "docx-story"),
+            "conversion": stats,
+        },
+        pages=tuple(pages),
+        fixed_layout_pdf=pdf_bytes,
+        warnings=tuple(warnings),
+    )
+
+
+def render_saved_pdf(
+    payload: bytes, config: ProcessingConfig, renderer: dict, warnings: tuple[str, ...]
+) -> RenderedDocument:
+    """Rasterise the immutable DOCX conversion artifact without calling its converter."""
+    _check_renderer_version(config)
+    document = _open_pdf(payload, config)
+    try:
+        pages = _rasterise(document, config)
+    finally:
+        document.close()
+    return RenderedDocument(
+        extension=".docx",
+        renderer=renderer,
+        pages=tuple(pages),
+        fixed_layout_pdf=payload,
+        warnings=warnings,
+    )
+
+
+async def render_saved_pdf_async(
+    payload: bytes, config: ProcessingConfig, renderer: dict, warnings: tuple[str, ...]
+) -> RenderedDocument:
+    async with _render_lock:
+        return await asyncio.to_thread(render_saved_pdf, payload, config, renderer, warnings)
+
+
 async def render_async(
     payload: bytes, extension: str, config: ProcessingConfig
 ) -> RenderedDocument:
-    """Serialise MuPDF work and keep the event loop responsive."""
+    """Wait for external conversion outside the lock reserved for MuPDF work."""
+    _check_renderer_version(config)
+    if extension.lower() == ".docx" and config.docx_converter == "gotenberg-libreoffice":
+        pdf, stats, warnings = await asyncio.to_thread(_docx_to_pdf_gotenberg, payload, config)
+        async with _render_lock:
+            return await asyncio.to_thread(_render_converted_docx, pdf, stats, warnings, config)
     async with _render_lock:
         return await asyncio.to_thread(render_document, payload, extension, config)
+
+
+def _check_renderer_version(config: ProcessingConfig) -> None:
+    if config.pymupdf_version is not None and config.pymupdf_version != pymupdf.version[0]:
+        raise AppException(
+            "Bộ kết xuất trang đã thay đổi; cần tạo lượt xử lý mới.",
+            code="renderer_version_changed",
+            status_code=409,
+        )

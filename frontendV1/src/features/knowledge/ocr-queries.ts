@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { v1Client } from "@/app/api/v1";
 import { useV1Auth } from "@/app/auth/v1";
 import {
@@ -10,6 +10,7 @@ import {
   listProcessingRuns,
   readPageImageBlob,
   readPageRawBlob,
+  readRenderedPdfBlob,
   readRunEvidence,
   readRunManifest,
   readTextReview,
@@ -586,19 +587,25 @@ export function usePageImageBlobUrl(
   revisionId: string,
   runId: string | null | undefined,
   pageNumber: number | null | undefined,
+  runStatus?: string | null,
 ) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+
+  const refetch = useCallback(() => {
+    setRetryKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
-    if (!runId || !pageNumber || pageNumber < 1) {
+    if (!runId || !pageNumber || pageNumber < 1 || runStatus === "failed") {
       setBlobUrl(null);
       setIsLoading(false);
       setError(null);
       return;
     }
-
+    void retryKey;
     let isSubscribed = true;
     setIsLoading(true);
     setError(null);
@@ -624,7 +631,7 @@ export function usePageImageBlobUrl(
         setError(
           err instanceof Error
             ? err.message
-            : "Không tải được ảnh trang của lượt OCR này.",
+            : "Không tải được ảnh trang của lượt xử lý này.",
         );
       });
 
@@ -635,9 +642,92 @@ export function usePageImageBlobUrl(
         return null;
       });
     };
-  }, [workspaceId, collectionId, sourceId, revisionId, runId, pageNumber]);
+  }, [
+    workspaceId,
+    collectionId,
+    sourceId,
+    revisionId,
+    runId,
+    pageNumber,
+    runStatus,
+    retryKey,
+  ]);
 
-  return { blobUrl, isLoading, error };
+  return { blobUrl, isLoading, error, refetch };
+}
+
+export function useRenderedPdfBlobUrl(
+  workspaceId: string,
+  collectionId: string,
+  sourceId: string,
+  revisionId: string,
+  runId: string | null | undefined,
+  enabled = true,
+) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+
+  const refetch = useCallback(() => {
+    setRetryKey((k) => k + 1);
+  }, []);
+
+  useEffect(() => {
+    void retryKey;
+    if (!enabled || !runId) {
+      setBlobUrl(null);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
+    let isSubscribed = true;
+    setIsLoading(true);
+    setError(null);
+
+    readRenderedPdfBlob(
+      v1Client,
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      runId,
+    )
+      .then((res) => {
+        if (!isSubscribed) return;
+        const url = URL.createObjectURL(res.blob);
+        setBlobUrl(url);
+        setIsLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (!isSubscribed) return;
+        setIsLoading(false);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Không tải được bản PDF kết xuất.",
+        );
+      });
+
+    return () => {
+      isSubscribed = false;
+      setBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, [
+    workspaceId,
+    collectionId,
+    sourceId,
+    revisionId,
+    runId,
+    enabled,
+    retryKey,
+  ]);
+
+  return { blobUrl, isLoading, error, refetch };
 }
 
 export function usePageRawText(

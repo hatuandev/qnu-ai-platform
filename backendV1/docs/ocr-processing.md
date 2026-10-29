@@ -301,6 +301,11 @@ cd backendV1
 
 - Chưa có Compiler, chunk, embedding, index, publication, RAG, frontend.
 - Chưa hỗ trợ `.xlsx`, `.txt`, `.md` cho OCR — API trả 415 rõ ràng, tệp vẫn được lưu.
-- DOCX được chiếu qua HTML nên layout gần đúng, không phải bản sao pixel-perfect của Word.
+- DOCX mới ghim `DOCX_CONVERTER` (mặc định Gotenberg LibreOffice), endpoint từ Settings,
+  revision triển khai `DOCX_RENDERER_REVISION` và phiên bản PyMuPDF. Gotenberg lỗi
+  không tự fallback sang Story. Chọn Story tường minh nếu cần layout gần đúng.
+- Retry DOCX dùng lại PDF đã lưu và kiểm checksum; không chuyển đổi lại tệp gốc.
+  Khi đổi image/font/options, cập nhật revision triển khai để tránh reuse job cũ.
+  Metadata phiên bản Gotenberg thực không được suy từ phiên bản PyMuPDF.
 - Bảng không tái dựng được giữ raw + cảnh báo, không được tự "đoán" lại.
 - Chưa có backfill tự động cho revision cũ: phải gọi API.

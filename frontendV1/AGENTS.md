@@ -1,6 +1,6 @@
 # Phạm vi bản sao frontendV1
 
-Áp dụng [AGENTS gốc của repo QNU AI](../AGENTS.md). Người dùng xác nhận giữ toàn bộ
+Áp dụng [AGENTS gốc của repo QNU AI](../AGENTS.md) và **bắt buộc tuân thủ [Quy Chuẩn Thiết Kế & Vibe Giao Diện (`ui-standards.md`)](../.agents/rules/ui-standards.md)** khi thiết kế, chỉnh sửa hoặc vibe UI. Người dùng xác nhận giữ toàn bộ
 màn hình KTX làm mẫu, thay nghiệp vụ sau. Phần dưới giữ quy ước giao diện từ source,
 không mang các quy tắc triển khai .NET/Git/production ở repo KTX sang đây.
 

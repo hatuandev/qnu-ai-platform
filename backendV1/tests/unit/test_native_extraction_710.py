@@ -13,6 +13,8 @@ from qnu.domains.ocr.native import extract_native, merge_layout
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException
 
+pytestmark = pytest.mark.usefixtures("offline_document_conversion")
+
 
 def pdf(text="Source text 2023: 0 -", image=False):
     doc = pymupdf.open()

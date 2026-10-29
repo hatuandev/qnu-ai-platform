@@ -1,6 +1,5 @@
 import { useForm } from "@tanstack/react-form";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { ApiProblemError, v1Client } from "@/app/api/v1";
@@ -35,6 +34,7 @@ type LifecycleActionDialogProps = {
   target: LifecycleTarget;
   label: string;
   onClose: () => void;
+  onCompleted?: (action: LifecycleAction) => void;
 };
 
 export function LifecycleActionDialog(props: LifecycleActionDialogProps) {
@@ -60,14 +60,15 @@ function LifecycleActionForm({
   target,
   label,
   onClose,
+  onCompleted,
 }: LifecycleActionDialogProps) {
   const confirmationOnly =
     target.action === "delete" &&
     ["collection", "source", "document"].includes(target.kind);
+  const permanent = target.kind === "source" && target.action === "delete";
   const automaticPreviewRequested = useRef(false);
   const { sessionId } = useV1Auth();
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const current = useActionScope();
   const [preview, setPreview] = useState<LifecycleAction | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -86,15 +87,14 @@ function LifecycleActionForm({
     )
       return;
     navigated.current = true;
-    void navigate({
-      to: "/workspaces/$workspaceId/resources",
-      params: { workspaceId },
-      search: { page: 1, actionId: live.id },
-    });
-  }, [live, navigate, workspaceId]);
+    if (onCompleted) onCompleted(live);
+    else onClose();
+  }, [live, onCompleted, onClose]);
   const form = useForm({
     defaultValues: {
-      reason: confirmationOnly ? "Yêu cầu đưa vào thùng rác từ giao diện." : "",
+      reason: confirmationOnly
+        ? permanent ? "Yêu cầu xóa vĩnh viễn tài liệu từ kho tri thức." : "Yêu cầu đưa vào thùng rác từ giao diện."
+        : "",
     },
     validators: {
       onSubmit: z.object({
@@ -172,7 +172,8 @@ function LifecycleActionForm({
         ["v1", sessionId, "lifecycle-action", workspaceId, result.id],
         result,
       );
-      void queryClient.invalidateQueries({ queryKey: ["v1", sessionId] });
+      if (!permanent || result.status === "completed")
+        void queryClient.invalidateQueries({ queryKey: ["v1", sessionId] });
     } catch (cause) {
       if (!current()) return;
       setError(
@@ -221,7 +222,13 @@ function LifecycleActionForm({
           ) : null}
           {confirmationOnly ? (
             <div className="space-y-3 text-sm">
-              <p>Mục này sẽ được đưa vào thùng rác và có thể khôi phục.</p>
+              <p>{permanent
+                ? "Xóa vĩnh viễn tệp gốc, các phiên bản và dữ liệu xử lý liên quan. Không thể khôi phục từ QNU."
+                : "Mục này sẽ được đưa vào thùng rác và có thể khôi phục."}</p>
+              {permanent && preview && Number(preview.impact.compiled_versions_to_delete) > 0 ? (
+                <p>Các bản biên soạn phụ thuộc sẽ bị xóa. Những tệp nguồn khác vẫn được giữ.</p>
+              ) : null}
+              {permanent ? <p className="text-muted-foreground">Bản sao lưu đã tạo được quản lý theo chính sách sao lưu riêng.</p> : null}
               {!preview && !error ? (
                 <p role="status" className="text-muted-foreground">
                   Đang chuẩn bị xác nhận…
@@ -350,7 +357,7 @@ function LifecycleActionForm({
                 : acceptStarted
                   ? "Thử lại cùng thao tác"
                   : confirmationOnly
-                    ? "Xóa"
+                    ? permanent ? "Xóa vĩnh viễn" : "Xóa"
                     : "Xác nhận thao tác"}
             </Button>
           ) : null}

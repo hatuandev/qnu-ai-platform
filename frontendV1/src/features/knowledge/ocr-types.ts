@@ -21,6 +21,7 @@ export type PageStatus =
 export interface ProcessingRunRequest {
   provider_id?: string | null;
   force?: boolean;
+  strategy?: "auto" | "native" | "ocr";
 }
 
 export interface ProcessingRunResponse {

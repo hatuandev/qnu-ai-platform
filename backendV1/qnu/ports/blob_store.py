@@ -17,6 +17,9 @@ class BlobObject:
 
 @runtime_checkable
 class BlobStore(Protocol):
+    async def purge(self, key: str) -> None:
+        """Permanently remove the exact key, including S3 object versions/delete markers."""
+        ...
     driver: str
 
     async def put_bytes(self, key: str, payload: bytes, content_type: str | None = None) -> str: ...

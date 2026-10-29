@@ -11,6 +11,7 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.identity.permissions import require_permission
 from qnu.domains.workspaces.access import resolve_workspace_access
 from qnu.domains.workspaces.models import Workspace, WorkspaceEvent, WorkspaceMember
+from qnu.domains.workspaces.navigation import resolve_navigation
 from qnu.domains.workspaces.schemas import (
     EventResponse,
     MemberCreateRequest,
@@ -94,6 +95,16 @@ async def list_workspaces(
         items=[_workspace_out(item, counts.get(item.id, 0)) for item in items],
         meta=PageMeta(page=page, page_size=page_size, total=total),
     )
+
+
+@router.get("/resolve-route", summary="Tra cứu liên kết workspace có kiểm tra quyền")
+async def resolve_workspace_route(
+    code: str = Query(..., min_length=2, max_length=64, pattern=r"^[a-z0-9]+(?:[-_][a-z0-9]+)*$"),
+    source_id: str | None = Query(None, min_length=1, max_length=64),
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+) -> dict[str, str | None]:
+    return await resolve_navigation(db, actor, code, source_id)
 
 
 @router.get("/{workspace_id}", response_model=WorkspaceResponse, summary="Chi tiết workspace")

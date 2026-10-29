@@ -63,6 +63,8 @@ export function flattenNavigation(groups = navigationGroups): NavItem[] {
 
 export function isItemActive(item: NavItem, pathname: string): boolean {
   if (item.to && pathname === item.to) return true;
+  if (item.to === "/workspaces")
+    return /^\/workspaces\/[^/]+\/?$/.test(pathname);
   if (item.to && pathname.startsWith(`${item.to}/`)) return true;
   return (
     item.children?.some(

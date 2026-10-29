@@ -7,6 +7,16 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-10-29 — Context715: sửa P2 DOCX renderer.** HTTP Gotenberg ngoài khóa MuPDF, log chỉ status/type, fixture offline cho unit render/native.6regression viết chưa chạy; scopedRuff/AST/UTF8/LF/diff đạt. Test/runtime NOT RUN theo yêu cầu; không restart/env/model/migrate/push. [Nhật ký715](../nhat_ky/2026-10-29_phien_715_sua_p2_docx_renderer.md).
+
+- **2026-10-29 — Context714: sửa hai P1 DOCX renderer.** Settings/.env thống nhất, profile DOCX ghim converter/endpoint/revision/rasterizer; lỗi không fallback, resume dùng PDF kiểm hash đã lưu. Legacy/PDF identity giữ;6regression mới chưa chạy. ScopedRuff/AST/UTF8/LF/diff đạt, test/runtime NOT RUN theo yêu cầu. Không restart/env/migrate/model/push. [Nhật ký714](../nhat_ky/2026-10-29_phien_714_sua_p1_docx_renderer.md).
+
+- **2026-10-29 — Context713: review tĩnh BE V1, không test.**5finding: converter DOCX chưa ghim/recovery, URL .env bị bỏ qua(P1); HTTP giữ khóa render, rawlog, unit test gọi service(P2). PDF/resolve-route có scope guard trong mã đã đọc. Chỉ docs, chưa sửa app; test/lint/build/runtime NOT RUN theo yêu cầu. [Nhật ký713](../nhat_ky/2026-10-29_phien_713_review_tinh_backend_v1.md).
+
+- **2026-10-29 — Context712: URL workspace và sidebar.** /:code/files/:sourceId, TanStack mask/bridge và resolve-route kiểm membership/lifecycle; giữ link cũ, sửa active Kho tri thức, quản lý workspace trong dropdown admin. FE465PASS/build/TS/Biome, full lintFAIL28lỗi ngoài phạm vi; BE338PASS/60SKIP thiếu DB test. Browser link cũ/ngắn/F5/đổi workspace/Back đạt; user cho restartV1 runner28344. Giữ diff đồng thời, không migrate/model/quota/push. [Nhật ký712](../nhat_ky/2026-10-29_phien_712_url_workspace_va_sidebar.md).
+
+- **2026-10-29 — Context711: Gotenberg trong Docker V1.** Runner thêm service sẵn có, bind127.0.0.1:3005; qnu_gotenberg healthy/image8 local8.38.1. Health200, DOCX tiếng Việt và HTML→PDF đều200/1trang; scripts44PASS/Ruff/Compose/diff đạt. Bốn container hạ tầng khác giữ ID/StartedAt. Chưa nối rendererV1; không env/model/quota/migrate/restart app/push. [Nhật ký711](../nhat_ky/2026-10-29_phien_711_them_gotenberg_vao_ha_tang_v1.md).
+
 - **2026-10-29 — Context710: backend V1 tự bóc tách sau upload.** Run auto cùng transaction nguồn, native PDF/DOCX, OCR khi cần, MD/JSON/ảnh/ZIP và processing theo revision; schema/code head0007. Bao phủ835ID PASS,28mới/mất0/trùng0 (210call trước gián đoạn+625PASS/lệnh exit0; không full liên tục); Ruff26/OpenAPI131path/link/encoding đạt. DB thử/sentinel và Redis10–15 đã dọn. Chưa migrate/restart phục vụ/live OCR; giữ FE/model/grants/default/quota hiện tại. [Nhật ký710](../nhat_ky/2026-10-29_phien_710_backend_v1_boc_tach_tu_dong.md).
 
 - **2026-10-29 — Context709: rút gọn xác nhận xóa kho tri thức.** Xóa collection/source/document chỉ hỏi Hủy/Xóa, không lý do/checkbox; preview tự chuẩn bị, giữ server quyền/hash/hạn sử dụng/chống lặp. FE450PASS/50tệp, focused29PASS, build+TS theo log hoàn tất; Biome2tệp exit0. Browser desktop/mobile đã kiểm và hủy, hai tài liệu thật giữ nguyên; không live accept/OCR/backend mới. Giữ cấu hình model/quota; không restart/push. [Nhật ký709](../nhat_ky/2026-10-29_phien_709_rut_gon_xac_nhan_xoa_kho_tri_thuc.md).
