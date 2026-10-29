@@ -5,7 +5,8 @@ kiểm tra người gọi ở mọi thao tác. Màn KTX vẫn là mẫu, không 
 
 ## Điểm vào
 
-- Trong từng Workspace có tab **Thùng rác** và **Vận hành**. Tab Vận hành dành
+- Menu **Tài nguyên/Thùng rác** đã ẩn theo yêu cầu ngày 2026-10-29; URL cũ
+  chuyển sang biên nhận vận hành. Trang **Vận hành** dành
   cho quản trị, biên tập và rà soát; kiểm tra sẵn sàng chỉ dành cho quản trị.
 - Nút **Quản lý** trên trang kho, nguồn, tài liệu biên soạn, trợ lý và hội thoại
   mở các thao tác phù hợp. Trợ lý có cùng menu trên danh sách và trang chi tiết.
@@ -18,6 +19,19 @@ Riêng **Xóa** kho tri thức, văn bản nguồn và tài liệu biên soạn 
 **Hủy / Xóa**, không nhập lý do hoặc đánh dấu checkbox. Giao diện tự chuẩn bị
 phạm vi ảnh hưởng; chỉ gửi xác nhận khi người dùng bấm **Xóa**. Các thao tác khác
 tiếp tục theo quy trình dưới đây.
+
+**Tài liệu nguồn:** nút là **Xóa vĩnh viễn**, giải thích rõ không thể khôi phục
+và phạm vi bản biên soạn phụ thuộc. Có bản còn phát hành thì chặn và yêu cầu
+thu hồi phát hành trước; dừng trợ lý không thay cho thu hồi. Xác nhận ngay trong
+kho/chi tiết tài liệu; không chuyển sang Tài nguyên. Khi hoàn tất, danh sách
+được làm mới hoặc quay về kho cha. Đang chờ/lỗi có trạng thái và mục theo dõi
+ngay tại kho để tiếp tục cùng yêu cầu sau khi tải lại trang. Backup đã tạo được
+quản lý riêng, không xóa tự động theo nút này.
+
+API archive/restore và danh sách tài nguyên cũ vẫn giữ để tương thích; nguồn
+đã chấp nhận xóa vĩnh viễn không thể restore. Thành viên theo dõi biên nhận hội
+thoại của mình tại URL Vận hành chỉ nhận phần biên nhận do backend kiểm quyền,
+không được tải danh sách tác vụ hoặc dữ liệu vận hành của đơn vị.
 
 1. Chọn tài nguyên → Quản lý → thao tác cần làm.
 2. Nhập lý do, chọn **Xem trước tác động**. Bước này chưa đổi tài nguyên.

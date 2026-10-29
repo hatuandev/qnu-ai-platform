@@ -330,11 +330,7 @@ test("human acknowledgement is required after impact preview; confirmation uses 
     body: { preview_id: "life-one", preview_sha256: "a".repeat(64) },
     key: "lifecycle:life-one",
   });
-  await waitFor(() =>
-    expect(env.navigate).toHaveBeenCalledWith(
-      expect.objectContaining({ to: "/workspaces/$workspaceId/resources" }),
-    ),
-  );
+  expect(env.navigate).not.toHaveBeenCalled();
 });
 test("retry after a disconnected accept retains the same preview, body and idempotency key", async () => {
   acceptMode = "network-once";
@@ -540,7 +536,22 @@ test("a conversation owner can follow a receipt without needing operations permi
     screen
       .getByRole("link", { name: "Theo dõi biên nhận" })
       .getAttribute("data-destination"),
-  ).toBe("/workspaces/$workspaceId/resources");
+  ).toBe("/workspaces/$workspaceId/operations");
+});
+
+test("a member receipt link loads only their receipt without operations data", async () => {
+  env.role = { kind: "member", role: "member" };
+  action = { ...action, kind: "conversation", status: "completed" };
+  mount(
+    <OperationsPage
+      workspaceId="w"
+      search={{ page: 1, pageSize: 20, lifecycleActionId: action.id }}
+      onSearch={vi.fn()}
+    />,
+  );
+  await screen.findByText("Hoàn tất");
+  expect(screen.queryByText("Tác vụ")).toBeNull();
+  expect(postCalls).toHaveLength(0);
 });
 
 test("an accepted pending recovery can continue after reload using its original key", async () => {

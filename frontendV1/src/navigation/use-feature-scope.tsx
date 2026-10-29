@@ -2,14 +2,22 @@ import { useRouterState } from "@tanstack/react-router";
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useState,
 } from "react";
 import { useV1Auth } from "@/app/auth/v1";
+import { useWorkspacesQuery } from "@/features/workspaces/queries";
 import { type FeatureScope, routeFeatureScope } from "./workspace-features";
 
-const FeatureScopeContext = createContext<FeatureScope | undefined>(undefined);
+type FeatureScopeContextValue = FeatureScope & {
+  setWorkspaceId?: (workspaceId: string) => void;
+};
+
+const FeatureScopeContext = createContext<FeatureScopeContextValue | undefined>(
+  undefined,
+);
 
 /** The shell owns selection so closing the mobile sheet cannot discard it. */
 export function FeatureScopeProvider({ children }: { children: ReactNode }) {
@@ -21,22 +29,28 @@ export function FeatureScopeProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useFeatureScope(): FeatureScope {
+export function useFeatureScope(): FeatureScopeContextValue {
   const scope = useContext(FeatureScopeContext);
   if (!scope) throw new Error("Feature navigation needs FeatureScopeProvider");
   return scope;
 }
 
-function useRouteFeatureScope(): FeatureScope {
+function useRouteFeatureScope(): FeatureScopeContextValue {
   const { sessionId, isAuthenticated } = useV1Auth();
   const location = useRouterState({ select: (state) => state.location });
   const current = routeFeatureScope(location.pathname, location.search);
+  const workspacesQuery = useWorkspacesQuery(
+    { page: 1, pageSize: 50 },
+    isAuthenticated,
+  );
+  const firstAvailableWorkspaceId = workspacesQuery.data?.items?.[0]?.id;
   const [last, setLast] = useState<{
     sessionId: number;
     scope: FeatureScope;
   }>();
   const previous = last?.sessionId === sessionId ? last.scope : {};
-  const workspaceId = current?.workspaceId ?? previous.workspaceId;
+  const workspaceId =
+    current?.workspaceId ?? previous.workspaceId ?? firstAvailableWorkspaceId;
   const collectionId = current
     ? (current.collectionId ??
       (!location.pathname.startsWith("/workspaces/choose/") &&
@@ -45,7 +59,29 @@ function useRouteFeatureScope(): FeatureScope {
         : undefined))
     : previous.collectionId;
   const selectedWorkspace =
-    current !== undefined ? current.workspaceId : workspaceId;
+    current !== undefined
+      ? (current.workspaceId ??
+        previous.workspaceId ??
+        firstAvailableWorkspaceId)
+      : workspaceId;
+
+  const setWorkspaceId = useCallback(
+    (nextWorkspaceId: string) => {
+      if (!isAuthenticated) return;
+      setLast((prev) => ({
+        sessionId,
+        scope: {
+          workspaceId: nextWorkspaceId,
+          collectionId:
+            prev?.scope.workspaceId === nextWorkspaceId
+              ? prev.scope.collectionId
+              : undefined,
+        },
+      }));
+    },
+    [isAuthenticated, sessionId],
+  );
+
   useEffect(() => {
     setLast(
       isAuthenticated
@@ -56,6 +92,6 @@ function useRouteFeatureScope(): FeatureScope {
         : undefined,
     );
   }, [sessionId, isAuthenticated, selectedWorkspace, collectionId]);
-  if (!isAuthenticated) return {};
-  return { workspaceId: selectedWorkspace, collectionId };
+  if (!isAuthenticated) return { setWorkspaceId };
+  return { workspaceId: selectedWorkspace, collectionId, setWorkspaceId };
 }

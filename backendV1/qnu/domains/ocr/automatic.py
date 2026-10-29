@@ -112,6 +112,8 @@ async def execute_auto(db, blob, run, actor, engine, config, settings):
             row.status = "blank" if rendered.pages[page.page_number - 1].blank else "completed"
             row.text, row.blocks_count = page.layout.text, len(page.layout.blocks)
             row.has_tables, row.usage_tokens = page.layout.has_tables, 0
+    run.pages_done = sum(1 for r in rows.values() if r.status == "completed")
+    run.pages_failed = sum(1 for r in rows.values() if r.status == "failed")
     await commit_owned(db, run)
     runtime = None
     if any(p.needs_ocr for p in plan.pages):

@@ -58,6 +58,13 @@ function OperationsSession({ workspaceId, search, onSearch }: Props) {
   const { role, isPending } = useCallerWorkspaceRole(workspaceId);
   const view = search.view ?? "jobs";
   if (isPending) return <p role="status">Đang kiểm tra quyền vận hành…</p>;
+  if (!canReadOperations(role) && search.lifecycleActionId)
+    return (
+      <LifecycleReceipt
+        workspaceId={workspaceId}
+        actionId={search.lifecycleActionId}
+      />
+    );
   if (!canReadOperations(role))
     return (
       <p role="alert">

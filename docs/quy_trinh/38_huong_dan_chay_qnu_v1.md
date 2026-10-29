@@ -4,6 +4,12 @@
 
 ## 1. Chạy nhanh hằng ngày
 
+**Cập nhật 29/10/2026:** worker hiện có nhận thêm `source_purge_job` để xóa vĩnh
+viễn tài liệu nguồn đã xác nhận và không còn bản phát hành. Không cần migration
+riêng cho thay đổi này; sau khi cập nhật mã, dừng/chạy lại `v1-dev` để API/worker
+nạp hàm mới. Không có thao tác tự xóa dữ liệu khi khởi động. Tác vụ lỗi giữ biên
+nhận chờ và được reconciler gửi lại; MinIO/S3 cần quyền xóa cả object version.
+
 Nếu đã cài thư viện, có cấu hình V1 và database đã migration, chỉ cần hạ tầng đang chạy cùng **ba cửa sổ PowerShell**: API, worker và giao diện. Máy mới làm phần 2–5 trước.
 
 ### Chạy bằng Make — cách gọn nhất

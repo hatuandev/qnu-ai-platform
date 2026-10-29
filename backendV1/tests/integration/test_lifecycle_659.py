@@ -50,14 +50,14 @@ def accept(client, workspace, response, key="accept"):
     )
 
 
-def test_delete_source_is_reversible_and_original_bytes_are_unchanged(client):
+def test_archive_source_is_reversible_and_original_bytes_are_unchanged(client):
     workspace, collection, source = setup_source(client)
     url = f"{API}/workspaces/{workspace['id']}/collections/{collection['id']}/sources"
     content = client.get(url + f"/{source['id']}/revisions").json()[0]
     original_url = url + f"/{source['id']}/revisions/{content['id']}/content"
     original = client.get(original_url).content
     as_actor(PLATFORM)
-    p = preview(client, workspace, "source", source["id"], "delete")
+    p = preview(client, workspace, "source", source["id"], "archive")
     result = accept(client, workspace, p)
     assert result.status_code == 200, result.text
     assert result.json()["status"] == "completed"
@@ -157,7 +157,7 @@ def test_concurrent_acceptance_has_one_effect_and_one_receipt(client):
 
     workspace, _, source = setup_source(client)
     as_actor(PLATFORM)
-    p = preview(client, workspace, "source", source["id"], "delete")
+    p = preview(client, workspace, "source", source["id"], "archive")
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = [pool.submit(accept, client, workspace, p) for _ in range(2)]
         responses = [future.result(timeout=20) for future in futures]
@@ -167,9 +167,9 @@ def test_concurrent_acceptance_has_one_effect_and_one_receipt(client):
 
 
 def test_deleted_restore_requires_admin(client):
-    workspace, _, source = setup_source(client)
+    workspace, collection, _ = setup_source(client)
     as_actor(PLATFORM)
-    p = preview(client, workspace, "source", source["id"], "delete")
+    p = preview(client, workspace, "collection", collection["id"], "delete")
     assert accept(client, workspace, p).status_code == 200
     as_actor(EDITOR)
-    assert preview(client, workspace, "source", source["id"], "restore").status_code == 403
+    assert preview(client, workspace, "collection", collection["id"], "restore").status_code == 403

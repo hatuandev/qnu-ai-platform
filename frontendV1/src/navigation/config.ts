@@ -21,7 +21,7 @@ import {
   QrCode,
   Receipt,
   ScrollText,
-  Server,
+  Settings2,
   Tag,
   UserCheck,
   UserRoundCog,
@@ -30,6 +30,9 @@ import {
 import type { NavGroup } from "@/navigation/types";
 
 export {
+  isPrimarySidebarFeatureActive,
+  isSettingsRouteActive,
+  primaryWorkspaceFeatureKeys,
   workspaceFeatureGroups,
   workspaceFeatureKeys,
   workspaceFeatures,
@@ -39,7 +42,7 @@ export const navigationGroups: NavGroup[] = [
   // 0. QNU AI — dữ liệu thật từ backendV1 (không phải màn hình mẫu)
   {
     id: "qnu-ai",
-    label: "QNU AI",
+    label: "Điều hướng",
     items: [
       {
         id: "dashboard",
@@ -49,11 +52,10 @@ export const navigationGroups: NavGroup[] = [
         scope: "v1",
       },
       {
-        id: "modelops-providers",
-        title: "Nhà cung cấp",
-        to: "/providers",
-        icon: Server,
-        permission: "ai.models.manage",
+        id: "settings",
+        title: "Cấu hình",
+        to: "/settings",
+        icon: Settings2,
         scope: "v1",
       },
     ],

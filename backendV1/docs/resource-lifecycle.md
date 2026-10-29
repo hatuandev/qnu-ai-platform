@@ -1,8 +1,8 @@
 # Vòng đời ngược của tài liệu và chatbot — backendV1
 
 Tệp dẫn xuất mồ côi có [luồng dọn riêng](storage-cleanup.md); phục hồi DB/tệp/vector
-vào đích mới theo [recovery v1](recovery.md). Các thao tác này không purge nguồn
-gốc hoặc đổi ý nghĩa thùng rác của lifecycle bên dưới.
+vào đích mới theo [recovery v1](recovery.md). Những luồng này không purge nguồn
+gốc. Ngoại lệ xóa vĩnh viễn tài liệu nguồn được người dùng xác nhận ngày 2026-10-29.
 
 Phạm vi: chỉ `backendV1/`; workspace là biên quyền theo ADR v1. Mọi thao tác
 được kiểm tra bằng actor thật và membership/role ở server. Không áp dụng cho `backend/`.
@@ -11,14 +11,16 @@ Phạm vi: chỉ `backendV1/`; workspace là biên quyền theo ADR v1. Mọi th
 
 | Tài nguyên (`kind`) | Thao tác (`action`) | Kết quả |
 |---|---|---|
-| `collection`, `source`, `document` | `archive`, `delete`, `restore` | Lưu trữ, đưa vào thùng rác hoặc khôi phục; giữ nguồn và lịch sử |
+| `collection`, `document` | `archive`, `delete`, `restore` | Lưu trữ, đưa vào thùng rác hoặc khôi phục; giữ nguồn và lịch sử |
+| `source` | `archive`, `restore` | Lưu trữ hoặc khôi phục nguồn còn tồn tại |
+| `source` | `delete` | Xóa vĩnh viễn sau xác nhận; cấm nếu còn bản phụ thuộc `published` |
 | `assistant` | `pause`, `resume`, `archive`, `delete`, `restore` | Ngừng/bật phục vụ hoặc đưa vào thùng rác; khôi phục xong vẫn tắt, cần bật riêng |
 | `conversation` | `archive`, `delete`, `restore` | Chỉ chủ hội thoại được thao tác, kể cả khi người khác là quản trị |
 | `job` | `cancel` + `job_kind` | Hủy OCR, Compiler, index, review tự động, review ngữ nghĩa, kiểm chính tả hoặc lượt hỏi |
 | `index` | `cleanup` | Xóa collection vector v1 và chunk DB của generation đã ngừng dùng |
 | `document` | `replace` + `replacement_version_id` | Chuẩn bị chỉ mục cho bản đã duyệt, rồi chuyển publication và index trong một transaction |
 
-`delete` là **xóa có thể khôi phục**, không xóa vĩnh viễn file gốc, raw OCR,
+Ngoại trừ `source/delete`, `delete` là **xóa có thể khôi phục**, không xóa vĩnh viễn file gốc, raw OCR,
 Markdown/JSON đã lưu, quyết định duyệt hay lịch sử hội thoại. Tài nguyên bị xóa/lưu
 trữ bị chặn trên API đọc nội dung, tải tệp, tác vụ và RAG; kết quả hỏi đáp cũ phải
 kiểm lại nguồn trước khi trả về. Tài nguyên con vẫn bị chặn nếu kho cha bị lưu trữ/xóa.
@@ -35,6 +37,47 @@ Prefix: `/platform/v1alpha1/workspaces/{workspace_id}/lifecycle`.
 3. `GET /actions/{action_id}`: trạng thái và biên nhận của thao tác do chính actor tạo.
 4. `GET /resources?limit=50&offset=0`: các tài nguyên đang lưu trữ/thùng rác.
    Hội thoại của người khác không xuất hiện. API có `Cache-Control: private, no-store`.
+5. `GET /source-deletions?collection_id=...`: các yêu cầu xóa nguồn đang chờ của chính
+   quản trị viên hiện tại, để tiếp tục ngay trong kho tri thức sau khi tải lại trang.
+
+## Xóa vĩnh viễn tài liệu nguồn — ngoại lệ có phạm vi
+
+- Chỉ quản trị viên workspace hoặc quản trị nền tảng được xem trước/xác nhận.
+  Tác vụ nền xác minh lại quyền từ membership DB hoặc cầu dev-admin hiện có;
+  không lưu quyền JWT vào hàng đợi. Nếu không phân giải được quyền nền, từ chối nhận tác vụ.
+- Bất kỳ phiên bản biên soạn phụ thuộc nào còn `published` đều trả `409 source_publication_in_use`.
+  Phải **thu hồi phát hành (`withdraw`)** trước; tắt chatbot, lưu trữ nguồn/văn bản
+  hoặc ngừng index không thay thế thu hồi. Kiểm tra ở preview, accept và worker.
+- Preview ghim đồ thị phụ thuộc và hash tệp. Accept lưu biên nhận `pending`, hủy
+  tác vụ liên quan và chặn sử dụng nguồn; chưa tuyên bố xóa xong. Tác vụ đang chạy
+  có khoảng chờ tối đa job hiện tại (1800 giây) trước khi dọn; reconciler hiện có
+  gửi lại việc còn chờ mỗi 5 phút. Dùng cùng biên nhận/idempotency key để tiếp tục.
+  Raw/artifact hoàn tất muộn chỉ được nhận thêm nếu thuộc đúng run đã xác nhận;
+  không mở rộng sang nguồn, phiên bản hay tác vụ mới.
+- Worker dọn toàn bộ revision của nguồn, raw OCR đã đăng ký, MD/JSON hậu OCR,
+  run/artifact Compiler/review phụ thuộc, kết quả hội thoại đã lưu có nguồn đó,
+  chunk và đúng point vector liên quan. Bản nháp gộp nhiều nguồn cũng bị xóa nếu
+  phụ thuộc nguồn này; giữ tệp nguồn khác và phiên bản không phụ thuộc.
+- Kho dữ liệu dạng S3/MinIO xóa cả version và delete marker của **đúng object key**.
+  Cần quyền liệt kê/xóa version; storage không cho xóa thì biên nhận còn `pending`.
+  Không dùng xóa theo prefix hoặc xóa toàn collection vector.
+- Index dùng chung được ghi manifest dẫn xuất cho phần còn lại, giữ chuỗi hash
+  manifest gốc làm dấu vết. Không gọi model, không re-embed/reindex tài liệu khác.
+- Giới hạn 10.000 hàng trong đồ thị; phụ thuộc ngoài allowlist, object dùng chung,
+  đổi target storage/vector hoặc đổi lineage sau xác nhận đều chặn dọn. Lỗi giữa
+  chừng giữ kế hoạch bền vững; tác vụ có thể đã xóa một phần tệp, không thể restore.
+- Chỉ báo `completed` sau khi storage/vector và SQL hoàn tất. API biên nhận không
+  trả kế hoạch nội bộ/đường dẫn object. Giữ audit/idempotency, metadata/hash lịch sử
+  và các bundle backup đã tạo theo chính sách sao lưu riêng; đây không phải purge
+  cả backup hay dữ liệu ngoài kho QNU. Không khôi phục nguồn đã xóa vĩnh viễn bằng `restore`.
+- FE xác nhận ngay trong kho hoặc chi tiết tài liệu; hoàn tất ở danh sách hoặc
+  quay về kho cha, không đưa sang trang Tài nguyên. Trang Tài nguyên bỏ khỏi menu;
+  URL cũ chuyển sang biên nhận vận hành. Thành viên chỉ xem được biên nhận hội
+  thoại của chính mình qua API đã kiểm quyền, không mở quyền xem tác vụ vận hành.
+
+Đăng ký thêm `source_purge_job` trên worker V1 hiện có, không thêm migration.
+Sau khi cập nhật mã cần khởi động lại phiên `v1-dev` để worker nạp hàm mới.
+Phiên triển khai chỉ kiểm tĩnh, **chưa chạy test hoặc xóa tài liệu thật**.
 
 Ví dụ thân yêu cầu xem trước, không chứa quyền hay trạng thái do client tự cấp:
 

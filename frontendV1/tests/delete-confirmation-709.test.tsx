@@ -45,7 +45,10 @@ beforeEach(() => {
     resource_id: "source-709",
     action: "delete",
     reason: "",
-    impact: { originals_and_raw_evidence: "retained" },
+    impact: {
+      originals_and_raw_evidence: "permanently_deleted",
+      permanent: true,
+    },
     preview_sha256: "a".repeat(64),
     status: "preview",
     result: null,
@@ -168,7 +171,9 @@ test.each(["source", "collection", "document"] as const)(
     await ready();
     expect(accepted).toHaveLength(0);
     expect(row.reason).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Xóa", exact: true }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Xóa(?: vĩnh viễn)?$/, exact: true }),
+    );
     await waitFor(() => expect(accepted).toHaveLength(1));
     expect(accepted[0]).toEqual({
       body: { preview_id: "preview-1", preview_sha256: "a".repeat(64) },
@@ -200,7 +205,9 @@ test("lost response retries the same deletion intent", async () => {
   mode = "network-once";
   mount();
   await ready();
-  fireEvent.click(screen.getByRole("button", { name: "Xóa", exact: true }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^Xóa(?: vĩnh viễn)?$/, exact: true }),
+  );
   const retry = await screen.findByRole("button", {
     name: "Thử lại cùng thao tác",
   });
@@ -213,7 +220,9 @@ test("a stale preview requires another explicit delete confirmation", async () =
   mode = "stale";
   mount();
   await ready();
-  fireEvent.click(screen.getByRole("button", { name: "Xóa", exact: true }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^Xóa(?: vĩnh viễn)?$/, exact: true }),
+  );
   await screen.findByText("Phạm vi xóa đã thay đổi.");
   mode = "ok";
   fireEvent.click(screen.getByRole("button", { name: "Thử lại", exact: true }));
@@ -225,7 +234,9 @@ test("revoked permission is shown without claiming deletion succeeded", async ()
   mode = "denied";
   mount();
   await ready();
-  fireEvent.click(screen.getByRole("button", { name: "Xóa", exact: true }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^Xóa(?: vĩnh viễn)?$/, exact: true }),
+  );
   await screen.findByText("Không còn quyền xóa.");
   expect(env.navigate).not.toHaveBeenCalled();
 });
@@ -237,7 +248,9 @@ test("an old account cannot submit a prepared deletion after logout", async () =
     clearAccessToken();
     setAccessToken("another-synthetic-account");
   });
-  fireEvent.click(screen.getByRole("button", { name: "Xóa", exact: true }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^Xóa(?: vĩnh viễn)?$/, exact: true }),
+  );
   expect(accepted).toHaveLength(0);
 });
 
@@ -245,9 +258,38 @@ test("an expired confirmation never submits a deletion", async () => {
   row.expires_at = new Date(Date.now() - 1000).toISOString();
   mount();
   await ready();
-  fireEvent.click(screen.getByRole("button", { name: "Xóa", exact: true }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^Xóa(?: vĩnh viễn)?$/, exact: true }),
+  );
   await screen.findByText("Thông tin xác nhận đã hết hạn. Vui lòng thử lại.");
   expect(accepted).toHaveLength(0);
+});
+
+test("published input blocks permanent deletion and keeps the user in knowledge", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      response(
+        {
+          status: 409,
+          code: "source_publication_in_use",
+          detail: "Tài liệu đang phát hành. Hãy thu hồi trước khi xóa.",
+        },
+        409,
+      ),
+    ),
+  );
+  mount();
+  await screen.findByText(
+    "Tài liệu đang phát hành. Hãy thu hồi trước khi xóa.",
+  );
+  expect(
+    screen
+      .getByRole("button", { name: "Xóa vĩnh viễn", exact: true })
+      .hasAttribute("disabled"),
+  ).toBe(true);
+  expect(accepted).toHaveLength(0);
+  expect(env.navigate).not.toHaveBeenCalled();
 });
 
 test("switching resources prepares a new confirmation instead of reusing the old one", async () => {
@@ -272,7 +314,9 @@ test("switching resources prepares a new confirmation instead of reusing the old
   rendered.rerender(view("second"));
   await waitFor(() => expect(previewCount).toBe(2));
   await ready();
-  fireEvent.click(screen.getByRole("button", { name: "Xóa", exact: true }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^Xóa(?: vĩnh viễn)?$/, exact: true }),
+  );
   await waitFor(() => expect(accepted).toHaveLength(1));
   expect(accepted[0].body).toMatchObject({ preview_id: "preview-2" });
   expect(row.resource_id).toBe("second");

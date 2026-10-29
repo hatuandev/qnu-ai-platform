@@ -90,6 +90,45 @@ export function getBreadcrumbs(
   pathname: string,
   search: Record<string, unknown> = {},
 ) {
+  if (pathname === "/settings" || pathname.startsWith("/settings/")) {
+    return [{ label: "QNU AI" }, { label: "Cấu hình" }];
+  }
+  if (pathname === "/providers" || pathname.startsWith("/modelops/providers")) {
+    return [
+      { label: "QNU AI" },
+      { label: "Cấu hình" },
+      { label: "Kết nối AI" },
+    ];
+  }
+  if (pathname.startsWith("/modelops/endpoints")) {
+    return [
+      { label: "QNU AI" },
+      { label: "Cấu hình" },
+      { label: "API tích hợp" },
+    ];
+  }
+  if (pathname.startsWith("/modelops/defaults")) {
+    return [
+      { label: "QNU AI" },
+      { label: "Cấu hình" },
+      { label: "Model mặc định" },
+    ];
+  }
+  if (pathname.startsWith("/modelops/models/")) {
+    return [
+      { label: "QNU AI" },
+      { label: "Cấu hình" },
+      { label: "Kết nối AI" },
+      { label: "Model" },
+    ];
+  }
+  if (pathname === "/workspaces") {
+    return [
+      { label: "QNU AI" },
+      { label: "Cấu hình" },
+      { label: "Quản lý đơn vị" },
+    ];
+  }
   const feature = workspaceFeatureKeys.find((key) =>
     isFeatureActive(key, pathname, search),
   );
@@ -103,23 +142,7 @@ export function getBreadcrumbs(
   if (pathname.startsWith("/workspaces/")) {
     return [
       { label: "QNU AI" },
-      { label: "Workspaces" },
-      { label: "Chi tiết" },
-    ];
-  }
-  if (pathname.startsWith("/modelops/providers/")) {
-    return [
-      { label: "QNU AI" },
-      { label: "ModelOps" },
-      { label: "Nhà cung cấp" },
-      { label: "Chi tiết" },
-    ];
-  }
-  if (pathname.startsWith("/modelops/models/")) {
-    return [
-      { label: "QNU AI" },
-      { label: "ModelOps" },
-      { label: "Model" },
+      { label: "Kho tri thức" },
       { label: "Chi tiết" },
     ];
   }

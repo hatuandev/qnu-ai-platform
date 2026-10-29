@@ -24,10 +24,17 @@ class QdrantVectorStore:
         if not point_ids:
             return
         response = await self._request(
-            "POST", f"/collections/{collection}/points/delete?wait=true", body={"points": point_ids},
+            "POST",
+            f"/collections/{collection}/points/delete?wait=true",
+            body={"points": point_ids},
         )
-        if response.status_code != 404 and response.json().get("result", {}).get("status") != "completed":
-            raise DependencyUnavailable("Qdrant chưa hoàn tất xóa vector.", code="purge_vector_pending")
+        if (
+            response.status_code != 404
+            and response.json().get("result", {}).get("status") != "completed"
+        ):
+            raise DependencyUnavailable(
+                "Qdrant chưa hoàn tất xóa vector.", code="purge_vector_pending"
+            )
 
     def __init__(
         self, base_url: str | None = None, *, transport: httpx.AsyncBaseTransport | None = None

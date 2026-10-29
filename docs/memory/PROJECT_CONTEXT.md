@@ -7,6 +7,8 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-10-29 — Context716: xóa vĩnh viễn tài liệu nguồn.** Còn bản published thì chặn, phải withdraw; durable purge giữ scope/quyền, dọn đúng file/point và giữ index còn lại. FE xác nhận/theo dõi tại kho, bỏ Tài nguyên. 13 regression mới NOT RUN; Ruff/Biome/TS kiểm tĩnh đạt, chưa nghiệm thu runtime. Không xóa thật/restart/migrate/model/push. [Nhật ký716](../nhat_ky/2026-10-29_phien_716_xoa_vinh_vien_tai_lieu.md).
+
 - **2026-10-29 — Context715: sửa P2 DOCX renderer.** HTTP Gotenberg ngoài khóa MuPDF, log chỉ status/type, fixture offline cho unit render/native.6regression viết chưa chạy; scopedRuff/AST/UTF8/LF/diff đạt. Test/runtime NOT RUN theo yêu cầu; không restart/env/model/migrate/push. [Nhật ký715](../nhat_ky/2026-10-29_phien_715_sua_p2_docx_renderer.md).
 
 - **2026-10-29 — Context714: sửa hai P1 DOCX renderer.** Settings/.env thống nhất, profile DOCX ghim converter/endpoint/revision/rasterizer; lỗi không fallback, resume dùng PDF kiểm hash đã lưu. Legacy/PDF identity giữ;6regression mới chưa chạy. ScopedRuff/AST/UTF8/LF/diff đạt, test/runtime NOT RUN theo yêu cầu. Không restart/env/migrate/model/push. [Nhật ký714](../nhat_ky/2026-10-29_phien_714_sua_p1_docx_renderer.md).

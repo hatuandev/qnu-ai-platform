@@ -7,6 +7,8 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+- **2026-10-29 — Context716: xóa vĩnh viễn tài liệu nguồn.** Còn bản published thì chặn, phải withdraw; durable purge giữ scope/quyền, dọn đúng file/point và giữ index còn lại. FE xác nhận/theo dõi tại kho, bỏ Tài nguyên. 13 regression mới NOT RUN; Ruff/Biome/TS kiểm tĩnh đạt, chưa nghiệm thu runtime. Không xóa thật/restart/migrate/model/push. [Nhật ký716](./2026-10-29_phien_716_xoa_vinh_vien_tai_lieu.md).
+
 - **2026-10-29 — Context715: sửa P2 DOCX renderer.** Tách HTTP khỏi khóa MuPDF, log lọc và unit test offline; chỉ kiểm tĩnh/Ruff, không test/runtime/restart. [Nhật ký715](./2026-10-29_phien_715_sua_p2_docx_renderer.md).
 
 - **2026-10-29 — Context714: sửa hai P1 DOCX renderer.** Settings/.env thống nhất, profile ghim và saved PDF recovery; legacy/PDF identity giữ. Chỉ kiểm tĩnh/Ruff, không test/runtime/restart. [Nhật ký714](./2026-10-29_phien_714_sua_p1_docx_renderer.md).

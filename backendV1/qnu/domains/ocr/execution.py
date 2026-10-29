@@ -524,6 +524,11 @@ async def _persist_render(
     await commit_owned(db, run)
 
 
+def _refresh_page_counters(run: OcrProcessingRun, rows: dict[int, OcrRunPage]) -> None:
+    run.pages_done = sum(1 for row in rows.values() if row.status == "completed")
+    run.pages_failed = sum(1 for row in rows.values() if row.status == "failed")
+
+
 async def _sync_pages(
     db: AsyncSession, run: OcrProcessingRun, rendered: RenderedDocument
 ) -> dict[int, OcrRunPage]:
@@ -561,6 +566,7 @@ async def _sync_pages(
         row.height = page.height
         row.image_key = artifact_key(run, "page_image", page.page_number, page.sha256)
     run.pages_total = len(rendered.pages)
+    _refresh_page_counters(run, existing)
     await commit_owned(db, run)
     return existing
 
@@ -623,6 +629,7 @@ async def _ocr_pages(
         except AppException as exc:
             row.status = "failed"
             row.error_code = exc.code
+            _refresh_page_counters(run, rows)
             await commit_owned(db, run)
             raise
 
@@ -662,12 +669,14 @@ async def _ocr_pages(
             await _save_raw(db, blob_store, run, row, exc.raw_body)
             row.status = "failed"
             row.error_code = exc.code
+            _refresh_page_counters(run, rows)
             await commit_owned(db, run)
             await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
             continue
         except AppException as exc:
             row.status = "uncertain" if is_uncertain(exc.code) else "failed"
             row.error_code = exc.code
+            _refresh_page_counters(run, rows)
             await commit_owned(db, run)
             await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
             continue
@@ -690,6 +699,7 @@ async def _ocr_pages(
         except AppException as exc:
             row.status = "failed"
             row.error_code = exc.code
+            _refresh_page_counters(run, rows)
             await commit_owned(db, run)
             await usage_service.settle(db, usage.id, total_tokens=call.usage_tokens, failed=True)
             continue
@@ -701,6 +711,7 @@ async def _ocr_pages(
         row.status = "completed"
         row.error_code = None
         row.usage_tokens = call.usage_tokens
+        _refresh_page_counters(run, rows)
         await commit_owned(db, run)
         await usage_service.settle(db, usage.id, total_tokens=call.usage_tokens)
 

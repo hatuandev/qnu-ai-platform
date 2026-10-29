@@ -5,8 +5,8 @@ from __future__ import annotations
 from arq import cron
 from arq.connections import RedisSettings
 
-from qnu.platform.config import get_settings
 from qnu.domains.lifecycle.purge import source_purge_job
+from qnu.platform.config import get_settings
 from qnu.workers.tasks.compilation import (
     compilation_reconcile,
     compile_run,

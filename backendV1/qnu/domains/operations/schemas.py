@@ -13,6 +13,9 @@ class JobView(BaseModel):
     id: str
     workspace_id: str
     collection_id: str | None
+    source_id: str | None = None
+    revision_id: str | None = None
+    compilation_run_id: str | None = None
     status: str
     created_at: datetime
     started_at: datetime | None = None

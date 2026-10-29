@@ -74,3 +74,8 @@ async def resources(
     offset: int = Query(0, ge=0),
 ):
     return await service.resources(db, actor, workspace_id, limit, offset)
+
+
+@router.get("/source-deletions", response_model=list[ActionResponse])
+async def pending_source_deletions(workspace_id: str, collection_id: str, db: DB, actor: Actor):
+    return await service.pending_source_deletions(db, actor, workspace_id, collection_id)

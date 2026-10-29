@@ -330,3 +330,24 @@ async def resources(
         "limit": limit,
         "offset": offset,
     }
+
+
+async def pending_source_deletions(db, actor, workspace_id, collection_id):
+    await authorize(db, actor, workspace_id, "source", "delete")
+    return list(
+        (
+            await db.scalars(
+                select(LifecycleAction)
+                .where(
+                    LifecycleAction.workspace_id == workspace_id,
+                    LifecycleAction.actor_ref == actor_ref(actor),
+                    LifecycleAction.kind == "source",
+                    LifecycleAction.action == "delete",
+                    LifecycleAction.status == "pending",
+                    LifecycleAction.impact["collection_id"].as_string() == collection_id,
+                )
+                .order_by(LifecycleAction.created_at.desc())
+                .limit(50)
+            )
+        ).all()
+    )

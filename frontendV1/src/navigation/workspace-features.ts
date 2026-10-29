@@ -78,28 +78,28 @@ export const workspaceFeatures = {
   },
   members: {
     title: "Thành viên",
-    group: "Quản trị",
+    group: "Cấu hình đơn vị",
     icon: UsersRound,
     kind: "workspace",
     to: "/workspaces/$workspaceId/members",
   },
   models: {
-    title: "Model workspace",
-    group: "Quản trị",
+    title: "Model được phép dùng",
+    group: "Cấu hình đơn vị",
     icon: Settings2,
     kind: "workspace",
     to: "/workspaces/$workspaceId/models",
   },
   quota: {
     title: "Hạn mức",
-    group: "Quản trị",
+    group: "Cấu hình đơn vị",
     icon: Gauge,
     kind: "workspace",
     to: "/workspaces/$workspaceId/quota",
   },
   audit: {
     title: "Nhật ký",
-    group: "Quản trị",
+    group: "Cấu hình đơn vị",
     icon: FileClock,
     kind: "workspace",
     to: "/workspaces/$workspaceId/audit",
@@ -121,7 +121,7 @@ export const workspaceFeatures = {
   },
   backups: {
     title: "Sao lưu",
-    group: "Vận hành",
+    group: "Cấu hình đơn vị",
     icon: Archive,
     kind: "workspace",
     to: "/workspaces/$workspaceId/operations",
@@ -129,7 +129,7 @@ export const workspaceFeatures = {
   },
   storage: {
     title: "Dọn dữ liệu",
-    group: "Vận hành",
+    group: "Cấu hình đơn vị",
     icon: Database,
     kind: "workspace",
     to: "/workspaces/$workspaceId/operations",
@@ -138,14 +138,36 @@ export const workspaceFeatures = {
 } as const;
 
 export type WorkspaceFeature = keyof typeof workspaceFeatures;
-export const workspaceFeatureKeys = Object.keys(
-  workspaceFeatures,
-).filter((key) => key !== "resources") as WorkspaceFeature[];
+/** The 4 workspace-scoped items among the 6 primary sidebar entries. */
+export const primaryWorkspaceFeatureKeys: WorkspaceFeature[] = [
+  "collections",
+  "assistants",
+  "conversations",
+  "jobs",
+];
+export const workspaceFeatureKeys: WorkspaceFeature[] = [
+  "ocr",
+  "compiler",
+  "documents",
+  "search",
+  "answers",
+  "evaluation",
+  "collections",
+  "assistants",
+  "conversations",
+  "jobs",
+  "members",
+  "models",
+  "quota",
+  "audit",
+  "backups",
+  "storage",
+];
 export const workspaceFeatureGroups = [
   "Tri thức",
   "Trợ lý",
-  "Quản trị",
   "Vận hành",
+  "Cấu hình đơn vị",
 ] as const;
 export type FeatureScope = { workspaceId?: string; collectionId?: string };
 
@@ -304,4 +326,79 @@ export function isFeatureActive(
   return new RegExp(
     `^/(?:collections|knowledge)/[^/]+/${destination.page}$`,
   ).test(suffix);
+}
+
+export function isPrimarySidebarFeatureActive(
+  feature: WorkspaceFeature,
+  pathname: string,
+  search: Record<string, unknown>,
+): boolean {
+  if (feature === "collections") {
+    if (
+      pathname.startsWith("/workspaces/choose/") &&
+      [
+        "collections",
+        "ocr",
+        "compiler",
+        "documents",
+        "search",
+        "answers",
+        "evaluation",
+      ].includes(pathname.replace("/workspaces/choose/", ""))
+    ) {
+      return true;
+    }
+    const match = /^\/workspaces\/[^/]+(.*)/.exec(pathname);
+    if (!match) return false;
+    const suffix = match[1].replace(/\/$/, "");
+    return (
+      suffix === "/collections" ||
+      suffix === "/knowledge" ||
+      suffix.startsWith("/collections/") ||
+      suffix.startsWith("/knowledge/")
+    );
+  }
+  return isFeatureActive(feature, pathname, search);
+}
+
+export function isSettingsRouteActive(
+  pathname: string,
+  search: Record<string, unknown>,
+): boolean {
+  if (
+    pathname === "/settings" ||
+    pathname.startsWith("/settings/") ||
+    pathname === "/providers" ||
+    pathname.startsWith("/modelops/") ||
+    pathname === "/workspaces"
+  ) {
+    return true;
+  }
+  if (
+    pathname.startsWith("/workspaces/choose/") &&
+    ["members", "models", "quota", "audit", "backups", "storage"].includes(
+      pathname.replace("/workspaces/choose/", ""),
+    )
+  ) {
+    return true;
+  }
+  const match = /^\/workspaces\/[^/]+(.*)/.exec(pathname);
+  if (!match) return false;
+  const suffix = match[1].replace(/\/$/, "");
+  if (
+    suffix === "/members" ||
+    suffix === "/models" ||
+    suffix === "/quota" ||
+    suffix === "/audit" ||
+    suffix === "/resources"
+  ) {
+    return true;
+  }
+  if (
+    suffix === "/operations" &&
+    (search.view === "backups" || search.view === "storage")
+  ) {
+    return true;
+  }
+  return false;
 }

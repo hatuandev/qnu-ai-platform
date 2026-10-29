@@ -5,6 +5,15 @@ không thay chính sách dữ liệu chung của backend cũ.
 
 ## Tài liệu cũ không còn được sử dụng
 
+**Cập nhật 2026-10-29:** riêng **xóa tài liệu nguồn** là xóa vĩnh viễn. Thu hồi
+mọi bản biên soạn đang phát hành (`withdraw`) → mở menu `⋯` của tài liệu →
+`Xóa vĩnh viễn` → xác nhận phạm vi → theo dõi ngay trong kho đến khi hoàn tất.
+Tắt chatbot hoặc lưu trữ nguồn chưa đủ điều kiện xóa. Tệp gốc, revision, raw OCR,
+MD/JSON và nội dung xử lý phụ thuộc bị xóa; không có restore. Yêu cầu đang chờ
+có thể tiếp tục sau khi tải lại trang; lỗi storage giữ trạng thái chưa hoàn tất.
+Các bước lưu trữ/thùng rác dưới đây còn áp dụng cho loại tài nguyên khác.
+Xem [hợp đồng và giới hạn](../../backendV1/docs/resource-lifecycle.md).
+
 1. Chọn tài liệu nguồn, văn bản biên soạn hoặc cả kho.
 2. Xem trước ảnh hưởng đến publication, tác vụ và phạm vi chatbot/hội thoại.
 3. Xác nhận lưu trữ hoặc đưa vào thùng rác bằng actor có quyền.

@@ -141,7 +141,13 @@ export function SourceActions({
             </>
           )}
           {canLifecycleAction(role, "source", "archive") && (
-            <DropdownMenuItem onSelect={() => onLifecycle ? onLifecycle("archive", source) : setOperation("archive")}>
+            <DropdownMenuItem
+              onSelect={() =>
+                onLifecycle
+                  ? onLifecycle("archive", source)
+                  : setOperation("archive")
+              }
+            >
               <Archive />
               Lưu trữ
             </DropdownMenuItem>
@@ -149,7 +155,11 @@ export function SourceActions({
           {canLifecycleAction(role, "source", "delete") && (
             <DropdownMenuItem
               className="text-destructive"
-              onSelect={() => onLifecycle ? onLifecycle("delete", source) : setOperation("delete")}
+              onSelect={() =>
+                onLifecycle
+                  ? onLifecycle("delete", source)
+                  : setOperation("delete")
+              }
             >
               <Trash2 />
               Xóa vĩnh viễn
@@ -163,7 +173,14 @@ export function SourceActions({
           target={{ kind: "source", resource_id: source.id, action: operation }}
           label={source.title}
           onClose={() => setOperation(null)}
-          onCompleted={() => { setOperation(null); toast.success(operation === "delete" ? "Đã xóa vĩnh viễn tài liệu." : "Đã lưu trữ tài liệu."); }}
+          onCompleted={() => {
+            setOperation(null);
+            toast.success(
+              operation === "delete"
+                ? "Đã xóa vĩnh viễn tài liệu."
+                : "Đã lưu trữ tài liệu.",
+            );
+          }}
         />
       )}
     </>

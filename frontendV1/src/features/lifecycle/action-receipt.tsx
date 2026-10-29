@@ -80,17 +80,15 @@ export function LifecycleReceiptView({
       action.status === "completed" ? (
         <p>Đã khôi phục trợ lý ở trạng thái tắt. Hãy bật lại khi sẵn sàng.</p>
       ) : null}
-      {(
-        <Button asChild size="sm" variant="outline">
-          <Link
-            to="/workspaces/$workspaceId/operations"
-            params={{ workspaceId }}
-            search={{ page: 1, pageSize: 20, lifecycleActionId: action.id }}
-          >
-            Theo dõi biên nhận
-          </Link>
-        </Button>
-      )}
+      <Button asChild size="sm" variant="outline">
+        <Link
+          to="/workspaces/$workspaceId/operations"
+          params={{ workspaceId }}
+          search={{ page: 1, pageSize: 20, lifecycleActionId: action.id }}
+        >
+          Theo dõi biên nhận
+        </Link>
+      </Button>
     </div>
   );
 }

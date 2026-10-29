@@ -1,6 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { ResourcesPage } from "@/features/lifecycle/resources-page";
 
 const schema = z.object({
   page: z.coerce.number().int().min(1).max(100000).default(1),
@@ -13,15 +12,12 @@ export const Route = createFileRoute("/workspaces/$workspaceId/resources")({
 function ResourcesRoute() {
   const { workspaceId } = Route.useParams();
   const search = Route.useSearch();
-  const navigate = Route.useNavigate();
   return (
-    <ResourcesPage
-      workspaceId={workspaceId}
-      page={search.page}
-      actionId={search.actionId}
-      onPageChange={(page) =>
-        void navigate({ search: (previous) => ({ ...previous, page }) })
-      }
+    <Navigate
+      to="/workspaces/$workspaceId/operations"
+      params={{ workspaceId }}
+      search={{ page: 1, pageSize: 20, lifecycleActionId: search.actionId }}
+      replace
     />
   );
 }

@@ -485,6 +485,35 @@ export function SourceDetailPage({
     activeRevision?.content_type ?? source?.content_type,
     activeRevision?.file_name ?? source?.file_name,
   );
+  const lifecycleDialog = lifecycleOp ? (
+    <LifecycleActionDialog
+      key="source-lifecycle"
+      workspaceId={workspaceId}
+      target={{ kind: "source", resource_id: sourceId, action: lifecycleOp }}
+      label={source?.title ?? "Tài liệu"}
+      onClose={() => {
+        setLifecycleOp(null);
+        if (!source || sourceQuery.isError)
+          void navigate({
+            to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
+            params: { workspaceId, knowledgeId: collectionId },
+            search: { page: 1, pageSize: 20 },
+          });
+      }}
+      onCompleted={() => {
+        toast.success(
+          lifecycleOp === "delete"
+            ? "Đã xóa vĩnh viễn tài liệu."
+            : "Đã lưu trữ tài liệu.",
+        );
+        void navigate({
+          to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
+          params: { workspaceId, knowledgeId: collectionId },
+          search: { page: 1, pageSize: 20 },
+        });
+      }}
+    />
+  ) : null;
 
   if (sourceQuery.isLoading || collectionQuery.isLoading) {
     return (
@@ -497,18 +526,7 @@ export function SourceDetailPage({
   }
 
   if (sourceQuery.isError || !source) {
-    if (lifecycleOp) return (
-      <LifecycleActionDialog workspaceId={workspaceId}
-        target={{ kind: "source", resource_id: sourceId, action: lifecycleOp }} label="Tài liệu"
-        onClose={() => { setLifecycleOp(null); void navigate({
-          to: "/workspaces/$workspaceId/knowledge/$knowledgeId", params: { workspaceId, knowledgeId: collectionId },
-          search: { page: 1, pageSize: 20 },
-        }); }}
-        onCompleted={() => { toast.success("Thao tác tài liệu đã hoàn tất."); void navigate({
-          to: "/workspaces/$workspaceId/knowledge/$knowledgeId", params: { workspaceId, knowledgeId: collectionId },
-          search: { page: 1, pageSize: 20 },
-        }); }} />
-    );
+    if (lifecycleOp) return <div className="space-y-4">{lifecycleDialog}</div>;
     return (
       <div className="space-y-4">
         <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs">
@@ -531,6 +549,7 @@ export function SourceDetailPage({
 
   return (
     <div className="space-y-4">
+      {lifecycleDialog}
       {/* 1. Header trên cùng: Tên tài liệu, phiên bản, trạng thái & Hàng hành động */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-border/70">
         <div className="min-w-0 space-y-1">
@@ -1048,23 +1067,6 @@ export function SourceDetailPage({
       )}
 
       {/* Lifecycle Actions (Lưu trữ / Xóa) */}
-      {lifecycleOp && (
-        <LifecycleActionDialog
-          workspaceId={workspaceId}
-          target={{
-            kind: "source",
-            resource_id: source.id,
-            action: lifecycleOp,
-          }}
-          label={source.title}
-          onClose={() => setLifecycleOp(null)}
-          onCompleted={() => {
-            toast.success(lifecycleOp === "delete" ? "Đã xóa vĩnh viễn tài liệu." : "Đã lưu trữ tài liệu.");
-            void navigate({ to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
-              params: { workspaceId, knowledgeId: collectionId }, search: { page: 1, pageSize: 20 } });
-          }}
-        />
-      )}
     </div>
   );
 }

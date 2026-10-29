@@ -93,6 +93,11 @@ async def view(db: AsyncSession, kind: str, row: Base) -> JobView:
         id=getattr(row, spec.id_field),
         workspace_id=row.workspace_id,
         collection_id=getattr(row, "collection_id", None),
+        source_id=getattr(row, "source_id", None),
+        revision_id=getattr(row, "revision_id", None),
+        compilation_run_id=(
+            getattr(row, "compilation_run_id", None) or (row.id if kind == "compiler" else None)
+        ),
         status=row.status,
         created_at=getattr(row, spec.created_field),
         started_at=getattr(row, "started_at", None),

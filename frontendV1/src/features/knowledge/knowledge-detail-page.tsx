@@ -72,7 +72,11 @@ import type {
   KBSource,
 } from "@/features/knowledge/types";
 import { LifecycleActionDialog } from "@/features/lifecycle/action-dialog";
-import { canLifecycleAction } from "@/features/lifecycle/permissions";
+import { PendingSourceDeletions } from "@/features/lifecycle/pending-source-deletions";
+import {
+  canLifecycleAction,
+  isLifecycleAdmin,
+} from "@/features/lifecycle/permissions";
 import type { LifecycleOperation } from "@/features/lifecycle/types";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { formatDateTimeValue } from "@/lib/date-utils";
@@ -132,7 +136,8 @@ export function KnowledgeDetailPage({
   const [collectionLifecycleOp, setCollectionLifecycleOp] =
     useState<LifecycleOperation | null>(null);
   const [sourceLifecycle, setSourceLifecycle] = useState<{
-    source: KBSource; operation: LifecycleOperation;
+    source: KBSource;
+    operation: LifecycleOperation;
   } | null>(null);
 
   const [folderFormOpen, setFolderFormOpen] = useState(false);
@@ -385,6 +390,13 @@ export function KnowledgeDetailPage({
               }}
               label={collection.name}
               onClose={() => setCollectionLifecycleOp(null)}
+              onCompleted={() =>
+                void navigate({
+                  to: "/workspaces/$workspaceId/knowledge",
+                  params: { workspaceId },
+                  search: { page: 1, pageSize: 20 },
+                })
+              }
             />
           )}
         </div>
@@ -657,7 +669,9 @@ export function KnowledgeDetailPage({
                             workspaceId={workspaceId}
                             collectionId={knowledgeId}
                             source={s}
-                            onLifecycle={(operation, source) => setSourceLifecycle({ source, operation })}
+                            onLifecycle={(operation, source) =>
+                              setSourceLifecycle({ source, operation })
+                            }
                             role={role}
                             canManage={canManage}
                             onOcr={() => {
@@ -808,7 +822,9 @@ export function KnowledgeDetailPage({
                               workspaceId={workspaceId}
                               collectionId={knowledgeId}
                               source={s}
-                              onLifecycle={(operation, source) => setSourceLifecycle({ source, operation })}
+                              onLifecycle={(operation, source) =>
+                                setSourceLifecycle({ source, operation })
+                              }
                               role={role}
                               canManage={canManage}
                               onOcr={() => {
@@ -915,14 +931,27 @@ export function KnowledgeDetailPage({
           void collectionQuery.refetch();
         }}
       />
+      <PendingSourceDeletions
+        workspaceId={workspaceId}
+        collectionId={knowledgeId}
+        enabled={isLifecycleAdmin(role)}
+      />
       {sourceLifecycle ? (
         <LifecycleActionDialog
           workspaceId={workspaceId}
-          target={{ kind: "source", resource_id: sourceLifecycle.source.id, action: sourceLifecycle.operation }}
+          target={{
+            kind: "source",
+            resource_id: sourceLifecycle.source.id,
+            action: sourceLifecycle.operation,
+          }}
           label={sourceLifecycle.source.title}
           onClose={() => setSourceLifecycle(null)}
           onCompleted={() => {
-            toast.success(sourceLifecycle.operation === "delete" ? "Đã xóa vĩnh viễn tài liệu." : "Đã lưu trữ tài liệu.");
+            toast.success(
+              sourceLifecycle.operation === "delete"
+                ? "Đã xóa vĩnh viễn tài liệu."
+                : "Đã lưu trữ tài liệu.",
+            );
             setSourceLifecycle(null);
             void sourcesQuery.refetch();
             void collectionQuery.refetch();
