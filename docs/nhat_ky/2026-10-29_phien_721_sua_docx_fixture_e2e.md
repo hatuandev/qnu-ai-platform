@@ -1,0 +1,26 @@
+# Phiên 721 — Sửa DOCX fixture khiến Gotenberg lỗi chuyển đổi
+
+Ngày: 2026-10-29.
+
+## Bằng chứng và phạm vi
+
+Người dùng báo extraction vẫn FAIL với docx_conversion_failed và hỏi có cần gửi cấu hình server AI. Đọc log worker của phiên thử xác nhận converter HTTP 500; đọc log Gotenberg của đúng Docker project E2E xác nhận `convert to PDF: supervisor run task: uno exception`. Không gọi model, không gửi dữ liệu tới upstream và không chạy lại E2E.
+
+Đọc scripts/e2e_fixtures.py và ZIP fixture cũ xác định DOCX chỉ có word/document.xml và Content_Types rỗng, không root officeDocument relationship/content type bắt buộc. Đây là lỗi bộ tạo dữ liệu thử, xảy ra trước OCR, không có căn cứ yêu cầu credential/model server thật.
+
+## Sửa mã
+
+- scripts/e2e_fixtures.py: tạo package OPC đầy đủ 6 part (Content_Types, root relationship, document, document relationships, styles, footnotes), khai báo bảng/grid và trang, giữ dữ liệu tiếng Việt giả lập. ZIP timestamp cố định cho fixture DOCX tái lập.
+- Thêm kiểm tra cấu trúc fixture trước upload: đọc XML, kiểm document content type và root relationship. Không xem kiểm tra này là nghiệm thu LibreOffice render.
+- scripts/v1_e2e_session.py: khi mở serve trên phiên đã có fixture, kiểm tra DOCX trước khi migrate/start để báo lỗi fixture cũ sớm; không tự ghi đè file/manifest/revision đã lưu.
+- Cập nhật hướng dẫn tạo phiên mới sau Ctrl+C serve → cleanup → init → serve rồi chạy lại navigation/upload/extraction. Phiên cũ đã lưu bytes hỏng, nên retry OCR không sửa được đầu vào. Không sửa backend parser/converter hay bỏ guard lỗi.
+
+Áp dụng skill qnu-knowledge-ingestion để giữ file gốc và revision; đây là sửa fixture cho phiên thử mới, không âm thầm sửa nguồn cũ.
+
+## Kiểm chứng thực hiện
+
+- PASS: Ruff check/format check trên hai file Python; AST/UTF-8/LF và git diff --check.
+- PASS: kiểm tra offline một DOCX mới trong TemporaryDirectory dưới tmp: ZIP đọc được, 6 XML part, tiếng Việt, bảng 4 cột/4 dòng, footnote reference/part tồn tại. Thư mục tạm được tự dọn sau kiểm tra.
+- PASS: validator từ chối fixture cũ đúng lỗi thiếu cấu trúc. Chỉ đọc tệp cũ, không thay đổi bytes, checkpoint hoặc DB.
+- Chỉ đọc log worker và docker logs của project E2E; không restart, migration, cleanup hoặc gọi API ghi.
+- NOT RUN: chuyển đổi Gotenberg sau sửa, Playwright/E2E và live OCR/model. Chưa khẳng định extraction PASS; người dùng chạy phiên mới để nghiệm thu.

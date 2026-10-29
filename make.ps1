@@ -10,7 +10,7 @@ param (
         "lint", "lint-fix", "typecheck", "build",
         "v1-help", "v1-dev", "v1-be", "v1-worker", "v1-fe", "v1-check", "v1-infra-up",
         "v1-install-be", "v1-install-fe", "v1-migrate", "v1-db-check",
-        "v1-test-be", "v1-test-fe", "v1-lint", "v1-typecheck", "v1-build",
+        "v1-test-be", "v1-test-fe", "v1-test-e2e", "v1-e2e", "v1-lint", "v1-typecheck", "v1-build",
         "help"
     )]
     [string]$Command = "help",
@@ -18,6 +18,10 @@ param (
     [string[]]$V1Arguments
 )
 
+if ($Command -eq "v1-e2e") {
+    & (Join-Path $PSScriptRoot "test-v1-e2e.ps1") @V1Arguments
+    exit $LASTEXITCODE
+}
 if ($Command.StartsWith("v1-")) {
     $V1Python = Join-Path $PSScriptRoot "backendV1/.venv/Scripts/python.exe"
     if (-not (Test-Path -LiteralPath $V1Python)) { $V1Python = "python" }

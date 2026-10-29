@@ -1,0 +1,24 @@
+# Phiên 720 — Sửa quota fixture E2E và phục hồi extraction
+
+Ngày: 2026-10-29.
+
+## Bằng chứng và nguyên nhân
+
+Người dùng cung cấp log Playwright: navigation 1 passed, upload 1 passed, extraction 1 failed vì job báo quota_not_configured; các chặng sau không chạy do thiếu prerequisite. Đây là kết quả do người dùng chạy, không phải một lượt kiểm chứng độc lập của agent. Đọc usage/service.py và usage/router.py xác nhận mọi inference reserve cần WorkspaceQuota theo tháng UTC. Fixture trước chỉ tạo workspace/provider/grant, chưa cấp quota.
+
+## Thay đổi có phạm vi
+
+- `frontendV1/e2e/stages/session.ts`: helper xác minh workspace.code khớp run ID. Workflow chỉ tạo quota tháng hiện tại 1.000.000 token nếu chưa cấu hình; không đặt lại usage, tăng quota đã có hoặc bỏ trạng thái khóa. Live thiếu quota báo BLOCKED.
+- Phục hồi riêng job failed/quota_not_configured trong workflow chưa có bản biên soạn: tạo processing run strategy=auto, force=false qua API hiện có, lưu ID lượt lỗi trước và run mới vào checkpoint; tối đa một lần mỗi nguồn. Không sửa job cũ, raw OCR hoặc bytes gốc; lỗi khác vẫn giữ nguyên thất bại.
+- `workflow.spec.ts`: kiểm quota ở navigation và extraction, phục hồi nguồn đã lỗi quota trước khi chờ kết quả, cho phép người dùng chạy lại extraction trên phiên hiện tại.
+- `scripts/v1_e2e_session.py`: tách thông báo thiếu prerequisite khỏi phiên đã hoàn tất purge, tránh hiểu nhầm đang bị xóa dữ liệu.
+- Bổ sung hướng dẫn khôi phục ở `docs/quy_trinh/V1_E2E_TUNG_BUOC.md`. Không đổi backend, chính sách quota hoặc cấu hình dev/server đang chạy.
+
+## Kiểm chứng
+
+- PASS: Biome scoped 2 file test, TypeScript `tsc --noEmit -p tsconfig.e2e.json`, Ruff check/format check runner; AST/UTF-8/LF và git diff --check.
+- NOT RUN: E2E sau sửa, Docker, API/model inference, migration, retry OCR thực tế. Giữ người dùng tự chạy từng lệnh; không sửa checkpoint hay quota dữ liệu qua runtime trong phiên này.
+
+## Bàn giao
+
+Giữ serve đang chạy; chạy lại `test-v1-e2e.ps1 run extraction --headed`. Không cần init/upload lại hoặc restart vì phần sửa nằm ở mã test được tải mới mỗi lượt. Nếu extraction PASS thì tiếp tục compilation/publication/chat/permissions/lifecycle. Chưa kết luận E2E đã đạt sau bản sửa.

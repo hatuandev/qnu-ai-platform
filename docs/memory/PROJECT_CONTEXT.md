@@ -7,6 +7,16 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-10-29 — Context723: sửa assertion API key E2E.** Người dùng chạy6chặng đến chat đạt; permissions lỗi expected401/received403. Đối chiếu backend: revoked trả403/api_key_inactive, unknown trả401/invalid_api_key. Spec kiểm chính xác status/code và khóa mới hoạt động sau rotate; không sửa BE. Biome/TS đạt; permissions/lifecycle sau sửa NOT RUN, giữ serve/phiên hiện tại. [Nhật ký723](../nhat_ky/2026-10-29_phien_723_sua_assertion_api_key_e2e.md).
+
+- **2026-10-29 — Context722: sửa cleanup E2E kẹt cờ serve cũ.** Kiểm tra chỉ đọc xác nhận cổng đã đóng/không còn client; thêm OS lease và guard TCP để nhận diện trạng thái cũ, không tự kill tiến trình.6regression offline/Ruff/AST đạt; cleanup Docker/E2E thực tế NOT RUN, người dùng chạy lại cleanup/init/serve. [Nhật ký722](../nhat_ky/2026-10-29_phien_722_sua_cleanup_e2e_stale_serve.md).
+
+- **2026-10-29 — Context721: sửa DOCX fixture E2E.** Log worker/Gotenberg xác nhận HTTP500/UNO; fixture cũ thiếu OPC content type/root relationship. Bổ sung DOCX package/styles/bảng/footnote và preflight, giữ revision gốc; cần phiên thử mới. Offline XML/ZIP/Ruff/AST đạt; Gotenberg/E2E sau sửa NOT RUN, không cần cấu hình model thật. [Nhật ký721](../nhat_ky/2026-10-29_phien_721_sua_docx_fixture_e2e.md).
+
+- **2026-10-29 — Context720: sửa quota fixture E2E.** Log người dùng: navigation/upload đạt, extraction lỗi quota_not_configured. Thêm quota workflow hữu hạn theo tháng và phục hồi một lần job quota lỗi qua API, giữ nguồn gốc/checkpoint; làm rõ BLOCKED prerequisite. Biome/TS/Ruff/AST đạt; E2E sau sửa NOT RUN, không đổi backend hoặc dữ liệu runtime. [Nhật ký720](../nhat_ky/2026-10-29_phien_720_sua_quota_fixture_e2e.md).
+
+- **2026-10-29 — Context719: E2E V1 chạy theo từng lệnh.** Thêm init/serve/run từng chặng, checkpoint và môi trường Docker riêng; bỏ FLUSHDB dùng chung, mock đúng contract và probe purge PostgreSQL/S3/Qdrant. Ruff/Biome/TypeScript/PowerShell/help kiểm tĩnh đạt; E2E/runtime/model NOT RUN, người dùng tự chạy. Không restart/migrate/xóa dữ liệu hiện có/push. [Nhật ký719](../nhat_ky/2026-10-29_phien_719_e2e_theo_tung_lenh.md).
+
 - **2026-10-29 — Context718: sửa upload trùng sau xóa mềm trên API cũ.** Chẩn đoán chỉ đọc xác định runtime chưa nạp purge; thêm inventory legacy/Hoàn tất xóa tại kho và thông báo duplicate theo trạng thái, giữ guard published/quyền/hash. Ruff/Biome/TS/build đạt,12regression NOT RUN. Chưa restart/xóa dữ liệu thật/model/migrate/push. [Nhật ký718](../nhat_ky/2026-10-29_phien_718_sua_upload_sau_xoa_cu.md).
 
 - **2026-10-29 — Context717: tinh gọn frontendV1 và luồng demo tài liệu → hỏi đáp.** Sidebar6mục, chọn Đơn vị cố định trên Topbar, trung tâm Cấu hình4nhóm; kho mở trực tiếp Tài liệu/Biên soạn/Phát hành + Công cụ nâng cao, bỏ màn trung gian. Upload gửi auto_extract=true, thanh tiến độ thật ProcessingProgress nối counter trang BE và JobView link nguồn/biên soạn; thêm Chat thử, link trích dẫn về nguồn/bản phát hành và điều kiện chuyển bước. Giữ nguyên diff Context716. Scoped Ruff4file, Biome32file, typecheck và build PASS; Pytest/Vitest/E2E/live model NOT RUN theo yêu cầu. [Nhật ký717](../nhat_ky/2026-10-29_phien_717_tinh_gon_frontend_v1_luong_demo.md).

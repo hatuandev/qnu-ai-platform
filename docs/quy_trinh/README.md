@@ -7,6 +7,8 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [V1 — Chạy E2E từng chặng bằng PowerShell](./V1_E2E_TUNG_BUOC.md): môi trường thử riêng, checkpoint, báo cáo và lệnh cho từng bước upload → hỏi đáp → purge.
+
 - [44 — Điều hướng workspace V1](./44_dieu_huong_workspace_v1.md): bộ chọn workspace, URL gọn và liên kết tài liệu có kiểm quyền.
 
 - [43 — Bóc tách tự động sau upload trong backendV1](./43_boc_tach_tu_dong_backend_v1.md): native-first PDF/DOCX, OCR khi cần, MD/JSON/ảnh, trạng thái và ZIP có kiểm quyền/hash.

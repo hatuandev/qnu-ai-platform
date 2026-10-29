@@ -26,6 +26,7 @@ COMMANDS = {
     "v1-db-check": "Read current Alembic revision; no migration or seed",
     "v1-test-be": "Backend isolated-DB harness; creates/deletes its test DB",
     "v1-test-fe": "Frontend Vitest suite",
+    "v1-test-e2e": "Show staged E2E help; use make.ps1 v1-e2e init/serve/run <stage>",
     "v1-lint": "Backend Ruff then frontend Biome; no automatic fixes",
     "v1-typecheck": "Frontend TypeScript; run dev/build first on a fresh clone",
     "v1-build": "Frontend build including TypeScript",
@@ -113,6 +114,9 @@ def command_plan(
             (runtime, [*uv, "python", str(backend / "scripts/run_isolated_tests.py")])
         ],
         "v1-test-fe": [(frontend, ["npm", "test"])],
+        "v1-test-e2e": [
+            (root, [*uv, "python", str(root / "scripts/v1_e2e_runner.py")])
+        ],
         "v1-lint": [
             (backend, [*uv, "ruff", "check", "."]),
             (frontend, ["npm", "run", "lint"]),
