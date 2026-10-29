@@ -44,6 +44,7 @@ TABLES = (
     "kb_upload_requests",
     "kb_source_revisions",
     "kb_sources",
+    "kb_folders",
     "kb_collections",
     "modelops_events",
     "model_usage_records",

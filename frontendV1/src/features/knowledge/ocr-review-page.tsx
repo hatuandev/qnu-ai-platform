@@ -4,12 +4,11 @@ import {
   ChevronRight,
   ClipboardList,
   Cpu,
-  FileText,
-  Loader2,
 } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompilationDialog } from "@/features/knowledge/compilation-dialog";
 import { OcrTabContainer, type OcrSubTab } from "@/features/knowledge/ocr-tab-container";
@@ -186,8 +185,8 @@ export function OcrReviewPage({
       {/* Compilation Dialog (to seamlessly continue pipeline to Compiler) */}
       {search?.runId ? (
         <CompilationDialog
-          open={compilationDialogOpen}
-          onOpenChange={setCompilationDialogOpen}
+          isOpen={compilationDialogOpen}
+          onClose={() => setCompilationDialogOpen(false)}
           workspaceId={workspaceId}
           collectionId={collectionId}
           initialRun={{
@@ -196,6 +195,7 @@ export function OcrReviewPage({
             sourceTitle: source?.title ?? "Tài liệu",
             revisionId: activeRevisionId,
             revisionNo: activeRevisionNo,
+            generation: 1,
           }}
           onSuccess={(runId) => {
             void navigate({

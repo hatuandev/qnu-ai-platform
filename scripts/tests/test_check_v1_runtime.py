@@ -100,10 +100,17 @@ class CheckTests(unittest.IsolatedAsyncioTestCase):
             patch.object(
                 checker, "check_qdrant", new=AsyncMock(return_value=(True, "ok"))
             ),
+            patch.object(
+                checker,
+                "check_storage",
+                new=AsyncMock(return_value=(False, "storage offline")),
+                create=True,
+            ),
         ):
             result = await checker.inspect(settings, Path(directory), "head")
         self.assertFalse(result["frontend"][0])
         self.assertIn("v1-install-fe", result["frontend"][1])
+        self.assertFalse(result["storage"][0])
 
 
 class CheckOutputTests(unittest.TestCase):

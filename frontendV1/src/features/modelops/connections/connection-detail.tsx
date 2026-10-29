@@ -15,7 +15,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ErrorState } from "@/components/admin/error-state";
 import {
@@ -32,6 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { useDiagnostics } from "../diagnostic-queries";
 import type { Provider, ProviderKey } from "../types";
 import {
   FAMILIES,
@@ -50,6 +51,12 @@ import { ImportModelsDialog } from "./import-models-dialog";
 import { ModelTestModal } from "./model-test-modal";
 
 export function ConnectionDetail({ connectionId }: { connectionId: string }) {
+  return (
+    <ConnectionDetailContent key={connectionId} connectionId={connectionId} />
+  );
+}
+
+function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
   const navigate = useNavigate();
   const query = useConnection(connectionId);
   const modelsQuery = useConnectionModels(connectionId);
@@ -70,7 +77,16 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
 
   // New model input
   const [newModelId, setNewModelId] = useState("");
-  const [roundRobin, setRoundRobin] = useState(false);
+  const diagnostics = useDiagnostics(connectionId);
+  const [keyResults, setKeyResults] = useState<Record<string, string>>({});
+  const operation = useRef(0);
+  useEffect(() => {
+    operation.current += 1;
+    setKeyResults({});
+    return () => {
+      operation.current += 1;
+    };
+  }, []);
   const [testingAll, setTestingAll] = useState(false);
   const [testingKeyId, setTestingKeyId] = useState<string | null>(null);
 
@@ -114,7 +130,9 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
       toast.success(`Đã thêm model ${newModelId.trim()}.`);
       setNewModelId("");
     } catch {
-      toast.error("Không thể thêm model. Vui lòng kiểm tra lại API Key dùng chung.");
+      toast.error(
+        "Không thể thêm model. Vui lòng kiểm tra lại API Key dùng chung.",
+      );
     }
   };
 
@@ -138,35 +156,54 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
     }
   };
 
-  const handleTestAllConnections = async () => {
-    setTestingAll(true);
+  const runKeyTest = async (key: ProviderKey, ticket: number) => {
     try {
-      const res = await testMutation.mutateAsync({});
-      if (res.ok) {
-        toast.success(res.detail || "Kết nối thành công tới nhà cung cấp!");
-      } else {
-        toast.error(res.detail || "Kiểm tra kết nối thất bại.");
-      }
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Kiểm tra kết nối thất bại.");
-    } finally {
-      setTestingAll(false);
+      const res = await testMutation.mutateAsync({ key_id: key.id });
+      if (ticket !== operation.current) return false;
+      setKeyResults((previous) => ({
+        ...previous,
+        [key.id]: `${res.ok ? "Đạt" : "Lỗi"}: ${res.detail}${res.latency_ms != null ? ` (${res.latency_ms} ms)` : ""}`,
+      }));
+      return res.ok;
+    } catch (error) {
+      if (ticket === operation.current)
+        setKeyResults((previous) => ({
+          ...previous,
+          [key.id]: `Lỗi: ${error instanceof Error ? error.message : "Không kiểm tra được kết nối."}`,
+        }));
+      return false;
     }
   };
-
+  const handleTestAllConnections = async () => {
+    const ticket = operation.current;
+    setTestingAll(true);
+    let passed = 0;
+    const active = keys.filter((key) => key.status === "active");
+    try {
+      for (const key of active) {
+        if (ticket !== operation.current) return;
+        setTestingKeyId(key.id);
+        if (await runKeyTest(key, ticket)) passed += 1;
+      }
+      if (ticket === operation.current) {
+        const detail = `Đã kiểm tra ${active.length} khóa: ${passed} đạt, ${active.length - passed} lỗi; ${keys.length - active.length} khóa không hoạt động được bỏ qua.`;
+        if (passed === active.length) toast.success(detail);
+        else toast.error(detail);
+      }
+    } finally {
+      if (ticket === operation.current) {
+        setTestingAll(false);
+        setTestingKeyId(null);
+      }
+    }
+  };
   const handleTestSingleKey = async (key: ProviderKey) => {
+    const ticket = operation.current;
     setTestingKeyId(key.id);
     try {
-      const res = await testMutation.mutateAsync({});
-      if (res.ok) {
-        toast.success(`Khóa '${key.name}': ${res.detail}`);
-      } else {
-        toast.error(`Khóa '${key.name}': ${res.detail}`);
-      }
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Kiểm tra kết nối thất bại.");
+      await runKeyTest(key, ticket);
     } finally {
-      setTestingKeyId(null);
+      if (ticket === operation.current) setTestingKeyId(null);
     }
   };
 
@@ -180,7 +217,12 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
   return (
     <div className="space-y-6">
       {/* Back Button */}
-      <Button asChild size="sm" variant="ghost" className="text-xs gap-1.5 -ml-2 text-muted-foreground hover:text-foreground">
+      <Button
+        asChild
+        size="sm"
+        variant="ghost"
+        className="text-xs gap-1.5 -ml-2 text-muted-foreground hover:text-foreground"
+      >
         <Link to="/providers">
           <ArrowLeft className="size-3.5" />
           <span>Quay lại danh sách</span>
@@ -203,7 +245,8 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
             {connection.name}
           </h1>
           <p className="text-xs text-muted-foreground">
-            {keys.length} kết nối · {FAMILIES[connection.family] ?? "OpenAI Compatible"}
+            {keys.length} kết nối ·{" "}
+            {FAMILIES[connection.family] ?? "OpenAI Compatible"}
           </p>
         </div>
       </div>
@@ -216,11 +259,15 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
               Chi tiết kết nối
             </h2>
             <p className="text-xs text-muted-foreground font-mono break-all">
-              Hoàn thành trò chuyện (Chat) · {connection.base_url}/chat/completions
+              Hoàn thành trò chuyện (Chat) · {connection.base_url}
+              /chat/completions
             </p>
             {connection.prefix && (
               <p className="text-[11px] text-muted-foreground font-mono">
-                Tiền tố model: <span className="font-semibold text-foreground">{connection.prefix}/</span>
+                Tiền tố model:{" "}
+                <span className="font-semibold text-foreground">
+                  {connection.prefix}/
+                </span>
               </p>
             )}
           </div>
@@ -264,14 +311,21 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
       {/* CARD 2: Connections (API Keys) */}
       <Card className="rounded-xl shadow-2xs border-border/80">
         <CardHeader className="p-5 pb-3 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <CardTitle className="text-sm font-semibold">Danh sách API Key</CardTitle>
+          <CardTitle className="text-sm font-semibold">
+            Danh sách API Key
+          </CardTitle>
 
           <div className="flex items-center gap-3 shrink-0">
             <Button
               size="sm"
               variant="outline"
               className="h-7 text-xs gap-1.5"
-              disabled={testingAll || keys.length === 0}
+              disabled={
+                testingAll ||
+                testingKeyId !== null ||
+                !connection.is_active ||
+                !keys.some((key) => key.status === "active")
+              }
               onClick={handleTestAllConnections}
             >
               {testingAll ? (
@@ -282,14 +336,9 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
               <span>Kiểm tra kết nối lần lượt</span>
             </Button>
 
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>Xoay vòng khóa (Round Robin)</span>
-              <Switch
-                checked={roundRobin}
-                onCheckedChange={setRoundRobin}
-                className="scale-75"
-              />
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Xoay khóa theo chính sách ModelOps của từng model.
+            </p>
           </div>
         </CardHeader>
 
@@ -299,7 +348,9 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
           ) : keys.length === 0 ? (
             <div className="text-center p-6 space-y-2 text-muted-foreground">
               <Key className="size-6 mx-auto text-muted-foreground/40" />
-              <p className="text-xs">Chưa có API Key nào được thiết lập cho nhà cung cấp này.</p>
+              <p className="text-xs">
+                Chưa có API Key nào được thiết lập cho nhà cung cấp này.
+              </p>
               <Button
                 size="sm"
                 variant="outline"
@@ -327,29 +378,62 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
                           <span className="font-semibold text-xs text-foreground">
                             {key.name}
                           </span>
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                            <span className="size-1.5 rounded-full bg-emerald-500" />
-                            Đang hoạt động
+                          <span
+                            className={`inline-flex items-center gap-1 text-[10px] font-medium ${key.status === "active" ? "text-success" : "text-muted-foreground"}`}
+                          >
+                            <span
+                              className={`size-1.5 rounded-full ${key.status === "active" ? "bg-success" : "bg-muted-foreground"}`}
+                            />
+                            {key.status === "active"
+                              ? "Đang hoạt động"
+                              : key.status === "revoked"
+                                ? "Đã thu hồi"
+                                : "Đã tạm dừng"}
                           </span>
-                          <Badge variant="secondary" className="text-[10px] py-0 px-1 font-normal">
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] py-0 px-1 font-normal"
+                          >
                             Khóa API
                           </Badge>
                           <span className="font-mono text-[11px] text-muted-foreground">
                             #{index + 1} · {key.masked_hint}
                           </span>
-                          <Badge variant="outline" className="text-[10px] py-0 px-1 font-mono">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] py-0 px-1 font-mono"
+                          >
                             Ưu tiên: {key.priority}
                           </Badge>
                         </div>
                       </div>
                     </div>
 
+                    <p
+                      className="text-xs text-muted-foreground break-words"
+                      role="status"
+                    >
+                      {keyResults[key.id] ??
+                        (() => {
+                          const check = diagnostics.data?.checks.find(
+                            (item) => item.key_id === key.id,
+                          );
+                          if (!check)
+                            return "Chưa có kết quả kiểm tra khóa này.";
+                          return `${check.configuration_status === "stale" ? "Cần kiểm tra lại" : check.outcome === "ok" ? "Đạt" : "Lỗi"}: ${check.detail} · ${new Date(check.tested_at).toLocaleString("vi-VN")}`;
+                        })()}
+                    </p>
                     <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
                       <Button
                         size="sm"
                         variant="ghost"
                         className="h-7 px-2 text-xs gap-1 text-primary hover:text-primary"
-                        disabled={isTestingThis}
+                        disabled={
+                          testingAll ||
+                          testingKeyId !== null ||
+                          !connection.is_active ||
+                          key.status !== "active"
+                        }
                         onClick={() => handleTestSingleKey(key)}
                         title="Kiểm tra kết nối khóa này"
                       >
@@ -391,10 +475,13 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
       <Card className="rounded-xl shadow-2xs border-border/80">
         <CardHeader className="p-5 pb-3 border-b space-y-1">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold">Mô hình sẵn có (LLM Models)</CardTitle>
+            <CardTitle className="text-sm font-semibold">
+              Mô hình sẵn có (LLM Models)
+            </CardTitle>
           </div>
           <p className="text-xs text-muted-foreground">
-            Thêm mô hình tương thích OpenAI bằng tay hoặc nhập tự động từ endpoint /models.
+            Thêm mô hình tương thích OpenAI bằng tay hoặc nhập tự động từ
+            endpoint /models.
           </p>
         </CardHeader>
 
@@ -448,7 +535,10 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
             <div className="text-center p-6 space-y-1 text-muted-foreground border rounded-lg bg-muted/10">
               <Bot className="size-6 mx-auto text-muted-foreground/40" />
               <p className="text-xs">Chưa có model nào được thêm.</p>
-              <p className="text-[11px]">Nhập Mã mô hình ở trên rồi bấm 'Thêm model' hoặc bấm 'Nhập từ /models'.</p>
+              <p className="text-[11px]">
+                Nhập Mã mô hình ở trên rồi bấm 'Thêm model' hoặc bấm 'Nhập từ
+                /models'.
+              </p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -480,7 +570,9 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
                         size="sm"
                         variant="ghost"
                         className="size-7 p-0 text-muted-foreground hover:text-foreground"
-                        onClick={() => copyToClipboard(fullModelPath, "tên model")}
+                        onClick={() =>
+                          copyToClipboard(fullModelPath, "tên model")
+                        }
                         title="Sao chép tên model"
                       >
                         <Copy className="size-3.5" />
@@ -561,16 +653,25 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
       />
 
       {/* Delete Connection Confirmation Dialog */}
-      <ResponsiveDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+      <ResponsiveDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+      >
         <ResponsiveDialogContent className="max-w-md p-5 text-xs space-y-4">
           <ResponsiveDialogHeader>
             <ResponsiveDialogTitle>Xóa nhà cung cấp AI</ResponsiveDialogTitle>
             <ResponsiveDialogDescription className="text-xs">
-              Bạn có chắc chắn muốn xóa nhà cung cấp <strong>{connection.name}</strong>? Thao tác này sẽ xóa toàn bộ các API Key và model thuộc nhà cung cấp này.
+              Bạn có chắc chắn muốn xóa nhà cung cấp{" "}
+              <strong>{connection.name}</strong>? Thao tác này sẽ xóa toàn bộ
+              các API Key và model thuộc nhà cung cấp này.
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>
           <ResponsiveDialogFooter className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" size="sm" onClick={() => setDeleteConfirmOpen(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteConfirmOpen(false)}
+            >
               Hủy
             </Button>
             <Button
@@ -579,7 +680,9 @@ export function ConnectionDetail({ connectionId }: { connectionId: string }) {
               disabled={deleteConnectionMutation.isPending}
               onClick={handleDeleteConnection}
             >
-              {deleteConnectionMutation.isPending ? "Đang xóa..." : "Xác nhận xóa"}
+              {deleteConnectionMutation.isPending
+                ? "Đang xóa..."
+                : "Xác nhận xóa"}
             </Button>
           </ResponsiveDialogFooter>
         </ResponsiveDialogContent>

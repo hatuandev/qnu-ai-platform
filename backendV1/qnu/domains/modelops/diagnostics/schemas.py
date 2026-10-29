@@ -13,6 +13,7 @@ class ProbeRequest(BaseModel):
 
 class DiagnosticCheck(BaseModel):
     id: str
+    key_id: str | None = None
     kind: DiagnosticKind
     outcome: Literal["ok", "failed", "unsupported"]
     configuration_status: Literal["current", "stale"] = "current"

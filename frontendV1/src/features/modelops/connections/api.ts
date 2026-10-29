@@ -3,7 +3,12 @@ import { v1Client } from "@/app/api/v1";
 import { useV1Auth } from "@/app/auth/v1";
 import type { Capability, Provider, ProviderKey } from "../types";
 
-export type ConnectionFamily = "openai" | "gemini" | "qnu" | "custom" | "anthropic";
+export type ConnectionFamily =
+  | "openai"
+  | "gemini"
+  | "qnu"
+  | "custom"
+  | "anthropic";
 
 export type Connection = {
   id: string;
@@ -42,6 +47,11 @@ export type ConnectionInput = {
 
 export type ConnectionTestResult = {
   ok: boolean;
+  key_id?: string | null;
+  check_id?: string | null;
+  code?: string;
+  http_status?: number | null;
+  tested_at?: string | null;
   latency_ms?: number | null;
   detail: string;
   models?: string[];
@@ -104,9 +114,18 @@ export function useConnectionModels(id: string) {
 export function useConnectionKeys(connectionId: string) {
   const { sessionId } = useV1Auth();
   return useQuery({
-    queryKey: ["v1", sessionId, "modelops", "connections", connectionId, "keys"],
+    queryKey: [
+      "v1",
+      sessionId,
+      "modelops",
+      "connections",
+      connectionId,
+      "keys",
+    ],
     queryFn: ({ signal }) =>
-      v1Client.get<ProviderKey[]>(`/modelops/providers/${connectionId}/keys`, { signal }),
+      v1Client.get<ProviderKey[]>(`/modelops/providers/${connectionId}/keys`, {
+        signal,
+      }),
     enabled: Boolean(connectionId),
   });
 }
@@ -173,7 +192,11 @@ export function useAddConnectionKey(connectionId: string) {
       secret: string;
       priority: number;
       default_model?: string;
-    }) => v1Client.post<ProviderKey>(`/modelops/providers/${connectionId}/keys`, input),
+    }) =>
+      v1Client.post<ProviderKey>(
+        `/modelops/providers/${connectionId}/keys`,
+        input,
+      ),
     onSuccess: () => {
       void cache.invalidateQueries({ queryKey: ["v1", sessionId, "modelops"] });
     },
@@ -193,8 +216,25 @@ export function useDeleteConnectionKey(connectionId: string) {
 }
 
 export function useTestConnection(connectionId: string) {
+  const cache = useQueryClient();
+  const { sessionId } = useV1Auth();
   return useMutation({
-    mutationFn: (input: { api_key?: string; model_name?: string }) =>
-      v1Client.post<ConnectionTestResult>(`${path}/${connectionId}/test`, input),
+    retry: false,
+    mutationFn: (input: {
+      key_id?: string;
+      api_key?: string;
+      model_name?: string;
+    }) =>
+      v1Client.post<ConnectionTestResult>(
+        `${path}/${connectionId}/test`,
+        input,
+        { timeoutMs: 310_000 },
+      ),
+    onSettled: (_result, _error, input) => {
+      if (!input.api_key)
+        void cache.invalidateQueries({
+          queryKey: ["v1", sessionId, "modelops"],
+        });
+    },
   });
 }

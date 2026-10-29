@@ -336,7 +336,13 @@ class FolderService:
             raise EntityNotFound("Không tìm thấy thư mục.", code="folder_not_found")
 
         impact = await self.get_impact(db, workspace, collection_id, folder_id)
-        all_folder_ids = [folder.id, *impact.descendant_folder_ids]
+        if impact.source_count or impact.subfolder_count:
+            raise AppException(
+                "Thư mục còn tài liệu hoặc thư mục con. Hãy di chuyển nội dung ra ngoài trước khi xóa.",
+                code="folder_not_empty",
+                status_code=409,
+            )
+        all_folder_ids = [folder.id]
 
         # Soft delete in ResourceState
         for f_id in all_folder_ids:

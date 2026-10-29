@@ -7,6 +7,16 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-10-29 — Context708: sửa chức năng kho tri thức.** Menu nguồn có xóa/lưu trữ/tải xuống ở thẻ/bảng, lifecycle preview/restore; chặn xóa thư mục còn nội dung, nối chặng3–5, sửa OCR error/paging/poll và quyền admin local ở worker. FE439PASS/buildPASS, BEfocused5+12PASS; full BE ghi804PASS/2FAIL rồi kẹt teardown; recovery17PASS/2FAIL (2revision cũ), DB thử đã dọn. Full lintFAIL29lỗi ngoài phạm vi. LiveCRUD/restoređạt, kho thử đã lưu trữ; User chốt giữ cấu hình model/quota hiện tại, hoàn tất sửa chức năng; không chạy thêm OCR thật. [Nhật ký708](../nhat_ky/2026-10-29_phien_708_sua_chuc_nang_kho_tri_thuc.md).
+
+- **2026-10-29 — Context706: sửa kiểm tra API Key/kết nối.** Chọn đúng key_id, batch từng khóa, strict HTTP/TLS/timeout và history; bỏ fake RoundRobin. FE422PASS/buildPASS, BEfocused36+9PASS; full BE FAIL787/4/3skip (2 lỗi env chạy riêng đạt, 2 assertion revision cũ). User cho restartV1, health200; live2khóa cũ đạt trước khi user tự thay/xóa. Không env/model/migration/push. [Nhật ký706](../nhat_ky/2026-10-29_phien_706_sua_kiem_tra_api_key_ket_noi.md).
+
+- **2026-10-29 — Context707: sửa v1-infra-up/storage.** Đủ PostgreSQL/Redis/Qdrant/MinIO, selected env, tạo bucket local khi thiếu và thử ghi/đọc/xóa; preflight thêm storage chỉ đọc. Giữ đúng image pgsty được yêu cầu. 44test/Ruff/Compose PASS; chạy thật hai lần +v1-check5mụcOK, MinIO giữ healthy. Không đổi env/domain/FE/restart API/migrate/inference/push. [Nhật ký707](../nhat_ky/2026-10-29_phien_707_sua_v1_infra_up_va_storage.md).
+
+- **2026-10-29 — Context705: review kiểm tra API Key/kết nối.** CHANGES REQUESTED9nhóm, trọng tâm kiểm sai khóa/batch1lượt và HTTP lỗi vẫnok. Live4model/47ms, key_id thứ2trả422; FE4FAIL+4cũPASS/BE8FAIL+3PASS; lintPASS. Chỉ review/test/docs, hash app giữ, không sửa cấu hình/restart/push. [Nhật ký705](../nhat_ky/2026-10-29_phien_705_review_kiem_tra_api_key_ket_noi.md).
+
+- **2026-10-29 — Context704: nghiên cứu AnythingLLM cho QNU.** Đọc36nguồn ghim0941fb0; đề xuất9hướng, ưu tiên menu theo quyền, folder/upload và onboarding; giữ membership/revision/hash và owner hội thoại. Link/encoding đạt; test/build/benchmark NOT RUN, chỉ docs, không sửa app/runtime. [Nhật ký704](../nhat_ky/2026-10-29_phien_704_nghien_cuu_anythingllm_cho_qnu.md).
+
 - **2026-10-28 — Context703: review Kho tri thức/thư mục.** CHANGES REQUESTED10nhóm: build27TSerror, OCR router, folder lifecycle/scope, upload identity/form, Compiler picker, URL và download. FE411cũPASS/probe2FAIL; handlerBE6FAIL/2PASS, unit5PASS/schema1FAIL, fixturegốc1ERROR; RuffPASS/BiomeFAIL. DB thử dọn; chỉ review/docs, chưa sửa app hoặc migrate/restart/push. [Nhật ký703](../nhat_ky/2026-10-28_phien_703_review_kho_tri_thuc_thu_muc.md).
 
 - **2026-10-28 — Context702: ModelOps nhà cung cấp và model.** Tạo kết nối → thêm khóa → discovery → thêm nhiều model; migration0005 giữ ID/grants/index và phạm vi khóa cũ, shared key/pool có owner cha. BE765PASS +recovery4PASS (ca có chuyển dữ liệu chạy lại1PASS); FE411PASS, lint/build+TS và UI desktop/mobile đã kiểm bằng dữ liệu riêng. DB thử dọn; chưa migrate DB phục vụ/live inference/restart/push. [Nhật ký702](../nhat_ky/2026-10-28_phien_702_modelops_nha_cung_cap_va_model.md).

@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.identity.background import background_actor
 from qnu.domains.knowledge.compilation.artifacts import artifact, json_bytes, read, store
 from qnu.domains.knowledge.compilation.drafting import (
     SYSTEM_PROMPT,
@@ -110,9 +111,7 @@ async def _settle(
 
 
 async def _compile(db: AsyncSession, blob: BlobStore, run: CompilationRun, model: ChatModel) -> str:
-    actor = AuthActor(
-        username=run.requested_by, actor_id=run.requested_by, roles=[], permissions=[]
-    )
+    actor = background_actor(run.requested_by)
     await authorize_collection(db, actor, run.workspace_id, run.collection_id, write=True)
     documents = await _inputs(db, blob, run)
     existing_raw = await artifact(db, run.id, "raw_response")

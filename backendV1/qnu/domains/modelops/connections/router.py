@@ -13,8 +13,10 @@ from qnu.domains.modelops.connections.schemas import (
     ConnectionTestResponse,
     ConnectionUpdate,
 )
+from qnu.domains.modelops.diagnostics.router import get_diagnostic_client
 from qnu.domains.modelops.providers.service import provider_payload
 from qnu.domains.modelops.schemas import ProviderResponse
+from qnu.ports.provider_diagnostics import ProviderDiagnosticClient
 
 router = APIRouter(prefix="/modelops/connections", tags=["ModelOps · Nhà cung cấp"])
 admin = require_permission("ai.models.manage")
@@ -62,8 +64,9 @@ async def test(
     req: ConnectionTestRequest,
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(admin),
+    client: ProviderDiagnosticClient = Depends(get_diagnostic_client),
 ):
-    return await service.test_connection(db, actor, connection_id, req)
+    return await service.test_connection(db, actor, connection_id, req, client)
 
 
 @router.get("/{connection_id}/models", response_model=list[ProviderResponse])

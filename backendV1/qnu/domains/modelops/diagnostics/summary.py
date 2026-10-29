@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.modelops.diagnostics.schemas import DiagnosticCheck
-from qnu.domains.modelops.diagnostics.service import HISTORY_KEY, configuration_identity
+from qnu.domains.modelops.diagnostics.service import HISTORY_KEY, history_current
 from qnu.domains.modelops.models import ProviderKey
 from qnu.domains.modelops.providers.service import provider_payload, provider_service
 from qnu.domains.modelops.schemas import ProviderSummaryItem
@@ -31,9 +31,7 @@ async def provider_summaries(db: AsyncSession) -> list[ProviderSummaryItem]:
         if history:
             last = history[0]
             check = DiagnosticCheck.model_validate(last)
-            current = last.get("identity") == configuration_identity(
-                provider, active[0] if active else None
-            )
+            current = history_current(provider, last, active)
             status = (
                 "stale" if not current else ("success" if check.outcome == "ok" else check.outcome)
             )

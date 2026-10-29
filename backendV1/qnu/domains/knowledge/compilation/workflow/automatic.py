@@ -8,7 +8,7 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from qnu.domains.identity.actor import AuthActor
+from qnu.domains.identity.background import background_actor
 from qnu.domains.knowledge.compilation.models import CompilationRun, utcnow
 from qnu.domains.knowledge.compilation.review.execution import execute
 from qnu.domains.knowledge.compilation.review.models import CompilationReview
@@ -94,7 +94,7 @@ async def execute_job(db: AsyncSession, blob, chat, run_id: str, worker_id: str)
     if claimed is None:
         return "not_claimed"
     job = await db.get(AutoReviewJob, run_id, populate_existing=True)
-    actor = AuthActor(username=job.created_by, actor_id=job.created_by, roles=[], permissions=[])
+    actor = background_actor(job.created_by)
     result_status, error_code, review_id = "uncertain", None, None
     try:
         result = await execute(

@@ -17,6 +17,7 @@ class DiagnosticTarget:
     expected_dimension: int | None = None
     max_output_tokens: int = 1024
     auth_optional: bool = False
+    auth_scheme: Literal["bearer", "anthropic"] = "bearer"
 
 
 @dataclass

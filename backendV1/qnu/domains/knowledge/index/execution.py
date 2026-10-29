@@ -9,6 +9,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.identity.background import background_actor
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.index.chunking import CHUNKER_VERSION
@@ -265,9 +266,7 @@ async def execute_run(
     if run is None:
         return "not_claimed"
     token = run.worker_id
-    actor = AuthActor(
-        username=run.requested_by, actor_id=run.requested_by, roles=[], permissions=[]
-    )
+    actor = background_actor(run.requested_by)
     async with heartbeat(run, seconds):
         try:
             if run.pending_batch is not None:

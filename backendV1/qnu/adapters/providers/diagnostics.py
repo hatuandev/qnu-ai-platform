@@ -210,7 +210,11 @@ class HttpProviderDiagnosticClient:
                     response = await client.request(
                         "GET" if kind == "discovery" else "POST",
                         url,
-                        headers={"Authorization": "Bearer " + target.api_key}
+                        headers=(
+                            {"x-api-key": target.api_key, "anthropic-version": "2023-06-01"}
+                            if target.auth_scheme == "anthropic"
+                            else {"Authorization": "Bearer " + target.api_key}
+                        )
                         if target.api_key
                         else {},
                         json=body,

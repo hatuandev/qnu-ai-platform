@@ -46,6 +46,7 @@ import type { NavItem } from "@/navigation/types";
 import { filterNavigationGroups, isItemActive } from "@/navigation/utils";
 import { useRbac } from "@/rbac/context";
 import { WorkspaceSidebar } from "./workspace-sidebar";
+import { WorkspaceSwitcher } from "./workspace-switcher";
 
 function NavLeaf({
   item,
@@ -355,11 +356,17 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   );
   return (
     <>
-      <SidebarHeaderBrand
-        compact={compact}
-        onNavigate={handleNavigate}
-        isQnuV1={isV1Route(pathname)}
-      />
+      {isV1Route(pathname) ? (
+        <SidebarHeader className={cn("p-2", compact && "justify-center px-0")}>
+          <WorkspaceSwitcher compact={compact} onNavigate={handleNavigate} />
+        </SidebarHeader>
+      ) : (
+        <SidebarHeaderBrand
+          compact={compact}
+          onNavigate={handleNavigate}
+          isQnuV1={false}
+        />
+      )}
       <SidebarContent>
         {groups.map((group) => (
           <SidebarGroup key={group.id}>

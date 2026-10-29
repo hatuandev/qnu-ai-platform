@@ -29,6 +29,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.identity.background import background_actor
 from qnu.domains.knowledge.public_api import (
     WRITE_ROLES,
     read_revision_bytes,
@@ -124,13 +125,7 @@ def _raw_text(payload: bytes) -> str:
 
 
 def _actor_for(run: OcrProcessingRun) -> AuthActor:
-    return AuthActor(
-        username=run.requested_by,
-        actor_id=run.requested_by,
-        authenticated=True,
-        permissions=[],
-        roles=[],
-    )
+    return background_actor(run.requested_by)
 
 
 async def _artifact(

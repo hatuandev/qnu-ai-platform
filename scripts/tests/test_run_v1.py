@@ -20,6 +20,56 @@ SPEC.loader.exec_module(runner)
 
 
 class RunnerTests(unittest.TestCase):
+    def test_infra_validation_failure_prevents_docker_and_bucket_setup(self):
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(runner.shutil, "which", side_effect=lambda name: name),
+            patch.object(
+                runner.subprocess, "run", return_value=Mock(returncode=1)
+            ) as run,
+        ):
+            root = Path(directory)
+            (root / ".env").touch()
+            with patch.object(runner, "ROOT", root):
+                self.assertEqual(runner.main(["v1-infra-up", "--env-dir", "root"]), 1)
+            self.assertEqual(run.call_count, 1)
+            self.assertIn("--validate", run.call_args.args[0])
+
+    def test_infra_docker_failure_prevents_bucket_setup(self):
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(runner.shutil, "which", side_effect=lambda name: name),
+            patch.object(
+                runner.subprocess,
+                "run",
+                side_effect=[
+                    Mock(returncode=0),
+                    Mock(returncode=17),
+                ],
+            ) as run,
+        ):
+            root = Path(directory)
+            (root / ".env").touch()
+            with patch.object(runner, "ROOT", root):
+                self.assertEqual(runner.main(["v1-infra-up", "--env-dir", "root"]), 17)
+            self.assertEqual(run.call_count, 2)
+
+    def test_infra_uses_selected_env_starts_storage_then_initializes_bucket(self):
+        for mode in ("root", "backend"):
+            plan = runner.command_plan("v1-infra-up", runner.ROOT, mode)
+            runtime = runner.ROOT if mode == "root" else runner.ROOT / "backendV1"
+            self.assertEqual(len(plan), 3)
+            self.assertIn("--validate", plan[0][1])
+            _, compose = plan[1]
+            self.assertEqual(
+                Path(compose[compose.index("--env-file") + 1]), runtime / ".env"
+            )
+            self.assertEqual(compose[-4:], ["postgres", "redis", "qdrant", "minio"])
+            self.assertIn("--wait", compose)
+            self.assertNotIn("gotenberg", compose)
+            self.assertIn("--prepare-local", plan[2][1])
+            self.assertEqual(plan[2][0], runtime)
+
     def test_successful_preflight_starts_only_three_services(self):
         with (
             tempfile.TemporaryDirectory() as directory,

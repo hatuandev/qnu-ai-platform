@@ -8,7 +8,6 @@ import {
   CheckCheck,
   CircleDollarSign,
   ClipboardList,
-  Cpu,
   CreditCard,
   DoorOpen,
   GraduationCap,

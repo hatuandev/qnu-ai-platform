@@ -12,7 +12,7 @@ Từ gốc dự án, dùng GNU Make hoặc `make.bat` trên CMD:
 
 ```text
 make v1-help          # Xem các lệnh V1
-make v1-infra-up      # Khởi động PostgreSQL + Redis + Qdrant sau khi mở Docker Desktop
+make v1-infra-up      # PostgreSQL + Redis + Qdrant + MinIO; chuẩn bị bucket local
 make v1-check         # Kiểm tra kết nối, schema và dependency FE
 make v1-dev           # Chạy API + worker + FE trong cùng phiên
 make v1-be            # Hoặc chạy riêng API
@@ -34,7 +34,9 @@ nếu đang có dịch vụ V1 thì dùng lại hoặc dừng đúng phiên đó
 Muốn đọc log riêng, chạy `v1-be`, `v1-worker`, `v1-fe` trong ba cửa sổ.
 
 Trước khi mở ba thành phần, `v1-dev` kiểm tra Redis PING, kết nối PostgreSQL và
-revision V1, Qdrant cùng Vite đã cài. Có lỗi thì báo từng mục và dừng ngay;
+revision V1, Qdrant, storage cùng Vite đã cài. Với S3, kiểm tra endpoint, credential
+và bucket bằng request chỉ đọc; với local, kiểm tra đường dẫn/quyền truy cập.
+Có lỗi thì báo từng mục và dừng ngay;
 kiểm tra không gọi model hoặc tự migration. Môi trường Python được chuẩn bị
 một lần ở bước này; API/worker dùng `--no-sync` để tránh hai tiến trình cùng
 cập nhật `.venv`. FE gọi trực tiếp Vite qua Node, tránh câu hỏi kết thúc batch
@@ -80,8 +82,8 @@ Các lệnh thiết lập và kiểm tra bổ sung:
 | Lệnh | Thực hiện |
 | --- | --- |
 | `make v1-install-be` / `make v1-install-fe` | Cài thư viện theo lockfile; không tạo/ghi đè cấu hình |
-| `make v1-infra-up` | Chủ động khởi động ba dịch vụ local, chờ health; cần mở Docker Desktop trước, không tự khởi động API/worker/FE |
-| `make v1-check` | Đọc trạng thái Redis/PostgreSQL schema/Qdrant/Vite, không ghi DB hoặc gọi model |
+| `make v1-infra-up` | Khởi động PostgreSQL, Redis, Qdrant, MinIO và chờ health; chuẩn bị storage local, kiểm tra ghi/đọc/xóa tệp thử; không mở API/worker/FE hoặc migrate DB |
+| `make v1-check` | Đọc trạng thái Redis/PostgreSQL schema/Qdrant/storage/Vite, không ghi DB/storage hoặc gọi model |
 | `make v1-db-check` | Đọc Alembic revision hiện tại, không seed hoặc migration |
 | `make v1-migrate` | **Chủ động nâng schema** bằng Alembic; kiểm tra database và backup theo phần 4 trước |
 | `make v1-test-be` | Harness tạo DB thử riêng trên loopback, chạy test rồi dọn đúng DB đó; cần quyền tạo DB |
@@ -166,19 +168,40 @@ Nếu dùng hạ tầng Docker của repo và các dịch vụ **chưa chạy**,
 
 ```powershell
 Set-Location D:\DuAnPhanMem\qnu-ai-platform
-docker compose -f .\docker-compose.infra.yml up -d postgres redis qdrant
+.\make.ps1 v1-infra-up
 docker compose -f .\docker-compose.infra.yml ps
 ```
 
-Compose hạ tầng lấy cấu hình PostgreSQL từ `.env` ở gốc hoặc biến môi trường. Kiểm tra tài khoản/database được cấp thay vì đoán mật khẩu. Nếu dịch vụ đã chạy ở máy/server khác, dùng địa chỉ thực tế trong cấu hình backend và bỏ bước khởi động Docker.
+Runner truyền tệp `.env` đã chọn cho Compose; biến môi trường của phiên có thể ghi đè giá trị tệp. Cấu hình `POSTGRES_*` của Compose phải khớp database local trong `DATABASE_URL`; lệnh không thay tài khoản/database trong volume đã có. Nếu dịch vụ đã chạy ở máy/server khác, dùng địa chỉ thực tế trong cấu hình backend và bỏ bước khởi động Docker.
 
-Với `STORAGE_DRIVER=s3`, cần thêm MinIO hoặc S3 đang hoạt động. Nếu dùng MinIO của repo:
+`v1-infra-up` đọc đúng `.env` đã chọn bằng `QNU_V1_ENV_DIR`/`--env-dir`,
+kiểm tra cấu hình storage trước khi chạy Docker, khởi động đủ bốn dịch vụ
+và chỉ báo thành công khi bước chuẩn bị storage cuối cùng đạt. MinIO dùng đúng
+image `pgsty/minio:RELEASE.2026-06-18T00-00-00Z`, dữ liệu nằm trong volume
+`qnu_minio_data`. Không cần chạy MinIO riêng sau lệnh này:
 
 ```powershell
-docker compose -f .\docker-compose.infra.yml up -d minio
+.\make.ps1 v1-infra-up
+.\make.ps1 v1-check
 ```
 
-Chuẩn bị bucket đúng `S3_BUCKET` và credential có quyền đọc/ghi. Với `STORAGE_DRIVER=local` không cần MinIO. V1 hiện render PDF/DOCX bằng PyMuPDF; luồng này không cần Gotenberg.
+Với `STORAGE_DRIVER=s3` và endpoint MinIO local `http://127.0.0.1:9000`
+(hoặc `localhost`/`[::1]` cùng cổng), lệnh tạo bucket `S3_BUCKET` nếu còn thiếu.
+Credential phải có quyền tạo bucket khi cần, ghi, đọc và xóa. Lệnh giữ nguyên
+bucket/tệp cũ, thử bằng một object có tên ngẫu nhiên rồi xóa đúng object thử;
+nếu lỗi xác thực, thao tác hoặc dọn tệp thử thì trả mã lỗi. Có thể chạy lại lệnh.
+Console ở [MinIO local](http://127.0.0.1:9001); tài khoản lấy từ cấu hình S3 đã chọn.
+
+Với S3 bên ngoài hoặc endpoint local tùy chỉnh, lệnh chỉ kiểm tra bucket đã có,
+không tạo bucket hay ghi object lên endpoint đó. Quản trị storage phải chuẩn bị
+bucket và quyền đọc/ghi. Với `STORAGE_DRIVER=local`, lệnh chuẩn bị đúng thư mục
+đang cấu hình và thử ghi/đọc tệp tạm; `v1-check` chỉ đọc, không tạo thư mục/tệp.
+MinIO vẫn được bật như một thành phần của bộ hạ tầng local.
+
+`v1-check` chỉ xác nhận S3 truy cập được bucket; đây không phải bằng chứng quyền
+ghi/đọc object. Phép thử ghi/đọc/xóa thực hiện trong `v1-infra-up` cho storage local.
+V1 render PDF/DOCX bằng PyMuPDF, không gọi Gotenberg nên không khởi động Gotenberg.
+Model AI vẫn được cấu hình riêng qua ModelOps; lệnh này không tải/chạy model.
 
 Cài thư viện một lần, hoặc khi lockfile thay đổi:
 
@@ -376,6 +399,7 @@ workspace. Xem [hướng dẫn ModelOps](39_modelops_lay_danh_sach_va_chay_thu.m
 | Capacity thiếu/stale, `model_input_budget_unknown` | Kiểm tra lại capacity và OCR image accounting sau khi đổi endpoint/model; không tăng token môi trường để bỏ qua kiểm tra |
 | Provider trả 401/403, ví dụ `embedding_auth_failed` | Kiểm tra credential đang active ở ModelOps và quyền trên server AI; không biến lỗi provider thành “không có dữ liệu” |
 | Upload đọc được ở API nhưng worker báo thiếu tệp | Hai tiến trình phải dùng cùng storage driver và cùng đường dẫn tuyệt đối/bucket; kiểm tra khác thư mục hiện tại |
+| Upload báo không ghi được tệp vào kho lưu trữ | Chạy `v1-check`; với MinIO local chạy `v1-infra-up` để bật dịch vụ, chuẩn bị bucket và thử quyền ghi/đọc/xóa. Với S3 khác kiểm tra endpoint, credential và quyền bucket |
 | Tìm kiếm/hỏi đáp chưa có nguồn | Kiểm tra tài liệu đã duyệt, xuất bản, index hoàn tất và scope đang chọn; upload/OCR xong chưa tự đưa dữ liệu vào trả lời |
 | Bấm tác vụ xong mất kết nối, trạng thái `uncertain` | Mở lại chi tiết job/biên nhận để đối soát trước khi gửi mới; không bấm lặp để ép chạy lại |
 

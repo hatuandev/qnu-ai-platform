@@ -46,6 +46,18 @@ async def test_discovery_is_not_inference_and_does_not_reflect_secret():
     assert bad.outcome == "failed" and TARGET.api_key not in repr(bad)
 
 
+async def test_anthropic_discovery_uses_its_declared_auth_scheme():
+    result, requests = await call(
+        "discovery",
+        {"data": [{"id": "a"}]},
+        target=replace(TARGET, auth_scheme="anthropic"),
+    )
+    assert result.outcome == "ok"
+    assert requests[0].headers["x-api-key"] == TARGET.api_key
+    assert requests[0].headers["anthropic-version"] == "2023-06-01"
+    assert "authorization" not in requests[0].headers
+
+
 @pytest.mark.parametrize(
     "status,code",
     [

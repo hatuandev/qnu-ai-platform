@@ -1,4 +1,4 @@
-import { Link, Outlet } from "@tanstack/react-router";
+import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Gauge,
@@ -102,6 +102,11 @@ export function WorkspaceDetailLayout({
   workspaceId: string;
 }) {
   const { actor } = useV1Auth();
+  const location = useRouterState({ select: (s) => s.location });
+  const pathname = location.pathname;
+  const isKnowledgePage =
+    pathname.includes("/knowledge") || pathname.includes("/collections");
+
   const workspaceQuery = useWorkspaceQuery(workspaceId);
   const { role, isPending: rolePending } = useCallerWorkspaceRole(workspaceId);
   const updateMutation = useUpdateWorkspace(workspaceId);
@@ -134,6 +139,16 @@ export function WorkspaceDetailLayout({
           error={workspaceQuery.error}
           onRetry={() => void workspaceQuery.refetch()}
         />
+      </div>
+    );
+  }
+
+  // Khi đang ở các trang thuộc Kho tri thức: Render trực tiếp nội dung kho tri thức
+  // (Không hiển thị banner quản trị workspace và thanh 10 tab ngang ngoài phạm vi tri thức)
+  if (isKnowledgePage) {
+    return (
+      <div className="space-y-6">
+        <Outlet />
       </div>
     );
   }

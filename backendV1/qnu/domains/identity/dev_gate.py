@@ -13,6 +13,18 @@ from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException
 
 ALGORITHM = "HS256"
+DEV_ADMIN_ACTOR_ID = "act_dev_admin"
+
+
+def dev_admin_actor() -> AuthActor:
+    return AuthActor(
+        username="dev.admin",
+        actor_id=DEV_ADMIN_ACTOR_ID,
+        display_name="Quản trị dev",
+        email="dev@qnu.edu.vn",
+        roles=["AI.Admin"],
+        permissions=["ai.access.admin"],
+    )
 
 
 def dev_gate_enabled() -> bool:
@@ -37,14 +49,7 @@ def issue_dev_token(access_key: str) -> tuple[str, AuthActor]:
             "Mật khẩu truy cập dev không đúng.", code="invalid_credentials", status_code=401
         )
 
-    actor = actor or AuthActor(
-        username="dev.admin",
-        actor_id="act_dev_admin",
-        display_name="Quản trị dev",
-        email="dev@qnu.edu.vn",
-        roles=["AI.Admin"],
-        permissions=["ai.access.admin"],
-    )
+    actor = actor or dev_admin_actor()
     now = datetime.now(UTC)
     payload = {
         "sub": actor.username,

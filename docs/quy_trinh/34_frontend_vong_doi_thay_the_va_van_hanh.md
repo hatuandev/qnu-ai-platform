@@ -31,6 +31,28 @@ Khi mất phản hồi xác nhận, giữ nguyên thao tác và đọc biên nh�
 preview/hash/key, không tạo yêu cầu mới âm thầm. Biên nhận đã được xác nhận nhưng
 còn pending có nút tiếp tục, kể cả sau khi tải lại trang. Backend vẫn kiểm quyền.
 
+## Thao tác trong kho tri thức
+
+Ở chặng **Tài liệu & Thư mục**, mở menu **⋮** của từng tài liệu (cả dạng thẻ và
+bảng) để xem chi tiết, tải bản gốc, mở OCR, đổi tên, di chuyển, lưu trữ hoặc xóa.
+Tải xuống tra đúng ID phiên bản hiện tại; không lấy số phiên bản làm ID tệp.
+
+- Admin nền tảng hoặc admin workspace được xóa tài liệu; editor được sửa,
+  di chuyển và lưu trữ. Thành viên chỉ đọc không có thao tác ghi.
+- **Xóa** tài liệu vẫn dùng quy trình xem trước/xác nhận ở trên. Khi hoàn tất,
+  trang **Tài nguyên → Lưu trữ & Thùng rác** cho phép khôi phục theo quyền.
+- **Xóa thư mục** chỉ áp dụng cho thư mục rỗng. Xem số tài liệu/thư mục con trong
+  xác nhận; nếu còn nội dung, di chuyển ra ngoài trước. Nếu không đọc được tác động,
+  phải thử lại; giao diện và server đều chặn xóa. Thao tác này giữ tệp gốc.
+- Tìm kiếm nhanh ở danh sách chỉ lọc trang đang xem. Danh sách OCR có phân trang;
+  nguồn được chọn qua liên kết vẫn đọc theo ID, kể cả ngoài trang hiện tại.
+- Chặng **Biên soạn**, **Xuất bản**, **Phục vụ AI** có nút mở trang chức năng
+  tương ứng. Upload không tự chạy OCR, biên soạn hoặc xuất bản.
+- Muốn chạy AI, workspace cần được cấp model phù hợp, chọn mặc định hoặc model
+  cụ thể và có hạn mức. Lỗi cấu hình/provider được hiển thị theo lượt OCR; trạng thái
+  thất bại không có nghĩa là tài liệu gốc đã mất. Quản lý tài liệu vẫn dùng được
+  khi chưa cấu hình AI.
+
 ## Thay tài liệu trong khi giữ bản cũ phục vụ
 
 1. Mở văn bản nguồn → **Tải lên phiên bản mới**. Mặc định bật **Chuẩn bị bản

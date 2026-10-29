@@ -41,7 +41,7 @@ export function ModelTestModal({
     try {
       const capability: Capability = model.capabilities.includes("chat")
         ? "chat"
-        : (model.capabilities[0] ?? "chat");
+        : ((model.capabilities[0] as Capability) ?? "chat");
       const check = await runDiagnostic.mutateAsync(capability);
       setResult({
         outcome: check.outcome,

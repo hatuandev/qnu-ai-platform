@@ -40,11 +40,13 @@ export function CollectionFormDialog({
   onOpenChange,
   workspaceId,
   collection,
+  onSuccess,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   workspaceId: string;
   collection?: KBCollection | null;
+  onSuccess?: (created: KBCollection) => void;
 }) {
   const isEdit = Boolean(collection);
   const createMutation = useCreateCollection(workspaceId);
@@ -81,16 +83,19 @@ export function CollectionFormDialog({
             return;
           }
 
-          await updateMutation.mutateAsync(patch);
+          const updated = await updateMutation.mutateAsync(patch);
           toast.success("Đã cập nhật bộ sưu tập.");
+          onOpenChange(false);
+          onSuccess?.(updated);
         } else {
-          await createMutation.mutateAsync({
+          const created = await createMutation.mutateAsync({
             name: value.name.trim(),
             description: value.description?.trim() || null,
           });
           toast.success("Đã tạo bộ sưu tập mới.");
+          onOpenChange(false);
+          onSuccess?.(created);
         }
-        onOpenChange(false);
       } catch (error) {
         if (error instanceof ApiProblemError) {
           setServerError(error.message);

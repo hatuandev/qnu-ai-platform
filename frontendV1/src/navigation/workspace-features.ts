@@ -19,7 +19,7 @@ export const workspaceFeatures = {
     group: "Tri thức",
     icon: Database,
     kind: "workspace",
-    to: "/workspaces/$workspaceId/collections",
+    to: "/workspaces/$workspaceId/knowledge",
   },
   ocr: {
     title: "OCR & chính tả",
@@ -224,7 +224,7 @@ export function routeFeatureScope(
     return { workspaceId: id(search.workspaceId) };
   if (pathname === "/dashboard" && id(search.workspaceId))
     return { workspaceId: id(search.workspaceId) };
-  const match = /^\/workspaces\/([^/]+)(?:\/collections\/([^/]+))?/.exec(
+  const match = /^\/workspaces\/([^/]+)(?:\/(?:collections|knowledge)\/([^/]+))?/.exec(
     pathname,
   );
   if (!match) return undefined;
@@ -244,7 +244,10 @@ export function isFeatureActive(
   search: Record<string, unknown>,
 ): boolean {
   if (feature === "providers") {
-    return pathname.startsWith("/modelops/providers");
+    return (
+      pathname.startsWith("/providers") ||
+      pathname.startsWith("/modelops/providers")
+    );
   }
   if (pathname.startsWith("/workspaces/choose/"))
     return pathname === `/workspaces/choose/${feature}`;
@@ -254,33 +257,63 @@ export function isFeatureActive(
   const suffix = match[1].replace(/\/$/, "");
   if (destination.kind === "workspace") {
     const target = destination.to.replace("/workspaces/$workspaceId", "");
-    if (feature === "collections") return suffix === "/collections";
+    if (feature === "collections")
+      return (
+        suffix === "/collections" ||
+        suffix === "/knowledge" ||
+        (/^\/knowledge\/[^/]+$/.test(suffix) &&
+          (!search.stage || search.stage === "files"))
+      );
     if ("view" in destination)
       return suffix === target && (search.view ?? "jobs") === destination.view;
     return suffix === target || suffix.startsWith(`${target}/`);
   }
+  if (feature === "ocr") {
+    if (
+      /^\/(?:collections|knowledge)\/[^/]+\/sources\/[^/]+\/ocr/.test(suffix) ||
+      /^\/knowledge\/[^/]+\/ocr/.test(suffix) ||
+      (/^\/(?:collections|knowledge)\/[^/]+$/.test(suffix) &&
+        (search.stage === "ocr" ||
+          search.sourceAction === "ocr" ||
+          search.tab === "sources"))
+    )
+      return true;
+    return false;
+  }
+  if (feature === "compiler") {
+    if (
+      /^\/(?:collections|knowledge)\/[^/]+\/compilations/.test(suffix) ||
+      (/^\/(?:collections|knowledge)\/[^/]+$/.test(suffix) &&
+        (search.stage === "compiler" || search.tab === "compilations"))
+    )
+      return true;
+    return false;
+  }
+  if (feature === "documents") {
+    if (
+      /^\/(?:collections|knowledge)\/[^/]+\/documents/.test(suffix) ||
+      (/^\/(?:collections|knowledge)\/[^/]+$/.test(suffix) &&
+        (search.stage === "publication" || search.tab === "documents"))
+    )
+      return true;
+    return false;
+  }
+  if (feature === "search") {
+    if (
+      /^\/(?:collections|knowledge)\/[^/]+\/search/.test(suffix) ||
+      (/^\/(?:collections|knowledge)\/[^/]+$/.test(suffix) &&
+        (search.stage === "serving" || search.tab === "index"))
+    )
+      return true;
+    return false;
+  }
   if ("tab" in destination) {
-    if (feature === "ocr" && /^\/collections\/[^/]+\/sources\//.test(suffix))
-      return true;
-    if (
-      feature === "compiler" &&
-      /^\/collections\/[^/]+\/compilations/.test(suffix)
-    )
-      return true;
-    if (
-      feature === "documents" &&
-      /^\/collections\/[^/]+\/documents/.test(suffix)
-    )
-      return true;
-    if (
-      feature === "search" &&
-      /^\/collections\/[^/]+\/search/.test(suffix)
-    )
-      return true;
     return (
-      /^\/collections\/[^/]+$/.test(suffix) &&
+      /^\/(?:collections|knowledge)\/[^/]+$/.test(suffix) &&
       (search.tab ?? "sources") === destination.tab
     );
   }
-  return new RegExp(`^/collections/[^/]+/${destination.page}$`).test(suffix);
+  return new RegExp(
+    `^/(?:collections|knowledge)/[^/]+/${destination.page}$`,
+  ).test(suffix);
 }

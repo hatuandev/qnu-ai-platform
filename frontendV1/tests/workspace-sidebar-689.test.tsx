@@ -92,7 +92,7 @@ test("workspace shortcuts use the selected workspace and operations view", () =>
     name: "Kho tri thức",
   });
   expect(collections.getAttribute("data-route")).toBe(
-    "/workspaces/$workspaceId/collections",
+    "/workspaces/$workspaceId/knowledge",
   );
   expect(JSON.parse(collections.getAttribute("data-params") ?? "null")).toEqual(
     {

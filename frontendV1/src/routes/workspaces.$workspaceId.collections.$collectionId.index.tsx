@@ -1,6 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { z } from "zod";
-import { CollectionDetailPage } from "@/features/knowledge/collection-detail-page";
 import { pageSearchSchema } from "@/features/workspaces/search";
 
 const collectionDetailSearchSchema = pageSearchSchema.extend({
@@ -15,33 +14,35 @@ export const Route = createFileRoute(
   "/workspaces/$workspaceId/collections/$collectionId/",
 )({
   validateSearch: (search) => collectionDetailSearchSchema.parse(search),
-  component: CollectionDetailRoute,
+  beforeLoad: ({ params, search }) => {
+    const stageMap: Record<
+      string,
+      "files" | "ocr" | "compiler" | "publication" | "serving"
+    > = {
+      sources: "files",
+      compilations: "compiler",
+      documents: "publication",
+      index: "serving",
+    };
+    const stage =
+      search.sourceAction === "ocr"
+        ? "ocr"
+        : search.tab
+          ? stageMap[search.tab] ?? "files"
+          : "files";
+
+    throw redirect({
+      to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
+      params: {
+        workspaceId: params.workspaceId,
+        knowledgeId: params.collectionId,
+      },
+      search: {
+        page: search.page ?? 1,
+        pageSize: search.pageSize ?? 20,
+        stage,
+        sourceAction: search.sourceAction,
+      },
+    });
+  },
 });
-
-function CollectionDetailRoute() {
-  const { workspaceId, collectionId } = Route.useParams();
-  const search = Route.useSearch();
-  const navigate = Route.useNavigate();
-
-  return (
-    <CollectionDetailPage
-      workspaceId={workspaceId}
-      collectionId={collectionId}
-      page={search.page}
-      pageSize={search.pageSize}
-      tab={search.tab ?? "sources"}
-      sourceAction={search.sourceAction}
-      onPageChange={(page) =>
-        void navigate({ search: (previous) => ({ ...previous, page }) })
-      }
-      onPageSizeChange={(pageSize) =>
-        void navigate({
-          search: (previous) => ({ ...previous, pageSize, page: 1 }),
-        })
-      }
-      onTabChange={(tab) =>
-        void navigate({ search: (previous) => ({ ...previous, tab, page: 1 }) })
-      }
-    />
-  );
-}

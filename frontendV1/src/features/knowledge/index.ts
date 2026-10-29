@@ -1,5 +1,5 @@
 export { CitationDrawer } from "@/features/knowledge/citation-drawer";
-export { CollectionDetailPage } from "@/features/knowledge/collection-detail-page";
+export { KnowledgeDetailPage } from "@/features/knowledge/knowledge-detail-page";
 export { CollectionFormDialog } from "@/features/knowledge/collection-form-dialog";
 export { CollectionsPanel } from "@/features/knowledge/collections-panel";
 export { CompilationDetailPage } from "@/features/knowledge/compilation-detail-page";

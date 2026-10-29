@@ -1,30 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { CollectionsPanel } from "@/features/knowledge/collections-panel";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { pageSearchSchema } from "@/features/workspaces/search";
 
 export const Route = createFileRoute("/workspaces/$workspaceId/collections/")({
   validateSearch: (search) => pageSearchSchema.parse(search),
-  component: CollectionsRoute,
+  beforeLoad: ({ params, search }) => {
+    throw redirect({
+      to: "/workspaces/$workspaceId/knowledge",
+      params: { workspaceId: params.workspaceId },
+      search: { page: search.page ?? 1, pageSize: search.pageSize ?? 20 },
+    });
+  },
 });
-
-function CollectionsRoute() {
-  const { workspaceId } = Route.useParams();
-  const search = Route.useSearch();
-  const navigate = Route.useNavigate();
-
-  return (
-    <CollectionsPanel
-      workspaceId={workspaceId}
-      page={search.page}
-      pageSize={search.pageSize}
-      onPageChange={(page) =>
-        void navigate({ search: (previous) => ({ ...previous, page }) })
-      }
-      onPageSizeChange={(pageSize) =>
-        void navigate({
-          search: (previous) => ({ ...previous, pageSize, page: 1 }),
-        })
-      }
-    />
-  );
-}

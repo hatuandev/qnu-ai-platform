@@ -1,9 +1,7 @@
 """Admin provider onboarding, independent from executable model/grant IDs."""
 
-import time
 import uuid
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,14 +17,14 @@ from qnu.domains.modelops.connections.schemas import (
     ConnectionUpdate,
 )
 from qnu.domains.modelops.diagnostics.schemas import DiagnosticCheck
-from qnu.domains.modelops.diagnostics.service import HISTORY_KEY, configuration_identity
+from qnu.domains.modelops.diagnostics.service import HISTORY_KEY, history_current
 from qnu.domains.modelops.models import Provider, ProviderKey
 from qnu.domains.modelops.providers.service import provider_service
 from qnu.domains.modelops.schemas import ProviderCreateRequest
 from qnu.domains.workspaces.access import actor_ref
-from qnu.platform.crypto import decrypt
 from qnu.platform.errors import Conflict, EntityNotFound
 from qnu.platform.network_policy import assert_allowed_endpoint
+from qnu.ports.provider_diagnostics import ProviderDiagnosticClient
 
 
 async def get_connection(db: AsyncSession, connection_id: str, *, lock: bool = False) -> Provider:
@@ -67,8 +65,7 @@ async def output(db: AsyncSession, rows: list[Provider]) -> list[ConnectionRespo
             check = DiagnosticCheck.model_validate(latest)
             status = (
                 "stale"
-                if latest.get("identity")
-                != configuration_identity(row, active[0] if active else None)
+                if not history_current(row, latest, active)
                 else ("success" if check.outcome == "ok" else check.outcome)
             )
             tested_at = check.tested_at
@@ -286,75 +283,15 @@ async def list_models(db: AsyncSession, connection_id: str):
 
 
 async def test_connection(
-    db: AsyncSession, actor: AuthActor, connection_id: str, req: ConnectionTestRequest
+    db: AsyncSession,
+    actor: AuthActor,
+    connection_id: str,
+    req: ConnectionTestRequest,
+    client: ProviderDiagnosticClient | None = None,
 ) -> ConnectionTestResponse:
+    from qnu.adapters.providers.diagnostics import HttpProviderDiagnosticClient
+    from qnu.domains.modelops.connections.testing import run_test
+
     require_model_admin(actor)
     parent = await get_connection(db, connection_id)
-    api_key = req.api_key
-    if not api_key:
-        active_key = (
-            await db.scalars(
-                select(ProviderKey)
-                .where(ProviderKey.provider_id == parent.id, ProviderKey.status == "active")
-                .order_by(ProviderKey.priority, ProviderKey.created_at)
-                .limit(1)
-            )
-        ).first()
-        if active_key:
-            try:
-                api_key = decrypt(active_key.secret_encrypted)
-            except Exception:
-                return ConnectionTestResponse(ok=False, detail="Không giải mã được API key đã lưu.")
-        else:
-            return ConnectionTestResponse(ok=False, detail="Chưa có API key nào để kiểm tra kết nối.")
-
-    endpoint = parent.base_url.rstrip("/")
-    family = (parent.extra_config or {}).get("connection_family", "custom")
-    headers = {"Accept": "application/json"}
-    if family == "anthropic":
-        headers["x-api-key"] = api_key
-        headers["anthropic-version"] = "2023-06-01"
-    else:
-        headers["Authorization"] = f"Bearer {api_key}"
-
-    start = time.monotonic()
-    models_target = endpoint if endpoint.endswith("/models") else f"{endpoint}/models"
-    try:
-        async with httpx.AsyncClient(timeout=10, verify=False) as client:
-            resp = await client.get(models_target, headers=headers)
-            latency = int((time.monotonic() - start) * 1000)
-            if resp.status_code in (200, 201):
-                try:
-                    data = resp.json()
-                    raw_models = data.get("data", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
-                    model_ids = [m.get("id") or m.get("name") for m in raw_models if isinstance(m, dict) and (m.get("id") or m.get("name"))]
-                    return ConnectionTestResponse(
-                        ok=True,
-                        latency_ms=latency,
-                        detail=f"Kết nối thành công ({latency}ms). Tìm thấy {len(model_ids)} models.",
-                        models=model_ids[:50],
-                    )
-                except Exception:
-                    return ConnectionTestResponse(
-                        ok=True,
-                        latency_ms=latency,
-                        detail=f"Kết nối thành công ({latency}ms).",
-                    )
-            elif resp.status_code in (401, 403):
-                return ConnectionTestResponse(
-                    ok=False,
-                    latency_ms=latency,
-                    detail=f"Xác thực thất bại (HTTP {resp.status_code}): Vui lòng kiểm tra lại API Key.",
-                )
-            else:
-                return ConnectionTestResponse(
-                    ok=True,
-                    latency_ms=latency,
-                    detail=f"Máy chủ phản hồi HTTP {resp.status_code} ({latency}ms).",
-                )
-    except httpx.ConnectError:
-        return ConnectionTestResponse(ok=False, detail=f"Không thể kết nối đến máy chủ: {endpoint}")
-    except httpx.TimeoutException:
-        return ConnectionTestResponse(ok=False, detail="Kết nối quá hạn (Timeout sau 10 giây).")
-    except Exception as exc:
-        return ConnectionTestResponse(ok=False, detail=f"Lỗi kiểm tra kết nối: {str(exc)[:200]}")
+    return await run_test(db, actor, parent, req, client or HttpProviderDiagnosticClient())

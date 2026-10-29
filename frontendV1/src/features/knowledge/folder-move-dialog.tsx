@@ -70,6 +70,7 @@ export function FolderMoveDialog({
   }, [itemType, itemId, allFolders]);
 
   const handleMove = async () => {
+    if (!foldersQuery.isSuccess) return;
     setServerError(null);
     try {
       if (itemType === "folder") {
@@ -108,12 +109,28 @@ export function FolderMoveDialog({
             </span>
             Di chuyển {itemType === "folder" ? "thư mục" : "tài liệu"}
           </ResponsiveDialogTitle>
-          <ResponsiveDialogDescription className="text-xs truncate" title={itemTitle}>
-            Chọn thư mục đích cho: <span className="font-semibold text-foreground">{itemTitle}</span>
+          <ResponsiveDialogDescription
+            className="text-xs truncate"
+            title={itemTitle}
+          >
+            Chọn thư mục đích cho:{" "}
+            <span className="font-semibold text-foreground">{itemTitle}</span>
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
         <div className="grid gap-3 px-4 py-4 sm:px-6">
+          {foldersQuery.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              Không thể tải thư mục đích.{" "}
+              <Button
+                variant="link"
+                size="sm"
+                onClick={() => void foldersQuery.refetch()}
+              >
+                Thử lại
+              </Button>
+            </p>
+          )}
           {serverError ? (
             <p
               role="alert"
@@ -202,7 +219,11 @@ export function FolderMoveDialog({
           <Button
             type="button"
             size="sm"
-            disabled={isSubmitting || selectedTargetId === currentFolderId}
+            disabled={
+              isSubmitting ||
+              !foldersQuery.isSuccess ||
+              selectedTargetId === (currentFolderId ?? null)
+            }
             className="gap-1.5"
             onClick={handleMove}
           >
@@ -220,4 +241,3 @@ export function FolderMoveDialog({
     </ResponsiveDialog>
   );
 }
-

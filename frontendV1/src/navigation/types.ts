@@ -42,6 +42,7 @@ export type AppPath =
   | "/help"
   // QNU AI v1 (real backendV1 data)
   | "/workspaces"
+  | "/providers"
   | "/modelops/providers"
   | "/modelops/endpoints"
   | "/modelops/defaults"

@@ -59,6 +59,8 @@ def configuration_identity(provider: Provider, key: ProviderKey | None) -> str:
         provider.capabilities,
         provider.is_active,
         provider.timeout_seconds,
+        (provider.extra_config or {}).get("api_type"),
+        (provider.extra_config or {}).get("connection_family"),
         bool((provider.extra_config or {}).get("ocr_auth_optional", False)),
         capacity.token_limits.model_dump() if capacity.token_limits else None,
         dimension,
@@ -68,16 +70,37 @@ def configuration_identity(provider: Provider, key: ProviderKey | None) -> str:
     return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
 
 
+def history_current(provider: Provider, row: dict, active_keys: list[ProviderKey]) -> bool:
+    """A result for the second key must not be compared to the first key."""
+    key_id = row.get("key_id")
+    key = (
+        next((item for item in active_keys if item.id == key_id), None)
+        if key_id
+        else next(iter(active_keys), None)
+    )
+    if key_id and key is None:
+        return False
+    return row.get("identity") == configuration_identity(provider, key)
+
+
 async def read_diagnostics(
     db: AsyncSession, provider_id: str, actor: AuthActor
 ) -> ProviderDiagnostics:
     require_model_admin(actor)
     provider = await provider_service.get(db, provider_id)
-    fingerprint = await identity(db, provider)
+    keys = list(
+        (
+            await db.scalars(
+                select(ProviderKey)
+                .where(key_scope(provider), ProviderKey.status == "active")
+                .order_by(ProviderKey.priority, ProviderKey.created_at, ProviderKey.id)
+            )
+        ).all()
+    )
     checks = []
     for row in (provider.extra_config or {}).get(HISTORY_KEY, [])[:20]:
         check = DiagnosticCheck.model_validate(row)
-        check.configuration_status = "current" if row.get("identity") == fingerprint else "stale"
+        check.configuration_status = "current" if history_current(provider, row, keys) else "stale"
         checks.append(check)
     return ProviderDiagnostics(
         provider_id=provider.id, configured_active=provider.is_active, checks=checks

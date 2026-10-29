@@ -10,6 +10,7 @@ import {
   Play,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,7 +28,11 @@ import {
 } from "@/features/knowledge/ocr-queries";
 import { OcrRequestDialog } from "@/features/knowledge/ocr-request-dialog";
 import { OcrRunsList } from "@/features/knowledge/ocr-runs-list";
-import { formatRunStatus, isDocx } from "@/features/knowledge/ocr-schemas";
+import {
+  formatOcrError,
+  formatRunStatus,
+  isDocx,
+} from "@/features/knowledge/ocr-schemas";
 import { OcrTextReviewPanel } from "@/features/knowledge/ocr-text-review-panel";
 import type { ProcessingRunResponse } from "@/features/knowledge/ocr-types";
 
@@ -257,6 +262,21 @@ export function OcrTabContainer({
           </div>
         </CardContent>
       </Card>
+
+      {activeRun && ["failed", "uncertain"].includes(activeRun.status) && (
+        <Alert variant="destructive" role="alert">
+          <AlertCircle className="size-4" />
+          <AlertTitle>OCR chưa hoàn tất</AlertTitle>
+          <AlertDescription>
+            {formatOcrError(activeRun.error_code, activeRun.error_detail)}
+            {activeRun.error_code && (
+              <span className="block font-mono text-xs">
+                {activeRun.error_code}
+              </span>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Main Tabs within OCR Container */}
       {hasUnsavedDraft ? (

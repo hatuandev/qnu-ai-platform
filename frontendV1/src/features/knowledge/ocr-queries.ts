@@ -219,6 +219,12 @@ export function useProcessingRunsQuery(
     enabled:
       Boolean(workspaceId && collectionId && sourceId && revisionId) &&
       (options?.enabled ?? true),
+    refetchInterval: (query) =>
+      query.state.data?.items.some(
+        (run) => run.status === "queued" || run.status === "running",
+      )
+        ? 2500
+        : false,
   });
 }
 

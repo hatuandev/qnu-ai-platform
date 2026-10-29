@@ -7,6 +7,7 @@ import type { Capability } from "./types";
 
 export type DiagnosticCheck = {
   id: string;
+  key_id?: string | null;
   kind: "discovery" | Capability;
   outcome: "ok" | "failed" | "unsupported";
   configuration_status: "current" | "stale";

@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from qnu.domains.modelops.capacity.schemas import ModelTokenLimits
 
@@ -63,12 +63,25 @@ class ConnectionModelCreate(BaseModel):
 
 class ConnectionTestRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-    api_key: str | None = Field(None, max_length=4096)
+    key_id: str | None = Field(None, min_length=1, max_length=64)
+    api_key: str | None = Field(None, min_length=1, max_length=4096, repr=False)
     model_name: str | None = Field(None, max_length=200)
+
+    @model_validator(mode="after")
+    def one_credential(self):
+        if self.key_id and self.api_key:
+            raise ValueError("Chọn khóa đã lưu hoặc nhập khóa thử, không dùng đồng thời.")
+        return self
 
 
 class ConnectionTestResponse(BaseModel):
     ok: bool
+    key_id: str | None = None
+    check_id: str | None = None
+    tested_at: datetime | None = None
+    code: str = "diagnostic_ok"
+    http_status: int | None = None
+    retry_after: datetime | None = None
     latency_ms: int | None = None
     detail: str
     models: list[str] = Field(default_factory=list)

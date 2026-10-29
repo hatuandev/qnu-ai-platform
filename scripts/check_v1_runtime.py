@@ -16,6 +16,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backendV1"))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from v1_storage import check_storage
 
 if TYPE_CHECKING:
     from qnu.platform.config import Settings
@@ -86,8 +89,11 @@ async def inspect(
         check_redis(settings.REDIS_URL),
         check_database(settings.DATABASE_URL, head),
         check_qdrant(settings.QDRANT_URL),
+        check_storage(settings),
     )
-    results = dict(zip(("redis", "postgresql", "qdrant"), checks, strict=True))
+    results = dict(
+        zip(("redis", "postgresql", "qdrant", "storage"), checks, strict=True)
+    )
     vite_present = (root / "frontendV1/node_modules/vite/bin/vite.js").is_file()
     results["frontend"] = (
         vite_present,
@@ -124,6 +130,11 @@ def main() -> int:
         if not results["redis"][0] or not results["qdrant"][0]:
             print(
                 "For local Docker services: open Docker Desktop, then make v1-infra-up."
+            )
+        if not results.get("storage", (True, ""))[0]:
+            print(
+                "Storage: run make v1-infra-up for local MinIO; "
+                "for remote S3, verify the configured service and bucket permissions."
             )
         print(
             "Remote infrastructure: check the selected configuration. No model inference was checked."

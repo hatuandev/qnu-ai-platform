@@ -4,7 +4,6 @@ import {
   ArrowRight,
   BookOpen,
   Check,
-  CheckCircle2,
   ChevronRight,
   Copy,
   Cpu,
@@ -14,7 +13,6 @@ import {
   FileText,
   Info,
   Loader2,
-  Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";

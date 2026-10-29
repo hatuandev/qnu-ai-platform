@@ -19,7 +19,7 @@ COMMANDS = {
     "v1-worker": "ARQ worker only, foreground, V1 queue",
     "v1-fe": "Frontend only, foreground, port from frontendV1/.env.local",
     "v1-check": "Read-only dependency/schema/frontend check before startup",
-    "v1-infra-up": "Explicitly start local PostgreSQL, Redis and Qdrant; Docker must be running",
+    "v1-infra-up": "Start PostgreSQL/Redis/Qdrant/MinIO; prepare and verify local storage",
     "v1-install-be": "Install backend dependencies from uv.lock",
     "v1-install-fe": "Install frontend dependencies from package-lock.json",
     "v1-migrate": "Explicit Alembic upgrade head; check target DB first",
@@ -68,20 +68,36 @@ def command_plan(
         "v1-check": [check],
         "v1-infra-up": [
             (
+                runtime,
+                [*uv, "python", str(root / "scripts/v1_storage.py"), "--validate"],
+            ),
+            (
                 root,
                 [
                     "docker",
                     "compose",
                     "-f",
                     str(root / "docker-compose.infra.yml"),
+                    "--env-file",
+                    str(runtime / ".env"),
                     "up",
                     "-d",
                     "--wait",
                     "postgres",
                     "redis",
                     "qdrant",
+                    "minio",
                 ],
-            )
+            ),
+            (
+                runtime,
+                [
+                    *service_uv,
+                    "python",
+                    str(root / "scripts/v1_storage.py"),
+                    "--prepare-local",
+                ],
+            ),
         ],
         "v1-be": [api],
         "v1-worker": [worker],
@@ -207,6 +223,7 @@ def main(argv: list[str] | None = None) -> int:
         "v1-migrate",
         "v1-db-check",
         "v1-test-be",
+        "v1-infra-up",
     }:
         env_path = (ROOT if args.env_dir == "root" else ROOT / "backendV1") / ".env"
         if not env_path.is_file():
