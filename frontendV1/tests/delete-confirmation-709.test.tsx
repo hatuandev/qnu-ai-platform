@@ -116,6 +116,14 @@ beforeEach(() => {
           ...row,
           status: "completed",
           accepted_at: new Date().toISOString(),
+          result:
+            row.kind === "source"
+              ? {
+                  permanent: true,
+                  originals_retained: false,
+                  restore_available: false,
+                }
+              : null,
         };
       }
       return response(row);
@@ -154,7 +162,7 @@ async function ready() {
     expect(
       (
         screen.getByRole("button", {
-          name: "Xóa",
+          name: /^Xóa(?: vĩnh viễn)?$/,
           exact: true,
         }) as HTMLButtonElement
       ).disabled,
@@ -290,6 +298,18 @@ test("published input blocks permanent deletion and keeps the user in knowledge"
   ).toBe(true);
   expect(accepted).toHaveLength(0);
   expect(env.navigate).not.toHaveBeenCalled();
+});
+
+test("a server with soft-delete preview cannot accept permanent deletion", async () => {
+  row.impact = { originals_and_raw_evidence: "retained" };
+  mount();
+  await screen.findByText(/Máy chủ chưa hỗ trợ xóa vĩnh viễn/);
+  expect(accepted).toHaveLength(0);
+  expect(
+    screen
+      .getByRole("button", { name: "Xóa vĩnh viễn", exact: true })
+      .hasAttribute("disabled"),
+  ).toBe(true);
 });
 
 test("switching resources prepares a new confirmation instead of reusing the old one", async () => {

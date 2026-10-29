@@ -351,6 +351,20 @@ export function CompilationDetailPage({
             </div>
           </div>
 
+          {/* Điều kiện chuyển bước rõ ràng */}
+          <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground flex flex-wrap items-center justify-between gap-2">
+            <span>
+              <strong className="text-foreground">
+                Điều kiện chuyển bước:
+              </strong>{" "}
+              {isCompleted
+                ? '1. Kiểm tra trích dẫn và hoàn tất rà soát chất lượng → 2. Bấm "Đăng ký thành tài liệu biên soạn" để chuyển sang bước Duyệt & Phát hành.'
+                : run.status === "running" || run.status === "queued"
+                  ? "Đang chờ tiến trình biên soạn hoàn tất sinh bản thảo có trích dẫn…"
+                  : "Lượt biên soạn chưa hoàn tất. Hãy kiểm tra thông báo lỗi hoặc tạo lượt biên soạn mới."}
+            </span>
+          </div>
+
           {/* Metadata Row */}
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 pt-2 border-t text-xs text-muted-foreground">
             <div>

@@ -2,11 +2,7 @@ import { FileUp, FolderPlus, HardDrive, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ApiProblemError } from "@/app/api/v1";
-import {
-  Field,
-  FieldError,
-  FieldLabel,
-} from "@/components/admin/field";
+import { Field, FieldError, FieldLabel } from "@/components/admin/field";
 import { FileUpload } from "@/components/admin/file-upload";
 import {
   ResponsiveDialog,
@@ -25,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CollectionFormDialog } from "@/features/knowledge/collection-form-dialog";
+import { ProcessingProgress } from "@/features/knowledge/processing-progress";
 import {
   useCollectionQuery,
   useCollectionsQuery,
@@ -37,7 +34,14 @@ import {
   MAX_UPLOAD_BYTES,
   validateUploadFile,
 } from "@/features/knowledge/schemas";
-import type { KBCollection } from "@/features/knowledge/types";
+import type { KBCollection, KBSource } from "@/features/knowledge/types";
+
+type FileUploadState = {
+  fileName: string;
+  status: "waiting" | "uploading" | "completed" | "failed";
+  processing?: KBSource["processing"];
+  error?: string;
+};
 
 export function SourceUploadDialog({
   open,
@@ -62,10 +66,7 @@ export function SourceUploadDialog({
   const effectiveCollectionId = collectionId || selectedCollectionId;
   const uploadMutation = useUploadSource(workspaceId, effectiveCollectionId);
 
-  const collectionsQuery = useCollectionsQuery(
-    workspaceId,
-    { pageSize: 100 },
-  );
+  const collectionsQuery = useCollectionsQuery(workspaceId, { pageSize: 100 });
   const activeCollectionQuery = useCollectionQuery(
     workspaceId,
     effectiveCollectionId,
@@ -80,12 +81,8 @@ export function SourceUploadDialog({
   const [fileError, setFileError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{
-    current: number;
-    total: number;
-    currentFileName: string;
-    progressPercent: number;
-  } | null>(null);
+  const [fileStates, setFileStates] = useState<FileUploadState[]>([]);
+  const [completedFilesCount, setCompletedFilesCount] = useState(0);
 
   useEffect(() => {
     if (open) {
@@ -98,7 +95,8 @@ export function SourceUploadDialog({
       setFileError(null);
       setServerError(null);
       setIsSubmitting(false);
-      setUploadProgress(null);
+      setFileStates([]);
+      setCompletedFilesCount(0);
     }
   }, [open, collectionId, collectionsQuery.data?.items, selectedCollectionId]);
 
@@ -143,19 +141,24 @@ export function SourceUploadDialog({
     }
 
     setIsSubmitting(true);
+    setCompletedFilesCount(0);
+    setFileStates(
+      files.map((f) => ({
+        fileName: f.name,
+        status: "waiting",
+      })),
+    );
     let successCount = 0;
     let lastSourceId = "";
 
     try {
       for (let i = 0; i < files.length; i++) {
         const currentFile = files[i];
-        const progressPercent = Math.round((i / files.length) * 100);
-        setUploadProgress({
-          current: i + 1,
-          total: files.length,
-          currentFileName: currentFile.name,
-          progressPercent,
-        });
+        setFileStates((prev) =>
+          prev.map((item, idx) =>
+            idx === i ? { ...item, status: "uploading" } : item,
+          ),
+        );
 
         const title =
           currentFile.name.replace(/\.[^/.]+$/, "").trim() || undefined;
@@ -169,28 +172,44 @@ export function SourceUploadDialog({
 
         lastSourceId = result.source.id;
         successCount++;
+        setCompletedFilesCount(successCount);
+        setFileStates((prev) =>
+          prev.map((item, idx) =>
+            idx === i
+              ? {
+                  ...item,
+                  status: "completed",
+                  processing: result.source.processing,
+                }
+              : item,
+          ),
+        );
       }
 
       toast.success(
         files.length === 1
-          ? "Đã tải lên tệp thành công."
-          : `Đã tải lên thành công ${successCount}/${files.length} tệp tài liệu.`,
+          ? "Đã tải tệp lên kho và bắt đầu tự động bóc tách."
+          : `Đã tải lên ${successCount}/${files.length} tệp và bắt đầu tự động bóc tách.`,
       );
       onOpenChange(false);
       if (lastSourceId) {
         onSuccess?.(lastSourceId);
       }
     } catch (error) {
-      if (error instanceof ApiProblemError) {
-        setServerError(error.message);
-      } else {
-        setServerError(
-          "Không tải lên được tệp. Vui lòng kiểm tra lại kết nối.",
-        );
-      }
+      const errMsg =
+        error instanceof ApiProblemError
+          ? error.message
+          : "Không tải lên được tệp. Vui lòng kiểm tra lại kết nối.";
+      setServerError(errMsg);
+      setFileStates((prev) =>
+        prev.map((item) =>
+          item.status === "uploading"
+            ? { ...item, status: "failed", error: errMsg }
+            : item,
+        ),
+      );
     } finally {
       setIsSubmitting(false);
-      setUploadProgress(null);
     }
   };
 
@@ -232,7 +251,8 @@ export function SourceUploadDialog({
                 <Field>
                   <div className="flex items-center justify-between">
                     <FieldLabel htmlFor="target-collection">
-                      Kho tri thức đích <span className="text-destructive">*</span>
+                      Kho tri thức đích{" "}
+                      <span className="text-destructive">*</span>
                     </FieldLabel>
                     <Button
                       type="button"
@@ -250,7 +270,10 @@ export function SourceUploadDialog({
                     onValueChange={setSelectedCollectionId}
                     disabled={isSubmitting || collections.length === 0}
                   >
-                    <SelectTrigger id="target-collection" className="text-xs h-9">
+                    <SelectTrigger
+                      id="target-collection"
+                      className="text-xs h-9"
+                    >
                       <SelectValue placeholder="Chọn kho tri thức..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -278,7 +301,9 @@ export function SourceUploadDialog({
                         </span>
                       </>
                     ) : (
-                      <span className="text-muted-foreground">(Thư mục gốc)</span>
+                      <span className="text-muted-foreground">
+                        (Thư mục gốc)
+                      </span>
                     )}
                   </div>
                 </div>
@@ -300,19 +325,66 @@ export function SourceUploadDialog({
                   disabled={isSubmitting}
                   value={files}
                   onFilesChange={handleFilesChange}
-                  progress={
-                    isSubmitting && uploadProgress
-                      ? uploadProgress.progressPercent
-                      : undefined
-                  }
-                  progressLabel={
-                    uploadProgress
-                      ? `Đang tải lên (${uploadProgress.current}/${uploadProgress.total}): ${uploadProgress.currentFileName}`
-                      : undefined
-                  }
                 />
                 {fileError ? <FieldError>{fileError}</FieldError> : null}
               </Field>
+
+              {fileStates.length > 0 ? (
+                <div className="space-y-2 rounded-xl border border-border/70 bg-muted/15 p-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-foreground">
+                      Tiến độ tải lên & khởi tạo bóc tách
+                    </span>
+                    <span className="font-mono text-muted-foreground">
+                      Đã hoàn tất tải {completedFilesCount}/{fileStates.length}{" "}
+                      tệp
+                    </span>
+                  </div>
+                  <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                    {fileStates.map((item) => (
+                      <div
+                        key={item.fileName}
+                        className="rounded-lg border border-border/60 bg-background p-2.5 space-y-1.5"
+                      >
+                        <div className="truncate text-xs font-medium text-foreground">
+                          {item.fileName}
+                        </div>
+                        {item.status === "waiting" ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            Đang chờ đến lượt tải tệp…
+                          </p>
+                        ) : item.status === "uploading" ? (
+                          <ProcessingProgress
+                            compact
+                            progress={{ status: "uploading" }}
+                          />
+                        ) : item.status === "failed" ? (
+                          <ProcessingProgress
+                            compact
+                            progress={{
+                              status: "failed",
+                              error_detail: item.error,
+                            }}
+                          />
+                        ) : (
+                          <ProcessingProgress
+                            compact
+                            progress={{
+                              status: item.processing?.status ?? "queued",
+                              pages_total: item.processing?.pages_total,
+                              pages_done: item.processing?.pages_done,
+                              pages_failed: item.processing?.pages_failed,
+                              results_ready: item.processing?.results_ready,
+                              dispatch_pending:
+                                item.processing?.dispatch_pending,
+                            }}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <ResponsiveDialogFooter className="border-t bg-card px-4 py-3 sm:px-6">
@@ -340,9 +412,7 @@ export function SourceUploadDialog({
                   <>
                     <Loader2 className="size-3.5 animate-spin" />
                     <span>
-                      {uploadProgress
-                        ? `Đang tải (${uploadProgress.current}/${uploadProgress.total})...`
-                        : "Đang tải lên..."}
+                      Đang tải tệp ({completedFilesCount}/{files.length})…
                     </span>
                   </>
                 ) : (
@@ -366,7 +436,9 @@ export function SourceUploadDialog({
         workspaceId={workspaceId}
         onSuccess={(created) => {
           setSelectedCollectionId(created.id);
-          toast.success(`Đã tạo kho "${created.name}". Bạn có thể tiếp tục tải tài liệu.`);
+          toast.success(
+            `Đã tạo kho "${created.name}". Bạn có thể tiếp tục tải tài liệu.`,
+          );
         }}
       />
     </>

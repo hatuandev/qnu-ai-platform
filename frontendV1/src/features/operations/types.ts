@@ -5,6 +5,9 @@ export type JobView = {
   id: string;
   workspace_id: string;
   collection_id: string | null;
+  source_id?: string | null;
+  revision_id?: string | null;
+  compilation_run_id?: string | null;
   status: string;
   created_at: string;
   started_at: string | null;

@@ -625,18 +625,18 @@ export function AssistantDetailPage({
               </div>
 
               {/* Check 4: Inference test (Honest indicator) */}
-              <div className="flex items-start gap-2.5 opacity-80">
-                <Sparkles className="size-4 text-muted-foreground shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2.5">
+                <Sparkles className="size-4 text-primary shrink-0 mt-0.5" />
                 <div>
                   <div className="font-medium text-foreground flex items-center gap-1">
                     Chức năng Hội thoại (Chat)
-                    <Badge variant="outline" className="text-[10px] py-0">
-                      Đợt tiếp theo
+                    <Badge variant="info" className="text-[10px] py-0">
+                      Sẵn sàng
                     </Badge>
                   </div>
                   <div className="text-muted-foreground text-[11px]">
-                    Giao diện chat, hội thoại và streaming sẽ được hoàn thiện ở
-                    đợt phát triển tiếp theo.
+                    Bấm &ldquo;Chat thử&rdquo; trên thanh đầu trang để mở phiên
+                    hội thoại và kiểm tra câu trả lời có dẫn nguồn bằng chứng.
                   </div>
                 </div>
               </div>

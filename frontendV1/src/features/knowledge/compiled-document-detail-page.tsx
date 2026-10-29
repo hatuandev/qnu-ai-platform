@@ -35,8 +35,12 @@ import { isLifecycleAdmin } from "@/features/lifecycle/permissions";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { formatDateTimeValue } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
+import { useIndexRunsQuery, useRequestIndexMutation } from "./index-queries";
 import { ListPagination } from "./list-pagination";
-import { canRegisterCompiledDocument } from "./permissions";
+import {
+  canPublishCompiledVersion,
+  canRegisterCompiledDocument,
+} from "./permissions";
 import {
   useCompiledDocumentHistoryQuery,
   useCompiledDocumentQuery,
@@ -105,8 +109,14 @@ export function CompiledDocumentDetailPage({
   useEffect(() => setCurrentTab(initialTab), [initialTab]);
 
   const canRegister = !rolePending && canRegisterCompiledDocument(role);
+  const canPublish = !rolePending && canPublishCompiledVersion(role);
 
   const collectionQuery = useCollectionQuery(workspaceId, collectionId);
+  const indexRunsQuery = useIndexRunsQuery(workspaceId, collectionId);
+  const requestIndexMutation = useRequestIndexMutation(
+    workspaceId,
+    collectionId,
+  );
   const documentQuery = useCompiledDocumentQuery(
     workspaceId,
     collectionId,
@@ -139,6 +149,23 @@ export function CompiledDocumentDetailPage({
   const published = publishedQuery.data;
   const versions = (versionsQuery.data ?? []).slice(0, pageSize);
   const history = (historyQuery.data ?? []).slice(0, pageSize);
+
+  const indexRuns = indexRunsQuery.data ?? [];
+  const activeIndexRun = indexRuns.find(
+    (r) => r.is_active && r.status === "completed",
+  );
+  const buildingIndexRun = indexRuns.find(
+    (r) =>
+      r.status === "queued" ||
+      r.status === "dispatched" ||
+      r.status === "running",
+  );
+  const isReadyForQA = Boolean(
+    published &&
+      activeIndexRun &&
+      new Date(activeIndexRun.requested_at).getTime() >=
+        new Date(published.decision.created_at).getTime(),
+  );
 
   if (documentQuery.isLoading || collectionQuery.isLoading) {
     return (
@@ -324,51 +351,99 @@ export function CompiledDocumentDetailPage({
       ) : published ? (
         <Card className="rounded-xl border-success/30 bg-success/5 shadow-2xs">
           <CardContent className="p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
                 <CheckCircle2 className="size-4 text-success shrink-0" />
                 <span className="text-xs font-semibold text-foreground">
-                  Phiên bản đang xuất bản hiện hành
+                  Phiên bản đang phát hành hiện hành
                 </span>
                 <Badge
                   variant="default"
                   className="text-xs bg-success text-success-foreground font-semibold"
                 >
-                  v{published.version.version_no}
+                  Đã phát hành · v{published.version.version_no}
                 </Badge>
+                {isReadyForQA ? (
+                  <Badge variant="info" className="text-xs font-medium">
+                    Sẵn sàng hỏi đáp (Index Gen #{activeIndexRun?.generation})
+                  </Badge>
+                ) : buildingIndexRun ? (
+                  <Badge variant="warning" className="text-xs font-medium">
+                    Đang cập nhật chỉ mục tìm kiếm…
+                  </Badge>
+                ) : (
+                  <Badge variant="warning" className="text-xs font-medium">
+                    Chưa cập nhật chỉ mục tìm kiếm mới nhất
+                  </Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Được phê duyệt và xuất bản bởi{" "}
+                Được phê duyệt và phát hành bởi{" "}
                 <span className="font-mono text-foreground font-medium">
                   {published.decision.actor_ref}
                 </span>{" "}
                 vào {formatDateTimeValue(published.decision.created_at)}.
               </p>
-              <div className="text-[11px] font-mono text-muted-foreground/80">
-                Receipt: {published.decision.id} (Seq #
-                {published.decision.document_sequence})
-              </div>
+              <p className="text-xs text-muted-foreground">
+                <strong className="text-foreground">
+                  Trạng thái phục vụ AI:
+                </strong>{" "}
+                {isReadyForQA
+                  ? "Tài liệu đã phát hành và đã được đưa vào chỉ mục tìm kiếm hiện hành — sẵn sàng phục vụ hỏi đáp có trích dẫn."
+                  : "Tài liệu đã phát hành nhưng cần cập nhật chỉ mục tìm kiếm của kho để Trợ lý AI truy xuất được nội dung mới nhất."}
+              </p>
             </div>
 
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              className="h-8 text-xs gap-1.5 shrink-0"
-            >
-              <Link
-                to="/workspaces/$workspaceId/collections/$collectionId/documents/$documentId/versions/$versionId"
-                params={{
-                  workspaceId,
-                  collectionId,
-                  documentId,
-                  versionId: published.version.id,
-                }}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {!isReadyForQA && canPublish ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={
+                    requestIndexMutation.isPending || Boolean(buildingIndexRun)
+                  }
+                  onClick={() =>
+                    void requestIndexMutation.mutateAsync({
+                      providerId: null,
+                      idempotencyKey: crypto.randomUUID(),
+                    })
+                  }
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <RefreshCw
+                    className={cn(
+                      "size-3.5",
+                      (requestIndexMutation.isPending || buildingIndexRun) &&
+                        "animate-spin",
+                    )}
+                  />
+                  <span>
+                    {buildingIndexRun
+                      ? "Đang cập nhật tìm kiếm…"
+                      : "Cập nhật tìm kiếm"}
+                  </span>
+                </Button>
+              ) : null}
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs gap-1.5 shrink-0"
               >
-                <span>Xem bản xuất bản</span>
-                <ArrowRight className="size-3.5" />
-              </Link>
-            </Button>
+                <Link
+                  to="/workspaces/$workspaceId/collections/$collectionId/documents/$documentId/versions/$versionId"
+                  params={{
+                    workspaceId,
+                    collectionId,
+                    documentId,
+                    versionId: published.version.id,
+                  }}
+                >
+                  <span>Xem bản phát hành</span>
+                  <ArrowRight className="size-3.5" />
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (

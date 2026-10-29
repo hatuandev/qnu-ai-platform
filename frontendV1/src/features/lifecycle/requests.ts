@@ -1,5 +1,10 @@
 import { lifecyclePaths, type V1Client } from "@/app/api/v1";
-import type { LifecycleAction, LifecycleRequest, ResourcePage } from "./types";
+import type {
+  LegacyDeletedSourcesPage,
+  LifecycleAction,
+  LifecycleRequest,
+  ResourcePage,
+} from "./types";
 
 export function previewLifecycle(
   client: V1Client,
@@ -45,4 +50,35 @@ export function listArchivedResources(
     searchParams: { limit: 21, offset: (page - 1) * 20 },
     signal,
   });
+}
+
+export function listPendingSourceDeletions(
+  client: V1Client,
+  workspaceId: string,
+  collectionId: string,
+  signal?: AbortSignal,
+) {
+  return client.get<LifecycleAction[]>(
+    lifecyclePaths.sourceDeletions(workspaceId),
+    {
+      searchParams: { collection_id: collectionId },
+      signal,
+    },
+  );
+}
+
+export function listLegacyDeletedSources(
+  client: V1Client,
+  workspaceId: string,
+  collectionId: string,
+  offset: number,
+  signal?: AbortSignal,
+) {
+  return client.get<LegacyDeletedSourcesPage>(
+    lifecyclePaths.legacyDeletedSources(workspaceId),
+    {
+      searchParams: { collection_id: collectionId, limit: 20, offset },
+      signal,
+    },
+  );
 }

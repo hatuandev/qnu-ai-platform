@@ -84,11 +84,7 @@ export const knowledgeKeys = {
         ] as const)
       : (["v1", "knowledge", "collection"] as const),
 
-  folders: (
-    sessionId?: number,
-    workspaceId?: string,
-    collectionId?: string,
-  ) =>
+  folders: (sessionId?: number, workspaceId?: string, collectionId?: string) =>
     sessionId !== undefined &&
     workspaceId !== undefined &&
     collectionId !== undefined
@@ -311,7 +307,12 @@ export function useFolderQuery(
 ) {
   const { sessionId } = useV1Auth();
   return useQuery<KBFolderDetail>({
-    queryKey: knowledgeKeys.folder(sessionId, workspaceId, collectionId, folderId),
+    queryKey: knowledgeKeys.folder(
+      sessionId,
+      workspaceId,
+      collectionId,
+      folderId,
+    ),
     queryFn: () => getFolder(v1Client, workspaceId, collectionId, folderId),
     enabled: Boolean(workspaceId && collectionId && folderId),
   });
@@ -330,7 +331,8 @@ export function useFolderImpactQuery(
       collectionId,
       folderId,
     ),
-    queryFn: () => getFolderImpact(v1Client, workspaceId, collectionId, folderId),
+    queryFn: () =>
+      getFolderImpact(v1Client, workspaceId, collectionId, folderId),
     enabled: Boolean(workspaceId && collectionId && folderId),
   });
 }
@@ -340,7 +342,8 @@ export function useCreateFolder(workspaceId: string, collectionId: string) {
   const { sessionId } = useV1Auth();
 
   return useMutation<KBFolder, Error, FolderCreateInput>({
-    mutationFn: (input) => createFolder(v1Client, workspaceId, collectionId, input),
+    mutationFn: (input) =>
+      createFolder(v1Client, workspaceId, collectionId, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: knowledgeKeys.folders(sessionId, workspaceId, collectionId),
@@ -464,6 +467,16 @@ export function useSourcesQuery(
     ),
     queryFn: () => listSources(v1Client, workspaceId, collectionId, params),
     enabled: Boolean(workspaceId && collectionId),
+    refetchInterval: (query) => {
+      const items = query.state.data?.items ?? [];
+      const hasActiveProcessing = items.some(
+        (item) =>
+          item.processing?.status === "queued" ||
+          item.processing?.status === "running" ||
+          item.processing?.dispatch_pending === true,
+      );
+      return hasActiveProcessing ? 3000 : false;
+    },
   });
 }
 
@@ -482,6 +495,14 @@ export function useSourceQuery(
     ),
     queryFn: () => getSource(v1Client, workspaceId, collectionId, sourceId),
     enabled: Boolean(workspaceId && collectionId && sourceId),
+    refetchInterval: (query) => {
+      const proc = query.state.data?.processing;
+      return proc?.status === "queued" ||
+        proc?.status === "running" ||
+        proc?.dispatch_pending === true
+        ? 3000
+        : false;
+    },
   });
 }
 
@@ -510,7 +531,12 @@ export function useUploadSource(workspaceId: string, collectionId: string) {
   return useMutation<
     SourceUploadResult,
     Error,
-    { file: File; title?: string; idempotencyKey?: string; folder_id?: string | null }
+    {
+      file: File;
+      title?: string;
+      idempotencyKey?: string;
+      folder_id?: string | null;
+    }
   >({
     mutationFn: ({ file, title, idempotencyKey, folder_id }) =>
       uploadSource(
@@ -594,11 +620,7 @@ export function useRenameSource(workspaceId: string, collectionId: string) {
   const queryClient = useQueryClient();
   const { sessionId } = useV1Auth();
 
-  return useMutation<
-    KBSource,
-    Error,
-    { sourceId: string; title: string }
-  >({
+  return useMutation<KBSource, Error, { sourceId: string; title: string }>({
     mutationFn: ({ sourceId, title }) =>
       renameSource(v1Client, workspaceId, collectionId, sourceId, title),
     onSuccess: (_, vars) => {

@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Database,
   ExternalLink,
+  MessageSquare,
   Pencil,
   Plus,
   Search,
@@ -30,6 +31,7 @@ import { AssistantFormDialog } from "@/features/assistants/assistant-form-dialog
 import { canManageAssistants } from "@/features/assistants/permissions";
 import { useAssistantsQuery } from "@/features/assistants/queries";
 import type { Assistant } from "@/features/assistants/types";
+import { ConversationCreateDialog } from "@/features/conversations/conversation-create-dialog";
 import { useCollectionsQuery } from "@/features/knowledge/queries";
 import { LifecycleActions } from "@/features/lifecycle/lifecycle-actions";
 import { useCatalogQuery } from "@/features/modelops/queries";
@@ -63,6 +65,7 @@ export function AssistantsPanel({
   const [editingAssistant, setEditingAssistant] = useState<Assistant | null>(
     null,
   );
+  const [chatAssistant, setChatAssistant] = useState<Assistant | null>(null);
 
   const canManage = !rolePending && canManageAssistants(role);
 
@@ -360,7 +363,22 @@ export function AssistantsPanel({
 
                       {/* Actions */}
                       <TableCell className="align-top py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5 text-xs"
+                            disabled={!item.is_active}
+                            onClick={() => setChatAssistant(item)}
+                            title={
+                              item.is_active
+                                ? "Mở hội thoại thử với trợ lý này"
+                                : "Cần bật trợ lý trước khi chat thử"
+                            }
+                          >
+                            <MessageSquare className="size-3.5 text-primary" />
+                            <span>Chat thử</span>
+                          </Button>
                           <Link
                             to="/workspaces/$workspaceId/assistants/$assistantId"
                             params={{
@@ -447,6 +465,16 @@ export function AssistantsPanel({
           onSuccess={() => setEditingAssistant(null)}
         />
       )}
+
+      {/* Chat thử Dialog */}
+      <ConversationCreateDialog
+        workspaceId={workspaceId}
+        open={Boolean(chatAssistant)}
+        onOpenChange={(open) => {
+          if (!open) setChatAssistant(null);
+        }}
+        preselectedAssistant={chatAssistant ?? undefined}
+      />
     </div>
   );
 }

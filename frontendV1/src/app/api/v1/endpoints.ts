@@ -21,6 +21,10 @@ export const lifecyclePaths = {
     `/workspaces/${workspaceId}/lifecycle/actions/${id}`,
   resources: (workspaceId: string) =>
     `/workspaces/${workspaceId}/lifecycle/resources`,
+  sourceDeletions: (workspaceId: string) =>
+    `/workspaces/${encodeURIComponent(workspaceId)}/lifecycle/source-deletions`,
+  legacyDeletedSources: (workspaceId: string) =>
+    `/workspaces/${encodeURIComponent(workspaceId)}/lifecycle/source-deletions/legacy`,
 } as const;
 
 export const operationsPaths = {

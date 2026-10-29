@@ -1,3 +1,5 @@
+import { Link } from "@tanstack/react-router";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { useV1Auth } from "@/app/auth/v1";
 import { DataTablePagination } from "@/components/admin/data-table/data-table-pagination";
@@ -20,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ProcessingProgress } from "@/features/knowledge/processing-progress";
 import { LifecycleReceipt } from "@/features/lifecycle/action-receipt";
 import {
   canReadOperations,
@@ -31,7 +34,6 @@ import { BackupsPanel } from "./backups-panel";
 import { JobDetails } from "./job-details";
 import { OperationReceipt } from "./operation-receipt";
 import { useJobs, useOperationsSummary } from "./queries";
-import { ReadinessPanel } from "./readiness-panel";
 import { RecoveryDialog } from "./recovery-dialog";
 import type { OperationsSearch } from "./search";
 import { StoragePanel } from "./storage-panel";
@@ -42,6 +44,83 @@ import {
   type JobView,
   statusLabel,
 } from "./types";
+
+function renderJobResourceLink(workspaceId: string, job: JobView) {
+  if (!job.collection_id) return null;
+  if (job.source_id) {
+    return (
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2 text-xs gap-1"
+      >
+        <Link
+          to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
+          params={{
+            workspaceId,
+            collectionId: job.collection_id,
+            sourceId: job.source_id,
+          }}
+          search={{
+            revisionId: job.revision_id ?? undefined,
+            runId: job.kind === "ocr" ? job.id : undefined,
+          }}
+        >
+          <span>Mở tài liệu</span>
+          <ExternalLink className="size-3" />
+        </Link>
+      </Button>
+    );
+  }
+  const compilationRunId =
+    job.compilation_run_id || (job.kind === "compiler" ? job.id : null);
+  if (compilationRunId) {
+    return (
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2 text-xs gap-1"
+      >
+        <Link
+          to="/workspaces/$workspaceId/collections/$collectionId/compilations/$runId"
+          params={{
+            workspaceId,
+            collectionId: job.collection_id,
+            runId: compilationRunId,
+          }}
+        >
+          <span>Mở bản biên soạn</span>
+          <ExternalLink className="size-3" />
+        </Link>
+      </Button>
+    );
+  }
+  if (job.kind === "index") {
+    return (
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2 text-xs gap-1"
+      >
+        <Link
+          to="/workspaces/$workspaceId/collections/$collectionId/search"
+          params={{
+            workspaceId,
+            collectionId: job.collection_id,
+          }}
+          search={{ page: 1, pageSize: 20 }}
+        >
+          <span>Mở chỉ mục kho</span>
+          <ExternalLink className="size-3" />
+        </Link>
+      </Button>
+    );
+  }
+  return null;
+}
 
 type Props = {
   workspaceId: string;
@@ -73,33 +152,6 @@ function OperationsSession({ workspaceId, search, onSearch }: Props) {
     );
   return (
     <div className="space-y-4">
-      <nav aria-label="Chức năng vận hành" className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant={view === "jobs" ? "secondary" : "outline"}
-          onClick={() => onSearch({ view: "jobs", page: 1 })}
-        >
-          Tác vụ
-        </Button>
-        {isLifecycleAdmin(role) ? (
-          <>
-            <Button
-              size="sm"
-              variant={view === "backups" ? "secondary" : "outline"}
-              onClick={() => onSearch({ view: "backups", page: 1 })}
-            >
-              Sao lưu
-            </Button>
-            <Button
-              size="sm"
-              variant={view === "storage" ? "secondary" : "outline"}
-              onClick={() => onSearch({ view: "storage", page: 1 })}
-            >
-              Dọn tệp
-            </Button>
-          </>
-        ) : null}
-      </nav>
       {view === "jobs" ? (
         <OperationsJobs
           workspaceId={workspaceId}
@@ -110,7 +162,20 @@ function OperationsSession({ workspaceId, search, onSearch }: Props) {
         <p role="alert">Chỉ quản trị viên được quản lý sao lưu và dọn tệp.</p>
       ) : view === "backups" ? (
         <>
-          <h1 className="type-page-title">Sao lưu bằng chứng</h1>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h1 className="type-page-title">Sao lưu bằng chứng</h1>
+              <p className="text-sm text-muted-foreground">
+                Tạo và quản lý bản sao lưu bằng chứng của đơn vị.
+              </p>
+            </div>
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link to="/settings">
+                <ArrowLeft className="size-3.5" />
+                <span>Về Cấu hình</span>
+              </Link>
+            </Button>
+          </div>
           {search.operationActionId ? (
             <OperationReceipt
               key={search.operationActionId}
@@ -127,7 +192,20 @@ function OperationsSession({ workspaceId, search, onSearch }: Props) {
         </>
       ) : (
         <>
-          <h1 className="type-page-title">Dọn tệp dẫn xuất</h1>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h1 className="type-page-title">Dọn dữ liệu dẫn xuất</h1>
+              <p className="text-sm text-muted-foreground">
+                Kiểm tra và dọn dẹp các tệp dẫn xuất không còn tham chiếu.
+              </p>
+            </div>
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link to="/settings">
+                <ArrowLeft className="size-3.5" />
+                <span>Về Cấu hình</span>
+              </Link>
+            </Button>
+          </div>
           <StoragePanel
             workspaceId={workspaceId}
             actionId={search.cleanupActionId}
@@ -165,10 +243,10 @@ function OperationsJobs({ workspaceId, search, onSearch }: Props) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="type-page-title">Trung tâm vận hành</h1>
+          <h1 className="type-page-title">Tác vụ</h1>
           <p className="text-sm text-muted-foreground">
-            Theo dõi trạng thái thật, hủy và giao lại tác vụ theo điều kiện của
-            server.
+            Danh sách công việc đang chạy hoặc cần xử lý, tiến độ thực tế và
+            liên kết quay về đúng tài liệu hoặc bản biên soạn.
           </p>
         </div>
         <Button
@@ -199,9 +277,7 @@ function OperationsJobs({ workspaceId, search, onSearch }: Props) {
       ) : null}
       <Card className="rounded-xl shadow-2xs">
         <CardContent className="p-4 space-y-3">
-          <h2 className="font-semibold text-sm">
-            Tổng quan tác vụ &amp; usage
-          </h2>
+          <h2 className="font-semibold text-sm">Tổng quan tác vụ</h2>
           {summary.isPending ? (
             <p role="status">Đang đọc tổng quan…</p>
           ) : summary.isError ? (
@@ -210,52 +286,22 @@ function OperationsJobs({ workspaceId, search, onSearch }: Props) {
               onRetry={() => void summary.refetch()}
             />
           ) : (
-            <>
-              <div className="flex flex-wrap gap-2">
-                {summary.data.jobs.map((item) => (
-                  <Badge key={`${item.kind}:${item.status}`} variant="outline">
-                    {JOB_LABEL[item.kind]} · {statusLabel(item.status)}:{" "}
-                    {item.count}
-                  </Badge>
-                ))}
-                {summary.data.jobs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Chưa có tác vụ được ghi nhận.
-                  </p>
-                ) : null}
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {summary.data.usage.map((usage) => (
-                  <div
-                    key={usage.status}
-                    className="rounded-lg border p-3 text-xs"
-                  >
-                    <p className="font-semibold">
-                      Usage · {statusLabel(usage.status)}
-                    </p>
-                    <p>
-                      Token quan sát: {usage.observed_tokens ?? "Chưa có số đo"}
-                    </p>
-                    <p>
-                      Token giữ chỗ: {usage.reserved_tokens ?? "Chưa có số đo"}
-                    </p>
-                    <p>
-                      Chi phí quan sát (USD):{" "}
-                      {usage.observed_cost_usd ?? "Chưa có số đo"}
-                    </p>
-                    <p className="text-muted-foreground">
-                      Có chi phí: {usage.cost_records}/{usage.records} bản ghi
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </>
+            <div className="flex flex-wrap gap-2">
+              {summary.data.jobs.map((item) => (
+                <Badge key={`${item.kind}:${item.status}`} variant="outline">
+                  {JOB_LABEL[item.kind]} · {statusLabel(item.status)}:{" "}
+                  {item.count}
+                </Badge>
+              ))}
+              {summary.data.jobs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Chưa có tác vụ được ghi nhận.
+                </p>
+              ) : null}
+            </div>
           )}
         </CardContent>
       </Card>
-      {isLifecycleAdmin(role) ? (
-        <ReadinessPanel workspaceId={workspaceId} />
-      ) : null}
       {search.jobId && search.jobKind ? (
         <JobDetails
           workspaceId={workspaceId}
@@ -360,22 +406,39 @@ function OperationsJobs({ workspaceId, search, onSearch }: Props) {
                         </p>
                       ) : null}
                     </TableCell>
-                    <TableCell>
-                      {job.progress_done ?? "—"} /{" "}
-                      {job.progress_total ?? "Chưa xác định"}
+                    <TableCell className="min-w-[200px]">
+                      <ProcessingProgress
+                        compact
+                        progress={{
+                          status: job.status,
+                          pages_total: job.progress_total,
+                          pages_done: job.progress_done,
+                          error_code: job.error_code,
+                          unitLabel:
+                            job.kind === "index"
+                              ? "chunk"
+                              : job.kind === "ocr"
+                                ? "trang"
+                                : "mục",
+                        }}
+                        isPollError={jobs.isError}
+                      />
                     </TableCell>
                     <TableCell>{job.usage_tokens ?? "Chưa có số đo"}</TableCell>
                     <TableCell>{formatDateTimeValue(job.created_at)}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          onSearch({ jobId: job.id, jobKind: job.kind })
-                        }
-                      >
-                        Xem
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {renderJobResourceLink(workspaceId, job)}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            onSearch({ jobId: job.id, jobKind: job.kind })
+                          }
+                        >
+                          Xem
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

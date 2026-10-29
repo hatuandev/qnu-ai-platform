@@ -1,8 +1,11 @@
+import { Link } from "@tanstack/react-router";
+import { ExternalLink } from "lucide-react";
 import type { CallerWorkspaceRole } from "@/app/auth/v1/permissions";
 import { ErrorState } from "@/components/admin/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ProcessingProgress } from "@/features/knowledge/processing-progress";
 import { LifecycleActions } from "@/features/lifecycle/lifecycle-actions";
 import {
   isLifecycleAdmin,
@@ -45,10 +48,77 @@ export function JobDetails({
           />
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-2">
-              <span>{JOB_LABEL[query.data.kind]}</span>
-              <Badge variant="outline">{statusLabel(query.data.status)}</Badge>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold">
+                  {JOB_LABEL[query.data.kind]}
+                </span>
+                <Badge variant="outline">
+                  {statusLabel(query.data.status)}
+                </Badge>
+              </div>
+              {query.data.collection_id && query.data.source_id ? (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <Link
+                    to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
+                    params={{
+                      workspaceId,
+                      collectionId: query.data.collection_id,
+                      sourceId: query.data.source_id,
+                    }}
+                    search={{
+                      revisionId: query.data.revision_id ?? undefined,
+                      runId:
+                        query.data.kind === "ocr" ? query.data.id : undefined,
+                    }}
+                  >
+                    <span>Mở tài liệu nguồn</span>
+                    <ExternalLink className="size-3.5" />
+                  </Link>
+                </Button>
+              ) : query.data.collection_id &&
+                (query.data.compilation_run_id ||
+                  query.data.kind === "compiler") ? (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <Link
+                    to="/workspaces/$workspaceId/collections/$collectionId/compilations/$runId"
+                    params={{
+                      workspaceId,
+                      collectionId: query.data.collection_id,
+                      runId: query.data.compilation_run_id ?? query.data.id,
+                    }}
+                  >
+                    <span>Mở bản biên soạn</span>
+                    <ExternalLink className="size-3.5" />
+                  </Link>
+                </Button>
+              ) : null}
             </div>
+            <ProcessingProgress
+              progress={{
+                status: query.data.status,
+                pages_total: query.data.progress_total,
+                pages_done: query.data.progress_done,
+                error_code: query.data.error_code,
+                unitLabel:
+                  query.data.kind === "index"
+                    ? "chunk"
+                    : query.data.kind === "ocr"
+                      ? "trang"
+                      : "mục",
+              }}
+              isPollError={query.isError}
+            />
             <dl className="grid gap-2 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-muted-foreground">Mã tác vụ</dt>

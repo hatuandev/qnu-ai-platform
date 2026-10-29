@@ -19,6 +19,9 @@ export function SettingsLayout({ children }: { children: React.ReactNode }) {
     select: (state) => state.location.pathname,
   });
   const router = useRouter();
+  if (pathname === "/settings" || pathname === "/settings/") {
+    return <main className="min-w-0">{children}</main>;
+  }
   const current =
     settingsItems.find((item) => item.to === pathname)?.to ?? "/settings";
   return (

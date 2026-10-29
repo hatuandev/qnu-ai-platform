@@ -283,6 +283,7 @@ def require_operation(kind: str, action: str, row: Base, lifecycle: ResourceStat
         action in {"archive", "delete", "pause", "resume", "replace"}
         and status != "active"
         and not (action == "delete" and status == "archived")
+        and not (kind == "source" and action == "delete" and status == "deleted")
     ):
         raise Conflict(
             "Cần khôi phục trước khi thực hiện thao tác.", code="lifecycle_transition_invalid"

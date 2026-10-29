@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.conversations.models import Conversation
@@ -351,3 +351,49 @@ async def pending_source_deletions(db, actor, workspace_id, collection_id):
             )
         ).all()
     )
+
+
+async def legacy_deleted_sources(db, actor, workspace_id, collection_id, limit, offset):
+    """Surface old soft deletions for a new, explicit permanent-deletion preview."""
+    from qnu.domains.knowledge.models import KBSource
+    from qnu.domains.knowledge.policies.access import load_collection
+
+    await authorize(db, actor, workspace_id, "source", "delete")
+    await load_collection(db, workspace_id, collection_id)
+    pending = (
+        select(LifecycleAction.id)
+        .where(
+            LifecycleAction.workspace_id == workspace_id,
+            LifecycleAction.kind == "source",
+            LifecycleAction.resource_id == KBSource.id,
+            LifecycleAction.action == "delete",
+            LifecycleAction.status == "pending",
+        )
+        .exists()
+    )
+    statement = (
+        select(KBSource.id.label("source_id"), KBSource.title)
+        .join(
+            ResourceState,
+            (ResourceState.workspace_id == KBSource.workspace_id)
+            & (ResourceState.kind == "source")
+            & (ResourceState.resource_id == KBSource.id),
+        )
+        .where(
+            KBSource.workspace_id == workspace_id,
+            KBSource.collection_id == collection_id,
+            ResourceState.status == "deleted",
+            ~pending,
+        )
+    )
+    total = await db.scalar(select(func.count()).select_from(statement.subquery()))
+    items = (
+        (
+            await db.execute(
+                statement.order_by(KBSource.created_at, KBSource.id).limit(limit).offset(offset)
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return {"items": [dict(row) for row in items], "total": total, "limit": limit, "offset": offset}

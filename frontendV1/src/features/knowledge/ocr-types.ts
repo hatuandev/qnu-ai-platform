@@ -49,6 +49,8 @@ export interface ProcessingRunResponse {
   usage_tokens: number | null;
   config_fingerprint: string;
   dispatch_pending: boolean;
+  strategy?: string;
+  results_ready?: boolean;
 }
 
 export interface ProcessingRunCreatedResponse {

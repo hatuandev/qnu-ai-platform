@@ -14,6 +14,11 @@ có thể tiếp tục sau khi tải lại trang; lỗi storage giữ trạng th
 Các bước lưu trữ/thùng rác dưới đây còn áp dụng cho loại tài nguyên khác.
 Xem [hợp đồng và giới hạn](../../backendV1/docs/resource-lifecycle.md).
 
+Nếu kho trống nhưng upload báo trùng sau lần xóa trên API cũ: chạy lại cả API và
+worker V1, rồi tại kho mở **Tài liệu đã xóa còn giữ tệp → ⋯ → Hoàn tất xóa**.
+Xác nhận xóa vĩnh viễn và chờ hoàn tất trước khi upload lại. Không tự bỏ chống
+trùng hoặc âm thầm chuyển xóa mềm cũ sang purge; bản còn phát hành vẫn bị chặn.
+
 1. Chọn tài liệu nguồn, văn bản biên soạn hoặc cả kho.
 2. Xem trước ảnh hưởng đến publication, tác vụ và phạm vi chatbot/hội thoại.
 3. Xác nhận lưu trữ hoặc đưa vào thùng rác bằng actor có quyền.

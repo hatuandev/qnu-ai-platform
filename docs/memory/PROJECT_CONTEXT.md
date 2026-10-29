@@ -7,6 +7,10 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-10-29 — Context718: sửa upload trùng sau xóa mềm trên API cũ.** Chẩn đoán chỉ đọc xác định runtime chưa nạp purge; thêm inventory legacy/Hoàn tất xóa tại kho và thông báo duplicate theo trạng thái, giữ guard published/quyền/hash. Ruff/Biome/TS/build đạt,12regression NOT RUN. Chưa restart/xóa dữ liệu thật/model/migrate/push. [Nhật ký718](../nhat_ky/2026-10-29_phien_718_sua_upload_sau_xoa_cu.md).
+
+- **2026-10-29 — Context717: tinh gọn frontendV1 và luồng demo tài liệu → hỏi đáp.** Sidebar6mục, chọn Đơn vị cố định trên Topbar, trung tâm Cấu hình4nhóm; kho mở trực tiếp Tài liệu/Biên soạn/Phát hành + Công cụ nâng cao, bỏ màn trung gian. Upload gửi auto_extract=true, thanh tiến độ thật ProcessingProgress nối counter trang BE và JobView link nguồn/biên soạn; thêm Chat thử, link trích dẫn về nguồn/bản phát hành và điều kiện chuyển bước. Giữ nguyên diff Context716. Scoped Ruff4file, Biome32file, typecheck và build PASS; Pytest/Vitest/E2E/live model NOT RUN theo yêu cầu. [Nhật ký717](../nhat_ky/2026-10-29_phien_717_tinh_gon_frontend_v1_luong_demo.md).
+
 - **2026-10-29 — Context716: xóa vĩnh viễn tài liệu nguồn.** Còn bản published thì chặn, phải withdraw; durable purge giữ scope/quyền, dọn đúng file/point và giữ index còn lại. FE xác nhận/theo dõi tại kho, bỏ Tài nguyên. 13 regression mới NOT RUN; Ruff/Biome/TS kiểm tĩnh đạt, chưa nghiệm thu runtime. Không xóa thật/restart/migrate/model/push. [Nhật ký716](../nhat_ky/2026-10-29_phien_716_xoa_vinh_vien_tai_lieu.md).
 
 - **2026-10-29 — Context715: sửa P2 DOCX renderer.** HTTP Gotenberg ngoài khóa MuPDF, log chỉ status/type, fixture offline cho unit render/native.6regression viết chưa chạy; scopedRuff/AST/UTF8/LF/diff đạt. Test/runtime NOT RUN theo yêu cầu; không restart/env/model/migrate/push. [Nhật ký715](../nhat_ky/2026-10-29_phien_715_sua_p2_docx_renderer.md).

@@ -1,5 +1,12 @@
 import { useRouter } from "@tanstack/react-router";
-import { LogOut, Moon } from "lucide-react";
+import {
+  KeyRound,
+  LayoutDashboard,
+  LogOut,
+  Moon,
+  Server,
+  Settings2,
+} from "lucide-react";
 import { hasV1Permission, useV1Auth } from "@/app/auth/v1";
 import { useTheme } from "@/app/theme-provider";
 import {
@@ -12,13 +19,12 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import {
-  navigationGroups,
+  primaryWorkspaceFeatureKeys,
   workspaceFeatureGroups,
   workspaceFeatureKeys,
   workspaceFeatures,
 } from "@/navigation/config";
 import { useFeatureScope } from "@/navigation/use-feature-scope.tsx";
-import { filterNavigationGroups, flattenNavigation } from "@/navigation/utils";
 import { featureTarget } from "@/navigation/workspace-features";
 
 export function QnuCommandMenu({
@@ -32,51 +38,73 @@ export function QnuCommandMenu({
   const scope = useFeatureScope();
   const auth = useV1Auth();
   const { resolvedTheme, setTheme } = useTheme();
-  const globals = flattenNavigation(
-    filterNavigationGroups(
-      navigationGroups.filter((group) => !group.template),
-      () => false,
-      undefined,
-      (permission) =>
-        auth.isAuthenticated && hasV1Permission(auth.actor, permission),
-    ),
-  );
+  const canManageModels =
+    auth.isAuthenticated && hasV1Permission(auth.actor, "ai.models.manage");
+
   return (
     <CommandDialog
       open={open}
       onOpenChange={onOpenChange}
       title="Chuyển đến chức năng QNU AI"
     >
-      <CommandInput placeholder="Tìm workspace, tài liệu, trợ lý hoặc tác vụ…" />
+      <CommandInput placeholder="Tìm đơn vị, kho tri thức, trợ lý, tác vụ hoặc cấu hình…" />
       <CommandList>
         <CommandEmpty>Không tìm thấy chức năng phù hợp.</CommandEmpty>
-        <CommandGroup heading="QNU AI">
-          {globals.map(
-            (item) =>
-              item.to && (
+        {auth.isAuthenticated && (
+          <CommandGroup heading="Điều hướng chính">
+            <CommandItem
+              value="Tổng quan dashboard"
+              onSelect={() => {
+                onOpenChange(false);
+                void router.navigate({
+                  to: "/dashboard",
+                  search: { workspaceId: scope.workspaceId },
+                });
+              }}
+            >
+              <LayoutDashboard className="size-4" />
+              Tổng quan
+            </CommandItem>
+            {primaryWorkspaceFeatureKeys.map((key) => {
+              const item = workspaceFeatures[key];
+              const Icon = item.icon;
+              return (
                 <CommandItem
-                  key={item.id}
+                  key={`primary-${key}`}
                   value={item.title}
                   onSelect={() => {
-                    if (!item.to) return;
                     onOpenChange(false);
-                    void router.navigate({
-                      to: item.to,
-                      search: { page: 1, pageSize: 20 },
-                    });
+                    void router.navigate(featureTarget(key, scope));
                   }}
                 >
+                  <Icon className="size-4" />
                   {item.title}
                 </CommandItem>
-              ),
-          )}
-        </CommandGroup>
+              );
+            })}
+            <CommandItem
+              value="Cấu hình settings"
+              onSelect={() => {
+                onOpenChange(false);
+                void router.navigate({ to: "/settings" });
+              }}
+            >
+              <Settings2 className="size-4" />
+              Cấu hình
+            </CommandItem>
+          </CommandGroup>
+        )}
         {auth.isAuthenticated &&
-          workspaceFeatureGroups.map((group) => (
-            <CommandGroup key={group} heading={group}>
-              {workspaceFeatureKeys
-                .filter((key) => workspaceFeatures[key].group === group)
-                .map((key) => {
+          workspaceFeatureGroups.map((group) => {
+            const subKeys = workspaceFeatureKeys.filter(
+              (key) =>
+                workspaceFeatures[key].group === group &&
+                !primaryWorkspaceFeatureKeys.includes(key),
+            );
+            if (subKeys.length === 0) return null;
+            return (
+              <CommandGroup key={group} heading={group}>
+                {subKeys.map((key) => {
                   const item = workspaceFeatures[key];
                   const Icon = item.icon;
                   return (
@@ -93,8 +121,39 @@ export function QnuCommandMenu({
                     </CommandItem>
                   );
                 })}
-            </CommandGroup>
-          ))}
+              </CommandGroup>
+            );
+          })}
+        {canManageModels && (
+          <CommandGroup heading="Cấu hình nền tảng">
+            <CommandItem
+              value="Kết nối AI Nhà cung cấp ModelOps"
+              onSelect={() => {
+                onOpenChange(false);
+                void router.navigate({
+                  to: "/providers",
+                  search: { page: 1, pageSize: 20 },
+                });
+              }}
+            >
+              <Server className="size-4" />
+              Kết nối AI (Nhà cung cấp & Model)
+            </CommandItem>
+            <CommandItem
+              value="API tích hợp API key ứng dụng bên ngoài"
+              onSelect={() => {
+                onOpenChange(false);
+                void router.navigate({
+                  to: "/modelops/endpoints",
+                  search: { workspaceId: scope.workspaceId },
+                });
+              }}
+            >
+              <KeyRound className="size-4" />
+              API tích hợp
+            </CommandItem>
+          </CommandGroup>
+        )}
         <CommandSeparator />
         <CommandGroup heading="Tài khoản & giao diện">
           <CommandItem

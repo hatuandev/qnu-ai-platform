@@ -1,12 +1,15 @@
+import { Link } from "@tanstack/react-router";
 import {
   BookOpen,
   CheckCircle2,
+  ExternalLink,
   FileText,
   Hash,
   Layers,
   Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -22,12 +25,16 @@ export function CitationSheet({
   statement,
   sources,
   turnNo,
+  workspaceId,
+  collectionId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   statement?: Statement | null;
   sources: EvidenceSource[];
   turnNo?: number;
+  workspaceId?: string;
+  collectionId?: string;
 }) {
   // Map evidence sources specifically bound to this statement
   const relevantSources = statement
@@ -100,6 +107,24 @@ export function CitationSheet({
                 const pageNum = citations.page ?? citations.page_number;
                 const tableNum = citations.table ?? citations.table_index;
                 const section = citations.section ?? citations.heading;
+                const rawSourceId =
+                  typeof citations.source_id === "string"
+                    ? citations.source_id
+                    : undefined;
+                const rawRevisionId =
+                  typeof citations.revision_id === "string"
+                    ? citations.revision_id
+                    : undefined;
+                const rawRunId =
+                  typeof citations.run_id === "string"
+                    ? citations.run_id
+                    : undefined;
+                const parsedPage =
+                  typeof pageNum === "number"
+                    ? pageNum
+                    : typeof pageNum === "string" && /^\d+$/.test(pageNum)
+                      ? Number(pageNum)
+                      : undefined;
 
                 return (
                   <div
@@ -202,6 +227,88 @@ export function CitationSheet({
                         {source.text || "(Trích đoạn trống)"}
                       </div>
                     </div>
+
+                    {/* Liên kết mở về đúng tài liệu/phiên bản/trang */}
+                    {workspaceId &&
+                    collectionId &&
+                    (rawSourceId || source.document_id) ? (
+                      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60">
+                        {rawSourceId ? (
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1.5"
+                            onClick={() => onOpenChange(false)}
+                          >
+                            <Link
+                              to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
+                              params={{
+                                workspaceId,
+                                collectionId,
+                                sourceId: rawSourceId,
+                              }}
+                              search={{
+                                revisionId: rawRevisionId,
+                                runId: rawRunId,
+                                page: parsedPage ?? 1,
+                              }}
+                            >
+                              <FileText className="size-3 text-primary" />
+                              <span>
+                                Mở tài liệu nguồn
+                                {parsedPage ? ` (Trang ${parsedPage})` : ""}
+                              </span>
+                              <ExternalLink className="size-3" />
+                            </Link>
+                          </Button>
+                        ) : null}
+                        {source.document_id && source.version_id ? (
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1.5"
+                            onClick={() => onOpenChange(false)}
+                          >
+                            <Link
+                              to="/workspaces/$workspaceId/collections/$collectionId/documents/$documentId/versions/$versionId"
+                              params={{
+                                workspaceId,
+                                collectionId,
+                                documentId: source.document_id,
+                                versionId: source.version_id,
+                              }}
+                            >
+                              <Layers className="size-3 text-primary" />
+                              <span>Mở bản phát hành đã trích dẫn</span>
+                              <ExternalLink className="size-3" />
+                            </Link>
+                          </Button>
+                        ) : source.document_id ? (
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1.5"
+                            onClick={() => onOpenChange(false)}
+                          >
+                            <Link
+                              to="/workspaces/$workspaceId/collections/$collectionId/documents/$documentId"
+                              params={{
+                                workspaceId,
+                                collectionId,
+                                documentId: source.document_id,
+                              }}
+                            >
+                              <Layers className="size-3 text-primary" />
+                              <span>Mở tài liệu phát hành</span>
+                              <ExternalLink className="size-3" />
+                            </Link>
+                          </Button>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 );
               })

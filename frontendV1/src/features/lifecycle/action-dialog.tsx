@@ -25,6 +25,7 @@ import { useLifecycleAction } from "./queries";
 import { acceptLifecycle, previewLifecycle } from "./requests";
 import {
   ACTION_LABEL,
+  isSourcePurgeCompleted,
   type LifecycleAction,
   type LifecycleTarget,
 } from "./types";
@@ -88,6 +89,7 @@ function LifecycleActionForm({
   useEffect(() => {
     if (
       live?.status !== "completed" ||
+      (permanent && !isSourcePurgeCompleted(live)) ||
       navigated.current ||
       !["archive", "delete", "restore"].includes(live.action)
     )
@@ -95,7 +97,7 @@ function LifecycleActionForm({
     navigated.current = true;
     if (onCompleted) onCompleted(live);
     else onClose();
-  }, [live, onCompleted, onClose]);
+  }, [live, onCompleted, onClose, permanent]);
   const form = useForm({
     defaultValues: {
       reason: confirmationOnly
@@ -120,6 +122,13 @@ function LifecycleActionForm({
           reason: value.reason.trim(),
         });
         if (!current()) return;
+        if (permanent && result.impact.permanent !== true) {
+          setPreview(null);
+          setError(
+            "Máy chủ chưa hỗ trợ xóa vĩnh viễn. Cần khởi động lại API và worker V1 trước khi xác nhận.",
+          );
+          return;
+        }
         setPreview(result);
         setConfirmed(false);
         queryClient.setQueryData(
@@ -268,7 +277,9 @@ function LifecycleActionForm({
                 permanent ? (
                   <p role="status">
                     {live.status === "completed"
-                      ? "Đã xóa vĩnh viễn tài liệu."
+                      ? isSourcePurgeCompleted(live)
+                        ? "Đã xóa vĩnh viễn tài liệu."
+                        : "Máy chủ chưa xác nhận xóa vĩnh viễn. Hãy nạp lại API/worker V1 và kiểm tra mục Hoàn tất xóa trong kho."
                       : live.error_code
                         ? "Xóa chưa hoàn tất. Bạn có thể tiếp tục cùng thao tác."
                         : "Đã nhận yêu cầu xóa. Đang chờ dừng tác vụ và dọn dữ liệu liên quan."}

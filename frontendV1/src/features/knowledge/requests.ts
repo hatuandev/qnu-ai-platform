@@ -117,8 +117,7 @@ export async function uploadSource(
   if (folderId) {
     formData.append("folder_id", folderId);
   }
-  // User uploads file to store only; extraction is actively triggered by user
-  formData.append("auto_extract", "false");
+  formData.append("auto_extract", "true");
   return client.upload<SourceUploadResult>(
     knowledgePaths.sources(workspaceId, collectionId),
     formData,
@@ -186,8 +185,7 @@ export async function addRevision(
   const formData = new FormData();
   formData.append("file", file);
   if (staged !== undefined) formData.append("staged", String(staged));
-  // User uploads revision to store only; extraction is actively triggered by user
-  formData.append("auto_extract", "false");
+  formData.append("auto_extract", "true");
   // NEVER append title: backend rejects it with 422 revision_title_not_supported
   return client.upload<SourceUploadResult>(
     knowledgePaths.revisions(workspaceId, collectionId, sourceId),

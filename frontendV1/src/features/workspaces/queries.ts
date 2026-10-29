@@ -178,12 +178,13 @@ function invalidateWorkspaceScopes(
   });
 }
 
-export function useWorkspacesQuery(params: PageParams) {
+export function useWorkspacesQuery(params: PageParams, enabled = true) {
   const { sessionId } = useV1Auth();
   return useQuery({
     queryKey: workspaceKeys.list(params, sessionId),
     queryFn: ({ signal }) => listWorkspaces(v1Client, params, { signal }),
     placeholderData: (previous) => previous,
+    enabled,
   });
 }
 

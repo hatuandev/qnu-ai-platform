@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/tooltip";
 import { usePlatformShortcut } from "@/hooks/use-platform-shortcut";
 import { Breadcrumbs } from "@/layouts/breadcrumbs";
+import { WorkspaceSwitcher } from "@/layouts/workspace-switcher";
 
 export function Topbar({ onOpenCommand }: { onOpenCommand: () => void }) {
   const { resolvedTheme, setTheme } = useTheme();
@@ -49,6 +50,9 @@ export function Topbar({ onOpenCommand }: { onOpenCommand: () => void }) {
   return (
     <header className="sticky top-0 z-30 flex h-[var(--topbar-height)] items-center gap-1.5 border-b bg-background/95 px-3 backdrop-blur sm:gap-3 sm:px-4 lg:px-5">
       <SidebarTrigger aria-label="Mở hoặc thu gọn thanh bên" />
+      {isQnuV1 && v1.isAuthenticated ? (
+        <WorkspaceSwitcher variant="topbar" />
+      ) : null}
       <Breadcrumbs />
       <div className="ml-auto flex items-center gap-1">
         <Tooltip>

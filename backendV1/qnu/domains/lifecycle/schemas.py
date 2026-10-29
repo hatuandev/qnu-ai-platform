@@ -51,6 +51,18 @@ class AcceptRequest(BaseModel):
     preview_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
+class LegacyDeletedSource(BaseModel):
+    source_id: str
+    title: str
+
+
+class LegacyDeletedSourcesResponse(BaseModel):
+    items: list[LegacyDeletedSource]
+    total: int
+    limit: int
+    offset: int
+
+
 class ActionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str

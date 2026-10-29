@@ -162,7 +162,7 @@ class SourceService:
                 raise EntityNotFound("Không tìm thấy thư mục đích.", code="folder_not_found")
         owner = await self._content_owner(db, scoped_collection_id, stored.sha256)
         if owner is not None:
-            raise self._duplicate_content(owner, source_id)
+            raise await self._duplicate_error(db, workspace_id, owner, source_id)
 
         storage_key = build_storage_key(workspace_id, scoped_collection_id, stored.sha256)
         try:
@@ -592,7 +592,7 @@ class SourceService:
                 )
         owner = await self._content_owner(db, collection_id, stored.sha256)
         if owner is not None:
-            raise self._duplicate_content(owner, source_id)
+            raise await self._duplicate_error(db, workspace_id, owner, source_id)
         raise Conflict(
             "Không ghi được nguồn tài liệu do dữ liệu thay đổi đồng thời.",
             code="source_write_conflict",
@@ -659,6 +659,36 @@ class SourceService:
             )
         return revision
 
+    async def _duplicate_error(self, db, workspace_id, owner_source_id, target_source_id):
+        from qnu.domains.lifecycle.models import LifecycleAction, ResourceState
+
+        if owner_source_id != target_source_id:
+            state = await db.get(ResourceState, (workspace_id, "source", owner_source_id))
+            if state and state.status == "deleted":
+                pending = await db.scalar(
+                    select(LifecycleAction.id)
+                    .where(
+                        LifecycleAction.workspace_id == workspace_id,
+                        LifecycleAction.kind == "source",
+                        LifecycleAction.resource_id == owner_source_id,
+                        LifecycleAction.action == "delete",
+                        LifecycleAction.status == "pending",
+                    )
+                    .limit(1)
+                )
+                if pending:
+                    return Conflict(
+                        "Bản cũ đang chờ xóa vĩnh viễn. Hãy theo dõi yêu cầu xóa trong kho "
+                        "và tải lại tệp sau khi hoàn tất.",
+                        code="source_purge_pending",
+                    )
+                return Conflict(
+                    "Tệp trùng với tài liệu đã xóa theo cơ chế cũ nhưng vẫn giữ bản gốc. "
+                    "Đóng hộp tải lên, chọn 'Hoàn tất xóa' trong kho và xác nhận; chờ xóa xong rồi tải lại.",
+                    code="duplicate_content_deleted",
+                )
+        return self._duplicate_content(owner_source_id, target_source_id)
+
     def _duplicate_content(self, owner_source_id: str, target_source_id: str | None) -> Conflict:
         if target_source_id is not None and owner_source_id == target_source_id:
             return Conflict(
@@ -666,7 +696,7 @@ class SourceService:
                 code="revision_unchanged",
             )
         return Conflict(
-            f"Nội dung tệp đã tồn tại trong kho tri thức (nguồn {owner_source_id}).",
+            "Nội dung tệp đã tồn tại trong kho tri thức. Hãy mở tài liệu đã có để sử dụng.",
             code="duplicate_content",
         )
 

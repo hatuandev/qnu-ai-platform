@@ -2,19 +2,24 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Archive,
   ArrowLeft,
+  BookMarked,
   ChevronDown,
   ChevronRight,
+  ClipboardList,
+  FileSearch,
   FileSpreadsheet,
   FileText,
   FileUp,
   Folder,
   FolderOpen,
   FolderPlus,
+  Gauge,
   HardDrive,
-  Loader2,
+  MessageSquare,
   Pencil,
   Play,
   Settings2,
+  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -46,12 +51,21 @@ import {
   ViewModeToggle,
 } from "@/components/ui/view-mode-toggle";
 import { CollectionFormDialog } from "@/features/knowledge/collection-form-dialog";
+import { CompilationDialog } from "@/features/knowledge/compilation-dialog";
+import { CompilationRunsList } from "@/features/knowledge/compilation-runs-list";
+import { CompiledDocumentsList } from "@/features/knowledge/compiled-documents-list";
 import { ExtractDocumentDialog } from "@/features/knowledge/extract-document-dialog";
 import { FolderDeleteDialog } from "@/features/knowledge/folder-delete-dialog";
 import { FolderFormDialog } from "@/features/knowledge/folder-form-dialog";
 import { FolderMoveDialog } from "@/features/knowledge/folder-move-dialog";
 import { FolderTreePanel } from "@/features/knowledge/folder-tree-panel";
-import { canManageKnowledge } from "@/features/knowledge/permissions";
+import { IndexPanel } from "@/features/knowledge/index-panel";
+import {
+  canCreateOrEditCompilation,
+  canManageKnowledge,
+  canRegisterCompiledDocument,
+} from "@/features/knowledge/permissions";
+import { ProcessingProgress } from "@/features/knowledge/processing-progress";
 import {
   useCollectionQuery,
   useFoldersQuery,
@@ -98,7 +112,7 @@ export function KnowledgeDetailPage({
   selectedSourceId: _selectedSourceId,
   onPageChange,
   onPageSizeChange,
-  onStageChange: _onStageChange,
+  onStageChange,
   onSelectSourceId: _onSelectSourceId,
 }: {
   workspaceId: string;
@@ -122,6 +136,8 @@ export function KnowledgeDetailPage({
   const collection = collectionQuery.data;
   const folders = foldersQuery.data ?? [];
   const canManage = !rolePending && canManageKnowledge(role);
+  const canCompile = !rolePending && canCreateOrEditCompilation(role);
+  const canPublish = !rolePending && canRegisterCompiledDocument(role);
 
   // Folder Explorer State
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -132,6 +148,7 @@ export function KnowledgeDetailPage({
   // Dialog States
   const [uploadOpen, setUploadOpen] = useState(false);
   const [extractDialogOpen, setExtractDialogOpen] = useState(false);
+  const [compilationDialogOpen, setCompilationDialogOpen] = useState(false);
   const [editCollectionOpen, setEditCollectionOpen] = useState(false);
   const [collectionLifecycleOp, setCollectionLifecycleOp] =
     useState<LifecycleOperation | null>(null);
@@ -402,8 +419,111 @@ export function KnowledgeDetailPage({
         </div>
       </div>
 
+      {/* Thanh điều hướng nội bộ Kho tri thức: Tài liệu · Biên soạn · Phát hành + Công cụ nâng cao */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-2.5">
+        <div
+          role="tablist"
+          aria-label="Điều hướng trong kho tri thức"
+          className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeStage === "files" || activeStage === "ocr"}
+            onClick={() => onStageChange?.("files")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+              activeStage === "files" || activeStage === "ocr"
+                ? "bg-background text-foreground shadow-2xs"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <FileText className="size-3.5" />
+            <span>Tài liệu</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeStage === "compiler"}
+            onClick={() => onStageChange?.("compiler")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+              activeStage === "compiler"
+                ? "bg-background text-foreground shadow-2xs"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <ClipboardList className="size-3.5" />
+            <span>Biên soạn</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeStage === "publication"}
+            onClick={() => onStageChange?.("publication")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+              activeStage === "publication"
+                ? "bg-background text-foreground shadow-2xs"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <BookMarked className="size-3.5" />
+            <span>Phát hành</span>
+          </button>
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <SlidersHorizontal className="size-3.5" />
+              <span>Công cụ nâng cao</span>
+              <ChevronDown className="size-3 opacity-60" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 text-xs">
+            <DropdownMenuItem asChild>
+              <Link
+                to="/workspaces/$workspaceId/collections/$collectionId/search"
+                params={{ workspaceId, collectionId: knowledgeId }}
+                search={{ page: 1, pageSize: 20 }}
+                className="flex items-center gap-2"
+              >
+                <FileSearch className="size-3.5 text-muted-foreground" />
+                <span>Tìm kiếm thử & Chỉ mục</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                to="/workspaces/$workspaceId/collections/$collectionId/answers"
+                params={{ workspaceId, collectionId: knowledgeId }}
+                className="flex items-center gap-2"
+              >
+                <MessageSquare className="size-3.5 text-muted-foreground" />
+                <span>Hỏi đáp trên kho</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                to="/workspaces/$workspaceId/collections/$collectionId/evaluations"
+                params={{ workspaceId, collectionId: knowledgeId }}
+                search={{ page: 1 }}
+                className="flex items-center gap-2"
+              >
+                <Gauge className="size-3.5 text-muted-foreground" />
+                <span>Đánh giá RAG</span>
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       {/* 2. KHU VỰC QUẢN LÝ TÀI LIỆU (Cột trái: Cây thư mục | Vùng phải: Danh sách tệp) */}
-      {activeStage === "files" && (
+      {(activeStage === "files" || activeStage === "ocr") && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-[540px]">
           {/* CỘT TRÁI (3 cols): Cây thư mục */}
           <div className="lg:col-span-3">
@@ -701,37 +821,67 @@ export function KnowledgeDetailPage({
                         </div>
                       </div>
 
-                      {/* Footer card thanh lịch: Trạng thái & Link điều hướng gọn */}
-                      <div className="pt-3 mt-3 border-t border-border/50 flex items-center justify-between gap-2 text-[11px]">
-                        <Badge
-                          variant={statusInfo.variant}
-                          className="text-[10px] py-0 px-1.5 font-normal truncate max-w-[65%]"
-                        >
-                          {statusInfo.status === "running" ? (
-                            <Loader2 className="size-3 animate-spin mr-1 inline" />
-                          ) : null}
-                          {statusInfo.label}
-                        </Badge>
+                      {/* Tiến độ xử lý (nếu đang chạy/hàng đợi hoặc đã xử lý) & Footer */}
+                      {s.processing ? (
+                        <div className="pt-2.5 mt-2.5 border-t border-border/50 space-y-2">
+                          <ProcessingProgress
+                            compact
+                            progress={{
+                              status: s.processing.status,
+                              pages_total: s.processing.pages_total,
+                              pages_done: s.processing.pages_done,
+                              pages_failed: s.processing.pages_failed,
+                              results_ready: s.processing.results_ready,
+                              dispatch_pending: s.processing.dispatch_pending,
+                              error_code: s.processing.error_code,
+                            }}
+                            isPollError={sourcesQuery.isError}
+                          />
+                          <div className="flex items-center justify-end text-[11px]">
+                            <Link
+                              to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
+                              params={{
+                                workspaceId,
+                                collectionId: knowledgeId,
+                                sourceId: s.id,
+                              }}
+                              className="flex items-center gap-0.5 text-primary font-medium hover:underline shrink-0"
+                            >
+                              <span>
+                                {statusInfo.status === "completed"
+                                  ? "Đối chiếu & hiệu đính"
+                                  : statusInfo.status === "running" ||
+                                      statusInfo.status === "queued"
+                                    ? "Theo dõi tiến độ"
+                                    : "Chi tiết"}
+                              </span>
+                              <ChevronRight className="size-3" />
+                            </Link>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="pt-3 mt-3 border-t border-border/50 flex items-center justify-between gap-2 text-[11px]">
+                          <Badge
+                            variant={statusInfo.variant}
+                            className="text-[10px] py-0 px-1.5 font-normal truncate max-w-[65%]"
+                          >
+                            {statusInfo.label}
+                          </Badge>
 
-                        <Link
-                          to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
-                          params={{
-                            workspaceId,
-                            collectionId: knowledgeId,
-                            sourceId: s.id,
-                          }}
-                          className="flex items-center gap-0.5 text-primary font-medium hover:underline shrink-0"
-                        >
-                          <span>
-                            {statusInfo.status === "completed"
-                              ? "Đối chiếu"
-                              : statusInfo.status === "running"
-                                ? "Theo dõi"
-                                : "Chi tiết"}
-                          </span>
-                          <ChevronRight className="size-3" />
-                        </Link>
-                      </div>
+                          <Link
+                            to="/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId"
+                            params={{
+                              workspaceId,
+                              collectionId: knowledgeId,
+                              sourceId: s.id,
+                            }}
+                            className="flex items-center gap-0.5 text-primary font-medium hover:underline shrink-0"
+                          >
+                            <span>Chi tiết</span>
+                            <ChevronRight className="size-3" />
+                          </Link>
+                        </div>
+                      )}
                     </Card>
                   );
                 })}
@@ -803,16 +953,30 @@ export function KnowledgeDetailPage({
                           <TableCell className="text-xs font-mono">
                             v{s.current_revision_no}
                           </TableCell>
-                          <TableCell className="text-xs">
-                            <Badge
-                              variant={statusInfo.variant}
-                              className="text-[10px] font-normal"
-                            >
-                              {statusInfo.status === "running" ? (
-                                <Loader2 className="size-3 animate-spin mr-1 inline" />
-                              ) : null}
-                              {statusInfo.label}
-                            </Badge>
+                          <TableCell className="text-xs min-w-[180px]">
+                            {s.processing ? (
+                              <ProcessingProgress
+                                compact
+                                progress={{
+                                  status: s.processing.status,
+                                  pages_total: s.processing.pages_total,
+                                  pages_done: s.processing.pages_done,
+                                  pages_failed: s.processing.pages_failed,
+                                  results_ready: s.processing.results_ready,
+                                  dispatch_pending:
+                                    s.processing.dispatch_pending,
+                                  error_code: s.processing.error_code,
+                                }}
+                                isPollError={sourcesQuery.isError}
+                              />
+                            ) : (
+                              <Badge
+                                variant={statusInfo.variant}
+                                className="text-[10px] font-normal"
+                              >
+                                {statusInfo.label}
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                             {formatDateTimeValue(s.updated_at || s.created_at)}
@@ -875,47 +1039,54 @@ export function KnowledgeDetailPage({
         </div>
       )}
 
-      {/* Legacy Stages Fallback (đáp ứng điều hướng link /compilations, /documents, /search) */}
+      {/* Khu vực Biên soạn trực tiếp trong kho (không qua màn trung gian) */}
       {activeStage === "compiler" && (
-        <div className="rounded-xl border border-dashed p-12 text-center space-y-3 bg-muted/10">
-          <Button asChild size="sm">
-            <Link
-              to="/workspaces/$workspaceId/collections/$collectionId/compilations"
-              params={{ workspaceId, collectionId: knowledgeId }}
-              search={{ page: 1, pageSize: 20 }}
-            >
-              Mở biên soạn
-            </Link>
-          </Button>
+        <div className="space-y-4">
+          <CompilationRunsList
+            workspaceId={workspaceId}
+            collectionId={knowledgeId}
+            canManage={canCompile}
+            onOpenCreateDialog={() => setCompilationDialogOpen(true)}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+          />
+          <CompilationDialog
+            workspaceId={workspaceId}
+            collectionId={knowledgeId}
+            isOpen={compilationDialogOpen}
+            onClose={() => setCompilationDialogOpen(false)}
+          />
         </div>
       )}
 
+      {/* Khu vực Phát hành trực tiếp trong kho (không qua màn trung gian) */}
       {activeStage === "publication" && (
-        <div className="rounded-xl border border-dashed p-12 text-center space-y-3 bg-muted/10">
-          <Button asChild size="sm">
-            <Link
-              to="/workspaces/$workspaceId/collections/$collectionId/documents"
-              params={{ workspaceId, collectionId: knowledgeId }}
-              search={{ page: 1, pageSize: 20 }}
-            >
-              Mở xuất bản
-            </Link>
-          </Button>
-        </div>
+        <CompiledDocumentsList
+          workspaceId={workspaceId}
+          collectionId={knowledgeId}
+          canRegister={canPublish}
+          onOpenCompilationTab={() => onStageChange?.("compiler")}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+        />
       )}
 
+      {/* Khu vực Chỉ mục & Tìm kiếm thử trực tiếp trong kho */}
       {activeStage === "serving" && (
-        <div className="rounded-xl border border-dashed p-12 text-center space-y-3 bg-muted/10">
-          <Button asChild size="sm">
-            <Link
-              to="/workspaces/$workspaceId/collections/$collectionId/search"
-              params={{ workspaceId, collectionId: knowledgeId }}
-              search={{ page: 1, pageSize: 20 }}
-            >
-              Mở phục vụ AI
-            </Link>
-          </Button>
-        </div>
+        <IndexPanel
+          workspaceId={workspaceId}
+          collectionId={knowledgeId}
+          canManage={canPublish}
+          role={role}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+        />
       )}
 
       {/* 3. MODALS & DIALOGS */}

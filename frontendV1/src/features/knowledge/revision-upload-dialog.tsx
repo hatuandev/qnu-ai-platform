@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { ProcessingProgress } from "@/features/knowledge/processing-progress";
 import { useAddRevision } from "@/features/knowledge/queries";
 import {
   ACCEPT_UPLOAD,
@@ -123,8 +124,8 @@ function RevisionUploadSession({
       if (!current()) return;
       toast.success(
         staged
-          ? "Đã tải bản chuẩn bị; bản đang phục vụ được giữ nguyên."
-          : "Đã tải phiên bản mới; cần xử lý và xuất bản lại.",
+          ? "Đã tải bản chuẩn bị và bắt đầu tự động bóc tách; bản đang phục vụ được giữ nguyên."
+          : "Đã tải phiên bản mới và bắt đầu tự động bóc tách.",
       );
       onOpenChange(false);
     } catch (error) {
@@ -226,13 +227,7 @@ function RevisionUploadSession({
             </div>
 
             {isSubmitting ? (
-              <div className="rounded-md border border-info/30 bg-info/5 p-3 text-xs text-info flex items-center gap-2">
-                <Loader2 className="size-4 animate-spin shrink-0" />
-                <span>
-                  Đang tải lên phiên bản mới ({file?.name}). Vui lòng không đóng
-                  trình duyệt...
-                </span>
-              </div>
+              <ProcessingProgress progress={{ status: "uploading" }} />
             ) : null}
           </div>
 

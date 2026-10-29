@@ -46,7 +46,6 @@ import type { NavItem } from "@/navigation/types";
 import { filterNavigationGroups, isItemActive } from "@/navigation/utils";
 import { useRbac } from "@/rbac/context";
 import { WorkspaceSidebar } from "./workspace-sidebar";
-import { WorkspaceSwitcher } from "./workspace-switcher";
 
 function NavLeaf({
   item,
@@ -348,26 +347,24 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   const handleNavigate = isMobile ? () => setOpenMobile(false) : onNavigate;
   const canV1 = (permission?: string) =>
     v1.isAuthenticated && hasV1Permission(v1.actor, permission);
+  const isQnuV1 = isV1Route(pathname);
   const groups = filterNavigationGroups(
-    navigationGroups.filter((group) => !group.template),
+    navigationGroups.filter(
+      (group) => !group.template && group.id !== "qnu-ai",
+    ),
     isAccessVerified ? can : (permission) => permission === undefined,
     user?.userType,
     canV1,
   );
   return (
     <>
-      {isV1Route(pathname) ? (
-        <SidebarHeader className={cn("p-2", compact && "justify-center px-0")}>
-          <WorkspaceSwitcher compact={compact} onNavigate={handleNavigate} />
-        </SidebarHeader>
-      ) : (
-        <SidebarHeaderBrand
-          compact={compact}
-          onNavigate={handleNavigate}
-          isQnuV1={false}
-        />
-      )}
+      <SidebarHeaderBrand
+        compact={compact}
+        onNavigate={handleNavigate}
+        isQnuV1={isQnuV1 || v1.isAuthenticated}
+      />
       <SidebarContent>
+        <WorkspaceSidebar onNavigate={handleNavigate} />
         {groups.map((group) => (
           <SidebarGroup key={group.id}>
             <SidebarGroupLabel className="flex items-center gap-1.5">
@@ -394,7 +391,6 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             </SidebarMenu>
           </SidebarGroup>
         ))}
-        <WorkspaceSidebar onNavigate={handleNavigate} />
       </SidebarContent>
       <SidebarFooter className={cn("px-3", compact && "px-0")}>
         <AccountMenu compact={compact} onNavigate={handleNavigate} />

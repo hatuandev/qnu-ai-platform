@@ -750,6 +750,8 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
         statement={activeStatement}
         sources={activeSources}
         turnNo={activeTurnNo}
+        workspaceId={workspaceId}
+        collectionId={assistant?.collection_id}
       />
     </div>
   );

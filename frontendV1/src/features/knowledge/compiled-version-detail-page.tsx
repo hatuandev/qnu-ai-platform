@@ -10,6 +10,7 @@ import {
   HelpCircle,
   Layers,
   Loader2,
+  RefreshCw,
   ShieldAlert,
   ShieldCheck,
   Tag,
@@ -37,6 +38,7 @@ import { formatDateTimeValue } from "@/lib/date-utils";
 import { CitationDrawer } from "./citation-drawer";
 import type { CitationDetail } from "./compilation-types";
 import { DecisionConfirmDialog } from "./decision-confirm-dialog";
+import { useIndexRunsQuery, useRequestIndexMutation } from "./index-queries";
 import {
   canApproveCompiledVersion,
   canPublishCompiledVersion,
@@ -77,6 +79,11 @@ export function CompiledVersionDetailPage({
 
   // Queries
   const collectionQuery = useCollectionQuery(workspaceId, collectionId);
+  const indexRunsQuery = useIndexRunsQuery(workspaceId, collectionId);
+  const requestIndexMutation = useRequestIndexMutation(
+    workspaceId,
+    collectionId,
+  );
   const documentQuery = useCompiledDocumentQuery(
     workspaceId,
     collectionId,
@@ -170,6 +177,22 @@ export function CompiledVersionDetailPage({
   }
 
   const statusInfo = formatPublicationStatus(ver.status);
+  const indexRuns = indexRunsQuery.data ?? [];
+  const activeIndexRun = indexRuns.find(
+    (r) => r.is_active && r.status === "completed",
+  );
+  const buildingIndexRun = indexRuns.find(
+    (r) =>
+      r.status === "queued" ||
+      r.status === "dispatched" ||
+      r.status === "running",
+  );
+  const isReadyForQA = Boolean(
+    ver.status === "published" &&
+      activeIndexRun &&
+      new Date(activeIndexRun.requested_at).getTime() >=
+        new Date(ver.created_at).getTime(),
+  );
 
   // Permissions & Transitions
   const canPerformApprove =
@@ -291,8 +314,25 @@ export function CompiledVersionDetailPage({
                   variant="outline"
                   className={`text-xs ${statusInfo.badgeClass}`}
                 >
-                  {statusInfo.label}
+                  {ver.status === "published"
+                    ? "Đã phát hành"
+                    : statusInfo.label}
                 </Badge>
+                {ver.status === "published" ? (
+                  isReadyForQA ? (
+                    <Badge variant="info" className="text-xs font-medium">
+                      Sẵn sàng hỏi đáp (Index Gen #{activeIndexRun?.generation})
+                    </Badge>
+                  ) : buildingIndexRun ? (
+                    <Badge variant="warning" className="text-xs font-medium">
+                      Đang cập nhật tìm kiếm…
+                    </Badge>
+                  ) : (
+                    <Badge variant="warning" className="text-xs font-medium">
+                      Chưa cập nhật chỉ mục tìm kiếm
+                    </Badge>
+                  )
+                ) : null}
               </div>
 
               <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono flex-wrap">
@@ -350,7 +390,51 @@ export function CompiledVersionDetailPage({
                   <span>Thu hồi (Withdraw)</span>
                 </Button>
               )}
+
+              {ver.status === "published" && !isReadyForQA && canPublish ? (
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-8 text-xs gap-1.5"
+                  disabled={
+                    requestIndexMutation.isPending || Boolean(buildingIndexRun)
+                  }
+                  onClick={() =>
+                    void requestIndexMutation.mutateAsync({
+                      providerId: null,
+                      idempotencyKey: crypto.randomUUID(),
+                    })
+                  }
+                >
+                  <RefreshCw
+                    className={`size-3.5 ${
+                      requestIndexMutation.isPending || buildingIndexRun
+                        ? "animate-spin"
+                        : ""
+                    }`}
+                  />
+                  <span>
+                    {buildingIndexRun
+                      ? "Đang cập nhật tìm kiếm…"
+                      : "Cập nhật tìm kiếm"}
+                  </span>
+                </Button>
+              ) : null}
             </div>
+          </div>
+
+          {/* Điều kiện chuyển bước rõ ràng */}
+          <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            <strong className="text-foreground">Điều kiện chuyển bước:</strong>{" "}
+            {ver.status === "draft"
+              ? 'Cần vượt qua cổng Rà soát chất lượng (Review Gate) và bấm "Duyệt phiên bản" trước khi được phép phát hành.'
+              : ver.status === "approved"
+                ? 'Phiên bản đã được duyệt. Bấm "Xuất bản (Publish)" để đưa phiên bản này thành bản phát hành chính thức của tài liệu.'
+                : ver.status === "published"
+                  ? isReadyForQA
+                    ? "Đã phát hành và đã có trong chỉ mục tìm kiếm hiện hành — Sẵn sàng phục vụ hỏi đáp có trích dẫn."
+                    : 'Đã phát hành nhưng chưa có chỉ mục tìm kiếm phù hợp sau thời điểm phát hành. Bấm "Cập nhật tìm kiếm" để hoàn tất đưa vào hỏi đáp.'
+                  : "Phiên bản này đã bị thay thế hoặc thu hồi. Có thể duyệt lại nếu cần khôi phục."}
           </div>
 
           {/* Hashes & Metadata Row */}

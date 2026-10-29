@@ -1,9 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Boxes, FolderOpen, RefreshCw, UsersRound } from "lucide-react";
+import {
+  Boxes,
+  FolderOpen,
+  RefreshCw,
+  Settings2,
+  UsersRound,
+} from "lucide-react";
 import { v1Client } from "@/app/api/v1";
 import { useV1Auth } from "@/app/auth/v1";
-import { Combobox } from "@/components/admin/combobox";
 import { ErrorState } from "@/components/admin/error-state";
 import { KpiMetric } from "@/components/admin/kpi-metric";
 import { PageHeader } from "@/components/admin/page-header";
@@ -11,14 +16,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ListPagination } from "@/features/knowledge/list-pagination";
 import { canReadCompilation } from "@/features/knowledge/permissions";
 import { useCollectionsQuery } from "@/features/knowledge/queries";
-import {
-  canReadOperations,
-  isLifecycleAdmin,
-} from "@/features/lifecycle/permissions";
-import { ReadinessPanel } from "@/features/operations/readiness-panel";
+import { canReadOperations } from "@/features/lifecycle/permissions";
+import { useFeatureScope } from "@/navigation/use-feature-scope";
 import { DashboardOperations } from "./qnu-dashboard-operations";
 import { useCallerWorkspaceRole, useWorkspaceQuery } from "./queries";
 import { listWorkspaces } from "./requests";
@@ -32,92 +33,61 @@ export function QnuDashboardPage(props: Props) {
   const { sessionId } = useV1Auth();
   return <DashboardSession key={sessionId} {...props} />;
 }
-function DashboardSession({ workspaceId, page, onSearch }: Props) {
+function DashboardSession({ workspaceId, page }: Props) {
   const { sessionId } = useV1Auth();
+  const scope = useFeatureScope();
   const query = useQuery({
     queryKey: ["v1", sessionId, "dashboard-workspaces", page],
     queryFn: ({ signal }) =>
       listWorkspaces(v1Client, { page, pageSize: 20 }, { signal }),
     retry: false,
   });
+  const effectiveWorkspaceId =
+    workspaceId || scope.workspaceId || query.data?.items?.[0]?.id;
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="QNU AI"
         title="Tổng quan"
-        description="Theo dõi kho tri thức và quá trình xử lý trong workspace bạn có quyền truy cập."
+        description="Theo dõi kho tri thức, trợ lý và quá trình xử lý tài liệu của đơn vị đang chọn trên thanh đầu trang."
         actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/workspaces" search={{ page: 1, pageSize: 20 }}>
-              Workspaces
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={query.isFetching}
+              onClick={() => void query.refetch()}
+            >
+              <RefreshCw className="size-3.5" />
+              Làm mới
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/settings">
+                <Settings2 className="size-3.5" />
+                Cấu hình
+              </Link>
+            </Button>
+          </div>
         }
       />
-      <section aria-label="Chọn workspace tổng quan" className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-full sm:w-96">
-            <Combobox
-              options={(query.data?.items ?? []).map((item) => ({
-                value: item.id,
-                label: `${item.name} · ${item.code}`,
-              }))}
-              value={workspaceId}
-              placeholder="Chọn workspace…"
-              searchPlaceholder="Lọc trong trang…"
-              loading={query.isPending}
-              disabled={query.isFetching || query.isError}
-              onValueChange={(id) => onSearch({ workspaceId: id })}
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={query.isFetching}
-            onClick={() => void query.refetch()}
-          >
-            <RefreshCw className="size-3.5" />
-            Làm mới
-          </Button>
-          {query.isSuccess ? (
-            <span className="text-xs text-muted-foreground">
-              {query.data.meta.total} workspace có quyền truy cập
-            </span>
-          ) : null}
-        </div>
-        {query.isError ? (
-          <ErrorState
-            error={query.error}
-            onRetry={() => void query.refetch()}
-          />
-        ) : null}
-        {query.isSuccess && query.data.meta.total === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Chưa có workspace để hiển thị. Quản trị viên có thể tạo hoặc cấp
-            quyền ở Workspaces.
-          </p>
-        ) : null}
-        <ListPagination
-          page={page}
-          pageSize={20}
-          onPageChange={(p) => onSearch({ page: p })}
-          hasNext={
-            !query.isError &&
-            Boolean(query.data && page * 20 < query.data.meta.total)
-          }
-          disabled={query.isFetching}
-          label="workspace tổng quan"
+      {query.isError ? (
+        <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+      ) : null}
+      {effectiveWorkspaceId ? (
+        <WorkspaceDashboard
+          key={effectiveWorkspaceId}
+          workspaceId={effectiveWorkspaceId}
         />
-      </section>
-      {workspaceId ? (
-        <WorkspaceDashboard key={workspaceId} workspaceId={workspaceId} />
+      ) : query.isPending ? (
+        <Skeleton className="h-40 rounded-xl" />
       ) : (
         <Card className="rounded-xl shadow-2xs border-border/70">
           <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground">
             <Boxes className="size-5 shrink-0 text-primary" />
             <span>
-              Chọn một workspace để xem số liệu tổng quan và danh sách kho tri
-              thức.
+              Chưa có đơn vị để hiển thị. Chọn đơn vị ở thanh đầu trang hoặc mở
+              Cấu hình để khởi tạo đơn vị mới.
             </span>
           </CardContent>
         </Card>
@@ -188,9 +158,6 @@ function WorkspaceContents({
           Số liệu tác vụ và usage dành cho quản trị, biên tập và rà soát.
         </p>
       )}
-      {isLifecycleAdmin(access.role) ? (
-        <ReadinessPanel workspaceId={workspaceId} />
-      ) : null}
     </>
   );
 }

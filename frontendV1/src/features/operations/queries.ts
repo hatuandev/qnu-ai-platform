@@ -21,7 +21,12 @@ export function useJobs(
     queryFn: ({ signal }) => listJobs(v1Client, workspaceId, filters, signal),
     enabled,
     retry: false,
-    refetchInterval: 5000,
+    refetchInterval: (q) =>
+      q.state.data?.items?.some((item) =>
+        ["queued", "running", "dispatched"].includes(item.status),
+      )
+        ? 3000
+        : false,
   });
 }
 export function useJob(
@@ -48,7 +53,12 @@ export function useOperationsSummary(workspaceId: string, enabled: boolean) {
     queryFn: ({ signal }) => getSummary(v1Client, workspaceId, signal),
     enabled,
     retry: false,
-    refetchInterval: 5000,
+    refetchInterval: (q) =>
+      q.state.data?.jobs?.some((item) =>
+        ["queued", "running", "dispatched"].includes(item.status),
+      )
+        ? 4000
+        : false,
   });
 }
 export function useReadiness(workspaceId: string, enabled: boolean) {

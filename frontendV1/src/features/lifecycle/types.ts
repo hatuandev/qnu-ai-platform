@@ -47,6 +47,16 @@ export type LifecycleAction = {
   accepted_at: string | null;
   finished_at: string | null;
 };
+export function isSourcePurgeCompleted(action: LifecycleAction): boolean {
+  return (
+    action.kind === "source" &&
+    action.action === "delete" &&
+    action.status === "completed" &&
+    action.result?.permanent === true &&
+    action.result?.originals_retained === false &&
+    action.result?.restore_available === false
+  );
+}
 export type ArchivedResource = {
   kind: ResourceKind;
   resource_id: string;
@@ -67,6 +77,14 @@ export const RESOURCE_LABEL: Record<ResourceKind, string> = {
   job: "Tác vụ",
   index: "Chỉ mục",
 };
+export type LegacyDeletedSource = { source_id: string; title: string };
+export type LegacyDeletedSourcesPage = {
+  items: LegacyDeletedSource[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export const ACTION_LABEL: Record<LifecycleOperation, string> = {
   archive: "Lưu trữ",
   delete: "Đưa vào thùng rác",

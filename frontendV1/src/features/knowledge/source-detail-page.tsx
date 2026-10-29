@@ -3,7 +3,6 @@ import {
   AlertCircle,
   Archive,
   ArrowLeft,
-  ChevronDown,
   ChevronRight,
   ClipboardList,
   Download,
@@ -78,6 +77,7 @@ import {
   canCreateOrEditCompilation,
   canManageKnowledge,
 } from "@/features/knowledge/permissions";
+import { ProcessingProgress } from "@/features/knowledge/processing-progress";
 import {
   useCollectionQuery,
   useRevisionsQuery,
@@ -178,12 +178,14 @@ export function SourceDetailPage({
 
   // Auto-select latest run if not specified
   useEffect(() => {
-    if (!selectedRunId && runs.length > 0) {
-      const latest = runs[0];
-      setSelectedRunId(latest.id);
-      onSearchChange?.({ runId: latest.id });
+    if (!selectedRunId) {
+      const fallbackRunId = runs[0]?.id ?? source?.processing?.id ?? null;
+      if (fallbackRunId) {
+        setSelectedRunId(fallbackRunId);
+        onSearchChange?.({ runId: fallbackRunId });
+      }
     }
-  }, [selectedRunId, runs, onSearchChange]);
+  }, [selectedRunId, runs, source?.processing?.id, onSearchChange]);
 
   // Fetch active run details (polling built-in for running/queued status)
   const runDetailQuery = useProcessingRunDetailQuery(
@@ -600,7 +602,7 @@ export function SourceDetailPage({
           </div>
         </div>
 
-        {/* Hàng hành động tinh gọn: Lưu thay đổi · Kiểm tra chính tả · Tải xuống · Menu ⋯ */}
+        {/* Hàng hành động tinh gọn: Hành động chính theo ngữ cảnh + Menu phụ ⋯ */}
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           {statusInfo.status === "unprocessed" ? (
             <Button
@@ -616,42 +618,7 @@ export function SourceDetailPage({
               )}
               <span>Bắt đầu bóc tách</span>
             </Button>
-          ) : statusInfo.status === "running" ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled
-              className="h-9 text-xs gap-1.5"
-            >
-              <Loader2 className="size-3.5 animate-spin text-primary" />
-              <span>
-                Đang xử lý ({activeRun?.pages_done ?? 0}/
-                {activeRun?.pages_total ?? "?"})
-              </span>
-            </Button>
           ) : null}
-
-          {/* Lưu thay đổi (nổi bật khi có nháp hiệu đính) */}
-          {statusInfo.status === "completed" && (
-            <Button
-              size="sm"
-              variant={hasUnsavedDraft ? "default" : "outline"}
-              className="h-9 text-xs gap-1.5"
-              disabled={!hasUnsavedDraft || saveMutation.isPending}
-              onClick={() => setSaveModalOpen(true)}
-            >
-              <Save className="size-3.5" />
-              <span>Lưu thay đổi</span>
-              {hasUnsavedDraft ? (
-                <Badge
-                  variant="warning"
-                  className="ml-1 text-[10px] py-0 px-1 font-mono"
-                >
-                  {draftCount}
-                </Badge>
-              ) : null}
-            </Button>
-          )}
 
           {/* Kiểm tra chính tả (khi đã có kết quả) */}
           {statusInfo.status === "completed" && (
@@ -678,56 +645,42 @@ export function SourceDetailPage({
             </Button>
           )}
 
-          {/* Dropdown Tải xuống (Markdown, JSON, ZIP kèm ảnh, Tệp gốc) */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                disabled={downloadingType !== null}
-              >
-                {downloadingType ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Download className="size-3.5" />
-                )}
-                <span>Tải xuống</span>
-                <ChevronDown className="size-3 opacity-60" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 text-xs">
-              <DropdownMenuItem
-                disabled={statusInfo.status !== "completed"}
-                onClick={() => void handleDownload("md")}
-              >
-                <span>Bản Markdown dẫn xuất (.md)</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={statusInfo.status !== "completed"}
-                onClick={() => void handleDownload("json")}
-              >
-                <span>Bản JSON cấu trúc (.json)</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={statusInfo.status !== "completed"}
-                onClick={() => void handleDownload("zip")}
-              >
-                <span>Gói ZIP kèm ảnh bóc tách (.zip)</span>
-              </DropdownMenuItem>
-              {isDocxFile && statusInfo.status === "completed" && (
-                <DropdownMenuItem onClick={() => void handleDownload("pdf")}>
-                  <span>Tệp PDF kết xuất từ Word (.pdf)</span>
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => void handleDownload("raw")}>
-                <span>Tệp gốc tải lên ({source.file_name})</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Lưu thay đổi (nổi bật khi có nháp hiệu đính) */}
+          {statusInfo.status === "completed" && (
+            <Button
+              size="sm"
+              variant={hasUnsavedDraft ? "default" : "outline"}
+              className="h-9 text-xs gap-1.5"
+              disabled={!hasUnsavedDraft || saveMutation.isPending}
+              onClick={() => setSaveModalOpen(true)}
+            >
+              <Save className="size-3.5" />
+              <span>Lưu thay đổi</span>
+              {hasUnsavedDraft ? (
+                <Badge
+                  variant="warning"
+                  className="ml-1 text-[10px] py-0 px-1 font-mono"
+                >
+                  {draftCount}
+                </Badge>
+              ) : null}
+            </Button>
+          )}
 
-          {/* Menu ⋯ gom toàn bộ tác vụ phụ: Dùng để biên soạn, Bóc tách lại, Tải phiên bản mới, Đổi tên, Lưu trữ, Xóa */}
+          {/* Dùng để biên soạn (khi đã bóc tách xong và không vướng nháp chưa lưu) */}
+          {canCompile && statusInfo.status === "completed" && selectedRunId ? (
+            <Button
+              size="sm"
+              variant={hasUnsavedDraft ? "outline" : "default"}
+              className="h-9 text-xs gap-1.5"
+              onClick={() => setCompilationDialogOpen(true)}
+            >
+              <ClipboardList className="size-3.5" />
+              <span>Dùng để biên soạn</span>
+            </Button>
+          ) : null}
+
+          {/* Menu phụ ⋯ gom Tải xuống (bản gốc/MD/JSON/ZIP), Bóc tách lại, Tải phiên bản mới và Thao tác vòng đời */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -736,21 +689,66 @@ export function SourceDetailPage({
                 className="size-9 p-0 text-muted-foreground hover:text-foreground"
                 aria-label="Thao tác tài liệu"
               >
-                <MoreHorizontal className="size-4" />
+                {downloadingType ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="size-4" />
+                )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52 text-xs">
-              {canCompile &&
-              statusInfo.status === "completed" &&
-              selectedRunId ? (
+            <DropdownMenuContent align="end" className="w-60 text-xs">
+              <DropdownMenuItem
+                className="gap-2"
+                disabled={downloadingType !== null}
+                onClick={() => void handleDownload("raw")}
+              >
+                <Download className="size-3.5 text-muted-foreground" />
+                <span className="truncate">
+                  Tải tệp gốc ({source.file_name})
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2"
+                disabled={
+                  statusInfo.status !== "completed" || downloadingType !== null
+                }
+                onClick={() => void handleDownload("md")}
+              >
+                <Download className="size-3.5 text-muted-foreground" />
+                <span>Tải bản Markdown (.md)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2"
+                disabled={
+                  statusInfo.status !== "completed" || downloadingType !== null
+                }
+                onClick={() => void handleDownload("json")}
+              >
+                <Download className="size-3.5 text-muted-foreground" />
+                <span>Tải bản JSON cấu trúc (.json)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2"
+                disabled={
+                  statusInfo.status !== "completed" || downloadingType !== null
+                }
+                onClick={() => void handleDownload("zip")}
+              >
+                <Download className="size-3.5 text-muted-foreground" />
+                <span>Tải gói ZIP kèm ảnh (.zip)</span>
+              </DropdownMenuItem>
+              {isDocxFile && statusInfo.status === "completed" && (
                 <DropdownMenuItem
                   className="gap-2"
-                  onClick={() => setCompilationDialogOpen(true)}
+                  disabled={downloadingType !== null}
+                  onClick={() => void handleDownload("pdf")}
                 >
-                  <ClipboardList className="size-3.5 text-primary" />
-                  <span>Dùng để biên soạn</span>
+                  <Download className="size-3.5 text-muted-foreground" />
+                  <span>Tải PDF kết xuất từ Word (.pdf)</span>
                 </DropdownMenuItem>
-              ) : null}
+              )}
+
+              <DropdownMenuSeparator />
 
               {statusInfo.status !== "unprocessed" &&
               statusInfo.status !== "running" ? (
@@ -761,14 +759,6 @@ export function SourceDetailPage({
                   <RotateCcw className="size-3.5 text-muted-foreground" />
                   <span>Bóc tách lại</span>
                 </DropdownMenuItem>
-              ) : null}
-
-              {(canCompile &&
-                statusInfo.status === "completed" &&
-                selectedRunId) ||
-              (statusInfo.status !== "unprocessed" &&
-                statusInfo.status !== "running") ? (
-                <DropdownMenuSeparator />
               ) : null}
 
               <DropdownMenuItem
@@ -812,6 +802,37 @@ export function SourceDetailPage({
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Thanh tiến độ dùng chung khi đang bóc tách / chờ xử lý hoặc vừa lưu kết quả */}
+      {activeProcessing &&
+      (activeProcessing.status === "queued" ||
+        activeProcessing.status === "running" ||
+        activeProcessing.dispatch_pending === true ||
+        (activeProcessing.status === "completed" &&
+          activeProcessing.results_ready === false)) ? (
+        <ProcessingProgress
+          progress={{
+            status: activeProcessing.status,
+            pages_total: activeProcessing.pages_total,
+            pages_done: activeProcessing.pages_done,
+            pages_failed: activeProcessing.pages_failed,
+            results_ready:
+              "results_ready" in activeProcessing
+                ? activeProcessing.results_ready
+                : true,
+            dispatch_pending:
+              "dispatch_pending" in activeProcessing
+                ? activeProcessing.dispatch_pending
+                : false,
+            error_code: activeProcessing.error_code,
+            error_detail:
+              "error_detail" in activeProcessing
+                ? activeProcessing.error_detail
+                : null,
+          }}
+          isPollError={runDetailQuery.isError || sourceQuery.isError}
+        />
+      ) : null}
 
       {/* Cảnh báo lỗi bóc tách nếu có */}
       {activeRun && ["failed", "uncertain"].includes(activeRun.status) && (

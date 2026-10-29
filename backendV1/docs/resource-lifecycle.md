@@ -39,6 +39,32 @@ Prefix: `/platform/v1alpha1/workspaces/{workspace_id}/lifecycle`.
    Hội thoại của người khác không xuất hiện. API có `Cache-Control: private, no-store`.
 5. `GET /source-deletions?collection_id=...`: các yêu cầu xóa nguồn đang chờ của chính
    quản trị viên hiện tại, để tiếp tục ngay trong kho tri thức sau khi tải lại trang.
+6. `GET /source-deletions/legacy?collection_id=...&limit=20&offset=0`: nguồn đã xóa
+   mềm nhưng vẫn còn tệp/bản ghi, chưa có yêu cầu xóa đang chờ. Chỉ admin workspace
+   được xem; kiểm quyền/collection, phân trang và không tự tạo thao tác ghi.
+
+## Tài liệu đã xóa bằng phiên bản V1 cũ
+
+API/worker đang chạy từ trước khi cập nhật mã có thể vẫn xử lý `source/delete`
+thành xóa mềm: nguồn bị ẩn nhưng checksum/tệp còn, upload cùng nội dung trả409.
+Runtime đó cũng chưa có endpoint `/source-deletions`, nên FE báo không đọc được trạng thái.
+FE chặn xác nhận xóa vĩnh viễn nếu preview chưa khai báo `impact.permanent=true`;
+không coi receipt `completed` là purge thành công khi thiếu bằng chứng không giữ
+nguồn và không thể restore. Vì vậy FE mới không tiếp tục báo thành công nhầm trên API cũ.
+
+1. Dừng phiên `v1-dev` cũ rồi chạy lại `./make.ps1 v1-dev` để cả API và worker
+   nạp mã mới. Chỉ làm mới trình duyệt hoặc chỉ restart FE không giải quyết phần BE.
+2. Tại kho, đóng hộp tải lên và xem **Tài liệu đã xóa còn giữ tệp**.
+3. Chọn `⋯ → Hoàn tất xóa`, xem trước/xác nhận **Xóa vĩnh viễn** một lần mới.
+   Không dùng biên nhận xóa mềm `completed` làm bằng chứng đã purge hoặc tự chuyển
+   biên nhận cũ thành yêu cầu phá hủy dữ liệu. Không cần restore để hiện lại nguồn.
+4. Vẫn chặn nếu còn version `published`. Nguồn có purge pending được theo dõi bằng
+   biên nhận đang có, không xuất hiện thêm trong danh sách cần xác nhận.
+5. Chờ hoàn tất rồi upload lại. Giữ kiểm tra checksum và ràng buộc unique; không bỏ
+   nguồn đã ẩn khỏi truy vấn chống trùng hoặc tự xóa dữ liệu khi upload.
+
+Upload phân biệt `duplicate_content`, `duplicate_content_deleted`, `source_purge_pending`
+và `revision_unchanged`; thông báo không lộ ID nguồn nội bộ.
 
 ## Xóa vĩnh viễn tài liệu nguồn — ngoại lệ có phạm vi
 
