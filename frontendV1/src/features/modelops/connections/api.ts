@@ -191,11 +191,14 @@ export function useAddConnectionKey(connectionId: string) {
       name: string;
       secret: string;
       priority: number;
-      default_model?: string;
     }) =>
       v1Client.post<ProviderKey>(
         `/modelops/providers/${connectionId}/keys`,
-        input,
+        {
+          name: input.name,
+          secret: input.secret,
+          priority: input.priority,
+        },
       ),
     onSuccess: () => {
       void cache.invalidateQueries({ queryKey: ["v1", sessionId, "modelops"] });

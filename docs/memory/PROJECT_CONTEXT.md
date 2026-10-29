@@ -7,6 +7,10 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-10-29 — Context710: backend V1 tự bóc tách sau upload.** Run auto cùng transaction nguồn, native PDF/DOCX, OCR khi cần, MD/JSON/ảnh/ZIP và processing theo revision; schema/code head0007. Bao phủ835ID PASS,28mới/mất0/trùng0 (210call trước gián đoạn+625PASS/lệnh exit0; không full liên tục); Ruff26/OpenAPI131path/link/encoding đạt. DB thử/sentinel và Redis10–15 đã dọn. Chưa migrate/restart phục vụ/live OCR; giữ FE/model/grants/default/quota hiện tại. [Nhật ký710](../nhat_ky/2026-10-29_phien_710_backend_v1_boc_tach_tu_dong.md).
+
+- **2026-10-29 — Context709: rút gọn xác nhận xóa kho tri thức.** Xóa collection/source/document chỉ hỏi Hủy/Xóa, không lý do/checkbox; preview tự chuẩn bị, giữ server quyền/hash/hạn sử dụng/chống lặp. FE450PASS/50tệp, focused29PASS, build+TS theo log hoàn tất; Biome2tệp exit0. Browser desktop/mobile đã kiểm và hủy, hai tài liệu thật giữ nguyên; không live accept/OCR/backend mới. Giữ cấu hình model/quota; không restart/push. [Nhật ký709](../nhat_ky/2026-10-29_phien_709_rut_gon_xac_nhan_xoa_kho_tri_thuc.md).
+
 - **2026-10-29 — Context708: sửa chức năng kho tri thức.** Menu nguồn có xóa/lưu trữ/tải xuống ở thẻ/bảng, lifecycle preview/restore; chặn xóa thư mục còn nội dung, nối chặng3–5, sửa OCR error/paging/poll và quyền admin local ở worker. FE439PASS/buildPASS, BEfocused5+12PASS; full BE ghi804PASS/2FAIL rồi kẹt teardown; recovery17PASS/2FAIL (2revision cũ), DB thử đã dọn. Full lintFAIL29lỗi ngoài phạm vi. LiveCRUD/restoređạt, kho thử đã lưu trữ; User chốt giữ cấu hình model/quota hiện tại, hoàn tất sửa chức năng; không chạy thêm OCR thật. [Nhật ký708](../nhat_ky/2026-10-29_phien_708_sua_chuc_nang_kho_tri_thuc.md).
 
 - **2026-10-29 — Context706: sửa kiểm tra API Key/kết nối.** Chọn đúng key_id, batch từng khóa, strict HTTP/TLS/timeout và history; bỏ fake RoundRobin. FE422PASS/buildPASS, BEfocused36+9PASS; full BE FAIL787/4/3skip (2 lỗi env chạy riêng đạt, 2 assertion revision cũ). User cho restartV1, health200; live2khóa cũ đạt trước khi user tự thay/xóa. Không env/model/migration/push. [Nhật ký706](../nhat_ky/2026-10-29_phien_706_sua_kiem_tra_api_key_ket_noi.md).

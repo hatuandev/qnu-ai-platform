@@ -7,7 +7,7 @@ artifact never accepts a storage path — the artifact kind is the address.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.api.dependencies import get_actor, get_blob_store, get_db, get_job_queue
@@ -36,6 +36,62 @@ router = APIRouter(
     ),
     tags=["Knowledge · OCR processing"],
 )
+
+
+@router.get("/{run_id}/bundle", response_class=Response)
+async def download_bundle(
+    workspace_id: str,
+    collection_id: str,
+    source_id: str,
+    revision_id: str,
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+    blob: BlobStore = Depends(get_blob_store),
+):
+    from qnu.domains.ocr.exports import bundle
+
+    scope = await _scope(db, actor, workspace_id, collection_id, source_id, revision_id, READ_ROLES)
+    run = await processing_service.get_run(db, scope.workspace_id, scope.revision_id, run_id)
+    sha, payload = await bundle(db, blob, run)
+    return Response(
+        payload,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="document.zip"',
+            "Cache-Control": "private, no-store",
+            "ETag": f'"{sha}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/{run_id}/images/{asset_no}", response_class=Response)
+async def read_embedded_image(
+    workspace_id: str,
+    collection_id: str,
+    source_id: str,
+    revision_id: str,
+    run_id: str,
+    asset_no: int = Path(gt=0),
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+    blob: BlobStore = Depends(get_blob_store),
+):
+    from qnu.domains.ocr.exports import read_image
+
+    scope = await _scope(db, actor, workspace_id, collection_id, source_id, revision_id, READ_ROLES)
+    run = await processing_service.get_run(db, scope.workspace_id, scope.revision_id, run_id)
+    image, payload = await read_image(db, blob, run, asset_no)
+    return Response(
+        payload,
+        media_type=image["content_type"],
+        headers={
+            "Cache-Control": "private, no-store",
+            "ETag": f'"{image["sha256"]}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 async def _scope(
@@ -80,6 +136,7 @@ async def request_processing_run(
         provider_id=body.provider_id if body else None,
         job_queue=job_queue,
         force=body.force if body else False,
+        strategy=body.strategy if body else "ocr",
     )
     if not outcome.created:
         response.status_code = status.HTTP_200_OK

@@ -1,5 +1,12 @@
 # Kho tri thức v1 — collection, nguồn và phiên bản file
 
+Từ Context710, upload PDF/DOCX mặc định ghi thêm yêu cầu bóc tách native-first
+trong cùng transaction, rồi giao worker sau commit. Tệp gốc vẫn `stored`; trạng
+thái nằm trong `source.processing`. Có thể gửi `auto_extract=false` để chỉ lưu.
+Xem [quy trình43](../../docs/quy_trinh/43_boc_tach_tu_dong_backend_v1.md).
+Phần intake bên dưới mô tả nền lưu tệp; các ghi chú “chưa OCR/job” là phạm vi
+batch khởi tạo trước khi nối luồng tự động, không phải hiện trạng Context710.
+
 Prefix: `/platform/v1alpha1`. DTO/router thực tế là nguồn OpenAPI; bản xuất tại
 [openapi-v1.json](openapi-v1.json).
 

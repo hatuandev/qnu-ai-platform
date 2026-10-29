@@ -7,13 +7,16 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 
 from alembic import command
+from qnu.platform.schema import SCHEMA_HEAD
 
 
 def test_single_initial_revision_has_no_dependencies():
     scripts = ScriptDirectory.from_config(Config("alembic.ini"))
     revisions = list(scripts.walk_revisions())
-    assert len(revisions) == 6
-    assert scripts.get_heads() == ["0006_kb_folders"]
+    assert len(revisions) == 7
+    assert scripts.get_heads() == ["0007_native_extraction"]
+    assert SCHEMA_HEAD == scripts.get_current_head()
+    assert scripts.get_revision("0007_native_extraction").down_revision == "0006_kb_folders"
     baseline = scripts.get_revision("0001_initial_schema")
     assert baseline.down_revision is None
     assert scripts.get_revision("0002_operational_readiness").down_revision == baseline.revision
@@ -47,7 +50,7 @@ def test_initial_schema_offline_sql_creates_v1_without_touching_legacy():
     assert "CREATE TABLE alembic_version (" not in sql
     assert "DROP TABLE" not in sql
     assert "0001_initial_schema" in sql
-    assert len(list(Path("alembic/versions").glob("[0-9]*.py"))) == 6
+    assert len(list(Path("alembic/versions").glob("[0-9]*.py"))) == 7
     assert "CREATE TABLE app_api_keys" in sql
     assert "CREATE UNIQUE INDEX ix_app_api_keys_idempotency_key" in sql
     assert "ADD COLUMN rag_policy JSONB" in sql

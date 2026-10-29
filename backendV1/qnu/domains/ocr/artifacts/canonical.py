@@ -36,6 +36,7 @@ class PageDocument:
     layout: PageLayout | None = None
     error_code: str | None = None
     usage_tokens: int | None = None
+    method: str | None = None
 
 
 def evidence_id(page: int, block_order: int, cell: tuple[int, int] | None = None) -> str:
@@ -105,11 +106,16 @@ def build_canonical(
                     },
                     "requires_review": block.requires_review,
                 }
+                artifact = "native_page" if block.origin == "native" else "raw_response"
+                if block.origin == "native":
+                    payload["origin"] = "native"
+                if block.image:
+                    payload["image"] = block.image
                 evidence[block_id] = {
                     "kind": "block",
                     "page": document.page_number,
                     "path": f"pages[{page_index}].blocks[{len(blocks)}]",
-                    "artifact": "raw_response",
+                    "artifact": artifact,
                 }
                 if block.table is not None:
                     table = _table_payload(block.table, document.page_number, block.order)
@@ -118,7 +124,7 @@ def build_canonical(
                         "kind": "table",
                         "page": document.page_number,
                         "path": f"pages[{page_index}].blocks[{len(blocks)}].table",
-                        "artifact": "raw_response",
+                        "artifact": artifact,
                     }
                     for row_index, row in enumerate(table["rows"]):
                         for column_index, cell in enumerate(row):
@@ -129,7 +135,7 @@ def build_canonical(
                                     f"pages[{page_index}].blocks[{len(blocks)}]"
                                     f".table.rows[{row_index}][{column_index}]"
                                 ),
-                                "artifact": "raw_response",
+                                "artifact": artifact,
                             }
                 blocks.append(payload)
 
@@ -149,6 +155,8 @@ def build_canonical(
                 "usage_tokens": document.usage_tokens,
             }
         )
+        if document.method:
+            page_payloads[-1]["extraction_method"] = document.method
 
     return {
         "schema_version": CANONICAL_SCHEMA,
@@ -161,7 +169,12 @@ def build_canonical(
             "layout_confidence",
             "text_confidence",
             "provider_usage_per_page_when_absent",
-        ],
+        ]
+        + (
+            ["native_pdf_header_roles", "image_semantics_unverified"]
+            if processing.get("extraction")
+            else []
+        ),
     }
 
 
@@ -202,6 +215,9 @@ def render_markdown(canonical: dict[str, Any]) -> str:
             lines.append("")
             continue
         for block in page["blocks"]:
+            if image := block.get("image"):
+                lines.append(f"![Ảnh trong tài liệu]({image['filename']})")
+                lines.append("")
             table = block.get("table")
             if table is not None and table["status"] == "parsed":
                 lines.append(_table_html(table))

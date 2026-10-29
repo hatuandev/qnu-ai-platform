@@ -7,6 +7,10 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+- **2026-10-29 — Context710: backend V1 tự bóc tách sau upload.** Native-first PDF/DOCX, OCR khi cần, MD/JSON/ảnh/ZIP; schema0007. Bao phủ835ID PASS gồm210call trước gián đoạn+625PASS qua lệnh exit0, Ruff26 đạt; chưa kích hoạt trên DB phục vụ/đổi FE/model/quota. [Nhật ký710](./2026-10-29_phien_710_backend_v1_boc_tach_tu_dong.md).
+
+- **2026-10-29 — Context709: rút gọn xác nhận xóa kho tri thức.** Chỉ Hủy/Xóa, không lý do/checkbox; giữ preview và quyền server. FE450PASS, focused29PASS, build+TS/Biome PASS; browser desktop/mobile đạt. Giữ cấu hình AI. [Nhật ký709](./2026-10-29_phien_709_rut_gon_xac_nhan_xoa_kho_tri_thuc.md).
+
 - **2026-10-29 — Context708: sửa chức năng kho tri thức.** Menu nguồn có xóa/lưu trữ/tải xuống ở thẻ/bảng, lifecycle preview/restore; chặn xóa thư mục còn nội dung, nối chặng3–5, sửa OCR error/paging/poll và quyền admin local ở worker. FE439PASS/buildPASS, BEfocused5+12PASS; full BE ghi804PASS/2FAIL rồi kẹt teardown; recovery17PASS/2FAIL (2revision cũ), DB thử đã dọn. Full lintFAIL29lỗi ngoài phạm vi. LiveCRUD/restoređạt, kho thử đã lưu trữ; User chốt giữ cấu hình model/quota hiện tại, hoàn tất sửa chức năng; không chạy thêm OCR thật. [Nhật ký708](./2026-10-29_phien_708_sua_chuc_nang_kho_tri_thuc.md).
 
 - **2026-10-29 — Context706: sửa kiểm tra API Key/kết nối.** Chọn đúng key_id, batch từng khóa, strict HTTP/TLS/timeout và history; bỏ fake RoundRobin. FE422PASS/buildPASS, BEfocused36+9PASS; full BE FAIL787/4/3skip (2 lỗi env chạy riêng đạt, 2 assertion revision cũ). User cho restartV1, health200; live2khóa cũ đạt trước khi user tự thay/xóa. Không env/model/migration/push. [Nhật ký706](./2026-10-29_phien_706_sua_kiem_tra_api_key_ket_noi.md).

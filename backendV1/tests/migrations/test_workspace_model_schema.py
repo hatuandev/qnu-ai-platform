@@ -57,6 +57,6 @@ async def test_migrations_match_models_and_exclude_legacy():
         )
         assert (
             await connection.scalar(text("SELECT version_num FROM alembic_version_backendv1"))
-            == "0005_provider_connections"
+            == "0007_native_extraction"
         )
     await engine.dispose()

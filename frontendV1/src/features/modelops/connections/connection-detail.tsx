@@ -1,12 +1,15 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
+  ArrowUpDown,
   Bot,
   Copy,
   Cpu,
   Download,
+  FileText,
   FlaskConical,
   Key,
+  Layers,
   Loader2,
   Pencil,
   Play,
@@ -17,6 +20,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { v1Client } from "@/app/api/v1";
 import { ErrorState } from "@/components/admin/error-state";
 import {
   ResponsiveDialog,
@@ -30,10 +34,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { updateProvider } from "@/features/modelops/requests";
 import { useDiagnostics } from "../diagnostic-queries";
-import type { Provider, ProviderKey } from "../types";
+import type { Capability, Provider, ProviderKey } from "../types";
 import {
   FAMILIES,
   useAddConnectionModel,
@@ -75,8 +88,64 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [modelToTest, setModelToTest] = useState<Provider | null>(null);
 
-  // New model input
+  // New model input & capability
   const [newModelId, setNewModelId] = useState("");
+  const [newModelCapability, setNewModelCapability] = useState<Capability>("chat");
+
+  // Edit model modal state
+  const [modelToEdit, setModelToEdit] = useState<Provider | null>(null);
+  const [editCap, setEditCap] = useState<Capability>("chat");
+  const [editBaseUrl, setEditBaseUrl] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  useEffect(() => {
+    if (modelToEdit) {
+      setEditCap(
+        (modelToEdit.capabilities?.[0] as Capability) || "chat",
+      );
+      setEditBaseUrl(modelToEdit.base_url);
+    }
+  }, [modelToEdit]);
+
+  const handleModelNameChange = (val: string) => {
+    setNewModelId(val);
+    const lower = val.toLowerCase();
+    if (lower.includes("embed") || lower.includes("bge-m3")) {
+      setNewModelCapability("embedding");
+    } else if (lower.includes("rerank")) {
+      setNewModelCapability("rerank");
+    } else if (
+      lower.includes("ocr") ||
+      lower.includes("parse") ||
+      lower.includes("nemotron")
+    ) {
+      setNewModelCapability("ocr");
+    } else {
+      setNewModelCapability("chat");
+    }
+  };
+
+  const handleSaveEditModel = async () => {
+    if (!modelToEdit) return;
+    setIsSavingEdit(true);
+    try {
+      await updateProvider(v1Client, modelToEdit.id, {
+        capabilities: [editCap],
+        base_url: editBaseUrl.trim() || undefined,
+      });
+      toast.success(`Đã cập nhật cấu hình cho model ${modelToEdit.model_name}.`);
+      setModelToEdit(null);
+      void modelsQuery.refetch();
+      void query.refetch();
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Không thể cập nhật cấu hình model.",
+      );
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   const diagnostics = useDiagnostics(connectionId);
   const [keyResults, setKeyResults] = useState<Record<string, string>>({});
   const operation = useRef(0);
@@ -122,16 +191,40 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
 
   const handleAddModel = async () => {
     if (!newModelId.trim()) return;
+    const trimmed = newModelId.trim();
     try {
-      await addModelMutation.mutateAsync({
-        model_name: newModelId.trim(),
-        capabilities: ["chat"],
+      const created = await addModelMutation.mutateAsync({
+        model_name: trimmed,
+        capabilities: [newModelCapability],
       });
-      toast.success(`Đã thêm model ${newModelId.trim()}.`);
+
+      // Nếu là connection QNU AI trên máy 100.105.13.53: tự động gán port tương ứng cho embedding/ocr
+      if (connection.base_url.includes("100.105.13.53") && created?.id) {
+        let targetPort = "8000";
+        if (newModelCapability === "embedding" || trimmed.includes("bge-m3")) {
+          targetPort = "8001";
+        } else if (newModelCapability === "ocr" || trimmed.includes("nemotron")) {
+          targetPort = "8081";
+        }
+        if (targetPort !== "8000") {
+          try {
+            await updateProvider(v1Client, created.id, {
+              base_url: `http://100.105.13.53:${targetPort}/v1`,
+            });
+          } catch {
+            // Port mapping update optional
+          }
+        }
+      }
+
+      toast.success(`Đã thêm model ${trimmed}.`);
       setNewModelId("");
-    } catch {
+      void modelsQuery.refetch();
+    } catch (err: unknown) {
       toast.error(
-        "Không thể thêm model. Vui lòng kiểm tra lại API Key dùng chung.",
+        err instanceof Error
+          ? err.message
+          : "Không thể thêm model. Vui lòng kiểm tra lại API Key dùng chung.",
       );
     }
   };
@@ -486,13 +579,13 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
         </CardHeader>
 
         <CardContent className="p-5 space-y-4">
-          {/* Model ID Input Bar (as shown in screenshot) */}
+          {/* Model ID Input Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <div className="relative flex-1">
               <Input
                 value={newModelId}
-                onChange={(e) => setNewModelId(e.target.value)}
-                placeholder="Mã mô hình (Model ID, ví dụ: gpt-4o, qwen3.8-27b-q4...)"
+                onChange={(e) => handleModelNameChange(e.target.value)}
+                placeholder="Mã mô hình (Model ID, ví dụ: gpt-4o, bge-m3, nemotron-parse...)"
                 className="font-mono text-xs h-9"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -501,6 +594,23 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                   }
                 }}
               />
+            </div>
+
+            <div className="w-full sm:w-48 shrink-0">
+              <Select
+                value={newModelCapability}
+                onValueChange={(v) => setNewModelCapability(v as Capability)}
+              >
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Chức năng..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="chat">Trò chuyện (Chat)</SelectItem>
+                  <SelectItem value="embedding">Nhúng vector (Embedding)</SelectItem>
+                  <SelectItem value="rerank">Xếp hạng lại (Reranker)</SelectItem>
+                  <SelectItem value="ocr">Bóc tách văn bản (OCR)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <Button
@@ -528,7 +638,7 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
             </Button>
           </div>
 
-          {/* Model List Items (as shown in screenshot) */}
+          {/* Model List Items */}
           {modelsQuery.isLoading ? (
             <Skeleton className="h-16 w-full" />
           ) : models.length === 0 ? (
@@ -544,6 +654,60 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
             <div className="space-y-2">
               {models.map((m) => {
                 const fullModelPath = `${fullPrefix}${m.model_name}`;
+                const visual = (() => {
+                  const cap = (m.capabilities?.[0] as Capability) || "chat";
+                  switch (cap) {
+                    case "embedding":
+                      return {
+                        icon: <Layers className="size-4 text-amber-500" />,
+                        badge: (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] py-0 px-1.5 border-amber-500/40 text-amber-600 bg-amber-500/10 font-normal"
+                          >
+                            Nhúng vector (Embedding)
+                          </Badge>
+                        ),
+                      };
+                    case "rerank":
+                      return {
+                        icon: <ArrowUpDown className="size-4 text-emerald-500" />,
+                        badge: (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] py-0 px-1.5 border-emerald-500/40 text-emerald-600 bg-emerald-500/10 font-normal"
+                          >
+                            Xếp hạng lại (Reranker)
+                          </Badge>
+                        ),
+                      };
+                    case "ocr":
+                      return {
+                        icon: <FileText className="size-4 text-rose-500" />,
+                        badge: (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] py-0 px-1.5 border-rose-500/40 text-rose-600 bg-rose-500/10 font-normal"
+                          >
+                            Bóc tách văn bản (OCR)
+                          </Badge>
+                        ),
+                      };
+                    case "chat":
+                    default:
+                      return {
+                        icon: <Bot className="size-4 text-blue-500" />,
+                        badge: (
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] py-0 px-1.5 text-blue-600 bg-blue-500/10 font-normal"
+                          >
+                            Trò chuyện (Chat)
+                          </Badge>
+                        ),
+                      };
+                  }
+                })();
 
                 return (
                   <div
@@ -551,15 +715,18 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                     className="flex items-center justify-between p-3 rounded-lg border border-border/80 bg-muted/10 hover:bg-muted/20 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex size-7 shrink-0 items-center justify-center rounded bg-primary/10 text-primary">
-                        <Bot className="size-4" />
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded bg-muted/60">
+                        {visual.icon}
                       </div>
                       <div className="min-w-0 space-y-0.5">
-                        <p className="font-mono text-xs font-semibold text-foreground truncate">
-                          {m.model_name}
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-mono text-xs font-semibold text-foreground truncate">
+                            {m.model_name}
+                          </p>
+                          {visual.badge}
+                        </div>
                         <p className="font-mono text-[11px] text-muted-foreground truncate">
-                          {fullModelPath}
+                          Endpoint: {m.base_url}
                         </p>
                       </div>
                     </div>
@@ -576,6 +743,17 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                         title="Sao chép tên model"
                       >
                         <Copy className="size-3.5" />
+                      </Button>
+
+                      {/* Edit Model */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="size-7 p-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => setModelToEdit(m)}
+                        title="Chỉnh sửa chức năng và endpoint của model"
+                      >
+                        <Pencil className="size-3.5" />
                       </Button>
 
                       {/* Test Model Flask Icon */}
@@ -651,6 +829,76 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
         model={modelToTest}
         connectionName={connection.name}
       />
+
+      {/* MODAL 5: Edit Model Dialog */}
+      <ResponsiveDialog
+        open={Boolean(modelToEdit)}
+        onOpenChange={(open) => {
+          if (!open) setModelToEdit(null);
+        }}
+      >
+        <ResponsiveDialogContent className="max-w-md p-5 text-xs space-y-4">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>
+              Cấu hình mô hình: {modelToEdit?.model_name}
+            </ResponsiveDialogTitle>
+            <ResponsiveDialogDescription className="text-xs">
+              Điều chỉnh chức năng năng lực và endpoint cụ thể cho mô hình này.
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
+
+          <div className="space-y-3 py-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-model-cap">Chức năng (Capability)</Label>
+              <Select
+                value={editCap}
+                onValueChange={(v) => setEditCap(v as Capability)}
+              >
+                <SelectTrigger id="edit-model-cap" className="h-9 text-xs">
+                  <SelectValue placeholder="Chọn chức năng..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="chat">Trò chuyện (Chat)</SelectItem>
+                  <SelectItem value="embedding">Nhúng vector (Embedding)</SelectItem>
+                  <SelectItem value="rerank">Xếp hạng lại (Reranker)</SelectItem>
+                  <SelectItem value="ocr">Bóc tách văn bản (OCR)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-model-url">Endpoint riêng (Base URL)</Label>
+              <Input
+                id="edit-model-url"
+                value={editBaseUrl}
+                onChange={(e) => setEditBaseUrl(e.target.value)}
+                placeholder="http://..."
+                className="font-mono text-xs h-9"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Để trống hoặc giữ nguyên để dùng endpoint của nhà cung cấp.
+              </p>
+            </div>
+          </div>
+
+          <ResponsiveDialogFooter className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setModelToEdit(null)}
+            >
+              Hủy
+            </Button>
+            <Button
+              size="sm"
+              disabled={isSavingEdit}
+              onClick={handleSaveEditModel}
+            >
+              {isSavingEdit ? "Đang lưu..." : "Lưu thay đổi"}
+            </Button>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       {/* Delete Connection Confirmation Dialog */}
       <ResponsiveDialog

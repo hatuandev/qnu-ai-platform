@@ -1,5 +1,9 @@
 # Xử lý tài liệu PDF/DOCX (OCR) — backendV1
 
+Context710 bổ sung upload tự bóc tách, native-first và ZIP MD/JSON/ảnh. Luồng OCR
+toàn trang thủ công bên dưới vẫn giữ tương thích. Xem [quy trình43](../../docs/quy_trinh/43_boc_tach_tu_dong_backend_v1.md)
+cho mode auto, migration0007, quyền và giới hạn; native không tạo raw provider giả.
+
 Luồng biến một revision đã lưu thành bằng chứng OCR có thể kiểm chứng:
 
 ```

@@ -156,7 +156,7 @@ def test_downgrade_cannot_mark_success_and_block_next_upgrade(client):
 
     # The failed downgrade must leave the recorded revision untouched, not half-applied.
     assert client.portal.call(current_version) == head_before
-    assert head_before == "0005_provider_connections"
+    assert head_before == "0007_native_extraction"
 
     upgraded = alembic("upgrade", "head")
     assert upgraded.returncode == 0, (

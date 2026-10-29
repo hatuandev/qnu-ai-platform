@@ -30,17 +30,41 @@ import {
   type LifecycleTarget,
 } from "./types";
 
-export function LifecycleActionDialog({
-  workspaceId,
-  target,
-  label,
-  onClose,
-}: {
+type LifecycleActionDialogProps = {
   workspaceId: string;
   target: LifecycleTarget;
   label: string;
   onClose: () => void;
-}) {
+};
+
+export function LifecycleActionDialog(props: LifecycleActionDialogProps) {
+  const { sessionId } = useV1Auth();
+  return (
+    <LifecycleActionForm
+      key={JSON.stringify([
+        sessionId,
+        props.workspaceId,
+        props.target.kind,
+        props.target.resource_id,
+        props.target.action,
+        props.target.job_kind,
+        props.target.replacement_version_id,
+      ])}
+      {...props}
+    />
+  );
+}
+
+function LifecycleActionForm({
+  workspaceId,
+  target,
+  label,
+  onClose,
+}: LifecycleActionDialogProps) {
+  const confirmationOnly =
+    target.action === "delete" &&
+    ["collection", "source", "document"].includes(target.kind);
+  const automaticPreviewRequested = useRef(false);
   const { sessionId } = useV1Auth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -69,14 +93,16 @@ export function LifecycleActionDialog({
     });
   }, [live, navigate, workspaceId]);
   const form = useForm({
-    defaultValues: { reason: "" },
+    defaultValues: {
+      reason: confirmationOnly ? "Yêu cầu đưa vào thùng rác từ giao diện." : "",
+    },
     validators: {
       onSubmit: z.object({
         reason: z.string().trim().min(1, "Nhập lý do thao tác.").max(2000),
       }),
     },
     onSubmit: async ({ value }) => {
-      if (submitting.current) return;
+      if (!current() || submitting.current) return;
       submitting.current = true;
       setBusy(true);
       setError(null);
@@ -105,16 +131,27 @@ export function LifecycleActionDialog({
       }
     },
   });
+  useEffect(() => {
+    if (!confirmationOnly || automaticPreviewRequested.current) return;
+    automaticPreviewRequested.current = true;
+    void form.handleSubmit();
+  }, [confirmationOnly, form.handleSubmit]);
+
   const accept = async () => {
     if (
+      !current() ||
       !preview ||
-      !confirmed ||
+      (!confirmationOnly && !confirmed) ||
       submitting.current ||
       (live?.status !== "preview" && live?.status !== "pending")
     )
       return;
     if (!acceptStarted && Date.parse(preview.expires_at) <= Date.now()) {
-      setError("Bản xem trước đã hết hạn. Hãy xem trước lại.");
+      setError(
+        confirmationOnly
+          ? "Thông tin xác nhận đã hết hạn. Vui lòng thử lại."
+          : "Bản xem trước đã hết hạn. Hãy xem trước lại.",
+      );
       setPreview(null);
       setConfirmed(false);
       return;
@@ -166,10 +203,14 @@ export function LifecycleActionDialog({
       <ResponsiveDialogContent className="max-w-xl p-0 gap-0 flex flex-col max-h-[min(820px,calc(100vh-2rem))]">
         <ResponsiveDialogHeader className="border-b bg-muted/20 px-4 py-4 sm:px-6">
           <ResponsiveDialogTitle>
-            {ACTION_LABEL[target.action]}
+            {confirmationOnly ? "Xác nhận xóa" : ACTION_LABEL[target.action]}
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
-            {label}. Xem phạm vi ảnh hưởng trước khi xác nhận.
+            {confirmationOnly ? (
+              <>Bạn có muốn xóa “{label}” không?</>
+            ) : (
+              <>{label}. Xem phạm vi ảnh hưởng trước khi xác nhận.</>
+            )}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto space-y-4 px-4 py-4 sm:px-6">
@@ -178,7 +219,35 @@ export function LifecycleActionDialog({
               {error}
             </p>
           ) : null}
-          {!preview ? (
+          {confirmationOnly ? (
+            <div className="space-y-3 text-sm">
+              <p>Mục này sẽ được đưa vào thùng rác và có thể khôi phục.</p>
+              {!preview && !error ? (
+                <p role="status" className="text-muted-foreground">
+                  Đang chuẩn bị xác nhận…
+                </p>
+              ) : null}
+              {preview &&
+              typeof preview.impact.jobs_to_cancel === "number" &&
+              preview.impact.jobs_to_cancel > 0 ? (
+                <p>Các tác vụ liên quan sẽ được dừng.</p>
+              ) : null}
+              {preview &&
+              typeof preview.impact.published_versions_affected === "number" &&
+              preview.impact.published_versions_affected > 0 ? (
+                <p>Nội dung xuất bản liên quan sẽ ngừng phục vụ.</p>
+              ) : null}
+              {live &&
+              ["pending", "completed", "failed"].includes(live.status) ? (
+                <LifecycleReceiptView workspaceId={workspaceId} action={live} />
+              ) : null}
+              {detail.isError ? (
+                <p role="alert" className="text-destructive">
+                  Không đọc được kết quả thao tác. {detail.error.message}
+                </p>
+              ) : null}
+            </div>
+          ) : !preview ? (
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -245,9 +314,18 @@ export function LifecycleActionDialog({
         </div>
         <ResponsiveDialogFooter className="border-t bg-card px-4 py-3 sm:px-6">
           <Button variant="outline" onClick={onClose} disabled={busy}>
-            Đóng
+            {confirmationOnly ? "Hủy" : "Đóng"}
           </Button>
-          {preview && !acceptStarted ? (
+          {confirmationOnly && !preview && error ? (
+            <Button
+              variant="outline"
+              onClick={() => void form.handleSubmit()}
+              disabled={busy}
+            >
+              Thử lại
+            </Button>
+          ) : null}
+          {preview && !acceptStarted && !confirmationOnly ? (
             <Button
               variant="ghost"
               onClick={() => {
@@ -260,17 +338,20 @@ export function LifecycleActionDialog({
               Xem trước lại
             </Button>
           ) : null}
-          {preview && ["preview", "pending"].includes(live?.status ?? "") ? (
+          {(preview && ["preview", "pending"].includes(live?.status ?? "")) ||
+          (confirmationOnly && !preview) ? (
             <Button
               variant={target.action === "delete" ? "destructive" : "default"}
               onClick={() => void accept()}
-              disabled={busy || !confirmed}
+              disabled={busy || !preview || (!confirmationOnly && !confirmed)}
             >
               {busy
                 ? "Đang xác nhận…"
                 : acceptStarted
                   ? "Thử lại cùng thao tác"
-                  : "Xác nhận thao tác"}
+                  : confirmationOnly
+                    ? "Xóa"
+                    : "Xác nhận thao tác"}
             </Button>
           ) : null}
         </ResponsiveDialogFooter>

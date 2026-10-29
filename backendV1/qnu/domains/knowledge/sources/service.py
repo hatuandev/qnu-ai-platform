@@ -39,6 +39,7 @@ from qnu.domains.workspaces.models import Workspace
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.errors import AppException, Conflict, DependencyUnavailable, EntityNotFound
 from qnu.ports.blob_store import BlobStore
+from qnu.ports.job_queue import JobQueue
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +108,8 @@ class SourceService:
         source_id: str | None = None,
         staged: bool = False,
         folder_id: str | None = None,
+        auto_extract: bool = True,
+        job_queue: JobQueue | None = None,
     ) -> UploadOutcome:
         ref = actor_ref(actor)
         workspace_id = workspace.id
@@ -123,6 +126,8 @@ class SourceService:
         request_hash = _request_hash(
             workspace_id, collection_id, source_id, stored, effective_title
         )
+        if auto_extract and stored.extension in {".pdf", ".docx"}:
+            request_hash = hashlib.sha256((request_hash + ":extract:auto-v1").encode()).hexdigest()
         if staged:
             request_hash = hashlib.sha256((request_hash + ":staged").encode()).hexdigest()
 
@@ -198,6 +203,23 @@ class SourceService:
                     staged=staged,
                 )
             await db.flush()
+            processing = None
+            if auto_extract and stored.extension in {".pdf", ".docx"}:
+                from qnu.domains.knowledge.public_api import resolve_revision_scope
+                from qnu.domains.ocr.service import processing_service
+
+                scope = await resolve_revision_scope(
+                    db, workspace_id, scoped_collection_id, source.id, revision.id
+                )
+                processing = await processing_service.request_run(
+                    db,
+                    actor,
+                    scope,
+                    provider_id=None,
+                    job_queue=None,
+                    strategy="auto",
+                    commit=False,
+                )
             await db.commit()
         except IntegrityError:
             await db.rollback()
@@ -218,7 +240,25 @@ class SourceService:
 
         await db.refresh(source)
         await db.refresh(revision)
+        if processing is not None:
+            await processing_service.dispatch(db, processing.run, job_queue)
         return UploadOutcome(source=source, revision=revision)
+
+    async def processing_for_revisions(self, db: AsyncSession, revision_ids: list[str]) -> dict:
+        """Caller supplies authorized revision IDs; batch avoids a query per source."""
+        from qnu.domains.ocr.models import OcrProcessingRun
+
+        if not revision_ids:
+            return {}
+        rows = (
+            await db.scalars(
+                select(OcrProcessingRun)
+                .where(OcrProcessingRun.revision_id.in_(revision_ids))
+                .order_by(OcrProcessingRun.revision_id, OcrProcessingRun.generation.desc())
+                .distinct(OcrProcessingRun.revision_id)
+            )
+        ).all()
+        return {row.revision_id: row for row in rows}
 
     async def list_page(
         self,
@@ -307,7 +347,9 @@ class SourceService:
     ) -> tuple[KBSource, KBSourceRevision]:
         clean_title = title.strip()
         if not clean_title:
-            raise AppException("Tiêu đề không được để trống.", code="invalid_title", status_code=422)
+            raise AppException(
+                "Tiêu đề không được để trống.", code="invalid_title", status_code=422
+            )
         source = await load_source(db, workspace.id, collection_id, source_id, for_update=True)
         source.title = clean_title[:255]
         await record_workspace_event(

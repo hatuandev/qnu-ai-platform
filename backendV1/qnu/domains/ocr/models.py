@@ -34,6 +34,8 @@ RUN_STATUSES = ("queued", "running", "completed", "failed", "uncertain", "cancel
 ACTIVE_RUN_STATUSES = ("queued", "running")
 PAGE_STATUSES = ("pending", "in_flight", "completed", "blank", "failed", "uncertain")
 ARTIFACT_KINDS = (
+    "native_page",
+    "embedded_image",
     "render_pdf",
     "page_image",
     "raw_response",
@@ -172,7 +174,7 @@ class OcrRunArtifact(Base):
     __table_args__ = (
         UniqueConstraint("run_id", "kind", "page_no", name="uq_ocr_artifact_kind_page"),
         CheckConstraint(
-            "kind IN ('render_pdf','page_image','raw_response','canonical_json','markdown','manifest')",
+            "kind IN ('render_pdf','page_image','raw_response','canonical_json','markdown','manifest','native_page','embedded_image')",
             name="ck_ocr_artifact_kind",
         ),
         CheckConstraint("page_no >= 0", name="ck_ocr_artifact_page"),

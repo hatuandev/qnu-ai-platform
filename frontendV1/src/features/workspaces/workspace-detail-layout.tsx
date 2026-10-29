@@ -21,7 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { canReadOperations } from "@/features/lifecycle/permissions";
 import {
   useCallerWorkspaceRole,
   useUpdateWorkspace,
@@ -30,71 +29,6 @@ import {
 import { DEFAULT_PAGE_SEARCH } from "@/features/workspaces/search";
 import { WorkspaceFormDialog } from "@/features/workspaces/workspace-form-dialog";
 import { WorkspaceStatusHint } from "@/features/workspaces/workspaces-table";
-import { cn } from "@/lib/utils";
-import { workspaceFeatures } from "@/navigation/config";
-
-const TABS = [
-  {
-    id: "overview",
-    label: "Tổng quan",
-    to: "/workspaces/$workspaceId",
-    exact: true,
-  },
-  {
-    id: "collections",
-    label: workspaceFeatures.collections.title,
-    to: workspaceFeatures.collections.to,
-    exact: false,
-  },
-  {
-    id: "assistants",
-    label: workspaceFeatures.assistants.title,
-    to: workspaceFeatures.assistants.to,
-    exact: false,
-  },
-  {
-    id: "conversations",
-    label: workspaceFeatures.conversations.title,
-    to: workspaceFeatures.conversations.to,
-    exact: false,
-  },
-  {
-    id: "members",
-    label: workspaceFeatures.members.title,
-    to: workspaceFeatures.members.to,
-    exact: false,
-  },
-  {
-    id: "models",
-    label: workspaceFeatures.models.title,
-    to: workspaceFeatures.models.to,
-    exact: false,
-  },
-  {
-    id: "quota",
-    label: workspaceFeatures.quota.title,
-    to: workspaceFeatures.quota.to,
-    exact: false,
-  },
-  {
-    id: "operations",
-    label: "Vận hành",
-    to: workspaceFeatures.jobs.to,
-    exact: false,
-  },
-  {
-    id: "resources",
-    label: workspaceFeatures.resources.title,
-    to: workspaceFeatures.resources.to,
-    exact: false,
-  },
-  {
-    id: "audit",
-    label: workspaceFeatures.audit.title,
-    to: workspaceFeatures.audit.to,
-    exact: false,
-  },
-] as const;
 
 export function WorkspaceDetailLayout({
   workspaceId,
@@ -104,8 +38,9 @@ export function WorkspaceDetailLayout({
   const { actor } = useV1Auth();
   const location = useRouterState({ select: (s) => s.location });
   const pathname = location.pathname;
-  const isKnowledgePage =
-    pathname.includes("/knowledge") || pathname.includes("/collections");
+  const isOverviewPage =
+    pathname === `/workspaces/${workspaceId}` ||
+    pathname === `/workspaces/${workspaceId}/`;
 
   const workspaceQuery = useWorkspaceQuery(workspaceId);
   const { role, isPending: rolePending } = useCallerWorkspaceRole(workspaceId);
@@ -143,9 +78,9 @@ export function WorkspaceDetailLayout({
     );
   }
 
-  // Khi đang ở các trang thuộc Kho tri thức: Render trực tiếp nội dung kho tri thức
-  // (Không hiển thị banner quản trị workspace và thanh 10 tab ngang ngoài phạm vi tri thức)
-  if (isKnowledgePage) {
+  // Khi đang ở các trang tính năng con (Kho tri thức, Trợ lý AI, Hội thoại, Thành viên, Models, Quota, v.v.):
+  // Render trực tiếp nội dung tính năng con, không hiển thị banner quản trị workspace và thanh 10 tab ngang
+  if (!isOverviewPage) {
     return (
       <div className="space-y-6">
         <Outlet />
@@ -256,31 +191,6 @@ export function WorkspaceDetailLayout({
           </p>
         ) : null}
       </div>
-
-      <nav
-        aria-label="Mục workspace"
-        className="flex gap-1 overflow-x-auto border-b"
-      >
-        {TABS.filter(
-          (tab) => tab.id !== "operations" || canReadOperations(role),
-        ).map((tab) => (
-          <Link
-            key={tab.id}
-            to={tab.to}
-            params={{ workspaceId }}
-            activeOptions={{ exact: tab.exact }}
-            className={cn(
-              "type-control inline-flex min-h-10 shrink-0 items-center border-b-2 border-transparent px-3 text-muted-foreground transition-colors hover:text-foreground",
-            )}
-            activeProps={{
-              className:
-                "border-primary font-semibold text-foreground hover:text-foreground",
-            }}
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </nav>
 
       <Outlet />
 

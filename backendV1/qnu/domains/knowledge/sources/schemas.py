@@ -6,6 +6,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from qnu.domains.ocr.schemas import ProcessingRunResponse
+
 
 class RevisionResponse(BaseModel):
     id: str
@@ -38,6 +40,7 @@ class SourceResponse(BaseModel):
     created_by: str
     created_at: datetime
     updated_at: datetime
+    processing: ProcessingRunResponse | None = None
 
 
 class SourceUploadResponse(BaseModel):

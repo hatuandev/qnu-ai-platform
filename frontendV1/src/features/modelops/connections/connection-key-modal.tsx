@@ -1,6 +1,7 @@
 import { Check, Eye, EyeOff, Key, Loader2, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ApiError } from "@/app/api/client";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -21,7 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAddConnectionKey, useTestConnection } from "./api";
+import {
+  useAddConnectionKey,
+  useAddConnectionModel,
+  useTestConnection,
+} from "./api";
 
 export function ConnectionKeyModal({
   open,
@@ -43,6 +48,9 @@ export function ConnectionKeyModal({
   const [showSecret, setShowSecret] = useState(false);
   const [defaultModel, setDefaultModel] = useState("");
   const [priority, setPriority] = useState(5);
+  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
+
+  const allModels = Array.from(new Set([...availableModels, ...discoveredModels]));
 
   const [testResult, setTestResult] = useState<{
     status: "idle" | "testing" | "success" | "error";
@@ -51,6 +59,7 @@ export function ConnectionKeyModal({
   }>({ status: "idle", message: "" });
 
   const addKeyMutation = useAddConnectionKey(connectionId);
+  const addModelMutation = useAddConnectionModel(connectionId);
   const testMutation = useTestConnection(connectionId);
 
   const handleTestConnection = async () => {
@@ -64,12 +73,19 @@ export function ConnectionKeyModal({
 
     setTestResult({ status: "testing", message: "Đang kiểm tra kết nối tới nhà cung cấp..." });
     try {
+      const modelToTest =
+        defaultModel.trim() && defaultModel !== "__all__"
+          ? defaultModel.trim()
+          : undefined;
       const res = await testMutation.mutateAsync({
         api_key: secret.trim(),
-        model_name: defaultModel.trim() || undefined,
+        model_name: modelToTest,
       });
 
       if (res.ok) {
+        if (res.models && res.models.length > 0) {
+          setDiscoveredModels(res.models);
+        }
         setTestResult({
           status: "success",
           message: res.detail,
@@ -101,8 +117,23 @@ export function ConnectionKeyModal({
         name: name.trim(),
         secret: secret.trim(),
         priority,
-        default_model: defaultModel.trim() || undefined,
       });
+
+      const chosenModel = defaultModel.trim();
+      if (
+        chosenModel &&
+        chosenModel !== "__all__" &&
+        !availableModels.includes(chosenModel)
+      ) {
+        try {
+          await addModelMutation.mutateAsync({
+            model_name: chosenModel,
+            capabilities: ["chat"],
+          });
+        } catch {
+          // Model phụ có thể cấu hình sau, không chặn việc lưu key
+        }
+      }
 
       toast.success("Đã thêm API Key thành công.");
       setName("");
@@ -112,8 +143,14 @@ export function ConnectionKeyModal({
       setTestResult({ status: "idle", message: "" });
       onOpenChange(false);
       onKeyAdded?.();
-    } catch {
-      toast.error("Không thể lưu API Key. Vui lòng thử lại.");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Không thể lưu API Key. Vui lòng thử lại.";
+      toast.error(msg);
     }
   };
 
@@ -194,7 +231,7 @@ export function ConnectionKeyModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="key-default-model">Mô hình mặc định (Default Model)</Label>
-              {availableModels.length > 0 ? (
+              {allModels.length > 0 ? (
                 <div className="space-y-1">
                   <Select value={defaultModel} onValueChange={setDefaultModel}>
                     <SelectTrigger id="key-default-model">
@@ -202,7 +239,7 @@ export function ConnectionKeyModal({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">Tất cả mô hình</SelectItem>
-                      {availableModels.map((m) => (
+                      {allModels.map((m) => (
                         <SelectItem key={m} value={m}>
                           {m}
                         </SelectItem>

@@ -72,6 +72,8 @@ logger = get_logger(__name__)
 
 RETRYABLE_CODES = frozenset({"storage_unavailable", "queue_unavailable", "dependency_unavailable"})
 ARTIFACT_CONTENT_TYPES = {
+    "native_page": "application/json",
+    "embedded_image": "application/octet-stream",
     "render_pdf": "application/pdf",
     "page_image": "image/png",
     "raw_response": "application/json",
@@ -80,6 +82,8 @@ ARTIFACT_CONTENT_TYPES = {
     "manifest": "application/json",
 }
 ARTIFACT_EXTENSIONS = {
+    "native_page": "json",
+    "embedded_image": "bin",
     "render_pdf": "pdf",
     "page_image": "png",
     "raw_response": "json",
@@ -395,6 +399,11 @@ async def _execute_claimed(
     with observe_stage(run, "authorize", logger=logger):
         await resolve_workspace_access(db, actor, run.workspace_id, required_roles=WRITE_ROLES)
 
+    if (run.config or {}).get("extraction", {}).get("strategy") == "auto":
+        from qnu.domains.ocr.automatic import execute_auto
+
+        return await execute_auto(db, blob_store, run, actor, engine, config, settings)
+
     requested = (run.config or {}).get("provider_requested")
     with observe_stage(run, "resolve_model", logger=logger):
         from dataclasses import replace
@@ -661,7 +670,7 @@ async def _assemble(
     db: AsyncSession,
     blob_store: BlobStore,
     run: OcrProcessingRun,
-    runtime: OcrRuntime,
+    runtime: OcrRuntime | None,
     config: ProcessingConfig,
     rendered: RenderedDocument,
 ) -> ExecutionOutcome:
@@ -677,7 +686,7 @@ async def _assemble_result(
     db: AsyncSession,
     blob_store: BlobStore,
     run: OcrProcessingRun,
-    runtime: OcrRuntime,
+    runtime: OcrRuntime | None,
     config: ProcessingConfig,
     rendered: RenderedDocument,
 ) -> ExecutionOutcome:
@@ -691,11 +700,24 @@ async def _assemble_result(
     for page in rendered.pages:
         row = rows[page.page_number]
         layout = None
+        native = None
         if row.status == "completed" and row.raw_key:
             _, raw = await read_artifact_bytes(
                 db, blob_store, run, "raw_response", page.page_number
             )
             layout = parse_page(_raw_text(raw))
+        if (run.config or {}).get("extraction"):
+            from qnu.domains.ocr.native import merge_layout, page_from_payload
+
+            _, native_bytes = await read_artifact_bytes(
+                db, blob_store, run, "native_page", page.page_number
+            )
+            native = page_from_payload(json.loads(native_bytes))
+            layout = merge_layout(native, layout)
+            if row.status == "completed":
+                row.text = layout.text
+                row.blocks_count = len(layout.blocks)
+                row.has_tables = layout.has_tables
         documents.append(
             PageDocument(
                 page_number=page.page_number,
@@ -707,6 +729,11 @@ async def _assemble_result(
                 layout=layout,
                 error_code=row.error_code,
                 usage_tokens=row.usage_tokens,
+                method=("hybrid" if native.native_text else "ocr")
+                if native and native.needs_ocr
+                else "native"
+                if native
+                else None,
             )
         )
 
@@ -726,11 +753,13 @@ async def _assemble_result(
         "table_layout_version": config.table_layout_version,
         "config_fingerprint": run.config_fingerprint,
         "renderer": rendered.renderer,
-        "provider": runtime.public_dict(),
+        "provider": runtime.public_dict() if runtime else None,
         "started_at": run.started_at.isoformat() if run.started_at else None,
         "finished_at": utcnow().isoformat(),
         "warnings": list(rendered.warnings),
     }
+    if run.config.get("extraction"):
+        processing["extraction"] = run.config["extraction"]
     limits = {
         "max_pages": config.max_pages,
         "dpi": config.dpi,
@@ -789,6 +818,11 @@ async def _assemble_result(
     run.pages_failed = sum(1 for page in pages if page["status"] == "failed")
     measured = [page["usage_tokens"] for page in pages if page["usage_tokens"] is not None]
     run.usage_tokens = sum(measured) if measured else None
+    if run.config.get("extraction") and any(
+        page.get("extraction_method") in {"ocr", "hybrid"} and page["usage_tokens"] is None
+        for page in pages
+    ):
+        run.usage_tokens = None
     run.finished_at = utcnow()
     run.lease_expires_at = None
 

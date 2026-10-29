@@ -209,7 +209,8 @@ def staged_version(client, data):
             files={
                 "file": ("replacement.pdf", real_pdf(["Replacement revision"]), "application/pdf")
             },
-            data={"staged": "true"},
+            # This fixture deliberately stages first, then explicitly requests OCR.
+            data={"staged": "true", "auto_extract": "false"},
         )
         assert uploaded.status_code == 201, uploaded.text
         revision = uploaded.json()["revision"]

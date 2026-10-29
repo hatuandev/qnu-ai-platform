@@ -1,5 +1,9 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- **2026-10-29 — Context710: backend V1 tự bóc tách sau upload.** Native-first PDF/DOCX, OCR trang cần thiết, giữ ảnh/nguồn và xuất MD/JSON/ZIP; processing theo revision, migration/code head0007. Bao phủ835ID PASS (210call trước gián đoạn +625PASS/lệnh exit0), mất0/trùng0,28mới; Ruff26/OpenAPI/link/encoding đạt, DB thử/Redis riêng đã dọn. Chưa migrate/restart phục vụ/live OCR hoặc đổi FE/model/quota. [Nhật ký710](./nhat_ky/2026-10-29_phien_710_backend_v1_boc_tach_tu_dong.md).
+
+- **2026-10-29 — Context709: rút gọn xác nhận xóa kho tri thức.** Chỉ Hủy/Xóa, không lý do/checkbox; tự chuẩn bị preview, giữ quyền/hash/hạn sử dụng/chống lặp. FE450PASS, focused29PASS, build+TS và Biome2tệp PASS; browser desktop/mobile đã kiểm và hủy, không xóa tài liệu thật. Giữ cấu hình AI; không restart/push. [Nhật ký709](./nhat_ky/2026-10-29_phien_709_rut_gon_xac_nhan_xoa_kho_tri_thuc.md).
+
 - **2026-10-29 — Context708: sửa chức năng kho tri thức.** Menu nguồn có xóa/lưu trữ/tải xuống ở thẻ/bảng, lifecycle preview/restore; chặn xóa thư mục còn nội dung, nối chặng3–5, sửa OCR error/paging/poll và quyền admin local ở worker. FE439PASS/buildPASS, BEfocused5+12PASS; full BE ghi804PASS/2FAIL rồi kẹt teardown; recovery17PASS/2FAIL (2revision cũ), DB thử đã dọn. Full lintFAIL29lỗi ngoài phạm vi. LiveCRUD/restoređạt, kho thử đã lưu trữ; User chốt giữ cấu hình model/quota hiện tại, hoàn tất sửa chức năng; không chạy thêm OCR thật. [Nhật ký708](./nhat_ky/2026-10-29_phien_708_sua_chuc_nang_kho_tri_thuc.md).
 
 - **2026-10-29 — Context707: sửa v1-infra-up/storage.** Đủ PostgreSQL/Redis/Qdrant/MinIO, selected env, tạo bucket local khi thiếu và thử ghi/đọc/xóa; preflight thêm storage chỉ đọc. 44test/Ruff/Compose PASS; chạy thật hai lần +v1-check5mụcOK, MinIO đúng image giữ healthy. [Nhật ký707](./nhat_ky/2026-10-29_phien_707_sua_v1_infra_up_va_storage.md).

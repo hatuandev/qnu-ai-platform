@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -16,6 +16,7 @@ class ProcessingRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     provider_id: str | None = Field(None, min_length=1, max_length=64)
+    strategy: Literal["ocr", "auto"] = "ocr"
     force: bool = Field(
         False,
         description=(
@@ -50,6 +51,8 @@ class ProcessingRunResponse(BaseModel):
     usage_tokens: int | None = None
     config_fingerprint: str
     dispatch_pending: bool = False
+    strategy: str = "ocr"
+    results_ready: bool = False
 
     @classmethod
     def from_run(cls, run: OcrProcessingRun) -> ProcessingRunResponse:
@@ -78,6 +81,8 @@ class ProcessingRunResponse(BaseModel):
             usage_tokens=run.usage_tokens,
             config_fingerprint=run.config_fingerprint,
             dispatch_pending=run.status in ACTIVE_RUN_STATUSES and run.dispatched_at is None,
+            strategy=(run.config or {}).get("extraction", {}).get("strategy", "ocr"),
+            results_ready=run.status == "completed",
         )
 
 

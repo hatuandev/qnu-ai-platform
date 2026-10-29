@@ -7,7 +7,6 @@ import {
   FileSearch,
   Gauge,
   MessageSquare,
-  Server,
   Settings2,
   UsersRound,
 } from "lucide-react";
@@ -83,13 +82,6 @@ export const workspaceFeatures = {
     icon: UsersRound,
     kind: "workspace",
     to: "/workspaces/$workspaceId/members",
-  },
-  providers: {
-    title: "Nhà cung cấp",
-    group: "Quản trị",
-    icon: Server,
-    kind: "workspace",
-    to: "/providers",
   },
   models: {
     title: "Model workspace",
@@ -243,12 +235,6 @@ export function isFeatureActive(
   pathname: string,
   search: Record<string, unknown>,
 ): boolean {
-  if (feature === "providers") {
-    return (
-      pathname.startsWith("/providers") ||
-      pathname.startsWith("/modelops/providers")
-    );
-  }
   if (pathname.startsWith("/workspaces/choose/"))
     return pathname === `/workspaces/choose/${feature}`;
   const destination = workspaceFeatures[feature];

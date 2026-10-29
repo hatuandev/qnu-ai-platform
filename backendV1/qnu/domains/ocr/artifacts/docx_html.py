@@ -276,10 +276,16 @@ def _render_table(
             colspan, merge = _cell_properties(cell)
             if merge == "continue":
                 origin = origins.get((row_index - 1, column))
-                if origin is not None:
-                    origin["row_span"] = int(origin["row_span"]) + 1
+                if origin is None or int(origin["col_span"]) != colspan:
+                    raise AppException(
+                        "Không xác định được ô gốc của vùng gộp dọc DOCX.",
+                        code="docx_table_merge_unsupported",
+                        status_code=422,
+                    )
+                origin["row_span"] = int(origin["row_span"]) + 1
                 for offset in range(colspan):
                     occupied.add((row_index, column + offset))
+                    origins[(row_index, column + offset)] = origin
                 column += colspan
                 continue
             record: dict[str, object] = {

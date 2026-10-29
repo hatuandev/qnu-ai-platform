@@ -14,6 +14,11 @@ kiểm tra người gọi ở mọi thao tác. Màn KTX vẫn là mẫu, không 
 
 ## Lưu trữ, xóa, khôi phục và dừng
 
+Riêng **Xóa** kho tri thức, văn bản nguồn và tài liệu biên soạn dùng hộp thoại
+**Hủy / Xóa**, không nhập lý do hoặc đánh dấu checkbox. Giao diện tự chuẩn bị
+phạm vi ảnh hưởng; chỉ gửi xác nhận khi người dùng bấm **Xóa**. Các thao tác khác
+tiếp tục theo quy trình dưới đây.
+
 1. Chọn tài nguyên → Quản lý → thao tác cần làm.
 2. Nhập lý do, chọn **Xem trước tác động**. Bước này chưa đổi tài nguyên.
 3. Đọc số tác vụ, bản xuất bản, trợ lý/hội thoại bị ảnh hưởng và việc giữ dữ liệu.
@@ -39,15 +44,17 @@ Tải xuống tra đúng ID phiên bản hiện tại; không lấy số phiên 
 
 - Admin nền tảng hoặc admin workspace được xóa tài liệu; editor được sửa,
   di chuyển và lưu trữ. Thành viên chỉ đọc không có thao tác ghi.
-- **Xóa** tài liệu vẫn dùng quy trình xem trước/xác nhận ở trên. Khi hoàn tất,
-  trang **Tài nguyên → Lưu trữ & Thùng rác** cho phép khôi phục theo quyền.
+- **Xóa** chỉ hỏi xác nhận **Hủy / Xóa**. Khi hoàn tất, trang
+  **Tài nguyên → Lưu trữ & Thùng rác** cho phép khôi phục theo quyền.
 - **Xóa thư mục** chỉ áp dụng cho thư mục rỗng. Xem số tài liệu/thư mục con trong
   xác nhận; nếu còn nội dung, di chuyển ra ngoài trước. Nếu không đọc được tác động,
   phải thử lại; giao diện và server đều chặn xóa. Thao tác này giữ tệp gốc.
 - Tìm kiếm nhanh ở danh sách chỉ lọc trang đang xem. Danh sách OCR có phân trang;
   nguồn được chọn qua liên kết vẫn đọc theo ID, kể cả ngoài trang hiện tại.
 - Chặng **Biên soạn**, **Xuất bản**, **Phục vụ AI** có nút mở trang chức năng
-  tương ứng. Upload không tự chạy OCR, biên soạn hoặc xuất bản.
+  tương ứng. BackendV1 từ Context710 tự bóc tách PDF/DOCX sau upload theo
+  [quy trình43](43_boc_tach_tu_dong_backend_v1.md); cần migration0007 và API/worker
+  mới. Bố cục FE chưa đổi trong phiên710; không tự biên soạn hoặc xuất bản.
 - Muốn chạy AI, workspace cần được cấp model phù hợp, chọn mặc định hoặc model
   cụ thể và có hạn mức. Lỗi cấu hình/provider được hiển thị theo lượt OCR; trạng thái
   thất bại không có nghĩa là tài liệu gốc đã mất. Quản lý tài liệu vẫn dùng được

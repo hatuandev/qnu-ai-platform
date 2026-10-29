@@ -1,7 +1,7 @@
 """HTTP API for knowledge sources and their immutable file revisions.
 
-The file is stored as uploaded bytes. Nothing in this module parses, indexes or
-queues the document, and no response claims a processing state that does not exist.
+The file is stored as uploaded bytes. The source service atomically records a
+native-first extraction intent for PDF/DOCX; processing remains a separate run.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from qnu.api.dependencies import get_actor, get_blob_store, get_db
+from qnu.api.dependencies import get_actor, get_blob_store, get_db, get_job_queue
 from qnu.contracts.idempotency import idempotency_key as idempotency_key_dep
 from qnu.contracts.pagination import Page, PageMeta
 from qnu.domains.identity.actor import AuthActor
@@ -24,10 +24,12 @@ from qnu.domains.knowledge.sources.schemas import (
     SourceUploadResponse,
 )
 from qnu.domains.knowledge.sources.service import source_service
+from qnu.domains.ocr.schemas import ProcessingRunResponse
 from qnu.domains.workspaces.access import resolve_workspace_access
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException
 from qnu.ports.blob_store import BlobStore
+from qnu.ports.job_queue import JobQueue
 
 router = APIRouter(
     prefix="/workspaces/{workspace_id}/collections/{collection_id}/sources",
@@ -49,7 +51,7 @@ def _revision_out(revision: KBSourceRevision) -> RevisionResponse:
     )
 
 
-def _source_out(source: KBSource, revision: KBSourceRevision) -> SourceResponse:
+def _source_out(source: KBSource, revision: KBSourceRevision, processing=None) -> SourceResponse:
     return SourceResponse(
         id=source.id,
         workspace_id=source.workspace_id,
@@ -67,6 +69,7 @@ def _source_out(source: KBSource, revision: KBSourceRevision) -> SourceResponse:
         created_by=source.created_by,
         created_at=source.created_at,
         updated_at=source.updated_at,
+        processing=ProcessingRunResponse.from_run(processing) if processing else None,
     )
 
 
@@ -83,10 +86,12 @@ async def upload_source(
     file: UploadFile = File(..., description="Tệp gốc cần lưu"),
     title: str | None = Form(None, max_length=255),
     folder_id: str | None = Form(None, description="Thư mục lưu trữ"),
+    auto_extract: bool = Form(True, description="Tự bóc tách PDF/DOCX sau khi lưu"),
     idempotency_key: str | None = Depends(idempotency_key_dep),
     db: AsyncSession = Depends(get_db),
     blob_store: BlobStore = Depends(get_blob_store),
     actor: AuthActor = Depends(get_actor),
+    job_queue: JobQueue | None = Depends(get_job_queue),
 ) -> SourceUploadResponse:
     workspace = await resolve_workspace_access(
         db, actor, workspace_id, required_roles=WRITE_ROLES, for_update=True
@@ -105,11 +110,14 @@ async def upload_source(
         actor=actor,
         idempotency_key=idempotency_key,
         folder_id=folder_id,
+        auto_extract=auto_extract,
+        job_queue=job_queue,
     )
     if outcome.replayed:
         response.status_code = status.HTTP_200_OK
+    processing = await source_service.processing_for_revisions(db, [outcome.revision.id])
     return SourceUploadResponse(
-        source=_source_out(outcome.source, outcome.revision),
+        source=_source_out(outcome.source, outcome.revision, processing.get(outcome.revision.id)),
         revision=_revision_out(outcome.revision),
     )
 
@@ -124,7 +132,9 @@ async def list_sources(
     collection_id: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    folder_id: str | None = Query(None, description="Mã thư mục, hoặc 'root' để lấy tài liệu ở gốc"),
+    folder_id: str | None = Query(
+        None, description="Mã thư mục, hoặc 'root' để lấy tài liệu ở gốc"
+    ),
     all_folders: bool = Query(False, description="Nếu true, lấy toàn bộ tài liệu bất kể thư mục"),
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(get_actor),
@@ -133,8 +143,11 @@ async def list_sources(
     rows, total = await source_service.list_page(
         db, workspace, collection_id, page, page_size, folder_id=folder_id, all_folders=all_folders
     )
+    processing = await source_service.processing_for_revisions(db, [r.id for _, r in rows])
     return Page[SourceResponse](
-        items=[_source_out(source, revision) for source, revision in rows],
+        items=[
+            _source_out(source, revision, processing.get(revision.id)) for source, revision in rows
+        ],
         meta=PageMeta(page=page, page_size=page_size, total=total),
     )
 
@@ -197,7 +210,8 @@ async def get_source(
 ) -> SourceResponse:
     workspace = await resolve_workspace_access(db, actor, workspace_id, required_roles=READ_ROLES)
     source, revision = await source_service.get(db, workspace, collection_id, source_id)
-    return _source_out(source, revision)
+    processing = await source_service.processing_for_revisions(db, [revision.id])
+    return _source_out(source, revision, processing.get(revision.id))
 
 
 @router.get(
@@ -233,10 +247,12 @@ async def add_revision(
     staged: bool = Form(
         False, description="Giữ bản đang phục vụ đến khi thay thế nguyên tử cùng chỉ mục mới"
     ),
+    auto_extract: bool = Form(True, description="Tự bóc tách phiên bản PDF/DOCX mới"),
     idempotency_key: str | None = Depends(idempotency_key_dep),
     db: AsyncSession = Depends(get_db),
     blob_store: BlobStore = Depends(get_blob_store),
     actor: AuthActor = Depends(get_actor),
+    job_queue: JobQueue | None = Depends(get_job_queue),
 ) -> SourceUploadResponse:
     workspace = await resolve_workspace_access(
         db, actor, workspace_id, required_roles=WRITE_ROLES, for_update=True
@@ -262,11 +278,14 @@ async def add_revision(
         idempotency_key=idempotency_key,
         source_id=source_id,
         staged=staged,
+        auto_extract=auto_extract,
+        job_queue=job_queue,
     )
     if outcome.replayed:
         response.status_code = status.HTTP_200_OK
+    processing = await source_service.processing_for_revisions(db, [outcome.revision.id])
     return SourceUploadResponse(
-        source=_source_out(outcome.source, outcome.revision),
+        source=_source_out(outcome.source, outcome.revision, processing.get(outcome.revision.id)),
         revision=_revision_out(outcome.revision),
     )
 

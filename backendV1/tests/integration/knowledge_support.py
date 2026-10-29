@@ -74,9 +74,7 @@ def add_member(client: TestClient, workspace_id: str, actor_ref: str, role: str)
 
 
 def create_collection(client: TestClient, workspace_id: str, name: str) -> dict:
-    response = client.post(
-        f"{API}/workspaces/{workspace_id}/collections", json={"name": name}
-    )
+    response = client.post(f"{API}/workspaces/{workspace_id}/collections", json={"name": name})
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -93,8 +91,12 @@ def upload_source(
     content_type: str = "application/pdf",
     extra_data: dict | None = None,
     extra_headers: dict | None = None,
+    auto_extract: bool = False,
 ):
     data = dict(extra_data or {})
+    # Existing fixtures intentionally stage stored sources before explicit OCR/index
+    # requests. New automatic-upload acceptance tests opt in to the new API default.
+    data.setdefault("auto_extract", str(auto_extract).lower())
     if title is not None:
         data["title"] = title
     headers = dict(extra_headers or {})
@@ -102,7 +104,9 @@ def upload_source(
         headers["Idempotency-Key"] = idempotency_key
     return client.post(
         f"{API}/workspaces/{workspace_id}/collections/{collection_id}/sources",
-        files={"file": (filename, payload if payload is not None else pdf_bytes("v1"), content_type)},
+        files={
+            "file": (filename, payload if payload is not None else pdf_bytes("v1"), content_type)
+        },
         data=data,
         headers=headers,
     )
@@ -122,6 +126,7 @@ def add_revision(
     return client.post(
         f"{API}/workspaces/{workspace_id}/collections/{collection_id}/sources/{source_id}/revisions",
         files={"file": (filename, payload, "application/pdf")},
+        data={"auto_extract": "false"},
         headers=headers,
     )
 

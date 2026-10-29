@@ -80,6 +80,8 @@ class Block:
     bbox: tuple[float, float, float, float]
     requires_review: bool
     table: Table | None = None
+    origin: str = "ocr"
+    image: dict | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,9 +267,7 @@ def parse_table(raw: str) -> Table:
             cells: list[Cell] = []
             for raw_cell in _split_top_level(raw_row, "&"):
                 text, colspan, rowspan, header = _unwrap(raw_cell)
-                cells.append(
-                    Cell(text=text, row_span=rowspan, col_span=colspan, header=header)
-                )
+                cells.append(Cell(text=text, row_span=rowspan, col_span=colspan, header=header))
             rows.append(cells)
     except ValueError as exc:
         return Table(status="unsupported", reason=f"unsupported_cell:{exc}")
@@ -310,9 +310,7 @@ def parse_page(raw: str) -> PageLayout:
         if label == "Table":
             table = parse_table(source)
             if table.status == "parsed":
-                text = "\n".join(
-                    "\t".join(cell.text for cell in row) for row in table.rows
-                )
+                text = "\n".join("\t".join(cell.text for cell in row) for row in table.rows)
             else:
                 requires_review = True
                 warnings.append(f"table_unsupported:{table.reason}")

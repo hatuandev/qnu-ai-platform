@@ -7,9 +7,11 @@ Reads never accept a storage path from the client: the artifact kind is the addr
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 
+import pymupdf
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,6 +66,8 @@ class ProcessingService:
         provider_id: str | None,
         job_queue: JobQueue | None,
         force: bool = False,
+        strategy: str = "ocr",
+        commit: bool = True,
     ) -> RequestOutcome:
         if scope.extension not in SUPPORTED_PROCESSING_EXTENSIONS:
             raise UnsupportedMedia(
@@ -76,6 +80,17 @@ class ProcessingService:
         if provider_id:
             payload["provider_requested"] = provider_id
         fingerprint = config.fingerprint
+        if strategy == "auto":
+            from qnu.domains.ocr.native import NATIVE_VERSION
+
+            payload["extraction"] = {
+                "strategy": "auto",
+                "version": NATIVE_VERSION,
+                "pymupdf": pymupdf.version[0],
+            }
+            fingerprint = hashlib.sha256(
+                (fingerprint + json.dumps(payload["extraction"], sort_keys=True)).encode()
+            ).hexdigest()
 
         active = await self._active_run(db, scope.revision_id)
         if active is not None:
@@ -139,8 +154,13 @@ class ProcessingService:
             },
         )
         try:
-            await db.commit()
+            if commit:
+                await db.commit()
+            else:
+                await db.flush()
         except IntegrityError as exc:
+            if not commit:
+                raise
             await db.rollback()
             raise Conflict(
                 "Đã có lượt xử lý khác được tạo cho phiên bản này.",
@@ -149,7 +169,7 @@ class ProcessingService:
         await db.refresh(run)
 
         logger.info("ocr_run_requested", **run_identity(run))
-        dispatched = await self.dispatch(db, run, job_queue)
+        dispatched = await self.dispatch(db, run, job_queue) if commit else False
         return RequestOutcome(run=run, created=True, dispatched=dispatched)
 
     async def dispatch(
@@ -359,6 +379,8 @@ class ProcessingService:
         )
         for candidate in (await db.execute(stmt)).scalars():
             if (candidate.config or {}).get("provider_requested") == provider_id:
+                if candidate.config.get("extraction") and candidate.provider_id is None:
+                    return candidate
                 selected, _ = await choose_target(db, workspace_id, "ocr", provider_id)
                 runtime = await resolve_ocr_runtime(db, workspace_id, selected)
                 pinned = (candidate.config or {}).get("provider") or {}
