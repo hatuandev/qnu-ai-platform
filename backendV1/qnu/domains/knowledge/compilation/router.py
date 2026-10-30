@@ -14,6 +14,7 @@ from qnu.domains.knowledge.compilation import service
 from qnu.domains.knowledge.compilation.models import CompilationRun
 from qnu.domains.knowledge.compilation.schemas import (
     CompilationCreated,
+    CompilationProgress,
     CompilationRequest,
     CompilationResponse,
 )
@@ -81,14 +82,56 @@ async def compilation_draft(
     collection_id: str,
     run_id: str,
     response: Response,
+    partial: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(get_actor),
     blob: BlobStore = Depends(get_blob_store),
 ) -> dict:
+    if partial:
+        sha256, payload = await service.read_partial_draft(
+            db, blob, actor, workspace_id, collection_id, run_id
+        )
+        response.headers.update({"ETag": f'"{sha256}"', "Cache-Control": "private, no-store"})
+        return json.loads(payload)
     run = await service.get_run(db, actor, workspace_id, collection_id, run_id)
     artifact, payload = await service.read_result(db, blob, run, "draft_json")
     response.headers.update({"ETag": f'"{artifact.sha256}"', "Cache-Control": "private, no-store"})
     return json.loads(payload)
+
+
+@router.get("/{run_id}/progress", response_model=CompilationProgress)
+async def compilation_progress(
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+) -> CompilationProgress:
+    return await service.progress(db, actor, workspace_id, collection_id, run_id)
+
+
+@router.get("/{run_id}/segments/{segment_index}/raw")
+async def compilation_segment_raw(
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    segment_index: int,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+    blob: BlobStore = Depends(get_blob_store),
+) -> Response:
+    content_type, sha256, payload = await service.read_segment_raw(
+        db, blob, actor, workspace_id, collection_id, run_id, segment_index
+    )
+    return Response(
+        payload,
+        media_type=content_type,
+        headers={
+            "ETag": f'"{sha256}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 async def _raw_response(

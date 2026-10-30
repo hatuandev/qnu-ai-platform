@@ -1,6 +1,10 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
+- [Phiên745 — Compiler hết output](2026-10-30_phien_745_compiler_output_truncated.md): xác nhận8192reasoning, chia phần theo output và phục hồi có giới hạn; NOT RUN sau sửa.
+
+- [Phiên744 — Hoàn thiện compiler chia phần](2026-10-30_phien_744_hoan_thien_compiler_chia_phan.md): tiếp tục OpenCode, migration/regression chưa chạy.
+
 - [Phiên 743 — Test PDF thật điểm sàn 26](2026-10-30_phien_743_test_pdf_diem_san_26.md): kịch bản5chặng và19câu, chưa chạy.
 
 - [Phiên 742 — Người dùng hoàn tất E2E 14 chặng](2026-10-30_phien_742_nguoi_dung_e2e_14_chang_pass.md): đối chiếu 14 PASS, giữ phạm vi kiểm chứng.

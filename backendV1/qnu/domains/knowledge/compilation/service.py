@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from dataclasses import dataclass
 
@@ -9,7 +10,14 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
-from qnu.domains.knowledge.compilation.artifacts import json_bytes, read, store
+from qnu.domains.knowledge.compilation import outputs as compilation_outputs
+from qnu.domains.knowledge.compilation import segments as split
+from qnu.domains.knowledge.compilation.artifacts import (
+    json_bytes,
+    read,
+    read_segment,
+    store,
+)
 from qnu.domains.knowledge.compilation.drafting import (
     PROMPT_VERSION,
     SYSTEM_PROMPT,
@@ -21,23 +29,38 @@ from qnu.domains.knowledge.compilation.models import (
     CompilationArtifact,
     CompilationInput,
     CompilationRun,
+    CompilationSegment,
     utcnow,
 )
-from qnu.domains.knowledge.compilation.schemas import CompilationRequest
+from qnu.domains.knowledge.compilation.schemas import (
+    CompilationProgress,
+    CompilationRequest,
+    CompilationSegmentProgress,
+)
 from qnu.domains.knowledge.policies.access import READ_ROLES, WRITE_ROLES, load_collection
 from qnu.domains.lifecycle.guards import require_compilation_sources
-from qnu.domains.modelops.inference.service import prepare_chat_request
+from qnu.domains.modelops.inference.service import (
+    available_input_tokens,
+    prepare_chat_limits,
+    prepare_chat_request,
+)
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.config import get_settings
-from qnu.platform.errors import Conflict, EntityNotFound
+from qnu.platform.errors import AppException, Conflict, EntityNotFound
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.job_queue import JobQueue
 
 logger = get_logger(__name__)
 TASK_NAME = "compile_run"
+SEGMENTED_CODES = {
+    "compilation_output_requires_segments",
+    "model_context_limit_exceeded",
+    "model_input_limit_exceeded",
+    "model_output_limit_exceeded",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,16 +201,62 @@ async def request_run(
     }
     payload = json_bytes(snapshot)
     schema = output_schema(documents) if req.structured_output else None
-    runtime, _, budget = await prepare_chat_request(
-        db,
-        actor,
-        workspace_id,
-        messages_for(req.topic, documents),
-        provider_id=req.provider_id,
-        task="compiler",
-        max_output_tokens=req.max_output_tokens or get_settings().COMPILER_MAX_OUTPUT_TOKENS,
-        output_schema=schema,
-    )
+    requested_output = req.max_output_tokens or get_settings().COMPILER_MAX_OUTPUT_TOKENS
+    plans: list[split.SegmentPlan] = []
+    try:
+        runtime, _, budget = await prepare_chat_request(
+            db,
+            actor,
+            workspace_id,
+            messages_for(req.topic, documents),
+            provider_id=req.provider_id,
+            task="compiler",
+            max_output_tokens=requested_output,
+            output_schema=schema,
+        )
+        owned_size = await asyncio.to_thread(
+            split.estimate_output_size, documents, split.build_units(documents)
+        )
+        if owned_size > budget.max_output_tokens * split.OUTPUT_CONTENT_RATIO:
+            raise AppException(
+                "Nguồn cần chia phần theo ngân sách đầu ra.",
+                code="compilation_output_requires_segments",
+                status_code=422,
+            )
+    except AppException as exc:
+        if exc.code not in SEGMENTED_CODES:
+            raise
+        runtime, budget = await prepare_chat_limits(
+            db,
+            actor,
+            workspace_id,
+            provider_id=req.provider_id,
+            task="compiler",
+            max_output_tokens=requested_output,
+        )
+        capacity = available_input_tokens(runtime.token_limits, budget.max_output_tokens)
+        if capacity is None:
+            raise AppException(
+                "Chưa xác định được ngân sách biên soạn.",
+                code="model_capacity_required",
+                status_code=422,
+            ) from exc
+        plans = await asyncio.to_thread(
+            split.plan_segments,
+            documents,
+            req.topic,
+            capacity=capacity,
+            structured=req.structured_output,
+            output_tokens=budget.max_output_tokens,
+        )
+        plans = await asyncio.to_thread(
+            split.finalize_plans,
+            plans,
+            documents,
+            req.topic,
+            capacity=capacity,
+            structured=req.structured_output,
+        )
     generation = 1 + int(
         await db.scalar(
             select(func.max(CompilationRun.generation)).where(
@@ -196,6 +265,41 @@ async def request_run(
         )
         or 0
     )
+    config = {
+        "workflow_version": "qnu.compiler.workflow/v2"
+        if plans
+        else "qnu.compiler.workflow/v1",
+        "auto_review": req.auto_review,
+        "review": {
+            "provider_id": req.review_provider_id or runtime.provider_id,
+            "max_output_tokens": req.review_max_output_tokens,
+            **({"structured_output": True} if req.review_structured_output else {}),
+        },
+        "provider": runtime.public_dict(),
+        "max_output_tokens": budget.max_output_tokens,
+        "prompt_version": PROMPT_VERSION,
+        "prompt_sha256": hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest(),
+        **(
+            {
+                "structured_output": True,
+                "output_schema_sha256": hashlib.sha256(json_bytes(schema)).hexdigest(),
+            }
+            if schema is not None
+            else {}
+        ),
+    }
+    if plans:
+        config["segmentation"] = {
+            "planner_version": split.PLANNER_VERSION,
+            "prompt_version": split.PROMPT_VERSION,
+            "segment_count": len(plans),
+            "input_capacity_tokens": available_input_tokens(
+                runtime.token_limits, budget.max_output_tokens
+            ),
+            "output_tokens": budget.max_output_tokens,
+            "output_content_ratio": split.OUTPUT_CONTENT_RATIO,
+            "manifest_sha256": None,
+        }
     run = CompilationRun(
         id=new_id("cmp"),
         workspace_id=workspace_id,
@@ -208,30 +312,65 @@ async def request_run(
         request_hash=request_hash,
         input_sha256=hashlib.sha256(payload).hexdigest(),
         provider_id=runtime.provider_id,
-        config={
-            "workflow_version": "qnu.compiler.workflow/v1",
-            "auto_review": req.auto_review,
-            "review": {
-                "provider_id": req.review_provider_id or runtime.provider_id,
-                "max_output_tokens": req.review_max_output_tokens,
-                **({"structured_output": True} if req.review_structured_output else {}),
-            },
-            "provider": runtime.public_dict(),
-            "max_output_tokens": budget.max_output_tokens,
-            "prompt_version": PROMPT_VERSION,
-            "prompt_sha256": hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest(),
-            **(
-                {
-                    "structured_output": True,
-                    "output_schema_sha256": hashlib.sha256(json_bytes(schema)).hexdigest(),
-                }
-                if schema is not None
-                else {}
-            ),
-        },
+        config=config,
     )
     db.add(run)
     await db.flush()
+    if plans:
+        manifest = split.manifest_for(
+            run,
+            plans,
+            documents,
+            capacity=available_input_tokens(
+                runtime.token_limits, budget.max_output_tokens
+            )
+            or 0,
+            output_tokens=budget.max_output_tokens,
+        )
+        manifest_payload = json_bytes(manifest)
+        await store(db, blob, run, "segment_manifest", manifest_payload)
+        run.config = {
+            **run.config,
+            "segmentation": {
+                **run.config["segmentation"],
+                "manifest_sha256": hashlib.sha256(manifest_payload).hexdigest(),
+            },
+        }
+        segment_config = {
+            "provider_id": runtime.provider_id,
+            "configuration_hash": runtime.configuration_hash,
+            "max_output_tokens": budget.max_output_tokens,
+            "structured_output": bool(req.structured_output),
+            "auto_review": req.auto_review,
+        }
+        for plan in plans:
+            db.add(
+                CompilationSegment(
+                    id=new_id("cseg"),
+                    run_id=run.id,
+                    segment_index=plan.index,
+                    status="pending",
+                    scope=plan.scope_dict(),
+                    input_sha256=plan.input_sha256,
+                    prompt_version=split.PROMPT_VERSION,
+                    schema_sha256=plan.schema_sha256,
+                    config=segment_config,
+                    request_hash=hashlib.sha256(
+                        json_bytes(
+                            {
+                                "run_id": run.id,
+                                "segment_index": plan.index,
+                                "input_sha256": plan.input_sha256,
+                                "schema_sha256": plan.schema_sha256,
+                                "configuration_hash": runtime.configuration_hash,
+                                "max_output_tokens": budget.max_output_tokens,
+                                "structured_output": bool(req.structured_output),
+                            }
+                        )
+                    ).hexdigest(),
+                )
+            )
+        await db.flush()
     for document in documents:
         db.add(
             CompilationInput(
@@ -300,3 +439,120 @@ async def read_result(
             "Lượt biên soạn chưa có bản nháp hoàn tất.", code="compilation_not_completed"
         )
     return await read(db, blob, run, kind)
+
+
+async def progress(
+    db: AsyncSession,
+    actor: AuthActor,
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+) -> CompilationProgress:
+    """Report only durable part states and provider-observed token counts."""
+    run = await get_run(db, actor, workspace_id, collection_id, run_id)
+    segments = list(
+        (
+            await db.scalars(
+                select(CompilationSegment)
+                .where(CompilationSegment.run_id == run.id)
+                .order_by(CompilationSegment.segment_index)
+            )
+        ).all()
+    )
+    latest = await compilation_outputs.latest(db, run.id)
+    counts: dict[str, int] = {}
+    for segment in segments:
+        counts[segment.status] = counts.get(segment.status, 0) + 1
+    segmented = bool(run.config.get("segmentation")) or bool(segments)
+    if segmented:
+        completed = counts.get("completed", 0)
+        pending = counts.get("pending", 0)
+        # A received part already has provider bytes but is still being validated.
+        running = counts.get("running", 0) + counts.get("received", 0)
+        failed = counts.get("failed", 0)
+        uncertain = counts.get("uncertain", 0)
+        cancelled = counts.get("cancelled", 0)
+        observed = [segment.usage_tokens for segment in segments if segment.usage_tokens is not None]
+    else:
+        # A single-call run is one durable request; map its status without inventing parts.
+        completed = int(run.status == "completed")
+        pending = int(run.status == "queued")
+        running = int(run.status == "running")
+        failed = int(run.status == "failed")
+        uncertain = int(run.status == "uncertain")
+        cancelled = int(run.status == "cancelled")
+        observed = []
+    usage_tokens = sum(observed) if observed else run.usage_tokens
+    return CompilationProgress(
+        run_id=run.id,
+        status=run.status,
+        workflow_version=str(run.config.get("workflow_version", "qnu.compiler.workflow/v1")),
+        segmented=segmented,
+        total=len(segments) if segmented else 1,
+        completed=completed,
+        pending=pending,
+        running=running,
+        failed=failed,
+        uncertain=uncertain,
+        cancelled=cancelled,
+        usage_tokens=usage_tokens,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+        latest_output_generation=latest.generation if latest is not None else None,
+        latest_output_partial=latest.partial if latest is not None else None,
+        segments=[
+            CompilationSegmentProgress(
+                index=segment.segment_index,
+                status=segment.status,
+                attempt_count=segment.attempt_count,
+                usage_tokens=segment.usage_tokens,
+                error_code=segment.error_code,
+                started_at=segment.started_at,
+                finished_at=segment.finished_at,
+            )
+            for segment in segments
+        ],
+    )
+
+
+async def read_partial_draft(
+    db: AsyncSession,
+    blob: BlobStore,
+    actor: AuthActor,
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+) -> tuple[str, bytes]:
+    """Latest partial JSON generation; never the final publication pointer."""
+    run = await get_run(db, actor, workspace_id, collection_id, run_id)
+    row = await compilation_outputs.latest(db, run.id, partial=True)
+    if row is None:
+        raise EntityNotFound(
+            "Chưa có bản nháp từng phần.", code="compilation_partial_not_found"
+        )
+    draft, _ = await compilation_outputs.read_output(db, blob, row)
+    return row.draft_sha256, draft
+
+
+async def read_segment_raw(
+    db: AsyncSession,
+    blob: BlobStore,
+    actor: AuthActor,
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    segment_index: int,
+) -> tuple[str, str, bytes]:
+    run = await get_run(db, actor, workspace_id, collection_id, run_id)
+    segment = await db.scalar(
+        select(CompilationSegment).where(
+            CompilationSegment.run_id == run.id,
+            CompilationSegment.segment_index == segment_index,
+        )
+    )
+    if segment is None:
+        raise EntityNotFound(
+            "Không tìm thấy phần biên soạn.", code="compilation_segment_not_found"
+        )
+    artifact, payload = await read_segment(db, blob, segment, "raw_response")
+    return artifact.content_type, artifact.sha256, payload

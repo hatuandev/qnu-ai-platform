@@ -30,6 +30,68 @@ def input_token_upper_bound(messages: list[ChatMessage]) -> int:
     return len(encoded) + 64 * len(messages) + 128
 
 
+def request_input_tokens(messages: list[ChatMessage], schema: dict | None) -> int:
+    """Same conservative bound used by ``prepare_chat_request``; never a tokenizer claim."""
+    return input_token_upper_bound(messages) + (
+        len(json.dumps(schema, ensure_ascii=False).encode()) if schema is not None else 0
+    )
+
+
+def available_input_tokens(limits, output_tokens: int) -> int | None:
+    """Input upper-bound units available after reserving declared output tokens."""
+    if limits is None:
+        return None
+    values = []
+    if limits.max_input_tokens is not None:
+        values.append(limits.max_input_tokens)
+    if limits.context_window_tokens is not None:
+        values.append(limits.context_window_tokens - output_tokens)
+    if not values:
+        return None
+    return max(0, min(values))
+
+
+async def prepare_chat_limits(
+    db: AsyncSession,
+    actor: AuthActor,
+    workspace_id: str,
+    *,
+    provider_id: str | None,
+    max_output_tokens: int | None,
+    task: Task = "chat",
+) -> tuple[ChatRuntime, RequestTokenBudget]:
+    """Resolve the pinned target and output budget without checking a message body.
+
+    Callers that must first plan parts use this to learn the declared input envelope;
+    every actual send still goes through ``prepare_chat_request``.
+    """
+    await resolve_workspace_access(db, actor, workspace_id)
+    provider_id, routing = await choose_target(db, workspace_id, task, provider_id)
+    snapshot, budget = await plan_model_request(
+        db,
+        actor,
+        workspace_id,
+        "chat",
+        input_tokens=1,
+        provider_id=provider_id,
+        requested_output_tokens=max_output_tokens,
+    )
+    runtime = await resolve_chat_runtime(db, workspace_id, provider_id)
+    runtime = replace(runtime, routing_trace=routing)
+    material = {
+        "provider_id": runtime.provider_id,
+        "endpoint": runtime.base_url.rstrip("/"),
+        "model_name": runtime.model_name,
+        "limits": runtime.token_limits.model_dump() if runtime.token_limits else None,
+    }
+    current = hashlib.sha256(
+        json.dumps(material, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    if current != snapshot.configuration_hash:
+        raise Conflict("Model thay đổi trong lúc lập ngân sách.", code="chat_provider_changed")
+    return runtime, budget
+
+
 async def prepare_chat_request(
     db: AsyncSession,
     actor: AuthActor,
@@ -40,6 +102,7 @@ async def prepare_chat_request(
     max_output_tokens: int | None,
     output_schema: dict | None = None,
     task: Task = "chat",
+    reasoning=None,
 ) -> tuple[ChatRuntime, ChatRequest, RequestTokenBudget]:
     await resolve_workspace_access(db, actor, workspace_id)
     provider_id, routing = await choose_target(db, workspace_id, task, provider_id)
@@ -48,12 +111,7 @@ async def prepare_chat_request(
         actor,
         workspace_id,
         "chat",
-        input_tokens=input_token_upper_bound(messages)
-        + (
-            len(json.dumps(output_schema, ensure_ascii=False).encode())
-            if output_schema is not None
-            else 0
-        ),
+        input_tokens=request_input_tokens(messages, output_schema),
         provider_id=provider_id,
         requested_output_tokens=max_output_tokens,
     )
@@ -80,6 +138,7 @@ async def prepare_chat_request(
             api_key=runtime.api_key,
             output_schema=output_schema,
             execution=runtime.execution_scope,
+            reasoning=reasoning,
         ),
         budget,
     )

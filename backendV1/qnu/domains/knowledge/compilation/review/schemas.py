@@ -70,3 +70,32 @@ class ReviewResponse(BaseModel):
     usage_id: str | None
     usage_tokens: int | None
     trace: dict
+
+
+class ReviewSegmentProgress(BaseModel):
+    index: int
+    status: str
+    attempt_count: int
+    usage_tokens: int | None
+    error_code: str | None
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
+class ReviewProgress(BaseModel):
+    review_id: str
+    status: str
+    verdict: str | None
+    segmented: bool
+    total: int
+    completed: int
+    pending: int
+    running: int
+    failed: int
+    uncertain: int
+    cancelled: int
+    usage_tokens: int | None
+    created_at: datetime
+    request_started_at: datetime | None
+    finished_at: datetime | None
+    segments: list[ReviewSegmentProgress]

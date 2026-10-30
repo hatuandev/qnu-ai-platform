@@ -17,6 +17,12 @@ from qnu.domains.modelops.capacity.schemas import CapacityBasis
 from qnu.domains.modelops.capacity.service import invalidate_capacity, read_capacity, set_capacity
 from qnu.domains.modelops.embedding.configuration import read_dimension, set_dimension
 from qnu.domains.modelops.models import Provider
+from qnu.domains.modelops.reasoning import (
+    EXTRA_CONFIG_KEY,
+    ReasoningPolicy,
+    parse_policy,
+    trace_for,
+)
 from qnu.domains.modelops.schemas import ProviderCreateRequest, ProviderUpdateRequest
 from qnu.domains.workspaces.access import actor_ref
 from qnu.platform.errors import Conflict, EntityNotFound
@@ -166,6 +172,51 @@ class ProviderService:
         await db.refresh(provider)
         return provider
 
+    async def read_reasoning(self, db: AsyncSession, provider_id: str) -> Provider:
+        provider = await self.get(db, provider_id)
+        return provider
+
+    async def set_reasoning(
+        self,
+        db: AsyncSession,
+        provider_id: str,
+        policy: ReasoningPolicy,
+        actor: AuthActor,
+    ) -> Provider:
+        """Persist a declared reasoning contract; never touches model/endpoint/keys."""
+        require_model_admin(actor)
+        provider = (
+            await db.execute(
+                select(Provider)
+                .where(Provider.id == provider_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
+        if provider is None:
+            raise EntityNotFound("Không tìm thấy provider.", code="provider_not_found")
+        if provider.is_connection:
+            raise Conflict(
+                "Khai báo reasoning trên model, không trên nhà cung cấp.",
+                code="model_required",
+            )
+        extra = dict(provider.extra_config or {})
+        if policy.mode == "server_default" and not policy.tasks:
+            extra.pop(EXTRA_CONFIG_KEY, None)
+        else:
+            extra[EXTRA_CONFIG_KEY] = policy.model_dump(mode="json")
+        provider.extra_config = extra
+        record_event(
+            db,
+            actor,
+            "provider.reasoning_updated",
+            provider.id,
+            ["mode", "parameter", "tasks", "verified"],
+        )
+        await db.commit()
+        await db.refresh(provider)
+        return provider
+
     async def require_capability(
         self, db: AsyncSession, provider_id: str, capability: str
     ) -> Provider:
@@ -193,6 +244,7 @@ def provider_payload(provider: Provider) -> dict[str, Any]:
     """Serialize a provider without leaking configuration secrets."""
     capacity = read_capacity(provider)
     dimension, dimension_status = read_dimension(provider)
+    policy = parse_policy((provider.extra_config or {}).get(EXTRA_CONFIG_KEY))
     return {
         "is_connection": provider.is_connection,
         "parent_id": provider.parent_id,
@@ -210,8 +262,23 @@ def provider_payload(provider: Provider) -> dict[str, Any]:
         "capacity_basis": capacity.basis,
         "embedding_dimension": dimension,
         "embedding_dimension_status": dimension_status,
+        "reasoning": policy.public_dict() if policy is not None else None,
+        "reasoning_status": policy.status if policy is not None else "not_configured",
         "created_at": provider.created_at,
         "updated_at": provider.updated_at,
+    }
+
+
+def reasoning_payload(provider: Provider) -> dict[str, Any]:
+    """Current contract plus the effective decision per compiler task."""
+    policy = parse_policy((provider.extra_config or {}).get(EXTRA_CONFIG_KEY))
+    return {
+        "provider_id": provider.id,
+        "status": policy.status if policy is not None else "not_configured",
+        "policy": policy.model_dump(mode="json") if policy is not None else None,
+        "effective": {
+            task: trace_for(policy, task) for task in ("compiler", "compiler_review")
+        },
     }
 
 

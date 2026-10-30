@@ -9,6 +9,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from qnu.domains.modelops.capacity.schemas import ModelTokenLimits
+from qnu.domains.modelops.reasoning import ReasoningPolicy
 
 ProviderType = Literal["openai_compatible", "gemini", "local", "nemotron", "paddleocr"]
 Capability = Literal["chat", "embedding", "rerank", "ocr"]
@@ -86,8 +87,26 @@ class ProviderResponse(BaseModel):
     capacity_basis: Literal["operator_configured", "server_reported"] | None = None
     embedding_dimension: int | None = None
     embedding_dimension_status: Literal["unknown", "configured", "stale"] = "unknown"
+    reasoning: dict[str, Any] | None = None
+    reasoning_status: Literal["not_configured", "server_default", "unverified", "active"] = (
+        "not_configured"
+    )
     created_at: datetime
     updated_at: datetime
+
+
+class ReasoningPolicyUpdate(BaseModel):
+    """Administrator declaration; ``verified`` means a probe confirmed the parameter."""
+
+    model_config = ConfigDict(extra="forbid")
+    policy: ReasoningPolicy
+
+
+class ReasoningPolicyResponse(BaseModel):
+    provider_id: str
+    status: Literal["not_configured", "server_default", "unverified", "active"]
+    policy: ReasoningPolicy | None = None
+    effective: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
 class KeyCreateRequest(BaseModel):

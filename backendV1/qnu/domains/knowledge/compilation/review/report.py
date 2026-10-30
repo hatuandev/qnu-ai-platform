@@ -52,8 +52,22 @@ covered phải chỉ vị trí bản nháp tương ứng. supported/contradicted
 """
 
 
-def messages_for(payload: dict, *, structured: bool = False) -> list[ChatMessage]:
+def messages_for(
+    payload: dict,
+    *,
+    structured: bool = False,
+    segment: tuple[int, int] | None = None,
+) -> list[ChatMessage]:
     instruction = SYSTEM
+    if segment is not None:
+        index, total = segment
+        instruction += (
+            f"\nĐây là phần {index}/{total} của một review dài. Chỉ nhận xét ĐÚNG MỘT LẦN "
+            "các ID trong source_units và draft_units của phần này. "
+            "context_source_units và context_draft_units chỉ là ngữ cảnh liên phần để "
+            "đối chiếu, có thể được tham chiếu nhưng không được nhận xét hay xếp hạng. "
+            "Không suy nội dung của phần khác và không bỏ qua đơn vị nào thuộc phần này."
+        )
     if structured:
         instruction += """\nĐịnh dạng của lượt này là keyed/v1 theo JSON Schema gửi kèm, thay hai mảng
 ở ví dụ trên bằng hai object. source_assessments có khóa là từng source ID;
@@ -65,6 +79,9 @@ không thêm khóa hay nhận xét tổng kết ở ngoài. Còn nghi ngờ thì
     # Full documents/draft stay in the immutable input snapshot. Units already
     # contain every text/cell and empty block, identity and structural location.
     context = {key: payload[key] for key in ("topic", "source_units", "draft_units")}
+    for key in ("context_source_units", "context_draft_units"):
+        if payload.get(key):
+            context[key] = payload[key]
     context["documents"] = [
         {key: value for key, value in document.items() if key not in {"pages", "evidence"}}
         for document in payload["documents"]
@@ -77,6 +94,8 @@ def output_schema(payload: dict) -> dict:
     schema = ReviewContent.model_json_schema()
     source_ids = [u["id"] for u in payload["source_units"]]
     draft_ids = [u["id"] for u in payload["draft_units"]]
+    allowed_source_ids = payload.get("allowed_source_ids", source_ids)
+    allowed_draft_ids = payload.get("allowed_draft_ids", draft_ids)
     for field, ids, definition in (
         ("source_assessments", source_ids, "SourceAssessment"),
         ("draft_assessments", draft_ids, "DraftAssessment"),
@@ -88,8 +107,8 @@ def output_schema(payload: dict) -> dict:
             "additionalProperties": False,
         }
     for definition, id_field, ids, references, ref_ids in (
-        ("SourceAssessment", "source_id", source_ids, "draft_ids", draft_ids),
-        ("DraftAssessment", "draft_id", draft_ids, "source_ids", source_ids),
+        ("SourceAssessment", "source_id", source_ids, "draft_ids", allowed_draft_ids),
+        ("DraftAssessment", "draft_id", draft_ids, "source_ids", allowed_source_ids),
     ):
         properties = schema["$defs"][definition]["properties"]
         del properties[id_field]
@@ -141,19 +160,21 @@ def validate_content(content: str, payload: dict) -> ReviewContent:
         value = ReviewContent.model_validate_json(content)
         source_ids = {u["id"] for u in payload["source_units"]}
         draft_ids = {u["id"] for u in payload["draft_units"]}
+        allowed_source_ids = set(payload.get("allowed_source_ids", source_ids))
+        allowed_draft_ids = set(payload.get("allowed_draft_ids", draft_ids))
         if Counter(a.source_id for a in value.source_assessments) != Counter(source_ids):
             raise ValueError("source coverage")
         if Counter(a.draft_id for a in value.draft_assessments) != Counter(draft_ids):
             raise ValueError("draft coverage")
         for assessment in value.source_assessments:
-            if not set(assessment.draft_ids) <= draft_ids or len(set(assessment.draft_ids)) != len(
-                assessment.draft_ids
-            ):
+            if not set(assessment.draft_ids) <= allowed_draft_ids or len(
+                set(assessment.draft_ids)
+            ) != len(assessment.draft_ids):
                 raise ValueError("draft refs")
             if assessment.status == "covered" and not assessment.draft_ids:
                 raise ValueError("missing draft refs")
         for assessment in value.draft_assessments:
-            if not set(assessment.source_ids) <= source_ids or len(
+            if not set(assessment.source_ids) <= allowed_source_ids or len(
                 set(assessment.source_ids)
             ) != len(assessment.source_ids):
                 raise ValueError("source refs")
@@ -168,8 +189,10 @@ def validate_content(content: str, payload: dict) -> ReviewContent:
         ) from exc
 
 
-def build_report(content: str, payload: dict, review_id: str, bundle_sha: str) -> dict:
-    assessed = validate_content(content, payload)
+def report_from_assessments(
+    assessed: ReviewContent, payload: dict, review_id: str, bundle_sha: str
+) -> dict:
+    """Build the durable report from already validated part assessments."""
     sources = {u["id"]: u for u in payload["source_units"]}
     drafts = {u["id"]: u for u in payload["draft_units"]}
     source_checks = [
@@ -236,6 +259,10 @@ def build_report(content: str, payload: dict, review_id: str, bundle_sha: str) -
             "Đây là báo cáo; không sửa, phê duyệt hoặc xuất bản bản nháp.",
         ],
     }
+
+
+def build_report(content: str, payload: dict, review_id: str, bundle_sha: str) -> dict:
+    return report_from_assessments(validate_content(content, payload), payload, review_id, bundle_sha)
 
 
 LABELS = {

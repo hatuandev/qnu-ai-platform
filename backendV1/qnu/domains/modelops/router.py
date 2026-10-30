@@ -12,7 +12,11 @@ from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.diagnostics.summary import provider_summaries
 from qnu.domains.modelops.keys.service import key_service
 from qnu.domains.modelops.models import ModelDefaults, Provider, ProviderKey
-from qnu.domains.modelops.providers.service import provider_payload, provider_service
+from qnu.domains.modelops.providers.service import (
+    provider_payload,
+    provider_service,
+    reasoning_payload,
+)
 from qnu.domains.modelops.schemas import (
     AllowedProviderItem,
     AllowlistResponse,
@@ -30,6 +34,8 @@ from qnu.domains.modelops.schemas import (
     ProviderResponse,
     ProviderSummaryItem,
     ProviderUpdateRequest,
+    ReasoningPolicyResponse,
+    ReasoningPolicyUpdate,
     WorkspaceDefaultsRequest,
 )
 from qnu.domains.modelops.usage.service import usage_service
@@ -188,6 +194,35 @@ async def update_provider(
     provider = await provider_service.get(db, provider_id)
     updated = await provider_service.update(db, provider, body, actor)
     return _provider_out(updated)
+
+
+@router.get(
+    "/providers/{provider_id}/reasoning",
+    response_model=ReasoningPolicyResponse,
+    summary="Chính sách reasoning đã khai báo cho model",
+)
+async def get_reasoning(
+    provider_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.models.manage")),
+) -> ReasoningPolicyResponse:
+    provider = await provider_service.read_reasoning(db, provider_id)
+    return ReasoningPolicyResponse(**reasoning_payload(provider))
+
+
+@router.put(
+    "/providers/{provider_id}/reasoning",
+    response_model=ReasoningPolicyResponse,
+    summary="Khai báo reasoning cho tác vụ compiler/review",
+)
+async def set_reasoning(
+    provider_id: str,
+    body: ReasoningPolicyUpdate,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.models.manage")),
+) -> ReasoningPolicyResponse:
+    provider = await provider_service.set_reasoning(db, provider_id, body.policy, actor)
+    return ReasoningPolicyResponse(**reasoning_payload(provider))
 
 
 @router.post(

@@ -85,3 +85,35 @@ class CompilationCreated(BaseModel):
     run: CompilationResponse
     created: bool
     dispatched: bool
+
+
+class CompilationSegmentProgress(BaseModel):
+    """Observed state of one durable part; never an estimate of remaining work."""
+
+    index: int
+    status: str
+    attempt_count: int
+    usage_tokens: int | None
+    error_code: str | None
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
+class CompilationProgress(BaseModel):
+    run_id: str
+    status: str
+    workflow_version: str
+    segmented: bool
+    total: int
+    completed: int
+    pending: int
+    running: int
+    failed: int
+    uncertain: int
+    cancelled: int
+    usage_tokens: int | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    latest_output_generation: int | None
+    latest_output_partial: bool | None
+    segments: list[CompilationSegmentProgress]

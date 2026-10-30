@@ -23,6 +23,34 @@ def completions_url(base_url: str) -> str:
     return cleaned + ("/chat/completions" if cleaned.endswith(("/v1", "/openai")) else "/v1/chat/completions")
 
 
+def build_payload(messages: list[ChatMessage], request: ChatRequest) -> dict:
+    """Request body from the pinned contract; reasoning only when explicitly declared.
+
+    The adapter never adds a provider-specific reasoning parameter on its own: a
+    ``server_default`` target keeps exactly the previous body.
+    """
+    payload = {
+        "model": request.model,
+        "messages": [{"role": m.role, "content": m.content} for m in messages],
+        "max_tokens": request.max_output_tokens,
+        "stream": False,
+    }
+    if request.output_schema is not None:
+        payload["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "qnu_output",
+                "schema": request.output_schema,
+                "strict": True,
+            },
+        }
+    elif request.json_mode:
+        payload["response_format"] = {"type": "json_object"}
+    if request.reasoning is not None:
+        request.reasoning.apply(payload)
+    return payload
+
+
 def _error(code: str, detail: str, status: int = 502) -> AppException:
     return AppException(detail, code=code, status_code=status, title="Provider chat lỗi")
 
@@ -81,23 +109,7 @@ class OpenAICompatibleChatModel:
             raise _error("chat_credentials_missing", "Chưa có credential chat.", 503)
         if not messages or any(m.role not in {"system", "user", "assistant"} for m in messages):
             raise _error("chat_messages_invalid", "Messages không hợp lệ.", 422)
-        payload = {
-            "model": request.model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
-            "max_tokens": request.max_output_tokens,
-            "stream": False,
-        }
-        if request.output_schema is not None:
-            payload["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "qnu_output",
-                    "schema": request.output_schema,
-                    "strict": True,
-                },
-            }
-        elif request.json_mode:
-            payload["response_format"] = {"type": "json_object"}
+        payload = build_payload(messages, request)
         started = time.monotonic()
         try:
             async with httpx.AsyncClient(
@@ -136,5 +148,6 @@ class OpenAICompatibleChatModel:
             status=response.status_code,
             duration_ms=int((time.monotonic() - started) * 1000),
             total_tokens=result.total_tokens,
+            reasoning_mode=request.reasoning.mode if request.reasoning is not None else "server_default",
         )
         return result

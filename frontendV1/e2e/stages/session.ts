@@ -14,6 +14,7 @@ export interface Source {
 }
 export interface Publication {
   run: string;
+  compilationRecoveryOf?: string;
   review?: string;
   document?: string;
   version?: string;
@@ -42,6 +43,7 @@ export interface Checkpoint {
     collection?: string;
     source?: Source;
     publication?: Publication;
+    compilationHistory?: Publication[];
     assistant?: string;
     queries?: Record<string, { conversation: string; turn?: string }>;
   };
@@ -208,6 +210,42 @@ export class Api {
       )
       .toBe("completed");
     if (!last) throw new Error("Không có trạng thái job.");
+    return last;
+  }
+  /**
+   * Poll a durable progress endpoint and grant one model call per observed part.
+   * The part count is read before polling; it is never inferred from elapsed time.
+   */
+  async waitProgress<
+    T extends {
+      status: string;
+      total: number;
+      segments?: { status: string; error_code?: string | null }[];
+    },
+  >(suffix: string, perPartMs: number, minMs = 240_000): Promise<T> {
+    let last = await this.get<T>(suffix);
+    const timeoutMs = Math.max(
+      minMs,
+      perPartMs * Math.max(1, last.total) + 60_000,
+    );
+    await expect
+      .poll(
+        async () => {
+          last = await this.get<T>(suffix);
+          if (["failed", "cancelled", "rejected", "uncertain"].includes(last.status)) {
+            const part = last.segments?.find(
+              (segment) => segment.status === last.status || segment.error_code,
+            );
+            throw new Error(
+              `Job: ${last.status}; part=${part?.status || "unknown"}; ` +
+                `code=${part?.error_code || "unknown"}; ${JSON.stringify(last.segments || [])}`,
+            );
+          }
+          return last.status;
+        },
+        { timeout: timeoutMs, intervals: [300, 700, 1500] },
+      )
+      .toBe("completed");
     return last;
   }
   async upload(state: Checkpoint, file: string, idempotencyKey: string, sourcePath?: string) {

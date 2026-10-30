@@ -7,6 +7,10 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-10-30 — Context745: sửa compiler hết output.** Raw phần1:8192completion toàn reasoning, content rỗng. Planner/prompt v2 theo input+output, owned/context rõ, E2E JSON Schema và recovery một lượt theo ModelOps ceiling. Regression đã viết; test/build/lint/live NOT RUN, giữ default8192. [Nhật ký745](../nhat_ky/2026-10-30_phien_745_compiler_output_truncated.md).
+
+- **2026-10-30 — Context744: tiếp tục compiler chia phần từ OpenCode.** Giữ khung planner/segments/review/output/migration0008; sửa review chưa gọi model, ownership/provider fence, context/coverage và output blob an toàn. Thêm regression/hướng dẫn; test/build/lint/migration/live NOT RUN theo yêu cầu. [Nhật ký744](../nhat_ky/2026-10-30_phien_744_hoan_thien_compiler_chia_phan.md).
+
 - **2026-10-30 — Context743: viết test PDF điểm sàn 26.** 5chặng admissions riêng từ upload đến chat, 19câu (16positive/3negative) theo PDF8trang đã chốt hash; report/citation/scope, giữ review gate. Nhãn draft cần người duyệt; test/build/lint/live NOT RUN theo yêu cầu. [Nhật ký743](../nhat_ky/2026-10-30_phien_743_test_pdf_diem_san_26.md).
 
 - **2026-10-30 — Context742: người dùng chạy E2E live 14/14 PASS.** Phiên816537dc7b48 đối chiếu checkpoint/14report: expected14, unexpected/skipped/flaky0; compilation5.3m, publication/chat/permissions/lifecycle đạt. consumed=true, lượt mới cần phiên mới. Không tự chạy test/model; gate rộng lịch sử737 giữ FAIL. [Nhật ký742](../nhat_ky/2026-10-30_phien_742_nguoi_dung_e2e_14_chang_pass.md).

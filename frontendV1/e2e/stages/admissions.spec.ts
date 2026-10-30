@@ -23,7 +23,8 @@ test(`PDF thật điểm sàn 2026: ${stage}`, async ({ page }) => {
     throw new Error("BLOCKED: cần phiên live, đủ kiểm tra model và navigation.");
   checkSource();
   const timeout = await modelTimeout(api, state);
-  test.setTimeout(Math.max(900_000, timeout * (stage === "admissions-chat" ? benchmark.cases.length + 2 : benchmark.source.pages + 3)));
+  const perPart = stage === "admissions-chat" ? benchmark.cases.length + 2 : benchmark.source.pages * 6 + 6;
+  test.setTimeout(Math.max(900_000, timeout * perPart));
   await steps[stage as keyof typeof steps](api, state);
   if (stage === "admissions-upload") {
     await page.goto(`/workspaces/${state.workspace}/knowledge/${state.admissions?.collection}`);

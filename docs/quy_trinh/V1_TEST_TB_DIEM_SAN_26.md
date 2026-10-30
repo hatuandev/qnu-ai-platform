@@ -1,5 +1,19 @@
 # Kiểm thử PDF thật — TB điểm sàn 26
 
+Compiler/review đã có nhánh chia phần và checkpoint: xem [triển khai, migration và cách chạy tiếp](V1_COMPILER_TAI_LIEU_LON.md). Restart serve để nạp mã và migration trước khi chạy lại compilation; chưa có kết quả nghiệm thu cho nhánh này.
+
+## Chạy tiếp sau lỗi output ở compilation
+
+Lượt lỗi đã dùng hết8192token cho suy luận, chưa có JSON. Đã sửa planner chia theo ngân sách đầu ra, phân định owned/context và bật JSON Schema. Lần chạy lại chặng được phép tạo một recovery riêng theo giới hạn output ModelOps, giữ lịch sử lượt lỗi; mặc định compiler8192 không đổi. Không tự chạy model lại khi đang uncertain.
+
+Tại cửa sổ serve nhấn Ctrl+C rồi chạy ` .\test-v1-e2e.ps1 serve ` để nạp mã mới. Ở cửa sổ thứ hai:
+
+```powershell
+.\test-v1-e2e.ps1 run admissions-compilation --headed
+```
+
+Không cleanup/init, upload hoặc OCR lại. Chỉ sau PASS mới chạy admissions-publication và admissions-chat. Nếu recovery vẫn lỗi thì giữ trạng thái để xem nguyên nhân, không thử lặp đến khi xanh. Các thay đổi này chưa chạy nghiệm thu.
+
 ## Phạm vi
 
 Upload nguyên file `docs/tai_lieu/tuyen_sinh/TB điểm sàn 26.pdf` (8 trang), bóc tách, biên soạn, review độc lập, phê duyệt/xuất bản/lập chỉ mục, rồi hỏi 19 câu. Có kho và trợ lý riêng, dùng bốn model đã cấu hình qua ModelOps; không trộn dữ liệu giả của bộ test 14 chặng vào kho này.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from qnu.platform.errors import AppException
 from qnu.ports.provider_execution import ProviderExecution
@@ -13,6 +13,18 @@ from qnu.ports.provider_execution import ProviderExecution
 class ChatMessage:
     role: str
     content: str
+
+
+@runtime_checkable
+class ReasoningParameter(Protocol):
+    """One declared reasoning parameter; the adapter applies it verbatim."""
+
+    mode: str
+    parameter: str
+
+    def apply(self, payload: dict[str, Any]) -> None: ...
+
+    def public_dict(self) -> dict[str, Any]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +37,8 @@ class ChatRequest:
     json_mode: bool = True
     output_schema: dict | None = field(default=None, repr=False)
     execution: ProviderExecution | None = field(default=None, repr=False)
+    # Declared reasoning parameter only; None keeps the provider/server default.
+    reasoning: ReasoningParameter | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)

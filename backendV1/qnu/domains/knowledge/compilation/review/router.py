@@ -10,7 +10,11 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.review import service
 from qnu.domains.knowledge.compilation.review.execution import execute
 from qnu.domains.knowledge.compilation.review.models import CompilationReview
-from qnu.domains.knowledge.compilation.review.schemas import ReviewRequest, ReviewResponse
+from qnu.domains.knowledge.compilation.review.schemas import (
+    ReviewProgress,
+    ReviewRequest,
+    ReviewResponse,
+)
 from qnu.platform.errors import Conflict
 from qnu.ports.blob_store import BlobStore
 
@@ -78,6 +82,52 @@ async def detail(
     workspace_id: str, collection_id: str, run_id: str, review_id: str, db: DB, actor: Actor
 ) -> CompilationReview:
     return await service.get_review(db, actor, workspace_id, collection_id, run_id, review_id)
+
+
+@router.get("/{review_id}/progress", response_model=ReviewProgress)
+async def progress(
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    review_id: str,
+    db: DB,
+    actor: Actor,
+) -> ReviewProgress:
+    return await service.progress(
+        db, actor, workspace_id, collection_id, run_id, review_id
+    )
+
+
+@router.get("/{review_id}/segments/{segment_index}/raw")
+async def segment_raw(
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    review_id: str,
+    segment_index: int,
+    db: DB,
+    actor: Actor,
+    blob: Blob,
+) -> Response:
+    content_type, sha256, payload = await service.read_segment_raw(
+        db,
+        blob,
+        actor,
+        workspace_id,
+        collection_id,
+        run_id,
+        review_id,
+        segment_index,
+    )
+    return Response(
+        payload,
+        media_type=content_type,
+        headers={
+            "ETag": f'"{sha256}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 async def output(

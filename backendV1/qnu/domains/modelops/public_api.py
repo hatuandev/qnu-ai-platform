@@ -21,6 +21,13 @@ from qnu.domains.modelops.capacity.service import (
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.keys.scope import key_scope
 from qnu.domains.modelops.models import Provider, ProviderKey
+from qnu.domains.modelops.reasoning import (
+    EXTRA_CONFIG_KEY,
+    ReasoningPolicy,
+    parse_policy,
+    resolve_directive,
+    trace_for,
+)
 from qnu.domains.modelops.registry import transport_for
 from qnu.platform.crypto import decrypt
 from qnu.platform.errors import AppException, DependencyUnavailable
@@ -44,6 +51,7 @@ class OcrRuntime:
     capacity_status: str = "unknown"
     workspace_id: str | None = None
     routing_trace: tuple[dict, ...] = ()
+    reasoning_policy: ReasoningPolicy | None = field(default=None, repr=False)
     session_factory: Any = field(default=None, repr=False, compare=False)
 
     @property
@@ -78,6 +86,14 @@ class OcrRuntime:
             "timeout_seconds": self.timeout_seconds,
             "configuration_hash": self.configuration_hash,
         }
+
+    def reasoning_directive(self, task: str):
+        """Declared parameter for one task, or None to keep the server default."""
+        return resolve_directive(self.reasoning_policy, task)
+
+    def reasoning_trace(self, task: str) -> dict[str, Any]:
+        """Explain what was sent: applied parameter or the reason it was not."""
+        return trace_for(self.reasoning_policy, task)
 
 
 async def visible_providers(
@@ -221,8 +237,10 @@ async def resolve_chat_runtime(
         base_url=provider.base_url,
         timeout_seconds=provider.timeout_seconds,
         api_key=secret,
+        extra=dict(provider.extra_config or {}),
         token_limits=capacity.token_limits,
         capacity_status=capacity.status,
+        reasoning_policy=parse_policy((provider.extra_config or {}).get(EXTRA_CONFIG_KEY)),
     )
 
 

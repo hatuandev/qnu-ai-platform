@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -90,6 +91,9 @@ class CompilationRun(Base):
         String(64), ForeignKey("model_usage_records.id", ondelete="RESTRICT")
     )
     usage_tokens: Mapped[int | None] = mapped_column(Integer)
+    # Pointer to the verified final JSON/Markdown pair; intentionally not an FK so
+    # old runs without outputs keep loading and a partial row can never be published.
+    output_id: Mapped[str | None] = mapped_column(String(64))
     error_code: Mapped[str | None] = mapped_column(String(64))
 
 
@@ -145,7 +149,7 @@ class CompilationArtifact(Base):
     __table_args__ = (
         UniqueConstraint("run_id", "kind", name="uq_compilation_artifact_kind"),
         CheckConstraint(
-            "kind IN ('input_snapshot','raw_response','draft_json','markdown')",
+            "kind IN ('input_snapshot','raw_response','draft_json','markdown','segment_manifest')",
             name="ck_compilation_artifact_kind",
         ),
         CheckConstraint(
@@ -156,6 +160,114 @@ class CompilationArtifact(Base):
     run_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("kb_compilation_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    blob_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+
+
+class CompilationOutput(Base):
+    """One verified JSON/Markdown generation; partial generations are never publishable."""
+
+    __tablename__ = "kb_compilation_outputs"
+    __table_args__ = (
+        UniqueConstraint("run_id", "generation", name="uq_compilation_output_generation"),
+        CheckConstraint("generation >= 1", name="ck_compilation_output_generation"),
+        CheckConstraint(
+            "char_length(draft_sha256) = 64 AND char_length(markdown_sha256) = 64",
+            name="ck_compilation_output_hash",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("kb_compilation_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    generation: Mapped[int] = mapped_column(Integer, nullable=False)
+    partial: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    draft_blob_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    draft_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    markdown_blob_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    markdown_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    coverage: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+
+
+class CompilationSegment(Base):
+    """Durable checkpoint for one owned source scope of a compilation run."""
+
+    __tablename__ = "kb_compilation_segments"
+    __table_args__ = (
+        UniqueConstraint("run_id", "segment_index", name="uq_compilation_segment_index"),
+        CheckConstraint(
+            "status IN ('pending','running','received','completed','failed','uncertain')",
+            name="ck_compilation_segment_status",
+        ),
+        CheckConstraint(
+            "segment_index >= 1 AND attempt_count >= 0",
+            name="ck_compilation_segment_counters",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("kb_compilation_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    segment_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="pending", index=True
+    )
+    scope: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    input_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(120), nullable=False)
+    schema_sha256: Mapped[str | None] = mapped_column(String(64))
+    config: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    worker_id: Mapped[str | None] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    request_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    usage_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("model_usage_records.id", ondelete="RESTRICT")
+    )
+    usage_tokens: Mapped[int | None] = mapped_column(Integer)
+    error_code: Mapped[str | None] = mapped_column(String(64))
+
+
+class CompilationSegmentArtifact(Base):
+    __tablename__ = "kb_compilation_segment_artifacts"
+    __table_args__ = (
+        UniqueConstraint("segment_id", "kind", name="uq_compilation_segment_artifact"),
+        CheckConstraint(
+            "kind IN ('raw_response','draft_json')",
+            name="ck_compilation_segment_artifact_kind",
+        ),
+        CheckConstraint(
+            "size_bytes >= 0 AND char_length(sha256) = 64",
+            name="ck_compilation_segment_artifact_integrity",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    segment_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("kb_compilation_segments.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
