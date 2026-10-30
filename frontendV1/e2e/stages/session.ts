@@ -22,7 +22,15 @@ export interface Publication {
 export interface Checkpoint {
   runId: string;
   mode: "workflow" | "live";
-  results: Record<string, { status: string }>;
+  results: Record<string, { status: string; report?: string }>;
+  runtimeDefaults?: Record<"chat" | "embedding" | "rerank" | "ocr", string>;
+  providerSetup?: {
+    connectionId: string;
+    keyId: string;
+    createdConnection?: boolean;
+    createdKey?: boolean;
+    modelsRegistered?: boolean;
+  };
   workspace?: string;
   collection?: string;
   folder?: string;
@@ -39,6 +47,7 @@ export interface Checkpoint {
 }
 export interface Run {
   id: string;
+  provider_id?: string | null;
   status: string;
   error_code?: string;
   pages_total?: number;
@@ -126,6 +135,7 @@ export class Api {
     body?: unknown,
     key?: string,
     token = this.token,
+    timeoutMs = 180_000,
   ) {
     if (!suffix.startsWith("/") || suffix.includes("://"))
       throw new Error("API path ngoài phiên.");
@@ -136,7 +146,7 @@ export class Api {
         ...(key ? { "Idempotency-Key": key } : {}),
       },
       data: body,
-      timeout: 180_000,
+      timeout: timeoutMs,
     });
   }
   async json<T>(
@@ -144,8 +154,16 @@ export class Api {
     suffix: string,
     body?: unknown,
     key?: string,
+    timeoutMs = 180_000,
   ): Promise<T> {
-    const response = await this.raw(method, suffix, body, key);
+    const response = await this.raw(
+      method,
+      suffix,
+      body,
+      key,
+      undefined,
+      timeoutMs,
+    );
     await requireOk(response, method, suffix);
     if (response.status() === 204) return undefined as T;
     return (await response.json()) as T;
@@ -153,8 +171,13 @@ export class Api {
   get<T>(suffix: string): Promise<T> {
     return this.json<T>("GET", suffix);
   }
-  post<T>(suffix: string, body: unknown, key?: string): Promise<T> {
-    return this.json<T>("POST", suffix, body, key);
+  post<T>(
+    suffix: string,
+    body: unknown,
+    key?: string,
+    timeoutMs = 180_000,
+  ): Promise<T> {
+    return this.json<T>("POST", suffix, body, key, timeoutMs);
   }
   async wait<T extends Run>(suffix: string): Promise<T> {
     let last: T | undefined;
@@ -162,7 +185,11 @@ export class Api {
       .poll(
         async () => {
           last = await this.get<T>(suffix);
-          if (["failed", "cancelled", "rejected"].includes(last.status)) {
+          if (
+            ["failed", "cancelled", "rejected", "uncertain"].includes(
+              last.status,
+            )
+          ) {
             throw new Error(
               `Job ${last.id}: ${last.status}; code=${last.error_code || "unknown"}`,
             );
@@ -215,7 +242,11 @@ export class Api {
   }
 }
 
-export async function ensureSessionQuota(api: Api, state: Checkpoint) {
+export async function ensureSessionQuota(
+  api: Api,
+  state: Checkpoint,
+  liveTestAllowance?: number,
+) {
   const owner = await api.get<{ code: string }>(workspace(state));
   if (owner.code !== `e2e-${state.runId}`) {
     throw new Error(
@@ -232,14 +263,14 @@ export async function ensureSessionQuota(api: Api, state: Checkpoint) {
   };
   let quota = await api.get<Quota>(base);
   if (!quota.configured) {
-    if (state.mode !== "workflow") {
+    if (state.mode !== "workflow" && liveTestAllowance === undefined) {
       throw new Error(
         "BLOCKED: cần cấu hình quota tháng hiện tại trong workspace E2E trước khi gọi model thật.",
       );
     }
     // A finite fixture allowance; never disable accounting or change an existing limit.
     quota = await api.json<Quota>("PUT", base, {
-      monthly_token_limit: 1_000_000,
+      monthly_token_limit: liveTestAllowance ?? 1_000_000,
       is_blocked: false,
     });
   }

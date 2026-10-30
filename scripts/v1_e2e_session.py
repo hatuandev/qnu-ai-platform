@@ -35,6 +35,14 @@ STAGES = (
     "permissions",
     "lifecycle",
 )
+MODEL_STAGES = (
+    "provider-setup",
+    "model-discovery",
+    "model-chat",
+    "model-embedding",
+    "model-rerank",
+    "model-ocr",
+)
 
 
 def save(path, value):
@@ -523,11 +531,26 @@ def _serve(directory, manifest):
 
 def run_stage(directory, manifest, stage, headed):
     state = read(directory / "checkpoint.json")
-    index = STAGES.index(stage)
+    model_test = stage in MODEL_STAGES
+    if model_test and manifest["mode"] != "live":
+        print(
+            "BLOCKED: model-* chỉ chạy trên phiên init --mode live; không dùng AI giả lập để xác nhận model thật."
+        )
+        return 2
+    sequence = MODEL_STAGES if model_test else STAGES
+    index = sequence.index(stage)
+    if model_test:
+        prerequisites = [] if stage == "provider-setup" else ["provider-setup"]
+        if stage != "provider-setup" and stage != "model-discovery":
+            prerequisites.append("model-discovery")
+    else:
+        prerequisites = STAGES[:index]
+    if manifest["mode"] == "live" and not model_test:
+        prerequisites = (*MODEL_STAGES, *prerequisites)
     missing = [
-        x for x in STAGES[:index] if state["results"].get(x, {}).get("status") != "PASS"
+        x for x in prerequisites if state["results"].get(x, {}).get("status") != "PASS"
     ]
-    if state.get("consumed"):
+    if state.get("consumed") and not model_test:
         print("BLOCKED: phiên đã hoàn tất purge; tạo phiên E2E mới để chạy lại.")
         return 2
     if missing:
@@ -556,6 +579,7 @@ def run_stage(directory, manifest, stage, headed):
             E2E_SESSION=str(directory),
             E2E_OUTPUT=str(output),
             E2E_BASE_URL=f"http://127.0.0.1:{manifest['ports']['frontend']}",
+            E2E_MODEL_PROFILE=str(ROOT / "scripts/e2e_profiles/qnu-server.json"),
         )
         args = [
             shutil.which("node"),
@@ -565,6 +589,25 @@ def run_stage(directory, manifest, stage, headed):
         ]
         if headed:
             args.append("--headed")
+        if stage == "provider-setup":
+            from e2e_provider_setup import prepare_provider
+
+            try:
+                prepare_provider(
+                    directory, env, ROOT / "scripts/e2e_profiles/qnu-server.json"
+                )
+            except RuntimeError as exc:
+                state = read(directory / "checkpoint.json")
+                state["results"][stage] = {
+                    "status": "BLOCKED",
+                    "exit_code": 2,
+                    "report": str(output),
+                }
+                for dependent in (*MODEL_STAGES[1:], *STAGES):
+                    state["results"].pop(dependent, None)
+                save(directory / "checkpoint.json", state)
+                print("BLOCKED:", exc)
+                return 2
         result = subprocess.run([str(a) for a in args], cwd=FE, env=env, check=False)
         verdict = "FAIL"
         report_file = output / "results.json"
@@ -589,7 +632,15 @@ def run_stage(directory, manifest, stage, headed):
             "at": datetime.now(UTC).isoformat(),
             "report": str(output),
         }
-        for dependent in STAGES[index + 1 :]:
+        if model_test:
+            dependents = (
+                (*MODEL_STAGES[index + 1 :], *STAGES)
+                if stage in {"provider-setup", "model-discovery"}
+                else STAGES
+            )
+        else:
+            dependents = STAGES[index + 1 :]
+        for dependent in dependents:
             state["results"].pop(dependent, None)
         if stage == "lifecycle" and verdict == "PASS":
             state["consumed"] = True
@@ -608,9 +659,19 @@ def main(argv=None):
         "command",
         nargs="?",
         default="help",
-        choices=("help", "init", "serve", "run", "all", "status", "report", "cleanup"),
+        choices=(
+            "help",
+            "init",
+            "serve",
+            "run",
+            "all",
+            "models",
+            "status",
+            "report",
+            "cleanup",
+        ),
     )
-    parser.add_argument("stage", nargs="?", choices=STAGES)
+    parser.add_argument("stage", nargs="?", choices=STAGES + MODEL_STAGES)
     parser.add_argument("--session")
     parser.add_argument("--mode", choices=("workflow", "live"), default="workflow")
     parser.add_argument("--headed", action="store_true")
@@ -624,17 +685,26 @@ def main(argv=None):
             directory, manifest = load_session(args.session)
             if args.command == "serve":
                 serve(directory, manifest)
-            elif args.command in {"run", "all"}:
+            elif args.command in {"run", "all", "models"}:
                 if args.command == "run" and not args.stage:
                     parser.error("run cần tên chặng")
-                for stage in STAGES if args.command == "all" else [args.stage]:
+                sequence = (
+                    MODEL_STAGES
+                    if args.command == "models"
+                    else STAGES
+                    if args.command == "all"
+                    else [args.stage]
+                )
+                for stage in sequence:
                     code = run_stage(directory, manifest, stage, args.headed)
                     if code:
                         return code
             elif args.command in {"status", "report"}:
                 state = read(directory / "checkpoint.json")
                 print("Phiên:", manifest["run_id"], "Mode:", manifest["mode"])
-                for stage in STAGES:
+                for stage in STAGES + (
+                    MODEL_STAGES if manifest["mode"] == "live" else ()
+                ):
                     row = state["results"].get(stage, {})
                     print(stage, row.get("status", "NOT RUN"), row.get("report", ""))
             elif args.command == "cleanup":

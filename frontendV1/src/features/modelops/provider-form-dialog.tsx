@@ -86,6 +86,7 @@ export function ProviderFormDialog({
   suggestedModel?: string;
 }) {
   const isEdit = Boolean(provider);
+  const isChildModel = Boolean(provider?.parent_id);
   const registry = useTransportRegistry();
   const createMutation = useCreateProvider();
   const updateMutation = useUpdateProvider(provider?.id ?? "");
@@ -215,12 +216,23 @@ export function ProviderFormDialog({
                 <Plus className="size-4" />
               )}
             </span>
-            {isEdit ? "Sửa provider" : "Thêm provider"}
+            {isChildModel
+              ? "Cấu hình model"
+              : isEdit
+                ? "Sửa provider"
+                : "Thêm provider"}
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-xs">
-            Một bản ghi provider là một endpoint gắn với đúng một
-            <code className="mx-1 font-mono">model_name</code>. Có thể lấy danh
-            sách và chạy thử trên trang chi tiết sau khi lưu provider và khóa.
+            {isChildModel ? (
+              "Khai báo giới hạn xử lý theo cấu hình server thực tế. Sau khi lưu, chạy lại kiểm tra model trước khi dùng trong quy trình."
+            ) : (
+              <>
+                Một bản ghi provider là một endpoint gắn với đúng một
+                <code className="mx-1 font-mono">model_name</code>. Có thể lấy
+                danh sách và chạy thử trên trang chi tiết sau khi lưu provider
+                và khóa.
+              </>
+            )}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 

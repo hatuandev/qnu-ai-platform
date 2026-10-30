@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { LayoutDashboard, Settings2 } from "lucide-react";
-import { useV1Auth } from "@/app/auth/v1";
+import { hasV1Permission, useV1Auth } from "@/app/auth/v1";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -12,18 +12,24 @@ import {
   isPrimarySidebarFeatureActive,
   isSettingsRouteActive,
   primaryWorkspaceFeatureKeys,
+  providerNavigation,
   workspaceFeatures,
 } from "@/navigation/config";
 import { useFeatureScope } from "@/navigation/use-feature-scope.tsx";
-import { featureTarget } from "@/navigation/workspace-features";
+import {
+  featureTarget,
+  isProviderRouteActive,
+} from "@/navigation/workspace-features";
 
 export function WorkspaceSidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { isAuthenticated } = useV1Auth();
+  const { isAuthenticated, actor } = useV1Auth();
   const scope = useFeatureScope();
   const location = useRouterState({ select: (state) => state.location });
   if (!isAuthenticated) return null;
 
   const isDashboardActive = location.pathname === "/dashboard";
+  const isProviderActive = isProviderRouteActive(location.pathname);
+  const ProviderIcon = providerNavigation.icon;
   const isSettingsActive = isSettingsRouteActive(
     location.pathname,
     location.search,
@@ -74,6 +80,24 @@ export function WorkspaceSidebar({ onNavigate }: { onNavigate?: () => void }) {
           );
         })}
 
+        {hasV1Permission(actor, providerNavigation.permission) ? (
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              tooltip={providerNavigation.title}
+              isActive={isProviderActive}
+            >
+              <Link
+                to={providerNavigation.to}
+                onClick={onNavigate}
+                aria-current={isProviderActive ? "page" : undefined}
+              >
+                <ProviderIcon className="size-4 shrink-0" />
+                <span>{providerNavigation.title}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ) : null}
         <SidebarMenuItem>
           <SidebarMenuButton
             asChild

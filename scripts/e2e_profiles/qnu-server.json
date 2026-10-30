@@ -1,0 +1,11 @@
+{
+  "name": "QNU AI Server",
+  "base_url": "http://100.105.13.53:8000/v1",
+  "test_monthly_token_limit": 1000000,
+  "models": {
+    "chat": "qwen3.8-27b-q4",
+    "embedding": "bge-m3",
+    "rerank": "bge-reranker-v2-m3",
+    "ocr": "nemotron-parse"
+  }
+}

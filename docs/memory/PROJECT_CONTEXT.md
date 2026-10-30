@@ -7,6 +7,24 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-10-30 — Context732: hướng dẫn test lại và giải thích hình OCR.** Bản ngắn tách resume với cleanup/init mới, đủ14chặng và cấu hình128K/16K. Ba finding cùng một figure rỗng; review bỏ block không text nên thiếu source unit. Chỉ đọc API/docs, chưa sửa OCR/review hoặc gọi model. Link/UTF8/LF/diff kiểm; không đổi runtime. [Nhật ký732](../nhat_ky/2026-10-30_phien_732_huong_dan_test_lai_va_review_hinh.md).
+
+- **2026-10-30 — Context731: test Qwen128K/16K.** Đã lưu Qwen context131072/output16384, Compiler8192 giữ. Chat641ms và navigation/upload/extraction/compilation PASS; review mới56s so91s nhưng token3968so6520, tốc độ decode tương đương. Report3uncertain hình ảnh; chưa phát hành/full pipeline. Biome/build+TS đạt. [Nhật ký731](../nhat_ky/2026-10-30_phien_731_test_qwen_128k_16k.md).
+
+- **2026-10-30 — Context730: phục hồi review timeout.** Phục hồi review120s: Qwen timeout300, output8192 giữ; lượt1 completed105s. Lượt2 truncated8192 reasoning, recovery JSON Schema completed91s. User tạm dừng;17regression/Biome/build+TS đạt, chưa full pipeline. [Nhật ký730](../nhat_ky/2026-10-30_phien_730_phuc_hoi_review_timeout.md).
+
+- **2026-10-30 — Context729: dừng chờ review uncertain.** Phiên E2E đang phục vụ, compilation completed/review uncertain. Helper thiếu terminal uncertain khiến đợi240s; sửa báo lỗi sau1.6s trên cùng review, vẫn FAIL đúng upstream, không inference mới. Biome/build+TS đạt; thêm hướng dẫn resume sau tắt máy. Không reset dữ liệu/capacity/restart/push. [Nhật ký729](../nhat_ky/2026-10-30_phien_729_dung_cho_review_uncertain.md).
+
+- **2026-10-30 — Context728: lưu capacity và test model live.** Bốn probe PASS; OCR đo max1664×2048 input3336, lưu budget4096 có căn cứ. Sửa assertion allowed-providers; navigation/upload/extraction PASS. Compilation4096 lỗi truncated; đã lưu Qwen262144/221184/32768 và giữ Compiler8192, chat/navigation/upload/extraction test lại đạt; biên soạn8192 completed nhưng review HTTP504/chat_provider_uncertain nên compilation FAIL, bốn chặng sau NOT RUN. Biome/build+TS đạt; chưa nghiệm thu toàn luồng. [Nhật ký728](../nhat_ky/2026-10-30_phien_728_luu_capacity_va_test_model_live.md).
+
+- **2026-10-30 — Context727: mở cấu hình capacity model con.** Sửa model trong chi tiết nhà cung cấp dùng form đầy đủ token/dimension/OCR; không bịa capacity hoặc bỏ guard. Người dùng báo5probe PASS, navigation vẫn BLOCKED thiếu giới hạn server. 18test trọng tâm/Biome/build+TS đạt; browser màn nhỏ xem và hủy form. Chưa live inference/navigation sau sửa; cần serving config bỏ credential. [Nhật ký727](../nhat_ky/2026-10-30_phien_727_cau_hinh_capacity_model_con.md).
+
+- **2026-10-30 — Context726: provider E2E và menu trực tiếp.** Thêm provider-setup tự chuẩn bị provider/key qua nhập ẩn, kiểm kết nối/đăng ký4model và UI tạo provider tạm trước discovery; không tự đặt capacity. Sidebar Nhà cung cấp /providers có RBAC, bỏ mục khỏi Cấu hình. FE5test/build/TS/Biome, Python14offline/Ruff và discovery-only đạt; UI sidebar đã xem. Live setup/inference NOT RUN. [Nhật ký726](../nhat_ky/2026-10-30_phien_726_provider_setup_va_sidebar.md).
+
+- **2026-10-29 — Context725: hướng dẫn model → pipeline QNU live.** File tổng hợp13lệnh; pipeline gắn đúng4model đã test/current làm default workspace E2E, quota thử hữu hạn nếu thiếu, chat hybrid+rerank và kiểm trace. Không đổi default dev/production/capacity. Biome/TS/Ruff/10offline và6helper-case đạt; live/E2E NOT RUN. [Nhật ký725](../nhat_ky/2026-10-29_phien_725_huong_dan_model_den_pipeline_live.md).
+
+- **2026-10-29 — Context724: thêm test model QNU thật.** Nhóm live model-discovery/chat/embedding/rerank/OCR qua ModelOps, profile4model không secret và báo cáo observation; workflow không thể xác nhận live. Ruff/Biome/TS/9offline/discovery-only đạt; live inference/E2E NOT RUN. Người dùng cấu hình key/model qua UI phiên thử rồi chạy từng lệnh. [Nhật ký724](../nhat_ky/2026-10-29_phien_724_test_model_qnu_live.md).
+
 - **2026-10-29 — Context723: sửa assertion API key E2E.** Người dùng chạy6chặng đến chat đạt; permissions lỗi expected401/received403. Đối chiếu backend: revoked trả403/api_key_inactive, unknown trả401/invalid_api_key. Spec kiểm chính xác status/code và khóa mới hoạt động sau rotate; không sửa BE. Biome/TS đạt; permissions/lifecycle sau sửa NOT RUN, giữ serve/phiên hiện tại. [Nhật ký723](../nhat_ky/2026-10-29_phien_723_sua_assertion_api_key_e2e.md).
 
 - **2026-10-29 — Context722: sửa cleanup E2E kẹt cờ serve cũ.** Kiểm tra chỉ đọc xác nhận cổng đã đóng/không còn client; thêm OS lease và guard TCP để nhận diện trạng thái cũ, không tự kill tiến trình.6regression offline/Ruff/AST đạt; cleanup Docker/E2E thực tế NOT RUN, người dùng chạy lại cleanup/init/serve. [Nhật ký722](../nhat_ky/2026-10-29_phien_722_sua_cleanup_e2e_stale_serve.md).

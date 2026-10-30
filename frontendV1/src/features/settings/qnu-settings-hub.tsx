@@ -7,7 +7,6 @@ import {
   FileClock,
   Gauge,
   KeyRound,
-  Server,
   Settings2,
   ShieldCheck,
   Sliders,
@@ -243,57 +242,34 @@ export function QnuSettingsHub() {
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Thiết lập nhà cung cấp AI, model toàn cục, danh mục đơn vị và tùy
-              chọn tài khoản.
+              Thiết lập model toàn cục, danh mục đơn vị và tùy chọn tài khoản.
             </p>
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* Nhóm: Kết nối AI */}
           {canManageModels ? (
-            <Card className="rounded-xl border-border/70 shadow-2xs flex flex-col justify-between">
+            <Card className="rounded-xl border-border/70 shadow-2xs">
               <CardHeader className="pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Server className="size-4.5" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-sm font-semibold">
-                      Kết nối AI
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      Nhà cung cấp, thông tin xác thực và danh mục model
-                    </CardDescription>
-                  </div>
-                </div>
+                <CardTitle className="flex items-center gap-2.5 text-sm font-semibold">
+                  <Sliders className="size-4 text-primary" />
+                  Model mặc định
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Thiết lập model dùng chung toàn nền tảng.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-1.5 pt-0">
-                <Link
-                  to="/providers"
-                  search={{ page: 1, pageSize: 20 }}
-                  className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/15 px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-muted/40"
-                >
-                  <span className="flex items-center gap-2">
-                    <Server className="size-3.5 text-muted-foreground" />
-                    Nhà cung cấp & Model
-                  </span>
-                  <ArrowUpRight className="size-3.5 text-muted-foreground" />
-                </Link>
+              <CardContent className="pt-0">
                 <Link
                   to="/modelops/defaults"
                   className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/15 px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-muted/40"
                 >
-                  <span className="flex items-center gap-2">
-                    <Sliders className="size-3.5 text-muted-foreground" />
-                    Model mặc định theo tác vụ
-                  </span>
+                  Model mặc định hệ thống
                   <ArrowUpRight className="size-3.5 text-muted-foreground" />
                 </Link>
               </CardContent>
             </Card>
           ) : null}
-
           {/* Nhóm: Quản lý danh sách Đơn vị */}
           {isPlatformAdmin ? (
             <Card className="rounded-xl border-border/70 shadow-2xs flex flex-col justify-between">

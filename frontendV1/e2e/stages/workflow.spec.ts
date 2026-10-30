@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { liveDefaults } from "./live-defaults";
 import {
   type Action,
   type Api,
@@ -127,6 +128,10 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
   test.setTimeout(900_000);
   const api = await authenticate(page);
   let state = checkpoint();
+  if (state.mode === "live" && stage !== "navigation" && !state.runtimeDefaults)
+    throw new Error(
+      "BLOCKED: chạy navigation để gắn bốn model QNU đã kiểm tra vào workspace thử.",
+    );
 
   if (stage === "navigation") {
     if (!state.workspace) {
@@ -137,7 +142,8 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
       state.workspace = result.id;
       save(state);
     }
-    await ensureSessionQuota(api, state);
+    const live = state.mode === "live" ? await liveDefaults(api, state) : null;
+    await ensureSessionQuota(api, state, live?.monthlyTokenLimit);
     let providers = await api.get<
       { id: string; capabilities: string[]; is_active: boolean }[]
     >("/modelops/providers");
@@ -182,9 +188,13 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
       }
     }
     const defaults: Record<string, string> = {};
-    for (const capability of ["chat", "embedding", "rerank", "ocr"]) {
+    for (const capability of ["chat", "embedding", "rerank", "ocr"] as const) {
+      const preferred = live?.defaults[capability];
       const match = providers.find(
-        (p) => p.is_active && p.capabilities.includes(capability),
+        (p) =>
+          p.is_active &&
+          p.capabilities.includes(capability) &&
+          (!preferred || p.id === preferred),
       );
       if (!match)
         throw new Error(
@@ -196,6 +206,30 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
       provider_ids: [...new Set(Object.values(defaults))],
       defaults,
     });
+    if (live) {
+      const granted = await api.get<{
+        providers: {
+          provider_id: string;
+          is_active: boolean;
+          default_capabilities: string[];
+        }[];
+      }>(`${workspace(state)}/allowed-providers`);
+      expect(granted.providers.map((item) => item.provider_id).sort()).toEqual(
+        [...new Set(Object.values(live.defaults))].sort(),
+      );
+      const observedDefaults = Object.fromEntries(
+        granted.providers.flatMap((item) => {
+          expect(item.is_active).toBe(true);
+          return item.default_capabilities.map((capability) => [
+            capability,
+            item.provider_id,
+          ]);
+        }),
+      );
+      expect(observedDefaults).toEqual(live.defaults);
+      state.runtimeDefaults = live.defaults;
+      save(state);
+    }
     await page.goto(`/workspaces/${state.workspace}/knowledge`);
     await expect(
       page.getByRole("heading", { name: /Kho tri thức/ }).first(),
@@ -281,6 +315,8 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
       expect(run.pages_total).toBeGreaterThan(0);
       expect(run.pages_done).toBe(run.pages_total);
       expect(run.results_ready).toBe(true);
+      if (state.runtimeDefaults && source.file === "thong_bao_scan_2024.pdf")
+        expect(run.provider_id).toBe(state.runtimeDefaults.ocr);
       const original = await api.raw(
         "GET",
         `${sourceBase(state, source)}/revisions/${source.revision}/content`,
@@ -344,6 +380,9 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
             topic: `Tóm tắt đầy đủ dữ liệu nguồn ${index + 1}`,
             ocr_run_ids: [source.run],
             auto_review: false,
+            ...(state.runtimeDefaults
+              ? { provider_id: state.runtimeDefaults.chat }
+              : {}),
             text_versions: { [source.run]: source.textVersion },
           },
           `${state.runId}-compile-${index}`,
@@ -370,10 +409,28 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
         ).toBe(true);
       }
       if (!publication.review) {
+        const reviewProvider = state.runtimeDefaults
+          ? await api.get<{ timeout_seconds: number }>(
+              `/modelops/providers/${state.runtimeDefaults.chat}`,
+            )
+          : undefined;
+        if (reviewProvider)
+          console.info(
+            `Đang review nguồn ${index + 1}; thời hạn model ${reviewProvider.timeout_seconds}s.`,
+          );
         const review = await api.post<Run>(
           `${collection(state)}/compilation-runs/${publication.run}/reviews`,
-          {},
+          state.runtimeDefaults
+            ? {
+                provider_id: state.runtimeDefaults.chat,
+                max_output_tokens: 8192,
+                structured_output: true,
+              }
+            : {},
           `${state.runId}-review-${index}`,
+          reviewProvider
+            ? (reviewProvider.timeout_seconds + 30) * 1000
+            : undefined,
         );
         publication.review = review.id;
         save(state);
@@ -425,7 +482,9 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
     }
     const created = await api.post<{ run: Run }>(
       `${collection(state)}/indexing-runs`,
-      {},
+      state.runtimeDefaults
+        ? { provider_id: state.runtimeDefaults.embedding }
+        : {},
       `${state.runId}-index`,
     );
     for (const publication of state.publications)
@@ -436,13 +495,27 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
     );
     expect(indexed.is_active).toBe(true);
     expect(indexed.chunks_total).toBeGreaterThan(0);
+    if (state.runtimeDefaults)
+      expect(indexed.provider_id).toBe(state.runtimeDefaults.embedding);
   }
 
   if (stage === "chat") {
     if (!state.assistant) {
       const result = await api.post<{ id: string }>(
         `${workspace(state)}/assistants`,
-        { name: `E2E ${state.runId}`, collection_id: state.collection },
+        {
+          name: `E2E ${state.runId}`,
+          collection_id: state.collection,
+          ...(state.runtimeDefaults
+            ? {
+                chat_provider_id: state.runtimeDefaults.chat,
+                rag_policy: {
+                  retrieval_mode: "hybrid_rerank",
+                  rerank_provider_id: state.runtimeDefaults.rerank,
+                },
+              }
+            : {}),
+        },
       );
       state.assistant = result.id;
       save(state);
@@ -467,6 +540,13 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
           citations: Record<string, unknown>;
         }[];
         statements: unknown[];
+        trace: {
+          provider_id: string;
+          retrieval: {
+            mode: string;
+            rerank_provider?: { provider_id: string };
+          };
+        };
       };
     };
     const turn = await api.post<Turn>(
@@ -484,6 +564,13 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
             `${workspace(state)}/conversations/${state.conversation}/turns/${turn.id}`,
           );
     expect(result.result.status).toBe("answered");
+    if (state.runtimeDefaults) {
+      expect(result.result.trace.provider_id).toBe(state.runtimeDefaults.chat);
+      expect(result.result.trace.retrieval.mode).toBe("hybrid_rerank");
+      expect(result.result.trace.retrieval.rerank_provider?.provider_id).toBe(
+        state.runtimeDefaults.rerank,
+      );
+    }
     expect(result.result.answer).toMatch(/5[., ]?500/);
     expect(result.result.statements.length).toBeGreaterThan(0);
     expect(result.result.sources.length).toBeGreaterThan(0);
@@ -693,6 +780,13 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
     }>(`${collection(state)}/answers`, {
       question: "Điểm chuẩn ngành Công nghệ thông tin năm 2024 là bao nhiêu?",
       document_ids: [state.publications[1].document],
+      ...(state.runtimeDefaults
+        ? {
+            provider_id: state.runtimeDefaults.chat,
+            retrieval_mode: "hybrid_rerank",
+            rerank_provider_id: state.runtimeDefaults.rerank,
+          }
+        : {}),
     });
     expect(answer.status).toBe("answered");
     expect(answer.answer).toMatch(/24[.,]5/);

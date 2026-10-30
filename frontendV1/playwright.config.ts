@@ -2,6 +2,12 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e/stages",
+  testMatch:
+    process.env.E2E_STAGE === "provider-setup"
+      ? "**/providers.spec.ts"
+      : process.env.E2E_STAGE?.startsWith("model-")
+        ? "**/models.spec.ts"
+        : "**/workflow.spec.ts",
   timeout: 300 * 1000,
   expect: {
     timeout: 15 * 1000,

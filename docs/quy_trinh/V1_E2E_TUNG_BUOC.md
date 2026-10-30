@@ -1,5 +1,7 @@
 # Chạy kiểm tra V1 theo từng lệnh
 
+Với server AI QNU thật, ưu tiên [hướng dẫn tổng hợp model → toàn bộ pipeline](./V1_TEST_TOAN_LUONG_MODEL_QNU.md), có đủ lệnh và model mặc định theo thứ tự. Tài liệu này tiếp tục mô tả workflow giả lập và cách vận hành runner.
+
 Bộ lệnh dành cho Windows PowerShell, chạy tại thư mục gốc repo. Bạn tự chạy từng chặng và gửi lỗi của chặng đó để xử lý. Chưa nghiệm thu E2E: lần bổ sung mã này chỉ kiểm tra tĩnh, chưa chạy Docker, migration, browser test hay model.
 
 ## 1. Chuẩn bị
@@ -106,6 +108,8 @@ Nếu `server.json` còn ghi đang chạy sau khi cửa sổ serve đã đóng, 
 
 ## 6. Thử model thật sau này
 
+Đã có nhóm `model-*` để thử riêng bốn model QNU sau khi thêm qua ModelOps. Xem [hướng dẫn test model QNU](./V1_TEST_MODEL_QNU.md) trước khi chạy pipeline live. Nhóm này dùng diagnostic API thật, không AI giả lập.
+
 Tạo phiên khác sau khi dọn phiên trước:
 
 ```powershell
@@ -113,7 +117,7 @@ Tạo phiên khác sau khi dọn phiên trước:
 .\test-v1-e2e.ps1 serve
 ```
 
-Mở URL frontend E2E do `serve` in ra. Cấu hình provider/key/capacity cho chat, embedding, rerank và OCR trong ModelOps của phiên thử, cùng quota tháng hiện tại cho workspace E2E. Sau đó chạy các chặng ở mục 3. Chưa cấu hình thì `navigation` BLOCKED; runner không đọc LLM key từ `.env` hay sao chép credential DB dev. Live mode không tự cấp quota cho model thật.
+Mở URL frontend E2E do `serve` in ra. Cấu hình provider/key/capacity/dimension/OCR budget cho bốn model QNU trong ModelOps của phiên thử, rồi chạy provider-setup và đủ nhóm model-* trước. Bước provider-setup đã tự kiểm tạo provider/key/model, nhận key bằng nhập ẩn trong terminal; chỉ capacity/dimension/ngân sách ảnh cần khai báo theo server thật. Navigation live sẽ kiểm lịch sử còn current, gắn đúng model đã test làm default workspace và cấp quota thử hữu hạn nếu chưa có theo profile. Không sửa quota đã có, không lấy LLM key từ `.env` hay sao chép credential DB dev. Làm theo [hướng dẫn tổng hợp](./V1_TEST_TOAN_LUONG_MODEL_QNU.md) để có đầy đủ thứ tự lệnh.
 
 Model thật có thể trả review finding hoặc nội dung khác fixture; giữ lỗi để điều tra, không đổi assertion thành skip. Live mode không chạy mock AI và có thể phát sinh usage. Chỉ dùng endpoint và dữ liệu mà bạn cho phép. Phạm vi chặng live giống workflow; không thay thế benchmark độc lập.
 

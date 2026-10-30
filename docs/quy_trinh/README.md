@@ -7,6 +7,12 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [V1 — Chạy tiếp sau tắt máy hoặc test mới từ đầu](./V1_QUY_TRINH_TEST_LAI.md): hai cách chạy, thứ tự14chặng, cấu hình đang dùng và giải thích ba nhận xét hình ảnh.
+
+- [V1 — Lệnh test toàn luồng với model QNU thật](./V1_TEST_TOAN_LUONG_MODEL_QNU.md): thứ tự đầy đủ từ test4model, gắn mặc định đến upload, Compiler, hỏi đáp và purge.
+
+- [V1 — Kiểm tra model thật trên server QNU](./V1_TEST_MODEL_QNU.md): thêm provider/key/model qua ModelOps rồi chạy discovery/chat/embedding/rerank/OCR theo từng lệnh.
+
 - [V1 — Chạy E2E từng chặng bằng PowerShell](./V1_E2E_TUNG_BUOC.md): môi trường thử riêng, checkpoint, báo cáo và lệnh cho từng bước upload → hỏi đáp → purge.
 
 - [44 — Điều hướng workspace V1](./44_dieu_huong_workspace_v1.md): bộ chọn workspace, URL gọn và liên kết tài liệu có kiểm quyền.

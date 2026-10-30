@@ -34,7 +34,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -46,6 +45,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { updateProvider } from "@/features/modelops/requests";
 import { useDiagnostics } from "../diagnostic-queries";
+import { ProviderFormDialog } from "../provider-form-dialog";
 import type { Capability, Provider, ProviderKey } from "../types";
 import {
   FAMILIES,
@@ -90,22 +90,11 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
 
   // New model input & capability
   const [newModelId, setNewModelId] = useState("");
-  const [newModelCapability, setNewModelCapability] = useState<Capability>("chat");
+  const [newModelCapability, setNewModelCapability] =
+    useState<Capability>("chat");
 
   // Edit model modal state
   const [modelToEdit, setModelToEdit] = useState<Provider | null>(null);
-  const [editCap, setEditCap] = useState<Capability>("chat");
-  const [editBaseUrl, setEditBaseUrl] = useState("");
-  const [isSavingEdit, setIsSavingEdit] = useState(false);
-
-  useEffect(() => {
-    if (modelToEdit) {
-      setEditCap(
-        (modelToEdit.capabilities?.[0] as Capability) || "chat",
-      );
-      setEditBaseUrl(modelToEdit.base_url);
-    }
-  }, [modelToEdit]);
 
   const handleModelNameChange = (val: string) => {
     setNewModelId(val);
@@ -122,27 +111,6 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
       setNewModelCapability("ocr");
     } else {
       setNewModelCapability("chat");
-    }
-  };
-
-  const handleSaveEditModel = async () => {
-    if (!modelToEdit) return;
-    setIsSavingEdit(true);
-    try {
-      await updateProvider(v1Client, modelToEdit.id, {
-        capabilities: [editCap],
-        base_url: editBaseUrl.trim() || undefined,
-      });
-      toast.success(`Đã cập nhật cấu hình cho model ${modelToEdit.model_name}.`);
-      setModelToEdit(null);
-      void modelsQuery.refetch();
-      void query.refetch();
-    } catch (err: unknown) {
-      toast.error(
-        err instanceof Error ? err.message : "Không thể cập nhật cấu hình model.",
-      );
-    } finally {
-      setIsSavingEdit(false);
     }
   };
 
@@ -203,7 +171,10 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
         let targetPort = "8000";
         if (newModelCapability === "embedding" || trimmed.includes("bge-m3")) {
           targetPort = "8001";
-        } else if (newModelCapability === "ocr" || trimmed.includes("nemotron")) {
+        } else if (
+          newModelCapability === "ocr" ||
+          trimmed.includes("nemotron")
+        ) {
           targetPort = "8081";
         }
         if (targetPort !== "8000") {
@@ -606,8 +577,12 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="chat">Trò chuyện (Chat)</SelectItem>
-                  <SelectItem value="embedding">Nhúng vector (Embedding)</SelectItem>
-                  <SelectItem value="rerank">Xếp hạng lại (Reranker)</SelectItem>
+                  <SelectItem value="embedding">
+                    Nhúng vector (Embedding)
+                  </SelectItem>
+                  <SelectItem value="rerank">
+                    Xếp hạng lại (Reranker)
+                  </SelectItem>
                   <SelectItem value="ocr">Bóc tách văn bản (OCR)</SelectItem>
                 </SelectContent>
               </Select>
@@ -671,7 +646,9 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                       };
                     case "rerank":
                       return {
-                        icon: <ArrowUpDown className="size-4 text-emerald-500" />,
+                        icon: (
+                          <ArrowUpDown className="size-4 text-emerald-500" />
+                        ),
                         badge: (
                           <Badge
                             variant="outline"
@@ -751,7 +728,7 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                         variant="ghost"
                         className="size-7 p-0 text-muted-foreground hover:text-foreground"
                         onClick={() => setModelToEdit(m)}
-                        title="Chỉnh sửa chức năng và endpoint của model"
+                        title="Cấu hình model và giới hạn xử lý"
                       >
                         <Pencil className="size-3.5" />
                       </Button>
@@ -831,74 +808,13 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
       />
 
       {/* MODAL 5: Edit Model Dialog */}
-      <ResponsiveDialog
+      <ProviderFormDialog
         open={Boolean(modelToEdit)}
+        provider={modelToEdit}
         onOpenChange={(open) => {
           if (!open) setModelToEdit(null);
         }}
-      >
-        <ResponsiveDialogContent className="max-w-md p-5 text-xs space-y-4">
-          <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>
-              Cấu hình mô hình: {modelToEdit?.model_name}
-            </ResponsiveDialogTitle>
-            <ResponsiveDialogDescription className="text-xs">
-              Điều chỉnh chức năng năng lực và endpoint cụ thể cho mô hình này.
-            </ResponsiveDialogDescription>
-          </ResponsiveDialogHeader>
-
-          <div className="space-y-3 py-1">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-model-cap">Chức năng (Capability)</Label>
-              <Select
-                value={editCap}
-                onValueChange={(v) => setEditCap(v as Capability)}
-              >
-                <SelectTrigger id="edit-model-cap" className="h-9 text-xs">
-                  <SelectValue placeholder="Chọn chức năng..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="chat">Trò chuyện (Chat)</SelectItem>
-                  <SelectItem value="embedding">Nhúng vector (Embedding)</SelectItem>
-                  <SelectItem value="rerank">Xếp hạng lại (Reranker)</SelectItem>
-                  <SelectItem value="ocr">Bóc tách văn bản (OCR)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-model-url">Endpoint riêng (Base URL)</Label>
-              <Input
-                id="edit-model-url"
-                value={editBaseUrl}
-                onChange={(e) => setEditBaseUrl(e.target.value)}
-                placeholder="http://..."
-                className="font-mono text-xs h-9"
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Để trống hoặc giữ nguyên để dùng endpoint của nhà cung cấp.
-              </p>
-            </div>
-          </div>
-
-          <ResponsiveDialogFooter className="flex justify-end gap-2 pt-2 border-t">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setModelToEdit(null)}
-            >
-              Hủy
-            </Button>
-            <Button
-              size="sm"
-              disabled={isSavingEdit}
-              onClick={handleSaveEditModel}
-            >
-              {isSavingEdit ? "Đang lưu..." : "Lưu thay đổi"}
-            </Button>
-          </ResponsiveDialogFooter>
-        </ResponsiveDialogContent>
-      </ResponsiveDialog>
+      />
 
       {/* Delete Connection Confirmation Dialog */}
       <ResponsiveDialog

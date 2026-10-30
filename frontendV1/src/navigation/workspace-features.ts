@@ -365,10 +365,10 @@ export function isSettingsRouteActive(
   pathname: string,
   search: Record<string, unknown>,
 ): boolean {
+  if (isProviderRouteActive(pathname)) return false;
   if (
     pathname === "/settings" ||
     pathname.startsWith("/settings/") ||
-    pathname === "/providers" ||
     pathname.startsWith("/modelops/") ||
     pathname === "/workspaces"
   ) {
@@ -401,4 +401,13 @@ export function isSettingsRouteActive(
     return true;
   }
   return false;
+}
+
+export function isProviderRouteActive(pathname: string): boolean {
+  return (
+    pathname === "/providers" ||
+    pathname.startsWith("/providers/") ||
+    pathname === "/modelops/providers" ||
+    pathname.startsWith("/modelops/providers/")
+  );
 }

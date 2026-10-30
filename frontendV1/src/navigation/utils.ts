@@ -2,7 +2,7 @@ import { hiddenRouteMeta, navigationGroups } from "@/navigation/config";
 import type { NavGroup, NavItem } from "@/navigation/types";
 import { isStudentAccount } from "@/rbac/backend-role-map";
 import { workspaceFeatureKeys, workspaceFeatures } from "./config";
-import { isFeatureActive } from "./workspace-features";
+import { isFeatureActive, isProviderRouteActive } from "./workspace-features";
 
 export type PermissionCheck = (permission?: string) => boolean;
 
@@ -62,6 +62,7 @@ export function flattenNavigation(groups = navigationGroups): NavItem[] {
 }
 
 export function isItemActive(item: NavItem, pathname: string): boolean {
+  if (item.id === "providers") return isProviderRouteActive(pathname);
   if (item.to && pathname === item.to) return true;
   if (item.to === "/workspaces")
     return /^\/workspaces\/[^/]+\/?$/.test(pathname);
@@ -93,12 +94,8 @@ export function getBreadcrumbs(
   if (pathname === "/settings" || pathname.startsWith("/settings/")) {
     return [{ label: "QNU AI" }, { label: "Cấu hình" }];
   }
-  if (pathname === "/providers" || pathname.startsWith("/modelops/providers")) {
-    return [
-      { label: "QNU AI" },
-      { label: "Cấu hình" },
-      { label: "Kết nối AI" },
-    ];
+  if (isProviderRouteActive(pathname)) {
+    return [{ label: "QNU AI" }, { label: "Nhà cung cấp" }];
   }
   if (pathname.startsWith("/modelops/endpoints")) {
     return [

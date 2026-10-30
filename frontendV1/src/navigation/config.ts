@@ -21,13 +21,23 @@ import {
   QrCode,
   Receipt,
   ScrollText,
+  Server,
   Settings2,
   Tag,
   UserCheck,
   UserRoundCog,
   UsersRound,
 } from "lucide-react";
-import type { NavGroup } from "@/navigation/types";
+import type { NavGroup, NavItem } from "@/navigation/types";
+
+export const providerNavigation = {
+  id: "providers",
+  title: "Nhà cung cấp",
+  to: "/providers",
+  icon: Server,
+  scope: "v1",
+  permission: "ai.models.manage",
+} satisfies NavItem;
 
 export {
   isPrimarySidebarFeatureActive,
@@ -51,6 +61,7 @@ export const navigationGroups: NavGroup[] = [
         icon: LayoutDashboard,
         scope: "v1",
       },
+      providerNavigation,
       {
         id: "settings",
         title: "Cấu hình",
