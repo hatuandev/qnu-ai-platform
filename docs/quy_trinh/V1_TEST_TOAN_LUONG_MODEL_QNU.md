@@ -55,7 +55,7 @@ Lệnh tự tạo QNU provider tại `http://100.105.13.53:8000/v1` nếu thiế
 
 Sau đó bài Playwright kiểm tra kết nối thật bằng key đã lưu, catalog bốn model, tự đăng ký bốn model nếu thiếu, chặn inference khi provider bị tắt và bật lại trong finally. Nó còn mở sidebar **Nhà cung cấp**, kiểm danh sách/chi tiết và thực sự submit form tạo một provider UI tạm không credential, xác nhận lưu rồi xóa provider tạm đó qua API. QNU provider và bốn model được giữ cho pipeline. Đây là test kết hợp API và UI, chưa tự nhập raw key vào form frontend.
 
-Nếu đã có một QNU provider cùng endpoint, bài test dùng lại; cấu hình trùng sẽ BLOCKED. Không chạy provider-setup sau khi đã upload, vì bài test có bật/tắt provider; muốn kiểm lại toàn bộ quản lý nhà cung cấp ở thời điểm đó thì tạo phiên mới. Phần provider/key mới chỉ chứa cấu hình kết nối/model, không tự bịa capacity/dimension. Trên FE phiên thử, mục **Nhà cung cấp** ở sidebar mở thẳng `/providers`; mục Cấu hình giữ thiết lập khác.
+Nếu đã có một QNU provider cùng endpoint, bài test dùng lại; cấu hình trùng sẽ BLOCKED. Không chạy provider-setup sau khi đã upload, vì bài test có bật/tắt provider; muốn kiểm lại toàn bộ quản lý nhà cung cấp ở thời điểm đó thì tạo phiên mới. provider-setup lưu capacity/dimension server công bố bằng snapshot discovery; timeout và OCR/input override bổ sung từ profile E2E có căn cứ, không tự bịa capacity. Trên FE phiên thử, mục **Nhà cung cấp** ở sidebar mở thẳng `/providers`; mục Cấu hình giữ thiết lập khác.
 
 Các model được đăng ký:
 
@@ -66,16 +66,20 @@ Các model được đăng ký:
 | Rerank | `bge-reranker-v2-m3` | Xếp hạng lại ứng viên sau hybrid search trong hỏi đáp. |
 | OCR | `nemotron-parse` | OCR trang scan hoặc trang không đủ text native. PDF/DOCX có chữ vẫn dùng native-first theo backend. |
 
-Sau provider-setup, mở chi tiết nhà cung cấp để khai báo capacity/dimension/ngân sách ảnh theo server thật trước pipeline. Không cần thêm lại bốn model đã được tạo. Test không chọn ngẫu nhiên khi cấu hình bị trùng.
+Sau provider-setup PASS, capacity/dimension đã được tự đồng bộ từ `/v1/models`; có thể chạy ngay nhóm model, không cần dừng để nhập thông số thủ công. Script dùng snapshot đã lưu và endpoint/model trong profile, đồng bộ model đã có hoặc đăng ký model mới kèm metadata. QNU giữ guard unknown/conflict; server công bố không phải inference verified.
 
-Trong FE của **phiên live**, vào **Nhà cung cấp → Mở nhà cung cấp → nút bút chì cạnh model** ("Cấu hình model và giới hạn xử lý"). Form có phần **Năng lực khai báo** cho context/input/output, `embedding_dimension` và `ocr_page_input`. Lưu từng model; form chỉ gửi trường thay đổi, không đổi kết nối cha hoặc thu hẹp danh sách chức năng đã có.
+Nếu muốn xem hoặc tự đồng bộ qua giao diện: mở đúng FE phiên thử → **Nhà cung cấp → Server AI QNU → Nhập từ /models → Lấy lại → chọn model → Áp dụng**. Bước này tùy chọn khi provider-setup đã PASS.
 
-| Model | Thông tin cần khai báo trước pipeline |
-| --- | --- |
-| Qwen | Giới hạn context/input và output theo cấu hình phục vụ thực tế. |
-| BGE embedding | Giới hạn input thực tế; chiều vector lấy từ probe (lượt người dùng cung cấp đã quan sát 1024). |
-| BGE rerank | Giới hạn input thực tế cho câu hỏi và đoạn ứng viên. |
-| Nemotron | Giới hạn token thực tế, kích thước ảnh tối đa, cận trên token đầu vào một trang và SHA-256 prompt OCR hiện hành. |
+| Model | Thông số server đang công bố | Bổ sung ngoài metadata |
+| --- | --- | --- |
+| Qwen | Context131072, output16384 | Timeout 300 giây; input riêng để trống; Compiler/Review 8192 giữ. |
+| BGE embedding | Context8192, dimension1024 | Timeout 60 giây; input riêng có thể để trống vì có context. |
+| BGE rerank | Context8192 | Timeout 60 giây; input riêng 1024 nếu giữ chính sách thử cũ. |
+| Nemotron | Context16384, output8192 | Timeout 180 giây và ngân sách ảnh OCR bên dưới. |
+
+Các con số phản ánh server người vận hành vừa bổ sung; nếu lấy lại thấy khác thì đối chiếu cấu hình phục vụ. Không tự nâng/ép số để test xanh. Trường server không công bố giữ unknown hoặc giá trị hợp lệ đã lưu. Sync giữ input override và ngân sách OCR, chặn xung đột; dimension embedding đổi khác cấu hình hiện hành cũng bị chặn để kiểm tra index trước.
+
+Timeout/input riêng/OCR trong bảng được provider-setup bổ sung từ profile QNU khi cần; không ghi đè input/OCR đã có. Mở **nút bút chì cạnh model** nếu muốn kiểm tra hoặc thay đổi. Form chỉ gửi trường thay đổi. Nemotron dùng lại ngân sách đã có căn cứ khi server/processor/prompt không đổi: ảnh tối đa1664×2048, input upper bound4096, hash prompt theo lệnh dưới. Nếu đổi điều kiện này phải xác minh lại, không suy token ảnh từ Base64.
 
 Các lệnh cURL thử inference không phải cấu hình capacity. `max_tokens` trong request là mức client yêu cầu, không chứng minh giới hạn server; `--max-time` là thời gian chờ. Địa chỉ `127.0.0.1:8000` trong lệnh chạy trên máy AI chỉ tới máy AI đó; QNU trên máy Windows vẫn dùng endpoint đã cấu hình trong ModelOps. Không suy capacity từ model ID, một ảnh mẫu hay vector đã trả về.
 
@@ -87,11 +91,11 @@ Push-Location backendV1
 Pop-Location
 ```
 
-Hash chỉ nhận diện prompt, không đo ngân sách ảnh. Nếu chưa biết các giới hạn còn lại, lấy cấu hình khởi chạy model (`vllm serve`, Docker Compose hoặc cấu hình gateway), bỏ credential trước khi chia sẻ. Giữ trạng thái BLOCKED cho đến khi có đủ căn cứ.
+Profile đã có hash và ngân sách OCR; lệnh này chỉ để đối chiếu. Hash chỉ nhận diện prompt, không đo ngân sách ảnh. Nếu chưa biết các giới hạn còn lại, lấy cấu hình khởi chạy model (`vllm serve`, Docker Compose hoặc cấu hình gateway), bỏ credential trước khi chia sẻ. Giữ trạng thái BLOCKED cho đến khi có đủ căn cứ.
 
 Capacity không được lấy từ thông số AI giả lập: khai báo giới hạn input/output/context có căn cứ của server. Compiler/Review hiện có thể yêu cầu tới 8192 output token, nên cấu hình phải phù hợp với request thật; không nâng giả giới hạn chỉ để test xanh. Cấu hình OCR cần ngân sách ảnh/prompt (`ocr_page_input`) đúng prompt hiện hành, kích thước ảnh được phép và căn cứ token ảnh do server vận hành cung cấp. Nếu thiếu, navigation sẽ BLOCKED trước upload. OCR probe trên ảnh nhỏ đạt không chứng minh trang A4 của pipeline đủ ngân sách.
 
-Nếu chưa biết dimension của BGE, chạy `model-embedding` trước để xem `observed_dimension`, sau đó cập nhật dimension trong ModelOps và chạy lại `model-embedding`. Mọi thay đổi endpoint/model/key/capacity/dimension làm kiểm định cũ hết hiệu lực: chạy lại các model liên quan trước navigation. Runner không tự đoán hoặc sửa capacity/dimension.
+Nếu server không công bố dimension của BGE, chạy `model-embedding` trước để xem `observed_dimension`, sau đó cập nhật dimension trong ModelOps và chạy lại `model-embedding`. Mọi thay đổi endpoint/model/key/capacity/dimension làm kiểm định cũ hết hiệu lực: chạy lại các model liên quan trước navigation. Runner không tự đoán capacity/dimension. provider-setup tự áp dụng metadata server và phần khai báo tường minh của profile trước probe; giao diện vẫn có thể dùng để kiểm tra/chỉnh sửa.
 
 ## 3. Test model — cửa sổ PowerShell thứ hai
 
@@ -167,10 +171,10 @@ Kết quả lưu tại `tmp/v1-e2e/<run_id>/runs/<stage>-<timestamp>/`. HTML ở
 - Review có finding thì pipeline dừng để xem nội dung thật, không tự bỏ qua/acknowledge. Model thật có thể trả lời thiếu căn cứ, sai schema hoặc citation; giữ lỗi để xử lý, không đổi thành skip.
 - Review `uncertain`/`chat_provider_uncertain` là kết quả chưa rõ, không phải job còn chạy. Test báo lỗi ngay; chạy lại compilation vẫn trỏ review đã lưu trong checkpoint, không tự gửi request mới. Cần xác minh upstream và quyết định recovery trước khi tạo lượt review khác; không xóa record hoặc tự approve để đi tiếp.
 - Review hiện được gọi đồng bộ: thời hạn HTTP của bài test live lấy từ timeout model được chọn cộng30giây, tránh client ngắt trước model. Với Qwen timeout300giây trong phiên đang dùng, terminal báo thời hạn này khi bắt đầu review; một lượt có thể mất khoảng2phút. Đây là thời gian chờ, không phải progress giả. Không nâng token output hoặc tự retry để che lỗi.
-- Review live mới dùng `structured_output=true` và yêu cầu8192token: JSON Schema ghim đủ source/draft ID, còn backend kiểm lại toàn bộ coverage và nội dung. `compilation PASS` chỉ xác nhận bản nháp và báo cáo hợp lệ; nếu verdict `needs_attention` phải xử lý nhận xét trước phát hành, không tự xác nhận finding để làm test xanh.
+- Review live mới dùng `structured_output=true` và yêu cầu 8192 token: JSON Schema ghim đủ source/draft ID, còn backend kiểm lại toàn bộ coverage và nội dung. `compilation PASS` chỉ xác nhận bản nháp và báo cáo hợp lệ; nếu verdict `needs_attention` phải xử lý nhận xét trước phát hành, không tự xác nhận finding để làm test xanh.
 - `lifecycle` là chặng cuối, thật sự xóa nguồn thử. Sau khi đạt, phiên bị đánh dấu đã dùng cho purge; muốn chạy lại pipeline thì tạo phiên mới.
 
-## 7. Kết thúc
+## 6. Kết thúc
 
 Sau khi xong hoặc muốn bắt đầu phiên mới, ở cửa sổ thứ nhất nhấn Ctrl+C. Sau đó:
 

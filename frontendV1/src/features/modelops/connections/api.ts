@@ -164,6 +164,7 @@ export function useAddConnectionModel(connectionId: string) {
       model_name: string;
       capabilities: Capability[];
       embedding_dimension?: number;
+      discovery_check_id?: string;
     }) => v1Client.post<Provider>(`${path}/${connectionId}/models`, input),
     onSuccess: () => {
       void cache.invalidateQueries({ queryKey: ["v1", sessionId, "modelops"] });
@@ -177,6 +178,19 @@ export function useDeleteConnectionModel(connectionId: string) {
   return useMutation({
     mutationFn: (modelId: string) =>
       v1Client.delete(`${path}/${connectionId}/models/${modelId}`),
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: ["v1", sessionId, "modelops"] });
+    },
+  });
+}
+
+export function useSyncConnectionCapacity(connectionId: string) {
+  const cache = useQueryClient();
+  const { sessionId } = useV1Auth();
+  return useMutation({
+    retry: false,
+    mutationFn: (input: { check_id: string; model_names: string[] }) =>
+      v1Client.post<Provider[]>(`${path}/${connectionId}/sync-capacity`, input),
     onSuccess: () => {
       void cache.invalidateQueries({ queryKey: ["v1", sessionId, "modelops"] });
     },

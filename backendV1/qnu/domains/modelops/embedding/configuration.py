@@ -5,7 +5,9 @@ from qnu.domains.modelops.models import Provider
 KEY = "embedding_dimension_v1"
 
 
-def set_dimension(provider: Provider, dimension: int | None) -> None:
+def set_dimension(
+    provider: Provider, dimension: int | None, *, basis: str = "operator_configured"
+) -> None:
     extra = dict(provider.extra_config or {})
     if dimension is None:
         extra.pop(KEY, None)
@@ -14,7 +16,7 @@ def set_dimension(provider: Provider, dimension: int | None) -> None:
             "endpoint": provider.base_url.rstrip("/"),
             "model": provider.model_name,
             "dimension": dimension,
-            "basis": "operator_configured",
+            "basis": basis,
         }
     provider.extra_config = extra
 

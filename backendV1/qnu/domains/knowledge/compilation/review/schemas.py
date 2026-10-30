@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class ReviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     provider_id: str | None = Field(None, min_length=1, max_length=64)
-    max_output_tokens: int = Field(8192, gt=0)
+    max_output_tokens: int | None = Field(None, gt=0)
     structured_output: bool = False
 
 

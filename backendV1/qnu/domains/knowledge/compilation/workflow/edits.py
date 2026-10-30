@@ -86,20 +86,24 @@ async def preview(db, blob, actor, workspace_id, collection_id, run_id, req):
     if bundle.bundle_sha256 != req.expected_bundle_sha256:
         raise Conflict("Bản biên soạn đã thay đổi.", code="compilation_edit_stale")
     content = req.content.model_dump()
-    if not req.reason.strip() or content == editable(bundle.content):
+    if not req.reason.strip():
         raise Conflict("Cần nội dung thay đổi và lý do lưu.", code="compilation_edit_empty")
     bindings = list(
         (await db.scalars(select(CompilationInput).where(CompilationInput.run_id == run_id))).all()
     )
     documents = await load_bound_documents(db, blob, workspace_id, collection_id, bindings)
     try:
-        build_draft(json.dumps(content, ensure_ascii=False), run.topic, documents, run.id)
+        content = editable(
+            build_draft(json.dumps(content, ensure_ascii=False), run.topic, documents, run.id)
+        )
     except AppException as exc:
         raise AppException(
             "Bản sửa cần có nội dung và citation thuộc nguồn đã ghim.",
             code="compilation_edit_invalid",
             status_code=422,
         ) from exc
+    if content == editable(bundle.content):
+        raise Conflict("Cần nội dung thay đổi và lý do lưu.", code="compilation_edit_empty")
     report_sha = await checked_review(db, blob, actor, run, req.review_id)
     row = EditPreview(
         id=new_id("ced"),
@@ -222,7 +226,7 @@ async def accept(db, blob, actor, workspace_id, collection_id, run_id, req, key,
             **run.config,
             "auto_review": True,
             "review": run.config.get(
-                "review", {"provider_id": run.provider_id, "max_output_tokens": 8192}
+                "review", {"provider_id": run.provider_id}
             ),
             "workflow_version": "qnu.compiler.workflow/v1",
             "edit": {

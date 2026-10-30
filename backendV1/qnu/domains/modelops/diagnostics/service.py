@@ -192,6 +192,7 @@ async def run_diagnostic(
         observed_dimension=result.observed_dimension,
         total_tokens=result.total_tokens,
         models=result.models,
+        model_metadata=result.model_metadata,
     )
     config = dict(current.extra_config or {})
     config[HISTORY_KEY] = [

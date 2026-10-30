@@ -37,7 +37,7 @@ async def prepare_chat_request(
     messages: list[ChatMessage],
     *,
     provider_id: str | None,
-    max_output_tokens: int,
+    max_output_tokens: int | None,
     output_schema: dict | None = None,
     task: Task = "chat",
 ) -> tuple[ChatRuntime, ChatRequest, RequestTokenBudget]:

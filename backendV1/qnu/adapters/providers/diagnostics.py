@@ -32,7 +32,12 @@ from qnu.platform.network_policy import assert_allowed_endpoint
 from qnu.ports.chat_model import ChatRequest
 from qnu.ports.embedding_model import EmbeddingRequest
 from qnu.ports.ocr_engine import OcrRequest
-from qnu.ports.provider_diagnostics import DiagnosticKind, DiagnosticResult, DiagnosticTarget
+from qnu.ports.provider_diagnostics import (
+    DiagnosticKind,
+    DiagnosticResult,
+    DiagnosticTarget,
+    DiscoveredModel,
+)
 
 
 def models_url(endpoint: str) -> str:
@@ -137,7 +142,17 @@ def validate(
                 raise ValueError("Invalid model ID")
             if target.api_key and target.api_key in model:
                 raise ValueError("Credential reflected by upstream")
+            if model in ids:
+                raise ValueError("Duplicate model ID")
             ids.append(model)
+            result.model_metadata.append(
+                DiscoveredModel(
+                    id=model,
+                    context_window_tokens=row.get("max_model_len"),
+                    max_output_tokens=row.get("max_output_tokens"),
+                    embedding_dimension=row.get("embedding_dimension"),
+                )
+            )
         result.models = sorted(set(ids))
         result.detail = "Đã lấy danh sách; các model chưa được kiểm tra inference."
     elif kind == "embedding":

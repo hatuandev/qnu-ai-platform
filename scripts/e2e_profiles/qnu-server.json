@@ -7,5 +7,23 @@
     "embedding": "bge-m3",
     "rerank": "bge-reranker-v2-m3",
     "ocr": "nemotron-parse"
+  },
+  "model_runtime": {
+    "chat": { "timeout_seconds": 300 },
+    "embedding": { "timeout_seconds": 60 },
+    "rerank": { "timeout_seconds": 60, "max_input_tokens": 1024 },
+    "ocr": {
+      "timeout_seconds": 180,
+      "ocr_page_input": {
+        "max_image_width": 1664,
+        "max_image_height": 2048,
+        "input_tokens_upper_bound": 4096,
+        "prompt_sha256": "893d80dc972bc64399fd997a7fa78cebdf3bd1dc92f0de4ac25dc0d1f9e7b92d"
+      }
+    }
+  },
+  "runtime_basis": {
+    "scope": "Only this QNU E2E profile; not model capacity defaults",
+    "ocr_accounting": "docs/nhat_ky/2026-10-30_phien_728_luu_capacity_va_test_model_live.md: measured 3336 prompt tokens at 1664x2048, conservative bound 4096 for the pinned prompt and same processor"
   }
 }

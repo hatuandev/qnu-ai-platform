@@ -66,7 +66,8 @@ export const compilationRequestSchema = z
       .number()
       .int()
       .positive("Số token review phải là số nguyên dương")
-      .default(8192),
+      .nullable()
+      .optional(),
     review_structured_output: z.boolean().default(false),
   })
   .refine(
@@ -110,7 +111,8 @@ export const manualReviewRequestSchema = z.object({
     .number()
     .int()
     .positive("Số token review phải là số nguyên dương")
-    .default(8192),
+    .nullable()
+    .optional(),
   structured_output: z.boolean().default(false),
 });
 

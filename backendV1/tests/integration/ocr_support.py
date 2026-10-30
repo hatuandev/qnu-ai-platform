@@ -9,11 +9,9 @@ reported separately as NOT RUN.
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import threading
 import time
-import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -25,6 +23,7 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.ocr.config import OCR_PROMPT
 from qnu.main import app
 from qnu.platform.database import AsyncSessionFactory
+from tests.docx_fixture import docx_with_table  # noqa: F401 -- shared fixture re-export
 from tests.integration.knowledge_support import (
     API,
     PLATFORM,
@@ -33,8 +32,6 @@ from tests.integration.knowledge_support import (
     create_collection,
     upload_source,
 )
-
-W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
 
 # --------------------------------------------------------------------------- documents
@@ -49,63 +46,6 @@ def real_pdf(pages: list[str | None]) -> bytes:
         return document.tobytes()
     finally:
         document.close()
-
-
-def _cell(text: str, *, span: int = 1, merge: str | None = None, footnote: bool = False) -> str:
-    properties = "<w:tcPr>"
-    if span > 1:
-        properties += f'<w:gridSpan w:val="{span}"/>'
-    if merge:
-        properties += f'<w:vMerge w:val="{merge}"/>'
-    properties += "</w:tcPr>"
-    runs = f'<w:r><w:t xml:space="preserve">{text}</w:t></w:r>'
-    if footnote:
-        runs += '<w:r><w:footnoteReference w:id="1"/></w:r>'
-    return f"<w:tc>{properties}<w:p>{runs}</w:p></w:tc>"
-
-
-def docx_with_table() -> bytes:
-    """DOCX with a two-level header, a merged cell, an empty cell, 0, '-' and a footnote."""
-    body = (
-        '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
-        "<w:r><w:t>PHỤ LỤC 01</w:t></w:r></w:p>"
-        "<w:p><w:r><w:t>Đơn vị: Khoa Công nghệ thông tin</w:t></w:r></w:p>"
-    )
-    body += "<w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr>"
-    body += _cell("STT") + _cell("Chỉ tiêu") + _cell("Năm", span=2)
-    body += "</w:tr><w:tr><w:trPr><w:tblHeader/></w:trPr>"
-    body += _cell("") + _cell("") + _cell("2023") + _cell("2024")
-    body += "</w:tr><w:tr>"
-    body += _cell("1") + _cell("Chỉ tiêu tuyển sinh") + _cell("0") + _cell("-")
-    body += "</w:tr><w:tr>"
-    body += _cell("2") + _cell("Chỉ tiêu trúng tuyển", footnote=True) + _cell("") + _cell("150")
-    body += "</w:tr><w:tr>"
-    body += _cell("3") + _cell("Ghi chú", merge="restart") + _cell("15", span=2)
-    body += "</w:tr><w:tr>"
-    body += _cell("4") + _cell("", merge="continue") + _cell("20", span=2)
-    body += "</w:tr></w:tbl>"
-
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr(
-            "[Content_Types].xml",
-            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/'
-            'package/2006/content-types"/>',
-        )
-        archive.writestr(
-            "word/document.xml",
-            '<?xml version="1.0" encoding="UTF-8"?>'
-            f'<w:document xmlns:w="{W}"><w:body>{body}</w:body></w:document>',
-        )
-        archive.writestr(
-            "word/footnotes.xml",
-            '<?xml version="1.0" encoding="UTF-8"?>'
-            f'<w:footnotes xmlns:w="{W}">'
-            '<w:footnote w:id="0"><w:p><w:r><w:t>sep</w:t></w:r></w:p></w:footnote>'
-            '<w:footnote w:id="1"><w:p><w:r><w:t>Ghi chú: số liệu năm 2023.</w:t></w:r></w:p>'
-            "</w:footnote></w:footnotes>",
-        )
-    return buffer.getvalue()
 
 
 def ocr_blocks(*blocks: str) -> str:

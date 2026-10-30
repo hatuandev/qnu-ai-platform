@@ -35,7 +35,7 @@ liệt kê `bge-m3`, `bge-reranker-v2-m3`, `qwen3.8-27b-q4`, `nemotron-parse`.
 Danh sách có thể đổi; dùng nút lấy lại để xem hiện trạng. Khóa lưu mã hóa trong
 ModelOps DB, không đưa vào tài liệu hoặc cấu hình FE.
 
-Chạy thử không tự cấp model cho workspace hoặc thay mặc định. Sau đó vẫn khai
-báo capacity, cấp provider, chọn default và quota theo [hướng dẫn V1](38_huong_dan_chay_qnu_v1.md).
+Chạy thử không tự cấp model cho workspace hoặc thay mặc định. Sau đó lấy capacity server công bố qua **Nhập từ /models → Lấy lại → chọn model → Áp dụng**,
+bổ sung phần thiếu như ngân sách ảnh OCR, cấp provider, chọn default và quota theo [hướng dẫn V1](38_huong_dan_chay_qnu_v1.md).
 Không suy context tối đa hay độ chính xác OCR/RAG từ một mẫu thử.
 [Hợp đồng BE](../../backendV1/docs/modelops-diagnostics.md).

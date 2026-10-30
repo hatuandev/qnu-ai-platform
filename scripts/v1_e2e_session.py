@@ -43,6 +43,13 @@ MODEL_STAGES = (
     "model-rerank",
     "model-ocr",
 )
+ADMISSIONS_STAGES = (
+    "admissions-upload",
+    "admissions-extraction",
+    "admissions-compilation",
+    "admissions-publication",
+    "admissions-chat",
+)
 
 
 def save(path, value):
@@ -57,6 +64,15 @@ def save(path, value):
 
 def read(path):
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def backend_source_hash():
+    digest = hashlib.sha256()
+    for source in sorted((BE / "qnu").rglob("*.py")):
+        digest.update(source.relative_to(BE).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(source.read_bytes()).digest())
+    return digest.hexdigest()
 
 
 def load_session(run_id=None):
@@ -443,6 +459,7 @@ def _serve(directory, manifest):
         MockAiServer(port=assigned["mock"]) if manifest["mode"] == "workflow" else None
     )
     children, streams = [], []
+    backend_sha256 = backend_source_hash()
     try:
         if mock:
             mock.start()
@@ -504,7 +521,12 @@ def _serve(directory, manifest):
         if not any(p.endswith("/source-deletions/legacy") for p in paths):
             raise RuntimeError("API chưa nạp hợp đồng purge mới.")
         wait_http(f"http://127.0.0.1:{assigned['frontend']}")
-        save(directory / "server.json", {"running": True})
+        if backend_source_hash() != backend_sha256:
+            raise RuntimeError("Mã backend thay đổi trong lúc khởi động. Chạy lại serve.")
+        save(
+            directory / "server.json",
+            {"running": True, "backend_source_sha256": backend_sha256},
+        )
         print(
             f"E2E {manifest['mode']}: http://127.0.0.1:{assigned['frontend']}\nGiữ cửa sổ này. Ctrl+C chỉ dừng API/worker/FE thử."
         )
@@ -532,19 +554,20 @@ def _serve(directory, manifest):
 def run_stage(directory, manifest, stage, headed):
     state = read(directory / "checkpoint.json")
     model_test = stage in MODEL_STAGES
-    if model_test and manifest["mode"] != "live":
+    admissions_test = stage in ADMISSIONS_STAGES
+    if (model_test or admissions_test) and manifest["mode"] != "live":
         print(
-            "BLOCKED: model-* chỉ chạy trên phiên init --mode live; không dùng AI giả lập để xác nhận model thật."
+            "BLOCKED: model-* và admissions-* cần phiên init --mode live, không dùng AI giả lập."
         )
         return 2
-    sequence = MODEL_STAGES if model_test else STAGES
+    sequence = MODEL_STAGES if model_test else ADMISSIONS_STAGES if admissions_test else STAGES
     index = sequence.index(stage)
     if model_test:
         prerequisites = [] if stage == "provider-setup" else ["provider-setup"]
         if stage != "provider-setup" and stage != "model-discovery":
             prerequisites.append("model-discovery")
     else:
-        prerequisites = STAGES[:index]
+        prerequisites = ("navigation", *ADMISSIONS_STAGES[:index]) if admissions_test else STAGES[:index]
     if manifest["mode"] == "live" and not model_test:
         prerequisites = (*MODEL_STAGES, *prerequisites)
     missing = [
@@ -556,11 +579,19 @@ def run_stage(directory, manifest, stage, headed):
     if missing:
         print("BLOCKED: cần chạy đạt các chặng trước: " + ", ".join(missing))
         return 2
-    if (
-        not (directory / "server.json").exists()
-        or not read(directory / "server.json")["running"]
-    ):
+    server = read(directory / "server.json") if (directory / "server.json").exists() else {}
+    if not server.get("running"):
         print("BLOCKED: chạy serve ở cửa sổ khác trước.")
+        return 2
+    if server.get("phase") == "starting":
+        print("BLOCKED: serve đang khởi động; chờ dòng E2E live/workflow rồi chạy lại.")
+        return 2
+    if server.get("backend_source_sha256") != backend_source_hash():
+        print(
+            "BLOCKED: API/worker chưa xác nhận mã backend hiện tại. "
+            "Nhấn Ctrl+C tại cửa sổ serve, chạy lại .\\test-v1-e2e.ps1 serve "
+            "rồi chạy lại chặng. Không cleanup/init."
+        )
         return 2
     lock = directory / "stage.lock"
     try:
@@ -603,7 +634,7 @@ def run_stage(directory, manifest, stage, headed):
                     "exit_code": 2,
                     "report": str(output),
                 }
-                for dependent in (*MODEL_STAGES[1:], *STAGES):
+                for dependent in (*MODEL_STAGES[1:], *STAGES, *ADMISSIONS_STAGES):
                     state["results"].pop(dependent, None)
                 save(directory / "checkpoint.json", state)
                 print("BLOCKED:", exc)
@@ -634,12 +665,14 @@ def run_stage(directory, manifest, stage, headed):
         }
         if model_test:
             dependents = (
-                (*MODEL_STAGES[index + 1 :], *STAGES)
+                (*MODEL_STAGES[index + 1 :], *STAGES, *ADMISSIONS_STAGES)
                 if stage in {"provider-setup", "model-discovery"}
-                else STAGES
+                else (*STAGES, *ADMISSIONS_STAGES)
             )
         else:
-            dependents = STAGES[index + 1 :]
+            dependents = sequence[index + 1 :]
+            if stage == "navigation":
+                dependents = (*dependents, *ADMISSIONS_STAGES)
         for dependent in dependents:
             state["results"].pop(dependent, None)
         if stage == "lifecycle" and verdict == "PASS":
@@ -671,7 +704,7 @@ def main(argv=None):
             "cleanup",
         ),
     )
-    parser.add_argument("stage", nargs="?", choices=STAGES + MODEL_STAGES)
+    parser.add_argument("stage", nargs="?", choices=STAGES + MODEL_STAGES + ADMISSIONS_STAGES)
     parser.add_argument("--session")
     parser.add_argument("--mode", choices=("workflow", "live"), default="workflow")
     parser.add_argument("--headed", action="store_true")
@@ -704,6 +737,8 @@ def main(argv=None):
                 print("Phiên:", manifest["run_id"], "Mode:", manifest["mode"])
                 for stage in STAGES + (
                     MODEL_STAGES if manifest["mode"] == "live" else ()
+                ) + (
+                    ADMISSIONS_STAGES if state.get("admissions") else ()
                 ):
                     row = state["results"].get(stage, {})
                     print(stage, row.get("status", "NOT RUN"), row.get("report", ""))

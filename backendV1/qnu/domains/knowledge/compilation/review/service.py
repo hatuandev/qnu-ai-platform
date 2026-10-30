@@ -12,6 +12,7 @@ from qnu.domains.knowledge.compilation.review import artifacts
 from qnu.domains.knowledge.compilation.review.material import ReviewMaterial, load_material
 from qnu.domains.knowledge.compilation.review.models import CompilationReview, ReviewArtifact
 from qnu.domains.knowledge.compilation.review.report import (
+    PROMPT_VERSION,
     SYSTEM,
     VERSION,
     messages_for,
@@ -216,7 +217,7 @@ async def prepare(
         bundle_sha256=material.bundle.bundle_sha256,
         expires_at=utcnow() + timedelta(seconds=max(900, runtime.timeout_seconds + 60)),
         trace={
-            "prompt_version": VERSION,
+            "prompt_version": PROMPT_VERSION,
             "prompt_sha256": digest(SYSTEM),
             "provider_id": runtime.provider_id,
             "model_name": runtime.model_name,

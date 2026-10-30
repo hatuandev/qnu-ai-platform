@@ -28,6 +28,11 @@ def source_units(documents: list[dict]) -> list[dict]:
                     "identity": doc["identity"],
                     "bbox": block["bbox"],
                     "kind": block["type"],
+                    **{
+                        key: block[key]
+                        for key in ("evidence_id", "origin", "requires_review", "label")
+                        if key in block
+                    },
                 }
                 table = block.get("table")
                 if table is not None and table["status"] == "parsed":
@@ -37,6 +42,7 @@ def source_units(documents: list[dict]) -> list[dict]:
                                 {
                                     **base,
                                     "id": doc["ocr_run_id"] + ":" + cell["evidence_id"],
+                                    "evidence_id": cell["evidence_id"],
                                     "text": cell["text"],
                                     "kind": "table_cell",
                                     "table_id": doc["ocr_run_id"] + ":" + block["evidence_id"],
@@ -47,7 +53,7 @@ def source_units(documents: list[dict]) -> list[dict]:
                                     "header": cell["header"],
                                 }
                             )
-                elif block["text"]:
+                else:
                     units.append(
                         {
                             **base,

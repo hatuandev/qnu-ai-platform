@@ -1,4 +1,4 @@
-import { Bot, Check, Download, Loader2, Plus, Sparkles } from "lucide-react";
+import { Download, Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -9,10 +9,36 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/admin/responsive-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useDiagnostics, useRunDiagnostic } from "../diagnostic-queries";
-import { useAddConnectionModel } from "./api";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  type DiagnosticCheck,
+  type DiscoveredModel,
+  useDiagnostics,
+  useRunDiagnostic,
+} from "../diagnostic-queries";
+import { CAPABILITY_LABELS, type Capability } from "../types";
+import { useAddConnectionModel, useSyncConnectionCapacity } from "./api";
+
+function describeMetadata(row?: DiscoveredModel) {
+  const values = [
+    row?.context_window_tokens
+      ? `Context ${row.context_window_tokens.toLocaleString("vi-VN")}`
+      : null,
+    row?.max_output_tokens
+      ? `Đầu ra ${row.max_output_tokens.toLocaleString("vi-VN")}`
+      : null,
+    row?.embedding_dimension ? `${row.embedding_dimension} chiều` : null,
+  ].filter(Boolean);
+  return values.length ? values.join(" · ") : "Server chưa công bố giới hạn";
+}
 
 export function ImportModelsDialog({
   open,
@@ -32,159 +58,230 @@ export function ImportModelsDialog({
   const diagnostic = useDiagnostics(connectionId);
   const runDiagnostic = useRunDiagnostic(connectionId);
   const addModelMutation = useAddConnectionModel(connectionId);
-
-  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
-  const [isDiscovering, setIsDiscovering] = useState(false);
-  const [addingModel, setAddingModel] = useState<string | null>(null);
-
+  const syncMutation = useSyncConnectionCapacity(connectionId);
+  const [loadedCheck, setCheck] = useState<DiagnosticCheck | null>();
+  const [selected, setSelected] = useState<string[]>([]);
+  const [capabilities, setCapabilities] = useState<Record<string, Capability>>(
+    {},
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const existingSet = new Set(existingModels);
+  const latest = diagnostic.data?.checks.find(
+    (item) => item.kind === "discovery",
+  );
+  const cachedCheck =
+    latest?.outcome === "ok" && latest.configuration_status === "current"
+      ? latest
+      : null;
+  const check = loadedCheck === undefined ? cachedCheck : loadedCheck;
 
-  // Auto discover when opened
   useEffect(() => {
-    if (open) {
-      const latest = diagnostic.data?.checks.find((x) => x.kind === "discovery");
-      if (latest?.outcome === "ok" && latest.models.length > 0) {
-        setDiscoveredModels(latest.models);
-      } else {
-        handleDiscover();
-      }
+    if (!open) {
+      setCheck(undefined);
+      setSelected([]);
+      setError(null);
+      return;
     }
-  }, [open, diagnostic.data]);
+  }, [open]);
 
   const handleDiscover = async () => {
-    setIsDiscovering(true);
+    setError(null);
+    setCheck(null);
+    setSelected([]);
     try {
-      const res = await runDiagnostic.mutateAsync("discovery");
-      if (res.outcome === "ok" && res.models.length > 0) {
-        setDiscoveredModels(res.models);
-        toast.success(`Tìm thấy ${res.models.length} model từ /models`);
-      } else {
-        toast.error(res.detail || "Không tìm thấy model nào từ endpoint /models.");
+      const result = await runDiagnostic.mutateAsync("discovery");
+      if (result.outcome !== "ok") {
+        setError(result.detail);
+        return;
       }
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Không thể truy xuất danh sách model.");
-    } finally {
-      setIsDiscovering(false);
+      setCheck(result);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Không lấy được danh sách model.",
+      );
     }
   };
 
-  const handleAddModel = async (modelName: string) => {
-    setAddingModel(modelName);
+  const handleApply = async () => {
+    if (!check) return;
+    setIsSaving(true);
+    setError(null);
     try {
-      await addModelMutation.mutateAsync({
-        model_name: modelName,
-        capabilities: ["chat"],
-      });
-      toast.success(`Đã thêm model ${modelName}.`);
-      onModelAdded?.();
-    } catch {
-      toast.error(`Không thể thêm model ${modelName}.`);
+      const registered = selected.filter((name) => existingSet.has(name));
+      if (registered.length)
+        await syncMutation.mutateAsync({
+          check_id: check.id,
+          model_names: registered,
+        });
+      for (const name of selected.filter((item) => !existingSet.has(item))) {
+        await addModelMutation.mutateAsync({
+          model_name: name,
+          capabilities: [capabilities[name] ?? "chat"],
+          ...(check.model_metadata?.some((row) => row.id === name)
+            ? { discovery_check_id: check.id }
+            : {}),
+        });
+        setSelected((current) => current.filter((item) => item !== name));
+      }
+      setSelected([]);
+      toast.success("Đã áp dụng thông số model.");
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Không áp dụng được thông số model.",
+      );
     } finally {
-      setAddingModel(null);
+      setIsSaving(false);
+      onModelAdded?.();
     }
   };
 
   return (
-    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
-      <ResponsiveDialogContent className="flex max-h-[min(820px,calc(100vh-2rem))] max-w-lg flex-col gap-0 overflow-hidden p-0 text-xs">
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={(value) => {
+        if (!isSaving) onOpenChange(value);
+      }}
+    >
+      <ResponsiveDialogContent className="flex max-h-[min(820px,calc(100vh-2rem))] max-w-xl flex-col gap-0 overflow-hidden p-0">
         <ResponsiveDialogHeader className="border-b bg-muted/20 p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Download className="size-4" />
-              </div>
-              <div>
-                <ResponsiveDialogTitle>Nhập mô hình từ /models</ResponsiveDialogTitle>
-                <ResponsiveDialogDescription className="text-xs">
-                  Truy vấn endpoint upstream của {connectionName} để lấy danh sách mô hình.
-                </ResponsiveDialogDescription>
-              </div>
-            </div>
-
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 text-xs"
-              disabled={isDiscovering}
-              onClick={handleDiscover}
-            >
-              {isDiscovering ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="size-3.5" />
-              )}
-              <span>Quét lại</span>
-            </Button>
-          </div>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
+            <Download className="size-4" />
+            Lấy model
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
+            Thông số do {connectionName} công bố; chưa phải kết quả kiểm định.
+            Chọn model để thêm hoặc đồng bộ.
+          </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
-
-        <div className="min-h-0 flex-1 p-5 overflow-y-auto space-y-2">
-          {isDiscovering ? (
-            <div className="flex flex-col items-center justify-center p-8 space-y-2 text-muted-foreground">
-              <Loader2 className="size-6 animate-spin text-primary" />
-              <p>Đang kết nối tới endpoint /models...</p>
-            </div>
-          ) : discoveredModels.length === 0 ? (
-            <div className="text-center p-8 space-y-2 text-muted-foreground">
-              <Bot className="size-8 mx-auto text-muted-foreground/50" />
-              <p>Chưa tìm thấy model nào từ nhà cung cấp.</p>
-              <p className="text-[11px]">Đảm bảo bạn đã thêm API Key hợp lệ và địa chỉ Base URL chính xác.</p>
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {discoveredModels.map((m) => {
-                const isAdded = existingSet.has(m);
-                const isCurrentAdding = addingModel === m;
-
-                return (
-                  <div
-                    key={m}
-                    className="flex items-center justify-between p-2.5 rounded-lg border border-border/80 bg-card hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <Bot className="size-4 text-primary shrink-0" />
-                      <span className="font-mono text-xs font-medium truncate">
-                        {m}
-                      </span>
-                    </div>
-
-                    <div className="shrink-0 ml-2">
-                      {isAdded ? (
-                        <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground">
-                          <Check className="size-3 text-success" />
-                          Đã thêm
-                        </Badge>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-7 text-xs gap-1"
-                          disabled={isCurrentAdding}
-                          onClick={() => handleAddModel(m)}
-                        >
-                          {isCurrentAdding ? (
-                            <Loader2 className="size-3 animate-spin" />
-                          ) : (
-                            <Plus className="size-3" />
-                          )}
-                          <span>Thêm</span>
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={runDiagnostic.isPending || isSaving}
+            onClick={handleDiscover}
+          >
+            {runDiagnostic.isPending ? (
+              <Loader2 className="mr-2 size-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 size-3.5" />
+            )}
+            Lấy lại
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Giới hạn input riêng và ngân sách ảnh OCR đã lưu được giữ lại. Chọn
+            đúng chức năng khi thêm model mới.
+          </p>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
           )}
+          {!check?.models.length && !runDiagnostic.isPending && (
+            <p className="text-sm text-muted-foreground">
+              Lấy danh sách để xem thông số hiện tại từ server.
+            </p>
+          )}
+          <div className="divide-y">
+            {check?.models.map((name) => {
+              const metadata = check.model_metadata?.find(
+                (row) => row.id === name,
+              );
+              const hasMetadata =
+                metadata &&
+                (metadata.context_window_tokens ||
+                  metadata.max_output_tokens ||
+                  metadata.embedding_dimension);
+              return (
+                <div key={name} className="flex items-start gap-3 py-3">
+                  <Checkbox
+                    id={`import-${name}`}
+                    className="mt-1"
+                    disabled={
+                      isSaving || (existingSet.has(name) && !hasMetadata)
+                    }
+                    checked={selected.includes(name)}
+                    onCheckedChange={(value) =>
+                      setSelected((current) =>
+                        value === true
+                          ? [...current, name]
+                          : current.filter((item) => item !== name),
+                      )
+                    }
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <label
+                      htmlFor={`import-${name}`}
+                      className="break-all text-sm font-medium"
+                    >
+                      {name}
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      {describeMetadata(metadata)}
+                    </p>
+                    {existingSet.has(name) ? (
+                      <p className="text-xs text-muted-foreground">
+                        Đã thêm · đồng bộ thông số
+                      </p>
+                    ) : (
+                      <Select
+                        value={capabilities[name] ?? "chat"}
+                        disabled={isSaving}
+                        onValueChange={(value) =>
+                          setCapabilities((current) => ({
+                            ...current,
+                            [name]: value as Capability,
+                          }))
+                        }
+                      >
+                        <SelectTrigger
+                          aria-label={`Chức năng ${name}`}
+                          className="w-40"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(CAPABILITY_LABELS).map(
+                            ([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ),
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-
-        <ResponsiveDialogFooter className="border-t bg-card p-4 flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+        <ResponsiveDialogFooter className="border-t bg-card p-4">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isSaving}
+            onClick={() => onOpenChange(false)}
+          >
             Đóng
+          </Button>
+          <Button
+            size="sm"
+            disabled={
+              !check || !selected.length || isSaving || runDiagnostic.isPending
+            }
+            onClick={handleApply}
+          >
+            {isSaving && <Loader2 className="mr-2 size-3.5 animate-spin" />}Áp
+            dụng
           </Button>
         </ResponsiveDialogFooter>
       </ResponsiveDialogContent>
     </ResponsiveDialog>
   );
 }
-

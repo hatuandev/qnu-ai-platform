@@ -1,5 +1,9 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+import {
+  configureTestModelCapacity,
+  type ProviderSetupProfile,
+} from "./provider-capacity";
 import { authenticate, checkpoint, save } from "./session";
 
 test.use({ trace: "off", video: "off", screenshot: "off" });
@@ -15,10 +19,9 @@ test("QNU nhà cung cấp: tạo, khóa, kết nối, model và sidebar", async 
     );
   const profileFile = process.env.E2E_MODEL_PROFILE;
   if (!profileFile) throw new Error("Thiếu profile.");
-  const profile = JSON.parse(readFileSync(profileFile, "utf8")) as {
-    base_url: string;
-    models: Record<string, string>;
-  };
+  const profile = JSON.parse(
+    readFileSync(profileFile, "utf8"),
+  ) as ProviderSetupProfile;
   const api = await authenticate(page);
   const id = state.providerSetup.connectionId;
   const base = `/modelops/connections/${id}`;
@@ -57,6 +60,7 @@ test("QNU nhà cung cấp: tạo, khóa, kết nối, model và sidebar", async 
     http_status: number | null;
     models: string[];
     key_id: string;
+    check_id: string | null;
   }>(`${base}/test`, { key_id: state.providerSetup.keyId });
   if (!checked.ok)
     throw new Error(
@@ -82,6 +86,7 @@ test("QNU nhà cung cấp: tạo, khóa, kết nối, model và sidebar", async 
       selected = await api.post(`${base}/models`, {
         model_name: model,
         capabilities: [capability],
+        discovery_check_id: checked.check_id,
       });
     expect(selected?.parent_id).toBe(id);
     expect(selected?.capabilities).toContain(capability);
@@ -94,6 +99,10 @@ test("QNU nhà cung cấp: tạo, khóa, kết nối, model và sidebar", async 
       Object.values(profile.models).includes(row.model_name),
     ),
   ).toHaveLength(4);
+  await configureTestModelCapacity(api, id, profile, checked.check_id);
+  console.log(
+    "Đã lưu capacity từ server và thông số vận hành của profile E2E; tiếp tục kiểm từng model.",
+  );
   // Check parent disable enforcement, and always restore it before model inference tests.
   try {
     await api.json("PATCH", base, { is_active: false });

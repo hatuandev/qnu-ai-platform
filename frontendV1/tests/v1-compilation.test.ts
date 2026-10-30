@@ -234,9 +234,17 @@ test("acceptEditSchema requires 64-char hex preview_sha256", () => {
   );
 });
 
-test("manualReviewRequestSchema defaults review_max_output_tokens to 8192", () => {
+test("manualReviewRequestSchema leaves output budgeting to ModelOps by default", () => {
   const parsed = manualReviewRequestSchema.parse({});
-  assert.equal(parsed.max_output_tokens, 8192);
+  assert.equal(parsed.max_output_tokens, undefined);
+  assert.equal(
+    manualReviewRequestSchema.parse({ max_output_tokens: null }).max_output_tokens,
+    null,
+  );
+  assert.equal(
+    manualReviewRequestSchema.parse({ max_output_tokens: 8192 }).max_output_tokens,
+    8192,
+  );
   assert.equal(parsed.provider_id, undefined);
   assert.equal(parsed.structured_output, false);
 });

@@ -71,16 +71,17 @@ function CapacityPanel({ provider }: { provider: Provider }) {
           <CapacityBadge status={provider.capacity_status} />
           {provider.capacity_basis ? (
             <Badge variant="outline" className="text-[10px]">
-              {provider.capacity_basis}
+              {provider.capacity_basis === "server_reported"
+                ? "Server công bố"
+                : "Khai báo tay"}
             </Badge>
           ) : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-[11px] leading-5 text-muted-foreground">
-          Đây là khai báo của quản trị viên, không phải giá trị đo hay kiểm
-          chứng từ provider. &quot;Chưa khai báo&quot; không có nghĩa là không
-          giới hạn.
+          Thông số từ server hoặc khai báo quản trị, chưa phải kết quả kiểm
+          định. &quot;Chưa khai báo&quot; không có nghĩa là không giới hạn.
         </p>
 
         {provider.capacity_status === "stale" ? (

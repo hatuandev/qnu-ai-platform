@@ -148,7 +148,10 @@ class ModelStageGuardTests(unittest.TestCase):
                         }
                     },
                 )
-                runner.save(self.directory / "server.json", {"running": True})
+                runner.save(
+                    self.directory / "server.json",
+                    {"running": True, "backend_source_sha256": "current"},
+                )
 
                 def report(args, skipped_count=skipped, **kwargs):
                     output = Path(kwargs["env"]["E2E_OUTPUT"])
@@ -165,6 +168,7 @@ class ModelStageGuardTests(unittest.TestCase):
 
                 with (
                     patch.object(runner, "environment", return_value={}),
+                    patch.object(runner, "backend_source_hash", return_value="current"),
                     patch.object(runner.subprocess, "run", side_effect=report),
                 ):
                     code = runner.run_stage(

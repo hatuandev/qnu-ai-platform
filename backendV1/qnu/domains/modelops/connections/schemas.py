@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from qnu.domains.modelops.capacity.schemas import ModelTokenLimits
+from qnu.ports.provider_diagnostics import DiscoveredModel
 
 Family = Literal["openai", "gemini", "qnu", "custom", "anthropic"]
 
@@ -59,6 +60,15 @@ class ConnectionModelCreate(BaseModel):
     )
     token_limits: ModelTokenLimits | None = None
     embedding_dimension: int | None = Field(None, ge=1, le=65536)
+    discovery_check_id: str | None = Field(None, min_length=1, max_length=64)
+
+    @model_validator(mode="after")
+    def one_capacity_source(self):
+        if self.discovery_check_id and (
+            self.token_limits is not None or self.embedding_dimension is not None
+        ):
+            raise ValueError("Chọn thông số server hoặc khai báo tay, không dùng đồng thời.")
+        return self
 
 
 class ConnectionTestRequest(BaseModel):
@@ -85,3 +95,10 @@ class ConnectionTestResponse(BaseModel):
     latency_ms: int | None = None
     detail: str
     models: list[str] = Field(default_factory=list)
+    model_metadata: list[DiscoveredModel] = Field(default_factory=list)
+
+
+class CapacitySyncRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    check_id: str = Field(min_length=1, max_length=64)
+    model_names: list[str] = Field(min_length=1, max_length=500)

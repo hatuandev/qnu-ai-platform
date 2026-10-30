@@ -24,6 +24,8 @@ Trước discovery, chạy bài test quản lý nhà cung cấp:
 
 Bài này tạo QNU provider/key và đăng ký bốn model nếu thiếu. Khóa nhập ẩn trong PowerShell rồi lưu qua ModelOps DB, không đưa vào source hoặc `.env`. Đồng thời kiểm API sửa/bật/tắt, kết nối, sidebar và form tạo provider UI tạm. Nhà cung cấp/key/model đã có được dùng lại; không cần làm tay để vượt BLOCKED. Xem [hướng dẫn tổng hợp](./V1_TEST_TOAN_LUONG_MODEL_QNU.md) để biết chi tiết và giới hạn kiểm tra UI.
 
+provider-setup tự lưu capacity/dimension từ server và bổ sung thông số vận hành có căn cứ trong profile E2E QNU trước các probe. Chỉ context/output/dimension lấy từ metadata; OCR bound và input override là khai báo tường minh của profile, không phải inference verified. Không cần nhập lại bằng tay sau mỗi init.
+
 Model và nhà cung cấp phải được bật. Dùng giới hạn token/capacity do server thật khai báo khi cấu hình; không xem thông số của model giả lập là thông số server. Embedding test ghi chiều vector quan sát, không tự ghi đè dimension của model/chỉ mục. Endpoint/model ID mong đợi nằm trong [profile không chứa secret](../../scripts/e2e_profiles/qnu-server.json); nếu server đổi model ID, điều chỉnh profile và cấu hình ModelOps tương ứng trước khi chạy.
 
 ## Chạy từng lệnh

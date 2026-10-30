@@ -62,7 +62,7 @@ export type Provider = {
   timeout_seconds: number;
   token_limits: TokenLimits | null;
   capacity_status: CapacityStatus;
-  capacity_basis: "operator_configured" | null;
+  capacity_basis: "operator_configured" | "server_reported" | null;
   embedding_dimension: number | null;
   embedding_dimension_status: CapacityStatus;
   created_at: string;

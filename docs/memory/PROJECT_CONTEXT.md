@@ -7,6 +7,28 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-10-30 — Context743: viết test PDF điểm sàn 26.** 5chặng admissions riêng từ upload đến chat, 19câu (16positive/3negative) theo PDF8trang đã chốt hash; report/citation/scope, giữ review gate. Nhãn draft cần người duyệt; test/build/lint/live NOT RUN theo yêu cầu. [Nhật ký743](../nhat_ky/2026-10-30_phien_743_test_pdf_diem_san_26.md).
+
+- **2026-10-30 — Context742: người dùng chạy E2E live 14/14 PASS.** Phiên816537dc7b48 đối chiếu checkpoint/14report: expected14, unexpected/skipped/flaky0; compilation5.3m, publication/chat/permissions/lifecycle đạt. consumed=true, lượt mới cần phiên mới. Không tự chạy test/model; gate rộng lịch sử737 giữ FAIL. [Nhật ký742](../nhat_ky/2026-10-30_phien_742_nguoi_dung_e2e_14_chang_pass.md).
+
+- **2026-10-30 — Context741: chặn runtime cũ và phục hồi compilation.** Runner lưu hash source khi khởi động API/worker, chặn run nếu mã đổi/chưa xác nhận; không tự restart. Khôi phục bản trung gian qua finding gốc cùng document và khóa sửa v2; giữ history/gate. Test/build/lint/live NOT RUN theo yêu cầu. [Nhật ký741](../nhat_ky/2026-10-30_phien_741_chan_runtime_cu_va_phuc_hoi_compilation.md).
+
+- **2026-10-30 — Context740: giữ giới hạn khối chưa đọc trong draft.** Ghi chú có citation từ metadata trống/cần kiểm tra, giữ nguồn/bảng/unknowns; preview edit đúng nội dung hiệu lực. E2E rerun append bản sửa và version mới, giữ gate/historical drafts. Test/build/lint/inference NOT RUN theo yêu cầu. [Nhật ký740](../nhat_ky/2026-10-30_phien_740_giu_gioi_han_khoi_chua_doc.md).
+
+- **2026-10-30 — Context739: hiển thị thời gian review.** E2E giải thích timeout là giới hạn chờ tối đa, báo thời gian completed theo timestamp server. Không đổi timeout/token, không ngắt lượt đang chạy; test/build/lint/live NOT RUN theo yêu cầu. [Nhật ký739](../nhat_ky/2026-10-30_phien_739_hien_thoi_gian_review.md).
+
+- **2026-10-30 — Context738: review output theo capacity.** Bỏ 8192 cố định ở review API/UI/E2E, dùng ModelOps planner; compiler giữ 8192. Chạy lại chặng chỉ phục hồi truncated khi cùng provider và output tăng, giữ lịch sử/idempotency. Test/build/lint/live NOT RUN theo yêu cầu; chưa restart/đổi DB. [Nhật ký738](../nhat_ky/2026-10-30_phien_738_review_output_theo_capacity.md).
+
+- **2026-10-30 — Context737: sửa fixture DOCX backend.** OPC package hợp lệ cho LibreOffice, giữ bảng/merge/literal/footnote; assertion converter theo cấu hình.46focused/18unit/14native/Ruff và HTTP200 PDF thật đạt. Gate rộng FAIL:410pass/2fail/1error/494notrun; lỗi lifecycle659,purge716,setup recovery666, ID tại nhật ký. E2E người dùng14/14 PASS giữ, không chạy lại/purge/restart. [Nhật ký737](../nhat_ky/2026-10-30_phien_737_sua_fixture_docx_backend.md).
+
+- **2026-10-30 — Context736: sửa review khối ảnh rỗng.** Giữ source unit không text và provenance, prompt v4 phân biệt unknown với kiểm định OCR, không bỏ gate.43focused/Ruff đạt; live review finding0, publication PASS, hash nguồn/draft giữ. Chat/permissions/lifecycle NOT RUN; full gate FAIL ở DOCX710 (25pass/1fail), chi tiết tại nhật ký. [Nhật ký736](../nhat_ky/2026-10-30_phien_736_sua_review_khoi_anh_rong.md).
+
+- **2026-10-30 — Context735: sửa E2E lưu capacity.** Provider-setup thiếu bước áp dụng discovery; đã nối snapshot/sync và profile vận hành có căn cứ, giữ input/OCR operator. Cùng phiên live: bốn model configured, setup +5model stages +navigation PASS.15FE/4offline/build+TS/Biome đạt; upload trở đi NOT RUN, fullBE FAIL lịch sử733 giữ. Không restart/reset. [Nhật ký735](../nhat_ky/2026-10-30_phien_735_sua_e2e_tu_dong_luu_capacity.md).
+
+- **2026-10-30 — Context734: hướng dẫn test lại từ đầu.** Bản ngắn mụcB và bản đầy đủ/README E2E đưa UI lấy capacity sau provider-setup, tách timeout/OCR còn thiếu, giữ đủ14chặng và gate review.18khối PowerShell kiểm cú pháp, thứ tự/link/UTF8/LF/diff; chỉ docs, chưa chạy E2E mới. [Nhật ký734](../nhat_ky/2026-10-30_phien_734_cap_nhat_huong_dan_test_tu_dau.md).
+
+- **2026-10-30 — Context733: lấy capacity từ server.** Discovery metadata + preview/import/sync current có audit, giữ input/OCR và chặn dimension đổi. Live GETmodels200 đủ4model;73ID BE trọng tâm/22FE/build+TS/Ruff/Biome và browser desktop/mobile đạt. Full889collected gặp Windows access violation, vẫn FAIL. Không inference/restart/đổi DB phục vụ. [Nhật ký733](../nhat_ky/2026-10-30_phien_733_tu_dong_lay_capacity_server.md).
+
 - **2026-10-30 — Context732: hướng dẫn test lại và giải thích hình OCR.** Bản ngắn tách resume với cleanup/init mới, đủ14chặng và cấu hình128K/16K. Ba finding cùng một figure rỗng; review bỏ block không text nên thiếu source unit. Chỉ đọc API/docs, chưa sửa OCR/review hoặc gọi model. Link/UTF8/LF/diff kiểm; không đổi runtime. [Nhật ký732](../nhat_ky/2026-10-30_phien_732_huong_dan_test_lai_va_review_hinh.md).
 
 - **2026-10-30 — Context731: test Qwen128K/16K.** Đã lưu Qwen context131072/output16384, Compiler8192 giữ. Chat641ms và navigation/upload/extraction/compilation PASS; review mới56s so91s nhưng token3968so6520, tốc độ decode tương đương. Report3uncertain hình ảnh; chưa phát hành/full pipeline. Biome/build+TS đạt. [Nhật ký731](../nhat_ky/2026-10-30_phien_731_test_qwen_128k_16k.md).

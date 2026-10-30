@@ -83,7 +83,7 @@ class ProviderResponse(BaseModel):
     timeout_seconds: int
     token_limits: ModelTokenLimits | None = None
     capacity_status: Literal["unknown", "configured", "stale"] = "unknown"
-    capacity_basis: Literal["operator_configured"] | None = None
+    capacity_basis: Literal["operator_configured", "server_reported"] | None = None
     embedding_dimension: int | None = None
     embedding_dimension_status: Literal["unknown", "configured", "stale"] = "unknown"
     created_at: datetime

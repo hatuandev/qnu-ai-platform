@@ -66,9 +66,9 @@ function CapacitySectionHeader() {
         Năng lực khai báo
       </h3>
       <p className="text-[11px] leading-5 text-muted-foreground">
-        Đây là khai báo của quản trị viên, không phải kết quả đo hay kiểm chứng
-        từ provider. Bỏ trống nghĩa là <strong>chưa biết</strong>, không phải
-        &quot;không giới hạn&quot;.
+        Thông số có thể lấy từ server qua “Lấy model” hoặc khai báo tại đây;
+        chưa phải kết quả kiểm định. Bỏ trống nghĩa là{" "}
+        <strong>chưa biết</strong>, không phải &quot;không giới hạn&quot;.
       </p>
     </div>
   );

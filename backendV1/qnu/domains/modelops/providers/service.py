@@ -13,6 +13,7 @@ from sqlalchemy.orm import aliased
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.modelops.access import require_model_admin
 from qnu.domains.modelops.audit import record_event
+from qnu.domains.modelops.capacity.schemas import CapacityBasis
 from qnu.domains.modelops.capacity.service import invalidate_capacity, read_capacity, set_capacity
 from qnu.domains.modelops.embedding.configuration import read_dimension, set_dimension
 from qnu.domains.modelops.models import Provider
@@ -48,6 +49,8 @@ class ProviderService:
         actor: AuthActor,
         *,
         parent_id: str | None = None,
+        capacity_basis: CapacityBasis = "operator_configured",
+        capacity_source: dict | None = None,
     ) -> Provider:
         require_model_admin(actor)
         assert_allowed_endpoint(req.base_url, allow_private=True)
@@ -72,9 +75,14 @@ class ProviderService:
             created_by=actor_ref(actor) or None,
         )
         if req.token_limits is not None:
-            set_capacity(provider, req.token_limits)
+            set_capacity(provider, req.token_limits, basis=capacity_basis)
         if req.embedding_dimension is not None:
-            set_dimension(provider, req.embedding_dimension)
+            set_dimension(provider, req.embedding_dimension, basis=capacity_basis)
+        if capacity_source:
+            provider.extra_config = {
+                **(provider.extra_config or {}),
+                "capacity_discovery_v1": capacity_source,
+            }
         db.add(provider)
         record_event(db, actor, "provider.created", provider.id, list(req.model_fields_set))
         try:

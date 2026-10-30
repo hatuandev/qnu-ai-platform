@@ -3,6 +3,10 @@ import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import {
+  type CompilationDraft,
+  needsUnreadBlockUpgrade,
+} from "./compilation-upgrade";
 import { liveDefaults } from "./live-defaults";
 import {
   type Action,
@@ -373,8 +377,8 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
     // Independent publications let lifecycle verify that deleting one source preserves another.
     for (const [index, source] of state.sources.slice(0, 2).entries()) {
       let publication = state.publications[index];
-      if (!publication) {
-        const created = await api.post<{ run: Run }>(
+      const startCompilation = (suffix = "") =>
+        api.post<{ run: Run }>(
           `${collection(state)}/compilation-runs`,
           {
             topic: `Tóm tắt đầy đủ dữ liệu nguồn ${index + 1}`,
@@ -385,8 +389,10 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
               : {}),
             text_versions: { [source.run]: source.textVersion },
           },
-          `${state.runId}-compile-${index}`,
+          `${state.runId}-compile-${index}${suffix}`,
         );
+      if (!publication) {
+        const created = await startCompilation();
         publication = { run: created.run.id };
         state.publications.push(publication);
         save(state);
@@ -394,9 +400,33 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
       await api.wait(
         `${collection(state)}/compilation-runs/${publication.run}`,
       );
-      const draft = await api.get<{
-        sections: { paragraphs: { text: string; citations: string[] }[] }[];
-      }>(`${collection(state)}/compilation-runs/${publication.run}/draft`);
+      let draft = await api.get<CompilationDraft>(
+        `${collection(state)}/compilation-runs/${publication.run}/draft`,
+      );
+      if (
+        await needsUnreadBlockUpgrade(
+          api,
+          collection(state),
+          publication,
+          draft,
+          state.compilationHistory,
+        )
+      ) {
+        // Explicit rerun after the server fix: append; never rewrite an old draft/review.
+        const created = await startCompilation("-source-limits-v2");
+        (state.compilationHistory ||= []).push({ ...publication });
+        publication = { run: created.run.id, document: publication.document };
+        state.publications[index] = publication;
+        save(state);
+        await api.wait(`${collection(state)}/compilation-runs/${publication.run}`);
+        draft = await api.get<CompilationDraft>(
+          `${collection(state)}/compilation-runs/${publication.run}/draft`,
+        );
+        expect(
+          draft.validation?.unread_source_blocks,
+          "API/worker chưa nạp bản sửa khối chưa đọc. Dừng cửa sổ serve rồi chạy lại serve; không cleanup/init.",
+        ).toBe("retained");
+      }
       const paragraphs = draft.sections.flatMap(
         (section) => section.paragraphs,
       );
@@ -408,36 +438,70 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
           paragraph.citations.every((c) => c.startsWith(`${source.run}:`)),
         ).toBe(true);
       }
-      if (!publication.review) {
+      {
         const reviewProvider = state.runtimeDefaults
-          ? await api.get<{ timeout_seconds: number }>(
+          ? await api.get<{
+              timeout_seconds: number;
+              token_limits?: { max_output_tokens?: number | null } | null;
+            }>(
               `/modelops/providers/${state.runtimeDefaults.chat}`,
             )
           : undefined;
-        if (reviewProvider)
-          console.info(
-            `Đang review nguồn ${index + 1}; thời hạn model ${reviewProvider.timeout_seconds}s.`,
+        const reviewBase = `${collection(state)}/compilation-runs/${publication.run}/reviews`;
+        type ReviewRun = Run & { trace?: { max_output_tokens?: number } };
+        const previous = publication.review
+          ? await api.get<ReviewRun>(`${reviewBase}/${publication.review}`)
+          : (await api.get<ReviewRun[]>(`${reviewBase}?limit=1`))[0];
+        const previousLimit = previous?.trace?.max_output_tokens;
+        const modelLimit = reviewProvider?.token_limits?.max_output_tokens;
+        // A new, explicit stage run may recover truncation only after budget increases.
+        // Uncertain requests and same-budget failures keep their original review.
+        const recoverTruncated =
+          previous?.status === "failed" &&
+          previous.error_code === "chat_output_truncated" &&
+          previous.provider_id === state.runtimeDefaults?.chat &&
+          typeof previousLimit === "number" &&
+          typeof modelLimit === "number" &&
+          previousLimit < modelLimit;
+        if (previous && !recoverTruncated) {
+          publication.review = previous.id;
+        } else {
+          if (reviewProvider)
+            console.info(
+              `Đang review nguồn ${index + 1}; chờ tối đa ${reviewProvider.timeout_seconds}s, trả kết quả ngay khi xử lý xong.`,
+            );
+          const review = await api.post<Run>(
+            reviewBase,
+            state.runtimeDefaults
+              ? {
+                  provider_id: state.runtimeDefaults.chat,
+                  structured_output: true,
+                }
+              : {},
+            `${state.runId}-review-${index}-${publication.run}${recoverTruncated ? `-budget-${modelLimit}` : ""}`,
+            reviewProvider
+              ? (reviewProvider.timeout_seconds + 30) * 1000
+              : undefined,
           );
-        const review = await api.post<Run>(
-          `${collection(state)}/compilation-runs/${publication.run}/reviews`,
-          state.runtimeDefaults
-            ? {
-                provider_id: state.runtimeDefaults.chat,
-                max_output_tokens: 8192,
-                structured_output: true,
-              }
-            : {},
-          `${state.runId}-review-${index}`,
-          reviewProvider
-            ? (reviewProvider.timeout_seconds + 30) * 1000
-            : undefined,
-        );
-        publication.review = review.id;
+          publication.review = review.id;
+        }
         save(state);
       }
-      await api.wait(
+      const completedReview = await api.wait<
+        Run & { created_at: string; finished_at: string | null }
+      >(
         `${collection(state)}/compilation-runs/${publication.run}/reviews/${publication.review}`,
       );
+      if (completedReview.finished_at) {
+        const elapsedSeconds =
+          (Date.parse(completedReview.finished_at) -
+            Date.parse(completedReview.created_at)) /
+          1000;
+        if (Number.isFinite(elapsedSeconds) && elapsedSeconds >= 0)
+          console.info(
+            `Review nguồn ${index + 1} đã hoàn tất; thời gian xử lý ${elapsedSeconds.toFixed(1)} giây.`,
+          );
+      }
       const report = await api.raw(
         "GET",
         `${collection(state)}/compilation-runs/${publication.run}/reviews/${publication.review}/report`,
@@ -452,17 +516,24 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
       throw new Error("Thiếu hai bản biên soạn độc lập.");
     for (const [index, publication] of state.publications.entries()) {
       if (!publication.version) {
+        const documentBase = `${collection(state)}/compiled-documents`;
         const result = await api.post<{
           document: { id: string };
           version: { id: string };
         }>(
-          `${collection(state)}/compiled-documents`,
-          {
-            document_key: `e2e-${state.runId}-${index}`,
-            title: `Bản thử ${index + 1}`,
-            compilation_run_id: publication.run,
-          },
-          `${state.runId}-publication-${index}`,
+          publication.document
+            ? `${documentBase}/${publication.document}/versions`
+            : documentBase,
+          publication.document
+            ? { compilation_run_id: publication.run }
+            : {
+                document_key: `e2e-${state.runId}-${index}`,
+                title: `Bản thử ${index + 1}`,
+                compilation_run_id: publication.run,
+              },
+          publication.document
+            ? `${state.runId}-publication-${index}-${publication.run}`
+            : `${state.runId}-publication-${index}`,
         );
         publication.document = result.document.id;
         publication.version = result.version.id;

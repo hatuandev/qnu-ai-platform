@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from qnu.ports.provider_diagnostics import DiagnosticKind
+from qnu.ports.provider_diagnostics import DiagnosticKind, DiscoveredModel
 
 
 class ProbeRequest(BaseModel):
@@ -28,6 +28,7 @@ class DiagnosticCheck(BaseModel):
     observed_dimension: int | None = None
     total_tokens: int | None = None
     models: list[str] = Field(default_factory=list)
+    model_metadata: list[DiscoveredModel] = Field(default_factory=list)
 
 
 class ProviderDiagnostics(BaseModel):

@@ -787,7 +787,7 @@ function CreateReviewDialog({
   onSuccess?: (reviewId: string) => void;
 }) {
   const [providerId, setProviderId] = useState<string>("default");
-  const [maxTokens, setMaxTokens] = useState<string>("8192");
+  const [maxTokens, setMaxTokens] = useState<string>("");
   const [structuredOutput, setStructuredOutput] = useState<boolean>(false);
   const [idempotencyKey, setIdempotencyKey] = useState<string>(() =>
     generateIdempotencyKey(),
@@ -808,7 +808,7 @@ function CreateReviewDialog({
     e.preventDefault();
     const input: ReviewRequestInput = {
       provider_id: providerId === "default" ? null : providerId,
-      max_output_tokens: maxTokens ? Number(maxTokens) : 8192,
+      max_output_tokens: maxTokens ? Number(maxTokens) : null,
       structured_output: structuredOutput,
     };
 
@@ -892,7 +892,7 @@ function CreateReviewDialog({
               }}
             />
             <p className="text-[11px] text-muted-foreground">
-              Mặc định 8192 tokens.
+              Để trống để tự chọn theo giới hạn model và dung lượng đầu vào.
             </p>
           </div>
 

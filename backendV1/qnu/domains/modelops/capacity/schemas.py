@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 PositiveTokens = Annotated[int, Field(strict=True, gt=0)]
+CapacityBasis = Literal["operator_configured", "server_reported"]
 
 
 class OcrPageInputBudget(BaseModel):
@@ -47,7 +48,7 @@ class ModelCapacity(BaseModel):
     model_config = ConfigDict(frozen=True)
     status: Literal["unknown", "configured", "stale"]
     token_limits: ModelTokenLimits | None = None
-    basis: Literal["operator_configured"] | None = None
+    basis: CapacityBasis | None = None
 
 
 class CapacitySnapshot(BaseModel):
@@ -55,7 +56,7 @@ class CapacitySnapshot(BaseModel):
     provider_id: str
     model_name: str
     token_limits: ModelTokenLimits
-    basis: Literal["operator_configured"]
+    basis: CapacityBasis
     configuration_hash: str
 
 

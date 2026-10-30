@@ -7,8 +7,8 @@
 1. Mở **ModelOps → Nhà cung cấp → Thêm nhà cung cấp**. Chọn OpenAI / ChatGPT, Google Gemini, Server AI QNU hoặc nhà cung cấp khác; nhập tên và địa chỉ API. Chưa cần model hoặc API key ở bước tạo.
 2. Trang chi tiết mở ngay sau khi lưu. Trong **API keys**, thêm khóa upstream được cấp bởi server AI. QNU bảo vệ khóa trong DB, chỉ trả masked hint khi đọc lại. Xoay/thu hồi tại đây là thay đổi credential QNU sử dụng; việc thu hồi trên upstream vẫn do nhà cung cấp thực hiện.
 3. Bấm **Thử kết nối** để gọi API danh sách model. HTTP thành công chỉ chứng minh lấy được danh sách bằng cấu hình hiện tại; chưa chứng minh inference từng model hoạt động.
-4. Bấm **Thêm** cạnh model tìm được, hoặc **Thêm model** để nhập ID thủ công nếu server không hỗ trợ danh sách. Khai báo chức năng thực tế: chat, embedding, rerank, OCR. Danh sách không tự suy ra chức năng hoặc giới hạn model.
-5. Mở **Cấu hình & chạy thử** trên từng model: khai báo capacity có căn cứ, dimension embedding nếu biết, chính sách phục hồi; chạy mẫu theo đúng chức năng.
+4. Bấm **Nhập từ /models → Lấy lại** để xem model và thông số server công bố. Chọn model, chọn đúng chức năng cho model mới rồi **Áp dụng**. Model đã có được đồng bộ thông số; model mới được thêm kèm capacity/dimension nếu server cung cấp. **Thêm model** thủ công vẫn dùng khi server không hỗ trợ danh sách.
+5. Mở **Cấu hình & chạy thử** trên từng model: kiểm tra thông số đã nhận, bổ sung phần thiếu như giới hạn input riêng/ngân sách OCR, chính sách phục hồi; chạy mẫu theo đúng chức năng. Server công bố chưa phải kết quả kiểm định. Thông số thiếu không bị suy đoán; xung đột capacity/dimension cần kiểm tra trước khi áp dụng.
 6. Cấp **model cụ thể** cho workspace, chọn mặc định và cấu hình quota. Nhà cung cấp không được cấp như một model thực thi. Workspace V1 tiếp tục là biên giới quyền qua `resolve_workspace_access`.
 
 Một server QNU là một nhà cung cấp, có thể chứa Nemotron, Qwen, BGE embedding và reranker. Các model mới dùng khóa dùng chung tại nhà cung cấp; không cần nhập lại endpoint/khóa cho từng model. Mỗi model vẫn có ID, capability, capacity, quyền workspace và lịch sử sử dụng riêng.
@@ -30,6 +30,7 @@ Prefix BE `/platform/v1alpha1`, yêu cầu `ai.models.manage`:
 | Danh sách / thêm model | GET / POST `/modelops/connections/{connection_id}/models` |
 | Khóa / xoay / thu hồi / audit | API `/modelops/providers/{connection_id}/keys` và các action hiện có |
 | Thử kết nối / lấy danh sách | POST `/modelops/providers/{connection_id}/discover` |
+| Đồng bộ capacity model đã có | POST `/modelops/connections/{connection_id}/sync-capacity` |
 | Chạy thử model | POST `/modelops/providers/{model_id}/probe` |
 
 FE dùng `/modelops/providers` cho danh sách, `/modelops/providers/{connection_id}` cho nhà cung cấp và `/modelops/models/{model_id}` cho cấu hình model. Deep link model cũ `/modelops/providers/{model_id}` tiếp tục được hỗ trợ. API `/modelops/providers` cũ giữ tương thích với model độc lập; giao diện mới tạo qua `connections`.

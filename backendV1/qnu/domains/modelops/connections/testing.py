@@ -100,6 +100,7 @@ async def run_test(
         retry_after=result.retry_after,
         requested_model="",
         models=result.models,
+        model_metadata=result.model_metadata,
     )
     current = (
         await db.execute(
@@ -143,4 +144,5 @@ async def run_test(
         retry_after=result.retry_after,
         latency_ms=result.latency_ms,
         models=result.models,
+        model_metadata=result.model_metadata,
     )

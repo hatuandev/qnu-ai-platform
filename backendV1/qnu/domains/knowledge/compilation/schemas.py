@@ -18,7 +18,7 @@ class CompilationRequest(BaseModel):
     text_versions: dict[str, Annotated[int, Field(strict=True, ge=0)]] = Field(default_factory=dict)
     auto_review: bool = Field(True, strict=True)
     review_provider_id: str | None = Field(None, min_length=1, max_length=64)
-    review_max_output_tokens: int = Field(8192, strict=True, gt=0)
+    review_max_output_tokens: int | None = Field(None, strict=True, gt=0)
     review_structured_output: bool = Field(False, strict=True)
 
     @model_validator(mode="after")

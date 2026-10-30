@@ -189,3 +189,56 @@ async def test_total_deadline_bounds_a_slow_upstream():
 async def test_http_200_error_is_not_an_empty_model_list():
     result, _ = await call("discovery", {"error": {"message": TARGET.api_key}, "data": []})
     assert result.outcome == "failed" and TARGET.api_key not in repr(result)
+
+
+async def test_discovery_keeps_only_validated_capacity_fields():
+    result, _ = await call(
+        "discovery",
+        {
+            "data": [
+                {
+                    "id": "server-model",
+                    "max_model_len": 131072,
+                    "max_output_tokens": 16384,
+                    "embedding_dimension": 1024,
+                    "secret": TARGET.api_key,
+                    "root": TARGET.api_key,
+                }
+            ]
+        },
+    )
+    assert result.model_metadata[0].model_dump() == {
+        "id": "server-model",
+        "context_window_tokens": 131072,
+        "max_output_tokens": 16384,
+        "embedding_dimension": 1024,
+    }
+    assert TARGET.api_key not in repr(result)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("max_model_len", True),
+        ("max_model_len", "8192"),
+        ("max_model_len", 0),
+        ("max_model_len", -1),
+        ("max_model_len", 3.5),
+        ("embedding_dimension", 65537),
+        ("max_output_tokens", 8193),
+    ],
+)
+async def test_discovery_rejects_invalid_metadata_without_leaking_raw(field, value):
+    result, _ = await call(
+        "discovery", {"data": [{"id": "a", "max_model_len": 8192, field: value}]}
+    )
+    assert result.code == "provider_response_invalid"
+    assert result.models == [] and result.model_metadata == []
+
+
+async def test_discovery_rejects_ambiguous_duplicate_ids():
+    result, _ = await call(
+        "discovery",
+        {"data": [{"id": "a", "max_model_len": 1024}, {"id": "a", "max_model_len": 8192}]},
+    )
+    assert result.outcome == "failed" and result.model_metadata == []

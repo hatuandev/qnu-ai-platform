@@ -1,11 +1,33 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
+- [Phiên 743 — Test PDF thật điểm sàn 26](2026-10-30_phien_743_test_pdf_diem_san_26.md): kịch bản5chặng và19câu, chưa chạy.
+
+- [Phiên 742 — Người dùng hoàn tất E2E 14 chặng](2026-10-30_phien_742_nguoi_dung_e2e_14_chang_pass.md): đối chiếu 14 PASS, giữ phạm vi kiểm chứng.
+
+- [Phiên 741 — Chặn runtime cũ và phục hồi compilation](2026-10-30_phien_741_chan_runtime_cu_va_phuc_hoi_compilation.md): yêu cầu restart đúng mã và giữ bản cũ; NOT RUN theo yêu cầu.
+
+- [Phiên 740 — Giữ giới hạn khối chưa đọc trong draft](2026-10-30_phien_740_giu_gioi_han_khoi_chua_doc.md): ghi chú có nguồn, tạo bản mới và giữ gate; NOT RUN theo yêu cầu.
+
+- [Phiên 739 — Hiển thị thời gian review](2026-10-30_phien_739_hien_thoi_gian_review.md): giới hạn chờ tối đa và thời gian thực tế; NOT RUN theo yêu cầu.
+
+- [Phiên 738 — Review output theo capacity](2026-10-30_phien_738_review_output_theo_capacity.md): bỏ ngân sách review cố định; NOT RUN theo yêu cầu.
+
 > **Quy định bắt buộc**: Mỗi khi bắt đầu và kết thúc một phiên làm việc ("Vibe Coding") — bao gồm phát triển tính năng, tái cấu trúc (refactor), sửa lỗi, cấu hình hạ tầng hay kiểm thử — **Kỹ sư / AI Agent BẮT BUỘC phải tạo hoặc cập nhật nhật ký làm việc vào thư mục này**.
 
 ---
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
+
+- **2026-10-30 — Context737: sửa fixture DOCX backend.** OPC package hợp lệ cho LibreOffice, giữ bảng/merge/literal/footnote; assertion converter theo cấu hình.46focused/18unit/14native/Ruff và HTTP200 PDF thật đạt. Gate rộng FAIL:410pass/2fail/1error/494notrun; lỗi lifecycle659,purge716,setup recovery666, ID tại nhật ký. E2E người dùng14/14 PASS giữ, không chạy lại/purge/restart. [Nhật ký737](./2026-10-30_phien_737_sua_fixture_docx_backend.md).
+
+- **2026-10-30 — Context736: sửa review khối ảnh rỗng.** Giữ source unit không text và provenance, prompt v4 phân biệt unknown với kiểm định OCR, không bỏ gate.43focused/Ruff đạt; live review finding0, publication PASS, hash nguồn/draft giữ. Chat/permissions/lifecycle NOT RUN; full gate FAIL ở DOCX710 (25pass/1fail), chi tiết tại nhật ký. [Nhật ký736](./2026-10-30_phien_736_sua_review_khoi_anh_rong.md).
+
+- **2026-10-30 — Context735: sửa E2E lưu capacity.** Provider-setup thiếu bước áp dụng discovery; đã nối snapshot/sync và profile vận hành có căn cứ, giữ input/OCR operator. Cùng phiên live: bốn model configured, setup +5model stages +navigation PASS.15FE/4offline/build+TS/Biome đạt; upload trở đi NOT RUN, fullBE FAIL lịch sử733 giữ. Không restart/reset. [Nhật ký735](./2026-10-30_phien_735_sua_e2e_tu_dong_luu_capacity.md).
+
+- **2026-10-30 — Context734: hướng dẫn test lại từ đầu.** Bản ngắn mụcB và bản đầy đủ/README E2E đưa UI lấy capacity sau provider-setup, tách timeout/OCR còn thiếu, giữ đủ14chặng và gate review.18khối PowerShell kiểm cú pháp, thứ tự/link/UTF8/LF/diff; chỉ docs, chưa chạy E2E mới. [Nhật ký734](./2026-10-30_phien_734_cap_nhat_huong_dan_test_tu_dau.md).
+
+- **2026-10-30 — Context733: lấy capacity từ server.** Discovery metadata + preview/import/sync current có audit, giữ input/OCR và chặn dimension đổi. Live GETmodels200 đủ4model;73ID BE trọng tâm/22FE/build+TS/Ruff/Biome và browser desktop/mobile đạt. Full889collected gặp Windows access violation, vẫn FAIL. Không inference/restart/đổi DB phục vụ. [Nhật ký733](./2026-10-30_phien_733_tu_dong_lay_capacity_server.md).
 
 - **2026-10-30 — Context732: hướng dẫn test lại và giải thích hình OCR.** Bản ngắn tách resume với cleanup/init mới, đủ14chặng và cấu hình128K/16K. Ba finding cùng một figure rỗng; review bỏ block không text nên thiếu source unit. Chỉ đọc API/docs, chưa sửa OCR/review hoặc gọi model. Link/UTF8/LF/diff kiểm; không đổi runtime. [Nhật ký732](./2026-10-30_phien_732_huong_dan_test_lai_va_review_hinh.md).
 

@@ -87,7 +87,7 @@ export function CompilationDialog({
   // Auto-review settings
   const [autoReview, setAutoReview] = useState(true);
   const [reviewProviderId, setReviewProviderId] = useState<string>("default");
-  const [reviewMaxTokens, setReviewMaxTokens] = useState<string>("8192");
+  const [reviewMaxTokens, setReviewMaxTokens] = useState<string>("");
   const [reviewStructuredOutput, setReviewStructuredOutput] = useState(false);
 
   // Idempotency & submission
@@ -157,7 +157,7 @@ export function CompilationDialog({
       setStructuredOutput(false);
       setAutoReview(true);
       setReviewProviderId("default");
-      setReviewMaxTokens("8192");
+      setReviewMaxTokens("");
       setReviewStructuredOutput(false);
       setIdempotencyKey(generateIdempotencyKey());
       setPickerSourceId("");
@@ -247,7 +247,7 @@ export function CompilationDialog({
         reviewProviderId === "default" ? null : reviewProviderId,
       review_max_output_tokens: reviewMaxTokens
         ? Number(reviewMaxTokens)
-        : 8192,
+        : null,
       review_structured_output: reviewStructuredOutput,
     };
 
@@ -640,7 +640,7 @@ export function CompilationDialog({
                         }}
                       />
                       <p className="text-[10px] text-muted-foreground">
-                        Mặc định 8192 tokens cho lượt rà soát hai chiều.
+                        Để trống để tự chọn theo giới hạn model và dung lượng đầu vào.
                       </p>
                     </div>
                   </div>

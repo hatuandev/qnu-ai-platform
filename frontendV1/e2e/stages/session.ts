@@ -37,6 +37,14 @@ export interface Checkpoint {
   provider?: string;
   sources: Source[];
   publications?: Publication[];
+  compilationHistory?: Publication[];
+  admissions?: {
+    collection?: string;
+    source?: Source;
+    publication?: Publication;
+    assistant?: string;
+    queries?: Record<string, { conversation: string; turn?: string }>;
+  };
   assistant?: string;
   conversation?: string;
   deletion?: string;
@@ -179,7 +187,7 @@ export class Api {
   ): Promise<T> {
     return this.json<T>("POST", suffix, body, key, timeoutMs);
   }
-  async wait<T extends Run>(suffix: string): Promise<T> {
+  async wait<T extends Run>(suffix: string, timeoutMs = 240_000): Promise<T> {
     let last: T | undefined;
     await expect
       .poll(
@@ -196,14 +204,14 @@ export class Api {
           }
           return last.status;
         },
-        { timeout: 240_000, intervals: [300, 700, 1500] },
+        { timeout: timeoutMs, intervals: [300, 700, 1500] },
       )
       .toBe("completed");
     if (!last) throw new Error("Không có trạng thái job.");
     return last;
   }
-  async upload(state: Checkpoint, file: string, idempotencyKey: string) {
-    const bytes = readFileSync(path.join(directory, "fixtures", file));
+  async upload(state: Checkpoint, file: string, idempotencyKey: string, sourcePath?: string) {
+    const bytes = readFileSync(sourcePath ?? path.join(directory, "fixtures", file));
     const response = await this.page.request.post(
       `${apiRoot}${collection(state)}/sources`,
       {

@@ -11,6 +11,7 @@ import json
 
 from fastapi.testclient import TestClient
 
+from qnu.platform.config import get_settings
 from tests.integration.knowledge_support import (
     API,
     EDITOR,
@@ -197,6 +198,7 @@ def test_pdf_flow_produces_pinned_evidence(client: TestClient) -> None:
 
 
 def test_docx_table_keeps_spans_values_and_footnote(client: TestClient) -> None:
+    expected_converter = get_settings().DOCX_CONVERTER
     with FakeNemotron() as fake:
         fake.responses = [TABLE_RESPONSE]
         workspace = workspace_with_editor(client, "ocr-docx")
@@ -239,7 +241,7 @@ def test_docx_table_keeps_spans_values_and_footnote(client: TestClient) -> None:
         manifest = client.get(
             f"{runs_url(workspace['id'], collection['id'], source['id'], revision['id'])}/{run_id}/manifest"
         ).json()
-        assert manifest["processing"]["renderer"]["converter"] == "docx-story"
+        assert manifest["processing"]["renderer"]["converter"] == expected_converter
         assert manifest["validation"]["ok"] is True
 
 

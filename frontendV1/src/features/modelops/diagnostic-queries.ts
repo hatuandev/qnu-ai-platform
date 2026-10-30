@@ -5,6 +5,13 @@ import { isModelAdmin, useV1Auth } from "@/app/auth/v1";
 import { modelopsKeys } from "./queries";
 import type { Capability } from "./types";
 
+export type DiscoveredModel = {
+  id: string;
+  context_window_tokens: number | null;
+  max_output_tokens: number | null;
+  embedding_dimension: number | null;
+};
+
 export type DiagnosticCheck = {
   id: string;
   key_id?: string | null;
@@ -22,6 +29,7 @@ export type DiagnosticCheck = {
   observed_dimension: number | null;
   total_tokens: number | null;
   models: string[];
+  model_metadata?: DiscoveredModel[];
 };
 export type ProviderDiagnostics = {
   provider_id: string;

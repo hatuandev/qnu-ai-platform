@@ -222,6 +222,25 @@ async def add_model(
             "Thêm API key dùng chung tại nhà cung cấp trước khi thêm model; khóa cũ giữ phạm vi model ban đầu.",
             code="connection_key_required",
         )
+    limits, dimension, basis, source = (
+        req.token_limits,
+        req.embedding_dimension,
+        "operator_configured",
+        None,
+    )
+    if req.discovery_check_id:
+        from qnu.domains.modelops.connections.capacity import (
+            current_discovery,
+            merge_limits,
+            metadata_for,
+            source_for,
+        )
+
+        check = await current_discovery(db, actor, parent, req.discovery_check_id)
+        metadata = metadata_for(check, req.model_name)
+        limits = merge_limits(None, metadata)
+        dimension = metadata.embedding_dimension if "embedding" in req.capabilities else None
+        basis, source = "server_reported", source_for(check, metadata)
     # ProviderCreateRequest applies existing capability/capacity validations.
     model = await provider_service.create(
         db,
@@ -232,11 +251,13 @@ async def add_model(
             model_name=req.model_name,
             capabilities=req.capabilities,
             timeout_seconds=parent.timeout_seconds,
-            token_limits=req.token_limits,
-            embedding_dimension=req.embedding_dimension,
+            token_limits=limits,
+            embedding_dimension=dimension,
         ),
         actor,
         parent_id=parent.id,
+        capacity_basis=basis,
+        capacity_source=source,
     )
     return model
 

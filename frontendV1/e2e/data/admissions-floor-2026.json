@@ -1,0 +1,289 @@
+{
+  "version": "floor2026-v1",
+  "source": {
+    "path": "docs/tai_lieu/tuyen_sinh/TB điểm sàn 26.pdf",
+    "sha256": "236ab3573d6d683a760ed227512022d6c21a03ba5c147c32d4ed7b042f7c6d45",
+    "pages": 8,
+    "document_number": "121/TB-HĐTS",
+    "document_date": "2026-07-09",
+    "data_year": 2026
+  },
+  "label_status": "draft_agent_read_pdf_not_human_approved",
+  "cases": [
+    {
+      "id": "F01",
+      "question": "Theo thông báo ngưỡng đầu vào năm 2026, ngành Quản lý giáo dục xét điểm thi tốt nghiệp THPT cần tối thiểu bao nhiêu điểm?",
+      "kind": "answerable",
+      "expected_numbers": [
+        15
+      ],
+      "expected_patterns": [],
+      "pages": [
+        1
+      ],
+      "expected": "15 điểm, cột điểm thi TN THPT, dòng 1.",
+      "rubric": "Không lấy 18 học bạ hoặc 600 ĐGNL thay cho điểm THPT."
+    },
+    {
+      "id": "F02",
+      "question": "Ngưỡng học bạ THPT năm 2026 của ngành Quản lý giáo dục là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [
+        18
+      ],
+      "expected_patterns": [],
+      "pages": [
+        1
+      ],
+      "expected": "18 điểm, dòng 1, cột kết quả học tập THPT.",
+      "rubric": "Giữ đúng phương thức học bạ."
+    },
+    {
+      "id": "F03",
+      "question": "Quản lý giáo dục năm 2026 yêu cầu tối thiểu bao nhiêu điểm đánh giá năng lực ĐHQG TP.HCM?",
+      "kind": "answerable",
+      "expected_numbers": [
+        600
+      ],
+      "expected_patterns": [],
+      "pages": [
+        1
+      ],
+      "expected": "600 điểm, dòng 1, cột ĐGNL ĐHQG TPHCM.",
+      "rubric": "Không gộp thang điểm THPT vào thang ĐGNL."
+    },
+    {
+      "id": "F04",
+      "question": "Ngành Sư phạm Toán học năm 2026 có ngưỡng điểm thi tốt nghiệp THPT là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [
+        20
+      ],
+      "expected_patterns": [],
+      "pages": [
+        2
+      ],
+      "expected": "20 điểm, dòng 6.",
+      "rubric": "Không biến điểm sàn thành điểm trúng tuyển."
+    },
+    {
+      "id": "F05",
+      "question": "Điểm sàn theo kết quả thi tốt nghiệp THPT năm 2026 của ngành Giáo dục Thể chất là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [
+        19
+      ],
+      "expected_patterns": [],
+      "pages": [
+        1
+      ],
+      "expected": "19 điểm, dòng 5.",
+      "rubric": "Phân biệt ngưỡng tổng 19 với ngưỡng 12,67 cho hai môn văn hóa và ưu tiên."
+    },
+    {
+      "id": "F06",
+      "question": "Ngành Ngôn ngữ Anh năm 2026 xét học bạ cần tối thiểu bao nhiêu điểm?",
+      "kind": "answerable",
+      "expected_numbers": [
+        19
+      ],
+      "expected_patterns": [],
+      "pages": [
+        3
+      ],
+      "expected": "19 điểm, dòng 17, cột học tập THPT.",
+      "rubric": "Không trả 16 của cột thi THPT hoặc 650 của ĐGNL."
+    },
+    {
+      "id": "F07",
+      "question": "Ngành Ngôn ngữ Trung Quốc năm 2026 có ngưỡng ĐGNL ĐHQG TP.HCM bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [
+        650
+      ],
+      "expected_patterns": [],
+      "pages": [
+        3
+      ],
+      "expected": "650 điểm, dòng 18.",
+      "rubric": "Không nhầm ngành/ngôn ngữ/phương thức."
+    },
+    {
+      "id": "F08",
+      "question": "Ngành Trí tuệ nhân tạo năm 2026 xét điểm thi tốt nghiệp THPT có ngưỡng bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [
+        16
+      ],
+      "expected_patterns": [],
+      "pages": [
+        5
+      ],
+      "expected": "16 điểm, dòng 37.",
+      "rubric": "Không lấy 19 học bạ hay 650 ĐGNL."
+    },
+    {
+      "id": "F09",
+      "question": "Ngành Luật năm 2026 có ngưỡng xét học bạ THPT bao nhiêu điểm?",
+      "kind": "answerable",
+      "expected_numbers": [
+        22
+      ],
+      "expected_patterns": [],
+      "pages": [
+        4
+      ],
+      "expected": "22 điểm, dòng 32.",
+      "rubric": "Ngưỡng học bạ không thay thế điều kiện bổ sung ở chú ý 3 trang 8."
+    },
+    {
+      "id": "F10",
+      "question": "Điểm sàn ĐGNL ĐHQG TP.HCM của ngành Luật năm 2026 là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [
+        750
+      ],
+      "expected_patterns": [],
+      "pages": [
+        4
+      ],
+      "expected": "750 điểm, dòng 32.",
+      "rubric": "Không trả 20 hoặc 22 của phương thức khác."
+    },
+    {
+      "id": "F11",
+      "question": "Đối với Giáo dục Mầm non năm 2026, tổng hai môn văn hóa cộng hai phần ba điểm ưu tiên cần đạt ngưỡng bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [
+        13.34
+      ],
+      "expected_patterns": [
+        "(2\\s*/\\s*3|hai phần ba)",
+        "(ưu tiên|ƯT)"
+      ],
+      "pages": [
+        1
+      ],
+      "expected": "Tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34, ghi chú dòng 2.",
+      "rubric": "Giữ hệ số 2/3, dấu tối thiểu và đúng phạm vi GDMN; không thay bằng 20 điểm tổng."
+    },
+    {
+      "id": "F12",
+      "question": "Giáo dục Thể chất năm 2026 yêu cầu tổng hai môn văn hóa cộng hai phần ba điểm ưu tiên tối thiểu bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [
+        12.67
+      ],
+      "expected_patterns": [
+        "(2\\s*/\\s*3|hai phần ba)",
+        "(ưu tiên|ƯT)"
+      ],
+      "pages": [
+        1,
+        2
+      ],
+      "expected": "Tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 12,67, dòng 5 nối trang 1–2.",
+      "rubric": "Phải nối đúng ghi chú dòng 5 qua trang, không lấy điều kiện GDMN 13,34."
+    },
+    {
+      "id": "F13",
+      "question": "Chú ý 1 quy định ngưỡng tổng ba môn thi THPT cho thí sinh tốt nghiệp năm 2026 bao nhiêu, và ngoại lệ là những nhóm ngành nào?",
+      "kind": "answerable",
+      "expected_numbers": [
+        15
+      ],
+      "expected_patterns": [
+        "2026",
+        "luật",
+        "(giáo viên|sư phạm)",
+        "(trừ|ngoại lệ|riêng|không áp dụng)"
+      ],
+      "pages": [
+        7,
+        8
+      ],
+      "expected": "Tối thiểu 15,00/30; áp dụng thí sinh tốt nghiệp 2026, trừ các ngành đào tạo giáo viên và Luật theo ngưỡng Bộ.",
+      "rubric": "Phải giữ năm tốt nghiệp, thang điểm và cả hai ngoại lệ; không áp dụng đại trà cho giáo viên/Luật."
+    },
+    {
+      "id": "F14",
+      "question": "Xét ĐGNL SPHN vào các ngành đào tạo giáo viên năm 2026 (trừ Giáo dục Thể chất), ngoài ngưỡng bảng còn có điều kiện học lực và hai ngưỡng điểm nào?",
+      "kind": "answerable",
+      "expected_numbers": [
+        18,
+        8.5
+      ],
+      "expected_patterns": [
+        "(tốt|giỏi)",
+        "hoặc"
+      ],
+      "pages": [
+        8
+      ],
+      "expected": "Mức tốt/giỏi trở lên cả năm lớp 12 (hoặc tương đương), tổng ba môn THPT từ 18,00 hoặc điểm xét tốt nghiệp từ 8,50; xem chú ý 2a.",
+      "rubric": "Giữ quan hệ và/hoặc theo nguyên văn; không thay ngưỡng ngành riêng bằng các điểm này."
+    },
+    {
+      "id": "F15",
+      "question": "Với Giáo dục Thể chất năm 2026 xét theo phương thức không dùng kết quả thi THPT, điều kiện học lực và hai ngưỡng điểm bổ sung ở chú ý 2b là gì?",
+      "kind": "answerable",
+      "expected_numbers": [
+        16.5,
+        6.5
+      ],
+      "expected_patterns": [
+        "khá",
+        "hoặc"
+      ],
+      "pages": [
+        8
+      ],
+      "expected": "Mức khá trở lên cả năm lớp 12 (hoặc tương đương), tổng ba môn thi THPT từ 16,50 hoặc điểm xét tốt nghiệp từ 6,50.",
+      "rubric": "Giữ ngoại lệ GDTC, không dùng 18/8,50 hay ngưỡng 19 trong bảng để thay thế."
+    },
+    {
+      "id": "F16",
+      "question": "Ký hiệu dấu gạch ngang trong các cột phương thức xét tuyển của thông báo năm 2026 có nghĩa là gì?",
+      "kind": "answerable",
+      "expected_numbers": [],
+      "expected_patterns": [
+        "không.{0,40}(xét tuyển|áp dụng|sử dụng)"
+      ],
+      "pages": [
+        8
+      ],
+      "expected": "Trường không xét tuyển theo phương thức tương ứng đối với ngành này.",
+      "rubric": "Không diễn giải dấu gạch thành điểm 0 hoặc điểm chưa công bố."
+    },
+    {
+      "id": "F17",
+      "question": "Chỉ dùng thông báo đã tải: điểm trúng tuyển chính thức ngành Luật năm 2026 là bao nhiêu?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Tài liệu chỉ công bố ngưỡng đầu vào, không cung cấp điểm trúng tuyển chính thức.",
+      "rubric": "Không đổi điểm sàn thành điểm chuẩn/điểm trúng tuyển."
+    },
+    {
+      "id": "F18",
+      "question": "Chỉ dùng thông báo đã tải: học phí ngành Luật năm học 2026–2027 bao nhiêu đồng?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Không có thông tin học phí trong snapshot PDF này.",
+      "rubric": "Không đoán giá hoặc dùng dữ liệu từ tài liệu khác."
+    },
+    {
+      "id": "F19",
+      "question": "Chỉ dùng thông báo đã tải: điểm sàn ngành Luật theo học bạ năm 2025 là bao nhiêu?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Nguồn này là thông báo ngưỡng năm 2026; không có căn cứ năm 2025.",
+      "rubric": "Không trả 22 của năm 2026 cho năm 2025."
+    }
+  ]
+}

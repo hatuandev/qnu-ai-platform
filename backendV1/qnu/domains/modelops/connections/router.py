@@ -5,7 +5,9 @@ from qnu.api.dependencies import get_db
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.identity.permissions import require_permission
 from qnu.domains.modelops.connections import service
+from qnu.domains.modelops.connections.capacity import sync_capacity
 from qnu.domains.modelops.connections.schemas import (
+    CapacitySyncRequest,
     ConnectionCreate,
     ConnectionModelCreate,
     ConnectionResponse,
@@ -20,6 +22,19 @@ from qnu.ports.provider_diagnostics import ProviderDiagnosticClient
 
 router = APIRouter(prefix="/modelops/connections", tags=["ModelOps · Nhà cung cấp"])
 admin = require_permission("ai.models.manage")
+
+
+@router.post("/{connection_id}/sync-capacity", response_model=list[ProviderResponse])
+async def synchronize_capacity(
+    connection_id: str,
+    req: CapacitySyncRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(admin),
+):
+    return [
+        ProviderResponse(**provider_payload(row))
+        for row in await sync_capacity(db, actor, connection_id, req)
+    ]
 
 
 @router.get("", response_model=list[ConnectionResponse])

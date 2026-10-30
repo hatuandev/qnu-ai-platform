@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.modelops.capacity.policy import plan_token_budget
 from qnu.domains.modelops.capacity.schemas import (
+    CapacityBasis,
     CapacitySnapshot,
     ModelCapacity,
     ModelTokenLimits,
@@ -23,7 +24,12 @@ from qnu.platform.errors import AppException
 CAPACITY_KEY = "model_token_capacity_v1"
 
 
-def set_capacity(provider: Provider, limits: ModelTokenLimits | None) -> None:
+def set_capacity(
+    provider: Provider,
+    limits: ModelTokenLimits | None,
+    *,
+    basis: CapacityBasis = "operator_configured",
+) -> None:
     config = dict(provider.extra_config or {})
     if limits is None:
         config.pop(CAPACITY_KEY, None)
@@ -32,7 +38,7 @@ def set_capacity(provider: Provider, limits: ModelTokenLimits | None) -> None:
             "endpoint": provider.base_url.rstrip("/"),
             "model_name": provider.model_name,
             "token_limits": limits.model_dump(),
-            "basis": "operator_configured",
+            "basis": basis,
             "recorded_at": datetime.now(UTC).isoformat(),
         }
     provider.extra_config = config
@@ -61,13 +67,13 @@ def read_capacity(provider: Provider) -> ModelCapacity:
         return ModelCapacity(status="stale")
     try:
         limits = ModelTokenLimits.model_validate(raw["token_limits"])
-        if raw.get("basis") != "operator_configured":
+        if raw.get("basis") not in ("operator_configured", "server_reported"):
             raise ValueError("Invalid capacity basis")
     except (ValidationError, KeyError, ValueError) as exc:
         raise AppException(
             "Capacity đã lưu không hợp lệ.", code="model_token_limits_invalid", status_code=422
         ) from exc
-    return ModelCapacity(status="configured", token_limits=limits, basis="operator_configured")
+    return ModelCapacity(status="configured", token_limits=limits, basis=raw["basis"])
 
 
 async def resolve_model_capacity(

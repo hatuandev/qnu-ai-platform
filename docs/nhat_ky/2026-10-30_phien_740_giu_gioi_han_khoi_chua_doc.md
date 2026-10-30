@@ -1,0 +1,10 @@
+# Phiên 740 — Giữ giới hạn khối chưa đọc trong bản biên soạn
+
+- Yêu cầu: sửa lỗi test người dùng gửi; tiếp tục không tự chạy test. Không restart, reindex, xóa phiên hoặc gọi model trong phiên sửa.
+- Bằng chứng: log người dùng compilation PASS, publication FAIL do một finding source_to_draft/uncertain cho khối cần kiểm tra nhưng text rỗng. Đọc API hiện tại xác nhận bản thứ hai có unknowns rỗng; bản thứ nhất không có finding. Các chặng sau bị chặn đúng thứ tự. Đây là lỗi thiếu biểu diễn giới hạn trong draft, không phải lỗi capacity hay cần bỏ gate.
+- Phương pháp: từ metadata nguồn đã ghim, bổ sung đoạn ghi giới hạn kèm citation cho block requires_review có text rỗng, trừ bảng parsed đã có hàng literal. Không suy nội dung ảnh, không kết luận OCR đã chính xác hoặc cả trang thiếu OCR. Giữ unknowns từ model, nguồn/hash gốc, bảng và report cũ. Dữ liệu thêm là dẫn xuất quan sát được; lưu ở mục Giới hạn dữ liệu trích xuất.
+- Backend: module limitations.py, drafting.py prompt v3 và validation marker; ghi chú có tính lặp an toàn qua edit và kiểm tra giới hạn cấu trúc. workflow/edits.py lưu preview với nội dung hiệu lực để không thêm ghi chú ngoài phần người dùng đã xem khi accept.
+- E2E: compilation-upgrade.ts và workflow.spec.ts nhận diện bản cũ có finding khối chưa đọc; khi người dùng chủ động chạy lại compilation thì tạo lượt mới bằng khóa idempotency riêng, giữ checkpoint history. Không tự lặp review để tìm kết quả xanh. Publication append version cho cùng tài liệu, giữ phiên bản cũ; gate finding nguyên vẹn.
+- Hướng dẫn: restart riêng serve; chạy compilation, publication rồi mới chat/permissions/lifecycle. Không cần cleanup/init phiên hiện tại.
+- Kiểm chứng: chỉ đọc log/code/Git/checkpoint và GET draft/report qua API (đăng nhập để đọc, credential không ghi log). Lần đọc đầu vướng encoding console Windows, đã đặt stdout UTF-8 và đọc lại thành công. Thêm regression unit nhưng chưa chạy. Test/build/lint/live inference NOT RUN theo yêu cầu. Không ghi checkpoint/DB test đang phục vụ.
+- Giới hạn: chưa xác nhận review model thật chấp nhận bản mới; finding khác vẫn có thể chặn phát hành. Các gate rộng FAIL của phiên 737 giữ nguyên.

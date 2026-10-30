@@ -61,3 +61,31 @@ Quota reserve bằng tổng input bound + output, không dùng OCR_PAGE_TOKEN_BU
 
 Tự động discovery metadata provider và đếm token ảnh phụ thuộc protocol/runtime,
 không được đánh dấu đã có chỉ vì API lưu được capacity. Không tạo verified giả.
+
+## Nhập thông số server (Context733)
+
+Discovery `/v1/models` nhận thêm các trường tùy chọn trên từng model:
+`max_model_len` → `context_window_tokens`, `max_output_tokens` và
+`embedding_dimension`. Chỉ số nguyên dương hợp lệ được nhận; số chiều tối đa65536.
+Model trùng ID hoặc giới hạn mâu thuẫn làm discovery thất bại. Không lưu các trường
+ngoài allowlist, URL/root của upstream hoặc credential. Giữ `models: string[]` để
+tương thích client cũ, bổ sung `model_metadata` trong response/history.
+
+Sau discovery, quản trị xem trước metadata rồi áp dụng:
+
+- Model mới: POST `/modelops/connections/{id}/models` thêm
+  `discovery_check_id` của kết quả đã lưu. Backend đọc metadata từ DB theo model,
+  không nhận capacity tự khai kèm discovery ID.
+- Model đã có: POST `/modelops/connections/{id}/sync-capacity` với
+  `{"check_id":"diag_...","model_names":["model-name"]}`. Chỉ model của connection
+  đang hoạt động, cùng endpoint và snapshot discovery hiện hành mới được áp dụng.
+  Chọn nhiều model là một transaction; xung đột trả409 và rollback toàn bộ.
+
+Capacity ghi `basis=server_reported`, check ID, metadata allowlist và thời điểm
+server được đọc. Đây là server công bố, không phải đã đo capacity. Sửa tay vẫn ghi
+`operator_configured`. Có nguồn server không làm discovery thành inference PASS.
+Thông số thiếu giữ unknown/giá trị hợp lệ đã lưu; không tự suy max_input, OCR budget
+hoặc capability từ tên model. OCR page accounting và input override giữ nguyên;
+context mới xung đột thì chặn. Dimension khác cấu hình embedding hiện tại cũng chặn,
+không tự thay index. Áp dụng cùng snapshot/giá trị không tạo audit lặp; đổi giới hạn
+khiến fingerprint probe/runtime thay đổi như trước. Không cần migration.

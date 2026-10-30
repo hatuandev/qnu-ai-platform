@@ -4,6 +4,29 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal, Protocol
 
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class DiscoveredModel(BaseModel):
+    """Allowlisted server declarations; discovery is not inference verification."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    id: str
+    context_window_tokens: int | None = Field(None, strict=True, gt=0, le=2147483647)
+    max_output_tokens: int | None = Field(None, strict=True, gt=0, le=2147483647)
+    embedding_dimension: int | None = Field(None, strict=True, gt=0, le=65536)
+
+    @model_validator(mode="after")
+    def consistent_limits(self):
+        if (
+            self.context_window_tokens is not None
+            and self.max_output_tokens is not None
+            and self.max_output_tokens > self.context_window_tokens
+        ):
+            raise ValueError("Output exceeds context")
+        return self
+
+
 DiagnosticKind = Literal["discovery", "chat", "embedding", "rerank", "ocr"]
 
 
@@ -32,6 +55,7 @@ class DiagnosticResult:
     observed_dimension: int | None = None
     total_tokens: int | None = None
     models: list[str] = field(default_factory=list)
+    model_metadata: list[DiscoveredModel] = field(default_factory=list)
 
 
 class ProviderDiagnosticClient(Protocol):

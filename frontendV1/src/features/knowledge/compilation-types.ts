@@ -54,7 +54,7 @@ export type CompilationRequestInput = {
   text_versions?: Record<string, number>;
   auto_review?: boolean;
   review_provider_id?: string | null;
-  review_max_output_tokens?: number;
+  review_max_output_tokens?: number | null;
   review_structured_output?: boolean;
 };
 
@@ -204,7 +204,7 @@ export type CompilationReviewResponse = {
 
 export type ReviewRequestInput = {
   provider_id?: string | null;
-  max_output_tokens?: number;
+  max_output_tokens?: number | null;
   structured_output?: boolean;
 };
 
