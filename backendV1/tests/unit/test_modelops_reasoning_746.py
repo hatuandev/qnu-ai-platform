@@ -149,6 +149,21 @@ def test_tasks_map_level_to_task_not_task_to_level():
     assert trace_for(policy, "compiler_review")["reason"] == "task_not_configured"
 
 
+def test_answer_task_supports_reasoning_policy():
+    policy = ReasoningPolicy(
+        mode="chat_template_kwarg",
+        parameter="enable_thinking",
+        off_value=False,
+        tasks={"off": ["answer"]},
+        verified=True,
+    )
+    directive = resolve_directive(policy, "answer")
+    assert directive is not None
+    assert directive.level == "off"
+    payload = build_payload(MESSAGES, request(reasoning=directive))
+    assert payload["chat_template_kwargs"] == {"enable_thinking": False}
+
+
 def test_directive_round_trip_and_corrupt_record():
     policy = ReasoningPolicy(
         mode="toggle",

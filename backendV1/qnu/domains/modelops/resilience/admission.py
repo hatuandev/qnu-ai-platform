@@ -15,6 +15,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
 
+from qnu.domains.modelops.resilience.heartbeat import maintain_lease
 from qnu.platform.cache import get_redis, namespaced
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException
@@ -41,6 +42,18 @@ def resource_key(endpoint: str, model: str) -> str:
     identity = f"{url.scheme.lower()}://{url.hostname}:{port}{url.path.rstrip('/')}\0{model}"
     digest = hashlib.sha256(identity.encode()).hexdigest()
     return namespaced(f"modelops:chat-admission:{digest}")
+
+
+RENEW = """
+local t = redis.call('TIME')
+local now = tonumber(t[1]) * 1000 + tonumber(t[2]) / 1000
+local old = redis.call('ZSCORE', KEYS[1], ARGV[2])
+if not old or tonumber(old) <= now then return 0 end
+redis.call('ZADD', KEYS[1], now + tonumber(ARGV[1]), ARGV[2])
+local last = redis.call('ZRANGE', KEYS[1], -1, -1, 'WITHSCORES')
+redis.call('PEXPIRE', KEYS[1], math.ceil(tonumber(last[2]) - now) + 1000)
+return 1
+"""
 
 
 def _not_dispatched(code: str, detail: str, status: int) -> ChatResponseError:
@@ -82,7 +95,14 @@ async def chat_slot(request: ChatRequest) -> AsyncIterator[None]:
             await asyncio.sleep(min(0.25, remaining))
     release = True
     try:
-        yield
+        if getattr(request, "wait_for_completion", False):
+            async def renew():
+                return bool(await client.eval(RENEW, 1, key, ttl_ms, token))
+
+            async with maintain_lease(renew, max(0.01, ttl_ms / 3000)):
+                yield
+        else:
+            yield
     except BaseException as exc:
         # A definite response/rejection frees a slot. Ambiguous outcomes retain
         # it until expiry, and never cause a duplicate model call here.

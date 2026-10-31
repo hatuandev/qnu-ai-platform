@@ -34,6 +34,12 @@ from qnu.platform.errors import AppException, DependencyUnavailable
 from qnu.ports.provider_execution import ProviderExecution
 
 
+def _wait_for_completion(provider: Provider) -> bool:
+    from qnu.domains.modelops.resilience.service import effective_policy
+
+    return effective_policy(provider).wait_for_completion
+
+
 @dataclass(frozen=True, slots=True)
 class OcrRuntime:
     """Resolved OCR target; the credential never leaves the process or reaches a log."""
@@ -53,6 +59,7 @@ class OcrRuntime:
     routing_trace: tuple[dict, ...] = ()
     reasoning_policy: ReasoningPolicy | None = field(default=None, repr=False)
     session_factory: Any = field(default=None, repr=False, compare=False)
+    wait_for_completion: bool = False
 
     @property
     def execution_scope(self) -> ProviderExecution | None:
@@ -73,6 +80,8 @@ class OcrRuntime:
             "capacity_status": self.capacity_status,
             "token_limits": self.token_limits.model_dump() if self.token_limits else None,
         }
+        if self.wait_for_completion:
+            material["wait_for_completion"] = True
         return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
 
     def public_dict(self) -> dict[str, Any]:
@@ -85,6 +94,7 @@ class OcrRuntime:
             "model_name": self.model_name,
             "timeout_seconds": self.timeout_seconds,
             "configuration_hash": self.configuration_hash,
+            **({"wait_for_completion": True} if self.wait_for_completion else {}),
         }
 
     def reasoning_directive(self, task: str):
@@ -241,6 +251,7 @@ async def resolve_chat_runtime(
         token_limits=capacity.token_limits,
         capacity_status=capacity.status,
         reasoning_policy=parse_policy((provider.extra_config or {}).get(EXTRA_CONFIG_KEY)),
+        wait_for_completion=_wait_for_completion(provider),
     )
 
 

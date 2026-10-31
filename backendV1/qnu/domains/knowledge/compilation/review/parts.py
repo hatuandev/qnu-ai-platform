@@ -17,7 +17,10 @@ from qnu.domains.modelops.inference.service import request_input_tokens
 from qnu.platform.errors import AppException
 from qnu.ports.chat_model import ChatMessage
 
-SEGMENT_PROMPT_VERSION = "qnu.compiler.review.part.prompt/v2"
+# v2 embeds "index/total" in the hashed instruction and is kept only to replay old plans.
+LEGACY_SEGMENT_PROMPT_VERSION = "qnu.compiler.review.part.prompt/v2"
+# v3 states ownership explicitly and does not depend on the sibling count.
+SEGMENT_PROMPT_VERSION = "qnu.compiler.review.part.prompt/v3"
 PLANNER_VERSION = "qnu.compiler.review.plan/v2"
 MANIFEST_VERSION = "qnu.compiler.review.segment-manifest/v2"
 TARGET_RATIO = 0.45
@@ -296,8 +299,19 @@ def payload_for(
     return payload
 
 
-def messages_for(payload: dict, *, structured: bool, index: int, total: int) -> list[ChatMessage]:
-    return report.messages_for(payload, structured=structured, segment=(index, total))
+def messages_for(
+    payload: dict,
+    *,
+    structured: bool,
+    index: int,
+    total: int,
+    prompt_version: str = SEGMENT_PROMPT_VERSION,
+) -> list[ChatMessage]:
+    """Only the legacy prompt embeds ``total``; v3 is independent of sibling count."""
+    legacy = prompt_version == LEGACY_SEGMENT_PROMPT_VERSION
+    return report.messages_for(
+        payload, structured=structured, segment=(index, total if legacy else None)
+    )
 
 
 def build_part(
@@ -314,6 +328,7 @@ def build_part(
     capacity: int = 0,
     output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
     reasoning_shares_budget: bool = True,
+    prompt_version: str = SEGMENT_PROMPT_VERSION,
 ) -> ReviewPartPlan:
     payload = payload_for(
         material,
@@ -323,7 +338,9 @@ def build_part(
         context_draft_ids,
         projection=projection,
     )
-    messages = messages_for(payload, structured=structured, index=index, total=total)
+    messages = messages_for(
+        payload, structured=structured, index=index, total=total, prompt_version=prompt_version
+    )
     schema = (
         report.output_schema(
             payload,
@@ -363,7 +380,7 @@ def build_part(
         reasoning_reserve_tokens=out_budget.reasoning_reserve_tokens,
         framing_reserve_tokens=out_budget.framing_reserve_tokens,
         planner_version=PLANNER_VERSION,
-        prompt_version=SEGMENT_PROMPT_VERSION,
+        prompt_version=prompt_version,
         schema_version=report.VERSION,
         prompt_sha256=_sha(messages[0].content),
         request_total=total,
@@ -1134,7 +1151,7 @@ def plan_from_scope(scope: dict) -> ReviewPartPlan:
         reasoning_reserve_tokens=budget_info.get("reasoning_reserve_tokens", 0),
         framing_reserve_tokens=budget_info.get("framing_reserve_tokens", 0),
         planner_version=replay_info.get("planner_version", PLANNER_VERSION),
-        prompt_version=replay_info.get("prompt_version", SEGMENT_PROMPT_VERSION),
+        prompt_version=replay_info.get("prompt_version", LEGACY_SEGMENT_PROMPT_VERSION),
         schema_version=replay_info.get("schema_version", report.VERSION),
         prompt_sha256=replay_info.get("prompt_sha256", ""),
         request_total=int(scope.get("request_total") or 1),
@@ -1144,7 +1161,12 @@ def plan_from_scope(scope: dict) -> ReviewPartPlan:
 def rebuild_part(
     material: dict, scope: dict, *, total: int, structured: bool
 ) -> tuple[ReviewPartPlan, list[ChatMessage], dict | None]:
-    """Rebuild exactly the planned payload for resume; hashes must still match."""
+    """Rebuild exactly the planned request; the returned messages are the hashed ones.
+
+    ``total`` only applies to legacy scopes without a stored ``request_total``. The
+    stored scope always wins, and the hash check below runs on the very messages and
+    schema handed back, so what is sent can never differ from what was verified.
+    """
     plan = plan_from_scope(scope)
     effective_total = int(scope.get("request_total") or total)
     rebuilt = build_part(
@@ -1159,17 +1181,15 @@ def rebuild_part(
         projection=plan.projection,
         capacity=plan.input_budget_tokens,
         output_tokens=plan.max_output_tokens,
+        prompt_version=plan.prompt_version,
     )
-    if (
-        rebuilt.input_sha256 != plan.input_sha256
-        or rebuilt.schema_sha256 != plan.schema_sha256
-        or (plan.prompt_sha256 and rebuilt.prompt_sha256 != plan.prompt_sha256)
-    ):
-        raise AppException(
-            "Phần review không còn khớp kế hoạch đã lưu.",
-            code="compilation_review_segment_mismatch",
-            status_code=409,
-        )
+    messages = messages_for(
+        rebuilt.payload,
+        structured=structured,
+        index=plan.index,
+        total=effective_total,
+        prompt_version=plan.prompt_version,
+    )
     schema = (
         report.output_schema(
             rebuilt.payload,
@@ -1180,8 +1200,15 @@ def rebuild_part(
         if structured
         else None
     )
-    return (
-        rebuilt,
-        messages_for(rebuilt.payload, structured=structured, index=plan.index, total=total),
-        schema,
-    )
+    schema_sha = _sha(json_bytes(schema)) if schema is not None else None
+    if (
+        _sha(messages[-1].content) != plan.input_sha256
+        or schema_sha != plan.schema_sha256
+        or (plan.prompt_sha256 and _sha(messages[0].content) != plan.prompt_sha256)
+    ):
+        raise AppException(
+            "Phần review không còn khớp kế hoạch đã lưu.",
+            code="compilation_review_segment_mismatch",
+            status_code=409,
+        )
+    return rebuilt, messages, schema

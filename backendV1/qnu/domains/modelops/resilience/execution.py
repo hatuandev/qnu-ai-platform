@@ -10,7 +10,9 @@ import uuid
 from dataclasses import replace
 
 from qnu.domains.modelops.resilience.admission import chat_slot
+from qnu.domains.modelops.resilience.heartbeat import maintain_lease
 from qnu.domains.modelops.resilience.key_pool import acquire, finish
+from qnu.domains.modelops.resilience.key_pool import renew as renew_key
 from qnu.platform.database import AsyncSessionFactory
 from qnu.platform.errors import AppException
 from qnu.ports.provider_execution import ProviderFailure
@@ -24,7 +26,9 @@ class CredentialExecutor:
         if capability == "chat":
             async with chat_slot(request):
                 try:
-                    async with asyncio.timeout(request.timeout_seconds):
+                    async with asyncio.timeout(
+                        None if getattr(request, "wait_for_completion", False) else request.timeout_seconds
+                    ):
                         return await self._call(capability, request, invoke)
                 except TimeoutError as exc:
                     raise AppException(
@@ -46,9 +50,12 @@ class CredentialExecutor:
             "rerank": "rerank_uncertain",
         }[capability]
         try:
-            async with asyncio.timeout(request.timeout_seconds) as deadline:
+            wait = capability == "chat" and getattr(request, "wait_for_completion", False)
+            async with asyncio.timeout(None if wait else request.timeout_seconds) as deadline:
                 for attempt in range(3):
-                    remaining = request.timeout_seconds - (time.monotonic() - started)
+                    remaining = request.timeout_seconds if wait else (
+                        request.timeout_seconds - (time.monotonic() - started)
+                    )
                     async with sessions() as db:
                         try:
                             lease = await acquire(
@@ -69,9 +76,16 @@ class CredentialExecutor:
                     failure, success, code = None, False, "cancelled"
                     attempt_started, tokens = time.monotonic(), None
                     try:
-                        result = await invoke(
-                            replace(request, api_key=lease.secret, timeout_seconds=remaining)
-                        )
+                        live_request = replace(request, api_key=lease.secret, timeout_seconds=remaining)
+                        if wait and lease.token:
+                            async def renew(lease=lease, remaining=remaining):
+                                async with sessions() as db:
+                                    return await renew_key(db, lease, remaining)
+
+                            async with maintain_lease(renew, max(0.01, (remaining + 10) / 3)):
+                                result = await invoke(live_request)
+                        else:
+                            result = await invoke(live_request)
                         success, code = True, "ok"
                         tokens = getattr(
                             result, "total_tokens", getattr(result, "usage_tokens", None)

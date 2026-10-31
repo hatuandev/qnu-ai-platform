@@ -1,7 +1,7 @@
 {
   "name": "QNU AI Server",
   "base_url": "http://100.105.13.53:8000/v1",
-  "test_monthly_token_limit": 1000000,
+  "test_monthly_token_limit": 5000000,
   "additional_chat_provider": {
     "name": "9router Ollama",
     "base_url": "https://qnu-9router.duckdns.org/v1",
@@ -20,7 +20,7 @@
   "model_runtime": {
     "chat": { "timeout_seconds": 300 },
     "embedding": { "timeout_seconds": 60 },
-    "rerank": { "timeout_seconds": 60, "max_input_tokens": 1024 },
+    "rerank": { "timeout_seconds": 60 },
     "ocr": {
       "timeout_seconds": 180,
       "ocr_page_input": {

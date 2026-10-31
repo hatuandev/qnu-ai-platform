@@ -113,7 +113,10 @@ class OpenAICompatibleChatModel:
         started = time.monotonic()
         try:
             async with httpx.AsyncClient(
-                timeout=request.timeout_seconds,
+                timeout=(
+                    httpx.Timeout(request.timeout_seconds, read=None)
+                    if request.wait_for_completion else request.timeout_seconds
+                ),
                 follow_redirects=False,
                 transport=self._transport,
                 trust_env=False,

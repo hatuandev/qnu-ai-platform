@@ -190,11 +190,7 @@ async def _can_resume_segmented(db: AsyncSession, previous: CompilationReview) -
         return False
     return any(
         leaf.status in {"pending", "running", "received"}
-        or (
-            leaf.status == "failed"
-            and leaf.error_code == "chat_output_truncated"
-            and not (leaf.config or {}).get("refinement_exhausted")
-        )
+        or refinement.refine_reason(leaf) is not None
         for leaf in leaves
     )
 
@@ -287,7 +283,11 @@ async def prepare(
                     )
                 material = await target_matches(db, blob, previous, run)
                 previous.status = "running"
-                previous.trace = {**previous.trace, "execution_token": new_id("rex")}
+                previous.trace = {
+                    **previous.trace,
+                    "execution_token": new_id("rex"),
+                    "execution_started_at": utcnow().isoformat(),
+                }
                 previous.error_code = None
                 previous.finished_at = None
                 previous.expires_at = utcnow() + timedelta(
@@ -378,6 +378,7 @@ async def prepare(
         "context_resolution_version": 2,
         "reference_contract_version": 2,
         "execution_token": new_id("rex"),
+        "execution_started_at": utcnow().isoformat(),
         "prompt_version": PROMPT_VERSION,
         "prompt_sha256": digest(SYSTEM),
         "provider_id": runtime.provider_id,

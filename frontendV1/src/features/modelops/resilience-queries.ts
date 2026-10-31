@@ -33,6 +33,7 @@ export const taskCapability = (task: Task): Capability =>
   task === "ocr" || task === "rerank" ? task : "chat";
 export type ResiliencePolicy = {
   key_pool_enabled: boolean;
+  wait_for_completion?: boolean;
   retry_owner: "qnu" | "gateway";
   max_key_attempts: number;
   auth_cooldown_seconds: number;

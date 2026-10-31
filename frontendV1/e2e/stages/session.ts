@@ -51,6 +51,14 @@ export interface Checkpoint {
     compilationHistory?: Publication[];
     assistant?: string;
     queries?: Record<string, { conversation: string; turn?: string }>;
+    queryHistory?: {
+      case_id: string;
+      conversation: string;
+      turn?: string;
+      status: string;
+      reason?: string;
+      error_code?: string;
+    }[];
   };
   assistant?: string;
   conversation?: string;
@@ -357,7 +365,12 @@ export async function ensureSessionQuota(
     tokens_reserved: number;
   };
   let quota = await api.get<Quota>(base);
-  if (!quota.configured) {
+  if (
+    !quota.configured ||
+    (liveTestAllowance !== undefined &&
+      quota.monthly_token_limit !== null &&
+      quota.monthly_token_limit < liveTestAllowance)
+  ) {
     if (state.mode !== "workflow" && liveTestAllowance === undefined) {
       throw new Error(
         "BLOCKED: cần cấu hình quota tháng hiện tại trong workspace E2E trước khi gọi model thật.",
@@ -365,7 +378,7 @@ export async function ensureSessionQuota(
     }
     // A finite fixture allowance; never disable accounting or change an existing limit.
     quota = await api.json<Quota>("PUT", base, {
-      monthly_token_limit: liveTestAllowance ?? 1_000_000,
+      monthly_token_limit: liveTestAllowance ?? 5_000_000,
       is_blocked: false,
     });
   }

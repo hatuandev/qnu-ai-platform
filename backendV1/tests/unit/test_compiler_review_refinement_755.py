@@ -711,8 +711,10 @@ def test_retry_and_resume_do_not_create_duplicate_nodes_or_rerun_completed_parts
         ({"max_depth": 0}, "compilation_review_refinement_depth_exceeded"),
         ({"max_nodes": 2}, "compilation_review_refinement_node_limit_exceeded"),
         ({"max_requests": 2}, "compilation_review_refinement_request_limit_exceeded"),
-        ({"max_tokens": 1000}, "compilation_review_refinement_token_budget_exceeded"),
-        ({"max_seconds": 1}, "compilation_review_refinement_time_limit_exceeded"),
+        # Token and time ceilings are enforced before every provider request, so they now
+        # stop the first send instead of waiting for a node to need splitting.
+        ({"max_tokens": 1000}, "compilation_review_budget_tokens_exceeded"),
+        ({"max_seconds": 1}, "compilation_review_budget_time_exceeded"),
     ],
 )
 def test_refinement_limits_stop_deterministically(monkeypatch, policy, expected_code):

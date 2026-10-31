@@ -19,6 +19,7 @@ from qnu.domains.knowledge.compilation.review.models import (
 from qnu.domains.knowledge.compilation.review.report import (
     build_report,
     decode_keyed,
+    diagnose_contract,
     markdown_for,
     report_from_assessments,
     segment_markdown_for,
@@ -42,6 +43,13 @@ from qnu.ports.chat_model import ChatModel, ChatResponseError
 from qnu.ports.provider_execution import bind_usage
 
 logger = get_logger(__name__)
+
+# Decided, terminal stops that keep their own code instead of the generic wrapper.
+TERMINAL_CODE_PREFIXES = (
+    "compilation_review_refinement_",
+    "compilation_review_budget_",
+    "compilation_review_recovery_",
+)
 
 
 async def execute(
@@ -183,7 +191,7 @@ async def _execute_segments(
         await _verify_manifest(db, blob, row, segments)
         await service.checkpoint(db, blob, actor, row, run)
         root_count = max(1, sum(1 for seg in segments if seg.parent_segment_id is None))
-        limits = refinement.limits_for(row.trace, root_count)
+        limits = refinement.limits_for(row.trace, root_count, segments=segments)
         concurrency = 2 if row.trace.get("review_concurrency") == 2 else 1
         while True:
             await _owned_checkpoint(db, blob, actor, row, run, token)
@@ -194,13 +202,10 @@ async def _execute_segments(
                 if leaf.status == "completed":
                     continue
                 await _resume_segment(db, blob, row, leaf)
-                if (
-                    leaf.status == "failed"
-                    and leaf.error_code == "chat_output_truncated"
-                    and not (leaf.config or {}).get("refinement_exhausted")
-                ):
-                    await _refine_truncated_segment(
-                        db, blob, actor, row, run, segments, leaf, material, limits, token
+                reason = refinement.refine_reason(leaf)
+                if reason is not None:
+                    await _refine_segment(
+                        db, blob, actor, row, run, segments, leaf, material, limits, token, reason
                     )
                     refined_in_pass = True
                     break
@@ -239,16 +244,19 @@ async def _execute_segments(
                         ),
                         return_exceptions=True,
                     )
-                    truncated_seen = False
+                    refine_seen = False
+                    first_error: BaseException | None = None
                     for outcome in outcomes:
                         if isinstance(outcome, asyncio.CancelledError):
                             raise outcome
                         if isinstance(outcome, BaseException):
-                            if refinement.is_refinable_truncation(outcome):
-                                truncated_seen = True
-                            else:
-                                raise outcome
-                    if truncated_seen:
+                            if refinement.refine_reason_for_exc(outcome) is not None:
+                                refine_seen = True
+                            elif first_error is None:
+                                first_error = outcome
+                    if first_error is not None:
+                        raise first_error
+                    if refine_seen:
                         break
             else:
                 for segment in runnable:
@@ -268,8 +276,8 @@ async def _execute_segments(
                             total_active,
                             token,
                         )
-                    except ChatResponseError as exc:
-                        if refinement.is_refinable_truncation(exc):
+                    except AppException as exc:
+                        if refinement.refine_reason_for_exc(exc) is not None:
                             break
                         raise
         await _owned_checkpoint(db, blob, actor, row, run, token)
@@ -324,15 +332,16 @@ async def _execute_segments(
             error_code=code,
         )
         all_segments = await _load_segments(db, row_id)
+        # A request having been sent is not by itself uncertainty: a complete answer that
+        # broke the contract, a spent budget or a known provider error are all decided
+        # outcomes. Only a part whose provider result is truly unknown makes the review so.
         has_uncertain_segment = any(seg.status == "uncertain" for seg in all_segments)
-        sent = await _anything_sent(db, row_id)
         is_uncertain = (
             has_uncertain_segment
             or not isinstance(exc, AppException)
             or "uncertain" in code
             or "interrupted" in code
             or "expired" in code
-            or (sent and not code.startswith("compilation_review_refinement_"))
         )
         if (
             failed is not None
@@ -343,7 +352,7 @@ async def _execute_segments(
             failed.error_code = code
             failed.finished_at = utcnow()
             await db.commit()
-        if isinstance(exc, AppException) and code.startswith("compilation_review_refinement_"):
+        if isinstance(exc, AppException) and code.startswith(TERMINAL_CODE_PREFIXES):
             raise
         raise AppException(
             "Review nhiều phần dừng trước khi đủ báo cáo.",
@@ -352,7 +361,7 @@ async def _execute_segments(
         ) from exc
 
 
-async def _refine_truncated_segment(
+async def _refine_segment(
     db: AsyncSession,
     blob: BlobStore,
     actor: AuthActor,
@@ -363,10 +372,27 @@ async def _refine_truncated_segment(
     material,
     limits: refinement.ReviewRefinementLimits,
     token: str,
+    reason: str,
 ) -> list[CompilationReviewSegment]:
+    """Replace a failed node by two children over its exact owned scope.
+
+    ``reason`` is the measured failure that justifies narrowing: a cut-off output or a
+    complete response that broke the ownership contract. The parent keeps its raw,
+    usage and ledger as history; only the children are executed again, and each child
+    request is checked against the review-wide budget at the provider boundary.
+    """
     await _owned_checkpoint(db, blob, actor, row, run, token)
     try:
         refinement.check_limits(row, segments, parent, limits)
+        if (
+            reason == refinement.CONTRACT_INVALID
+            and refinement.contract_recoveries(row) >= limits.max_contract_recoveries
+        ):
+            raise AppException(
+                "Đã dùng hết số lần phục hồi phản hồi sai hợp đồng của review.",
+                code="compilation_review_recovery_exhausted",
+                status_code=422,
+            )
         next_index = max((seg.segment_index for seg in segments), default=0) + 1
         active_leaves = len(refinement.ordered_leaves(segments))
         children_plans = refinement.split_segment_plans(
@@ -377,7 +403,12 @@ async def _refine_truncated_segment(
         )
     except AppException as exc:
         parent.error_code = exc.code
-        parent.config = {**(parent.config or {}), "refinement_exhausted": True}
+        parent.config = {
+            **(parent.config or {}),
+            "refinement_exhausted": True,
+            "refinement_stop": exc.code,
+            "refinement_reason": reason,
+        }
         await db.commit()
         raise
     children = refinement.create_child_segments(
@@ -385,7 +416,7 @@ async def _refine_truncated_segment(
         parent,
         children_plans,
         request_total=active_leaves + 1,
-        split_reason="chat_output_truncated",
+        split_reason=reason,
     )
     for child in children:
         db.add(child)
@@ -397,8 +428,10 @@ async def _refine_truncated_segment(
             "child_segment_ids": [child.id for child in children],
             "child_segment_indices": [child.segment_index for child in children],
             "depth": refinement.segment_depth(parent) + 1,
-            "reason": "chat_output_truncated",
+            "reason": reason,
+            "policy": "split_owned_scope/v1",
             "parent_input_sha256": parent.input_sha256,
+            "diagnosis": ((parent.config or {}).get("last_failure") or {}).get("diagnosis"),
         }
     )
     row.trace = {
@@ -531,11 +564,22 @@ async def _resume_segment(
 ) -> None:
     if segment.status == "completed":
         return
+    if segment.status == "pending" and segment.request_started_at is None:
+        # The attempt was recorded but the send was never started: nothing can have been
+        # consumed, so the reservation is released instead of counting a phantom request.
+        entries = refinement.attempts_of(segment)
+        if entries and entries[-1].get("state") == "reserved":
+            refinement.settle_attempt(segment, "released")
+            if segment.usage_id:
+                await usage_service.settle(db, segment.usage_id, total_tokens=0, failed=True)
+            await db.commit()
+        return
     raw = await artifacts.segment_artifact(db, segment.id, "raw_response")
     if segment.status == "running":
         # A durable assessment means the part finished before its status commit.
         assessed = await artifacts.segment_artifact(db, segment.id, "assessment_json")
         if assessed is not None and segment.usage_tokens is not None:
+            refinement.settle_attempt(segment, "settled", usage_tokens=segment.usage_tokens)
             if segment.usage_id:
                 await usage_service.settle(db, segment.usage_id, total_tokens=segment.usage_tokens)
             segment.status, segment.error_code = "completed", None
@@ -543,6 +587,7 @@ async def _resume_segment(
             await db.commit()
             return
         if segment.request_started_at is not None and raw is None:
+            refinement.settle_attempt(segment, "unknown")
             if segment.usage_id:
                 await usage_service.settle(db, segment.usage_id, total_tokens=None, failed=True)
             segment.status = "uncertain"
@@ -556,12 +601,14 @@ async def _resume_segment(
     if segment.status == "received" and raw is None:
         assessed = await artifacts.segment_artifact(db, segment.id, "assessment_json")
         if assessed is not None and segment.usage_tokens is not None:
+            refinement.settle_attempt(segment, "settled", usage_tokens=segment.usage_tokens)
             if segment.usage_id:
                 await usage_service.settle(db, segment.usage_id, total_tokens=segment.usage_tokens)
             segment.status, segment.error_code = "completed", None
             segment.finished_at = utcnow()
             await db.commit()
             return
+        refinement.settle_attempt(segment, "unknown")
         if segment.usage_id:
             await usage_service.settle(db, segment.usage_id, total_tokens=None, failed=True)
         segment.status = "uncertain"
@@ -669,6 +716,18 @@ async def _run_segment(
                     "Chính sách reasoning review đã đổi so với phần đã lập.",
                     code="compilation_review_reasoning_changed",
                 )
+        # Take the review row lock, then check and record the attempt before anything can
+        # be sent: concurrent workers serialize here, so the ceilings cannot be overspent.
+        await _owned_checkpoint(db, blob, actor, row, run, token)
+        siblings = await _load_segments(db, row.id)
+        limits = refinement.limits_for(
+            row.trace,
+            max(1, sum(1 for seg in siblings if seg.parent_segment_id is None)),
+            segments=siblings,
+        )
+        refinement.reserve_attempt(
+            row, siblings, segment, limits, estimate_tokens=budget.total_reserved_tokens
+        )
         usage = await usage_service.reserve(
             db,
             actor,
@@ -683,11 +742,16 @@ async def _run_segment(
         segment.status, segment.worker_id = "running", row.created_by
         segment.attempt_count += 1
         segment.request_started_at = utcnow()
-        await _owned_checkpoint(db, blob, actor, row, run, token)
         await db.commit()
         try:
             result = await chat.complete(messages, bind_usage(request, usage.id))
         except ChatResponseError as exc:
+            # A response arrived: its usage is whatever the provider reported, else unknown.
+            refinement.settle_attempt(
+                segment,
+                "settled" if exc.usage_tokens is not None else "usage_unknown",
+                usage_tokens=exc.usage_tokens,
+            )
             if exc.raw_body:
                 await artifacts.store_segment(db, blob, row, segment, "raw_response", exc.raw_body)
             segment.usage_tokens = exc.usage_tokens
@@ -696,6 +760,8 @@ async def _run_segment(
             await _owned_checkpoint(db, blob, actor, row, run, token)
             raise
         except (Exception, asyncio.CancelledError) as exc:
+            # Possibly sent, outcome unknown: it keeps counting at its reserved bound.
+            refinement.settle_attempt(segment, "unknown")
             await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
             if isinstance(exc, AppException) and "uncertain" in exc.code:
                 segment.status = "uncertain"
@@ -705,6 +771,11 @@ async def _run_segment(
             raise
         await usage_service.settle(db, usage.id, total_tokens=result.total_tokens)
         segment.usage_tokens = result.total_tokens
+        refinement.settle_attempt(
+            segment,
+            "settled" if result.total_tokens is not None else "usage_unknown",
+            usage_tokens=result.total_tokens,
+        )
         if result.raw_body:
             await artifacts.store_segment(db, blob, row, segment, "raw_response", result.raw_body)
         segment.status = "received"
@@ -712,12 +783,26 @@ async def _run_segment(
         await _owned_checkpoint(db, blob, actor, row, run, token)
         content = result.content
     await _owned_checkpoint(db, blob, actor, row, run, token)
-    if structured:
-        content = decode_keyed(content, plan.payload)
+    # Decode and validation share one boundary: any complete-but-wrong response is the
+    # same decided outcome (raw and usage kept, node failed), never "received forever".
+    original = content
     try:
+        if structured:
+            content = decode_keyed(content, plan.payload)
         checked = validate_content(content, plan.payload)
-    except AppException:
-        await _fail_segment(db, segment, "compilation_review_invalid")
+    except AppException as exc:
+        if exc.code != refinement.CONTRACT_INVALID:
+            raise
+        segment.config = {
+            **(segment.config or {}),
+            "last_failure": {
+                "code": exc.code,
+                "attempt": int(segment.attempt_count or 0),
+                "source": "raw_replay" if raw is not None else "provider_response",
+                "diagnosis": diagnose_contract(original, plan.payload),
+            },
+        }
+        await _fail_segment(db, segment, refinement.CONTRACT_INVALID)
         raise
     await artifacts.store_segment(
         db, blob, row, segment, "assessment_json", content.encode("utf-8")
@@ -765,10 +850,16 @@ async def _mark_uncertain(db: AsyncSession, review_id: str, token: str) -> None:
             continue
         raw = await artifacts.segment_artifact(db, segment.id, "raw_response")
         if raw is not None:
+            refinement.settle_attempt(
+                segment,
+                "settled" if segment.usage_tokens is not None else "usage_unknown",
+                usage_tokens=segment.usage_tokens,
+            )
             segment.status = "received"
             segment.worker_id = None
             changed = True
             continue
+        refinement.settle_attempt(segment, "unknown")
         segment.status = "uncertain"
         segment.error_code = "compilation_review_request_interrupted"
         segment.finished_at = utcnow()

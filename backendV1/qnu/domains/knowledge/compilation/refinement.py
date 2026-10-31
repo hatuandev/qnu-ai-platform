@@ -24,12 +24,15 @@ def reject(code: str) -> NoReturn:
 
 
 def diagnose(raw: bytes) -> bool:
-    """Only a definite length stop with visible output is eligible; no 422 heuristic."""
+    """Only the provider's definite length stop is eligible; no HTTP 422 heuristic.
+
+    Reasoning can consume the output allowance before any content is written. A length
+    stop still confirms truncation in that case; children narrow the owned scope while
+    the parent's raw response and usage remain intact.
+    """
     try:
         choice = json.loads(raw)["choices"][0]
-        return choice.get("finish_reason") == "length" and bool(
-            (choice["message"].get("content") or "").strip()
-        )
+        return choice.get("finish_reason") == "length"
     except (ValueError, KeyError, IndexError, TypeError, AttributeError):
         return False
 

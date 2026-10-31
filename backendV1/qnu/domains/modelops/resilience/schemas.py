@@ -15,6 +15,7 @@ TASK_CAPABILITIES = {
 class ResiliencePolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     key_pool_enabled: bool = False
+    wait_for_completion: bool = False
     retry_owner: Literal["qnu", "gateway"] = "qnu"
     max_key_attempts: int = Field(1, ge=1, le=3)
     auth_cooldown_seconds: int = Field(300, ge=1, le=86400)

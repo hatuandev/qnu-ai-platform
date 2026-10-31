@@ -415,11 +415,16 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
       ) {
         // Explicit rerun after the server fix: append; never rewrite an old draft/review.
         const created = await startCompilation("-source-limits-v2");
-        (state.compilationHistory ||= []).push({ ...publication });
+        if (!state.compilationHistory) {
+          state.compilationHistory = [];
+        }
+        state.compilationHistory.push({ ...publication });
         publication = { run: created.run.id, document: publication.document };
         state.publications[index] = publication;
         save(state);
-        await api.wait(`${collection(state)}/compilation-runs/${publication.run}`);
+        await api.wait(
+          `${collection(state)}/compilation-runs/${publication.run}`,
+        );
         draft = await api.get<CompilationDraft>(
           `${collection(state)}/compilation-runs/${publication.run}/draft`,
         );
@@ -448,8 +453,10 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
           : undefined;
         const reviewBase = `${collection(state)}/compilation-runs/${publication.run}/reviews`;
         type ReviewRun = Run & {
+          error_code?: string | null;
           trace?: {
             max_output_tokens?: number;
+            reference_contract_version?: number;
             segmentation?: { planner_version?: string | null } | null;
           };
         };
@@ -462,10 +469,16 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
           state.runtimeDefaults?.chat,
           modelLimit,
         );
-        if (previous && !recovery.recover) {
+        const needsReplan =
+          previous?.status === "uncertain" &&
+          previous?.error_code === "compilation_review_invalid" &&
+          previous?.trace?.reference_contract_version !== 2;
+        const shouldRecover = recovery.recover || needsReplan;
+        const recoverSuffix = needsReplan ? "-contract-v2" : recovery.suffix;
+        if (previous && !shouldRecover) {
           publication.review = previous.id;
         } else {
-          if (previous && recovery.recover) {
+          if (previous && shouldRecover) {
             publication.reviewHistory = [
               ...(publication.reviewHistory ?? []),
               previous.id,
@@ -483,7 +496,7 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
                   structured_output: true,
                 }
               : {},
-            `${state.runId}-review-${index}-${publication.run}${recovery.suffix}`,
+            `${state.runId}-review-${index}-${publication.run}${recoverSuffix}`,
             reviewProvider
               ? Math.max((reviewProvider.timeout_seconds + 30) * 1000, 300_000)
               : undefined,

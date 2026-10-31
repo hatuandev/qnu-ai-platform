@@ -128,7 +128,11 @@ test("policy never runs or saves on mount and explains pinning and unsupported t
   expect(state.save).not.toHaveBeenCalled();
   expect(screen.getByText(/Responses API: chưa hỗ trợ/)).toBeTruthy();
   expect(screen.getByText(/Không đổi model embedding/)).toBeTruthy();
-  expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");
+  expect(
+    screen
+      .getByRole("switch", { name: "Dùng nhóm khóa" })
+      .getAttribute("aria-checked"),
+  ).toBe("false");
   expect(
     screen.getByLabelText("Tối đa lượt gọi").hasAttribute("disabled"),
   ).toBe(true);
@@ -136,7 +140,7 @@ test("policy never runs or saves on mount and explains pinning and unsupported t
 
 test("gateway owns retries so switching to it resets attempts to one", async () => {
   render(<ProviderResiliencePanel provider={provider} />);
-  fireEvent.click(screen.getByRole("switch"));
+  fireEvent.click(screen.getByRole("switch", { name: "Dùng nhóm khóa" }));
   fireEvent.change(screen.getByLabelText("Tối đa lượt gọi"), {
     target: { value: "3" },
   });
@@ -160,6 +164,23 @@ test("gateway owns retries so switching to it resets attempts to one", async () 
   expect(await screen.findByText("Đã lưu chính sách.")).toBeTruthy();
 });
 
+test("waiting for completion is explicit and preserves the other policy values", async () => {
+  render(<ProviderResiliencePanel provider={provider} />);
+  const wait = screen.getByRole("switch", { name: "Chờ model xử lý xong" });
+  expect(wait.getAttribute("aria-checked")).toBe("false");
+  expect(state.save).not.toHaveBeenCalled();
+  fireEvent.click(wait);
+  fireEvent.click(screen.getByRole("button", { name: "Lưu chính sách" }));
+  await waitFor(() =>
+    expect(state.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        wait_for_completion: true,
+        key_pool_enabled: false,
+      }),
+    ),
+  );
+});
+
 test("ordered task fallback saves IDs and excludes inactive and primary providers", async () => {
   render(<ProviderResiliencePanel provider={provider} />);
   fireEvent.keyDown(
@@ -179,15 +200,23 @@ test("ordered task fallback saves IDs and excludes inactive and primary provider
 
 test("provider and session changes discard drafts", () => {
   const view = render(<ProviderResiliencePanel provider={provider} />);
-  fireEvent.click(screen.getByRole("switch"));
+  fireEvent.click(screen.getByRole("switch", { name: "Dùng nhóm khóa" }));
   state.session = 2;
   view.rerender(<ProviderResiliencePanel provider={provider} />);
-  expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");
-  fireEvent.click(screen.getByRole("switch"));
+  expect(
+    screen
+      .getByRole("switch", { name: "Dùng nhóm khóa" })
+      .getAttribute("aria-checked"),
+  ).toBe("false");
+  fireEvent.click(screen.getByRole("switch", { name: "Dùng nhóm khóa" }));
   view.rerender(
     <ProviderResiliencePanel provider={{ ...provider, id: "p2" }} />,
   );
-  expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");
+  expect(
+    screen
+      .getByRole("switch", { name: "Dùng nhóm khóa" })
+      .getAttribute("aria-checked"),
+  ).toBe("false");
 });
 
 test("stale, pending, error, loading and unauthorized states stay truthful", () => {

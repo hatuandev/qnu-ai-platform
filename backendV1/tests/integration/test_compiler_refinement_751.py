@@ -37,9 +37,24 @@ class RefineChat(FakeChat):
         return status, body
 
 
-def test_truncated_parent_builds_child_pairs_and_aggregates_usage(client):
+class ReasoningOnlyRefineChat(RefineChat):
+    def _respond(self, index):
+        status, body = super()._respond(index)
+        if index == 0:
+            data = json.loads(body)
+            data["choices"][0]["message"] = {
+                "role": "assistant",
+                "content": "",
+                "reasoning_content": "Still reasoning when the output limit was reached.",
+            }
+            body = json.dumps(data).encode()
+        return status, body
+
+
+@pytest.mark.parametrize("chat_type", [RefineChat, ReasoningOnlyRefineChat])
+def test_truncated_parent_builds_child_pairs_and_aggregates_usage(client, chat_type):
     data = processed_input(client, code="refine751")
-    with RefineChat() as chat:
+    with chat_type() as chat:
         chat_provider(client, data, chat.base_url)
         created = request_compile(client, data, auto_review=False, max_output_tokens=4096)
         assert created.status_code == 201, created.text

@@ -1,6 +1,20 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
+- [Phiên762 — Review admissions-chat và giới hạn token](2026-10-31_phien_762_review_admissions_chat.md):19PASS tích lũy khác19fresh cùngconfig;P1 recovery/test/nối bảng,16unit/14FE đạt.
+
+- [Phiên 761 — Khắc phục triệt để lỗi và hoàn thành 100% chặng E2E Admissions Chat (F01–F19)](2026-10-31_phien_761_khac_phuc_e2e_admissions_chat.md): sửa rerank input limit, reasoning output truncation cho task answer, nâng quota 5M tokens, candidate_k 50 cho 46 chunks và hướng dẫn đọc bảng nối trang; toàn bộ 19/19 câu hỏi F01–F19 PASS (3.7m).
+
+- [Phiên760 — Qwen giảm suy luận và chờ hoàn tất](2026-10-31_phien_760_qwen_reasoning_va_cho_hoan_tat.md): cấu hình ModelOps có probe, bỏ deadline phản hồi chat với lease heartbeat;28focused/26FE/build đạt, giữrununcertain.
+
+- [Phiên759 — Qwen reasoning-only hết output](2026-10-31_phien_759_qwen_reasoning_only_truncated.md): sửa Compiler bỏ qua refinement khi content rỗng;63focused/4integrationPASS, live sau sửaNOTRUN.
+
+- [Phiên758 — Review độc lập và test compilation](2026-10-31_phien_758_review_doc_lap_va_test_compilation.md): 8integration/58focused/32FE đạt; review mới3/3 nhưng5findings; còn P2 budget thời gian qua resume.
+
+- [Phiên 757 — Giới hạn ranh giới model, prompt replay hash và phục hồi contract review](2026-10-31_phien_757_gioi_han_model_hash_va_phuc_hoi_contract.md): áp trần request/token/time trước send, prompt v3 độc lập số lá, recovery hữu hạn phản hồi sai hợp đồng, sửa lint Biome; 71 unit PASS, live E2E compilation PASS.
+
+- [Phiên756 — Review và test compiler/review](2026-10-31_phien_756_review_va_test_compiler.md): 3 finding đã tái hiện, live compilation FAIL hợp đồng; 41focused/6integration/32FE đạt, full unit và Biome còn FAIL.
+
 - [Phiên755 — Review chia phần theo output và phục hồi truncated](2026-10-31_phien_755_review_chia_phan_va_phuc_hoi_truncated.md): planner v4 xét output/reasoning 4096, refinement cha–con, JSON/MD lá và E2E recovery; 25 unit trọng tâm + 16 FE PASS, live chờ Docker.
 
 - [Phiên754 — E2E alias model 9router](2026-10-31_phien_754_test_alias_model_9router.md): ánh xạ tên phản hồi cụ thể; giữ kiểm model, 14 regression và build PASS.

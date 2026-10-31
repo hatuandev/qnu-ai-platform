@@ -127,6 +127,24 @@ async def acquire(
     return KeyLease(provider.id, model, key.id, token, secret, policy)
 
 
+async def renew(db: AsyncSession, lease: KeyLease, timeout: float) -> bool:
+    """Extend only the still-live key lease owned by this request."""
+    owner = await credential_owner(db, lease.provider_id, lock=True)
+    leases = dict((owner.extra_config or {}).get(LEASES_KEY, {}))
+    saved = leases.get(lease.key_id, {})
+    now = datetime.now(UTC)
+    if saved.get("token") != lease.token or saved.get("expires", "") <= now.isoformat():
+        return False
+    key = await db.get(ProviderKey, lease.key_id, with_for_update=True)
+    if key is None:
+        return False
+    key.lease_until = now + timedelta(seconds=timeout + 10)
+    leases[lease.key_id] = {"token": lease.token, "expires": key.lease_until.isoformat()}
+    owner.extra_config = {**(owner.extra_config or {}), LEASES_KEY: leases}
+    await db.commit()
+    return True
+
+
 async def finish(
     db: AsyncSession,
     lease: KeyLease,

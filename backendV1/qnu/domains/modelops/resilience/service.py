@@ -88,6 +88,8 @@ async def save_policy(
     if provider is None:
         await provider_service.get(db, provider_id)
     own_transport = transport_for(provider.provider_type)
+    if policy.wait_for_completion and "chat" not in provider.capabilities:
+        raise Conflict("Chỉ model chat được chờ hoàn tất.", code="chat_policy_capability_mismatch")
     if policy.key_pool_enabled and not own_transport.protocols:
         raise Conflict(
             "Loại provider chưa có adapter runtime.", code="provider_transport_unsupported"

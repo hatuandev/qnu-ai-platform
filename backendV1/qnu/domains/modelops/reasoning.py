@@ -22,7 +22,7 @@ EXTRA_CONFIG_KEY = "reasoning_policy_v1"
 ReasoningMode = Literal["server_default", "effort", "toggle", "chat_template_kwarg"]
 ReasoningLevel = Literal["off", "low"]
 # Tasks whose prompt is owned by QNU and where reasoning can be tuned safely.
-REASONING_TASKS = ("compiler", "compiler_review")
+REASONING_TASKS = ("compiler", "compiler_review", "answer")
 REASONING_LEVELS = ("off", "low")
 PARAMETER_PATTERN = r"^[a-z][a-z0-9_]{0,63}$"
 

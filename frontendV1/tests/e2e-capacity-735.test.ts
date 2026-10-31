@@ -96,10 +96,10 @@ test("syncs current server metadata before applying explicit E2E runtime setting
     },
   );
   const rerank = requiredModel(models, "rerank");
-  expect(api.json).toHaveBeenCalledWith(
+  expect(api.json).not.toHaveBeenCalledWith(
     "PATCH",
     `/modelops/providers/${rerank.id}`,
-    { token_limits: { ...rerank.token_limits, max_input_tokens: 1024 } },
+    expect.anything(),
   );
 });
 

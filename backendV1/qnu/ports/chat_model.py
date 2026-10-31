@@ -39,6 +39,8 @@ class ChatRequest:
     execution: ProviderExecution | None = field(default=None, repr=False)
     # Declared reasoning parameter only; None keeps the provider/server default.
     reasoning: ReasoningParameter | None = field(default=None, repr=False)
+    # Server-owned ModelOps policy; connection/write limits remain finite.
+    wait_for_completion: bool = False
 
 
 @dataclass(frozen=True, slots=True)

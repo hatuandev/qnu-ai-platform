@@ -80,6 +80,29 @@ function PolicyForm({
         Chỉ lỗi 401 và 429 mới tạm nghỉ khóa và cho phép thử khóa khác trong
         cùng model.
       </p>
+      {provider.capabilities.includes("chat") && (
+        <form.Field name="wait_for_completion">
+          {(field) => (
+            <Field>
+              <div className="flex items-center justify-between gap-4">
+                <FieldLabel htmlFor="wait-for-completion">
+                  Chờ model xử lý xong
+                </FieldLabel>
+                <Switch
+                  id="wait-for-completion"
+                  checked={field.state.value ?? false}
+                  disabled={mutation.isPending}
+                  onCheckedChange={field.handleChange}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Không giới hạn thời gian chờ câu trả lời. Giới hạn kết nối và
+                ngân sách xử lý vẫn áp dụng.
+              </p>
+            </Field>
+          )}
+        </form.Field>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <form.Field name="key_pool_enabled">
           {(field) => (

@@ -9,7 +9,7 @@ from qnu.platform.errors import AppException
 from tests.unit.test_compiler_projection_746 import cell, document, table_block, text_block
 
 
-def test_only_measured_truncation_with_visible_output_can_refine():
+def test_only_measured_length_stop_can_refine_even_before_content():
     def raw(finish, content):
         return json.dumps(
             {"choices": [{"finish_reason": finish, "message": {"content": content}}]}
@@ -17,7 +17,7 @@ def test_only_measured_truncation_with_visible_output_can_refine():
 
     assert diagnose(raw("length", "{partial"))
     assert not diagnose(raw("stop", "content"))
-    assert not diagnose(raw("length", ""))
+    assert diagnose(raw("length", ""))
     assert not diagnose(b"422 invalid schema")
 
 

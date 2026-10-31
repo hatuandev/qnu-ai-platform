@@ -4,6 +4,20 @@ Compiler/review đã có nhánh chia phần và checkpoint: xem [triển khai, m
 
 ## Chạy tiếp sau lỗi output ở compilation
 
+### Qwen: giảm suy luận và chờ phản hồi hoàn tất (phiên760)
+
+Trong ModelOps → model Qwen → Dự phòng & Phục hồi, bật **Chờ model xử lý xong** nếu không muốn giới hạn thời gian sinh phản hồi. Tùy chọn này áp dụng cho model được chọn, không đổi model khác; thời hạn kết nối/ghi HTTP, hàng đợi và ngân sách tổng của job vẫn giữ. Không dùng số timeout rất lớn để giả lập vô hạn.
+
+Phiên thử `1da945adac7c` đã lưu tùy chọn này cho Qwen. Probe tổng hợp qua gateway xác nhận `chat_template_kwargs.enable_thinking=false` trả JSON đúng và không có reasoning; ModelOps đã lưu reasoning off cho `compiler`/`compiler_review`. Không suy khả năng này cho model hoặc server khác chưa kiểm tra. Cleanup/init sẽ tạo ModelOps mới; không coi cấu hình phiên cũ tự chuyển sang phiên mới.
+
+Với lượt `uncertain` do timeout, không đổi trạng thái để gửi lại cùng request. Sau khi nạp mã mới, có thể chủ động tạo lượt mới từ OCR đã xong bằng:
+
+```powershell
+.\test-v1-e2e.ps1 run admissions-compilation --headed --recover
+```
+
+Lượt lỗi/partial cũ được giữ trong lịch sử. Đây là lượt inference mới, không phải chứng minh provider chưa xử lý request bị timeout. Không cleanup/init hoặc upload/OCR lại. Tùy chọn chờ ở QNU không thay timeout Nginx/router/server AI ở máy khác.
+
 Lượt lỗi đã dùng hết8192token cho suy luận, chưa có JSON. Đã sửa planner chia theo ngân sách đầu ra, phân định owned/context và bật JSON Schema. Lần chạy lại chặng được phép tạo một recovery riêng theo giới hạn output ModelOps, giữ lịch sử lượt lỗi; mặc định compiler8192 không đổi. Không tự chạy model lại khi đang uncertain.
 
 Tại cửa sổ serve nhấn Ctrl+C rồi chạy ` .\test-v1-e2e.ps1 serve ` để nạp mã mới. Ở cửa sổ thứ hai:

@@ -197,7 +197,20 @@ def test_part_messages_carry_owned_units_and_small_context_not_full_snapshot():
     assert [unit["id"] for unit in user["draft_units"]] == ["section:2:paragraph:1"]
     assert [unit["id"] for unit in user["context_source_units"]] == ["ocr_one:ev1"]
     assert "pages" not in user["documents"][0]
-    assert "phần 2/3" in messages[0].content
+    # Prompt v3 states ownership and does not depend on how many sibling parts exist.
+    assert "đúng 1 đơn vị trong source_units" in messages[0].content
+    assert "tuyệt đối không tạo nhận xét" in messages[0].content
+    other_total = parts.messages_for(part, structured=False, index=2, total=9)
+    assert other_total[0].content == messages[0].content
+    # Prompt v2 stays reproducible for plans stored before v3.
+    legacy = parts.messages_for(
+        part,
+        structured=False,
+        index=2,
+        total=3,
+        prompt_version=parts.LEGACY_SEGMENT_PROMPT_VERSION,
+    )
+    assert "phần 2/3" in legacy[0].content
 
 
 def test_required_citations_exceeding_neighbour_cap_are_not_dropped():

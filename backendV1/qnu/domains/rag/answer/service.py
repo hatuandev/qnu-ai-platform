@@ -110,6 +110,7 @@ async def answer(
         messages,
         provider_id=req.provider_id,
         task="answer",
+        reasoning_task="answer",
         max_output_tokens=req.max_output_tokens or get_settings().RAG_MAX_OUTPUT_TOKENS,
     )
     usage = await usage_service.reserve(

@@ -118,8 +118,9 @@ async def prepare_chat_request(
     )
     runtime = await resolve_chat_runtime(db, workspace_id, provider_id)
     runtime = replace(runtime, routing_trace=routing)
-    if reasoning is None and reasoning_task is not None:
-        reasoning = runtime.reasoning_directive(reasoning_task)
+    effective_reasoning_task = reasoning_task or (task if isinstance(task, str) else None)
+    if reasoning is None and effective_reasoning_task is not None:
+        reasoning = runtime.reasoning_directive(effective_reasoning_task)
     material = {
         "provider_id": runtime.provider_id,
         "endpoint": runtime.base_url.rstrip("/"),
@@ -138,6 +139,7 @@ async def prepare_chat_request(
             model=runtime.model_name,
             max_output_tokens=budget.max_output_tokens,
             timeout_seconds=runtime.timeout_seconds,
+            wait_for_completion=runtime.wait_for_completion,
             api_key=runtime.api_key,
             output_schema=output_schema,
             execution=runtime.execution_scope,

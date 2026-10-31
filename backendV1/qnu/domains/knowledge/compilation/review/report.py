@@ -57,18 +57,35 @@ def messages_for(
     payload: dict,
     *,
     structured: bool = False,
-    segment: tuple[int, int] | None = None,
+    segment: tuple[int, int | None] | None = None,
 ) -> list[ChatMessage]:
     instruction = SYSTEM
     if segment is not None:
         index, total = segment
-        instruction += (
-            f"\nĐây là phần {index}/{total} của một review dài. Chỉ nhận xét ĐÚNG MỘT LẦN "
-            "các ID trong source_units và draft_units của phần này. "
-            "context_source_units và context_draft_units chỉ là ngữ cảnh liên phần để "
-            "đối chiếu, có thể được tham chiếu nhưng không được nhận xét hay xếp hạng. "
-            "Không suy nội dung của phần khác và không bỏ qua đơn vị nào thuộc phần này."
-        )
+        if total is not None:
+            # Prompt v2 (replay only): "index/total" is part of the hashed instruction.
+            instruction += (
+                f"\nĐây là phần {index}/{total} của một review dài. Chỉ nhận xét ĐÚNG MỘT LẦN "
+                "các ID trong source_units và draft_units của phần này. "
+                "context_source_units và context_draft_units chỉ là ngữ cảnh liên phần để "
+                "đối chiếu, có thể được tham chiếu nhưng không được nhận xét hay xếp hạng. "
+                "Không suy nội dung của phần khác và không bỏ qua đơn vị nào thuộc phần này."
+            )
+        else:
+            # Prompt v3: ownership is explicit and the text never depends on how many
+            # sibling parts exist, so refinement elsewhere cannot change a planned prompt.
+            owned_sources = len(payload["source_units"])
+            owned_drafts = len(payload["draft_units"])
+            instruction += (
+                f"\nĐây là nút review #{index} trong cây chia phần của một review dài; "
+                "số thứ tự chỉ để truy vết, không cho biết nội dung phần khác. "
+                f"Phần này sở hữu đúng {owned_sources} đơn vị trong source_units và "
+                f"{owned_drafts} đơn vị trong draft_units. Chỉ nhận xét ĐÚNG MỘT LẦN "
+                "mỗi ID trong hai danh sách sở hữu đó, không thêm và không bỏ ID nào. "
+                "context_source_units và context_draft_units là ngữ cảnh chỉ đọc: chỉ được "
+                "tham chiếu trong source_ids/draft_ids, tuyệt đối không tạo nhận xét cho "
+                "ID nằm trong ngữ cảnh. Không suy nội dung của phần khác."
+            )
     if structured:
         instruction += """\nĐịnh dạng của lượt này là keyed/v1 theo JSON Schema gửi kèm, thay hai mảng
 ở ví dụ trên bằng hai object. source_assessments có khóa là từng source ID;
@@ -177,6 +194,46 @@ def decode_keyed(content: str, payload: dict) -> str:
             code="compilation_review_invalid",
             status_code=502,
         ) from exc
+
+
+def diagnose_contract(content: str, payload: dict) -> dict:
+    """Count how a complete response broke ownership, never storing its text.
+
+    Missing/extra counts are separated from ids that belong to read-only context so a
+    trace can tell "answered a context unit" apart from "skipped an owned unit".
+    """
+    result: dict = {"parsed": False}
+    try:
+        value = json.loads(content)
+        if not isinstance(value, dict):
+            return result
+        result["parsed"] = True
+        for field, units, identity, context_key in (
+            ("source_assessments", "source_units", "source_id", "context_source_units"),
+            ("draft_assessments", "draft_units", "draft_id", "context_draft_units"),
+        ):
+            checks = value.get(field)
+            if isinstance(checks, dict):
+                returned = list(checks)
+            elif isinstance(checks, list):
+                returned = [c.get(identity) for c in checks if isinstance(c, dict)]
+            else:
+                result[field] = {"shape": "invalid"}
+                continue
+            owned = [unit["id"] for unit in payload[units]]
+            context = {unit["id"] for unit in payload.get(context_key, [])}
+            returned_set = set(returned)
+            result[field] = {
+                "expected": len(owned),
+                "returned": len(returned),
+                "missing": len(set(owned) - returned_set),
+                "extra_context": len((returned_set - set(owned)) & context),
+                "extra_unknown": len(returned_set - set(owned) - context),
+                "duplicates": len(returned) - len(returned_set),
+            }
+    except (ValueError, TypeError, KeyError, AttributeError):
+        result["parsed"] = False
+    return result
 
 
 def validate_content(content: str, payload: dict) -> ReviewContent:
