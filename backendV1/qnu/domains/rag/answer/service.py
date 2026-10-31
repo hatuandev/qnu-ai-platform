@@ -1,6 +1,7 @@
 """Retrieval → evidence → ModelOps generation → citation and current-source validation."""
 
 import asyncio
+import json
 import time
 import uuid
 from collections.abc import Awaitable, Callable
@@ -15,12 +16,14 @@ from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.modelops.inference.service import prepare_chat_request
 from qnu.domains.modelops.public_api import resolve_chat_runtime
 from qnu.domains.modelops.usage.service import usage_service
+from qnu.domains.rag.answer.cells import PROJECTION_VERSION, catalog, materialize
+from qnu.domains.rag.answer.cells import VERSION as CELLS_VERSION
 from qnu.domains.rag.answer.context import expand_context
 from qnu.domains.rag.answer.drafting import PROMPT_VERSION, messages_for, parse_answer, sources_for
 from qnu.domains.rag.answer.schemas import AnswerRequest, AnswerResponse, AnswerTrace
 from qnu.domains.rag.answer.verification import verify
 from qnu.platform.config import get_settings
-from qnu.platform.errors import Conflict
+from qnu.platform.errors import AppException, Conflict
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.chat_model import ChatModel, ChatResponseError
@@ -93,13 +96,43 @@ async def answer(
         trace.verification["skip_reason"] = "no_evidence"
         return response
     sources = sources_for(retrieval)
+    cells = catalog(sources, trace.context.get("table_links"))
     messages = messages_for(
         req.question,
         sources,
+        table_context=trace.context.get("table_links"),
+        table_cells=cells,
         resolved_question=retrieval_query,
         persona=persona,
         metadata_filter=req.metadata_filter.model_dump(mode="json", exclude_none=True),
     )
+    # Count the actual evidence envelope, including the derived cell catalog and
+    # dependency links. Question/style/history are bounded separately by ModelOps.
+    envelope = json.loads(messages[-1].content)
+    evidence_bytes = len(
+        json.dumps(
+            {
+                key: envelope[key]
+                for key in ("evidence", "table_cells", "table_context")
+                if key in envelope
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
+    trace.context["bytes_used"] = evidence_bytes
+    if evidence_bytes > req.context_max_bytes:
+        raise AppException(
+            "Bằng chứng và danh mục ô vượt ngân sách context.",
+            code="answer_context_budget_exceeded",
+            status_code=422,
+        )
+    trace.grounding = {
+        "version": CELLS_VERSION,
+        "available_cells": sum(len(t["cells"]) for t in cells["tables"]),
+        "unresolved_tables": len(cells["issues"]),
+        "catalog_sha256": digest(cells),
+    }
     proof = await validate_results(
         db, blob, vectors, actor, workspace_id, collection_id, retrieval, req.document_ids
     )
@@ -113,6 +146,9 @@ async def answer(
         reasoning_task="answer",
         max_output_tokens=req.max_output_tokens or get_settings().RAG_MAX_OUTPUT_TOKENS,
     )
+    inference_hash = runtime.inference_configuration_hash("answer")
+    trace.inference_configuration_hash = inference_hash
+    trace.reasoning = runtime.reasoning_trace("answer")
     usage = await usage_service.reserve(
         db,
         actor,
@@ -124,7 +160,9 @@ async def answer(
                 "question": req.question,
                 "evidence": proof,
                 "config": runtime.configuration_hash,
+                "inference_config": inference_hash,
                 "prompt_version": PROMPT_VERSION,
+                "cell_catalog_sha256": trace.grounding["catalog_sha256"],
                 "metadata_filter": req.metadata_filter.model_dump(mode="json", exclude_none=True),
             }
         ),
@@ -142,7 +180,7 @@ async def answer(
         ):
             raise Conflict("Evidence thay đổi trước khi gọi model.", code="answer_evidence_changed")
         current = await resolve_chat_runtime(db, workspace_id, runtime.provider_id)
-        if current.configuration_hash != runtime.configuration_hash:
+        if current.inference_configuration_hash("answer") != inference_hash:
             raise Conflict("Model chat đã thay đổi.", code="chat_provider_changed")
         if checkpoint is not None:
             await checkpoint()
@@ -167,7 +205,20 @@ async def answer(
         result.completion_tokens,
         result.total_tokens,
     )
-    draft = parse_answer(result.content, sources)
+    proposed = parse_answer(result.content, sources)
+    draft = materialize(proposed, sources, cells)
+    trace.grounding["selected_cells"] = [item.cell_id for item in proposed.lookups]
+    trace.grounding["projection"] = {
+        "version": PROJECTION_VERSION,
+        "mode": "selected_cells" if proposed.lookups else "narrative",
+        "omitted_model_statements": len(proposed.statements) if proposed.lookups else 0,
+    }
+    trace.grounding["cell_proofs"] = [
+        {key: cell[key] for key in ("cell_id", "evidence_ids", "source_cells")}
+        for table in cells["tables"]
+        for cell in table["cells"]
+        if cell["cell_id"] in trace.grounding["selected_cells"]
+    ]
     started = time.monotonic()
 
     async def safety_check():
@@ -176,7 +227,7 @@ async def answer(
         ):
             raise Conflict("Evidence thay đổi khi model trả lời.", code="answer_evidence_changed")
         current = await resolve_chat_runtime(db, workspace_id, runtime.provider_id)
-        if current.configuration_hash != runtime.configuration_hash:
+        if current.inference_configuration_hash("answer") != inference_hash:
             raise Conflict("Model chat đã thay đổi khi trả lời.", code="chat_provider_changed")
         if checkpoint is not None:
             await checkpoint()

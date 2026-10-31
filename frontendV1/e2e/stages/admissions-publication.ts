@@ -1,5 +1,11 @@
 import { expect } from "@playwright/test";
-import { benchmark, context, modelTimeout } from "./admissions-context";
+import {
+  type BenchmarkDoc,
+  benchmark,
+  context,
+  modelTimeout,
+} from "./admissions-context";
+import { verifyAdmissionsIndex } from "./admissions-policy";
 import {
   decideCompilationRecovery,
   invalidReviewCanBeReplanned,
@@ -13,7 +19,9 @@ import {
   type Checkpoint,
   collection,
   type Publication,
+  processing,
   type Run,
+  type Source,
   save,
   versionBase,
 } from "./session";
@@ -38,15 +46,93 @@ const NEW_RUN_MESSAGE: Record<string, string> = {
 };
 
 export async function compileAdmissionSource(api: Api, state: Checkpoint) {
-  const source = state.admissions?.source;
-  if (!source || !state.admissions)
-    throw new Error("BLOCKED: thiếu nguồn điểm sàn.");
-  const base = collection(context(state));
+  if (!state.admissions?.documents) {
+    throw new Error("BLOCKED: thiếu bộ tài liệu tuyển sinh.");
+  }
   const timeout = await modelTimeout(api, state);
-  const previous = state.admissions.publication;
+
+  // Validate every source before spending tokens on the first document.
+  for (const [key, docMeta] of Object.entries(benchmark.documents)) {
+    const source = state.admissions.documents[key]?.source;
+    if (!source || source.sha256 !== docMeta.sha256)
+      throw new Error(`BLOCKED: thiếu/sai hash nguồn ${key}.`);
+    const run = await api.get<Run>(processing(context(state), source));
+    if (
+      run.status !== "completed" ||
+      !run.results_ready ||
+      run.pages_done !== docMeta.pages ||
+      run.pages_total !== docMeta.pages
+    )
+      throw new Error(`BLOCKED: OCR ${key} chưa đủ trang/kết quả.`);
+    await pinAdmissionText(api, state, source);
+  }
+
+  for (const [key, docMeta] of Object.entries(benchmark.documents)) {
+    const entry = state.admissions.documents[key];
+    if (!entry?.source) {
+      throw new Error(`BLOCKED: thiếu nguồn ${key}.`);
+    }
+    await compileOneAdmissionSource(
+      api,
+      state,
+      key,
+      docMeta,
+      entry.source,
+      timeout,
+    );
+  }
+
+  // Đồng bộ lại publication của floor2026 cho state.admissions để tương thích ngược
+  if (state.admissions.documents.floor2026?.publication) {
+    state.admissions.publication =
+      state.admissions.documents.floor2026.publication;
+    state.admissions.compilationHistory =
+      state.admissions.documents.floor2026.compilationHistory;
+  }
+}
+
+async function pinAdmissionText(api: Api, state: Checkpoint, source: Source) {
+  const suffix =
+    source.textVersion === undefined ? "" : `?version=${source.textVersion}`;
+  const text = await api.get<{
+    run_id: string;
+    version: number;
+    canonical_sha256: string;
+    units: unknown[];
+  }>(`${processing(context(state), source)}/text-review${suffix}`);
+  if (
+    text.run_id !== source.run ||
+    !Number.isSafeInteger(text.version) ||
+    text.version < 0 ||
+    !/^[a-f0-9]{64}$/.test(text.canonical_sha256) ||
+    !text.units.length ||
+    (source.textVersion !== undefined && text.version !== source.textVersion) ||
+    (source.textSha256 && text.canonical_sha256 !== source.textSha256)
+  )
+    throw new Error("BLOCKED: bản văn bản OCR không khớp checkpoint.");
+  source.textVersion = text.version;
+  source.textSha256 = text.canonical_sha256;
+  save(state);
+}
+
+async function compileOneAdmissionSource(
+  api: Api,
+  state: Checkpoint,
+  docKey: string,
+  docMeta: BenchmarkDoc,
+  source: Source,
+  timeout: number,
+) {
+  const base = collection(context(state));
+  const entry = state.admissions?.documents?.[docKey];
+  if (!entry) {
+    throw new Error(`BLOCKED: thiếu thông tin lưu trữ cho ${docKey}.`);
+  }
+  const previous = entry.publication;
   let replaceWith: "raise_output" | "new_run" | undefined;
   let reason = "";
   let recoverOutput: number | undefined;
+
   if (previous) {
     const run = await api.get<Run>(`${base}/compilation-runs/${previous.run}`);
     let outputLimit: number | null | undefined;
@@ -88,78 +174,91 @@ export async function compileAdmissionSource(api: Api, state: Checkpoint) {
       reason = decision.reason;
     }
   }
+
   if (replaceWith && !recoveryAllowed(process.env.E2E_RECOVER_COMPILATION)) {
     throw new Error(
-      `BLOCKED: ${NEW_RUN_MESSAGE[reason] ?? reason}. ` +
+      `BLOCKED: [${docKey}] ${NEW_RUN_MESSAGE[reason] ?? reason}. ` +
         "Chạy lại chặng với --recover để tạo lượt mới từ nguồn OCR đã xong; " +
         "lượt cũ được giữ trong compilationHistory.",
     );
   }
+
   if (!previous || replaceWith) {
-    let idempotencyKey = `${state.runId}-floor-compile-v5`;
+    let idempotencyKey = `${state.runId}-${docKey}-compile-v5`;
+    const history = previous
+      ? [...(entry.compilationHistory ?? []), previous]
+      : entry.compilationHistory;
     if (previous) {
-      idempotencyKey =
-        replaceWith === "raise_output"
-          ? `${state.runId}-floor-recover-output-v5-${previous.run}`
-          : `${state.runId}-floor-replan-v5-${previous.run}`;
+      idempotencyKey = `${state.runId}-${docKey}-compile-v5-r${history?.length}`;
+      console.info(
+        `[${docKey}] Tạo lượt biên soạn mới (${NEW_RUN_MESSAGE[reason] ?? reason}); ` +
+          `giữ lượt ${previous.run} trong lịch sử.`,
+      );
+    }
+    const body: Record<string, unknown> = {
+      topic: `Biên soạn đầy đủ tài liệu: ${docMeta.title}`,
+      ocr_run_ids: [source.run],
+      text_versions: { [source.run]: source.textVersion },
+      provider_id: state.runtimeDefaults?.chat,
+      structured_output: true,
+      auto_review: false,
+    };
+    if (recoverOutput !== undefined) {
+      body.max_output_tokens = recoverOutput;
     }
     const created = await api.post<{ run: Run }>(
       `${base}/compilation-runs`,
-      {
-        topic:
-          "Biên soạn đầy đủ ngưỡng đầu vào đại học chính quy năm 2026: giữ mọi ngành/chương trình, mã xét tuyển, bốn cột phương thức, tổ hợp, dấu gạch và tất cả chú ý/ngoại lệ. Không đổi điểm sàn thành điểm trúng tuyển.",
-        ocr_run_ids: [source.run],
-        auto_review: false,
-        provider_id: state.runtimeDefaults?.chat,
-        structured_output: true,
-        ...(recoverOutput !== undefined
-          ? { max_output_tokens: recoverOutput }
-          : {}),
-      },
+      body,
       idempotencyKey,
     );
-    if (previous) {
-      state.admissions.compilationHistory ??= [];
-      if (
-        !state.admissions.compilationHistory.some(
-          (item) => item.run === previous.run,
-        )
-      )
-        state.admissions.compilationHistory.push({ ...previous });
-      console.info(
-        replaceWith === "raise_output"
-          ? `Tạo lượt phục hồi compiler với JSON Schema và output ${recoverOutput} token; giữ lượt lỗi trong lịch sử.`
-          : `Tạo lượt biên soạn mới (${NEW_RUN_MESSAGE[reason] ?? reason}); giữ lượt ${previous.run} trong lịch sử.`,
-      );
-    }
-    state.admissions.publication = {
+    // A failed POST must not advance history and generate another recovery key.
+    entry.compilationHistory = history;
+    entry.publication = {
       run: created.run.id,
-      // Only a truncated run replaced with a larger ceiling is a "recovery"; a
-      // replanned run must not consume the single allowed output recovery.
-      ...(previous && recoverOutput !== undefined
-        ? { compilationRecoveryOf: previous.run }
-        : {}),
+      compilationRecoveryOf: previous?.run,
     };
     save(state);
   }
-  const publication = state.admissions.publication;
-  if (!publication) throw new Error("BLOCKED: chưa tạo lượt biên soạn.");
-  const progressSuffix = `${base}/compilation-runs/${publication.run}/progress`;
-  const progress = await api.waitProgress<Progress>(progressSuffix, timeout);
+
+  const publication = entry.publication;
+  if (!publication) {
+    throw new Error(
+      `[${docKey}] Lỗi logic: không tìm thấy publication sau khi tạo.`,
+    );
+  }
+  const progress = await api.waitProgress<Progress>(
+    `${base}/compilation-runs/${publication.run}/progress`,
+    timeout,
+  );
+  expect(
+    progress.status,
+    `[${docKey}] Biên soạn không đạt; dừng chặng để rà soát artifact/log.`,
+  ).toBe("completed");
+
   const draft = await api.get<{
     sections: unknown[];
     citations: Record<string, unknown>;
   }>(`${base}/compilation-runs/${publication.run}/draft`);
   expect(draft.sections.length).toBeGreaterThan(0);
+  expect(Object.keys(draft.citations).length).toBeGreaterThan(0);
   expect(
     Object.keys(draft.citations).every((id) => id.startsWith(`${source.run}:`)),
   ).toBe(true);
-  await reviewAdmissionDraft(api, state, publication, timeout, progress.total);
+
+  await reviewOneAdmissionDraft(
+    api,
+    state,
+    docKey,
+    publication,
+    timeout,
+    progress.total,
+  );
 }
 
-async function reviewAdmissionDraft(
+async function reviewOneAdmissionDraft(
   api: Api,
   state: Checkpoint,
+  docKey: string,
   publication: Publication,
   timeout: number,
   parts: number,
@@ -185,13 +284,12 @@ async function reviewAdmissionDraft(
       delete publication.review;
       save(state);
       console.info(
-        "Tạo review theo chính sách mới; giữ báo cáo cũ trong lịch sử.",
+        `[${docKey}] Tạo review theo chính sách mới; giữ báo cáo cũ trong lịch sử.`,
       );
     }
   }
+
   if (!publication.review) {
-    // The review endpoint executes its parts synchronously, so this request must
-    // survive one model call per part; progress below verifies the observed total.
     const reviewTimeout = timeout * Math.max(8, parts * 4);
     const body = {
       provider_id: state.runtimeDefaults?.chat,
@@ -200,8 +298,8 @@ async function reviewAdmissionDraft(
     const attempts = publication.reviewAttempts ?? 0;
     const key =
       attempts === 0
-        ? `${state.runId}-floor-review-${publication.run}`
-        : `${state.runId}-floor-review-${publication.run}-r${attempts}`;
+        ? `${state.runId}-${docKey}-review-${publication.run}`
+        : `${state.runId}-${docKey}-review-${publication.run}-r${attempts}`;
     let review: Run;
     try {
       review = await api.post<Run>(base, body, key, reviewTimeout);
@@ -234,8 +332,6 @@ async function reviewAdmissionDraft(
       if (!replace) {
         throw error;
       }
-      // The stored review was planned for another model configuration; keep it in
-      // history and start exactly one new review under a new key.
       const stopped = await api.get<{ id: string; status: string }[]>(
         `${base}?limit=20`,
       );
@@ -251,36 +347,39 @@ async function reviewAdmissionDraft(
       review = await api.post<Run>(
         base,
         body,
-        `${state.runId}-floor-review-${publication.run}-r${attempts + 1}`,
+        `${state.runId}-${docKey}-review-${publication.run}-r${attempts + 1}`,
         reviewTimeout,
       );
     }
     publication.review = review.id;
     save(state);
   }
+
   await api.waitProgress<Progress>(
     `${base}/${publication.review}/progress`,
     timeout,
   );
-  const report = await api.get<{ findings: unknown[] }>(
+  const report = await api.get<{ review_id: string; findings: unknown[] }>(
     `${base}/${publication.review}/report`,
   );
+  expect(report.review_id).toBe(publication.review);
   expect(
     report.findings,
-    "Review còn finding; không tự chấp nhận rủi ro để xuất bản.",
+    `[${docKey}] Review còn finding; không tự chấp nhận rủi ro để xuất bản.`,
   ).toHaveLength(0);
 }
 
 async function decide(
   api: Api,
   state: Checkpoint,
+  docKey: string,
   publication: Publication,
   action: "approve" | "publish",
 ) {
   const base = versionBase(context(state), publication);
   const body: Record<string, unknown> = {
     action,
-    reason: "E2E TB điểm sàn 2026",
+    reason: `E2E ${docKey} tuyển sinh`,
   };
   if (action === "approve") {
     const gate = await api.get<{
@@ -290,8 +389,11 @@ async function decide(
     }>(`${base}/review-gate`);
     expect(
       gate.findings,
-      "Finding chưa xử lý; giữ nguyên chốt xuất bản.",
+      `[${docKey}] Finding chưa xử lý; giữ nguyên chốt xuất bản.`,
     ).toHaveLength(0);
+    expect(gate.review_id, "Review gate phải là báo cáo đã kiểm tra.").toBe(
+      publication.review,
+    );
     body.review_ack = {
       review_id: gate.review_id,
       report_sha256: gate.report_sha256,
@@ -306,76 +408,142 @@ async function decide(
   await api.post(
     `${base}/decisions`,
     { preview_id: preview.id, preview_sha256: preview.preview_sha256 },
-    `${state.runId}-floor-${publication.version}-${action}`,
+    `${state.runId}-${docKey}-${publication.version}-${action}`,
   );
 }
 
 export async function publishAdmissionDraft(api: Api, state: Checkpoint) {
-  const publication = state.admissions?.publication;
-  if (!publication) throw new Error("BLOCKED: chưa biên soạn điểm sàn.");
-  const base = collection(context(state));
-  if (!publication.version) {
-    const created = await api.post<{
-      document: { id: string };
-      version: { id: string };
-    }>(
-      base + "/compiled-documents",
-      {
-        document_key: `floor-${state.runId}`,
-        title: "Ngưỡng đầu vào QNU 2026",
-        compilation_run_id: publication.run,
-      },
-      `${state.runId}-floor-document`,
-    );
-    publication.document = created.document.id;
-    publication.version = created.version.id;
-    save(state);
+  if (!state.admissions?.documents) {
+    throw new Error("BLOCKED: chưa có tài liệu nào được biên soạn.");
   }
-  let version = await api.get<{ status: string }>(
-    versionBase(context(state), publication),
-  );
-  if (version.status === "draft")
-    await decide(api, state, publication, "approve");
-  version = await api.get<{ status: string }>(
-    versionBase(context(state), publication),
-  );
-  if (version.status === "approved")
-    await decide(api, state, publication, "publish");
-  expect(
-    (
-      await api.get<{ status: string }>(
-        versionBase(context(state), publication),
-      )
-    ).status,
-  ).toBe("published");
-  await indexAdmissionDraft(api, state, publication);
+  const base = collection(context(state));
+
+  // No document is published if another document is known to have no valid review.
+  for (const key of Object.keys(benchmark.documents)) {
+    const publication = state.admissions.documents[key]?.publication;
+    if (!publication?.review)
+      throw new Error(`BLOCKED: thiếu review của ${key}.`);
+    const reviewBase = `${base}/compilation-runs/${publication.run}/reviews/${publication.review}`;
+    const review = await api.get<Run & { compilation_run_id: string }>(
+      reviewBase,
+    );
+    if (
+      review.status !== "completed" ||
+      review.compilation_run_id !== publication.run
+    )
+      throw new Error(`BLOCKED: review ${key} chưa hoàn tất/không khớp.`);
+    const report = await api.get<{ review_id: string; findings: unknown[] }>(
+      `${reviewBase}/report`,
+    );
+    expect(report.review_id).toBe(publication.review);
+    expect(
+      report.findings,
+      `[${key}] Finding chưa xử lý; không xuất bản.`,
+    ).toHaveLength(0);
+  }
+
+  // Xuất bản từng tài liệu
+  for (const [key, docMeta] of Object.entries(benchmark.documents)) {
+    const entry = state.admissions.documents[key];
+    const publication = entry?.publication;
+    if (!publication) {
+      throw new Error(`BLOCKED: chưa biên soạn ${key}.`);
+    }
+
+    if (!publication.version) {
+      const created = await api.post<{
+        document: { id: string };
+        version: { id: string };
+      }>(
+        `${base}/compiled-documents`,
+        {
+          document_key: `${key}-${state.runId}`,
+          title: docMeta.title,
+          compilation_run_id: publication.run,
+        },
+        `${state.runId}-${key}-document`,
+      );
+      publication.document = created.document.id;
+      publication.version = created.version.id;
+      save(state);
+    }
+
+    let version = await api.get<{ status: string }>(
+      versionBase(context(state), publication),
+    );
+    if (version.status === "draft") {
+      await decide(api, state, key, publication, "approve");
+    }
+    version = await api.get<{ status: string }>(
+      versionBase(context(state), publication),
+    );
+    if (version.status === "approved") {
+      await decide(api, state, key, publication, "publish");
+    }
+    expect(
+      (
+        await api.get<{ status: string }>(
+          versionBase(context(state), publication),
+        )
+      ).status,
+    ).toBe("published");
+    console.info(
+      `Đã xuất bản thành công tài liệu ${key}: version=${publication.version}`,
+    );
+  }
+
+  // Đồng bộ lại publication floor2026 cho state.admissions
+  if (state.admissions.documents.floor2026?.publication) {
+    state.admissions.publication =
+      state.admissions.documents.floor2026.publication;
+  }
+
+  // Tạo indexing-run chung cho toàn bộ collection chứa đủ cả 3 tài liệu
+  await indexCombinedAdmissionsDrafts(api, state);
 }
 
-async function indexAdmissionDraft(
-  api: Api,
-  state: Checkpoint,
-  publication: Publication,
-) {
+async function indexCombinedAdmissionsDrafts(api: Api, state: Checkpoint) {
   const base = collection(context(state));
-  if (!publication.index) {
+  const admissions = state.admissions;
+  if (!admissions) {
+    throw new Error("BLOCKED: thiếu dữ liệu admissions.");
+  }
+
+  if (!admissions.combinedIndex) {
     const created = await api.post<{ run: Run }>(
       `${base}/indexing-runs`,
       {
         provider_id: state.runtimeDefaults?.embedding,
       },
-      `${state.runId}-floor-index`,
+      `${state.runId}-combined-admissions-index`,
     );
-    publication.index = created.run.id;
+    admissions.combinedIndex = created.run.id;
+    // Gán index vào publication của các doc để tương thích ngược
+    if (admissions.publication) {
+      admissions.publication.index = created.run.id;
+    }
+    for (const entry of Object.values(admissions.documents ?? {})) {
+      if (entry.publication) {
+        entry.publication.index = created.run.id;
+      }
+    }
     save(state);
   }
+
   const run = await api.wait<Run>(
-    `${base}/indexing-runs/${publication.index}`,
+    `${base}/indexing-runs/${admissions.combinedIndex}`,
     900_000,
   );
   expect(run.is_active).toBe(true);
   expect(run.chunks_total).toBeGreaterThan(0);
   expect(run.provider_id).toBe(state.runtimeDefaults?.embedding);
+  await verifyAdmissionsIndex(api, state);
+
+  const totalPages = Object.values(benchmark.documents).reduce(
+    (sum, d) => sum + d.pages,
+    0,
+  );
   console.info(
-    `Đã xuất bản và lập chỉ mục PDF ${benchmark.source.pages} trang.`,
+    `Đã xuất bản và lập chỉ mục chung cho cả 3 PDF (${totalPages} trang, ${run.chunks_total} chunks).`,
   );
 }

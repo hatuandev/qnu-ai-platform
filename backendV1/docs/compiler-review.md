@@ -1,5 +1,14 @@
 # Review ngữ nghĩa sau Compiler
 
+Cập nhật phiên767: giới hạn `max_seconds` của review chia phần cộng dồn thời gian
+các claim đang chạy qua resume; khoảng đã dừng không tính thêm. Mỗi lần tiếp tục
+lưu `execution_elapsed_seconds` và `execution_started_at`; hết ngân sách trả422
+`compilation_review_budget_time_exceeded` trước request model tiếp theo. Trần lượt
+gọi/token, artifact và fencing vẫn giữ. Run cũ thiếu ledger dùng cận trên thời gian
+từ lúc tạo đến lúc dừng, ghi basis `legacy_wall_clock_upper_bound/v1`, không tự cấp
+lại ngân sách đã mất dấu vết. Đây là giới hạn dispatch tổng, không bật lại timeout
+300s hay hủy phản hồi đang chờ theo tùy chọn `wait_for_completion`.
+
 Context666 nối báo cáo vào [xác nhận review trước duyệt](publication-review-gate.md).
 Người có quyền phải xác nhận báo cáo/hash và giải trình từng finding. Review vẫn
 không tự approve/publish hoặc sửa báo cáo gốc; các giới hạn batch cũ phía dưới là
@@ -134,7 +143,9 @@ không gọi model hoặc reserve hai lần. ModelOps giải quyết grant, acti
 giữ kết nối trong khi model chạy; nếu client mất phản hồi, đọc lại trạng thái hoặc
 replay cùng key. Lượt hết hạn (ít nhất900giây hoặc timeout model+60) được đánh dấu
 uncertain khi đọc. Kết quả muộn sau expiry/fence không được commit thành completed.
-Chưa có resume từ raw hoặc background reconcile/retry cho review.
+Review nhiều phần có thể tiếp tục phần chưa xong hoặc đọc lại raw đã nhận khi
+claim trước đã dừng và còn ngân sách. Phần completed không gọi lại; phần uncertain
+không được tự gửi lại. Resume giữ tổng thời gian đã dùng như cập nhật phiên767 ở trên.
 
 Ghi thời điểm bắt đầu HTTP, usage theo quan sát; token không biết giữ NULL và
 reservation, không giả0. Quyền/provider/source/bundle kiểm lại trước và sau HTTP.

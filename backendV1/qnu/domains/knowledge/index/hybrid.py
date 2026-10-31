@@ -9,10 +9,11 @@ from sqlalchemy import cast, func, literal, select
 from sqlalchemy.dialects.postgresql import REGCONFIG
 
 from qnu.domains.knowledge.index.models import IndexChunk
+from qnu.domains.knowledge.index.presentation import PRESENTATION_VERSION, rerank_text
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.modelops import rerank as runtime_service
 from qnu.domains.modelops.usage.service import usage_service
-from qnu.platform.errors import Conflict
+from qnu.platform.errors import AppException, Conflict
 from qnu.ports.provider_execution import bind_usage
 from qnu.ports.vector_store import VectorHit
 
@@ -74,7 +75,8 @@ def fuse(dense, sparse, count: int, k: int):
 async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint):
     runtime = await runtime_service.resolve(db, workspace_id, req.rerank_provider_id)
     proof = await checkpoint()
-    documents = [h.text for h in hits]
+    documents = [rerank_text(h) for h in hits]
+    trace["rerank_presentation"] = PRESENTATION_VERSION
     reserved = runtime_service.budget(runtime, req.query, documents)
     usage = await usage_service.reserve(
         db,
@@ -87,6 +89,7 @@ async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint):
                 "query": req.query,
                 "chunks": [h.chunk_id for h in hits],
                 "config": runtime.configuration_hash,
+                "presentation": PRESENTATION_VERSION,
             }
         ),
         reserved,
@@ -110,8 +113,10 @@ async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint):
             min(req.top_k, len(hits)),
             bind_usage(runtime_service.request(runtime), usage.id),
         )
-    except BaseException:
-        await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
+    except BaseException as exc:
+        tokens = getattr(exc, "usage_tokens", None) if isinstance(exc, AppException) else None
+        measured = tokens if type(tokens) is int and 0 <= tokens <= 10**15 else None
+        await usage_service.settle(db, usage.id, total_tokens=measured, failed=True)
         raise
     await usage_service.settle(db, usage.id, total_tokens=result.total_tokens)
     current = await runtime_service.resolve(db, workspace_id, runtime.provider_id)

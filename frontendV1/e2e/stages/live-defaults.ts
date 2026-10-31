@@ -44,10 +44,10 @@ export async function liveDefaults(api: Api, state: Checkpoint) {
   if (
     !Number.isSafeInteger(profile.test_monthly_token_limit) ||
     profile.test_monthly_token_limit <= 0 ||
-    profile.test_monthly_token_limit > 1_000_000
+    profile.test_monthly_token_limit > 20_000_000
   ) {
     throw new Error(
-      "BLOCKED: quota thử phải là số nguyên dương, tối đa 1.000.000 token trong profile.",
+      "BLOCKED: quota thử phải là số nguyên dương, tối đa 20.000.000 token trong profile.",
     );
   }
   const connections = await api.get<

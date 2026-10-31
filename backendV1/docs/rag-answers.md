@@ -6,6 +6,103 @@ và nguồn hiện hành → câu trả lời cùng nguồn**. Chưa lưu hội 
 
 ## API
 
+Cập nhật772: `qnu.rag.answer/v9` và `qnu.answer-projection/v1`. Có ít nhất một
+lookup hợp lệ thì đáp án là bản trích các ô đã chọn, backend bỏ toàn bộ statements
+do model tự viết trước khi materialize. Model không còn vừa chỉ đúng ô vừa làm
+hỏng lượt bằng một bản chép số dư thừa. Không kiểm bằng từ khóa ngành hoặc đáp
+án fixture, không nhận số trong prose làm giá trị thay thế.
+
+Schema/text/citation và selector vẫn phải hợp lệ trước projection; ô ngoài scope,
+ID trùng và selector giả tiếp tục báo lỗi. Nếu không có selector mà prose dẫn số
+từ bảng, vẫn `answer_cell_selection_required`. Trả lời văn bản không có lookup
+giữ nguyên luồng hiện hữu. Trace `grounding.projection` ghi version, mode và
+`omitted_model_statements`; phần prose bị bỏ không được trình bày như đã được
+kiểm chứng. Không tự thêm request sửa câu trả lời hoặc bật verifier/fallback.
+
+Đây là đáp án trích ô, không bảo đảm đủ mọi điều kiện văn bản ở ngoài ô. Câu hỏi
+cần quy định/ngoại lệ phải dùng nhánh narrative với bằng chứng phù hợp hoặc từ
+chối khi thiếu; không coi một ngưỡng điểm là toàn bộ điều kiện tuyển sinh.
+Chọn ô đúng nguồn vẫn chưa chứng minh đúng ý định câu hỏi. Lượt F09 mới772 trả
+selector thuần, đúng22,20.672s,mỗi capability1execution attempt1; không gộp với
+cohort770/771 và không tuyên bố đủ19câu đạt.
+
+Cập nhật phiên770: prompt `qnu.rag.answer/v8`, bộ đọc ô
+`qnu.answer-cells/v2`. Model chọn `lookups[].cell_id` khi đọc số từ bảng; backend
+kiểm tra ID trong catalog của đúng lượt truy xuất rồi lấy nguyên chủ thể, header,
+giá trị và citation từ nguồn. Response công khai vẫn là `statements`/`sources`;
+`lookups` là hợp đồng nội bộ, không nhận đường dẫn nguồn hoặc quyền do model đặt.
+
+Catalog dựng vị trí cột từ `row_span`/`col_span`, không dùng vị trí trong danh sách
+ô làm cột vật lý. Header nhiều tầng được giữ theo đường dẫn; chủ thể nhóm/hàng
+được giữ khi có rowspan. Ô trống không thành0; dấu gạch không bị diễn giải lại.
+Header chưa rõ, grid có lỗ/span sai hoặc thiếu citation ô thì không cấp selector.
+Header từ bảng khác chỉ dùng quan hệ nguồn đã kiểm tra, cùng document/version/
+publication. Hàng nối trang chỉ mượn chủ thể từ phần trước đã ghim; không ghép vì
+hai trang liền nhau. Catalog không sửa raw text, bảng, bbox hay metadata năm.
+
+Trace `grounding` giữ version, hash catalog, số ô, số bảng chưa rõ, selector và
+`cell_proofs` (các citation ô/header/chủ thể). Backend chặn selector ngoài catalog
+hoặc trùng bằng502 `answer_cell_invalid`. Model chép số từ bảng vào văn bản thay
+vì selector bị502 `answer_cell_selection_required`; lỗi này không biến thành câu
+trả lời “thiếu dữ liệu”, không tự gửi lại. Nội dung ô vi phạm hợp đồng text thuần
+bị `answer_source_text_invalid`. Điều này kiểm tra tính nguyên bản của ô, **chưa
+chứng minh model đã chọn đúng ô với ý định câu hỏi**. Văn bản diễn giải tiếp tục
+qua verifier theo policy `off/observe/enforce`, không tự bật thêm lượt gọi model.
+
+Prompt dùng catalog gọn: mỗi bảng dùng chung đường dẫn header, mỗi hàng dùng
+chung chủ thể và các cặp `[column, value]`. Chỉ bỏ bản đọc hàng bị lặp khi xác nhận
+được exact JSON suffix; structure gốc vẫn nguyên vẹn. Budget cuối tính cả evidence,
+catalog và quan hệ đọc trước reserve/gọi chat. ModelOps kiểm thêm framing/schema/
+output. Không tự cắt nguồn hoặc nâng budget/capacity/quota.
+
+Chỉ mục tạo mới dùng `qnu.published-chunks/v3`, ghi `reading_quality` và
+`source_dependencies` dẫn xuất trên fragment; config generation có số fragment
+cần review theo input. Chỉ mục cũ vẫn đọc qua nguồn đã ghim; không tự reindex.
+Report chất lượng là chẩn đoán, chưa thay gate phê duyệt publication. PDF/DOCX đã
+có parser; upload XLSX chưa có luồng extraction hoàn chỉnh nên không được coi là
+đã hỗ trợ end-to-end chỉ vì bộ đọc grid dùng được cho bảng có cấu trúc.
+
+Nghiệm thu770: synthetic/API kiểm contract và provenance; live3câu riêng trên
+cùng index, không retry: F12/F17PASS, F09FAIL `answer_cell_selection_required`.
+Đây chưa là PASS toàn19 hoặc benchmark độc lập đa định dạng. Cần đo riêng độ đúng
+retrieval, chọn hàng/cột, giá trị, năm/nguồn, điều kiện và citation; không chỉ kiểm
+ID hoặc số xuất hiện trong câu. Xem [nhật ký770](../../docs/nhat_ky/2026-10-31_phien_770_rag_chon_o_nguon.md).
+
+Cập nhật phiên769: prompt `qnu.rag.answer/v7` dùng bản đọc bảng theo hàng bên cạnh
+`structure` nguyên vẹn. Reranker nhận text đã chuẩn hóa khoảng trắng, không nhận
+chuỗi JSON lặp của ô; trace ghi `rerank_presentation=qnu.evidence-reading/v1`.
+Không thay text/structure/citation đã lưu hoặc thứ hạng nguồn bằng đáp án test.
+
+Context bảng bổ sung tối đa bốn chunk phụ thuộc ngoài top20, dùng chung ngân sách
+byte/token. `context_window=0` tắt cửa sổ lân cận, không tắt phụ thuộc cấu trúc này.
+Các chunk hỗ trợ vẫn qua manifest, quyền, metadata filter và kiểm lại publication
+trước/sau model. Không bỏ primary để nhường chỗ; thiếu chỗ ghi `table_support=no_room`.
+
+Nhánh `native_numbered_table_boundary/v1` chỉ áp dụng cho bảng native đã parsed,
+không requires_review, không ô gộp. Header ứng viên là hàng đầu toàn chữ trước chuỗi
+số thứ tự liên tục. Nối qua trang cần đồng thời: cùng snapshot/binding, hai trang
+kề nhau, cuối/đầu trang không xen block, khung ngang sai khác tối đa0.005 theo tọa
+độ chuẩn hóa, mép dưới≥0.90/mép trên≤0.12, cùng số cột và số thứ tự tiếp đúng.
+Các ngưỡng là heuristic giới hạn cho nhánh này, không phải quy tắc cho mọi PDF.
+Header có số, bảng phức tạp/OCR hoặc thiếu dấu hiệu vẫn unresolved; không đổi
+`header=false` trong canonical. Hàng đầu trống chỉ được dẫn hàng cuối trước đó
+khi cả chuỗi cấu trúc được xác lập. `table_links` lưu basis, chain và support IDs;
+prompt nhận mapping sang evidence IDs. Không suy năm hay ưu tiên pháp lý từ liên kết.
+
+Cập nhật phiên767: `context_max_bytes` kiểm cả evidence chính khi `context_window=0`;
+0 chỉ tắt lấy thêm đoạn lân cận. Vượt ngân sách trả422
+`answer_context_budget_exceeded` trước model chat, không cắt chunk để vừa trần.
+Trace có `context.bytes_used` là cận trên byte của JSON evidence, không phải token.
+
+Trace trả thêm `reasoning` (directive/policy hash đã áp dụng hoặc lý do giữ mặc định)
+và `inference_configuration_hash` gắn với task answer. Guard trước/sau inference và
+usage reservation dùng danh tính này để nhận biết thay đổi reasoning. Trường
+`configuration_hash` cũ vẫn giữ nghĩa cũ để đọc run/index lịch sử. Prompt không đổi
+trong767, vẫn là `qnu.rag.answer/v5`; kết quả cũ không được gán trace mới.
+
+Rerank lỗi giữ số token hợp lệ do provider báo, kể cả0; chỉ missing/không hợp lệ
+hoặc kết quả chưa rõ mới giữ reservation unknown. Không tự resend để đo usage.
+
 `POST /platform/v1alpha1/workspaces/{workspace_id}/collections/{collection_id}/answers`
 
 ```json
@@ -58,7 +155,7 @@ Response là `private, no-store`; không có semantic cache.
    chat. Trước khi trả kết quả kiểm lại quyền, active index, receipt, revision/hash,
    chunk/manifest và model. Thu hồi/thay đổi trong lúc inference loại câu trả lời,
    không trả đáp án vừa sinh từ evidence cũ.
-6. JSON model chỉ có status/statements. Chặn extra field, schema sai, ý không có
+6. JSON model có status/statements và tùy chọn lookups (từ770). Chặn extra field, schema sai, ý không có
    citation, ID ngoài danh sách/trùng, marker citation chèn trong text, Markdown link
    và HTML trong statement. BE gắn marker và lấy nguồn từ bản đồ đã giữ.
 

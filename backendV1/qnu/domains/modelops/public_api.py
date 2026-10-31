@@ -213,6 +213,18 @@ async def resolve_ocr_runtime(
 class ChatRuntime(OcrRuntime):
     """Protected chat target with the same pinned identity contract as OCR."""
 
+    def inference_configuration_hash(self, task: str) -> str:
+        """Task-specific identity; legacy compiler/index hashes remain unchanged."""
+        material = {
+            "version": "qnu.chat.inference/v1",
+            "configuration_hash": self.configuration_hash,
+            "task": task,
+            "reasoning": self.reasoning_trace(task),
+        }
+        return hashlib.sha256(
+            json.dumps(material, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+
 
 async def resolve_chat_runtime(
     db: AsyncSession, workspace_id: str, provider_id: str | None = None

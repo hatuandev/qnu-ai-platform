@@ -7,10 +7,12 @@ import json
 import re
 from dataclasses import dataclass
 
+from qnu.domains.knowledge.index.table_dependencies import dependencies
+from qnu.domains.knowledge.index.table_layout import quality
 from qnu.domains.knowledge.metadata import chunk_metadata
 from qnu.platform.errors import AppException
 
-CHUNKER_VERSION = "qnu.published-chunks/v2"
+CHUNKER_VERSION = "qnu.published-chunks/v3"
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +147,7 @@ def build_chunks(
 ) -> list[Chunk]:
     index = content["citations"]
     annotations = annotations or []
+    relations = {ref: link for doc in documents for ref, link in dependencies(doc).items()}
     chunks = []
     for section_no, section in enumerate(content["sections"]):
         prefix = content["title"] + "\n" + section["heading"] + "\n"
@@ -187,6 +190,9 @@ def build_chunks(
                 "title": content["title"],
             }
             structure["retrieval_metadata"] = chunk_metadata(annotations, targets)
+            structure["reading_quality"] = quality(structure)
+            if table["citation"] in relations:
+                structure["source_dependencies"] = relations[table["citation"]]
         chunks += fragments
     if not chunks:
         raise AppException(

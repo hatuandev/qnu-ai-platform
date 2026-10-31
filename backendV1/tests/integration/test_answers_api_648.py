@@ -20,6 +20,31 @@ class FakeAnswerChat(FakeNemotron):
             "status": "answered",
             "statements": [{"text": "Chỉ tiêu là 150.", "evidence_ids": [source["evidence_id"]]}],
         }
+        # The fake follows the production table contract; negative modes below
+        # deliberately keep malformed prose/citations to exercise rejection.
+        if self.mode in {"ok", "mixed_lookup"}:
+            choices = [
+                {"cell_id": f"{t['evidence_id']}:{row}:{key}", "value": value[1]}
+                for t in incoming["table_cells"]["tables"]
+                for row, r in t["rows"].items()
+                for key, value in r["values"].items()
+            ]
+            if choices:
+                chosen = next(c for c in choices if c["value"] == "150")
+                value = {
+                    "status": "answered",
+                    "statements": [],
+                    "lookups": [{"cell_id": chosen["cell_id"]}],
+                }
+                if self.mode == "mixed_lookup":
+                    value["statements"] = [
+                        {
+                            "text": "Chỉ tiêu là 999, phải nộp thêm phí.",
+                            "evidence_ids": [source["evidence_id"]],
+                        }
+                    ]
+        if self.mode == "foreign_cell":
+            value = {"status": "answered", "statements": [], "lookups": [{"cell_id": "E999:r1:k2"}]}
         if self.mode == "abstain":
             value = {"status": "insufficient_evidence", "statements": []}
         if self.mode == "foreign_citation":
@@ -125,6 +150,25 @@ def test_answer_returns_only_server_bound_sources(client, ready):
     assert "revision_id" not in sent["messages"][-1]["content"]
 
 
+def test_answer_projection_preserves_published_table_and_prompt_contract(client, ready):
+    response = ask(client, ready)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["trace"]["prompt_version"] == "qnu.rag.answer/v9"
+    assert body["trace"]["grounding"]["selected_cells"]
+    sent = json.loads(ready["answer_chat"].requests[0]["body"]["messages"][-1]["content"])
+    source = next(s for s in body["sources"] if s["kind"] == "table")
+    projected = next(e for e in sent["evidence"] if e["evidence_id"] == source["evidence_id"])
+    assert projected["structure"] == source["structure"]
+    structure = projected["structure"]
+    if structure.get("rows"):
+        assert structure["source_table_citation"] in source["citations"]
+        assert structure["row_indices"]
+        assert all("col_span" in c and "row_span" in c for r in structure["rows"] for c in r)
+    else:
+        assert projected["text"] == source["text"]
+
+
 @pytest.mark.parametrize(
     "mode,code",
     [
@@ -134,6 +178,8 @@ def test_answer_returns_only_server_bound_sources(client, ready):
         ("inline_citation", "answer_response_invalid"),
         ("truncated", "chat_output_truncated"),
         ("http_error", "chat_provider_unavailable"),
+        ("foreign_cell", "answer_cell_invalid"),
+        ("numeric_prose", "answer_cell_selection_required"),
     ],
 )
 def test_invalid_answer_is_an_error_not_no_data(client, ready, mode, code):
@@ -214,7 +260,13 @@ def test_withdrawal_during_generation_discards_answer(client, ready, monkeypatch
 
 @pytest.mark.parametrize(
     "change,expected",
-    [("membership", 404), ("provider_disabled", 409), ("provider_identity", 409), ("index", 409)],
+    [
+        ("membership", 404),
+        ("provider_disabled", 409),
+        ("provider_identity", 409),
+        ("reasoning", 409),
+        ("index", 409),
+    ],
 )
 def test_runtime_changes_during_chat_do_not_return_answer(
     client, ready, monkeypatch, change, expected
@@ -253,6 +305,17 @@ def test_runtime_changes_during_chat_do_not_return_answer(
                     row = await db.get(Provider, ready["chat_provider"]["id"])
                     if change == "provider_disabled":
                         row.is_active = False
+                    elif change == "reasoning":
+                        row.extra_config = {
+                            **(row.extra_config or {}),
+                            "reasoning_policy_v1": {
+                                "mode": "chat_template_kwarg",
+                                "parameter": "enable_thinking",
+                                "off_value": False,
+                                "tasks": {"off": ["answer"]},
+                                "verified": True,
+                            },
+                        }
                     else:
                         row.model_name = "changed-model"
                 await db.commit()
@@ -262,6 +325,59 @@ def test_runtime_changes_during_chat_do_not_return_answer(
     response = ask(client, ready)
     assert response.status_code == expected, response.text
     assert "answer" not in response.json()
+    assert len(ready["answer_chat"].requests) == 1
+
+
+def test_answer_budget_window_zero_is_checked_before_chat(client, ready):
+    response = ask(client, ready, context_window=0, context_max_bytes=256)
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "answer_context_budget_exceeded"
+    assert not ready["answer_chat"].requests
+
+
+def test_mixed_lookup_returns_only_original_cells_with_projection_trace(client, ready):
+    ready["answer_chat"].mode = "mixed_lookup"
+    response = ask(client, ready)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "answered" and "150" in body["answer"]
+    assert "999" not in body["answer"] and "phí" not in body["answer"]
+    assert len(body["statements"]) == 1
+    assert body["trace"]["grounding"]["projection"] == {
+        "version": "qnu.answer-projection/v1",
+        "mode": "selected_cells",
+        "omitted_model_statements": 1,
+    }
+    assert len(ready["answer_chat"].requests) == 1
+
+
+def test_answer_trace_records_the_exact_reasoning_contract(client, ready):
+    as_actor(PLATFORM)
+    configured = client.put(
+        f"{API}/modelops/providers/{ready['chat_provider']['id']}/reasoning",
+        json={
+            "policy": {
+                "mode": "chat_template_kwarg",
+                "parameter": "enable_thinking",
+                "off_value": False,
+                "tasks": {"off": ["answer"]},
+                "verified": True,
+            }
+        },
+    )
+    assert configured.status_code == 200, configured.text
+    as_actor(EDITOR)
+    response = ask(client, ready)
+    assert response.status_code == 200, response.text
+    trace = response.json()["trace"]
+    assert trace["reasoning"]["applied"] is True
+    assert trace["reasoning"]["value"] is False
+    assert len(trace["reasoning"]["policy_sha256"]) == 64
+    assert trace["inference_configuration_hash"] != trace["configuration_hash"]
+    assert ready["answer_chat"].requests[0]["body"]["chat_template_kwargs"] == {
+        "enable_thinking": False,
+    }
+    assert len(ready["answer_chat"].requests) == 1
 
 
 def test_invalid_document_list_is_422_before_inference(client, ready):
@@ -294,11 +410,14 @@ def test_no_search_hits_does_not_call_chat(client, ready, monkeypatch):
     assert not ready["answer_chat"].requests
 
 
-def test_change_after_reservation_before_chat_releases_unused_budget(client, ready, monkeypatch):
+@pytest.mark.parametrize("change", ["index", "reasoning"])
+def test_change_after_reservation_before_chat_releases_unused_budget(
+    client, ready, monkeypatch, change
+):
     from sqlalchemy import select, update
 
     from qnu.domains.knowledge.index.models import IndexRun
-    from qnu.domains.modelops.models import ModelUsageRecord
+    from qnu.domains.modelops.models import ModelUsageRecord, Provider
     from qnu.domains.modelops.usage.service import usage_service
     from qnu.platform.database import AsyncSessionFactory
 
@@ -308,11 +427,24 @@ def test_change_after_reservation_before_chat_releases_unused_budget(client, rea
         record = await original(*args, **kwargs)
         if record.capability == "chat":
             async with AsyncSessionFactory() as db:
-                await db.execute(
-                    update(IndexRun)
-                    .where(IndexRun.id == ready["index_run"]["id"])
-                    .values(is_active=False)
-                )
+                if change == "index":
+                    await db.execute(
+                        update(IndexRun)
+                        .where(IndexRun.id == ready["index_run"]["id"])
+                        .values(is_active=False)
+                    )
+                else:
+                    provider = await db.get(Provider, ready["chat_provider"]["id"])
+                    provider.extra_config = {
+                        **(provider.extra_config or {}),
+                        "reasoning_policy_v1": {
+                            "mode": "chat_template_kwarg",
+                            "parameter": "enable_thinking",
+                            "off_value": False,
+                            "tasks": {"off": ["answer"]},
+                            "verified": True,
+                        },
+                    }
                 await db.commit()
         return record
 

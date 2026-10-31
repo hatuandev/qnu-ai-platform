@@ -1,7 +1,7 @@
 {
   "name": "QNU AI Server",
   "base_url": "http://100.105.13.53:8000/v1",
-  "test_monthly_token_limit": 5000000,
+  "test_monthly_token_limit": 20000000,
   "additional_chat_provider": {
     "name": "9router Ollama",
     "base_url": "https://qnu-9router.duckdns.org/v1",

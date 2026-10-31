@@ -1,5 +1,91 @@
 # Kiểm thử PDF thật — TB điểm sàn 26
 
+## Sửa hợp đồng compiler → hỏi đáp — phiên777
+
+Request compiler phải dùng `topic`, `ocr_run_ids`, `text_versions`, `provider_id`; `source_id`/`revision_id` không phải trường được nhận. Runner kiểm tra đủ cả ba nguồn/hash/trang OCR trước lượt model đầu, ghim version/hash văn bản canonical qua API text-review, bật structured output và tắt auto_review vì chặng gọi review riêng.
+
+Compiler và review hoàn tất mới đọc report; report phải đúng review đã lưu. Trước khi tạo tài liệu, cả ba review phải hoàn tất và không có finding. Gate duyệt phải khớp review đã kiểm tra; preview/commit giữ hash và idempotency. Khi POST phục hồi lỗi, không tăng lịch sử để đổi khóa sang lượt khác. Index trước chat phải completed/active, đúng embedding và đúng tập ba document/version/receipt/bundle.
+
+Test mới `admissions-pipeline-777.test.ts` chạy runner bằng adapter kiểm thử, thu request từ compiler, review, publication, index, assistant create/update và conversation single/all. `scripts/check_v1_e2e_contracts.py` kiểm chúng bằng chính APIRoute/Pydantic backend, bao gồm method/path/body/header/query; không gọi handler/DB/model. Đây là kiểm tra hợp đồng, không thay kết quả E2E với model thật.
+
+Với lỗi422 trước đây, request bị chặn trước khi tạo compilation. Giữ phiên và các kết quả upload/OCR; không cleanup/init hay thêm `--recover` chỉ vì lỗi payload này. Chạy lại từng chặng, dừng khi có lỗi:
+
+```powershell
+.\test-v1-e2e.ps1 run admissions-compilation --headed
+.\test-v1-e2e.ps1 run admissions-publication --headed
+.\test-v1-e2e.ps1 run admissions-chat --headed
+```
+
+Bản sửa chỉ nằm trong runner/test, không cần restart backend/serve. Không bỏ finding hoặc tự tạo lượt hỏi mới để làm xanh kết quả. Chất lượng model thật vẫn cần đánh giá riêng qua53câu.
+
+
+## Ngân sách được duyệt — phiên776
+
+Người dùng đã yêu cầu ngân sách tháng **20.000.000 token** cho profile E2E QNU. `test_monthly_token_limit` và validator ở `live-defaults.ts` đã đồng bộ mức này; vẫn chỉ chấp nhận số nguyên dương trong trần hữu hạn. Đây là quota tháng của workspace thử, không phải context/output của một request.
+
+Sau khi provider-setup và các chặng model đã PASS, chạy lại:
+
+```powershell
+.\test-v1-e2e.ps1 run navigation --headed
+```
+
+Navigation áp dụng mức khai báo cho đúng workspace E2E theo cơ chế hiện có; không reset usage/reserved. Không cần cleanup/init, nhập lại key hoặc restart serve chỉ vì sửa profile/test. Các chặng admissions vẫn chỉ kiểm quota, không tự tăng nếu thiếu. Phiên776 chỉ kiểm thử cấu hình cục bộ; chưa chạy lại navigation/live.
+
+## Hiện hành — benchmark 3 PDF, phiên775
+
+Bộ `admissions-multi-docs-v2-775` gồm 53 câu trên 3 PDF/28 trang. Giữ nguyên toàn bộ câu và nhãn F01–F19 từ bộ 2026 ban đầu. Các nhãn đa tài liệu được sửa theo PDF gốc: Sư phạm Tin học và Sư phạm Tiếng Anh THPT 2026 đều 20; CNTT (An toàn, an ninh mạng) 15 tại trang vật lý 5. Học phí kỹ sư ở info2025 trang 10; nữ nhập học ở report2024 trang 2. Trang báo cáo có số in lặp lại: citation dùng **trang vật lý PDF**, không dùng số in ở chân/đầu trang.
+
+Mỗi fact có nguồn, năm, trang, chủ thể, metric và kiểu số. Chấm câu có đáp án đòi đúng publication/version/revision/hash; dữ kiện bảng cần proof của ô được chọn cùng nhãn dòng/header, giá trị ở đúng trang. Không chỉ dò số trong toàn câu. Regex và proof là kiểm tra quy tắc; nhãn vẫn draft, đánh giá ngữ nghĩa độc lập `NOT_RUN`.
+
+Chặng chat khai báo rõ output 4096, history 0, top20/candidate50 và context byte theo capacity đã xác nhận. Dự phòng prompt 16384 byte; context evidence tối đa 128000 byte và phải nằm trong input/context sau khi trừ output. Đây là **dự toán**, không thay phép đo payload cuối gồm prompt/schema/catalog của ModelOps. Report ghi kích thước bundle, capacity plan, dự toán cặp query/chunk rerank và quota; nếu trần bị vượt, giữ lỗi để điều chỉnh có chủ đích, không tự cắt nguồn hay nâng quota. Chặng upload chỉ đọc quota; đã bỏ tự tăng lên 20M. Trước chat, quota khả dụng phải đủ dự toán trong report; chỉnh hạn mức trong ModelOps khi đã kiểm tra, không xóa usage/reservation.
+
+Index manifest phải khớp cả 3 phiên bản và quyết định xuất bản đang dùng. Cố định benchmark/index/assistant/provider bằng fingerprint trước chấm, rồi khóa prompt/config trace từ kết quả đầu; đổi cấu hình giữa lượt bị chặn. Scope single thiếu binding hoặc hội thoại cũ sai scope đều BLOCKED, không chuyển sang cả kho.
+
+Mỗi câu một dispatch, không retry khi sai đáp án hoặc gặp lỗi. Dấu dispatch được lưu **trước** POST để timeout/HTTP lỗi cũng có vết. Câu sai nội dung vẫn tiếp tục các câu độc lập; lỗi hạ tầng/quota/capacity dừng và để phần còn lại NOT_RUN. Kết thúc vẫn FAIL nếu có câu lỗi/chưa chạy. Replay/resume không được tính thành PASS lần đầu.
+
+Phiên `93faa11f0caf` hiện ở `provider-setup BLOCKED` do chưa nhập key. **Không cleanup/init lại.** Chạy trong PowerShell tương tác tại root repo:
+
+```powershell
+.\test-v1-e2e.ps1 run provider-setup --headed
+```
+
+Sau khi nhập key ẩn và chặng trên PASS, chạy lần lượt, dừng nếu chặng có lỗi:
+
+```powershell
+.\test-v1-e2e.ps1 run model-discovery --headed
+.\test-v1-e2e.ps1 run model-chat --headed
+.\test-v1-e2e.ps1 run model-embedding --headed
+.\test-v1-e2e.ps1 run model-rerank --headed
+.\test-v1-e2e.ps1 run model-ocr --headed
+.\test-v1-e2e.ps1 run navigation --headed
+.\test-v1-e2e.ps1 run admissions-upload --headed
+.\test-v1-e2e.ps1 run admissions-extraction --headed
+.\test-v1-e2e.ps1 run admissions-compilation --headed
+.\test-v1-e2e.ps1 run admissions-publication --headed
+.\test-v1-e2e.ps1 run admissions-chat --headed
+```
+
+Kiểm chứng775: 49 regression liên quan PASS; kiểm PDF gốc 3 file/28 trang/55 fact checks PASS; E2E TypeScript, build, scoped Biome/Ruff PASS. Full frontend Vitest **539 PASS/33 FAIL** ở 9 file UI/fixture, không thuộc các file ứng dụng sửa trong lượt này; chưa có baseline tái hiện riêng để khẳng định toàn bộ là lỗi nền. Live 53 câu **NOT_RUN** vì thiếu key, không dùng unit PASS để báo RAG đã đạt.
+
+Các mục bên dưới là lịch sử vận hành các bộ/cohort trước, không thay trạng thái hiện hành này.
+
+
+## Kết quả mới nhất và giới hạn (phiên769)
+
+Trợ lý hiện tại revision6 có budget **81920 byte** cho top20 và tối đa4chunk phụ thuộc bảng. Promptv7/rerank đọc bảng rõ hàng, giữ ô và provenance; nhánh context native chỉ nối khi có các dấu hiệu cấu trúc cùng snapshot. Không sửa dữ liệu đã xuất bản hoặc index. Context model128K/output4096 giữ.
+
+Hai cohort model thật được giữ riêng: v6 đạt16/19, sau sửa context v7 đạt **17/19** trong295.797s; F09 sai cột và F12 từ chối. F06/F15 đạt bản cuối nhưng chưa thể nghiệm thu cả19. Mỗi câu một lần/cohort, không retry từng câu hoặc cộng các PASS từ nhiều đợt. [Nhật ký769](../nhat_ky/2026-10-31_phien_769_sua_doc_bang_va_live_rag.md).
+
+Đây là testAPI backend hiện tại, chưa phải PlaywrightPASS. Serve cũ chưa được tự restart; nếu chạyCLI cần mởlạiserve để nạp mã. Không cleanup/init chỉ để nạp mã. Không tự tăngquota hoặc xóareservationunknown; cuốiđợt còn450364tokenkhảdụng, ít hơn696149tokenđãdùngởđợtnày.
+
+## Ngân sách context và kết quả một lượt (phiên768)
+
+Trên trợ lý admissions hiện tại, đã lưu `context_max_bytes = 57344` qua API (revision4). Con số này là **byte evidence**, không phải token: cận của 20 chunks lớn nhất trong chỉ mục 46 chunks là 51391 byte, thêm dự phòng rồi làm tròn. Context Qwen131072/output4096, candidate50/top20 giữ nguyên. Phiên mới hoặc tài liệu/model khác phải tính lại, không sao chép ngân sách hoặc tăng quota mặc định để bỏ lỗi.
+
+Đợt API mới đủ 19 câu, mỗi câu một lần, đạt **16/19** trong 228.297s: F06/F09 bị từ chối, F15 sai số liệu ngoại lệ. Audit xác nhận không retry và không lỗi token/context/quota. [Chi tiết phiên768](../nhat_ky/2026-10-31_phien_768_context_budget_va_live_19_cau.md). Chưa chạy lại Playwright/UI trong đợt này; nhãn vẫn draft, cần duyệt độc lập. Không coi đợt này là admissions-chat PASS hoặc ghi đè checkpoint.
+
+Serve cũ không được tự restart. Trước khi tự chạy CLI với mã mới, dừng serve cũ rồi mở lại ` .\test-v1-e2e.ps1 serve `; giữ phiên/index đã có, không cleanup/init chỉ vì đổi byte budget. Khi nghiệm thu một đợt mới, giữ báo cáo đầu và không hỏi lại câu sai để chuyển kết quả thành PASS.
+
 Compiler/review đã có nhánh chia phần và checkpoint: xem [triển khai, migration và cách chạy tiếp](V1_COMPILER_TAI_LIEU_LON.md). Restart serve để nạp mã và migration trước khi chạy lại compilation; chưa có kết quả nghiệm thu cho nhánh này.
 
 ## Chạy tiếp sau lỗi output ở compilation
@@ -70,6 +156,14 @@ Không chạy nhóm `upload/extraction/compilation/publication/chat/lifecycle` d
 
 ## Điều kiện đạt và khi dừng
 
+Từ phiên767, ngân sách JSON evidence được kiểm cả khi không lấy đoạn lân cận
+(`context_window=0`). Nếu gặp `answer_context_budget_exceeded`, kiểm tra ngân sách
+ngữ cảnh của trợ lý: top_k lớn có thể vượt mặc định16000byte. Cần chọn ngân sách
+hợp lệ cho cấu hình retrieval đang dùng hoặc giảm top_k; không bỏ kiểm tra/cắt
+nguồn/tự tăng capacity model để làm test xanh. Phiên767 không tự sửa cấu hình trợ
+lý đang phục vụ. Trace mới có `inference_configuration_hash` và `reasoning` để
+phân biệt hợp đồng suy luận; report cũ giữ nguyên.
+
 - Upload: đúng hash PDF đã chốt; tải lại bytes nguồn vẫn giữ nguyên. Thay file sẽ BLOCKED để soạn/đối chiếu lại nhãn.
 - Extraction: đủ 8 trang, kết quả sẵn sàng. Không tự sửa văn bản hay điền điểm từ đáp án test vào OCR.
 - Compilation: dùng toàn bộ tài liệu, giữ bảng/ngành/phương thức/chú ý/ngoại lệ; review chỉ đạt khi không còn finding. Giữ ngân sách biên soạn hiện tại, output review theo capacity.
@@ -82,6 +176,38 @@ Nếu đã FAIL, giữ phiên và chạy lại đúng chặng sau khi xử lý n
 
 ## Báo cáo
 
-Mỗi chặng có HTML/JSON tại đường dẫn runner in ra. Chặng chat thêm `admissions-answers.json`: từng ID, câu trả lời/tham chiếu, PASS/FAIL/NOT_RUN, tổng expected/passed/failed/not_run. Dừng ở câu đầu lỗi, các câu còn lại vẫn được đếm NOT_RUN.
+Mỗi chặng có HTML/JSON tại đường dẫn runner in ra. Chặng chat thêm `admissions-answers.json`: từng ID, câu trả lời/tham chiếu, PASS/FAIL/NOT_RUN, tổng expected/passed/failed/not_run. Từ phiên775: tiếp tục sau lỗi nội dung độc lập; chỉ dừng khi lỗi hạ tầng/quota/capacity, các câu còn lại NOT_RUN.
+
+Từ prompt `qnu.rag.answer/v4`, report chat phân biệt `origin=fresh/replayed/resumed`, `fresh_results`, `replayed`, `resumed` và `first_attempt_passed`. Kết quả lấy từ checkpoint không tính là đạt lần đầu; `inference_ms` của replay/resume là null, `client_elapsed_ms` chỉ là thời gian thao tác client. Report giữ `prompt_versions` và `configuration_hashes` để thấy khi đang trộn kết quả cũ/mới. Không dùng tổng PASS tích lũy làm tỷ lệ đúng của một lượt gọi mới. Lượt failed/uncertain không tự gửi lại hoặc đổi khóa; lỗi đọc trạng thái phải được xử lý trước.
+
+Kiểm chứng phiên764 trên cùng index: API19câu mới, không retry, đạt18/19;F15model_abstained. Đây chưa phải nghiệm thu toàn bộ chat. Không cleanup/init hay xuất bản lại để xóa kết quả lỗi.
+
+Phiên765 giữ relevance khi dựng evidence và nâng promptv5 cho quy định chung/ngoại lệ có scope. F15 được kiểm lại đúng một lần và đạt; F14 và3câu negative cũng đạt. Đây là5case với hợp đồngv5, không cộng với18case cũ để báo19/19 cùng cấu hình. Report giữ vết prompt/config và không retry câu sai để làm xanh.
 
 PASS chỉ là các kiểm tra tự động đã khai báo, không chứng minh mọi câu diễn giải đúng toàn bộ quan hệ và/hoặc hay OCR chính xác tuyệt đối. Đọc thêm rubric từng câu, đặc biệt F11–F16. `semantic_review=NOT_RUN` giữ nguyên đến khi có đánh giá thực. Không dùng kết quả chưa chạy để báo PASS.
+
+## Hợp đồng đọc ô từ phiên770
+
+Từ772: promptv9, projectionv1. Khi có lookup hợp lệ, BE chỉ xuất dữ liệu ô đã
+chọn và ghi số statements tự do bị loại trong `trace.grounding.projection`.
+Không có lookup mà tự chép số từ bảng vẫn bị chặn; ID/citation ngoài scope vẫn
+lỗi. Một câu trả lời dạng trích ô không tự chứng minh đủ các điều kiện ở đoạn
+văn khác. F09 đã PASS ở một lượt mới sau sửa (20.672s), không retry. Đủ19câu với
+promptv9 chưa chạy; không cộng PASS từ cohort khác.
+
+Ở phiên770, backend dùng promptv8 và catalog ôv2. Trợ lý chọn định danh ô; backend lấy
+nguyên giá trị/header/chủ thể từ nguồn và ghi trace `grounding.cell_proofs`.
+`answer_cell_selection_required` là lỗi model chưa tuân hợp đồng chọn ô, không
+phải lỗi hết token và không phải không có dữ liệu. Giữ lượt lỗi; không tự chạy
+lại với khóa mới. `answer_context_budget_exceeded` vẫn là lỗi dung lượng evidence;
+budget nay gồm cả catalog và quan hệ đọc, không chỉ các chunk.
+
+Với phiên còn publication/index hợp lệ, không cần cleanup/init/upload/compile lại.
+Để tiến trình đang mở nạp mã mới: Ctrl+C ở cửa sổ `serve`, chạy lại
+`.\test-v1-e2e.ps1 serve`, chờ sẵn sàng rồi thực hiện lượt đánh giá có chủ đích.
+Không tự reset checkpoint hoặc coi kết quả replay là đánh giá mới. Chỉ mục mới
+sẽ có quality report v3; không cần reindex chỉ để dùng catalog đọc ô trên index cũ.
+
+Kiểm chứng770 hiện chỉ có3câu API mới, mỗi câu một POST: F09FAIL, F12/F17PASS,
+không gộp với kết quả769. Đủ19câu trên hợp đồng mới **NOT_RUN**; quota còn hạn chế,
+không tự nâng hạn mức. Nhãn gold hiện còn draft và semantic review vẫn NOT_RUN.

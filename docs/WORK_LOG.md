@@ -1,5 +1,35 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- **Context776 — Quota E2E20M được người dùng duyệt:** sửa profile/validator;14test/E2ETS/Biome/build/diffPASS; navigation/DB chưa chạy. [Nhật ký776](./nhat_ky/2026-10-31_phien_776_tang_quota_e2e_20m.md).
+
+
+- **Context775 — Sửa benchmark multi-docs:** v2giữ19gốc,sửa gold/typednumbers/factproof/scope,durable dispatch,no-retry,aggregatefail,quota read-only,explicitbudget/index/cohort.49focused/PDF28trang55facts/TS/build/Biome/RuffPASS;fullfrontend539PASS33FAIL9UI/fixture;live53NOT_RUNchờkey93faa11f0caf. [Nhật ký775](./nhat_ky/2026-10-31_phien_775_sua_benchmark_multi_docs.md).
+
+
+- **Context774 — Review multi-docs773:** P1goldbịđổi/sainhãn,budget16K,checkerđa nguồnfalsePASS;P2scopefailopen/parsehàngnghìn/failfast/autoquota.14Vitest/typecheckPASS,3probetáihiệnbug;livechưachạy,provider-setupBLOCKED. Chỉreview. [Nhật ký774](./nhat_ky/2026-10-31_phien_774_review_multi_docs.md).
+
+- **Context773 — Bộ E2E Tuyển sinh 3 tài liệu, 53 cases:** Mở rộng toàn diện bộ E2E từ 1 tài liệu (19 câu) lên 3 tài liệu (28 trang, 53 câu hỏi gồm 19 câu floor2026, 12 câu info2025, 12 câu report2024, 10 câu đa tài liệu/scope boundary MX). Checkpoint đa nguồn `documents[key]`, OCR 28 trang tuần tự, compilation/review độc lập từng tài liệu, combined indexing-run cho toàn bộ kho; RAG chat hỗ trợ scope riêng vs cả kho, citation đúng SHA256 từng nguồn; quota 20M. 6 unit vitest mới PASS, 22 targeted PASS, typecheck/Biome PASS, 29 pytest PASS, Ruff PASS. Đã cleanup phiên cũ `1da945adac7c`, init phiên mới `93faa11f0caf`, serve daemon đang chạy (API: 64624, Frontend: 64625). Dừng đúng tại `provider-setup` để người dùng nhập API key qua terminal tương tác theo quy chuẩn bảo mật. [Nhật ký773](./nhat_ky/2026-10-31_phien_773_mo_rong_e2e_tuyen_sinh_3_tai_lieu.md).
+
+- **Context772 — Sửa F09 lookup projection:** validlookup→BEtríchô/bỏprose,tracecount,promptv9;no-lookup/foreignIDvẫnchặn. RED3→focused40PASS,full587PASS/1FAILnền716,API28PASS. LiveF09PASS20.672s,mộtlượt/attempt1;khôngđổinguồn/index/config/quota. [Nhật ký772](./nhat_ky/2026-10-31_phien_772_fix_f09_lookup_projection.md).
+
+- **Context771 — Xem phản hồi F09:** theo yêu cầu chạy mới1lượt/capture trướcBE; model chọn đúng22 nhưng kèm numeric prose nên FAIL contract,19.515s. Audit1execution/capability/attempt1; giữapp/config/index/quota. [Nhật ký771](./nhat_ky/2026-10-31_phien_771_xem_phan_hoi_f09.md).
+
+- **Context770 — RAG chọn ô nguồn:** grid/span/header, quality chunkerv3, catalogv2/promptv8, BE copy giá trị/citation và kiểm budget. Focused55PASS, full581PASS/1FAILnền716; API47PASS/APIv2cuối27PASS. Live3casev1:2PASS/1FAIL F09vi phạm selector, khôngretry; bảnv2 chưa live/19câuNOT_RUN. Giữ nguồn/index/quota/serve. [Nhật ký770](./nhat_ky/2026-10-31_phien_770_rag_chon_o_nguon.md).
+
+- **Context769 — Đọc bảng và context phụ thuộc:** plaintext rerank, promptv7, native numbered-table proof/4sealed supportchunks; budget81920/revision6. Cohortv6 16/19 rồi cohortv7 **17/19**,F06/F15đạt,F09saicột/F12abstain; khôngretrytừngcâu/khônggộpPASS. API45PASS,fullunit562PASS/1FAILnền716. Giữnguồn/index/quota/serve; chưafixtrọnmục tiêu. [Nhật ký769](./nhat_ky/2026-10-31_phien_769_sua_doc_bang_va_live_rag.md).
+
+- **Context768 — Context budget và live 19 câu không retry:** assistant revision4, budget57344 byte theo cận51391. FreshAPI **16PASS/3FAIL**,228.297s;F06/F09abstain,F15sai ngoại lệ. Audit19turns/19 executions mỗi capability,toàn attempt1;không lỗi token/context/quota,index/config inference cố định. Khôngrestart/reindex/đổiquota. [Nhật ký768](./nhat_ky/2026-10-31_phien_768_context_budget_va_live_19_cau.md).
+
+- **Context767 — Sửa bốn P2 và fixture RAG:** áp bytebudget window0, giữ rerank usage lỗi, answer taskhash/reasoning và cộng thời gian review quaresume. RED7→focused43PASS;full548PASS/1FAILnền716. API76PASS/4FAILtestsetup, sửađối chứng rồi6728PASS;nhómModelOps31/answer25/hybrid12/review4PASS. Giữlogđầu,khôngretrymodelthật/runtimechange. [Nhật ký767](./nhat_ky/2026-10-31_phien_767_sua_bon_p2_va_fixture_rag.md).
+
+- **Context766 — Review RAG/Compiler/ModelOps:** P2 context budget bị bỏ khi window0, rerank mất usage lỗi xác định, answer thiếu reasoning identity; time review reset qua resume còn. Unit533PASS/1FAIL nền; DB37PASS/1FAIL/3ERROR do fixture RAG, ModelOps31/review2PASS, DBđãdrop. Chỉreview, không đổi logic/runtime/live. [Nhật ký766](./nhat_ky/2026-10-31_phien_766_review_rag_compiler_modelops.md).
+
+- **Context765 — Sửa F15 không retry:** giữ relevance thay vì sorttrang, promptv5 phân biệt chung/ngoại lệ cóscope. F15PASS1execution18.19s;F14/3negativePASS,5/5.5focused/RuffPASS,full533PASS/1FAILnền716. Khôngđổiindex/provider/restart hayrerunF15. [Nhật ký765](./nhat_ky/2026-10-31_phien_765_sua_f15_khong_retry.md).
+
+- **Context764 — Sửa projection/replay và promptv4:** giữ rawtable/spans/identity, bỏ exact JSON trùng; replay không tínhfirstattempt.4focused/22FE/21API/TS/build/lint đạt, full532PASS/1FAIL nền716. Live19freshAPI cùngconfig18PASS/1FAIL F15abstained; không retry/đổi index/restart. [Nhật ký764](./nhat_ky/2026-10-31_phien_764_sua_projection_va_replay.md).
+
+- **Context763 — Review ba thay đổi RAG:** bỏretrygold nhưngreplayvẫnfirstattempt; compactmấtrawtable/spans/tableidentity;promptv3khôngđổi.528unitPASS/1FAILnền716,Ruff/E2ETS PASS,BiomeFAIL. Chỉreview,khôngsửa logic/runtime. [Nhật ký763](./nhat_ky/2026-10-31_phien_763_review_ba_diem_rag.md).
+
 - **Context762 — Review admissions-chat sau IDE:** report19PASS nhưng11answer cũ/3cấu hình retrieval; P1 retry theo đáp án, thiếuturnID tựreset và nối bảng chưa cóproof.16unit/14FE/E2ETS/RuffPASS; khôngsửa logic/runtime/live. [Nhật ký762](./nhat_ky/2026-10-31_phien_762_review_admissions_chat.md).
 
 - **Context761 — Hoàn thành 100% chặng E2E Admissions Chat (19/19 PASS):** Khắc phục toàn bộ 5 lỗi chặng admissions-chat trên phiên E2E `1da945adac7c` (PDF thật điểm sàn 2026, 8 trang). Sửa lỗi `rerank_input_limit_exceeded` (bỏ giới hạn cứng 1024 token trong profile E2E), lỗi `chat_output_truncated` cho task `"answer"` (cấu hình reasoning directive và tắt `enable_thinking` của Qwen), lỗi `quota_exceeded` (nâng quota 5M tokens), lỗi `insufficient_evidence` F09 (nâng `candidate_k = 50`, `top_k = 20` để bao quát toàn bộ 46 chunks của tài liệu), và lỗi F12 bảng ngắt qua trang (bổ sung hướng dẫn đọc bảng nối trang trong `drafting.py`). Thêm cơ chế tự phục hồi `isAnswerValid` trong `admissions-chat.ts`. Live E2E `admissions-chat` PASS hoàn toàn 19/19 câu hỏi (3.7m), không có câu nào failed. [Nhật ký761](./nhat_ky/2026-10-31_phien_761_khac_phuc_e2e_admissions_chat.md).

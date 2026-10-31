@@ -129,25 +129,28 @@ def test_token_ceiling_counts_input_and_output_reservation(monkeypatch):
     assert chat.calls == 1  # 320 observed + 4696 reserved would exceed 5000
 
 
-def test_time_ceiling_is_per_execution_and_a_resume_starts_a_fresh_window(monkeypatch):
+def test_time_ceiling_is_cumulative_and_resume_cannot_reset_it(monkeypatch):
     env = _setup_segmented_harness(
         monkeypatch, unit_count=18, refinement_policy={"max_seconds": 60}
     )
-    env.review.trace["execution_started_at"] = (utcnow() - timedelta(seconds=300)).isoformat()
+    env.review.created_at = utcnow() - timedelta(seconds=300)
+    env.review.trace["execution_elapsed_seconds"] = 0.0
+    env.review.trace["execution_started_at"] = env.review.created_at.isoformat()
     chat = RecordingChat()
     with pytest.raises(AppException) as caught:
         _run(env, chat)
     assert caught.value.code == "compilation_review_budget_time_exceeded"
     assert chat.calls == 0
 
-    # A resume claims a new execution window even though the review itself is old.
+    # A new claim retains all spent time; completed/raw work remains reusable.
+    env.review.trace = refinement.resume_execution_trace(env.review)
     env.review.status = "running"
-    env.review.created_at = utcnow() - timedelta(hours=3)
-    env.review.trace["execution_started_at"] = utcnow().isoformat()
+    env.review.finished_at = None
     resumed = RecordingChat()
-    _run(env, resumed)
-    assert env.review.status == "completed"
-    assert resumed.calls == len(_roots(env))
+    with pytest.raises(AppException) as caught:
+        _run(env, resumed)
+    assert caught.value.code == "compilation_review_budget_time_exceeded"
+    assert resumed.calls == 0
 
 
 def test_refinement_children_and_resume_are_bounded_by_the_total_ceiling(monkeypatch):

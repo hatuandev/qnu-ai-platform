@@ -10,23 +10,17 @@ from qnu.domains.knowledge.index.models import IndexChunk, IndexRun
 from qnu.domains.knowledge.index.schemas import SearchHit, SearchResponse
 from qnu.domains.knowledge.index.search import _eligible, _hits, manifest
 from qnu.domains.knowledge.metadata import matches_metadata
+from qnu.domains.rag.answer.projection import evidence_item
 from qnu.domains.rag.answer.schemas import AnswerRequest
+from qnu.domains.rag.answer.table_support import attach_table_support
 from qnu.platform.errors import AppException, Conflict
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.vector_store import VectorHit
 
 
 def evidence_size(hit: SearchHit) -> int:
-    # Match the JSON sent to the model. SQL/source locator DTOs are not prompt context.
-    return (
-        len(
-            json.dumps(
-                {"evidence_id": "E20", **hit.model_dump(include={"kind", "text", "structure"})},
-                ensure_ascii=False,
-            ).encode("utf-8")
-        )
-        + 2
-    )
+    # Two-digit IDs cover top20 plus at most four structural table dependencies.
+    return len(json.dumps(evidence_item(hit, "E20"), ensure_ascii=False).encode("utf-8")) + 2
 
 
 async def expand_context(
@@ -44,6 +38,25 @@ async def expand_context(
         "added": [],
         "budget_bytes": req.context_max_bytes,
     }
+    consumed = 2 + sum(evidence_size(h) for h in result.hits)
+    trace["bytes_used"] = consumed
+    if consumed > req.context_max_bytes:
+        raise AppException(
+            "Evidence chính vượt ngân sách context; giảm top_k hoặc tăng budget.",
+            code="answer_context_budget_exceeded",
+            status_code=422,
+        )
+    result, support_trace = await attach_table_support(
+        db, blob, actor, workspace_id, collection_id, result, req
+    )
+    trace.update(support_trace)
+    consumed = 2 + sum(evidence_size(h) for h in result.hits)
+    trace["bytes_used"] = consumed
+    if consumed > req.context_max_bytes:
+        raise AppException(
+            "Evidence cùng context bảng vượt ngân sách.",
+            code="answer_context_budget_exceeded", status_code=422,
+        )
     if not req.context_window or not result.hits:
         trace["status"] = "disabled" if not req.context_window else "no_hits"
         return result, trace
@@ -73,13 +86,6 @@ async def expand_context(
         parent = (row.structure or {}).get("context", {}).get("parent")
         if parent is not None:
             groups.setdefault((row.input_id, parent), []).append(row)
-    consumed = 2 + sum(evidence_size(h) for h in result.hits)
-    if consumed > req.context_max_bytes:
-        raise AppException(
-            "Evidence chính vượt ngân sách context; giảm top_k hoặc tăng budget.",
-            code="answer_context_budget_exceeded",
-            status_code=422,
-        )
     known = {h.chunk_id for h in result.hits}
     additions = []
     truncated = 0

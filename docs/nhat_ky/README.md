@@ -1,6 +1,36 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
+- [Phiên 776 — Quota E2E 20M](2026-10-31_phien_776_tang_quota_e2e_20m.md): profile/validator đồng bộ20M;14test, TS, Biome, build PASS; chạy lại navigation để áp dụng DB.
+
+
+- [Phiên775 — Sửa benchmark đa tài liệu](2026-10-31_phien_775_sua_benchmark_multi_docs.md): sửa gold/scope/proof/dispatch/budget/quota;49regressionPASS,PDF28trang55factsPASS;fullfrontend539PASS/33FAIL;liveBLOCKEDkey,khôngretry.
+
+
+- [Phiên774 — Review multi-docs773](2026-10-31_phien_774_review_multi_docs.md): gold sai/budget thiếu/checkerfalsePASS;3probe tái hiện,14Vitest/typecheckđạt;liveNOT_RUN,khôngsửaapp.
+
+- [Phiên 773 — Bộ E2E Tuyển sinh Đa tài liệu (3 PDF, 53 Cases)](2026-10-31_phien_773_mo_rong_e2e_tuyen_sinh_3_tai_lieu.md): Benchmark 53 cases (19 floor2026, 12 info2025, 12 report2024, 10 cross/boundary MX); checkpoint `documents[key]`, upload & OCR 28 trang tuần tự, 3 compiled docs, 1 combined index; RAG scope single/all, citations per source, quota 20M, không retry; 6 unit vitest mới PASS, 22 targeted PASS, typecheck/Biome PASS, 29 pytest PASS, Ruff PASS; đã cleanup phiên cũ `1da945adac7c`, init phiên `93faa11f0caf`, serve daemon đang chạy (API 64624, FE 64625), dừng đúng tại `provider-setup` để nhập API key qua terminal tương tác.
+
+- [Phiên772 — Sửa F09 lookup projection](2026-10-31_phien_772_fix_f09_lookup_projection.md): promptv9,BEtríchô;focused40PASS/full587+1nền/API28PASS,F09livePASS1lượt20.672s,khôngretry.
+
+- [Phiên771 — Xem phản hồi F09](2026-10-31_phien_771_xem_phan_hoi_f09.md): model đúng ô22 nhưng numeric prose vi phạm,1FAIL/khôngretry,khôngsửaapp.
+
+- [Phiên770 — RAG chọn ô nguồn](2026-10-31_phien_770_rag_chon_o_nguon.md): grid/header/span/quality, selectorv2; focused55PASS/full581+1nền,API47PASS/v2cuối27PASS; live2/3,F09FAIL,khôngretry/khôngreindex.
+
+- [Phiên769 — Đọc bảng và live RAG](2026-10-31_phien_769_sua_doc_bang_va_live_rag.md): promptv7/context4chunk hỗ trợ; cuối17/19,F09/F12FAIL; hai cohort giữ riêng,API45PASS,fullunit562/1nền. Chưa hoàn tất chất lượng.
+
+- [Phiên768 — Context budget và live 19 câu](2026-10-31_phien_768_context_budget_va_live_19_cau.md): budget57344 byte, freshAPI16PASS/3FAIL;F06/F09abstain,F15sai số liệu; mỗi câu một lần, audit không retry/token error.
+
+- [Phiên767 — Sửa bốn P2 và fixture RAG](2026-10-31_phien_767_sua_bon_p2_va_fixture_rag.md): context/usage/reasoning/time;full548PASS/1FAILnền,APIcácnhómđạt/fixture6728PASSsauchỉnhđối chứng,giữlogđầu4FAIL.
+
+- [Phiên766 — Review RAG, Compiler và ModelOps](2026-10-31_phien_766_review_rag_compiler_modelops.md): bốn gap budget/usage/trace/time; unit533PASS/1FAIL, DB37PASS/1FAIL/3ERROR; không sửa logic/runtime.
+
+- [Phiên765 — F15 giữ relevance và xử lý ngoại lệ](2026-10-31_phien_765_sua_f15_khong_retry.md): F15PASSmộtlần cóaudit,4controlPASS,promptv5;full533PASS/1FAILnền.
+
+- [Phiên764 — Sửa projection và replay](2026-10-31_phien_764_sua_projection_va_replay.md): giữ bảng đầy đủ/promptv4,22FE/21API đạt;live18/19fresh,F15abstained,fullunit còn1lỗi nền.
+
+- [Phiên763 — Review ba thay đổi RAG](2026-10-31_phien_763_review_ba_diem_rag.md): compactmấtbằngchứngbảng,testreplayfirstattempt;528unitPASS/1FAILnền,Ruff/E2ETS PASS,BiomeFAIL.
+
 - [Phiên762 — Review admissions-chat và giới hạn token](2026-10-31_phien_762_review_admissions_chat.md):19PASS tích lũy khác19fresh cùngconfig;P1 recovery/test/nối bảng,16unit/14FE đạt.
 
 - [Phiên 761 — Khắc phục triệt để lỗi và hoàn thành 100% chặng E2E Admissions Chat (F01–F19)](2026-10-31_phien_761_khac_phuc_e2e_admissions_chat.md): sửa rerank input limit, reasoning output truncation cho task answer, nâng quota 5M tokens, candidate_k 50 cho 46 chunks và hướng dẫn đọc bảng nối trang; toàn bộ 19/19 câu hỏi F01–F19 PASS (3.7m).

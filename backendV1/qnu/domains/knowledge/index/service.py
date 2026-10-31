@@ -178,6 +178,22 @@ async def request_index(
                 for a in publication.version.retrieval_metadata
             ],
         )
+        reports = [
+            c.structure["reading_quality"]
+            for c in chunks
+            if c.structure and "reading_quality" in c.structure
+        ]
+        run.config = {
+            **run.config,
+            "reading_quality": [
+                *run.config.get("reading_quality", []),
+                {
+                    "input_id": binding.id,
+                    "table_fragments": len(reports),
+                    "review_required": sum(r["status"] == "review_required" for r in reports),
+                },
+            ],
+        }
         for chunk in chunks:
             ordinal = run.chunks_total
             point_id = str(

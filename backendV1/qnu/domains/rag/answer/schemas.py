@@ -57,14 +57,20 @@ class Statement(BaseModel):
         return value
 
 
+class CellSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    cell_id: str = Field(pattern=r"^E[1-9]\d*:r\d+:k\d+$", max_length=80)
+
+
 class ModelAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid")
     status: Literal["answered", "insufficient_evidence"]
     statements: list[Statement] = Field(max_length=20)
+    lookups: list[CellSelection] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def consistent_status(self) -> "ModelAnswer":
-        if bool(self.statements) != (self.status == "answered"):
+        if bool(self.statements or self.lookups) != (self.status == "answered"):
             raise ValueError("Status và statements không khớp.")
         return self
 
@@ -80,6 +86,8 @@ class AnswerTrace(BaseModel):
     provider_id: str | None = None
     model_name: str | None = None
     configuration_hash: str | None = None
+    inference_configuration_hash: str | None = None
+    reasoning: dict = Field(default_factory=dict)
     usage_id: str | None = None
     routing: list[dict] = Field(default_factory=list)
     prompt_tokens: int | None = None
@@ -87,6 +95,7 @@ class AnswerTrace(BaseModel):
     total_tokens: int | None = None
     stage_ms: dict[str, float] = Field(default_factory=dict)
     context: dict = Field(default_factory=dict)
+    grounding: dict = Field(default_factory=dict)
     verification: dict = Field(default_factory=lambda: {"mode": "off", "status": "not_run"})
 
 

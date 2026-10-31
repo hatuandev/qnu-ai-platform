@@ -143,15 +143,34 @@ def limits_for(
 
 
 def execution_elapsed_seconds(review: CompilationReview) -> float:
-    """Time spent in the current execution claim, so a resume after a stop starts fresh."""
-    started = (review.trace or {}).get("execution_started_at")
+    """Active execution time across claims; stopped time is frozen at finished_at.
+
+    Old reviews have no cumulative ledger. Use their lifetime up to the stop as a
+    conservative bound instead of inventing zero usage for earlier lost claims.
+    """
+    trace = review.trace or {}
+    accumulated = trace.get("execution_elapsed_seconds")
     begin = review.created_at
-    if started:
+    if accumulated is not None and trace.get("execution_started_at"):
         try:
-            begin = datetime.fromisoformat(started)
+            begin = datetime.fromisoformat(trace["execution_started_at"])
         except ValueError:
             begin = review.created_at
-    return max(0.0, (utcnow() - begin).total_seconds()) if begin is not None else 0.0
+    end = review.finished_at or utcnow()
+    current = max(0.0, (end - begin).total_seconds()) if begin is not None else 0.0
+    return max(0.0, float(accumulated or 0)) + current
+
+
+def resume_execution_trace(review: CompilationReview) -> dict:
+    """Close the stopped claim before opening a new one, retaining spent time."""
+    return {
+        **(review.trace or {}),
+        "execution_elapsed_seconds": execution_elapsed_seconds(review),
+        "execution_started_at": utcnow().isoformat(),
+        "execution_budget_basis": (
+            (review.trace or {}).get("execution_budget_basis") or "legacy_wall_clock_upper_bound/v1"
+        ),
+    }
 
 
 def segment_depth(segment: CompilationReviewSegment) -> int:
@@ -737,10 +756,7 @@ def create_child_segments(
     limits = limits_for(review.trace or {}, 1)
     remaining_seconds = max(
         60,
-        int(
-            limits.max_seconds
-            - ((utcnow() - review.created_at).total_seconds() if review.created_at else 0)
-        ),
+        int(limits.max_seconds - execution_elapsed_seconds(review)),
     )
     review.expires_at = max(
         review.expires_at,

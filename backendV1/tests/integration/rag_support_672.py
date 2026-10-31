@@ -25,7 +25,9 @@ class ParagraphChat(FakeChat):
         body = json.loads(raw)
         draft = json.loads(body["choices"][0]["message"]["content"])
         original = draft["sections"][0]["paragraphs"][0]
-        draft["sections"][0]["paragraphs"] = [dict(original) for _ in range(4)]
+        draft["sections"][0]["paragraphs"] = [
+            {**original, "text": f"{original['text']} Đoạn kiểm thử {i + 1}."} for i in range(4)
+        ]
         draft["sections"].append({"heading": "Mục khác", "paragraphs": [dict(original)]})
         body["choices"][0]["message"]["content"] = json.dumps(draft)
         return status, json.dumps(body).encode()
@@ -39,6 +41,9 @@ def prepared(client):
         run = request_compile(client, data).json()["run"]["id"]
         assert execute_compile(client, run) == "completed"
     content = client.get(data["url"] + "/" + run + "/draft").json()
+    paragraphs = content["sections"][0]["paragraphs"]
+    assert len(paragraphs) == 4
+    assert len({p["text"] for p in paragraphs}) == 4
     table = content["source_tables"][0]
     run_prefix = table["citation"].split(":", 1)[0]
     proofs = {}
@@ -62,10 +67,10 @@ def prepared(client):
     return {**data, "run": run, "annotations": annotations, "base": base}
 
 
-def register(client, data, annotations=None):
+def register(client, data, annotations=None, *, key="register-metadata"):
     return client.post(
         data["base"] + "/compiled-documents",
-        headers={"Idempotency-Key": "register-metadata"},
+        headers={"Idempotency-Key": key},
         json={
             "document_key": "scope",
             "title": "Controlled scope fixture",

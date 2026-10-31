@@ -6,244 +6,255 @@ import {
   benchmark,
   modelTimeout,
 } from "./admissions-context";
+import { type Answer, checkAdmissionAnswer } from "./admissions-evaluation";
+import {
+  fingerprint,
+  freezeCohort,
+  planAdmissionsBudget,
+  requireAdmissionsQuota,
+  verifyAdmissionsIndex,
+} from "./admissions-policy";
 import {
   type Api,
   type Checkpoint,
   type Run,
-  ensureSessionQuota,
   save,
   workspace,
 } from "./session";
 
-interface Answer {
-  status: "answered" | "insufficient_evidence";
-  reason?: string;
-  answer: string | null;
-  index_run_id: string;
-  statements: { text: string; evidence_ids: string[] }[];
-  sources: {
-    evidence_id: string;
-    version_id: string;
-    citations: Record<
-      string,
-      { page: number; source_sha256: string; revision_id: string }
-    >;
-  }[];
-  trace: {
-    provider_id?: string;
-    retrieval: { mode?: string; rerank_provider?: { provider_id: string } };
-    prompt_tokens?: number | null;
-    completion_tokens?: number | null;
-    total_tokens?: number | null;
-  };
-}
-type Turn = Run & { result: Answer };
+export type Attempt = {
+  origin?: "fresh" | "replayed" | "resumed";
+  dispatched?: boolean;
+  conversation?: string;
+  turn?: string;
+};
+type Turn = Run & { result: Answer; question?: string };
 
-async function ask(
-  api: Api,
+export async function askAdmissionQuestion(
+  api: Pick<Api, "get" | "post" | "wait">,
   state: Checkpoint,
   item: AdmissionCase,
   timeout: number,
-): Promise<{ answer: Answer; elapsedMs: number }> {
+  attempt: Attempt = {},
+): Promise<{
+  answer: Answer;
+  elapsedMs: number;
+  inferenceMs: number | null;
+  origin: "fresh" | "replayed" | "resumed";
+  firstAttempt: boolean;
+}> {
   const scenario = state.admissions;
   if (!scenario?.assistant)
-    throw new Error("BLOCKED: chưa có trợ lý điểm sàn.");
+    throw new Error("BLOCKED: chưa có trợ lý tuyển sinh.");
+  let documentIds: string[] | undefined;
+  if (item.scope === "single") {
+    const docId = scenario.documents?.[item.target_doc]?.publication?.document;
+    if (!docId)
+      throw new Error(
+        "BLOCKED: thiếu tài liệu scope single; không mở rộng sang cả kho.",
+      );
+    documentIds = [docId];
+  } else if (item.scope !== "all")
+    throw new Error("BLOCKED: scope không hợp lệ.");
+  const requestHash = fingerprint({
+    question: item.question,
+    assistant: scenario.assistant,
+    documentIds: documentIds || null,
+    benchmark: benchmark.version,
+  });
   scenario.queries ||= {};
-  let query: { conversation: string; turn?: string } | undefined =
-    scenario.queries[item.id];
-  const idempotencyKey = `${state.runId}-floor-${benchmark.version}-${item.id}`;
-
+  let query = scenario.queries[item.id];
   if (!query) {
     const conversation = await api.post<{ id: string }>(
       `${workspace(state)}/conversations`,
-      {
-        assistant_id: scenario.assistant,
-        document_ids: [scenario.publication?.document],
-      },
+      { assistant_id: scenario.assistant, document_ids: documentIds },
+      `${state.runId}-adm-${benchmark.version}-${item.id}-conversation`,
     );
-    query = { conversation: conversation.id };
+    query = { conversation: conversation.id, request_sha256: requestHash };
     scenario.queries[item.id] = query;
     save(state);
   }
-
+  attempt.conversation = query.conversation;
+  if (query.request_sha256 && query.request_sha256 !== requestHash)
+    throw new Error("BLOCKED: câu hỏi/scope checkpoint đã đổi.");
+  const conversation = await api.get<{
+    assistant_id: string;
+    document_ids: string[] | null;
+  }>(`${workspace(state)}/conversations/${query.conversation}`);
+  if (
+    conversation.assistant_id !== scenario.assistant ||
+    JSON.stringify(conversation.document_ids || null) !==
+      JSON.stringify(documentIds || null)
+  )
+    throw new Error("BLOCKED: hội thoại cũ sai assistant/scope.");
   const base = `${workspace(state)}/conversations/${query.conversation}/turns`;
-  let turn: Turn;
   const startedAt = Date.now();
-
-  if (query.turn) {
-    // Trường hợp mất kết nối hoặc khôi phục: kiểm tra lượt cũ trước khi gửi mới
-    const existing = await api
-      .get<Turn>(`${base}/${query.turn}`)
-      .catch(() => null);
-    if (existing && existing.status === "completed") {
-      turn = existing;
-    } else if (
-      existing &&
-      (existing.status === "running" || existing.status === "pending")
-    ) {
-      turn = await api.wait<Turn>(`${base}/${query.turn}`, timeout);
-    } else {
-      turn = await api.post<Turn>(
-        base,
-        { question: item.question, expected_turn_no: 0 },
-        idempotencyKey,
-        timeout,
-      );
-      query.turn = turn.id;
-      save(state);
-      if (turn.status !== "completed") {
-        turn = await api.wait<Turn>(`${base}/${turn.id}`, timeout);
-      }
-    }
-  } else {
+  // Khôi phục reservation của server trước khi quyết định turn mới
+  const existing = query.turn
+    ? await api.get<Turn>(`${base}/${query.turn}`)
+    : (await api.get<Turn[]>(base))[0];
+  if (
+    existing &&
+    existing.question !== undefined &&
+    existing.question !== item.question
+  )
+    throw new Error("BLOCKED: lượt hỏi cũ khác câu đang kiểm tra.");
+  const origin = !existing
+    ? "fresh"
+    : existing.status === "completed"
+      ? "replayed"
+      : "resumed";
+  attempt.origin = origin;
+  if (!existing && query.dispatched)
+    throw new Error(
+      "BLOCKED: lượt đã dispatch nhưng chưa đối soát được; không gửi lại.",
+    );
+  let turn = existing;
+  if (!turn) {
+    query.dispatched = true;
+    query.request_sha256 = requestHash;
+    attempt.dispatched = true;
+    save(state); // durable before network dispatch, including timeout/HTTP failures
     turn = await api.post<Turn>(
       base,
       { question: item.question, expected_turn_no: 0 },
-      idempotencyKey,
+      `${state.runId}-adm-${benchmark.version}-${item.id}`,
       timeout,
     );
-    query.turn = turn.id;
-    save(state);
-    if (turn.status !== "completed") {
-      turn = await api.wait<Turn>(`${base}/${turn.id}`, timeout);
-    }
   }
-
-  const elapsedMs = Date.now() - startedAt;
-  return { answer: turn.result, elapsedMs };
-}
-
-function checkAnswer(answer: Answer, item: AdmissionCase, state: Checkpoint) {
-  const scenario = state.admissions;
-  expect(answer.index_run_id).toBe(scenario?.publication?.index);
-  if (item.kind === "unanswerable") {
-    expect(answer.status, "Không được đoán dữ kiện ngoài PDF đã chốt.").toBe(
-      "insufficient_evidence",
-    );
-    expect(answer.statements).toHaveLength(0);
-    return;
-  }
-  expect(answer.status).toBe("answered");
-  expect(answer.trace.provider_id).toBe(state.runtimeDefaults?.chat);
-  expect(answer.trace.retrieval.mode).toBe("hybrid_rerank");
-  expect(answer.trace.retrieval.rerank_provider?.provider_id).toBe(
-    state.runtimeDefaults?.rerank,
-  );
-  expect(answer.statements.length).toBeGreaterThan(0);
-  expect(answer.sources.length).toBeGreaterThan(0);
-  const numbers = [
-    ...(answer.answer || "").matchAll(
-      /(?<![\p{L}\d])\d+(?:[.,]\d+)?(?![\p{L}\d])/gu,
-    ),
-  ].map((match) => Number(match[0].replace(",", ".")));
-  for (const value of item.expected_numbers) expect(numbers).toContain(value);
-  const text = (answer.answer || "").replace(/\s+/g, " ");
-  for (const pattern of item.expected_patterns)
-    expect(text).toMatch(new RegExp(pattern, "iu"));
-  const refs = answer.sources.flatMap((source) => {
-    expect(source.version_id).toBe(scenario?.publication?.version);
-    expect(Object.keys(source.citations).length).toBeGreaterThan(0);
-    return Object.entries(source.citations);
-  });
-  for (const [ref, citation] of refs) {
-    expect(ref.startsWith(`${scenario?.source?.run}:`)).toBe(true);
-    expect(citation.source_sha256).toBe(benchmark.source.sha256);
-    expect(citation.revision_id).toBe(scenario?.source?.revision);
-  }
-  expect(refs.some(([, citation]) => item.pages.includes(citation.page))).toBe(
-    true,
-  );
-  const evidence = new Set(answer.sources.map((source) => source.evidence_id));
-  for (const statement of answer.statements)
-    expect(
-      statement.evidence_ids.length > 0 &&
-        statement.evidence_ids.every((id) => evidence.has(id)),
-    ).toBe(true);
-}
-
-async function ensureAssistant(api: Api, state: Checkpoint) {
-  if (!state.admissions) throw new Error("BLOCKED: chưa tạo kho điểm sàn.");
-  if (state.admissions.assistant) {
-    const existing = await api
-      .get<{
-        revision: number;
-        name: string;
-        description: string;
-        persona: string;
-        collection_id: string;
-        chat_provider_id: string | null;
-        top_k: number;
-        history_turns: number;
-        max_output_tokens: number;
-        is_active: boolean;
-        rag_policy: {
-          retrieval_mode: string;
-          candidate_k: number;
-          rrf_k: number;
-          rerank_provider_id: string | null;
-          [k: string]: unknown;
-        };
-      }>(`${workspace(state)}/assistants/${state.admissions.assistant}`)
-      .catch(() => null);
-
-    if (
-      existing &&
-      (existing.top_k !== 20 || existing.rag_policy?.candidate_k !== 50)
-    ) {
-      await api
-        .json(
-          "PUT",
-          `${workspace(state)}/assistants/${state.admissions.assistant}`,
-          {
-            name: existing.name,
-            description: existing.description,
-            persona: existing.persona,
-            collection_id: existing.collection_id,
-            chat_provider_id: existing.chat_provider_id,
-            top_k: 20,
-            history_turns: existing.history_turns,
-            max_output_tokens: existing.max_output_tokens,
-            is_active: existing.is_active,
-            rag_policy: {
-              ...existing.rag_policy,
-              candidate_k: 50,
-            },
-            expected_revision: existing.revision,
-          },
-        )
-        .catch(() => null);
-    }
-    return;
-  }
-  const assistant = await api.post<{ id: string }>(
-    `${workspace(state)}/assistants`,
-    {
-      name: `Điểm sàn QNU 2026 — ${state.runId}`,
-      collection_id: state.admissions.collection,
-      chat_provider_id: state.runtimeDefaults?.chat,
-      top_k: 20,
-      rag_policy: {
-        retrieval_mode: "hybrid_rerank",
-        candidate_k: 50,
-        rerank_provider_id: state.runtimeDefaults?.rerank,
-      },
-    },
-  );
-  state.admissions.assistant = assistant.id;
+  attempt.turn = turn.id;
+  query.turn = turn.id;
   save(state);
+  if (["failed", "uncertain", "cancelled"].includes(turn.status))
+    throw new Error(
+      `Lượt hỏi ${turn.status}: ${turn.error_code || "unknown"}; giữ lịch sử, không gửi lại.`,
+    );
+  if (turn.status !== "completed")
+    turn = await api.wait<Turn>(`${base}/${turn.id}`, timeout);
+  const elapsedMs = Date.now() - startedAt;
+  return {
+    answer: turn.result,
+    elapsedMs,
+    origin,
+    inferenceMs:
+      origin === "fresh"
+        ? (turn.result.trace?.stage_ms?.generation ?? null)
+        : null,
+    firstAttempt:
+      origin === "fresh" &&
+      !scenario.queryHistory?.some((h) => h.case_id === item.id),
+  };
+}
+
+interface AssistantConfig {
+  id: string;
+  revision: number;
+  name: string;
+  description: string;
+  persona: string;
+  collection_id: string;
+  chat_provider_id: string;
+  top_k: number;
+  history_turns: number;
+  max_output_tokens: number;
+  is_active: boolean;
+  rag_policy: {
+    candidate_k: number;
+    context_max_bytes: number;
+    [k: string]: unknown;
+  };
+}
+
+export async function ensureAdmissionsAssistant(
+  api: Api,
+  state: Checkpoint,
+  budget: ReturnType<typeof planAdmissionsBudget>,
+) {
+  const scenario = state.admissions;
+  if (!scenario?.collection)
+    throw new Error("BLOCKED: chưa tạo kho tuyển sinh.");
+  const desired = {
+    collection_id: scenario.collection,
+    chat_provider_id: state.runtimeDefaults?.chat,
+    top_k: 20,
+    history_turns: 0,
+    max_output_tokens: budget.max_output_tokens,
+    rag_policy: {
+      retrieval_mode: "hybrid_rerank",
+      candidate_k: 50,
+      context_window: 0,
+      context_max_bytes: budget.context_max_bytes,
+      rerank_provider_id: state.runtimeDefaults?.rerank,
+    },
+  };
+  if (!scenario.assistant) {
+    const created = await api.post<{ id: string }>(
+      `${workspace(state)}/assistants`,
+      { name: `Tuyển sinh QNU (Đa tài liệu) — ${state.runId}`, ...desired },
+    );
+    scenario.assistant = created.id;
+    save(state);
+  }
+  const existing = await api.get<AssistantConfig>(
+    `${workspace(state)}/assistants/${scenario.assistant}`,
+  );
+  const same =
+    existing.collection_id === desired.collection_id &&
+    existing.chat_provider_id === desired.chat_provider_id &&
+    existing.top_k === desired.top_k &&
+    existing.history_turns === 0 &&
+    existing.max_output_tokens === desired.max_output_tokens &&
+    Object.entries(desired.rag_policy).every(
+      ([k, v]) => existing.rag_policy[k] === v,
+    );
+  if (!same) {
+    if (scenario.cohort || Object.keys(scenario.queries || {}).length)
+      throw new Error(
+        "BLOCKED: assistant khác cấu hình cohort; không tự đổi khi đã có lượt hỏi.",
+      );
+    await api.json(
+      "PUT",
+      `${workspace(state)}/assistants/${scenario.assistant}`,
+      {
+        name: existing.name,
+        description: existing.description,
+        persona: existing.persona,
+        is_active: existing.is_active,
+        ...desired,
+        expected_revision: existing.revision,
+      },
+    );
+    return api.get<AssistantConfig>(
+      `${workspace(state)}/assistants/${scenario.assistant}`,
+    );
+  }
+  return existing;
+}
+
+export function stopsAdmissionsCohort(message: string) {
+  return /BLOCKED:|quota_|provider_|timeout|ECONN|HTTP (401|403|429|5\d\d)|capacity_|input_limit|context_budget|uncertain/i.test(
+    message,
+  );
 }
 
 export async function questionAdmissionDraft(api: Api, state: Checkpoint) {
-  if (!state.admissions?.publication?.index)
+  if (!state.admissions?.combinedIndex && !state.admissions?.publication?.index)
     throw new Error("BLOCKED: chưa xuất bản/lập chỉ mục.");
-  await ensureSessionQuota(api, state, 5_000_000);
-  await ensureAssistant(api, state);
   const timeout = await modelTimeout(api, state);
   const records: {
     id: string;
+    group: string;
+    scope: string;
+    target_doc: string;
     status: string;
     first_attempt_pass: boolean;
-    elapsed_ms?: number;
+    dispatched?: boolean;
+    conversation?: string;
+    turn?: string;
+    error_code?: string;
+    client_elapsed_ms?: number;
+    inference_ms?: number | null;
+    origin?: "fresh" | "replayed" | "resumed";
     tokens?: {
       prompt_tokens?: number | null;
       completion_tokens?: number | null;
@@ -253,9 +264,14 @@ export async function questionAdmissionDraft(api: Api, state: Checkpoint) {
     error?: string;
   }[] = benchmark.cases.map((item) => ({
     id: item.id,
+    group: item.group,
+    scope: item.scope,
+    target_doc: item.target_doc,
     status: "NOT_RUN",
     first_attempt_pass: false,
   }));
+
+  let preflight: unknown;
   const report = () =>
     writeFileSync(
       path.join(
@@ -265,14 +281,33 @@ export async function questionAdmissionDraft(api: Api, state: Checkpoint) {
       `${JSON.stringify(
         {
           benchmark: benchmark.version,
-          source_sha256: benchmark.source.sha256,
-          publication: state.admissions?.publication,
+          preflight,
+          cohort: state.admissions?.cohort,
+          documents: benchmark.documents,
+          combined_index: state.admissions?.combinedIndex,
           label_status: benchmark.label_status,
           semantic_review: "NOT_RUN",
+          prompt_versions: [
+            ...new Set(
+              records
+                .map((r) => r.response?.trace.prompt_version)
+                .filter(Boolean),
+            ),
+          ],
+          configuration_hashes: [
+            ...new Set(
+              records
+                .map((r) => r.response?.trace.configuration_hash)
+                .filter(Boolean),
+            ),
+          ],
           expected: records.length,
           passed: records.filter((r) => r.status === "PASS").length,
           failed: records.filter((r) => r.status === "FAIL").length,
           not_run: records.filter((r) => r.status === "NOT_RUN").length,
+          replayed: records.filter((r) => r.origin === "replayed").length,
+          resumed: records.filter((r) => r.origin === "resumed").length,
+          fresh_results: records.filter((r) => r.origin === "fresh").length,
           first_attempt_passed: records.filter((r) => r.first_attempt_pass)
             .length,
           records,
@@ -283,31 +318,123 @@ export async function questionAdmissionDraft(api: Api, state: Checkpoint) {
       "utf8",
     );
   report();
+
+  try {
+    const index = await verifyAdmissionsIndex(api, state);
+    const provider = await api.get<Parameters<typeof planAdmissionsBudget>[0]>(
+      `/modelops/providers/${state.runtimeDefaults?.chat}`,
+    );
+    const budget = planAdmissionsBudget(provider);
+    const assistant = await ensureAdmissionsAssistant(api, state, budget);
+    const rerank = await api.get<Parameters<typeof planAdmissionsBudget>[0]>(
+      `/modelops/providers/${state.runtimeDefaults?.rerank}`,
+    );
+    const rerankInput =
+      rerank.token_limits?.max_input_tokens ??
+      rerank.token_limits?.context_window_tokens;
+    if (rerank.capacity_status !== "configured" || !rerankInput)
+      throw new Error("BLOCKED: chưa biết capacity rerank.");
+    const maxQuestion = Math.max(
+      ...benchmark.cases.map((c) => Buffer.byteLength(c.question)),
+    );
+    const rerankPair =
+      index.manifest.config.chunk_max_bytes + maxQuestion + 256;
+    if (!Number.isFinite(rerankPair) || rerankPair > rerankInput)
+      throw new Error(
+        "BLOCKED: dự toán cặp query/chunk vượt rerank input; kiểm tra cấu hình index/provider.",
+      );
+    const fresh = benchmark.cases.filter(
+      (c) => !state.admissions?.queries?.[c.id]?.turn,
+    ).length;
+    const quotaEstimate =
+      fresh *
+      (budget.input_tokens_plan +
+        budget.max_output_tokens +
+        50 * rerankPair +
+        maxQuestion +
+        256);
+    preflight = {
+      budget,
+      published: index.published,
+      rerank_pair_token_upper_plan: rerankPair,
+      fresh_cases: fresh,
+      quota_tokens_plan: quotaEstimate,
+      budget_basis:
+        "UTF8-byte conservative planning; final prompt/schema/catalog still guarded by ModelOps",
+    };
+    freezeCohort(state, {
+      benchmark: fingerprint(benchmark),
+      manifest: fingerprint(index.manifest),
+      assistant,
+      provider,
+      rerank,
+    });
+    await requireAdmissionsQuota(api, state, quotaEstimate);
+    report();
+  } catch (error) {
+    preflight = {
+      error: error instanceof Error ? error.message : String(error),
+      details: preflight,
+    };
+    report();
+    throw error;
+  }
+  let halt = false;
   for (const [index, item] of benchmark.cases.entries()) {
-    await test.step(`${item.id}: ${item.question}`, async () => {
+    if (halt) break;
+    await test.step(`[${item.id}] [${item.group}] ${item.question}`, async () => {
       const stepStart = Date.now();
+      const attempt: Attempt = {};
       try {
-        const { answer, elapsedMs } = await ask(api, state, item, timeout);
+        const { answer, elapsedMs, inferenceMs, origin, firstAttempt } =
+          await askAdmissionQuestion(api, state, item, timeout, attempt);
         records[index].response = answer;
-        records[index].elapsed_ms = elapsedMs;
+        records[index].client_elapsed_ms = elapsedMs;
+        records[index].inference_ms = inferenceMs;
+        records[index].origin = origin;
         records[index].tokens = {
-          prompt_tokens: answer?.trace?.prompt_tokens,
-          completion_tokens: answer?.trace?.completion_tokens,
-          total_tokens: answer?.trace?.total_tokens,
+          prompt_tokens: answer.trace.prompt_tokens,
+          completion_tokens: answer.trace.completion_tokens,
+          total_tokens: answer.trace.total_tokens,
         };
-        checkAnswer(answer, item, state);
+        const cohort = state.admissions?.cohort;
+        if (!answer.trace.prompt_version || !answer.trace.configuration_hash)
+          throw new Error("BLOCKED: thiếu prompt/config trace.");
+        if (cohort) {
+          if (
+            (cohort.prompt_version &&
+              cohort.prompt_version !== answer.trace.prompt_version) ||
+            (cohort.configuration_hash &&
+              cohort.configuration_hash !== answer.trace.configuration_hash)
+          )
+            throw new Error("BLOCKED: prompt/config đã đổi giữa cohort.");
+          cohort.prompt_version ||= answer.trace.prompt_version;
+          cohort.configuration_hash ||= answer.trace.configuration_hash;
+          save(state);
+        }
+        checkAdmissionAnswer(answer, item, state, benchmark.documents);
         records[index].status = "PASS";
-        records[index].first_attempt_pass = true;
+        records[index].first_attempt_pass = firstAttempt;
       } catch (error) {
         records[index].status = "FAIL";
         records[index].first_attempt_pass = false;
-        records[index].elapsed_ms ||= Date.now() - stepStart;
+        records[index].client_elapsed_ms ||= Date.now() - stepStart;
         records[index].error =
           error instanceof Error ? error.message : String(error);
-        throw error;
+        records[index].error_code = records[index].error.match(
+          /(?:code=|: )([a-z]+_[a-z_]+)/,
+        )?.[1];
+        halt = stopsAdmissionsCohort(records[index].error);
       } finally {
+        Object.assign(records[index], attempt);
         report();
       }
     });
   }
+  expect(
+    records
+      .filter((r) => r.status !== "PASS")
+      .map((r) => `${r.id}:${r.status}`),
+    "Một lượt/câu; không retry. Các lỗi độc lập được chấm hết, hạ tầng dừng và để NOT_RUN.",
+  ).toEqual([]);
 }

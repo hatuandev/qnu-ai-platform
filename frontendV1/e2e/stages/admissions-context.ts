@@ -2,8 +2,20 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { type Api, type Checkpoint, sha256 } from "./session";
 
+export interface BenchmarkDoc {
+  key: string;
+  path: string;
+  sha256: string;
+  pages: number;
+  title: string;
+  data_year: number;
+}
+
 export interface AdmissionCase {
   id: string;
+  group: string;
+  scope: "single" | "all";
+  target_doc: string;
   question: string;
   kind: "answerable" | "unanswerable";
   expected_numbers: number[];
@@ -11,31 +23,83 @@ export interface AdmissionCase {
   pages: number[];
   expected: string;
   rubric: string;
+  facts?: AdmissionFact[];
 }
-export const benchmark = JSON.parse(
-  readFileSync(path.resolve("e2e/data/admissions-floor-2026.json"), "utf8"),
+
+export interface AdmissionFact {
+  document: string;
+  pages: number[];
+  data_year: number;
+  locator: string;
+  subject_patterns: string[];
+  metric_patterns: string[];
+  values: { value: number; kind: "integer" | "decimal" }[];
+  support: "table" | "text";
+  /** Offline native-PDF row/column audit; never sent to the model. */
+  source_row_code?: string;
+  source_value_column?: number;
+}
+
+export interface BenchmarkMultiDocs {
+  version: string;
+  documents: Record<string, BenchmarkDoc>;
+  source: BenchmarkDoc; // Alias to floor2026 for compatibility
+  label_status: string;
+  cases: AdmissionCase[];
+}
+
+const rawBenchmark = JSON.parse(
+  readFileSync(path.resolve("e2e/data/admissions-multi-docs.json"), "utf8"),
 ) as {
   version: string;
-  source: { path: string; sha256: string; pages: number };
+  documents: Record<string, BenchmarkDoc>;
   label_status: string;
   cases: AdmissionCase[];
 };
-export const sourcePath = path.resolve("..", benchmark.source.path);
+
+export const benchmark: BenchmarkMultiDocs = {
+  ...rawBenchmark,
+  source: rawBenchmark.documents.floor2026,
+};
+
+export const docPaths: Record<string, string> = {
+  floor2026: path.resolve("..", benchmark.documents.floor2026.path),
+  info2025: path.resolve("..", benchmark.documents.info2025.path),
+  report2024: path.resolve("..", benchmark.documents.report2024.path),
+};
+
+export const sourcePath = docPaths.floor2026;
 
 export function context(state: Checkpoint): Checkpoint {
-  return { ...state, collection: state.admissions?.collection, folder: undefined };
+  return {
+    ...state,
+    collection: state.admissions?.collection,
+    folder: undefined,
+  };
 }
 
 export function checkSource() {
-  if (sha256(readFileSync(sourcePath)) !== benchmark.source.sha256)
-    throw new Error("BLOCKED: PDF đã đổi so với bộ câu hỏi; cần đối chiếu lại đáp án/hash.");
+  checkAllSources();
+}
+
+export function checkAllSources() {
+  for (const [key, doc] of Object.entries(benchmark.documents)) {
+    const fullPath = docPaths[key];
+    const bytes = readFileSync(fullPath);
+    const hash = sha256(bytes);
+    if (hash !== doc.sha256) {
+      throw new Error(
+        `BLOCKED: PDF ${key} (${doc.path}) đã đổi so với bộ câu hỏi: observed ${hash} != expected ${doc.sha256}.`,
+      );
+    }
+  }
 }
 
 export async function modelTimeout(api: Api, state: Checkpoint) {
-  if (!state.runtimeDefaults) throw new Error("BLOCKED: chạy navigation trước.");
+  if (!state.runtimeDefaults)
+    throw new Error("BLOCKED: chạy navigation trước.");
   const provider = await api.get<{ timeout_seconds: number }>(
     `/modelops/providers/${state.runtimeDefaults.chat}`,
   );
   return (provider.timeout_seconds + 30) * 1000;
 }
-

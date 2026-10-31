@@ -95,6 +95,51 @@ def test_hybrid_uses_same_index_and_scoped_lexical_candidates(client, indexed):
     assert response.status_code == 404
 
 
+@pytest.mark.parametrize("tokens", [0, 37, None])
+def test_rerank_rejection_settles_measured_usage_without_retry(client, indexed, tokens):
+    from sqlalchemy import select
+
+    from qnu.domains.modelops.models import ModelUsageRecord, WorkspaceQuota
+    from qnu.domains.modelops.usage.service import month_start
+    from qnu.platform.database import AsyncSessionFactory
+
+    class RejectedRerank(FakeRerank):
+        def _respond(self, index):
+            payload = {"error": "rate limit"}
+            if tokens is not None:
+                payload["usage"] = {"total_tokens": tokens}
+            return 429, json.dumps(payload).encode()
+
+    assert execute_index(client, indexed["index_run"]["id"]) == "completed"
+    with RejectedRerank() as fake:
+        setup_rerank(client, indexed, fake.base_url)
+        response = client.post(
+            indexed["base"] + "/search",
+            json={"query": "Chỉ tiêu", "mode": "hybrid_rerank", "candidate_k": 10},
+        )
+        assert response.status_code == 503, response.text
+        assert response.json()["code"] == "rerank_unavailable"
+        assert len(fake.requests) == 1
+
+    async def ledger():
+        async with AsyncSessionFactory() as db:
+            record = (
+                await db.scalars(
+                    select(ModelUsageRecord).where(
+                        ModelUsageRecord.workspace_id == indexed["workspace"]["id"],
+                        ModelUsageRecord.capability == "rerank",
+                    )
+                )
+            ).one()
+            quota = await db.get(WorkspaceQuota, (indexed["workspace"]["id"], month_start()))
+            return record.total_tokens, record.status, quota.tokens_reserved, record.reserved_tokens
+
+    used, status, held, reserved = client.portal.call(ledger)
+    assert used == tokens
+    assert status == ("unknown" if tokens is None else "failed")
+    assert held == (reserved if tokens is None else 0)
+
+
 @pytest.mark.parametrize("mode", ["normal", "duplicate", "foreign", "missing", "auth"])
 def test_rerank_protocol_is_strict_and_citations_stay_server_bound(client, indexed, mode):
     assert execute_index(client, indexed["index_run"]["id"]) == "completed"
@@ -113,6 +158,8 @@ def test_rerank_protocol_is_strict_and_citations_stay_server_bound(client, index
             assert response.status_code == 200, response.text
             body = response.json()
             assert body["trace"]["rerank_tokens"] == 57
+            assert body["trace"]["rerank_presentation"] == "qnu.evidence-reading/v1"
+            assert all("\n" not in text for text in fake.requests[0]["body"]["documents"])
             assert all(h["citations"] for h in body["hits"])
             assert fake.requests[0]["path"].endswith("/v1/rerank")
 

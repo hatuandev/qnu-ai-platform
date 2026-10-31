@@ -11,6 +11,7 @@ export interface Source {
   file: string;
   sha256: string;
   textVersion?: number;
+  textSha256?: string;
   quotaRecoveryRunIds?: string[];
 }
 export interface Publication {
@@ -22,6 +23,12 @@ export interface Publication {
   document?: string;
   version?: string;
   index?: string;
+}
+export interface AdmissionsDocEntry {
+  key: string;
+  source?: Source;
+  publication?: Publication;
+  compilationHistory?: Publication[];
 }
 export interface Checkpoint {
   runId: string;
@@ -49,8 +56,30 @@ export interface Checkpoint {
     source?: Source;
     publication?: Publication;
     compilationHistory?: Publication[];
+    documents?: Record<string, AdmissionsDocEntry>;
+    combinedIndex?: string;
+    indexInputs?: {
+      document_id: string;
+      version_id: string;
+      publication_decision_id: string;
+      bundle_sha256: string;
+      version_state: number;
+    }[];
+    cohort?: {
+      fingerprint: string;
+      prompt_version?: string;
+      configuration_hash?: string;
+    };
     assistant?: string;
-    queries?: Record<string, { conversation: string; turn?: string }>;
+    queries?: Record<
+      string,
+      {
+        conversation: string;
+        turn?: string;
+        dispatched?: boolean;
+        request_sha256?: string;
+      }
+    >;
     queryHistory?: {
       case_id: string;
       conversation: string;

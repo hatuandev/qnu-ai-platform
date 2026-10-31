@@ -1,0 +1,1686 @@
+{
+  "version": "admissions-multi-docs-v2-775",
+  "documents": {
+    "floor2026": {
+      "key": "floor2026",
+      "path": "docs/tai_lieu/tuyen_sinh/TB điểm sàn 26.pdf",
+      "sha256": "236ab3573d6d683a760ed227512022d6c21a03ba5c147c32d4ed7b042f7c6d45",
+      "pages": 8,
+      "title": "Thông báo ngưỡng đảm bảo chất lượng đầu vào năm 2026",
+      "data_year": 2026
+    },
+    "info2025": {
+      "key": "info2025",
+      "path": "docs/tai_lieu/tuyen_sinh/Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed.pdf",
+      "sha256": "f427bb580ad0b2bea89b847a8ce31ffeb8611ea67fd1ba069fd7521ab7327b6b",
+      "pages": 13,
+      "title": "Thông tin tuyển sinh đại học chính quy năm 2025",
+      "data_year": 2025
+    },
+    "report2024": {
+      "key": "report2024",
+      "path": "docs/tai_lieu/tuyen_sinh/Báo cáo công tác Tư vấn tuyển sinh năm 2024_FINAL (1)_signed_signed-signed.pdf",
+      "sha256": "92353949628629e6dc63c5eed9aad587fd8e9a9db7c6d9814e2718a39ad6d96f",
+      "pages": 7,
+      "title": "Báo cáo công tác tư vấn tuyển sinh và kết quả khảo sát K47 năm 2024",
+      "data_year": 2024
+    }
+  },
+  "label_status": "draft_agent_read_pdf_not_human_approved",
+  "cases": [
+    {
+      "id": "F01",
+      "question": "Theo thông báo ngưỡng đầu vào năm 2026, ngành Quản lý giáo dục xét điểm thi tốt nghiệp THPT cần tối thiểu bao nhiêu điểm?",
+      "kind": "answerable",
+      "expected_numbers": [15],
+      "expected_patterns": [],
+      "pages": [1],
+      "expected": "15 điểm, cột điểm thi TN THPT, dòng 1.",
+      "rubric": "Không lấy 18 học bạ hoặc 600 ĐGNL thay cho điểm THPT.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [1],
+          "subject_patterns": ["Quản lý giáo dục"],
+          "metric_patterns": ["(thi|TN|THPT)"],
+          "values": [
+            {
+              "value": 15,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 1 / Quản lý giáo dục ; (thi|TN|THPT)",
+          "source_row_code": "7140114",
+          "source_value_column": 0
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "question": "Ngưỡng học bạ THPT năm 2026 của ngành Quản lý giáo dục là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [18],
+      "expected_patterns": [],
+      "pages": [1],
+      "expected": "18 điểm, dòng 1, cột kết quả học tập THPT.",
+      "rubric": "Giữ đúng phương thức học bạ.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [1],
+          "subject_patterns": ["Quản lý giáo dục"],
+          "metric_patterns": ["(học bạ|học tập)"],
+          "values": [
+            {
+              "value": 18,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 1 / Quản lý giáo dục ; (học bạ|học tập)",
+          "source_row_code": "7140114",
+          "source_value_column": 1
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "question": "Quản lý giáo dục năm 2026 yêu cầu tối thiểu bao nhiêu điểm đánh giá năng lực ĐHQG TP.HCM?",
+      "kind": "answerable",
+      "expected_numbers": [600],
+      "expected_patterns": [],
+      "pages": [1],
+      "expected": "600 điểm, dòng 1, cột ĐGNL ĐHQG TPHCM.",
+      "rubric": "Không gộp thang điểm THPT vào thang ĐGNL.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [1],
+          "subject_patterns": ["Quản lý giáo dục"],
+          "metric_patterns": ["(ĐGNL|năng lực|TP.?HCM)"],
+          "values": [
+            {
+              "value": 600,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 1 / Quản lý giáo dục ; (ĐGNL|năng lực|TP.?HCM)",
+          "source_row_code": "7140114",
+          "source_value_column": 2
+        }
+      ]
+    },
+    {
+      "id": "F04",
+      "question": "Ngành Sư phạm Toán học năm 2026 có ngưỡng điểm thi tốt nghiệp THPT là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [20],
+      "expected_patterns": [],
+      "pages": [2],
+      "expected": "20 điểm, dòng 6.",
+      "rubric": "Không biến điểm sàn thành điểm trúng tuyển.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [2],
+          "subject_patterns": ["Sư phạm Toán"],
+          "metric_patterns": ["(thi|TN|THPT)"],
+          "values": [
+            {
+              "value": 20,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 2 / Sư phạm Toán ; (thi|TN|THPT)",
+          "source_row_code": "7140209",
+          "source_value_column": 0
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "question": "Điểm sàn theo kết quả thi tốt nghiệp THPT năm 2026 của ngành Giáo dục Thể chất là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [19],
+      "expected_patterns": [],
+      "pages": [1],
+      "expected": "19 điểm, dòng 5.",
+      "rubric": "Phân biệt ngưỡng tổng 19 với ngưỡng 12,67 cho hai môn văn hóa và ưu tiên.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [1],
+          "subject_patterns": ["Giáo dục Thể chất"],
+          "metric_patterns": ["(thi|TN|THPT)"],
+          "values": [
+            {
+              "value": 19,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 1 / Giáo dục Thể chất ; (thi|TN|THPT)",
+          "source_row_code": "7140206",
+          "source_value_column": 0
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "question": "Ngành Ngôn ngữ Anh năm 2026 xét học bạ cần tối thiểu bao nhiêu điểm?",
+      "kind": "answerable",
+      "expected_numbers": [19],
+      "expected_patterns": [],
+      "pages": [3],
+      "expected": "19 điểm, dòng 17, cột học tập THPT.",
+      "rubric": "Không trả 16 của cột thi THPT hoặc 650 của ĐGNL.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [3],
+          "subject_patterns": ["Ngôn ngữ Anh"],
+          "metric_patterns": ["(học bạ|học tập)"],
+          "values": [
+            {
+              "value": 19,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 3 / Ngôn ngữ Anh ; (học bạ|học tập)",
+          "source_row_code": "7220201",
+          "source_value_column": 1
+        }
+      ]
+    },
+    {
+      "id": "F07",
+      "question": "Ngành Ngôn ngữ Trung Quốc năm 2026 có ngưỡng ĐGNL ĐHQG TP.HCM bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [650],
+      "expected_patterns": [],
+      "pages": [3],
+      "expected": "650 điểm, dòng 18.",
+      "rubric": "Không nhầm ngành/ngôn ngữ/phương thức.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [3],
+          "subject_patterns": ["Ngôn ngữ Trung Quốc"],
+          "metric_patterns": ["(ĐGNL|năng lực|TP.?HCM)"],
+          "values": [
+            {
+              "value": 650,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 3 / Ngôn ngữ Trung Quốc ; (ĐGNL|năng lực|TP.?HCM)",
+          "source_row_code": "7220204",
+          "source_value_column": 2
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "question": "Ngành Trí tuệ nhân tạo năm 2026 xét điểm thi tốt nghiệp THPT có ngưỡng bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [16],
+      "expected_patterns": [],
+      "pages": [5],
+      "expected": "16 điểm, dòng 37.",
+      "rubric": "Không lấy 19 học bạ hay 650 ĐGNL.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [5],
+          "subject_patterns": ["Trí tuệ nhân tạo"],
+          "metric_patterns": ["(thi|TN|THPT)"],
+          "values": [
+            {
+              "value": 16,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 5 / Trí tuệ nhân tạo ; (thi|TN|THPT)",
+          "source_row_code": "7480107",
+          "source_value_column": 0
+        }
+      ]
+    },
+    {
+      "id": "F09",
+      "question": "Ngành Luật năm 2026 có ngưỡng xét học bạ THPT bao nhiêu điểm?",
+      "kind": "answerable",
+      "expected_numbers": [22],
+      "expected_patterns": [],
+      "pages": [4],
+      "expected": "22 điểm, dòng 32.",
+      "rubric": "Ngưỡng học bạ không thay thế điều kiện bổ sung ở chú ý 3 trang 8.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [4],
+          "subject_patterns": ["Luật"],
+          "metric_patterns": ["(học bạ|học tập)"],
+          "values": [
+            {
+              "value": 22,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 4 / Luật ; (học bạ|học tập)",
+          "source_row_code": "7380101",
+          "source_value_column": 1
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "question": "Điểm sàn ĐGNL ĐHQG TP.HCM của ngành Luật năm 2026 là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [750],
+      "expected_patterns": [],
+      "pages": [4],
+      "expected": "750 điểm, dòng 32.",
+      "rubric": "Không trả 20 hoặc 22 của phương thức khác.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [4],
+          "subject_patterns": ["Luật"],
+          "metric_patterns": ["(ĐGNL|năng lực|TP.?HCM)"],
+          "values": [
+            {
+              "value": 750,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 4 / Luật ; (ĐGNL|năng lực|TP.?HCM)",
+          "source_row_code": "7380101",
+          "source_value_column": 2
+        }
+      ]
+    },
+    {
+      "id": "F11",
+      "question": "Đối với Giáo dục Mầm non năm 2026, tổng hai môn văn hóa cộng hai phần ba điểm ưu tiên cần đạt ngưỡng bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [13.34],
+      "expected_patterns": ["(2\\s*/\\s*3|hai phần ba)", "(ưu tiên|ƯT)"],
+      "pages": [1],
+      "expected": "Tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34, ghi chú dòng 2.",
+      "rubric": "Giữ hệ số 2/3, dấu tối thiểu và đúng phạm vi GDMN; không thay bằng 20 điểm tổng.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [1],
+          "subject_patterns": ["Giáo dục Mầm non"],
+          "metric_patterns": ["(văn hóa|ưu tiên|ƯT)"],
+          "values": [
+            {
+              "value": 13.34,
+              "kind": "decimal"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 1 / Giáo dục Mầm non ; (văn hóa|ưu tiên|ƯT)"
+        }
+      ]
+    },
+    {
+      "id": "F12",
+      "question": "Giáo dục Thể chất năm 2026 yêu cầu tổng hai môn văn hóa cộng hai phần ba điểm ưu tiên tối thiểu bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [12.67],
+      "expected_patterns": ["(2\\s*/\\s*3|hai phần ba)", "(ưu tiên|ƯT)"],
+      "pages": [1, 2],
+      "expected": "Tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 12,67, dòng 5 nối trang 1–2.",
+      "rubric": "Phải nối đúng ghi chú dòng 5 qua trang, không lấy điều kiện GDMN 13,34.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [1, 2],
+          "subject_patterns": ["Giáo dục Thể chất"],
+          "metric_patterns": ["(văn hóa|ưu tiên|ƯT)"],
+          "values": [
+            {
+              "value": 12.67,
+              "kind": "decimal"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 1,2 / Giáo dục Thể chất ; (văn hóa|ưu tiên|ƯT)"
+        }
+      ]
+    },
+    {
+      "id": "F13",
+      "question": "Chú ý 1 quy định ngưỡng tổng ba môn thi THPT cho thí sinh tốt nghiệp năm 2026 bao nhiêu, và ngoại lệ là những nhóm ngành nào?",
+      "kind": "answerable",
+      "expected_numbers": [15],
+      "expected_patterns": [
+        "2026",
+        "luật",
+        "(giáo viên|sư phạm)",
+        "(trừ|ngoại lệ|riêng|không áp dụng)"
+      ],
+      "pages": [7, 8],
+      "expected": "Tối thiểu 15,00/30; áp dụng thí sinh tốt nghiệp 2026, trừ các ngành đào tạo giáo viên và Luật theo ngưỡng Bộ.",
+      "rubric": "Phải giữ năm tốt nghiệp, thang điểm và cả hai ngoại lệ; không áp dụng đại trà cho giáo viên/Luật.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [7, 8],
+          "subject_patterns": ["(THPT|tốt nghiệp)"],
+          "metric_patterns": ["(trừ|ngoại lệ|riêng|không áp dụng)"],
+          "values": [
+            {
+              "value": 15,
+              "kind": "integer"
+            }
+          ],
+          "support": "text",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 7,8 / (THPT|tốt nghiệp) ; (trừ|ngoại lệ|riêng|không áp dụng)"
+        }
+      ]
+    },
+    {
+      "id": "F14",
+      "question": "Xét ĐGNL SPHN vào các ngành đào tạo giáo viên năm 2026 (trừ Giáo dục Thể chất), ngoài ngưỡng bảng còn có điều kiện học lực và hai ngưỡng điểm nào?",
+      "kind": "answerable",
+      "expected_numbers": [18, 8.5],
+      "expected_patterns": ["(tốt|giỏi)", "hoặc"],
+      "pages": [8],
+      "expected": "Mức tốt/giỏi trở lên cả năm lớp 12 (hoặc tương đương), tổng ba môn THPT từ 18,00 hoặc điểm xét tốt nghiệp từ 8,50; xem chú ý 2a.",
+      "rubric": "Giữ quan hệ và/hoặc theo nguyên văn; không thay ngưỡng ngành riêng bằng các điểm này.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [8],
+          "subject_patterns": ["(giáo viên|sư phạm)"],
+          "metric_patterns": ["(tốt|giỏi)"],
+          "values": [
+            {
+              "value": 18,
+              "kind": "integer"
+            },
+            {
+              "value": 8.5,
+              "kind": "decimal"
+            }
+          ],
+          "support": "text",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 8 / (giáo viên|sư phạm) ; (tốt|giỏi)"
+        }
+      ]
+    },
+    {
+      "id": "F15",
+      "question": "Với Giáo dục Thể chất năm 2026 xét theo phương thức không dùng kết quả thi THPT, điều kiện học lực và hai ngưỡng điểm bổ sung ở chú ý 2b là gì?",
+      "kind": "answerable",
+      "expected_numbers": [16.5, 6.5],
+      "expected_patterns": ["khá", "hoặc"],
+      "pages": [8],
+      "expected": "Mức khá trở lên cả năm lớp 12 (hoặc tương đương), tổng ba môn thi THPT từ 16,50 hoặc điểm xét tốt nghiệp từ 6,50.",
+      "rubric": "Giữ ngoại lệ GDTC, không dùng 18/8,50 hay ngưỡng 19 trong bảng để thay thế.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [8],
+          "subject_patterns": ["(Thể chất|GDTC)"],
+          "metric_patterns": ["khá"],
+          "values": [
+            {
+              "value": 16.5,
+              "kind": "decimal"
+            },
+            {
+              "value": 6.5,
+              "kind": "decimal"
+            }
+          ],
+          "support": "text",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 8 / (Thể chất|GDTC) ; khá"
+        }
+      ]
+    },
+    {
+      "id": "F16",
+      "question": "Ký hiệu dấu gạch ngang trong các cột phương thức xét tuyển của thông báo năm 2026 có nghĩa là gì?",
+      "kind": "answerable",
+      "expected_numbers": [],
+      "expected_patterns": ["không.{0,40}(xét tuyển|áp dụng|sử dụng)"],
+      "pages": [8],
+      "expected": "Trường không xét tuyển theo phương thức tương ứng đối với ngành này.",
+      "rubric": "Không diễn giải dấu gạch thành điểm 0 hoặc điểm chưa công bố.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": [
+        {
+          "document": "floor2026",
+          "pages": [8],
+          "subject_patterns": ["(gạch|phương thức|ngành)"],
+          "metric_patterns": ["không.{0,40}(xét tuyển|áp dụng|sử dụng)"],
+          "values": [],
+          "support": "text",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 8 / (gạch|phương thức|ngành) ; không.{0,40}(xét tuyển|áp dụng|sử dụng)"
+        }
+      ]
+    },
+    {
+      "id": "F17",
+      "question": "Chỉ dùng thông báo đã tải: điểm trúng tuyển chính thức ngành Luật năm 2026 là bao nhiêu?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Tài liệu chỉ công bố ngưỡng đầu vào, không cung cấp điểm trúng tuyển chính thức.",
+      "rubric": "Không đổi điểm sàn thành điểm chuẩn/điểm trúng tuyển.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": []
+    },
+    {
+      "id": "F18",
+      "question": "Chỉ dùng thông báo đã tải: học phí ngành Luật năm học 2026–2027 bao nhiêu đồng?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Không có thông tin học phí trong snapshot PDF này.",
+      "rubric": "Không đoán giá hoặc dùng dữ liệu từ tài liệu khác.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": []
+    },
+    {
+      "id": "F19",
+      "question": "Chỉ dùng thông báo đã tải: điểm sàn ngành Luật theo học bạ năm 2025 là bao nhiêu?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Nguồn này là thông báo ngưỡng năm 2026; không có căn cứ năm 2025.",
+      "rubric": "Không trả 22 của năm 2026 cho năm 2025.",
+      "group": "floor2026",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "facts": []
+    },
+    {
+      "id": "I25-01",
+      "group": "info2025",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Theo thông tin tuyển sinh 2025, ngành Sư phạm Toán học có chỉ tiêu dự kiến là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [70],
+      "expected_patterns": [],
+      "pages": [3],
+      "expected": "70 chỉ tiêu, ngành Sư phạm Toán học (mã 7140209), trang 3.",
+      "rubric": "Không nhầm sang chỉ tiêu Tin học 112 hay Quản lý giáo dục 50.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [3],
+          "subject_patterns": ["Sư phạm Toán"],
+          "metric_patterns": ["(chỉ tiêu|tuyển sinh)"],
+          "values": [
+            {
+              "value": 70,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 3 / Sư phạm Toán ; (chỉ tiêu|tuyển sinh)"
+        }
+      ]
+    },
+    {
+      "id": "I25-02",
+      "group": "info2025",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Theo thông tin tuyển sinh 2025, ngành Sư phạm Tiếng Anh tuyển bao nhiêu chỉ tiêu?",
+      "kind": "answerable",
+      "expected_numbers": [130],
+      "expected_patterns": [],
+      "pages": [3],
+      "expected": "130 chỉ tiêu, ngành Sư phạm Tiếng Anh (mã 7140231), trang 3.",
+      "rubric": "Không lấy chỉ tiêu ngành Ngôn ngữ Anh.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [3],
+          "subject_patterns": ["Sư phạm Tiếng Anh"],
+          "metric_patterns": ["(chỉ tiêu|tuyển sinh)"],
+          "values": [
+            {
+              "value": 130,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 3 / Sư phạm Tiếng Anh ; (chỉ tiêu|tuyển sinh)"
+        }
+      ]
+    },
+    {
+      "id": "I25-03",
+      "group": "info2025",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Theo thông tin tuyển sinh 2025, ngành Giáo dục Tiểu học có chỉ tiêu dự kiến là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [206],
+      "expected_patterns": [],
+      "pages": [2],
+      "expected": "206 chỉ tiêu, ngành Giáo dục Tiểu học (mã 7140202), trang 2.",
+      "rubric": "Giữ đúng chỉ tiêu 206 của Giáo dục Tiểu học.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [2],
+          "subject_patterns": ["Giáo dục Tiểu học"],
+          "metric_patterns": ["(chỉ tiêu|tuyển sinh)"],
+          "values": [
+            {
+              "value": 206,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 2 / Giáo dục Tiểu học ; (chỉ tiêu|tuyển sinh)"
+        }
+      ]
+    },
+    {
+      "id": "I25-04",
+      "group": "info2025",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Theo đề án 2025, thí sinh có chứng chỉ IELTS 6.0 được quy đổi thành bao nhiêu điểm môn Tiếng Anh khi xét theo PT1 và PT2?",
+      "kind": "answerable",
+      "expected_numbers": [10],
+      "expected_patterns": ["10(?:\\.0)?"],
+      "pages": [9],
+      "expected": "10.0 (hoặc 10) điểm môn Tiếng Anh đối với IELTS 6.0, trang 9.",
+      "rubric": "Không lấy mức 8.0 (IELTS 5.0) hoặc 9.0 (IELTS 5.5).",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [9],
+          "subject_patterns": ["IELTS", "6[.,]0"],
+          "metric_patterns": ["(quy đổi|điểm)"],
+          "values": [
+            {
+              "value": 10,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 9 / IELTS ; 6[.,]0 ; (quy đổi|điểm)"
+        }
+      ]
+    },
+    {
+      "id": "I25-05",
+      "group": "info2025",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Theo đề án 2025, thí sinh có chứng chỉ IELTS 5.0 được quy đổi thành bao nhiêu điểm môn Tiếng Anh trong tổ hợp xét tuyển?",
+      "kind": "answerable",
+      "expected_numbers": [8],
+      "expected_patterns": ["8(?:\\.0)?"],
+      "pages": [9],
+      "expected": "8.0 (hoặc 8) điểm môn Tiếng Anh đối với IELTS 5.0, trang 9.",
+      "rubric": "Không nhầm sang mức 9.0 điểm của IELTS 5.5.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [9],
+          "subject_patterns": ["IELTS", "5[.,]0"],
+          "metric_patterns": ["(quy đổi|điểm)"],
+          "values": [
+            {
+              "value": 8,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 9 / IELTS ; 5[.,]0 ; (quy đổi|điểm)"
+        }
+      ]
+    },
+    {
+      "id": "I25-06",
+      "group": "info2025",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Thí sinh xét tuyển ngành Giáo dục Thể chất năm 2025 phải đáp ứng điều kiện chiều cao tối thiểu đối với nam và nữ là bao nhiêu mét?",
+      "kind": "answerable",
+      "expected_numbers": [1.65, 1.55],
+      "expected_patterns": ["nam", "nữ"],
+      "pages": [9],
+      "expected": "Nam cao tối thiểu 1.65m (nặng 45kg) và nữ cao tối thiểu 1.55m (nặng 40kg), trang 9.",
+      "rubric": "Nêu đủ cả hai số đo chiều cao theo giới tính.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [9],
+          "subject_patterns": ["nam"],
+          "metric_patterns": ["(cao|mét|m)"],
+          "values": [
+            {
+              "value": 1.65,
+              "kind": "decimal"
+            }
+          ],
+          "support": "text",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 9 / nam ; (cao|mét|m)"
+        },
+        {
+          "document": "info2025",
+          "pages": [9],
+          "subject_patterns": ["nữ"],
+          "metric_patterns": ["(cao|mét|m)"],
+          "values": [
+            {
+              "value": 1.55,
+              "kind": "decimal"
+            }
+          ],
+          "support": "text",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 9 / nữ ; (cao|mét|m)"
+        }
+      ]
+    },
+    {
+      "id": "I25-07",
+      "group": "info2025",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Lệ phí thi các môn năng khiếu tuyển sinh năm 2025 của Trường ĐH Quy Nhơn là bao nhiêu đồng một thí sinh?",
+      "kind": "answerable",
+      "expected_numbers": [300000],
+      "expected_patterns": ["300(?:\\.|,)?000"],
+      "pages": [10],
+      "expected": "300.000 đồng/thí sinh, trang 10 mục f.",
+      "rubric": "Đúng số tiền lệ phí năng khiếu 300.000 đ.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [10],
+          "subject_patterns": ["(năng khiếu|lệ phí)"],
+          "metric_patterns": ["(lệ phí|đồng|đ/)"],
+          "values": [
+            {
+              "value": 300000,
+              "kind": "integer"
+            }
+          ],
+          "support": "text",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 10 / (năng khiếu|lệ phí) ; (lệ phí|đồng|đ/)"
+        }
+      ]
+    },
+    {
+      "id": "I25-08",
+      "group": "info2025",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Phương thức 3 (PT3 - mã 402A) năm 2025 của Trường Đại học Quy Nhơn là phương thức xét tuyển gì?",
+      "kind": "answerable",
+      "expected_numbers": [],
+      "expected_patterns": [
+        "(đánh giá năng lực|đgnl)",
+        "(đhqg|đại học quốc gia).{0,30}(tp\\.?\\s?hcm|hồ chí minh)"
+      ],
+      "pages": [2],
+      "expected": "Xét kết quả kỳ thi Đánh giá năng lực của ĐHQG TP.HCM (mã 402A), trang 2.",
+      "rubric": "Phải đúng kỳ thi ĐGNL ĐHQG TP.HCM, không nhầm sang ĐHSP Hà Nội (PT4 - 402B).",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [2],
+          "subject_patterns": ["(PT3|phương thức 3)"],
+          "metric_patterns": ["(TP.?HCM|Hồ Chí Minh)"],
+          "values": [],
+          "support": "text",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 2 / (PT3|phương thức 3) ; (TP.?HCM|Hồ Chí Minh)"
+        }
+      ]
+    },
+    {
+      "id": "I25-09",
+      "group": "info2025",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Năm 2025 trường Đại học Quy Nhơn thông báo sử dụng tổng cộng bao nhiêu phương thức xét tuyển?",
+      "kind": "answerable",
+      "expected_numbers": [6],
+      "expected_patterns": ["6\\s*phương thức"],
+      "pages": [1, 2],
+      "expected": "6 phương thức tuyển sinh (PT1 đến PT6), trang 1-2.",
+      "rubric": "Đúng số lượng 6 phương thức xét tuyển.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [1, 2],
+          "subject_patterns": ["(phương thức|PT[1-6])"],
+          "metric_patterns": ["(tuyển|phương thức)"],
+          "values": [
+            {
+              "value": 6,
+              "kind": "integer"
+            }
+          ],
+          "support": "text",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 1,2 / (phương thức|PT[1-6]) ; (tuyển|phương thức)"
+        }
+      ]
+    },
+    {
+      "id": "I25-10",
+      "group": "info2025",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Học phí dự kiến toàn khóa đối với khối ngành đào tạo Kỹ sư trong tài liệu tuyển sinh 2025 là bao nhiêu triệu đồng?",
+      "kind": "answerable",
+      "expected_numbers": [102],
+      "expected_patterns": ["102"],
+      "pages": [10],
+      "expected": "102 triệu đồng/khóa đối với chương trình Kỹ sư, trang 10.",
+      "rubric": "Phân biệt mức 102 triệu của Kỹ sư với 75-88 triệu của Cử nhân.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [10],
+          "subject_patterns": ["(Kỹ sư|kĩ sư)"],
+          "metric_patterns": ["(học phí|triệu)"],
+          "values": [
+            {
+              "value": 102,
+              "kind": "integer"
+            }
+          ],
+          "support": "text",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 10 / (Kỹ sư|kĩ sư) ; (học phí|triệu)"
+        }
+      ]
+    },
+    {
+      "id": "I25-11",
+      "group": "info2025",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Chỉ dùng thông tin tuyển sinh 2025: Điểm trúng tuyển chính thức đợt 1 năm 2025 ngành Công nghệ thông tin là bao nhiêu?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Tài liệu là Đề án/Thông tin tuyển sinh dự kiến năm 2025, chưa có điểm trúng tuyển chính thức.",
+      "rubric": "Từ chối trả lời vì tài liệu không có điểm trúng tuyển chính thức.",
+      "facts": []
+    },
+    {
+      "id": "I25-12",
+      "group": "info2025",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Chỉ dùng thông tin tuyển sinh 2025: Điểm sàn xét tuyển thi tốt nghiệp THPT năm 2026 của ngành Sư phạm Toán học là bao nhiêu?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Tài liệu tuyển sinh 2025 không có thông tin điểm sàn năm 2026.",
+      "rubric": "Không lấy dữ liệu từ năm 2026 sang tài liệu 2025.",
+      "facts": []
+    },
+    {
+      "id": "BC24-01",
+      "group": "report2024",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Theo báo cáo năm 2024, tổng số thí sinh đã nhập học và tỷ lệ đạt được là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [4681, 97],
+      "expected_patterns": [],
+      "pages": [2],
+      "expected": "4.681 thí sinh nhập học, đạt tỷ lệ 97%, trang vật lý 2. Không suy diễn mẫu số 4.826 là số trúng tuyển.",
+      "rubric": "Đúng số nhập học và tỷ lệ; không gán vai trò không được giải thích cho mẫu số.",
+      "facts": [
+        {
+          "document": "report2024",
+          "pages": [2],
+          "subject_patterns": ["(nhập học|nhập trường)"],
+          "metric_patterns": ["(tổng|đạt|nhập học)"],
+          "values": [
+            {
+              "value": 4681,
+              "kind": "integer"
+            },
+            {
+              "value": 97,
+              "kind": "integer"
+            }
+          ],
+          "support": "text",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 2 / (nhập học|nhập trường) ; (tổng|đạt|nhập học)"
+        }
+      ]
+    },
+    {
+      "id": "BC24-02",
+      "group": "report2024",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Theo báo cáo năm 2024, tỉnh nào có số lượng và tỷ lệ thí sinh trúng tuyển cao nhất vào Trường ĐH Quy Nhơn?",
+      "kind": "answerable",
+      "expected_numbers": [2974, 63.53],
+      "expected_patterns": ["bình định"],
+      "pages": [2],
+      "expected": "Tỉnh Bình Định với 2.974 thí sinh, chiếm 63.53%, trang 2.",
+      "rubric": "Đúng tỉnh Bình Định kèm số lượng 2.974 hoặc 63.53%.",
+      "facts": [
+        {
+          "document": "report2024",
+          "pages": [2],
+          "subject_patterns": ["Bình Định"],
+          "metric_patterns": ["(số lượng|sinh viên|thí sinh)"],
+          "values": [
+            {
+              "value": 2974,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 2 / Bình Định ; (số lượng|sinh viên|thí sinh)"
+        },
+        {
+          "document": "report2024",
+          "pages": [2],
+          "subject_patterns": ["Bình Định"],
+          "metric_patterns": ["(tỷ lệ|%)"],
+          "values": [
+            {
+              "value": 63.53,
+              "kind": "decimal"
+            }
+          ],
+          "support": "table",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 2 / Bình Định ; (tỷ lệ|%)"
+        }
+      ]
+    },
+    {
+      "id": "BC24-03",
+      "group": "report2024",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Tỉnh Gia Lai có bao nhiêu thí sinh trúng tuyển vào Trường Đại học Quy Nhơn năm 2024 và chiếm tỷ lệ bao nhiêu %?",
+      "kind": "answerable",
+      "expected_numbers": [609, 13.01],
+      "expected_patterns": ["gia lai"],
+      "pages": [2],
+      "expected": "Gia Lai có 609 thí sinh nhập học, chiếm 13.01%, trang 2.",
+      "rubric": "Đúng số liệu 609 thí sinh và 13.01% của Gia Lai.",
+      "facts": [
+        {
+          "document": "report2024",
+          "pages": [2],
+          "subject_patterns": ["Gia Lai"],
+          "metric_patterns": ["(số lượng|sinh viên|thí sinh)"],
+          "values": [
+            {
+              "value": 609,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 2 / Gia Lai ; (số lượng|sinh viên|thí sinh)"
+        },
+        {
+          "document": "report2024",
+          "pages": [2],
+          "subject_patterns": ["Gia Lai"],
+          "metric_patterns": ["(tỷ lệ|%)"],
+          "values": [
+            {
+              "value": 13.01,
+              "kind": "decimal"
+            }
+          ],
+          "support": "table",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 2 / Gia Lai ; (tỷ lệ|%)"
+        }
+      ]
+    },
+    {
+      "id": "BC24-04",
+      "group": "report2024",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Hai trường THPT nào có số lượng sinh viên nhập học đông nhất vào Trường Đại học Quy Nhơn năm 2024 và mỗi trường có bao nhiêu sinh viên?",
+      "kind": "answerable",
+      "expected_numbers": [195],
+      "expected_patterns": ["trần cao vân", "nguyễn thái học"],
+      "pages": [3],
+      "expected": "THPT Trần Cao Vân và THPT Nguyễn Thái Học (mỗi trường 195 sinh viên), trang 3.",
+      "rubric": "Nêu đúng cả hai trường THPT Trần Cao Vân và THPT Nguyễn Thái Học.",
+      "facts": [
+        {
+          "document": "report2024",
+          "pages": [3],
+          "subject_patterns": ["Trần Cao Vân"],
+          "metric_patterns": ["(số lượng|sinh viên|thí sinh)"],
+          "values": [
+            {
+              "value": 195,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 3 / Trần Cao Vân ; (số lượng|sinh viên|thí sinh)"
+        },
+        {
+          "document": "report2024",
+          "pages": [3],
+          "subject_patterns": ["Nguyễn Thái Học"],
+          "metric_patterns": ["(số lượng|sinh viên|thí sinh)"],
+          "values": [
+            {
+              "value": 195,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 3 / Nguyễn Thái Học ; (số lượng|sinh viên|thí sinh)"
+        }
+      ]
+    },
+    {
+      "id": "BC24-05",
+      "group": "report2024",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Theo báo cáo công tác tuyển sinh 2024, số lượng sinh viên nhập học là nữ là bao nhiêu và chiếm tỷ lệ bao nhiêu %?",
+      "kind": "answerable",
+      "expected_numbers": [2937, 62.7],
+      "expected_patterns": ["nữ"],
+      "pages": [2],
+      "expected": "Nữ: 2.937 sinh viên, chiếm 62.7% (Nam: 1.744, 37.3%), trang 2.",
+      "rubric": "Nêu đúng số lượng nữ 2.937 và tỷ lệ 62.7%.",
+      "facts": [
+        {
+          "document": "report2024",
+          "pages": [2],
+          "subject_patterns": ["nữ"],
+          "metric_patterns": ["(số lượng|sinh viên|thí sinh)"],
+          "values": [
+            {
+              "value": 2937,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 2 / nữ ; (số lượng|sinh viên|thí sinh)"
+        },
+        {
+          "document": "report2024",
+          "pages": [2],
+          "subject_patterns": ["nữ"],
+          "metric_patterns": ["(tỷ lệ|%)"],
+          "values": [
+            {
+              "value": 62.7,
+              "kind": "decimal"
+            }
+          ],
+          "support": "table",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 2 / nữ ; (tỷ lệ|%)"
+        }
+      ]
+    },
+    {
+      "id": "BC24-06",
+      "group": "report2024",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Trong năm 2024, Ban Tư vấn tuyển sinh đã tư vấn, giải đáp bao nhiêu lượt thí sinh qua hệ thống fanpage?",
+      "kind": "answerable",
+      "expected_numbers": [14438],
+      "expected_patterns": ["14\\.?438"],
+      "pages": [1],
+      "expected": "14.438 lượt qua fanpage, trang 1.",
+      "rubric": "Đúng số lượt fanpage 14.438, không nhầm sang email 1.551 hay trực tiếp >700.",
+      "facts": [
+        {
+          "document": "report2024",
+          "pages": [1],
+          "subject_patterns": ["fanpage"],
+          "metric_patterns": ["(lượt|tin nhắn|tư vấn)"],
+          "values": [
+            {
+              "value": 14438,
+              "kind": "integer"
+            }
+          ],
+          "support": "text",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 1 / fanpage ; (lượt|tin nhắn|tư vấn)"
+        }
+      ]
+    },
+    {
+      "id": "BC24-07",
+      "group": "report2024",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Nhà trường đã phối hợp với Trung tâm GDNN Bình Định tổ chức tư vấn trực tiếp tại bao nhiêu trường THPT ở Bình Định trong năm 2024?",
+      "kind": "answerable",
+      "expected_numbers": [29],
+      "expected_patterns": ["29\\s*trường"],
+      "pages": [1],
+      "expected": "29 trường THPT trên địa bàn tỉnh Bình Định, trang 1.",
+      "rubric": "Đúng con số 29 trường THPT.",
+      "facts": [
+        {
+          "document": "report2024",
+          "pages": [1],
+          "subject_patterns": ["(THPT|trường)"],
+          "metric_patterns": ["(tư vấn|trực tiếp)"],
+          "values": [
+            {
+              "value": 29,
+              "kind": "integer"
+            }
+          ],
+          "support": "text",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 1 / (THPT|trường) ; (tư vấn|trực tiếp)"
+        }
+      ]
+    },
+    {
+      "id": "BC24-08",
+      "group": "report2024",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Hoạt động tham quan thực tế môi trường giáo dục tại Trường ĐH Quy Nhơn năm 2024 có bao nhiêu học sinh THPT tham gia?",
+      "kind": "answerable",
+      "expected_numbers": [2152, 8],
+      "expected_patterns": ["2\\.?152"],
+      "pages": [1],
+      "expected": "2.152 học sinh từ 08 trường THPT tham gia, trang 1.",
+      "rubric": "Nêu đúng 2.152 học sinh (từ 8 trường).",
+      "facts": [
+        {
+          "document": "report2024",
+          "pages": [1],
+          "subject_patterns": ["(học sinh|THPT)"],
+          "metric_patterns": ["(tham quan|hướng nghiệp)"],
+          "values": [
+            {
+              "value": 2152,
+              "kind": "integer"
+            },
+            {
+              "value": 8,
+              "kind": "integer"
+            }
+          ],
+          "support": "text",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 1 / (học sinh|THPT) ; (tham quan|hướng nghiệp)"
+        }
+      ]
+    },
+    {
+      "id": "BC24-09",
+      "group": "report2024",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Trong khảo sát sinh viên K47 năm 2024, kênh thông tin nào được sinh viên tiếp cận nhiều nhất và chiếm tỷ lệ bao nhiêu %?",
+      "kind": "answerable",
+      "expected_numbers": [69.6],
+      "expected_patterns": ["facebook"],
+      "pages": [5],
+      "expected": "Facebook là kênh tiếp cận nhiều nhất với 69.6%, trang 5.",
+      "rubric": "Đúng kênh Facebook và tỷ lệ 69.6%.",
+      "facts": [
+        {
+          "document": "report2024",
+          "pages": [5],
+          "subject_patterns": ["facebook"],
+          "metric_patterns": ["(tỷ lệ|%|tiếp cận)"],
+          "values": [
+            {
+              "value": 69.6,
+              "kind": "decimal"
+            }
+          ],
+          "support": "text",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 5 / facebook ; (tỷ lệ|%|tiếp cận)"
+        }
+      ]
+    },
+    {
+      "id": "BC24-10",
+      "group": "report2024",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Lý do hàng đầu khiến sinh viên K47 lựa chọn học tại Trường Đại học Quy Nhơn trong cuộc khảo sát năm 2024 là gì; tỷ lệ là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [66.7],
+      "expected_patterns": ["học phí.{0,30}(phù hợp|gia đình)"],
+      "pages": [6],
+      "expected": "Học phí phù hợp hoàn cảnh gia đình (chiếm 66.7%), trang 6.",
+      "rubric": "Đúng lý do học phí phù hợp hoàn cảnh gia đình kèm tỷ lệ 66.7%.",
+      "facts": [
+        {
+          "document": "report2024",
+          "pages": [6],
+          "subject_patterns": ["học phí"],
+          "metric_patterns": ["(phù hợp|gia đình)"],
+          "values": [
+            {
+              "value": 66.7,
+              "kind": "decimal"
+            }
+          ],
+          "support": "text",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 6 / học phí ; (phù hợp|gia đình)"
+        }
+      ]
+    },
+    {
+      "id": "BC24-11",
+      "group": "report2024",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Chỉ dùng báo cáo năm 2024: Chỉ tiêu tuyển sinh ngành Sư phạm Tiếng Anh năm 2025 là bao nhiêu?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Báo cáo năm 2024 không có chỉ tiêu tuyển sinh năm 2025.",
+      "rubric": "Từ chối trả lời vì tài liệu không chứa chỉ tiêu 2025.",
+      "facts": []
+    },
+    {
+      "id": "BC24-12",
+      "group": "report2024",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Chỉ dùng báo cáo năm 2024: Ngưỡng điểm sàn nhận hồ sơ xét tuyển ngành Sư phạm Toán năm 2026 là bao nhiêu?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Báo cáo 2024 không có thông tin điểm sàn năm 2026.",
+      "rubric": "Từ chối trả lời vì không có dữ kiện trong tài liệu 2024.",
+      "facts": []
+    },
+    {
+      "id": "MX-01",
+      "group": "cross_document",
+      "scope": "all",
+      "target_doc": "all",
+      "question": "So sánh giữa năm 2025 và 2026: Ngành Quản lý giáo dục có chỉ tiêu dự kiến năm 2025 là bao nhiêu và ngưỡng điểm sàn thi tốt nghiệp THPT năm 2026 là bao nhiêu điểm?",
+      "kind": "answerable",
+      "expected_numbers": [50, 15],
+      "expected_patterns": ["50", "15"],
+      "pages": [1, 2],
+      "expected": "Chỉ tiêu năm 2025 là 50 (Doc 2025 trang 2), điểm sàn thi TN THPT năm 2026 là 15 điểm (Doc 2026 trang 1).",
+      "rubric": "Phải nêu đúng 50 chỉ tiêu cho năm 2025 và 15 điểm sàn cho năm 2026.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [2],
+          "subject_patterns": ["Quản lý giáo dục"],
+          "metric_patterns": ["(chỉ tiêu|tuyển sinh)"],
+          "values": [
+            {
+              "value": 50,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 2 / Quản lý giáo dục ; (chỉ tiêu|tuyển sinh)"
+        },
+        {
+          "document": "floor2026",
+          "pages": [1],
+          "subject_patterns": ["Quản lý giáo dục"],
+          "metric_patterns": ["(thi|TN|THPT)"],
+          "values": [
+            {
+              "value": 15,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 1 / Quản lý giáo dục ; (thi|TN|THPT)",
+          "source_row_code": "7140114",
+          "source_value_column": 0
+        }
+      ]
+    },
+    {
+      "id": "MX-02",
+      "group": "cross_document",
+      "scope": "all",
+      "target_doc": "all",
+      "question": "So sánh giữa năm 2025 và 2026: Chỉ tiêu dự kiến năm 2025 của ngành Sư phạm Tin học là bao nhiêu và điểm sàn thi tốt nghiệp THPT năm 2026 của ngành này là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [112, 20],
+      "expected_patterns": [],
+      "pages": [2, 3],
+      "expected": "Chỉ tiêu Sư phạm Tin học 2025: 112 (info2025 trang 3 dòng 7); ngưỡng THPT 2026: 20 (floor2026 trang 2 dòng 7).",
+      "rubric": "Gắn đúng ngành, năm, chỉ tiêu và ngưỡng THPT theo hai nguồn.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [3],
+          "subject_patterns": ["Sư phạm Tin"],
+          "metric_patterns": ["(chỉ tiêu|tuyển sinh)"],
+          "values": [
+            {
+              "value": 112,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 3 / Sư phạm Tin ; (chỉ tiêu|tuyển sinh)"
+        },
+        {
+          "document": "floor2026",
+          "pages": [2],
+          "subject_patterns": ["Sư phạm Tin"],
+          "metric_patterns": ["(thi|THPT)"],
+          "values": [
+            {
+              "value": 20,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 2 / Sư phạm Tin ; (thi|THPT)",
+          "source_row_code": "7140210",
+          "source_value_column": 0
+        }
+      ]
+    },
+    {
+      "id": "MX-03",
+      "group": "cross_document",
+      "scope": "all",
+      "target_doc": "all",
+      "question": "Trong thông tin tuyển sinh 2025 ngành Giáo dục Thể chất có chỉ tiêu dự kiến là bao nhiêu, và trong thông báo điểm sàn 2026 ngành này yêu cầu điểm sàn tốt nghiệp THPT là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [54, 19],
+      "expected_patterns": ["54", "19"],
+      "pages": [1, 2],
+      "expected": "Chỉ tiêu 2025 là 54 (Doc 2025 trang 2), điểm sàn THPT 2026 là 19 điểm (Doc 2026 trang 1 dòng 5).",
+      "rubric": "Nêu đủ cả hai số liệu: chỉ tiêu 54 và điểm sàn 19.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [2],
+          "subject_patterns": ["Giáo dục Thể chất"],
+          "metric_patterns": ["(chỉ tiêu|tuyển sinh)"],
+          "values": [
+            {
+              "value": 54,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 2 / Giáo dục Thể chất ; (chỉ tiêu|tuyển sinh)"
+        },
+        {
+          "document": "floor2026",
+          "pages": [1],
+          "subject_patterns": ["Giáo dục Thể chất"],
+          "metric_patterns": ["(thi|TN|THPT)"],
+          "values": [
+            {
+              "value": 19,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 1 / Giáo dục Thể chất ; (thi|TN|THPT)",
+          "source_row_code": "7140206",
+          "source_value_column": 0
+        }
+      ]
+    },
+    {
+      "id": "MX-04",
+      "group": "cross_document",
+      "scope": "all",
+      "target_doc": "all",
+      "question": "Theo các tài liệu tuyển sinh đã nạp: Năm 2024 có bao nhiêu thí sinh nhập học vào Trường Đại học Quy Nhơn, và dự kiến học phí toàn khóa cho khối ngành Kỹ sư năm 2025 là bao nhiêu triệu đồng?",
+      "kind": "answerable",
+      "expected_numbers": [4681, 102],
+      "expected_patterns": ["4\\.?681", "102"],
+      "pages": [2, 10],
+      "expected": "Năm 2024 có 4.681 thí sinh nhập học (Doc 2024 trang 2), học phí toàn khóa kỹ sư 2025 là 102 triệu đồng (Doc 2025 trang 10).",
+      "rubric": "Nêu đúng cả số lượng nhập học 4.681 và học phí kỹ sư 102 triệu.",
+      "facts": [
+        {
+          "document": "report2024",
+          "pages": [2],
+          "subject_patterns": ["(nhập học|nhập trường)"],
+          "metric_patterns": ["(tổng|nhập học)"],
+          "values": [
+            {
+              "value": 4681,
+              "kind": "integer"
+            }
+          ],
+          "support": "text",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 2 / (nhập học|nhập trường) ; (tổng|nhập học)"
+        },
+        {
+          "document": "info2025",
+          "pages": [10],
+          "subject_patterns": ["(Kỹ sư|kĩ sư)"],
+          "metric_patterns": ["(học phí|triệu)"],
+          "values": [
+            {
+              "value": 102,
+              "kind": "integer"
+            }
+          ],
+          "support": "text",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 10 / (Kỹ sư|kĩ sư) ; (học phí|triệu)"
+        }
+      ]
+    },
+    {
+      "id": "MX-05",
+      "group": "cross_document",
+      "scope": "all",
+      "target_doc": "all",
+      "question": "Đối chiếu hai tài liệu: IELTS 6.0 được quy đổi thành bao nhiêu điểm Tiếng Anh trong tuyển sinh 2025, và kênh tiếp cận nhiều nhất của sinh viên K47 trong báo cáo 2024 là kênh nào với tỷ lệ bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [10, 69.6],
+      "expected_patterns": ["facebook"],
+      "pages": [9, 5],
+      "expected": "IELTS 6.0 quy đổi 10 điểm (info2025 trang 9); Facebook 69,6% (report2024 trang 5).",
+      "rubric": "Tách điểm quy đổi 2025 và tỷ lệ khảo sát 2024; không trộn đơn vị/năm.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [9],
+          "subject_patterns": ["IELTS", "6[.,]0"],
+          "metric_patterns": ["(quy đổi|điểm)"],
+          "values": [
+            {
+              "value": 10,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 9 / IELTS ; 6[.,]0 ; (quy đổi|điểm)"
+        },
+        {
+          "document": "report2024",
+          "pages": [5],
+          "subject_patterns": ["facebook"],
+          "metric_patterns": ["(tỷ lệ|%|tiếp cận)"],
+          "values": [
+            {
+              "value": 69.6,
+              "kind": "decimal"
+            }
+          ],
+          "support": "text",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 5 / facebook ; (tỷ lệ|%|tiếp cận)"
+        }
+      ]
+    },
+    {
+      "id": "MX-06",
+      "group": "cross_document",
+      "scope": "single",
+      "target_doc": "floor2026",
+      "question": "Chỉ dùng thông báo điểm sàn năm 2026: Hãy cho biết tổng số thí sinh nhập học năm 2024 của Trường Đại học Quy Nhơn là bao nhiêu?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Thông báo điểm sàn 2026 không có số liệu nhập học năm 2024.",
+      "rubric": "Phải từ chối trả lời do vượt phạm vi tài liệu điểm sàn 2026.",
+      "facts": []
+    },
+    {
+      "id": "MX-07",
+      "group": "cross_document",
+      "scope": "single",
+      "target_doc": "info2025",
+      "question": "Chỉ dùng thông tin tuyển sinh năm 2025: Hãy cho biết trường THPT nào có nhiều sinh viên nhập học nhất trong năm 2024?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Thông tin tuyển sinh 2025 không có số liệu sinh viên nhập học theo trường THPT năm 2024.",
+      "rubric": "Phải từ chối trả lời do vượt phạm vi tài liệu tuyển sinh 2025.",
+      "facts": []
+    },
+    {
+      "id": "MX-08",
+      "group": "cross_document",
+      "scope": "single",
+      "target_doc": "report2024",
+      "question": "Chỉ dùng báo cáo tư vấn tuyển sinh năm 2024: Điểm sàn xét tuyển học bạ ngành Luật năm 2026 là bao nhiêu?",
+      "kind": "unanswerable",
+      "expected_numbers": [],
+      "expected_patterns": [],
+      "pages": [],
+      "expected": "Báo cáo 2024 không có điểm sàn xét tuyển học bạ ngành Luật năm 2026.",
+      "rubric": "Phải từ chối trả lời do vượt phạm vi tài liệu báo cáo 2024.",
+      "facts": []
+    },
+    {
+      "id": "MX-09",
+      "group": "cross_document",
+      "scope": "all",
+      "target_doc": "all",
+      "question": "So sánh ngành Sư phạm Tiếng Anh qua các tài liệu: Chỉ tiêu năm 2025 là bao nhiêu và điểm sàn thi tốt nghiệp THPT năm 2026 của ngành này là bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [130, 20],
+      "expected_patterns": [],
+      "pages": [2, 3],
+      "expected": "Sư phạm Tiếng Anh: chỉ tiêu 2025 là 130 (info2025 trang 3 dòng 14); ngưỡng THPT 2026 là 20 (floor2026 trang 2 dòng 14).",
+      "rubric": "Đúng hai năm, chỉ tiêu và cột THPT.",
+      "facts": [
+        {
+          "document": "info2025",
+          "pages": [3],
+          "subject_patterns": ["Sư phạm Tiếng Anh"],
+          "metric_patterns": ["(chỉ tiêu|tuyển sinh)"],
+          "values": [
+            {
+              "value": 130,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2025,
+          "locator": "info2025 / physical pages 3 / Sư phạm Tiếng Anh ; (chỉ tiêu|tuyển sinh)"
+        },
+        {
+          "document": "floor2026",
+          "pages": [2],
+          "subject_patterns": ["Sư phạm Tiếng Anh"],
+          "metric_patterns": ["(thi|THPT)"],
+          "values": [
+            {
+              "value": 20,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 2 / Sư phạm Tiếng Anh ; (thi|THPT)",
+          "source_row_code": "7140231",
+          "source_value_column": 0
+        }
+      ]
+    },
+    {
+      "id": "MX-10",
+      "group": "cross_document",
+      "scope": "all",
+      "target_doc": "all",
+      "question": "Theo báo cáo 2024, Bình Định có bao nhiêu thí sinh trúng tuyển? Trong thông báo điểm sàn 2026, chương trình Công nghệ thông tin (An toàn, an ninh mạng) có ngưỡng thi tốt nghiệp THPT bao nhiêu?",
+      "kind": "answerable",
+      "expected_numbers": [2974, 15],
+      "expected_patterns": [],
+      "pages": [2, 5],
+      "expected": "Bình Định: 2.974 thí sinh trúng tuyển (report2024 trang 2); CNTT An toàn, an ninh mạng: 15 điểm THPT (floor2026 trang 5 dòng 38).",
+      "rubric": "Đúng tỉnh/năm/số lượng và chương trình/cột THPT/năm.",
+      "facts": [
+        {
+          "document": "report2024",
+          "pages": [2],
+          "subject_patterns": ["Bình Định"],
+          "metric_patterns": ["(số lượng|sinh viên|thí sinh)"],
+          "values": [
+            {
+              "value": 2974,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2024,
+          "locator": "report2024 / physical pages 2 / Bình Định ; (số lượng|sinh viên|thí sinh)"
+        },
+        {
+          "document": "floor2026",
+          "pages": [5],
+          "subject_patterns": ["Công nghệ thông tin"],
+          "metric_patterns": ["(thi|THPT)"],
+          "values": [
+            {
+              "value": 15,
+              "kind": "integer"
+            }
+          ],
+          "support": "table",
+          "data_year": 2026,
+          "locator": "floor2026 / physical pages 5 / Công nghệ thông tin ; (thi|THPT)",
+          "source_row_code": "7480201",
+          "source_value_column": 0
+        }
+      ]
+    }
+  ]
+}

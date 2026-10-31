@@ -282,11 +282,20 @@ async def prepare(
                         code="compilation_review_provider_changed",
                     )
                 material = await target_matches(db, blob, previous, run)
+                clock = refinement.resume_execution_trace(previous)
+                if (
+                    clock["execution_elapsed_seconds"]
+                    >= refinement.limits_for(previous.trace, max(1, segment_count)).max_seconds
+                ):
+                    raise AppException(
+                        "Review đã hết tổng ngân sách thời gian thực thi.",
+                        code="compilation_review_budget_time_exceeded",
+                        status_code=422,
+                    )
                 previous.status = "running"
                 previous.trace = {
-                    **previous.trace,
+                    **clock,
                     "execution_token": new_id("rex"),
-                    "execution_started_at": utcnow().isoformat(),
                 }
                 previous.error_code = None
                 previous.finished_at = None
@@ -379,6 +388,8 @@ async def prepare(
         "reference_contract_version": 2,
         "execution_token": new_id("rex"),
         "execution_started_at": utcnow().isoformat(),
+        "execution_elapsed_seconds": 0.0,
+        "execution_budget_basis": "cumulative_active/v1",
         "prompt_version": PROMPT_VERSION,
         "prompt_sha256": digest(SYSTEM),
         "provider_id": runtime.provider_id,

@@ -30,8 +30,13 @@ def test_registration_rejects_untraceable_or_overbroad_metadata(client, case):
         annotations[0]["values"]["data_year"] = 2030
     if case == "global_data_year":
         annotations[0]["target"] = "document"
-    result = register(client, data, annotations)
+    result = register(client, data, annotations, key=f"invalid-{case}")
     assert result.status_code == 422, result.text
+    expected_code = "validation_error" if case == "global_data_year" else "retrieval_metadata_invalid"
+    assert result.json()["code"] == expected_code
+    # The invalid request must not create a document or poison idempotency state.
+    valid = register(client, data)
+    assert valid.status_code == 201, valid.text
 
 
 def test_scope_is_applied_before_topk_in_all_modes_on_same_snapshot(

@@ -58,3 +58,51 @@ def test_parallel_review_obeys_one_request_ceiling(client, monkeypatch, ceiling)
             if "source_units" in json.loads(request["body"]["messages"][-1]["content"])
         ]
         assert len(reviews_sent) == (1 if ceiling == "requests" else 0)
+
+        if ceiling == "requests":
+            # Replaying the same key probes the stop guard, never another model attempt.
+            from sqlalchemy import select
+
+            from qnu.domains.knowledge.compilation.review.models import CompilationReview
+            from qnu.platform.database import AsyncSessionFactory
+
+            async def exhausted_time():
+                async with AsyncSessionFactory() as db:
+                    row = (
+                        await db.scalars(
+                            select(CompilationReview).where(
+                                CompilationReview.compilation_run_id == run_id,
+                            )
+                        )
+                    ).one()
+                    trace = dict(row.trace)
+                    trace["execution_elapsed_seconds"] = 65.0
+                    trace["refinement_policy"] = {"max_seconds": 60, "max_requests": 1}
+                    row.trace = trace
+                    await db.commit()
+                    return row.trace["execution_token"]
+
+            token = client.portal.call(exhausted_time)
+            calls_before_replay = len(chat.requests)
+            again = client.post(
+                data["url"] + "/" + run_id + "/reviews",
+                json={"provider_id": small["id"]},
+                headers={"Idempotency-Key": "review-budget-758-requests"},
+            )
+            assert again.status_code == 422, again.text
+            assert again.json()["code"] == "compilation_review_budget_time_exceeded"
+            assert len(chat.requests) == calls_before_replay
+
+            async def current_token():
+                async with AsyncSessionFactory() as db:
+                    row = (
+                        await db.scalars(
+                            select(CompilationReview).where(
+                                CompilationReview.compilation_run_id == run_id,
+                            )
+                        )
+                    ).one()
+                    assert row.status == "failed"
+                    return row.trace["execution_token"]
+
+            assert client.portal.call(current_token) == token
