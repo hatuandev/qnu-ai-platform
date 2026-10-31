@@ -73,6 +73,10 @@ class ReviewResponse(BaseModel):
 
 
 class ReviewSegmentProgress(BaseModel):
+    id: str | None = None
+    parent_segment_id: str | None = None
+    depth: int = 0
+    is_leaf: bool = True
     index: int
     status: str
     attempt_count: int

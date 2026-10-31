@@ -134,6 +134,38 @@ async def compilation_segment_raw(
     )
 
 
+@router.get("/{run_id}/segments/{segment_index}/artifacts/{kind}")
+async def compilation_node_artifact(
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    segment_index: int,
+    kind: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+    blob: BlobStore = Depends(get_blob_store),
+) -> Response:
+    content_type, sha256, payload = await service.read_segment_raw(
+        db,
+        blob,
+        actor,
+        workspace_id,
+        collection_id,
+        run_id,
+        segment_index,
+        kind,
+    )
+    return Response(
+        payload,
+        media_type=content_type,
+        headers={
+            "ETag": f'"{sha256}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 async def _raw_response(
     db: AsyncSession,
     blob: BlobStore,

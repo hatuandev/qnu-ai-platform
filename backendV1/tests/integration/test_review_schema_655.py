@@ -18,7 +18,14 @@ def test_structured_review_keeps_server_coverage_guard_and_idempotency(client, m
         schema = sent["json_schema"]["schema"]
         assert len(schema["properties"]["source_assessments"]["required"]) == 14
         assert len(schema["properties"]["draft_assessments"]["required"]) == 15
-        assert "source_id" not in schema["$defs"]["SourceAssessment"]["properties"]
+        for branch in schema["$defs"]["SourceAssessment"]["anyOf"]:
+            assert "source_id" not in branch["properties"]
+            assert set(branch["required"]) == {
+                "status",
+                "draft_ids",
+                "explanation",
+                "suggested_action",
+            }
         import json
 
         incoming = json.loads(chat.requests[-1]["body"]["messages"][-1]["content"])

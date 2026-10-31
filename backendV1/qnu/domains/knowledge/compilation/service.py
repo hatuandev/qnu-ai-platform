@@ -11,8 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation import outputs as compilation_outputs
+from qnu.domains.knowledge.compilation import refinement
 from qnu.domains.knowledge.compilation import segments as split
 from qnu.domains.knowledge.compilation.artifacts import (
+    artifact,
     json_bytes,
     read,
     read_segment,
@@ -30,8 +32,10 @@ from qnu.domains.knowledge.compilation.models import (
     CompilationInput,
     CompilationRun,
     CompilationSegment,
+    CompilationSegmentArtifact,
     utcnow,
 )
+from qnu.domains.knowledge.compilation.scheduler import effective_concurrency
 from qnu.domains.knowledge.compilation.schemas import (
     CompilationProgress,
     CompilationRequest,
@@ -202,6 +206,19 @@ async def request_run(
     payload = json_bytes(snapshot)
     schema = output_schema(documents) if req.structured_output else None
     requested_output = req.max_output_tokens or get_settings().COMPILER_MAX_OUTPUT_TOKENS
+    provider_id = req.provider_id
+    planned_runtime = None
+    if req.max_output_tokens is None:
+        planned_runtime, ceiling = await prepare_chat_limits(
+            db,
+            actor,
+            workspace_id,
+            provider_id=provider_id,
+            task="compiler",
+            max_output_tokens=None,
+        )
+        requested_output = min(requested_output, ceiling.max_output_tokens)
+        provider_id = planned_runtime.provider_id
     plans: list[split.SegmentPlan] = []
     try:
         runtime, _, budget = await prepare_chat_request(
@@ -209,15 +226,17 @@ async def request_run(
             actor,
             workspace_id,
             messages_for(req.topic, documents),
-            provider_id=req.provider_id,
+            provider_id=provider_id,
             task="compiler",
+            reasoning_task="compiler",
             max_output_tokens=requested_output,
             output_schema=schema,
         )
         owned_size = await asyncio.to_thread(
             split.estimate_output_size, documents, split.build_units(documents)
         )
-        if owned_size > budget.max_output_tokens * split.OUTPUT_CONTENT_RATIO:
+        content_budget = split.output_content_bytes(budget.max_output_tokens)
+        if content_budget is not None and owned_size > content_budget:
             raise AppException(
                 "Nguồn cần chia phần theo ngân sách đầu ra.",
                 code="compilation_output_requires_segments",
@@ -230,7 +249,7 @@ async def request_run(
             db,
             actor,
             workspace_id,
-            provider_id=req.provider_id,
+            provider_id=provider_id,
             task="compiler",
             max_output_tokens=requested_output,
         )
@@ -257,6 +276,33 @@ async def request_run(
             capacity=capacity,
             structured=req.structured_output,
         )
+    if (
+        planned_runtime is not None
+        and runtime.configuration_hash != planned_runtime.configuration_hash
+    ):
+        raise Conflict("Model thay đổi trong lúc lập kế hoạch.", code="chat_provider_changed")
+    if not plans:
+        capacity = available_input_tokens(runtime.token_limits, budget.max_output_tokens)
+        if capacity is None:
+            raise AppException(
+                "Chưa xác định được ngân sách biên soạn.", code="model_capacity_required"
+            )
+        plans = await asyncio.to_thread(
+            split.plan_segments,
+            documents,
+            req.topic,
+            capacity=capacity,
+            structured=req.structured_output,
+            output_tokens=budget.max_output_tokens,
+        )
+        plans = await asyncio.to_thread(
+            split.finalize_plans,
+            plans,
+            documents,
+            req.topic,
+            capacity=capacity,
+            structured=req.structured_output,
+        )
     generation = 1 + int(
         await db.scalar(
             select(func.max(CompilationRun.generation)).where(
@@ -265,18 +311,29 @@ async def request_run(
         )
         or 0
     )
+    reasoning_directive = runtime.reasoning_directive("compiler")
     config = {
-        "workflow_version": "qnu.compiler.workflow/v2"
-        if plans
-        else "qnu.compiler.workflow/v1",
+        "refinement": {
+            "version": 1,
+            "max_depth": 4,
+            "max_nodes": len(plans) * 31,
+            "max_seconds": 1500,
+        },
+        "workflow_version": "qnu.compiler.workflow/v2" if plans else "qnu.compiler.workflow/v1",
         "auto_review": req.auto_review,
         "review": {
             "provider_id": req.review_provider_id or runtime.provider_id,
             "max_output_tokens": req.review_max_output_tokens,
             **({"structured_output": True} if req.review_structured_output else {}),
         },
-        "provider": runtime.public_dict(),
+        "provider": {
+            **runtime.public_dict(),
+            "reasoning": runtime.reasoning_trace("compiler"),
+        },
         "max_output_tokens": budget.max_output_tokens,
+        "reasoning_directive": (
+            reasoning_directive.public_dict() if reasoning_directive is not None else None
+        ),
         "prompt_version": PROMPT_VERSION,
         "prompt_sha256": hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest(),
         **(
@@ -292,12 +349,14 @@ async def request_run(
         config["segmentation"] = {
             "planner_version": split.PLANNER_VERSION,
             "prompt_version": split.PROMPT_VERSION,
+            "projection_version": split.PROJECTION_V4,
             "segment_count": len(plans),
+            "concurrency": get_settings().COMPILER_SEGMENT_CONCURRENCY,
             "input_capacity_tokens": available_input_tokens(
                 runtime.token_limits, budget.max_output_tokens
             ),
             "output_tokens": budget.max_output_tokens,
-            "output_content_ratio": split.OUTPUT_CONTENT_RATIO,
+            "output_content_bytes": split.output_content_bytes(budget.max_output_tokens),
             "manifest_sha256": None,
         }
     run = CompilationRun(
@@ -321,10 +380,7 @@ async def request_run(
             run,
             plans,
             documents,
-            capacity=available_input_tokens(
-                runtime.token_limits, budget.max_output_tokens
-            )
-            or 0,
+            capacity=available_input_tokens(runtime.token_limits, budget.max_output_tokens) or 0,
             output_tokens=budget.max_output_tokens,
         )
         manifest_payload = json_bytes(manifest)
@@ -336,12 +392,18 @@ async def request_run(
                 "manifest_sha256": hashlib.sha256(manifest_payload).hexdigest(),
             },
         }
+        reasoning_public = (
+            reasoning_directive.public_dict() if reasoning_directive is not None else None
+        )
         segment_config = {
             "provider_id": runtime.provider_id,
             "configuration_hash": runtime.configuration_hash,
             "max_output_tokens": budget.max_output_tokens,
             "structured_output": bool(req.structured_output),
             "auto_review": req.auto_review,
+            "projection_version": split.PROJECTION_V4,
+            # Stored verbatim so a resume sends the same reasoning contract or fails.
+            "reasoning": reasoning_public,
         }
         for plan in plans:
             db.add(
@@ -365,6 +427,8 @@ async def request_run(
                                 "configuration_hash": runtime.configuration_hash,
                                 "max_output_tokens": budget.max_output_tokens,
                                 "structured_output": bool(req.structured_output),
+                                "projection_version": plan.projection,
+                                "reasoning": reasoning_public,
                             }
                         )
                     ).hexdigest(),
@@ -433,11 +497,27 @@ async def read_result(
     blob: BlobStore,
     run: CompilationRun,
     kind: str,
-) -> tuple[CompilationArtifact, bytes]:
+) -> tuple[CompilationArtifact | CompilationSegmentArtifact, bytes]:
     if run.status != "completed" and kind in {"draft_json", "markdown"}:
         raise Conflict(
             "Lượt biên soạn chưa có bản nháp hoàn tất.", code="compilation_not_completed"
         )
+    if kind == "raw_response" and await artifact(db, run.id, kind) is None:
+        # Preserve the single-source raw API; multi-root runs use per-node artifacts.
+        roots = list(
+            (
+                await db.scalars(
+                    select(CompilationSegment)
+                    .where(
+                        CompilationSegment.run_id == run.id,
+                        CompilationSegment.parent_segment_id.is_(None),
+                    )
+                    .limit(2)
+                )
+            ).all()
+        )
+        if len(roots) == 1:
+            return await read_segment(db, blob, roots[0], kind)
     return await read(db, blob, run, kind)
 
 
@@ -455,11 +535,23 @@ async def progress(
             await db.scalars(
                 select(CompilationSegment)
                 .where(CompilationSegment.run_id == run.id)
+                .where(CompilationSegment.parent_segment_id.is_(None))
                 .order_by(CompilationSegment.segment_index)
             )
         ).all()
     )
     latest = await compilation_outputs.latest(db, run.id)
+    nodes = list(
+        (
+            await db.scalars(
+                select(CompilationSegment)
+                .where(
+                    CompilationSegment.run_id == run.id,
+                )
+                .order_by(CompilationSegment.segment_index)
+            )
+        ).all()
+    )
     counts: dict[str, int] = {}
     for segment in segments:
         counts[segment.status] = counts.get(segment.status, 0) + 1
@@ -472,7 +564,15 @@ async def progress(
         failed = counts.get("failed", 0)
         uncertain = counts.get("uncertain", 0)
         cancelled = counts.get("cancelled", 0)
-        observed = [segment.usage_tokens for segment in segments if segment.usage_tokens is not None]
+        observed = [
+            segment.usage_tokens for segment in segments if segment.usage_tokens is not None
+        ]
+        active = [
+            segment.segment_index
+            for segment in segments
+            if segment.status in {"running", "received"}
+        ]
+        concurrency = effective_concurrency(run.config)
     else:
         # A single-call run is one durable request; map its status without inventing parts.
         completed = int(run.status == "completed")
@@ -482,8 +582,29 @@ async def progress(
         uncertain = int(run.status == "uncertain")
         cancelled = int(run.status == "cancelled")
         observed = []
+        active = []
+        concurrency = 1
     usage_tokens = sum(observed) if observed else run.usage_tokens
+    if run.config.get("refinement"):
+        usage_tokens = refinement.total_usage(nodes)
+    elapsed_seconds = (
+        round(((run.finished_at or utcnow()) - run.started_at).total_seconds(), 1)
+        if run.started_at is not None
+        else None
+    )
     return CompilationProgress(
+        refinement_timeout_seconds=(run.config.get("refinement") or {}).get("max_seconds", 0),
+        nodes=[
+            {
+                "id": node.id,
+                "parent_id": node.parent_segment_id,
+                "index": node.segment_index,
+                "status": node.status,
+                "error_code": node.error_code,
+                "request_usage_tokens": refinement.request_usage(node),
+            }
+            for node in nodes
+        ],
         run_id=run.id,
         status=run.status,
         workflow_version=str(run.config.get("workflow_version", "qnu.compiler.workflow/v1")),
@@ -509,9 +630,20 @@ async def progress(
                 error_code=segment.error_code,
                 started_at=segment.started_at,
                 finished_at=segment.finished_at,
+                duration_seconds=(
+                    round((segment.finished_at - segment.started_at).total_seconds(), 1)
+                    if segment.started_at is not None and segment.finished_at is not None
+                    else None
+                ),
             )
             for segment in segments
         ],
+        received=counts.get("received", 0) if segmented else 0,
+        concurrency=concurrency,
+        active_segments=active,
+        elapsed_seconds=elapsed_seconds,
+        planner_version=(run.config.get("segmentation") or {}).get("planner_version"),
+        queue_timeout_seconds=get_settings().MODEL_CHAT_QUEUE_TIMEOUT_SECONDS,
     )
 
 
@@ -527,9 +659,7 @@ async def read_partial_draft(
     run = await get_run(db, actor, workspace_id, collection_id, run_id)
     row = await compilation_outputs.latest(db, run.id, partial=True)
     if row is None:
-        raise EntityNotFound(
-            "Chưa có bản nháp từng phần.", code="compilation_partial_not_found"
-        )
+        raise EntityNotFound("Chưa có bản nháp từng phần.", code="compilation_partial_not_found")
     draft, _ = await compilation_outputs.read_output(db, blob, row)
     return row.draft_sha256, draft
 
@@ -542,6 +672,7 @@ async def read_segment_raw(
     collection_id: str,
     run_id: str,
     segment_index: int,
+    kind: str = "raw_response",
 ) -> tuple[str, str, bytes]:
     run = await get_run(db, actor, workspace_id, collection_id, run_id)
     segment = await db.scalar(
@@ -551,8 +682,8 @@ async def read_segment_raw(
         )
     )
     if segment is None:
-        raise EntityNotFound(
-            "Không tìm thấy phần biên soạn.", code="compilation_segment_not_found"
-        )
-    artifact, payload = await read_segment(db, blob, segment, "raw_response")
+        raise EntityNotFound("Không tìm thấy phần biên soạn.", code="compilation_segment_not_found")
+    if kind not in {"raw_response", "draft_json", "markdown"}:
+        raise EntityNotFound("Không có loại artifact này.", code="compilation_artifact_not_found")
+    artifact, payload = await read_segment(db, blob, segment, kind)
     return artifact.content_type, artifact.sha256, payload

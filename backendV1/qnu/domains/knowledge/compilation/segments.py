@@ -2,7 +2,13 @@
 
 The immutable input snapshot keeps every block, table cell and citation. A model
 request only receives the projected blocks/rows owned by one part plus structural
-context. Nothing is cropped: if one row cannot fit, the part is rejected.
+context that the part actually needs: the header rows of its own tables, the
+caption/heading that introduces them and document notes that qualify them.
+
+Legacy v2/v3 request shapes remain reproducible for already-planned runs. The v4
+planner retains possible conditions with unresolved scope and never infers table
+identity from equal headers. It measures estimated written output instead of the
+source size. Nothing is cropped: a unit that cannot fit is rejected.
 """
 
 from __future__ import annotations
@@ -10,14 +16,27 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
+from itertools import pairwise
 
-from pydantic import BaseModel, ConfigDict, Field
-
+from qnu.domains.knowledge.compilation import segments_v2
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.drafting import SYSTEM_PROMPT
 from qnu.domains.knowledge.compilation.evidence import citation_index, literal_tables
 from qnu.domains.knowledge.compilation.limitations import retain_limitations
-from qnu.domains.knowledge.compilation.schemas import DraftSection
+from qnu.domains.knowledge.compilation.projection import (
+    citations_in,
+    project_block,
+    project_documents,
+    project_table_block,
+)
+from qnu.domains.knowledge.compilation.schemas import SegmentDraftContent
+from qnu.domains.knowledge.compilation.units import (
+    Unit,
+    _ref_key,
+    build_units,
+    header_row_indexes,
+    owned_refs,
+)
 from qnu.domains.modelops.inference.service import (
     available_input_tokens,
     request_input_tokens,
@@ -25,36 +44,59 @@ from qnu.domains.modelops.inference.service import (
 from qnu.platform.errors import AppException
 from qnu.ports.chat_model import ChatMessage
 
-PROMPT_VERSION = "qnu.compiler.segment.prompt/v2"
-PLANNER_VERSION = "qnu.compiler.plan/v2"
-MANIFEST_VERSION = "qnu.compiler.segment-manifest/v1"
-TARGET_RATIO = 0.6
-# Planning heuristic, not a tokenizer or a guarantee about model reasoning. Keep
-# most of the generation allowance for reasoning and JSON/citation expansion.
-OUTPUT_CONTENT_RATIO = 0.25
-CONTEXT_TYPES = {"title", "header", "caption", "footnote"}
+PROJECTION_V2 = "qnu.compiler.projection/v2"
+PROJECTION_V3 = "qnu.compiler.projection/v3"
+PROJECTION_V4 = "qnu.compiler.projection/v4"
+PROMPT_VERSION = "qnu.compiler.segment.prompt/v4"
+PLANNER_VERSION = "qnu.compiler.plan/v5"
+MANIFEST_VERSION = "qnu.compiler.segment-manifest/v2"
 
+PROMPT_VERSIONS = {
+    PROJECTION_V2: segments_v2.PROMPT_VERSION,
+    PROJECTION_V3: "qnu.compiler.segment.prompt/v3",
+    PROJECTION_V4: PROMPT_VERSION,
+}
 
-class SegmentDraftContent(BaseModel):
-    """A part may be context-only, hence an optional title and empty sections."""
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-    title: str | None = Field(None, max_length=500)
-    sections: list[DraftSection] = Field(default_factory=list, max_length=100)
-    unknowns: list[str] = Field(default_factory=list, max_length=100)
+TARGET_RATIO = 0.7
+# Planning heuristic, not a tokenizer. Half of the declared output allowance is
+# reserved for the written content; the rest stays for reasoning, JSON keys and
+# citation lists. Vietnamese UTF-8 JSON needs roughly three bytes per token.
+OUTPUT_CONTENT_SHARE = 0.5
+OUTPUT_BYTES_PER_TOKEN = 3
+# One owned table row only needs a note/condition, never a re-written row.
+ROW_INTERPRETATION_BYTES = 96
+SECTION_FRAMING_BYTES = 160
+# Retained only to reproduce the frozen v3 request. New plans never discard
+# possible conditions just because they exceed an arbitrary length/count.
+NOTE_TAIL_MAX_BLOCKS = 6
+NOTE_TAIL_MAX_BYTES = 4000
+HEADING_TYPES = {"title", "header"}
+NOTE_TYPES = {"caption", "footnote"}
 
 
 @dataclass(frozen=True, slots=True)
-class Unit:
-    document_index: int
+class TableLayout:
     page_index: int
-    page_number: int
     block_index: int
-    ocr_run_id: str
+    page_number: int
     evidence_id: str
-    kind: str
-    row_index: int | None = None
-    header_rows: tuple[int, ...] = ()
+    header_rows: tuple[int, ...]
+    signature: tuple
+    row_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class Layout:
+    """Structural index of one document, computed once per planning run."""
+
+    reading: tuple[tuple[int, int], ...]
+    headings: tuple[tuple[int, int, int, str, str], ...]
+    tables: dict[tuple[int, int], TableLayout]
+    captions: dict[tuple[int, int], tuple[dict, ...]]
+    trailing_notes: tuple[dict, ...]
+    note_tail_blocks: int
+    note_tail_bytes: int
+    table_links: tuple[dict, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +110,7 @@ class SegmentPlan:
     schema_sha256: str | None
     units: tuple[Unit, ...] = field(default=(), compare=False)
     output_size_estimate: int = 0
+    projection: str = PROJECTION_V4
 
     def scope_dict(self) -> dict:
         return {
@@ -79,6 +122,7 @@ class SegmentPlan:
             "input_tokens": self.input_tokens,
             "schema_sha256": self.schema_sha256,
             "output_size_estimate": self.output_size_estimate,
+            "projection_version": self.projection,
         }
 
 
@@ -95,90 +139,221 @@ def input_capacity(limits, output_tokens: int) -> int | None:
     return available_input_tokens(limits, output_tokens)
 
 
-def header_row_indexes(rows: list[list[dict]]) -> tuple[int, ...]:
-    leading = 0
-    for row in rows:
-        if not row or not all(cell.get("header") for cell in row):
-            break
-        leading += 1
-    if leading == len(rows):
-        return ()
-    return tuple(range(leading))
+def output_content_bytes(output_tokens: int | None) -> int | None:
+    """Estimated bytes the model may spend on written content for one part."""
+    if not output_tokens:
+        return None
+    return int(output_tokens * OUTPUT_CONTENT_SHARE * OUTPUT_BYTES_PER_TOKEN)
 
 
-def build_units(documents: list[dict]) -> list[Unit]:
-    """One unit per text block, or per data row of a parsed table; never a half row."""
-    units: list[Unit] = []
-    for document_index, document in enumerate(documents):
-        for page_index, page in enumerate(document["pages"]):
-            for block_index, block in enumerate(page["blocks"]):
-                table = block.get("table")
-                rows = table.get("rows") if table and table.get("status") == "parsed" else None
-                headers = header_row_indexes(rows) if rows else ()
-                data_rows = [index for index in range(len(rows or [])) if index not in headers]
-                common = {
-                    "document_index": document_index,
-                    "page_index": page_index,
-                    "page_number": page["page_number"],
-                    "block_index": block_index,
+def prompt_version_for(projection: str) -> str:
+    version = PROMPT_VERSIONS.get(projection)
+    if version is None:
+        raise AppException(
+            "Phần biên soạn dùng phiên bản projection không hỗ trợ.",
+            code="compilation_segment_version_unsupported",
+            status_code=409,
+        )
+    return version
+
+
+# --------------------------------------------------------------------------- layout
+
+
+def _table_signature(rows: list[list[dict]], headers: tuple[int, ...], columns: int) -> tuple:
+    if headers:
+        return tuple(
+            " ".join((cell.get("text") or "").strip() for cell in rows[index])
+            for index in headers
+        )
+    return ("columns", columns)
+
+
+def build_layout(document: dict, *, legacy_v3: bool = False) -> Layout:
+    """One pass over the document: headings, tables, captions, notes and links."""
+    reading: list[tuple[int, int]] = []
+    headings: list[tuple[int, int, int, str, str]] = []
+    tables: dict[tuple[int, int], TableLayout] = {}
+    captions: dict[tuple[int, int], tuple[dict, ...]] = {}
+    blocks_at: dict[tuple[int, int], dict] = {}
+    pages = document["pages"]
+    last_table: tuple[int, int] | None = None
+    for page_index, page in enumerate(pages):
+        for block_index, block in enumerate(page["blocks"]):
+            position = (page_index, block_index)
+            reading.append(position)
+            blocks_at[position] = block
+            if block.get("type") in HEADING_TYPES and (block.get("text") or "").strip():
+                headings.append(
+                    (page_index, block_index, page["page_number"], block["evidence_id"], block["text"])
+                )
+            table = block.get("table")
+            if table and table.get("status") == "parsed":
+                rows = table.get("rows") or []
+                headers = header_row_indexes(rows)
+                tables[position] = TableLayout(
+                    page_index=page_index,
+                    block_index=block_index,
+                    page_number=page["page_number"],
+                    evidence_id=block["evidence_id"],
+                    header_rows=headers,
+                    signature=_table_signature(rows, headers, table["column_count"]),
+                    row_count=table["row_count"],
+                )
+                last_table = position
+    order = {position: index for index, position in enumerate(reading)}
+    for position in tables:
+        found: list[dict] = []
+        start = order[position] - 1
+        while start >= 0 and len(found) < 2:
+            previous = reading[start]
+            block = blocks_at[previous]
+            if block.get("table") is not None or block.get("type") not in HEADING_TYPES | NOTE_TYPES:
+                break
+            found.append(
+                {
+                    "kind": "block",
                     "ocr_run_id": document["ocr_run_id"],
+                    "page": pages[previous[0]]["page_number"],
                     "evidence_id": block["evidence_id"],
+                    "role": "caption",
                 }
-                if data_rows:
-                    units.extend(
-                        Unit(**common, kind="table_row", row_index=row, header_rows=headers)
-                        for row in data_rows
-                    )
-                else:
-                    units.append(Unit(**common, kind="block"))
-    return units
+            )
+            start -= 1
+        captions[position] = tuple(reversed(found))
+    notes: list[dict] = []
+    tail_bytes = 0
+    tail_blocks = 0
+    if last_table is not None:
+        for position in reading[order[last_table] + 1 :]:
+            block = blocks_at[position]
+            if block.get("table") is not None:
+                continue
+            tail_blocks += 1
+            tail_bytes += len((block.get("text") or "").encode("utf-8"))
+            notes.append(
+                {
+                    "kind": "block",
+                    "ocr_run_id": document["ocr_run_id"],
+                    "page": pages[position[0]]["page_number"],
+                    "evidence_id": block["evidence_id"],
+                    "role": "document_note",
+                }
+            )
+    shared_notes = tuple(notes)
+    if legacy_v3 and (tail_blocks > NOTE_TAIL_MAX_BLOCKS or tail_bytes > NOTE_TAIL_MAX_BYTES):
+        shared_notes = ()
+    if not legacy_v3:
+        shared_notes = tuple({**ref, "scope": "unresolved"} for ref in shared_notes)
+    links: list[dict] = []
+    ordered = [tables[position] for position in reading if position in tables]
+    for first, second in pairwise(ordered):
+        # Header equality/page adjacency never prove source table identity.
+        # Keep this heuristic solely for replay of already-pinned v3 bytes.
+        if legacy_v3 and second.page_index == first.page_index + 1 and second.signature == first.signature:
+            links.append(
+                {
+                    "from": first.evidence_id,
+                    "to": second.evidence_id,
+                    "from_page": first.page_number,
+                    "to_page": second.page_number,
+                }
+            )
+    return Layout(
+        reading=tuple(reading),
+        headings=tuple(headings),
+        tables=tables,
+        captions=captions,
+        trailing_notes=shared_notes,
+        note_tail_blocks=tail_blocks,
+        note_tail_bytes=tail_bytes,
+        table_links=tuple(links),
+    )
 
 
-def _block_ref(unit: Unit) -> dict:
+def build_layouts(documents: list[dict], *, legacy_v3: bool = False) -> list[Layout]:
+    return [build_layout(document, legacy_v3=legacy_v3) for document in documents]
+
+
+def _heading_for(unit: Unit, layout: Layout) -> dict | None:
+    chosen = None
+    for page_index, block_index, page_number, evidence_id, _ in layout.headings:
+        if (page_index, block_index) > (unit.page_index, unit.block_index):
+            break
+        chosen = (page_number, evidence_id)
+    if chosen is None:
+        return None
     return {
         "kind": "block",
         "ocr_run_id": unit.ocr_run_id,
-        "page": unit.page_number,
-        "evidence_id": unit.evidence_id,
+        "page": chosen[0],
+        "evidence_id": chosen[1],
+        "role": "section_heading",
     }
 
 
-def owned_refs(units: list[Unit]) -> tuple[dict, ...]:
-    """Group consecutive table-row units; ownership stays per source row."""
+def context_for(unit: Unit, document: dict, layout: Layout) -> list[dict]:
+    """Context this unit actually needs, with an explicit role for each ref."""
+    position = (unit.page_index, unit.block_index)
     refs: list[dict] = []
-    table: dict | None = None
-    for unit in units:
-        if unit.kind == "block":
-            table = None
-            refs.append(_block_ref(unit))
-            continue
-        key = (unit.ocr_run_id, unit.page_number, unit.evidence_id)
-        if table is None or table["_key"] != key:
-            table = {
-                "_key": key,
-                "kind": "table_rows",
-                "ocr_run_id": unit.ocr_run_id,
-                "page": unit.page_number,
-                "evidence_id": unit.evidence_id,
-                "rows": [],
-                "header_rows": list(unit.header_rows),
-            }
-            refs.append(table)
-        table["rows"].append(unit.row_index)
-    for ref in refs:
-        ref.pop("_key", None)
-    return tuple(refs)
+    table = layout.tables.get(position)
+    if table is not None:
+        if table.header_rows:
+            refs.append(
+                {
+                    "kind": "table_header_rows",
+                    "ocr_run_id": unit.ocr_run_id,
+                    "page": table.page_number,
+                    "evidence_id": table.evidence_id,
+                    "rows": list(table.header_rows),
+                    "role": "table_header",
+                }
+            )
+        refs.extend(layout.captions.get(position, ()))
+        refs.extend(_following_notes(document, unit, layout))
+        heading = _heading_for(unit, layout)
+        if heading is not None and heading["evidence_id"] != unit.evidence_id:
+            refs.append(heading)
+        refs.extend(layout.trailing_notes)
+        return refs
+    heading = _heading_for(unit, layout)
+    if heading is not None and heading["evidence_id"] != unit.evidence_id:
+        refs.append(heading)
+    refs.extend(_adjacent_notes(document, unit))
+    refs.extend(layout.trailing_notes)
+    return refs
 
 
-def _adjacent_context(documents: list[dict], unit: Unit) -> list[dict]:
-    page = documents[unit.document_index]["pages"][unit.page_index]
+def _following_notes(document: dict, unit: Unit, layout: Layout) -> list[dict]:
+    """Keep possible table qualifications until a new heading/table begins.
+
+    These are candidates with unresolved scope, not proof that each note applies
+    to every row. Text may contain conditions even when the parser labels it text.
+    """
+    position = (unit.page_index, unit.block_index)
     refs = []
+    for page_index, block_index in layout.reading[layout.reading.index(position) + 1 :]:
+        page = document["pages"][page_index]
+        block = page["blocks"][block_index]
+        if block.get("table") is not None or block.get("type") in HEADING_TYPES:
+            break
+        refs.append({
+            "kind": "block", "ocr_run_id": unit.ocr_run_id,
+            "page": page["page_number"], "evidence_id": block["evidence_id"],
+            "role": "neighbour_note", "scope": "unresolved",
+        })
+    return refs
+
+
+def _adjacent_notes(document: dict, unit: Unit) -> list[dict]:
+    page = document["pages"][unit.page_index]
+    refs: list[dict] = []
     for offset in (-2, -1, 1, 2):
         index = unit.block_index + offset
         if not 0 <= index < len(page["blocks"]):
             continue
         block = page["blocks"][index]
-        if block.get("table") is not None or block.get("type") not in CONTEXT_TYPES:
+        if block.get("table") is not None or block.get("type") not in NOTE_TYPES:
             continue
         refs.append(
             {
@@ -186,64 +361,18 @@ def _adjacent_context(documents: list[dict], unit: Unit) -> list[dict]:
                 "ocr_run_id": unit.ocr_run_id,
                 "page": unit.page_number,
                 "evidence_id": block["evidence_id"],
+                "role": "neighbour_note",
             }
         )
     return refs
 
 
-def structural_context(documents: list[dict], unit: Unit) -> list[dict]:
-    """Preserve document headings/notes and candidate headers without guessing joins.
-
-    Non-table blocks form the shared context of tabular documents. This includes
-    conditions printed after the last table. A text-only document carries its
-    preceding heading and explicit captions/footnotes instead of the whole text.
-    Oversized required context fails the budget check rather than being cropped.
-    """
-    document = documents[unit.document_index]
-    has_tables = any(b.get("table") for p in document["pages"] for b in p["blocks"])
-    refs = []
-    heading = None
-    for page in document["pages"]:
-        for block in page["blocks"]:
-            table = block.get("table")
-            base = {
-                "ocr_run_id": unit.ocr_run_id,
-                "page": page["page_number"],
-                "evidence_id": block["evidence_id"],
-            }
-            if table and table.get("status") == "parsed":
-                rows = header_row_indexes(table.get("rows") or [])
-                if rows:
-                    refs.append({**base, "kind": "table_header_rows", "rows": list(rows)})
-            elif has_tables or block.get("type") in {"caption", "footnote"}:
-                refs.append({**base, "kind": "block"})
-            if block.get("type") in {"title", "header"}:
-                heading = {**base, "kind": "block"}
-            if block["evidence_id"] == unit.evidence_id and heading:
-                refs.append(heading)
-    return refs
-
-
-def context_refs(documents: list[dict], units: list[Unit]) -> tuple[dict, ...]:
-    """Repeat table headers and nearby title/caption/footnote blocks as context only."""
+def _merge_context(documents: list[dict], units: list[Unit], layouts: list[Layout]) -> tuple[dict, ...]:
     owned = {_ref_key(ref) for ref in owned_refs(units)}
     refs: list[dict] = []
     seen: set[tuple] = set()
     for unit in units:
-        candidates = []
-        if unit.kind == "table_row" and unit.header_rows:
-            candidates.append(
-                {
-                    "kind": "table_header_rows",
-                    "ocr_run_id": unit.ocr_run_id,
-                    "page": unit.page_number,
-                    "evidence_id": unit.evidence_id,
-                    "rows": list(unit.header_rows),
-                }
-            )
-        candidates.extend(_adjacent_context(documents, unit))
-        candidates.extend(structural_context(documents, unit))
-        for ref in candidates:
+        for ref in context_for(unit, documents[unit.document_index], layouts[unit.document_index]):
             key = _ref_key(ref)
             if key in owned or key in seen:
                 continue
@@ -252,204 +381,68 @@ def context_refs(documents: list[dict], units: list[Unit]) -> tuple[dict, ...]:
     return tuple(refs)
 
 
-def _ref_key(ref: dict) -> tuple:
-    return (
-        ref["ocr_run_id"],
-        ref["page"],
-        ref["evidence_id"],
-        ref["kind"],
-        tuple(ref.get("rows", ())),
+def context_refs(documents: list[dict], units: list[Unit]) -> tuple[dict, ...]:
+    """Union of structural context over the units, excluding anything owned here."""
+    return _merge_context(documents, units, build_layouts(documents))
+
+
+def structural_context(documents: list[dict], unit: Unit) -> list[dict]:
+    """Kept for callers/tests: context of one unit inside its own document."""
+    return context_for(
+        unit, documents[unit.document_index], build_layout(documents[unit.document_index])
     )
 
 
-def _block_index(documents: list[dict]) -> dict[tuple[str, str], tuple[int, int, int, dict]]:
-    index = {}
-    for document_index, document in enumerate(documents):
-        for page_index, page in enumerate(document["pages"]):
-            for block_index, block in enumerate(page["blocks"]):
-                index[(document["ocr_run_id"], block["evidence_id"])] = (
-                    document_index,
-                    page_index,
-                    block_index,
-                    block,
-                )
-    return index
+# ------------------------------------------------------------------------- payload
 
 
-def _project_block(block: dict) -> dict:
-    """Allowlist fields; never forward inline Base64 images or the evidence map."""
-    payload = {
-        "evidence_id": block["evidence_id"],
-        "type": block["type"],
-        "label": block.get("label"),
-        "text": block.get("text", ""),
-        "bbox": block.get("bbox"),
-        "requires_review": bool(block.get("requires_review")),
-    }
-    if block.get("origin"):
-        payload["origin"] = block["origin"]
-    table = block.get("table")
-    if table is not None:
-        payload["table"] = {
-            "evidence_id": table["evidence_id"],
-            "status": table["status"],
-            "reason": table.get("reason"),
-            "column_count": table["column_count"],
-            "row_count": table["row_count"],
-            "rows": table["rows"],
-        }
-    return payload
-
-
-def _project_table_block(block: dict, rows: list[int]) -> dict:
-    table = block["table"]
-    payload = _project_block({**block, "table": None})
-    payload["table"] = {
-        "evidence_id": table["evidence_id"],
-        "status": table["status"],
-        "reason": table.get("reason"),
-        "column_count": table["column_count"],
-        "row_count": table["row_count"],
-        "rows": [table["rows"][index] for index in rows],
-        "row_numbers": [index + 1 for index in rows],
-    }
-    return payload
-
-
-def project_documents(
-    documents: list[dict], owned: tuple[dict, ...] | list[dict], context: tuple[dict, ...] | list[dict]
-) -> list[dict]:
-    """Rebuild exactly the owned blocks/rows plus repeated context from the snapshot."""
-    index = _block_index(documents)
-    selection: dict[tuple[int, int, int], dict] = {}
-    for ref in [*owned, *context]:
-        key = (ref["ocr_run_id"], ref["evidence_id"])
-        if key not in index:
-            raise AppException(
-                "Phần biên soạn tham chiếu khối không có trong snapshot.",
-                code="compilation_segment_manifest_mismatch",
-                status_code=409,
-            )
-        document_index, page_index, block_index, block = index[key]
-        page = documents[document_index]["pages"][page_index]
-        if page["page_number"] != ref["page"]:
-            raise AppException(
-                "Phần biên soạn tham chiếu sai trang nguồn.",
-                code="compilation_segment_manifest_mismatch",
-                status_code=409,
-            )
-        entry = selection.setdefault(
-            (document_index, page_index, block_index), {"block": False, "rows": set()}
-        )
-        if ref["kind"] == "block":
-            entry["block"] = True
-        else:
-            rows = ref.get("rows", [])
-            table = block.get("table") or {}
-            source_rows = table.get("rows") or []
-            if any(not isinstance(row, int) or not 0 <= row < len(source_rows) for row in rows):
-                raise AppException(
-                    "Phần biên soạn tham chiếu hàng bảng không hợp lệ.",
-                    code="compilation_segment_manifest_mismatch",
-                    status_code=409,
-                )
-            entry["rows"].update(rows)
-
-    projected = []
-    for document_index, document in enumerate(documents):
-        pages = []
-        for page_index, page in enumerate(document["pages"]):
-            blocks = []
-            for block_index, block in enumerate(page["blocks"]):
-                entry = selection.get((document_index, page_index, block_index))
-                if entry is None:
-                    continue
-                table = block.get("table")
-                if entry["block"]:
-                    blocks.append(_project_block(block))
-                elif table is not None and table.get("status") == "parsed":
-                    blocks.append(_project_table_block(block, sorted(entry["rows"])))
-            if blocks:
-                pages.append(
-                    {
-                        "page_number": page["page_number"],
-                        "status": page["status"],
-                        "blocks": blocks,
-                    }
-                )
-        if pages:
-            projected.append(
-                {
-                    "ocr_run_id": document["ocr_run_id"],
-                    "identity": document["identity"],
-                    "pages": pages,
-                }
-            )
-    return projected
-
-
-def citations_in(documents: list[dict]) -> list[str]:
-    citations: list[str] = []
-    seen: set[str] = set()
-    for document in documents:
-        run_id = document["ocr_run_id"]
-        for page in document["pages"]:
-            for block in page["blocks"]:
-                refs = [block["evidence_id"]]
-                table = block.get("table")
-                if table is not None:
-                    refs.append(table["evidence_id"])
-                    refs.extend(cell["evidence_id"] for row in table["rows"] for cell in row)
-                for evidence_id in refs:
-                    ref = f"{run_id}:{evidence_id}"
-                    if ref not in seen:
-                        seen.add(ref)
-                        citations.append(ref)
-    return citations
-
-
-def document_structure(documents: list[dict]) -> dict:
-    """Small structural outline only: counts, table shapes and heading text."""
+def document_outline(documents: list[dict], layouts: list[Layout]) -> dict:
+    """Compact structure: page count, table shapes and headings; no per-page blocks."""
     payload = []
-    for document in documents:
-        pages = []
-        outline = []
-        for page in document["pages"]:
-            tables = []
-            for block in page["blocks"]:
-                if block.get("type") in {"title", "header"} and block.get("text"):
-                    outline.append(
-                        {"page": page["page_number"], "text": block["text"][:300]}
-                    )
-                table = block.get("table")
-                if table is not None:
-                    tables.append(
-                        {
-                            "page": page["page_number"],
-                            "evidence_id": block["evidence_id"],
-                            "status": table["status"],
-                            "row_count": table["row_count"],
-                            "column_count": table["column_count"],
-                        }
-                    )
-            pages.append(
-                {
-                    "page": page["page_number"],
-                    "status": page["status"],
-                    "block_count": len(page["blocks"]),
-                    "tables": tables,
-                }
-            )
+    for document, layout in zip(documents, layouts, strict=True):
+        tables = [
+            {
+                "evidence_id": layout.tables[position].evidence_id,
+                "page": layout.tables[position].page_number,
+                "row_count": layout.tables[position].row_count,
+                "header_rows": len(layout.tables[position].header_rows),
+            }
+            for position in layout.reading
+            if position in layout.tables
+        ]
         payload.append(
             {
                 "ocr_run_id": document["ocr_run_id"],
                 "identity": document["identity"],
                 "page_count": len(document["pages"]),
-                "pages": pages,
-                "outline": outline[:80],
+                "tables": tables[:60],
+                "headings": [
+                    {"page": page_number, "text": text[:200]}
+                    for _, _, page_number, _, text in layout.headings[:40]
+                ],
+                "note_tail": {
+                    "blocks": layout.note_tail_blocks,
+                    "bytes": layout.note_tail_bytes,
+                    "shared_as_context": bool(layout.trailing_notes),
+                },
             }
         )
     return {"documents": payload}
+
+
+def document_structure(documents: list[dict]) -> dict:
+    """Backward-compatible name used by older callers and diagnostics."""
+    return document_outline(documents, build_layouts(documents))
+
+
+def _part_note(index: int, total: int) -> str:
+    return (
+        f"Phần {index}/{total}. Chỉ biên soạn khối/hàng trong owned; context_only chỉ "
+        "để đối chiếu header, điều kiện và chú thích, không biên soạn lại. "
+        "rows của refs bắt đầu từ 0; row_numbers trong bảng bắt đầu từ 1. "
+        "Bảng literal do hệ thống ghép nguyên gốc: không chép lại ô, chỉ nêu điều kiện, "
+        "ngoại lệ hoặc ghi chú cần thiết. Không suy nội dung phần khác."
+    )
 
 
 def build_projection(
@@ -458,40 +451,59 @@ def build_projection(
     owned: tuple[dict, ...] | list[dict],
     context: tuple[dict, ...] | list[dict],
     index: int,
+    *,
+    total: int | None = None,
+    projection: str = PROJECTION_V4,
 ) -> tuple[dict, list[str]]:
+    if projection == PROJECTION_V2:
+        return segments_v2.build_projection(topic, documents, owned, context, index)
+    if projection not in {PROJECTION_V3, PROJECTION_V4}:
+        raise AppException(
+            "Phần biên soạn dùng phiên bản projection không hỗ trợ.",
+            code="compilation_segment_version_unsupported",
+            status_code=409,
+        )
     projected = project_documents(documents, owned, context)
     citations = citations_in(projected)
+    layouts = build_layouts(documents, legacy_v3=projection == PROJECTION_V3)
     payload = {
         "topic": topic,
-        "segment": {
+        "part": {
             "index": index,
-            "has_previous": index > 1,
+            "total": total or index,
             "owned": list(owned),
             "context_only": list(context),
-            "note": (
-                "Chỉ biên soạn các refs trong owned; context_only chỉ dùng đối chiếu "
-                "điều kiện/header, không biên soạn lại. rows của refs bắt đầu từ 0; "
-                "row_numbers trong bảng bắt đầu từ 1. Không suy nội dung phần khác."
-            ),
+            "note": _part_note(index, total or index),
         },
-        "structure": document_structure(documents),
+        "outline": document_outline(documents, layouts),
+        "table_links": [link for layout in layouts for link in layout.table_links],
         "documents": projected,
         "allowed_citations": citations,
     }
     return payload, citations
 
 
-def segment_system(index: int, total: int) -> str:
-    return SYSTEM_PROMPT + (
-        f"\nĐây là phần {index}/{total} của một tài liệu dài. Chỉ trả nội dung thuộc phần "
-        "này; giữ tiêu đề mục ngắn và không lặp lại nội dung đã viết ở phần khác. "
-        "Nếu phần này không đủ căn cứ, trả sections rỗng và ghi unknowns. "
-        "Tuyệt đối không tạo lại bảng và không trích dẫn ID ngoài allowed_citations. "
-        "Hệ thống ghép đủ hàng/ô bảng nguyên gốc ở cuối; không diễn giải tuần tự "
-        "mọi ô thành đoạn văn. Chỉ viết ghi chú cần thiết về phạm vi, điều kiện, "
-        "ngoại lệ của owned; chỉ dùng context_only khi cần xác định các ghi chú đó. "
-        "Không cần soạn cả tài liệu hoặc kiểm kê toàn bộ citation trong phản hồi."
+def segment_system(index: int, total: int, *, projection: str = PROJECTION_V4) -> str:
+    if projection == PROJECTION_V2:
+        return segments_v2.segment_system(index, total)
+    prompt = SYSTEM_PROMPT + (
+        f"\nĐây là phần {index}/{total} của một tài liệu dài. Chỉ trả nội dung của phần "
+        "này, viết gọn và không lặp lại nội dung phần khác. Không tạo lại bảng: hệ thống "
+        "đã ghép đủ hàng/ô nguyên gốc. Chỉ nêu điều kiện, phạm vi, ngoại lệ hoặc ghi chú "
+        "cần thiết cho owned; dùng context_only khi cần đối chiếu các ghi chú đó. "
+        "Nếu owned rỗng hoặc không đủ căn cứ cho một nhận định, trả sections rỗng (hoặc "
+        "bỏ nhận định đó) và ghi unknowns; không suy đoán. Không trích dẫn ID ngoài "
+        "allowed_citations và không kiểm kê toàn bộ citation trong phản hồi."
     )
+
+    if projection == PROJECTION_V3:
+        return prompt  # Frozen request text for runs pinned before v4.
+    return prompt + (
+        "\nContext có scope=unresolved chỉ là căn cứ tiềm năng, không chứng minh ghi chú "
+        "áp dụng cho mọi hàng. Chỉ gắn điều kiện khi nội dung nguồn xác định rõ phạm vi; "
+        "nếu chưa rõ thì ghi unknowns. Không tự nối bảng chỉ vì cùng header hoặc số cột."
+    )
+
 
 
 def segment_schema(citations: list[str]) -> dict:
@@ -500,14 +512,102 @@ def segment_schema(citations: list[str]) -> dict:
     return schema
 
 
-def segment_messages(payload: dict, index: int, total: int) -> list[ChatMessage]:
+def segment_messages(
+    payload: dict, index: int, total: int, *, projection: str = PROJECTION_V4
+) -> list[ChatMessage]:
+    if projection == PROJECTION_V2:
+        return segments_v2.segment_messages(payload, index, total)
     return [
-        ChatMessage("system", segment_system(index, total)),
-        ChatMessage(
-            "user",
-            json.dumps(payload, ensure_ascii=False, sort_keys=True),
-        ),
+        ChatMessage("system", segment_system(index, total, projection=projection)),
+        ChatMessage("user", json.dumps(payload, ensure_ascii=False, sort_keys=True)),
     ]
+
+
+# --------------------------------------------------------------------------- budget
+
+
+class Budget:
+    """Estimated cost of one request; exact bytes are recomputed before persisting.
+
+    The estimate only drives packing. ``build_plan`` produces the real
+    ``input_sha256``/``input_tokens`` that are persisted and verified.
+    """
+
+    def __init__(self, documents: list[dict], *, projection: str = PROJECTION_V4):
+        self.documents = documents
+        self.projection = projection
+        self.layouts = build_layouts(documents)
+        self.outline = document_outline(documents, self.layouts)
+        self.outline_bytes = len(
+            json.dumps(self.outline, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        )
+        # The system prompt is sent with every part; ignoring it made small
+        # capacities produce parts that could never fit.
+        self.prompt_bytes = len(segment_system(1, 99, projection=projection).encode("utf-8")) + 384
+        self._blocks = {
+            (document["ocr_run_id"], block["evidence_id"]): block
+            for document in documents
+            for page in document["pages"]
+            for block in page["blocks"]
+        }
+        self._unit: dict[tuple, int] = {}
+        self._ref: dict[tuple, int] = {}
+
+    def unit_bytes(self, unit: Unit) -> int:
+        key = (unit.ocr_run_id, unit.evidence_id, unit.row_index)
+        cached = self._unit.get(key)
+        if cached is not None:
+            return cached
+        block = self.documents[unit.document_index]["pages"][unit.page_index]["blocks"][
+            unit.block_index
+        ]
+        if unit.kind == "table_row":
+            row = block["table"]["rows"][unit.row_index]
+            citation = sum(
+                len(f"{unit.ocr_run_id}:{cell['evidence_id']}".encode()) + 4
+                for cell in row
+            )
+            size = ROW_INTERPRETATION_BYTES + citation
+        else:
+            citation = len(f"{unit.ocr_run_id}:{block['evidence_id']}".encode()) + 4
+            size = SECTION_FRAMING_BYTES + len((block.get("text") or "").encode("utf-8")) + citation
+        self._unit[key] = size
+        return size
+
+    def ref_bytes(self, ref: dict) -> int:
+        key = _ref_key(ref)
+        cached = self._ref.get(key)
+        if cached is not None:
+            return cached
+        block = self._blocks[(ref["ocr_run_id"], ref["evidence_id"])]
+        projected = (
+            project_block(block)
+            if ref["kind"] == "block"
+            else project_table_block(block, list(ref.get("rows", [])))
+        )
+        size = len(json.dumps(projected, ensure_ascii=False, sort_keys=True).encode("utf-8"))
+        self._ref[key] = size
+        return size
+
+    def output(self, units: list[Unit]) -> int:
+        return 512 + sum(self.unit_bytes(unit) for unit in units)
+
+    def input(self, units: list[Unit], context: tuple[dict, ...] | list[dict]) -> int:
+        owned = sum(self.unit_bytes(unit) for unit in units)
+        context_bytes = sum(self.ref_bytes(ref) for ref in context)
+        # 128 B of JSON framing per ref plus ~34 B for its citation in the enum.
+        fixed = (
+            768
+            + self.prompt_bytes
+            + self.outline_bytes
+            + 162 * (len(units) + len(context))
+        )
+        return int((fixed + owned + context_bytes) * 1.1)
+
+
+def estimate_output_size(documents: list[dict], units: list[Unit]) -> int:
+    """Estimated written bytes for the owned units of one part."""
+    return Budget(documents).output(units)
 
 
 def build_plan(
@@ -518,14 +618,19 @@ def build_plan(
     topic: str,
     structured: bool,
     total_estimate: int,
+    projection: str = PROJECTION_V4,
+    budget: Budget | None = None,
 ) -> SegmentPlan:
+    meter = budget or Budget(documents, projection=projection)
     owned = owned_refs(units)
-    context = context_refs(documents, units)
-    payload, citations = build_projection(topic, documents, owned, context, index)
+    context = _merge_context(documents, units, meter.layouts)
+    payload, citations = build_projection(
+        topic, documents, owned, context, index, total=total_estimate, projection=projection
+    )
     user = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     schema = segment_schema(citations) if structured else None
     messages = [
-        ChatMessage("system", segment_system(index, total_estimate)),
+        ChatMessage("system", segment_system(index, total_estimate, projection=projection)),
         ChatMessage("user", user),
     ]
     return SegmentPlan(
@@ -537,27 +642,9 @@ def build_plan(
         input_tokens=request_input_tokens(messages, schema),
         schema_sha256=_sha(json_bytes(schema)) if schema is not None else None,
         units=tuple(units),
-        output_size_estimate=estimate_output_size(documents, units),
+        output_size_estimate=meter.output(units),
+        projection=projection,
     )
-
-
-def estimate_output_size(documents: list[dict], units: list[Unit]) -> int:
-    """UTF-8 copy-size proxy for owned content plus JSON and citation overhead.
-
-    Context is read-only; including its repeated bytes would prevent splitting.
-    Literal tables are attached by the backend, but their owned rows still count
-    here to limit how many facts the model must consider in one generation.
-    """
-    size = 256
-    for unit in units:
-        block = documents[unit.document_index]["pages"][unit.page_index]["blocks"][unit.block_index]
-        cells = block["table"]["rows"][unit.row_index] if unit.kind == "table_row" else [block]
-        size += 96  # Paragraph/section JSON framing.
-        for cell in cells:
-            text = cell.get("text") or ""
-            citation = f"{unit.ocr_run_id}:{cell['evidence_id']}"
-            size += len(json.dumps([text, citation], ensure_ascii=False).encode("utf-8"))
-    return size
 
 
 def _scope_text(units: list[Unit], documents: list[dict]) -> str:
@@ -581,64 +668,72 @@ def plan_segments(
     structured: bool,
     target_ratio: float = TARGET_RATIO,
     output_tokens: int | None = None,
+    projection: str = PROJECTION_V4,
 ) -> list[SegmentPlan]:
     """Pack units in reading order; split only at block boundaries or whole rows."""
     units = build_units(documents)
     if not units:
         raise _invalid("Nguồn không có khối để biên soạn.", "compilation_source_empty")
     target = max(1, min(capacity, max(1024, int(capacity * target_ratio))))
-    output_target = int(output_tokens * OUTPUT_CONTENT_RATIO) if output_tokens else None
+    output_target = output_content_bytes(output_tokens)
+    meter = Budget(documents, projection=projection)
     plans: list[SegmentPlan] = []
     current: list[Unit] = []
+    seen: set[tuple] = set()
+    owned_blocks: set[tuple[str, int, str]] = set()
+    owned_bytes = 0
+    context_bytes = 0
     for unit in units:
-        candidate = [*current, unit]
-        plan = build_plan(
-            index=len(plans) + 1,
-            units=candidate,
-            documents=documents,
-            topic=topic,
-            structured=structured,
-            total_estimate=max(2, len(plans) + 1),
+        refs = context_for(unit, documents[unit.document_index], meter.layouts[unit.document_index])
+        new_refs = [
+            ref
+            for ref in refs
+            if _ref_key(ref) not in seen
+            and not (
+                ref["kind"] == "block"
+                and (ref["ocr_run_id"], ref["page"], ref["evidence_id"]) in owned_blocks
+            )
+        ]
+        unit_cost = meter.unit_bytes(unit)
+        added_context = sum(meter.ref_bytes(ref) for ref in new_refs)
+        estimate = int(
+            (
+                768
+                + meter.prompt_bytes
+                + meter.outline_bytes
+                + 162 * (len(current) + 1 + len(seen) + len(new_refs))
+                + owned_bytes
+                + unit_cost
+                + context_bytes
+                + added_context
+            )
+            * 1.1
         )
-        if not current:
-            if plan.input_tokens > capacity:
-                raise _invalid(
-                    "Một khối hoặc hàng bảng vượt ngân sách model; không cắt nội dung.",
-                    "compilation_segment_too_large",
+        output_estimate = 512 + owned_bytes + unit_cost
+        if current and (estimate > target or (output_target is not None and output_estimate > output_target)):
+            plans.append(
+                build_plan(
+                    index=len(plans) + 1,
+                    units=current,
+                    documents=documents,
+                    topic=topic,
+                    structured=structured,
+                    total_estimate=max(2, len(plans) + 1),
+                    projection=projection,
+                    budget=meter,
                 )
-            _check_output_size(plan, output_target)
-            current = candidate
-            continue
-        if plan.input_tokens <= target and (
-            output_target is None or plan.output_size_estimate <= output_target
-        ):
-            current = candidate
-            continue
-        plans.append(
-            build_plan(
-                index=len(plans) + 1,
-                units=current,
-                documents=documents,
-                topic=topic,
-                structured=structured,
-                total_estimate=max(2, len(plans) + 1),
             )
-        )
-        current = [unit]
-        single = build_plan(
-            index=len(plans) + 1,
-            units=current,
-            documents=documents,
-            topic=topic,
-            structured=structured,
-            total_estimate=max(2, len(plans) + 1),
-        )
-        if single.input_tokens > capacity:
-            raise _invalid(
-                "Một khối hoặc hàng bảng vượt ngân sách model; không cắt nội dung.",
-                "compilation_segment_too_large",
-            )
-        _check_output_size(single, output_target)
+            current, seen, owned_blocks = [], set(), set()
+            owned_bytes = context_bytes = 0
+            added_context = sum(meter.ref_bytes(ref) for ref in new_refs)
+        if not current:
+            _check_unit_fits(meter, unit, capacity, output_target, output_tokens)
+        current.append(unit)
+        owned_bytes += unit_cost
+        if unit.kind == "block":
+            owned_blocks.add((unit.ocr_run_id, unit.page_number, unit.evidence_id))
+        seen.update(_ref_key(ref) for ref in new_refs)
+        context_bytes += added_context
     if current:
         plans.append(
             build_plan(
@@ -648,17 +743,33 @@ def plan_segments(
                 topic=topic,
                 structured=structured,
                 total_estimate=max(2, len(plans) + 1),
+                projection=projection,
+                budget=meter,
             )
         )
     return plans
 
 
-def _check_output_size(plan: SegmentPlan, target: int | None) -> None:
-    if target is not None and plan.output_size_estimate > target:
+def _check_unit_fits(
+    meter: Budget,
+    unit: Unit,
+    capacity: int,
+    output_target: int | None,
+    output_tokens: int | None,
+) -> None:
+    """A single row/block that cannot fit fails loudly instead of being cropped."""
+    single = meter.output([unit])
+    if output_target is not None and single > output_target:
         raise _invalid(
             "Một khối hoặc hàng bảng vượt mức lập kế hoạch đầu ra; cần ngân sách "
             "đầu ra lớn hơn hoặc nguồn có cấu trúc chi tiết hơn, không cắt nội dung.",
             "compilation_segment_output_too_large",
+        )
+    context = _merge_context(meter.documents, [unit], meter.layouts)
+    if meter.input([unit], context) > capacity:
+        raise _invalid(
+            "Một khối hoặc hàng bảng vượt ngân sách model; không cắt nội dung.",
+            "compilation_segment_too_large",
         )
 
 
@@ -669,35 +780,64 @@ def finalize_plans(
     *,
     capacity: int,
     structured: bool,
+    projection: str = PROJECTION_V4,
 ) -> list[SegmentPlan]:
-    """Recompute the exact bound with the real part count before persistence."""
-    total = len(plans)
-    finalized = []
+    """Rebuild every part with its final index/total and the exact request bound.
+
+    The packing loop uses an estimate. Here the real ``input_tokens`` decides: a part
+    that still exceeds capacity is split in half at a unit boundary, never cropped.
+    """
+    meter = Budget(documents, projection=projection)
+    groups = [list(plan.units) for plan in plans]
     for plan in plans:
-        rebuilt = build_plan(
-            index=plan.index,
-            units=list(plan.units),
-            documents=documents,
-            topic=topic,
-            structured=structured,
-            total_estimate=total,
-        )
-        if rebuilt.input_tokens > capacity:
+        if plan.projection != projection:
             raise _invalid(
-                "Phần biên soạn vượt ngân sách model sau khi chốt kế hoạch.",
-                "compilation_segment_too_large",
+                "Kế hoạch biên soạn trộn nhiều phiên bản projection.",
+                "compilation_plan_invalid",
             )
-        finalized.append(rebuilt)
+    finalized: list[SegmentPlan] = []
+    for _ in range(32):  # Each pass strictly grows the group count, so this ends.
+        total = len(groups)
+        finalized = [
+            build_plan(
+                index=position,
+                units=units,
+                documents=documents,
+                topic=topic,
+                structured=structured,
+                total_estimate=total,
+                projection=projection,
+                budget=meter,
+            )
+            for position, units in enumerate(groups, start=1)
+        ]
+        overflow = [index for index, plan in enumerate(finalized) if plan.input_tokens > capacity]
+        if not overflow:
+            break
+        for index in reversed(overflow):
+            units = groups[index]
+            if len(units) <= 1:
+                raise _invalid(
+                    "Một khối hoặc hàng bảng vượt ngân sách model; không cắt nội dung.",
+                    "compilation_segment_too_large",
+                )
+            middle = len(units) // 2
+            groups[index : index + 1] = [units[:middle], units[middle:]]
+    else:
+        raise _invalid(
+            "Không chốt được kế hoạch biên soạn trong ngân sách model.",
+            "compilation_segment_too_large",
+        )
     expected = [ref for unit in build_units(documents) for ref in owned_refs([unit])]
     actual = [ref for plan in finalized for ref in plan.owned]
+
     def atoms(refs):
         result = []
         for ref in refs:
             base = (ref["ocr_run_id"], ref["page"], ref["evidence_id"])
-            result.extend(
-                (*base, row) for row in ref.get("rows", [None])
-            )
+            result.extend((*base, row) for row in ref.get("rows", [None]))
         return result
+
     owned = atoms(actual)
     if len(owned) != len(set(owned)) or set(owned) != set(atoms(expected)):
         raise _invalid("Kế hoạch biên soạn thiếu hoặc trùng nguồn.", "compilation_plan_invalid")
@@ -715,6 +855,7 @@ def manifest_for(
     return {
         "schema_version": MANIFEST_VERSION,
         "planner_version": PLANNER_VERSION,
+        "projection_version": plans[0].projection if plans else PROJECTION_V4,
         "run_id": run.id,
         "input_sha256": run.input_sha256,
         "topic": run.topic,
@@ -722,8 +863,11 @@ def manifest_for(
             "input_capacity_tokens": capacity,
             "output_tokens": output_tokens,
             "target_ratio": TARGET_RATIO,
-            "output_content_ratio": OUTPUT_CONTENT_RATIO,
-            "output_estimate_kind": "owned_utf8_copy_size_heuristic",
+            "output_content_share": OUTPUT_CONTENT_SHARE,
+            "output_bytes_per_token": OUTPUT_BYTES_PER_TOKEN,
+            "output_content_bytes": output_content_bytes(output_tokens),
+            "output_estimate_kind": "estimated_written_bytes_heuristic",
+            "row_interpretation_bytes": ROW_INTERPRETATION_BYTES,
         },
         "segments": [plan.scope_dict() for plan in plans],
         "source": {
@@ -765,6 +909,7 @@ def plan_from_scope(scope: dict) -> SegmentPlan:
         input_tokens=scope.get("input_tokens", 0),
         schema_sha256=scope.get("schema_sha256"),
         output_size_estimate=scope.get("output_size_estimate", 0),
+        projection=scope.get("projection_version", PROJECTION_V2),
     )
 
 
@@ -814,6 +959,27 @@ def _merge_sections(parts: list[dict]) -> list[dict]:
                     {"text": paragraph["text"], "citations": list(paragraph["citations"])}
                 )
     return [section for section in sections if section["paragraphs"]]
+
+
+def merge_parts_in_order(
+    parts: list[tuple[int, dict]],
+    topic: str,
+    documents: list[dict],
+    run_id: str,
+    *,
+    partial: bool,
+    segmentation: dict,
+) -> dict:
+    """Merge by source index, never by completion order."""
+    ordered = [part for _, part in sorted(parts, key=lambda item: item[0])]
+    return merge_drafts(
+        ordered,
+        topic,
+        documents,
+        run_id,
+        partial=partial,
+        segmentation=segmentation,
+    )
 
 
 def merge_drafts(

@@ -242,3 +242,31 @@ async def test_discovery_rejects_ambiguous_duplicate_ids():
         {"data": [{"id": "a", "max_model_len": 1024}, {"id": "a", "max_model_len": 8192}]},
     )
     assert result.outcome == "failed" and result.model_metadata == []
+
+
+@pytest.mark.parametrize("count", [638, 5000])
+async def test_gateway_catalog_preserves_models_beyond_the_first_500(count):
+    rows = [{"id": f"gateway/model-{index}"} for index in range(count)]
+    rows[-1] = {"id": "ollama/gpt-oss:120b"}
+    result, requests = await call("discovery", {"object": "list", "data": rows})
+    assert result.outcome == "ok" and result.http_status == 200
+    assert len(result.models) == len(result.model_metadata) == count
+    assert "ollama/gpt-oss:120b" in result.models
+    assert len(requests) == 1
+
+
+async def test_gateway_catalog_over_limit_is_explicit_not_silently_truncated():
+    result, _ = await call(
+        "discovery", {"data": [{"id": f"model-{index}"} for index in range(5001)]}
+    )
+    assert result.code == "provider_catalog_too_large" and result.http_status == 200
+    assert result.models == [] and result.model_metadata == []
+
+
+@pytest.mark.parametrize("tail", [{"id": "model-0"}, {"id": TARGET.api_key}, {"id": 123}])
+async def test_large_catalog_still_validates_every_row(tail):
+    rows = [{"id": f"model-{index}"} for index in range(637)] + [tail]
+    result, _ = await call("discovery", {"data": rows})
+    assert result.code == "provider_response_invalid"
+    assert result.models == [] and result.model_metadata == []
+    assert TARGET.api_key not in repr(result)

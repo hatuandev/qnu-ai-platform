@@ -2,20 +2,19 @@
 
 A run created with ``qnu.compiler.plan/v2`` stored ``input_sha256`` over exactly
 these bytes. Resuming such a run must rebuild the same request, so this module is
-never edited: new behaviour goes into ``segments.py`` under a new version. The
-pinning test in ``tests/unit/test_compiler_projection_746.py`` fails if a byte here
-changes.
+never edited: new behaviour lives in ``segments.py`` under a new version. The
+pinning test in ``tests/unit/test_compiler_projection_746.py`` fails if any byte of
+the v2 payload or prompt changes.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 
 from qnu.domains.knowledge.compilation.drafting import SYSTEM_PROMPT
 from qnu.domains.knowledge.compilation.projection import citations_in, project_documents
-from qnu.domains.knowledge.compilation.segments import Unit, _ref_key, owned_refs
-from qnu.domains.knowledge.compilation.schemas import DraftSection
+from qnu.domains.knowledge.compilation.schemas import SegmentDraftContent
+from qnu.domains.knowledge.compilation.units import Unit, owned_refs, ref_key
 from qnu.ports.chat_model import ChatMessage
 
 PROMPT_VERSION = "qnu.compiler.segment.prompt/v2"
@@ -24,14 +23,6 @@ MANIFEST_VERSION = "qnu.compiler.segment-manifest/v1"
 TARGET_RATIO = 0.6
 OUTPUT_CONTENT_RATIO = 0.25
 CONTEXT_TYPES = {"title", "header", "caption", "footnote"}
-
-
-class SegmentDraftContentV2:
-    """Only used to keep the frozen module self-describing; parsing lives in v3."""
-
-
-def _sha(value: bytes) -> str:
-    return hashlib.sha256(value).hexdigest()
 
 
 def header_row_indexes(rows: list[list[dict]]) -> tuple[int, ...]:
@@ -95,7 +86,7 @@ def structural_context(documents: list[dict], unit: Unit) -> list[dict]:
 
 def context_refs(documents: list[dict], units: list[Unit]) -> tuple[dict, ...]:
     """Repeat table headers and nearby title/caption/footnote blocks as context only."""
-    owned = {_ref_key(ref) for ref in owned_refs(units)}
+    owned = {ref_key(ref) for ref in owned_refs(units)}
     refs: list[dict] = []
     seen: set[tuple] = set()
     for unit in units:
@@ -113,7 +104,7 @@ def context_refs(documents: list[dict], units: list[Unit]) -> tuple[dict, ...]:
         candidates.extend(_adjacent_context(documents, unit))
         candidates.extend(structural_context(documents, unit))
         for ref in candidates:
-            key = _ref_key(ref)
+            key = ref_key(ref)
             if key in owned or key in seen:
                 continue
             seen.add(key)
@@ -214,10 +205,7 @@ def segment_schema(citations: list[str]) -> dict:
 def segment_messages(payload: dict, index: int, total: int) -> list[ChatMessage]:
     return [
         ChatMessage("system", segment_system(index, total)),
-        ChatMessage(
-            "user",
-            json.dumps(payload, ensure_ascii=False, sort_keys=True),
-        ),
+        ChatMessage("user", json.dumps(payload, ensure_ascii=False, sort_keys=True)),
     ]
 
 
@@ -235,11 +223,3 @@ def estimate_output_size(documents: list[dict], units: list[Unit]) -> int:
             citation = f"{unit.ocr_run_id}:{cell['evidence_id']}"
             size += len(json.dumps([text, citation], ensure_ascii=False).encode("utf-8"))
     return size
-
-
-from qnu.domains.knowledge.compilation.schemas import DraftSection  # noqa: E402,F401
-from qnu.domains.knowledge.compilation.segments import SegmentDraftContent  # noqa: E402
-
-# The v2 schema function referenced this model; keep the name resolvable.
-SegmentDraftContent = SegmentDraftContent
-DraftSection = DraftSection

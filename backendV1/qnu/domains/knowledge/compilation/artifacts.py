@@ -27,6 +27,7 @@ TYPES = {
 }
 
 SEGMENT_TYPES = {
+    "markdown": ("md", "text/markdown; charset=utf-8"),
     "raw_response": ("bin", "application/octet-stream"),
     "draft_json": ("json", "application/json"),
 }

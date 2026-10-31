@@ -26,6 +26,7 @@ TYPES = {
 SEGMENT_TYPES = {
     "raw_response": "application/octet-stream",
     "assessment_json": "application/json",
+    "markdown": "text/markdown; charset=utf-8",
 }
 
 

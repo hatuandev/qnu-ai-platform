@@ -58,7 +58,17 @@ def document(*, text: str = "Nội dung nguồn.") -> dict:
         "canonical_sha256": "1" * 64,
         "manifest_sha256": "2" * 64,
         "identity": {"revision_id": "rev_one"},
-        "evidence": {"ev_title": {}, "ev_table": {}},
+        # The canonical OCR document indexes every table cell separately; the
+        # citation map is built from this evidence map, so a fixture without cells
+        # would hide a missing cell citation.
+        "evidence": {
+            "ev_title": {"kind": "text", "page": 1},
+            "ev_table": {"kind": "table", "page": 1},
+            "ev_h1": {"kind": "table_cell", "page": 1},
+            "ev_h2": {"kind": "table_cell", "page": 1},
+            "ev_c1": {"kind": "table_cell", "page": 1},
+            "ev_c2": {"kind": "table_cell", "page": 1},
+        },
         "pages": [
             {
                 "page_number": 1,
@@ -123,8 +133,8 @@ def test_table_rows_are_atomic_and_headers_are_context_only():
     assert table["rows"][1][0]["text"] == "Công nghệ"
     assert "ev_c3" not in citations
     assert "ocr_one:ev_h1" in citations and "ocr_one:ev_c1" in citations
-    assert payload["segment"]["owned"] == list(owned)
-    assert payload["segment"]["context_only"] == list(context)
+    assert payload["part"]["owned"] == list(owned)
+    assert payload["part"]["context_only"] == list(context)
 
 
 def test_output_budget_splits_even_when_all_input_fits():
@@ -137,32 +147,56 @@ def test_output_budget_splits_even_when_all_input_fits():
     unlimited = split.plan_segments([doc], "Nội dung", capacity=200_000, structured=True)
     assert len(unlimited) == 1
     tight = split.plan_segments(
-        [doc], "Nội dung", capacity=200_000, structured=True, output_tokens=8192
+        [doc], "Nội dung", capacity=200_000, structured=True, output_tokens=2048
     )
     generous = split.plan_segments(
         [doc], "Nội dung", capacity=200_000, structured=True, output_tokens=16384
     )
-    assert len(tight) > 1 and len(generous) <= len(tight)
-    for plans, budget in ((tight, 8192), (generous, 16384)):
+    assert len(tight) > len(generous)
+    for plans, budget in ((tight, 2048), (generous, 16384)):
         finalized = split.finalize_plans(
             plans, [doc], "Nội dung", capacity=200_000, structured=True
         )
         assert all(
-            plan.output_size_estimate <= budget * split.OUTPUT_CONTENT_RATIO
+            plan.output_size_estimate <= split.output_content_bytes(budget)
             for plan in finalized
         )
         assert sum(len(plan.units) for plan in finalized) == 12
     assert doc == original
 
 
-def test_output_budget_never_crops_one_oversized_row():
+def test_moderate_source_with_default_output_stays_in_one_part():
+    """The previous proxy used 25% of the output allowance as source bytes: too small."""
     doc = document()
-    doc["pages"][0]["blocks"][1]["table"]["rows"][1][0]["text"] = "x" * 5000
+    doc["pages"][0]["blocks"] = [
+        {"evidence_id": f"ev_{index}", "type": "text", "text": "Dữ kiện nguồn. " * 30}
+        for index in range(12)
+    ]
+    plans = split.plan_segments(
+        [doc], "Nội dung", capacity=122_880, structured=True, output_tokens=8192
+    )
+    assert len(plans) == 1
+    assert split.estimate_output_size([doc], split.build_units([doc])) <= (
+        split.output_content_bytes(8192)
+    )
+
+
+def test_output_budget_never_crops_one_oversized_unit():
+    prose = document()
+    prose["pages"][0]["blocks"] = [
+        {"evidence_id": "ev_big", "type": "text", "text": "x" * 5000}
+    ]
     with pytest.raises(AppException) as error:
         split.plan_segments(
-            [doc], "Nội dung", capacity=200_000, structured=False, output_tokens=8192
+            [prose], "Nội dung", capacity=200_000, structured=False, output_tokens=1024
         )
     assert error.value.code == "compilation_segment_output_too_large"
+    # A literal cell is attached by the backend, so its size is an input constraint.
+    table = document()
+    table["pages"][0]["blocks"][1]["table"]["rows"][1][0]["text"] = "x" * 5000
+    with pytest.raises(AppException) as error:
+        split.plan_segments([table], "Nội dung", capacity=2000, structured=False)
+    assert error.value.code == "compilation_segment_too_large"
 
 
 def test_planner_packs_blocks_within_capacity_without_duplicate_ownership():
@@ -181,13 +215,13 @@ def test_planner_packs_blocks_within_capacity_without_duplicate_ownership():
         )
     original = copy.deepcopy(documents)
     plans = split.plan_segments(
-        documents, "Chủ đề", capacity=6000, structured=False
+        documents, "Chủ đề", capacity=20_000, structured=False
     )
     plans = split.finalize_plans(
-        plans, documents, "Chủ đề", capacity=6000, structured=False
+        plans, documents, "Chủ đề", capacity=20_000, structured=False
     )
     assert len(plans) > 1
-    assert all(plan.input_tokens <= 6000 for plan in plans)
+    assert all(plan.input_tokens <= 20_000 for plan in plans)
     owned = [
         (ref["ocr_run_id"], ref["evidence_id"], tuple(ref.get("rows", ())))
         for plan in plans

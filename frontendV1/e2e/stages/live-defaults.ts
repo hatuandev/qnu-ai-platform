@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { type LiveProfile, profileForCapability } from "./live-profile";
 import { type Api, type Checkpoint, directory, sha256 } from "./session";
 
 type Capability = "chat" | "embedding" | "rerank" | "ocr";
@@ -39,11 +40,7 @@ interface Observation {
 export async function liveDefaults(api: Api, state: Checkpoint) {
   const file = process.env.E2E_MODEL_PROFILE;
   if (!file) throw new Error("BLOCKED: thiếu profile model cho pipeline live.");
-  const profile = JSON.parse(readFileSync(file, "utf8")) as {
-    base_url: string;
-    models: Record<Capability, string>;
-    test_monthly_token_limit: number;
-  };
+  const profile = JSON.parse(readFileSync(file, "utf8")) as LiveProfile;
   if (
     !Number.isSafeInteger(profile.test_monthly_token_limit) ||
     profile.test_monthly_token_limit <= 0 ||
@@ -56,20 +53,26 @@ export async function liveDefaults(api: Api, state: Checkpoint) {
   const connections = await api.get<
     { id: string; base_url: string; is_active: boolean }[]
   >("/modelops/connections");
-  const connection = connections.filter(
-    (row) =>
-      row.is_active &&
-      row.base_url.replace(/\/+$/, "") === profile.base_url.replace(/\/+$/, ""),
-  );
-  if (connection.length !== 1)
-    throw new Error(
-      "BLOCKED: cần đúng một nhà cung cấp QNU đang bật theo profile.",
-    );
-  const providers = await api.get<RuntimeProvider[]>(
-    `/modelops/connections/${connection[0].id}/models`,
-  );
   const defaults = {} as RuntimeDefaults;
   for (const capability of ["chat", "embedding", "rerank", "ocr"] as const) {
+    const target = profileForCapability(
+      profile,
+      state.chatSelection,
+      capability,
+    );
+    const connection = connections.filter(
+      (row) =>
+        row.is_active &&
+        row.base_url.replace(/\/+$/, "") ===
+          target.base_url.replace(/\/+$/, ""),
+    );
+    if (connection.length !== 1)
+      throw new Error(
+        "BLOCKED: cần đúng một nhà cung cấp đang bật cho model đã chọn.",
+      );
+    const providers = await api.get<RuntimeProvider[]>(
+      `/modelops/connections/${connection[0].id}/models`,
+    );
     const stage = `model-${capability}`;
     const result = state.results[stage];
     if (result?.status !== "PASS" || !result.report)
@@ -86,10 +89,10 @@ export async function liveDefaults(api: Api, state: Checkpoint) {
     if (
       !provider?.is_active ||
       provider.parent_id !== connection[0].id ||
-      provider.model_name !== profile.models[capability] ||
+      provider.model_name !== target.models[capability] ||
       !provider.capabilities.includes(capability) ||
       provider.base_url.replace(/\/+$/, "") !==
-        profile.base_url.replace(/\/+$/, "")
+        target.base_url.replace(/\/+$/, "")
     ) {
       throw new Error(
         `BLOCKED: model ${capability} đã thay đổi hoặc không khớp profile, chạy lại test model.`,

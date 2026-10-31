@@ -1,5 +1,6 @@
 """Offline provider bootstrap regressions; no server, credential or browser required."""
 
+import io
 import json
 import tempfile
 import unittest
@@ -110,6 +111,202 @@ class ProviderSetupTests(unittest.TestCase):
                 self.profile,
             )
         client.assert_not_called()
+
+    def run_two_providers(self, *, limits, answers):
+        profile = read(self.profile)
+        profile.update(
+            models={"chat": "qwen-test"},
+            additional_chat_provider={
+                "base_url": "https://router.test/v1",
+                "models": {"chat": "ollama/gpt-oss:120b"},
+            },
+        )
+        save(self.profile, profile)
+        providers, keys, sent = [], {}, []
+        secrets = {
+            "conn_qnu": "synthetic-qnu-secret",
+            "conn_router": "synthetic-router-secret",
+        }
+
+        def handle(incoming):
+            suffix = incoming.url.path.removeprefix("/platform/v1alpha1/")
+            body = json.loads(incoming.content) if incoming.content else {}
+            if suffix == "auth/login":
+                return httpx.Response(200, json={"access_token": "test-admin"})
+            if suffix == "modelops/connections":
+                if incoming.method == "GET":
+                    return httpx.Response(200, json=providers)
+                row = {
+                    **body,
+                    "id": "conn_qnu" if body["family"] == "qnu" else "conn_router",
+                    "is_active": True,
+                }
+                providers.append(row)
+                return httpx.Response(201, json=row)
+            if suffix.endswith("/keys"):
+                identifier = suffix.split("/")[2]
+                if incoming.method == "POST":
+                    self.assertEqual(body["secret"], secrets[identifier])
+                    sent.append(identifier)
+                    keys[identifier] = [{"id": "key_" + identifier, "status": "active"}]
+                    return httpx.Response(201, json=keys[identifier][0])
+                return httpx.Response(200, json=keys.get(identifier, []))
+            if suffix.endswith("/test"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "ok": True,
+                        "check_id": "diag_router",
+                        "models": ["ollama/gpt-oss:120b"],
+                    },
+                )
+            if suffix.endswith("/sync-capacity"):
+                return httpx.Response(
+                    200,
+                    json=[
+                        {
+                            "id": "model_router",
+                            "model_name": "ollama/gpt-oss:120b",
+                            "token_limits": limits,
+                        }
+                    ],
+                )
+            if suffix.endswith("/models"):
+                return httpx.Response(
+                    200, json=[] if incoming.method == "GET" else {"id": "model_router"}
+                )
+            if (
+                suffix == "modelops/providers/model_router"
+                and incoming.method == "PATCH"
+            ):
+                sent.append(body)
+                return httpx.Response(200, json={"id": "model_router"})
+            raise AssertionError(suffix)
+
+        client = httpx.Client(
+            base_url="http://127.0.0.1:1234/platform/v1alpha1/",
+            transport=httpx.MockTransport(handle),
+        )
+        output = io.StringIO()
+        with (
+            patch.object(setup.httpx, "Client", return_value=client),
+            patch.object(setup.sys.stdin, "isatty", return_value=True),
+            patch.object(
+                setup.getpass, "getpass", side_effect=secrets.values()
+            ) as prompt,
+            patch("builtins.input", side_effect=answers) as choice,
+            patch("sys.stdout", output),
+        ):
+            setup.prepare_provider(
+                self.directory, {"DEV_ACCESS_PASSWORD": "test-password"}, self.profile
+            )
+        self.assertIn("server QNU", prompt.call_args_list[0].args[0])
+        self.assertIn("9router", prompt.call_args_list[1].args[0])
+        for value in secrets.values():
+            self.assertNotIn(value, output.getvalue())
+            for file in self.directory.iterdir():
+                self.assertNotIn(value, file.read_text())
+        return read(self.directory / "checkpoint.json"), sent, choice
+
+    def test_two_hidden_keys_and_selected_router_use_distinct_modelops_connections(
+        self,
+    ):
+        state, sent, choice = self.run_two_providers(
+            limits={"context_window_tokens": 65536, "max_output_tokens": 4096},
+            answers=["2"],
+        )
+        self.assertEqual(sent, ["conn_qnu", "conn_router"])
+        self.assertEqual(state["providerSetup"]["keyId"], "key_conn_qnu")
+        self.assertEqual(state["routerProviderSetup"]["keyId"], "key_conn_router")
+        self.assertEqual(state["chatSelection"], "router")
+        self.assertEqual(choice.call_count, 1)
+
+    def test_undeclared_router_capacity_uses_only_operator_values(self):
+        state, sent, choice = self.run_two_providers(
+            limits={}, answers=["2", "65536", "4096"]
+        )
+        self.assertEqual(state["chatSelection"], "router")
+        self.assertEqual(
+            sent[-1],
+            {
+                "token_limits": {
+                    "context_window_tokens": 65536,
+                    "max_output_tokens": 4096,
+                }
+            },
+        )
+        self.assertEqual(choice.call_count, 3)
+
+    def test_qnu_selection_does_not_require_or_invent_router_capacity(self):
+        state, sent, choice = self.run_two_providers(limits={}, answers=["1"])
+        self.assertEqual(state["chatSelection"], "qnu")
+        self.assertEqual(sent, ["conn_qnu", "conn_router"])
+        self.assertEqual(choice.call_count, 1)
+
+    def test_unverified_capacity_cannot_be_bypassed_by_empty_input(self):
+        with self.assertRaisesRegex(RuntimeError, "giới hạn token thực tế"):
+            self.run_two_providers(limits={}, answers=["2", ""])
+
+    def test_invalid_choice_is_not_saved_as_a_default(self):
+        with self.assertRaisesRegex(RuntimeError, "Chọn 1 hoặc 2"):
+            self.run_two_providers(limits={}, answers=["3"])
+        self.assertNotIn("chatSelection", read(self.directory / "checkpoint.json"))
+
+    def test_router_discovery_error_distinguishes_contract_failure_from_missing_model(
+        self,
+    ):
+        state = {"routerProviderSetup": {"connectionId": "conn_router", "keyId": "key"}}
+        profile = {"models": {"chat": "ollama/gpt-oss:120b"}}
+        with (
+            patch.object(
+                setup,
+                "request",
+                return_value={
+                    "ok": False,
+                    "code": "provider_catalog_too_large",
+                    "http_status": 200,
+                    "detail": self.secret,
+                },
+            ) as request,
+            self.assertRaisesRegex(
+                RuntimeError, "provider_catalog_too_large, HTTP 200"
+            ) as error,
+        ):
+            setup.prepare_router_capacity(None, state, profile)
+        request.assert_called_once()
+        self.assertNotIn(self.secret, str(error.exception))
+        with (
+            patch.object(
+                setup, "request", return_value={"ok": True, "models": ["other"]}
+            ),
+            self.assertRaisesRegex(RuntimeError, "kết nối thành công"),
+        ):
+            setup.prepare_router_capacity(None, state, profile)
+
+    def test_router_discovery_error_does_not_echo_arbitrary_diagnostic_values(self):
+        with (
+            patch.object(
+                setup,
+                "request",
+                return_value={
+                    "ok": False,
+                    "code": self.secret,
+                    "http_status": self.secret,
+                },
+            ),
+            self.assertRaisesRegex(RuntimeError, "diagnostic_failed") as error,
+        ):
+            setup.prepare_router_capacity(
+                None,
+                {
+                    "routerProviderSetup": {
+                        "connectionId": "conn_router",
+                        "keyId": "key",
+                    }
+                },
+                {"models": {"chat": "ollama/gpt-oss:120b"}},
+            )
+        self.assertNotIn(self.secret, str(error.exception))
 
 
 if __name__ == "__main__":

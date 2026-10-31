@@ -66,7 +66,7 @@ class CompatibilityChat(FakeChat):
         return 200, self.last_raw
 
 
-def test_single_call_run_exposes_progress_without_inventing_segments(client):
+def test_new_small_run_uses_one_refinable_node_and_exposes_its_artifacts(client):
     data = processed_input(client, code="compat-progress")
     with CompatibilityChat() as chat:
         chat_provider(client, data, chat.base_url)
@@ -79,12 +79,14 @@ def test_single_call_run_exposes_progress_without_inventing_segments(client):
         progress = client.get(base + "/progress")
         assert progress.status_code == 200, progress.text
         body = progress.json()
-        assert body["status"] == "completed" and body["segmented"] is False
-        assert body["total"] == 1 and body["completed"] == 1 and body["segments"] == []
-        assert body["latest_output_generation"] is None
+        assert body["status"] == "completed" and body["segmented"] is True
+        assert body["total"] == 1 and body["completed"] == 1
+        assert len(body["segments"]) == 1 and len(body["nodes"]) == 1
+        assert body["latest_output_generation"] is not None
 
-        assert client.get(base + "/draft?partial=true").status_code == 404
-        assert client.get(base + "/segments/1/raw").status_code == 404
+        assert client.get(base + "/draft?partial=true").status_code == 200
+        assert client.get(base + "/segments/1/raw").status_code == 200
+        assert client.get(base + "/segments/1/artifacts/markdown").status_code == 200
 
         review = client.post(
             base + "/reviews",

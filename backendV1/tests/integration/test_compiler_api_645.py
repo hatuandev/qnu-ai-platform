@@ -102,7 +102,7 @@ def test_compiler_draft_retains_tables_citations_raw_and_single_delivery(client)
     [
         ("bad_citation", "compilation_citation_invalid"),
         ("bad_schema", "compilation_draft_invalid"),
-        ("truncated", "chat_output_truncated"),
+        ("truncated", "compilation_refinement_atomic_limit"),
         ("http_error", "chat_provider_unavailable"),
     ],
 )
@@ -119,9 +119,13 @@ def test_invalid_draft_never_succeeds_and_raw_is_preserved(client, mode, code):
         url = data["url"] + "/" + run_id
         assert client.get(url).json()["error_code"] == code
         assert client.get(url + "/draft").status_code == 409
-        assert client.get(url + "/raw").content == chat.last_raw
+        raw = client.get(url + "/raw")
+        if mode == "truncated":
+            assert raw.json()["choices"][0]["finish_reason"] == "length"
+        else:
+            assert raw.content == chat.last_raw
         assert execute_compile(client, run_id) == "not_claimed"
-        assert len(chat.requests) == 1
+        assert 1 < len(chat.requests) <= 5 if mode == "truncated" else len(chat.requests) == 1
 
 
 def test_compiler_access_is_checked_at_api_and_worker(client):
@@ -187,7 +191,10 @@ def test_compiler_rechecks_provider_and_quota_before_http(client):
 
 
 def test_compiler_expired_inflight_request_is_not_resent(client):
-    from qnu.domains.knowledge.compilation.models import utcnow
+    from sqlalchemy import select
+
+    from qnu.domains.knowledge.compilation.models import CompilationSegment, utcnow
+    from qnu.platform.database import AsyncSessionFactory
 
     data = processed_input(client)
     with FakeChat() as chat:
@@ -202,6 +209,19 @@ def test_compiler_expired_inflight_request_is_not_resent(client):
             request_started_at=utcnow(),
             lease_expires_at=utcnow() - timedelta(seconds=10),
         )
+
+        async def mark_durable_leaf_inflight():
+            # New runs dispatch from leaf checkpoints, not the legacy run marker.
+            async with AsyncSessionFactory() as db:
+                leaf = await db.scalar(
+                    select(CompilationSegment).where(
+                        CompilationSegment.run_id == run_id,
+                    )
+                )
+                leaf.status, leaf.request_started_at = "running", utcnow()
+                await db.commit()
+
+        client.portal.call(mark_durable_leaf_inflight)
         assert execute_compile(client, run_id) == "uncertain"
         assert not chat.requests
         assert execute_compile(client, run_id) == "not_claimed"

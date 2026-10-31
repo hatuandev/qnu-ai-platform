@@ -59,6 +59,15 @@ class DraftContent(BaseModel):
     unknowns: list[str] = Field(max_length=100)
 
 
+class SegmentDraftContent(BaseModel):
+    """A part may be context-only, hence an optional title and empty sections."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+    title: str | None = Field(None, max_length=500)
+    sections: list[DraftSection] = Field(default_factory=list, max_length=100)
+    unknowns: list[str] = Field(default_factory=list, max_length=100)
+
+
 class CompilationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -97,6 +106,7 @@ class CompilationSegmentProgress(BaseModel):
     error_code: str | None
     started_at: datetime | None
     finished_at: datetime | None
+    duration_seconds: float | None = None
 
 
 class CompilationProgress(BaseModel):
@@ -117,3 +127,12 @@ class CompilationProgress(BaseModel):
     latest_output_generation: int | None
     latest_output_partial: bool | None
     segments: list[CompilationSegmentProgress]
+    # Observed scheduling facts; there is deliberately no estimated time remaining.
+    received: int = 0
+    concurrency: int = 1
+    active_segments: list[int] = Field(default_factory=list)
+    elapsed_seconds: float | None = None
+    planner_version: str | None = None
+    queue_timeout_seconds: int = 0
+    nodes: list[dict] = Field(default_factory=list)
+    refinement_timeout_seconds: int = 0

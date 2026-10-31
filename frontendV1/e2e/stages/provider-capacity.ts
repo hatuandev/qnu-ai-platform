@@ -7,7 +7,8 @@ import type { Api } from "./session";
 
 export type ProviderSetupProfile = {
   base_url: string;
-  models: Record<Capability, string>;
+  models: Partial<Record<Capability, string>>;
+  observed_model_aliases?: Record<string, string[]>;
   model_runtime?: Partial<
     Record<
       Capability,
@@ -59,6 +60,7 @@ export async function configureTestModelCapacity(
   connectionId: string,
   profile: ProviderSetupProfile,
   checkId: string | null | undefined,
+  requireCapacity = true,
 ) {
   if (!checkId)
     throw new Error(
@@ -83,11 +85,15 @@ export async function configureTestModelCapacity(
       !model.is_active ||
       model.base_url.replace(/\/+$/, "") !==
         profile.base_url.replace(/\/+$/, "") ||
-      !model.capabilities.includes(capability) ||
-      model.capacity_status !== "configured" ||
-      !model.token_limits
+      !model.capabilities.includes(capability)
     ) {
       throw new Error(`BLOCKED: chưa đồng bộ đúng capacity cho ${name}.`);
+    }
+    if (model.capacity_status !== "configured" || !model.token_limits) {
+      if (!requireCapacity) continue;
+      throw new Error(
+        `BLOCKED: chưa đồng bộ đúng capacity cho ${name}; cấu hình giới hạn thật trong ModelOps rồi chạy lại.`,
+      );
     }
     const patch = runtimePatch(model, profile, capability);
     if (Object.keys(patch).length) {

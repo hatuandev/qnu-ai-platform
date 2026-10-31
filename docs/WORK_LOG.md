@@ -1,5 +1,23 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- **Context755 — Review chia phần theo output và phục hồi truncated:** planner `review_parts_v4` tách ngân sách 4096 cho reasoning/JSON, chia trước khi gửi; migration `0010` + refinement cha–con chỉ chia phần `chat_output_truncated`, giữ phần `completed`, lưu JSON/MD từng phần, đối chiếu coverage lá và phục hồi E2E. 25 unit trọng tâm PASS, full unit 499 PASS/1 FAIL nền `source_purge_716`, FE 16 PASS + TS/Biome/build PASS; live E2E NOT RUN do Docker dừng. [Nhật ký755](./nhat_ky/2026-10-31_phien_755_review_chia_phan_va_phuc_hoi_truncated.md).
+
+- **Context754 — E2E nhận alias 9router:** khai báo riêng ollama/gpt-oss:120b → gpt-oss:120b; giữ requested/capability/provider và trace, model khác vẫn FAIL. 14 regression/E2E TS/Biome/build PASS; live model-chat sau sửa NOT RUN. Đợi OCR rồi chạy lại model-chat; không restart/cleanup/init. [Nhật ký754](./nhat_ky/2026-10-31_phien_754_test_alias_model_9router.md).
+
+- **Context753 — Sửa catalog 9router:** HTTP200 có 638 model nhưng trần cũ 500; nâng 5000 có kiểm tra, setup báo lỗi rõ. 40 adapter/23 script PASS, live discovery PASS; full gate 488 PASS/1 FAIL nền/69 SKIP. Chưa restart/inference/E2E; giữ phiên/key, mở lại serve rồi provider-setup. [Nhật ký753](./nhat_ky/2026-10-31_phien_753_sua_catalog_9router.md).
+
+- **Context752 — E2E9router/chọnchat:** keyQNU rồi key9router nhậpẩn, chọnQwen hoặcGPT-OSS làm chat/Compiler/review; OCR/embed/rerank giữQNU. Capacity từserver hoặc operator, khôngđoán.21script/28FE/E2ETS/build PASS; live9routerNOTRUNchờkey, khôngđổi dữliệu/runtimephiên751. [Nhật ký752](./nhat_ky/2026-10-30_phien_752_e2e_9router_model_mac_dinh.md).
+
+- **Context751 — Compiler cha–con và review có context đầy đủ:** planner v5/migration0009, refinement có giới hạn, JSON/MD liên kết, replay/unknown usage và model4K; review literal, concurrency2, compactv3/schema contract2. Full unit479PASS/1FAIL nền, FE17PASS, integration trọng tâm đạt. Compiler live4/4/211.6s; review mới20/20/7.8phút nhưng9findings nên chặngFAIL. Không publish; serve agent đã dừng, giữ checkpoint. [Nhật ký751](./nhat_ky/2026-10-30_phien_751_compiler_refinement.md).
+
+- **2026-10-30 — Context749: admissions đọc uncertain cũ.** Test2.1s đọc run6/15 đã lỗi provider17:48; E2E chỉ replan failed nên chưa tạo v4. Chưa đủ phân biệt timeout/network; chưa sửa code/runtime hoặc chạy test. [Nhật ký749](./nhat_ky/2026-10-30_phien_749_chan_doan_admissions_uncertain.md).
+
+- **2026-10-30 — Context748: giải phóng cổng E2E.** Serve cha đã thoát, API/worker/frontend con còn sống; đã xác minh/dừng đúng5con, ports trống. Giữ phiên7082ee7b7311 và checkpoint; người dùng mở serve rồi chạy tiếp compilation. Không cleanup/init/test/model. [Nhật ký748](./nhat_ky/2026-10-30_phien_748_dung_tien_trinh_e2e_mo_coi.md).
+
+- **2026-10-30 — Context747: sửa P1/P2 compiler song song.** Dừng hàng đợi khi lỗi/hủy, tách usage khỏi commit phần stale; v4 giữ note dài/giữa bảng, bỏ suy nối bảng; shared Redis cap chat, single-call reasoning, E2E ceil-waves/queue budget. Giữ replay v2/v3. Regression đã viết, **NOT RUN** theo yêu cầu; không restart/đổi DB/checkpoint. [Nhật ký747](./nhat_ky/2026-10-30_phien_747_sua_compiler_p1_p2.md).
+
+- **2026-10-30 — Context746: compiler chia phần song song có giới hạn.** Planner/projection v3 ước lượng nội dung sẽ viết, context theo vai trò, outline gọn; v2 đóng băng byte để run15phần đang dở dựng lại đúng `input_sha256`. ModelOps thêm `reasoning_policy_v1` có cổng `verified`; scheduler bounded2/4, mỗi phần session riêng, ghép theo `segment_index`. Đo planner8trang/105hàng →2phần ở8192. Test/build/lint/live **NOT RUN**, không restart/migration/push. [Nhật ký746](./nhat_ky/2026-10-30_phien_746_compiler_chia_phan_song_song.md).
+
 - **2026-10-30 — Context745: sửa compiler hết output.** Raw phần1:8192completion toàn reasoning, content rỗng. Planner/prompt v2 theo input+output, owned/context rõ, E2E JSON Schema và recovery một lượt theo ModelOps ceiling. Regression đã viết; test/build/lint/live NOT RUN, giữ default8192. [Nhật ký745](./nhat_ky/2026-10-30_phien_745_compiler_output_truncated.md).
 
 - **2026-10-30 — Context744: tiếp tục compiler chia phần từ OpenCode.** Giữ khung planner/segments/review/output/migration0008; sửa review chưa gọi model, ownership/provider fence, context/coverage và output blob an toàn. Thêm regression/hướng dẫn; test/build/lint/migration/live NOT RUN theo yêu cầu. [Nhật ký744](./nhat_ky/2026-10-30_phien_744_hoan_thien_compiler_chia_phan.md).

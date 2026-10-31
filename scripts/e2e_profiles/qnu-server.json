@@ -2,6 +2,15 @@
   "name": "QNU AI Server",
   "base_url": "http://100.105.13.53:8000/v1",
   "test_monthly_token_limit": 1000000,
+  "additional_chat_provider": {
+    "name": "9router Ollama",
+    "base_url": "https://qnu-9router.duckdns.org/v1",
+    "models": { "chat": "ollama/gpt-oss:120b" },
+    "observed_model_aliases": {
+      "ollama/gpt-oss:120b": ["gpt-oss:120b"]
+    },
+    "model_runtime": { "chat": { "timeout_seconds": 300 } }
+  },
   "models": {
     "chat": "qwen3.8-27b-q4",
     "embedding": "bge-m3",

@@ -103,6 +103,7 @@ async def prepare_chat_request(
     output_schema: dict | None = None,
     task: Task = "chat",
     reasoning=None,
+    reasoning_task: str | None = None,
 ) -> tuple[ChatRuntime, ChatRequest, RequestTokenBudget]:
     await resolve_workspace_access(db, actor, workspace_id)
     provider_id, routing = await choose_target(db, workspace_id, task, provider_id)
@@ -117,6 +118,8 @@ async def prepare_chat_request(
     )
     runtime = await resolve_chat_runtime(db, workspace_id, provider_id)
     runtime = replace(runtime, routing_trace=routing)
+    if reasoning is None and reasoning_task is not None:
+        reasoning = runtime.reasoning_directive(reasoning_task)
     material = {
         "provider_id": runtime.provider_id,
         "endpoint": runtime.base_url.rstrip("/"),

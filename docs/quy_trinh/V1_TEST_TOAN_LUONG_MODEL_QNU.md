@@ -2,7 +2,7 @@
 
 Nếu cần bản lệnh ngắn sau khi bật máy hoặc muốn tạo phiên mới, xem [Chạy lại E2E](./V1_QUY_TRINH_TEST_LAI.md).
 
-Đây là hướng dẫn tổng hợp cho một phiên thử dùng server QNU thật. Thứ tự:
+Đây là hướng dẫn tổng hợp cho một phiên thử dùng server QNU và chat tùy chọn qua 9router. Thứ tự:
 
 **Test tạo provider/key/model → test đủ bốn model → gắn model mặc định vào workspace thử → upload → bóc tách/sửa → biên soạn/review → phát hành/index → hỏi đáp → quyền/API key → xóa/nạp lại.**
 
@@ -53,6 +53,20 @@ Không cần tự tạo nhà cung cấp/key/model trước. Trong phiên live đ
 
 Lệnh tự tạo QNU provider tại `http://100.105.13.53:8000/v1` nếu thiếu, kiểm tra API sửa/lưu và trạng thái. Nếu chưa có khóa active, terminal yêu cầu **nhập API key ẩn**; dán khóa rồi Enter. Không truyền key trong tham số, `.env`, source hoặc file checkpoint. Key đi từ bộ nhớ tới API ModelOps local, lưu mã hóa trong DB thử; trình duyệt test không nhận raw key. Nếu đã thêm key qua UI, lệnh dùng khóa đang bật và không hỏi lại. Key sai thì thay/xoay trong giao diện rồi chạy lại provider-setup.
 
+### Chọn Qwen hoặc GPT-OSS qua 9router
+
+Trong phiên mới, cùng lệnh `provider-setup` sẽ lần lượt:
+
+1. Hỏi key **server QNU** (nhập ẩn).
+2. Hỏi key **9router** tại `https://qnu-9router.duckdns.org/v1` (nhập ẩn, key riêng).
+3. Cho chọn **1 — Qwen trên QNU** hoặc **2 — ollama/gpt-oss:120b qua 9router** làm chat/biên soạn mặc định. Enter chọn Qwen lần đầu; chạy lại trước upload thì mặc định là lựa chọn đã lưu.
+
+Key đang active được tái dùng, không hỏi lại. Lựa chọn lưu trong checkpoint chỉ gồm mã lựa chọn/ID; key chỉ lưu qua ModelOps. Nếu chọn 9router, script lấy capacity từ discovery hiện tại. Thiếu context/output thì hỏi số token thực tế theo cấu hình Ollama của bạn; Enter trống sẽ dừng để cấu hình trong ModelOps, không đoán theo tên model hay lấy giới hạn Qwen.
+
+Hai provider/model đều được đăng ký và discovery. `model-chat` chỉ probe model chat đã chọn; `navigation` kiểm diagnostic còn current rồi đặt model đó làm chat mặc định của workspace thử. **Compiler, review và hỏi đáp** dùng model đã chọn. **Embedding, rerank và OCR** vẫn lần lượt dùng BGE-M3, BGE reranker và Nemotron ở QNU; không chuyển sang 9router.
+
+Muốn đổi lựa chọn, chạy lại provider-setup **trước upload**, rồi chạy lại model-discovery, model-chat và các chặng còn lại theo thứ tự. Phiên đã có nguồn (kể cả PDF admissions) bị chặn vì test provider có bật/tắt connection: dùng phiên mới cho lựa chọn khác. Không tự dọn phiên đang có draft/report cần giữ. Kết quả chạy thật với 9router chỉ có sau khi bạn nhập key và chạy; các test offline không chứng minh endpoint/model Ollama thật hoạt động.
+
 Sau đó bài Playwright kiểm tra kết nối thật bằng key đã lưu, catalog bốn model, tự đăng ký bốn model nếu thiếu, chặn inference khi provider bị tắt và bật lại trong finally. Nó còn mở sidebar **Nhà cung cấp**, kiểm danh sách/chi tiết và thực sự submit form tạo một provider UI tạm không credential, xác nhận lưu rồi xóa provider tạm đó qua API. QNU provider và bốn model được giữ cho pipeline. Đây là test kết hợp API và UI, chưa tự nhập raw key vào form frontend.
 
 Nếu đã có một QNU provider cùng endpoint, bài test dùng lại; cấu hình trùng sẽ BLOCKED. Không chạy provider-setup sau khi đã upload, vì bài test có bật/tắt provider; muốn kiểm lại toàn bộ quản lý nhà cung cấp ở thời điểm đó thì tạo phiên mới. provider-setup lưu capacity/dimension server công bố bằng snapshot discovery; timeout và OCR/input override bổ sung từ profile E2E có căn cứ, không tự bịa capacity. Trên FE phiên thử, mục **Nhà cung cấp** ở sidebar mở thẳng `/providers`; mục Cấu hình giữ thiết lập khác.
@@ -61,7 +75,7 @@ Các model được đăng ký:
 
 | Chức năng | Model ID | Được dùng ở đâu trong pipeline |
 | --- | --- | --- |
-| Chat | `qwen3.8-27b-q4` | Compiler, Compiler Review, trả lời và gateway chat. |
+| Chat | Chọn `qwen3.8-27b-q4` (QNU) hoặc `ollama/gpt-oss:120b` (9router) | Compiler, Compiler Review, trả lời và gateway chat. |
 | Embedding | `bge-m3` | Tạo chỉ mục và vector truy vấn. |
 | Rerank | `bge-reranker-v2-m3` | Xếp hạng lại ứng viên sau hybrid search trong hỏi đáp. |
 | OCR | `nemotron-parse` | OCR trang scan hoặc trang không đủ text native. PDF/DOCX có chữ vẫn dùng native-first theo backend. |
@@ -109,7 +123,7 @@ Chạy từng dòng theo thứ tự, chỉ chuyển tiếp khi đạt:
 .\test-v1-e2e.ps1 run model-ocr --headed
 ```
 
-Discovery kiểm đủ bốn model trong catalog; bốn lệnh sau thực sự gửi dữ liệu mẫu nhỏ tới model qua diagnostic API ModelOps. HTTP200 quản trị chưa đủ: outcome, upstream HTTP và schema adapter phải hợp lệ. Không có model/key thì BLOCKED, auth/timeout/phản hồi sai thì FAIL.
+Discovery kiểm cả catalog QNU và 9router; bốn lệnh sau gửi dữ liệu mẫu nhỏ tới model theo lựa chọn ở trên qua diagnostic API ModelOps. HTTP200 quản trị chưa đủ: outcome, upstream HTTP và schema adapter phải hợp lệ. Không có model/key thì BLOCKED, auth/timeout/phản hồi sai thì FAIL.
 
 Các diagnostic giữ trong lịch sử ModelOps, kết quả quan sát nằm trong `model-observation.json` của từng lượt. Đây là kiểm tra hợp đồng inference, chưa phải đánh giá chất lượng tài liệu thật.
 
@@ -143,7 +157,7 @@ Giữ nguyên phiên và cửa sổ serve. Chạy tiếp:
 .\test-v1-e2e.ps1 run lifecycle --headed
 ```
 
-Trong live mode, navigation bắt buộc provider-setup và cả năm chặng model đã PASS. Nó đọc lại đúng model/provider ID từ báo cáo thử và lịch sử current trong DB, kiểm capacity/dimension/OCR budget, rồi cấp riêng bốn model đó làm default theo capability cho workspace E2E. Không lấy model đầu tiên trong danh sách, không sửa default hệ thống hoặc workspace dev. Các chặng sau giữ lựa chọn này; chat kiểm trace để xác nhận Qwen và BGE rerank thực sự được dùng.
+Trong live mode, navigation bắt buộc provider-setup và cả năm chặng model đã PASS. Nó đọc lại đúng model/provider ID từ báo cáo thử và lịch sử current trong DB, kiểm capacity/dimension/OCR budget, rồi cấp riêng bốn model đó làm default theo capability cho workspace E2E. Không lấy model đầu tiên trong danh sách, không sửa default hệ thống hoặc workspace dev. Các chặng sau giữ lựa chọn này; chat kiểm trace để xác nhận model chat đã chọn và BGE rerank thực sự được dùng.
 
 Navigation tạo quota tháng hiện tại **1.000.000 token** cho workspace E2E nếu chưa có, theo `test_monthly_token_limit` trong [profile thử](../../scripts/e2e_profiles/qnu-server.json). Đây là hạn mức thử hữu hạn, không phải thông số model; không đặt lại usage, tự tăng quota đã có hoặc bỏ khóa quota. Có thể hạ hạn mức trong profile trước khi chạy. Phạm vi tự cấp quota live này phục vụ yêu cầu chạy trọn pipeline của phiên thử, không áp dụng cho dev/production. Diagnostic upstream và các request pipeline thật có thể phát sinh usage trên server AI; quota QNU không phải giới hạn chi phí upstream toàn hệ thống.
 

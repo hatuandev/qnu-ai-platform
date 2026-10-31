@@ -2,6 +2,7 @@
 
 import json
 from collections import Counter
+from copy import deepcopy
 from html import escape
 
 from pydantic import ValidationError
@@ -89,7 +90,7 @@ không thêm khóa hay nhận xét tổng kết ở ngoài. Còn nghi ngờ thì
     return [ChatMessage("system", instruction), ChatMessage("user", json_bytes(context).decode())]
 
 
-def output_schema(payload: dict) -> dict:
+def output_schema(payload: dict, *, require_references: int = 0) -> dict:
     """Key every required unit explicitly; the model supplies assessments, never identities."""
     schema = ReviewContent.model_json_schema()
     source_ids = [u["id"] for u in payload["source_units"]]
@@ -116,6 +117,29 @@ def output_schema(payload: dict) -> dict:
         # Empty counterpart lists remain valid when the assessment cannot cite a unit.
         if ref_ids:
             properties[references]["items"]["enum"] = ref_ids
+        if require_references:
+            if not ref_ids:
+                properties[references]["maxItems"] = 0
+            supported = (
+                ["covered"] if definition == "SourceAssessment" else ["supported", "contradicted"]
+            )
+            other = [status for status in properties["status"]["enum"] if status not in supported]
+            if require_references == 2:
+                # Complete branches keep required fields visible to decoders that
+                # choose an anyOf branch without merging its sibling constraints.
+                base = schema["$defs"][definition]
+                supported_branch, other_branch = deepcopy(base), deepcopy(base)
+                supported_branch["properties"]["status"]["enum"] = supported
+                supported_branch["properties"][references]["minItems"] = 1
+                other_branch["properties"]["status"]["enum"] = other
+                schema["$defs"][definition] = (
+                    {"anyOf": [supported_branch, other_branch]} if ref_ids else other_branch
+                )
+            else:
+                schema["$defs"][definition]["anyOf"] = [
+                    {"properties": {"status": {"enum": supported}, references: {"minItems": 1}}},
+                    {"properties": {"status": {"enum": other}}},
+                ]
     return schema
 
 
@@ -262,7 +286,9 @@ def report_from_assessments(
 
 
 def build_report(content: str, payload: dict, review_id: str, bundle_sha: str) -> dict:
-    return report_from_assessments(validate_content(content, payload), payload, review_id, bundle_sha)
+    return report_from_assessments(
+        validate_content(content, payload), payload, review_id, bundle_sha
+    )
 
 
 LABELS = {
@@ -301,4 +327,80 @@ def markdown_for(report: dict) -> bytes:
         if finding["suggested_action"]:
             lines += ["Gợi ý: " + escape(finding["suggested_action"]), ""]
     lines += ["## Giới hạn", "", *["- " + escape(v) for v in report["limits"]], ""]
+    return ("\n".join(lines)).encode("utf-8")
+
+
+def segment_markdown_for(
+    review,
+    segment,
+    assessed: ReviewContent,
+    payload: dict,
+    *,
+    parent_index: int | None = None,
+    child_indices: tuple[int, ...] | list[int] = (),
+) -> bytes:
+    """Render deterministic Markdown for a single review segment with source/hierarchy links."""
+    base_url = (
+        f"/platform/v1alpha1/workspaces/{review.workspace_id}"
+        f"/collections/{review.collection_id}"
+        f"/compilation-runs/{review.compilation_run_id}"
+        f"/reviews/{review.id}"
+    )
+    lines = [
+        f"# Phần review #{segment.segment_index}",
+        "",
+        f"- Review ID: `{review.id}`",
+        f"- Segment ID: `{segment.id}`",
+        f"- Bundle SHA-256: `{review.bundle_sha256}`",
+        f"- Input SHA-256: `{segment.input_sha256}`",
+        f"- Báo cáo tổng: [markdown]({base_url}/markdown) | [report]({base_url}/report)",
+    ]
+    if parent_index is not None:
+        lines.append(
+            f"- Phần cha: [phần #{parent_index}]({base_url}/segments/{parent_index}/markdown)"
+        )
+    if child_indices:
+        links = ", ".join(
+            f"[phần #{idx}]({base_url}/segments/{idx}/markdown)" for idx in child_indices
+        )
+        lines.append(f"- Phần con: {links}")
+    doc_refs = [
+        f"`{doc.get('ocr_run_id')}` (rev `{doc.get('identity', {}).get('revision_id', '')}`)"
+        for doc in payload.get("documents", [])
+        if doc.get("ocr_run_id")
+    ]
+    if doc_refs:
+        lines.append("- Nguồn đối chiếu: " + ", ".join(doc_refs))
+    lines.extend(
+        [
+            "",
+            "## Phạm vi sở hữu",
+            "",
+            f"- Đơn vị nguồn kiểm tra: {len(assessed.source_assessments)}",
+            f"- Đơn vị bản nháp kiểm tra: {len(assessed.draft_assessments)}",
+            "",
+        ]
+    )
+    if assessed.source_assessments:
+        lines.extend(["## Nhận xét đơn vị nguồn", ""])
+        for item in assessed.source_assessments:
+            refs = ", ".join(f"`{r}`" for r in item.draft_ids) or "—"
+            lines.append(
+                f"- `{escape(item.source_id)}` [{escape(item.status)}] (bản nháp: {refs}): "
+                f"{escape(item.explanation)}"
+            )
+            if item.suggested_action:
+                lines.append(f"  - Gợi ý: {escape(item.suggested_action)}")
+        lines.append("")
+    if assessed.draft_assessments:
+        lines.extend(["## Nhận xét đơn vị bản nháp", ""])
+        for item in assessed.draft_assessments:
+            refs = ", ".join(f"`{r}`" for r in item.source_ids) or "—"
+            lines.append(
+                f"- `{escape(item.draft_id)}` [{escape(item.status)}] (nguồn: {refs}): "
+                f"{escape(item.explanation)}"
+            )
+            if item.suggested_action:
+                lines.append(f"  - Gợi ý: {escape(item.suggested_action)}")
+        lines.append("")
     return ("\n".join(lines)).encode("utf-8")

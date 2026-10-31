@@ -124,6 +124,12 @@ class CompilationReviewSegment(Base):
         nullable=False,
         index=True,
     )
+    parent_segment_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("kb_compilation_review_segments.id"),
+        nullable=True,
+        index=True,
+    )
     segment_index: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="pending", index=True
@@ -154,7 +160,7 @@ class CompilationReviewSegmentArtifact(Base):
     __table_args__ = (
         UniqueConstraint("segment_id", "kind", name="uq_compilation_review_segment_artifact"),
         CheckConstraint(
-            "kind IN ('raw_response','assessment_json')",
+            "kind IN ('raw_response','assessment_json','markdown')",
             name="ck_compilation_review_segment_artifact_kind",
         ),
         CheckConstraint(

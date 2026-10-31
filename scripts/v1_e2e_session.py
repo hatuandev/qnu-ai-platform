@@ -551,7 +551,7 @@ def _serve(directory, manifest):
         save(directory / "server.json", {"running": False})
 
 
-def run_stage(directory, manifest, stage, headed):
+def run_stage(directory, manifest, stage, headed, recover=False):
     state = read(directory / "checkpoint.json")
     model_test = stage in MODEL_STAGES
     admissions_test = stage in ADMISSIONS_STAGES
@@ -612,6 +612,10 @@ def run_stage(directory, manifest, stage, headed):
             E2E_BASE_URL=f"http://127.0.0.1:{manifest['ports']['frontend']}",
             E2E_MODEL_PROFILE=str(ROOT / "scripts/e2e_profiles/qnu-server.json"),
         )
+        if recover:
+            # Explicit operator choice: replace a terminal compilation run with a
+            # new one built from the completed OCR source. Never a silent retry.
+            env["E2E_RECOVER_COMPILATION"] = "1"
         args = [
             shutil.which("node"),
             FE / "node_modules/@playwright/test/cli.js",
@@ -708,6 +712,11 @@ def main(argv=None):
     parser.add_argument("--session")
     parser.add_argument("--mode", choices=("workflow", "live"), default="workflow")
     parser.add_argument("--headed", action="store_true")
+    parser.add_argument(
+        "--recover",
+        action="store_true",
+        help="Cho phép thay lượt biên soạn đã kết thúc bằng lượt mới từ nguồn OCR đã xong.",
+    )
     args = parser.parse_args(argv)
     try:
         if args.command == "help":
@@ -729,7 +738,7 @@ def main(argv=None):
                     else [args.stage]
                 )
                 for stage in sequence:
-                    code = run_stage(directory, manifest, stage, args.headed)
+                    code = run_stage(directory, manifest, stage, args.headed, args.recover)
                     if code:
                         return code
             elif args.command in {"status", "report"}:

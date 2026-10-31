@@ -1,7 +1,6 @@
 """Durable review: one call when it fits, exhaustive parts when it does not."""
 
 import asyncio
-import hashlib
 import json
 from collections import Counter
 
@@ -11,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.models import CompilationRun, utcnow
-from qnu.domains.knowledge.compilation.review import artifacts, parts, report, service
+from qnu.domains.knowledge.compilation.review import artifacts, parts, refinement, service
+from qnu.domains.knowledge.compilation.review.literal import assess as assess_literal
 from qnu.domains.knowledge.compilation.review.models import (
     CompilationReview,
     CompilationReviewSegment,
@@ -21,6 +21,7 @@ from qnu.domains.knowledge.compilation.review.report import (
     decode_keyed,
     markdown_for,
     report_from_assessments,
+    segment_markdown_for,
     validate_content,
 )
 from qnu.domains.knowledge.compilation.review.schemas import (
@@ -30,8 +31,10 @@ from qnu.domains.knowledge.compilation.review.schemas import (
 )
 from qnu.domains.modelops.inference.service import prepare_chat_request
 from qnu.domains.modelops.public_api import resolve_chat_runtime
+from qnu.domains.modelops.reasoning import ReasoningDirective
 from qnu.domains.modelops.usage.service import usage_service
 from qnu.domains.workspaces.public_api import record_workspace_event
+from qnu.platform.database import AsyncSessionFactory
 from qnu.platform.errors import AppException, Conflict
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
@@ -52,9 +55,7 @@ async def execute(
     req: ReviewRequest,
     key: str,
 ) -> ReviewResponse:
-    prepared = await service.prepare(
-        db, blob, actor, workspace_id, collection_id, run_id, req, key
-    )
+    prepared = await service.prepare(db, blob, actor, workspace_id, collection_id, run_id, req, key)
     run, row, material, runtime = prepared.run, prepared.review, prepared.material, prepared.runtime
     if material is None:
         if row.status == "completed":
@@ -97,13 +98,16 @@ async def execute(
             row.usage_tokens = exc.usage_tokens
             await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
             await retain_raw(db, blob, row, exc.raw_body)
+            await db.commit()
             raise
         except (Exception, asyncio.CancelledError):
             await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
+            await db.commit()
             raise
         row.usage_tokens = result.total_tokens
         await usage_service.settle(db, usage.id, total_tokens=result.total_tokens)
         await retain_raw(db, blob, row, result.raw_body)
+        await db.commit()
         await service.checkpoint(db, blob, actor, row, run)
         await require_provider(db, workspace_id, runtime.provider_id, runtime.configuration_hash)
         content = (
@@ -178,42 +182,103 @@ async def _execute_segments(
     try:
         await _verify_manifest(db, blob, row, segments)
         await service.checkpoint(db, blob, actor, row, run)
-        total = len(segments)
-        for segment in segments:
+        root_count = max(1, sum(1 for seg in segments if seg.parent_segment_id is None))
+        limits = refinement.limits_for(row.trace, root_count)
+        concurrency = 2 if row.trace.get("review_concurrency") == 2 else 1
+        while True:
             await _owned_checkpoint(db, blob, actor, row, run, token)
-            if segment.status == "completed":
+            segments = await _load_segments(db, row_id)
+            leaves = refinement.ordered_leaves(segments)
+            refined_in_pass = False
+            for leaf in leaves:
+                if leaf.status == "completed":
+                    continue
+                await _resume_segment(db, blob, row, leaf)
+                if (
+                    leaf.status == "failed"
+                    and leaf.error_code == "chat_output_truncated"
+                    and not (leaf.config or {}).get("refinement_exhausted")
+                ):
+                    await _refine_truncated_segment(
+                        db, blob, actor, row, run, segments, leaf, material, limits, token
+                    )
+                    refined_in_pass = True
+                    break
+                if leaf.status in {"failed", "uncertain"}:
+                    raise AppException(
+                        "Một phần review không hoàn tất.",
+                        code=leaf.error_code or "compilation_review_segment_failed",
+                        status_code=409,
+                    )
+            if refined_in_pass:
                 continue
-            await _resume_segment(db, blob, row, segment)
-            if segment.status in {"failed", "uncertain"}:
-                raise AppException(
-                    "Một phần review không hoàn tất.",
-                    code=segment.error_code or "compilation_review_segment_failed",
-                    status_code=409,
-                )
-            if segment.status == "completed":
-                continue
-            await _run_segment(
-                db,
-                blob,
-                chat,
-                actor,
-                workspace_id,
-                row,
-                segment,
-                material,
-                runtime,
-                total,
-                token,
-            )
+            runnable = [leaf for leaf in leaves if leaf.status != "completed"]
+            if not runnable:
+                break
+            total_active = len(leaves)
+            if concurrency == 2 and len(runnable) > 1:
+                await db.commit()  # Release the review lock before independent part sessions.
+                for offset in range(0, len(runnable), concurrency):
+                    batch = runnable[offset : offset + concurrency]
+                    outcomes = await asyncio.gather(
+                        *(
+                            _part_session(
+                                blob,
+                                chat,
+                                actor,
+                                workspace_id,
+                                run.id,
+                                row_id,
+                                part.id,
+                                material,
+                                runtime,
+                                total_active,
+                                token,
+                            )
+                            for part in batch
+                        ),
+                        return_exceptions=True,
+                    )
+                    truncated_seen = False
+                    for outcome in outcomes:
+                        if isinstance(outcome, asyncio.CancelledError):
+                            raise outcome
+                        if isinstance(outcome, BaseException):
+                            if refinement.is_refinable_truncation(outcome):
+                                truncated_seen = True
+                            else:
+                                raise outcome
+                    if truncated_seen:
+                        break
+            else:
+                for segment in runnable:
+                    await _owned_checkpoint(db, blob, actor, row, run, token)
+                    try:
+                        await _run_segment(
+                            db,
+                            blob,
+                            chat,
+                            actor,
+                            workspace_id,
+                            run,
+                            row,
+                            segment,
+                            material,
+                            runtime,
+                            total_active,
+                            token,
+                        )
+                    except ChatResponseError as exc:
+                        if refinement.is_refinable_truncation(exc):
+                            break
+                        raise
         await _owned_checkpoint(db, blob, actor, row, run, token)
-        assessed = await _merged_assessments(db, blob, segments, material)
-        built = report_from_assessments(
-            assessed, material.payload, row_id, row.bundle_sha256
-        )
+        segments = await _load_segments(db, row_id)
+        assessed = await _merged_assessments(db, blob, row, segments, material)
+        built = report_from_assessments(assessed, material.payload, row_id, row.bundle_sha256)
         await artifacts.store(db, blob, row, "report_json", json_bytes(built))
         await artifacts.store(db, blob, row, "markdown", markdown_for(built))
-        tokens = [segment.usage_tokens for segment in segments if segment.usage_tokens]
-        row.usage_tokens = sum(tokens) if tokens else None
+        row.usage_tokens = refinement.total_usage(segments)
         row.verdict, row.status, row.finished_at = built["verdict"], "completed", utcnow()
         row.error_code = None
         await record_workspace_event(
@@ -225,14 +290,17 @@ async def _execute_segments(
                 "review_id": row_id,
                 "verdict": row.verdict,
                 "finding_count": built["summary"]["finding_count"],
-                "segments": len(segments),
+                "segments": len(refinement.ordered_leaves(segments)),
+                "total_nodes": len(segments),
             },
         )
         await db.commit()
         return ReviewResponse.model_validate(row)
     except asyncio.CancelledError:
         await _mark_uncertain(db, row_id, token)
-        failed = await db.get(CompilationReview, row_id, populate_existing=True, with_for_update=True)
+        failed = await db.get(
+            CompilationReview, row_id, populate_existing=True, with_for_update=True
+        )
         if (
             failed is not None
             and failed.status == "running"
@@ -245,27 +313,135 @@ async def _execute_segments(
         raise
     except Exception as exc:
         await _mark_uncertain(db, row_id, token)
-        failed = await db.get(CompilationReview, row_id, populate_existing=True, with_for_update=True)
-        code = exc.code if isinstance(exc, AppException) else "compilation_review_interrupted"
-        uncertain = await _has_uncertain(db, row_id)
+        failed = await db.get(
+            CompilationReview, row_id, populate_existing=True, with_for_update=True
+        )
+        code = exc.code if isinstance(exc, AppException) else "compilation_review_internal_error"
+        logger.exception(
+            "compilation_review_segments_failed",
+            review_id=row_id,
+            error_type=type(exc).__name__,
+            error_code=code,
+        )
+        all_segments = await _load_segments(db, row_id)
+        has_uncertain_segment = any(seg.status == "uncertain" for seg in all_segments)
+        sent = await _anything_sent(db, row_id)
+        is_uncertain = (
+            has_uncertain_segment
+            or not isinstance(exc, AppException)
+            or "uncertain" in code
+            or "interrupted" in code
+            or "expired" in code
+            or (sent and not code.startswith("compilation_review_refinement_"))
+        )
         if (
             failed is not None
             and failed.status == "running"
             and failed.trace.get("execution_token") == token
         ):
-            failed.status = (
-                "uncertain"
-                if uncertain or not isinstance(exc, AppException) or "interrupted" in code
-                else "failed"
-            )
+            failed.status = "uncertain" if is_uncertain else "failed"
             failed.error_code = code
             failed.finished_at = utcnow()
             await db.commit()
+        if isinstance(exc, AppException) and code.startswith("compilation_review_refinement_"):
+            raise
         raise AppException(
             "Review nhiều phần dừng trước khi đủ báo cáo.",
             code=code,
             status_code=409,
         ) from exc
+
+
+async def _refine_truncated_segment(
+    db: AsyncSession,
+    blob: BlobStore,
+    actor: AuthActor,
+    row: CompilationReview,
+    run: CompilationRun,
+    segments: list[CompilationReviewSegment],
+    parent: CompilationReviewSegment,
+    material,
+    limits: refinement.ReviewRefinementLimits,
+    token: str,
+) -> list[CompilationReviewSegment]:
+    await _owned_checkpoint(db, blob, actor, row, run, token)
+    try:
+        refinement.check_limits(row, segments, parent, limits)
+        next_index = max((seg.segment_index for seg in segments), default=0) + 1
+        active_leaves = len(refinement.ordered_leaves(segments))
+        children_plans = refinement.split_segment_plans(
+            material.payload,
+            parent,
+            next_index=next_index,
+            total_estimate=active_leaves + 1,
+        )
+    except AppException as exc:
+        parent.error_code = exc.code
+        parent.config = {**(parent.config or {}), "refinement_exhausted": True}
+        await db.commit()
+        raise
+    children = refinement.create_child_segments(
+        row,
+        parent,
+        children_plans,
+        request_total=active_leaves + 1,
+        split_reason="chat_output_truncated",
+    )
+    for child in children:
+        db.add(child)
+    refinement_events = list((row.trace or {}).get("refinement_events") or [])
+    refinement_events.append(
+        {
+            "parent_segment_id": parent.id,
+            "parent_segment_index": parent.segment_index,
+            "child_segment_ids": [child.id for child in children],
+            "child_segment_indices": [child.segment_index for child in children],
+            "depth": refinement.segment_depth(parent) + 1,
+            "reason": "chat_output_truncated",
+            "parent_input_sha256": parent.input_sha256,
+        }
+    )
+    row.trace = {
+        **row.trace,
+        "refinement_policy": limits.to_dict(),
+        "refinement_events": refinement_events,
+    }
+    await db.commit()
+    return children
+
+
+async def _part_session(
+    blob, chat, actor, workspace_id, run_id, review_id, part_id, material, runtime, total, token
+):
+    async with AsyncSessionFactory() as db:
+        row = await db.get(CompilationReview, review_id)
+        run = await db.get(CompilationRun, run_id)
+        segment = await db.get(CompilationReviewSegment, part_id)
+        await _owned_checkpoint(db, blob, actor, row, run, token)
+        if segment.status == "completed":
+            return
+        await _resume_segment(db, blob, row, segment)
+        if segment.status in {"failed", "uncertain"}:
+            raise AppException(
+                "Một phần review không hoàn tất.",
+                code=segment.error_code or "compilation_review_segment_failed",
+                status_code=409,
+            )
+        if segment.status != "completed":
+            await _run_segment(
+                db,
+                blob,
+                chat,
+                actor,
+                workspace_id,
+                run,
+                row,
+                segment,
+                material,
+                runtime,
+                total,
+                token,
+            )
 
 
 async def _load_segments(db: AsyncSession, review_id: str) -> list[CompilationReviewSegment]:
@@ -275,6 +451,7 @@ async def _load_segments(db: AsyncSession, review_id: str) -> list[CompilationRe
                 select(CompilationReviewSegment)
                 .where(CompilationReviewSegment.review_id == review_id)
                 .order_by(CompilationReviewSegment.segment_index)
+                .execution_options(populate_existing=True)
             )
         ).all()
     )
@@ -285,7 +462,9 @@ async def _owned_checkpoint(db, blob, actor, row, run, token):
         await service.checkpoint(db, blob, actor, row, run)
         if row.trace.get("execution_token") != token:
             raise Conflict("Lượt review đã được tiếp quản.", code="compilation_review_claim_lost")
-        await require_provider(db, row.workspace_id, row.provider_id, row.trace["configuration_hash"])
+        await require_provider(
+            db, row.workspace_id, row.provider_id, row.trace["configuration_hash"]
+        )
 
 
 async def _verify_manifest(
@@ -311,12 +490,13 @@ async def _verify_manifest(
             status_code=409,
         ) from exc
     scopes = manifest.get("segments") or []
+    roots = [segment for segment in segments if segment.parent_segment_id is None]
     if (
         manifest.get("review_id") != row.id
         or manifest.get("bundle_sha256") != row.bundle_sha256
-        or len(scopes) != len(segments)
+        or len(scopes) != len(roots)
         or [scope.get("index") for scope in scopes]
-        != [segment.segment_index for segment in segments]
+        != [segment.segment_index for segment in roots]
         or [
             (
                 scope.get("source_ids"),
@@ -335,7 +515,7 @@ async def _verify_manifest(
                 segment.scope.get("context_draft_ids"),
                 segment.input_sha256,
             )
-            for segment in segments
+            for segment in roots
         ]
     ):
         raise AppException(
@@ -343,6 +523,7 @@ async def _verify_manifest(
             code="compilation_review_segment_manifest_mismatch",
             status_code=409,
         )
+    refinement.verify_parent_child_coverage(segments)
 
 
 async def _resume_segment(
@@ -356,9 +537,7 @@ async def _resume_segment(
         assessed = await artifacts.segment_artifact(db, segment.id, "assessment_json")
         if assessed is not None and segment.usage_tokens is not None:
             if segment.usage_id:
-                await usage_service.settle(
-                    db, segment.usage_id, total_tokens=segment.usage_tokens
-                )
+                await usage_service.settle(db, segment.usage_id, total_tokens=segment.usage_tokens)
             segment.status, segment.error_code = "completed", None
             segment.finished_at = utcnow()
             await db.commit()
@@ -378,9 +557,7 @@ async def _resume_segment(
         assessed = await artifacts.segment_artifact(db, segment.id, "assessment_json")
         if assessed is not None and segment.usage_tokens is not None:
             if segment.usage_id:
-                await usage_service.settle(
-                    db, segment.usage_id, total_tokens=segment.usage_tokens
-                )
+                await usage_service.settle(db, segment.usage_id, total_tokens=segment.usage_tokens)
             segment.status, segment.error_code = "completed", None
             segment.finished_at = utcnow()
             await db.commit()
@@ -399,6 +576,7 @@ async def _run_segment(
     chat: ChatModel,
     actor: AuthActor,
     workspace_id: str,
+    run: CompilationRun,
     row: CompilationReview,
     segment: CompilationReviewSegment,
     material,
@@ -412,6 +590,36 @@ async def _run_segment(
     plan, messages, schema = parts.rebuild_part(
         material.payload, segment.scope, total=total, structured=structured
     )
+    if row.trace.get("literal_check_version") == 1 and segment.request_started_at is None:
+        assessment = assess_literal(material.payload, plan.payload)
+        if assessment is not None:
+            await _owned_checkpoint(db, blob, actor, row, run, token)
+            checked = validate_content(json.dumps(assessment, ensure_ascii=False), plan.payload)
+            await artifacts.store_segment(
+                db, blob, row, segment, "assessment_json", json_bytes(checked.model_dump())
+            )
+            await artifacts.store_segment(
+                db,
+                blob,
+                row,
+                segment,
+                "markdown",
+                segment_markdown_for(
+                    row,
+                    segment,
+                    checked,
+                    material.payload,
+                    parent_index=(segment.scope or {}).get("parent_segment_index"),
+                ),
+            )
+            segment.status, segment.finished_at, segment.usage_tokens = "completed", utcnow(), 0
+            segment.config = {
+                **segment.config,
+                "assessment_method": "literal_equality/v1",
+                "literal_assessed": True,
+            }
+            await db.commit()
+            return
     raw = await artifacts.segment_artifact(db, segment.id, "raw_response")
     if raw is not None:
         _, payload = await artifacts.read_segment(db, blob, segment, "raw_response")
@@ -429,6 +637,12 @@ async def _run_segment(
                 status_code=409,
             )
     else:
+        recorded = "reasoning" in (segment.config or {})
+        reasoning = (
+            ReasoningDirective.from_public_dict(segment.config.get("reasoning"))
+            if recorded
+            else None
+        )
         current_runtime, request, budget = await prepare_chat_request(
             db,
             actor,
@@ -438,22 +652,29 @@ async def _run_segment(
             task="compiler_review",
             max_output_tokens=segment.config["max_output_tokens"],
             output_schema=schema,
+            reasoning=reasoning,
         )
         if current_runtime.configuration_hash != row.trace["configuration_hash"]:
-            raise Conflict(
-                "Model review đã thay đổi.", code="compilation_review_provider_changed"
-            )
+            raise Conflict("Model review đã thay đổi.", code="compilation_review_provider_changed")
         if current_runtime.provider_id != segment.config["provider_id"]:
             raise Conflict(
                 "Provider review đã thay đổi.", code="compilation_review_provider_changed"
             )
+        if recorded:
+            live = current_runtime.reasoning_directive("compiler_review")
+            if (live.public_dict() if live is not None else None) != (
+                reasoning.public_dict() if reasoning is not None else None
+            ):
+                raise Conflict(
+                    "Chính sách reasoning review đã đổi so với phần đã lập.",
+                    code="compilation_review_reasoning_changed",
+                )
         usage = await usage_service.reserve(
             db,
             actor,
             workspace_id,
             "chat",
-            f"compiler-review:{row.id}:segment:{segment.segment_index}:"
-            f"{segment.attempt_count + 1}",
+            f"compiler-review:{row.id}:segment:{segment.segment_index}:{segment.attempt_count + 1}",
             segment.request_hash,
             budget.total_reserved_tokens,
             runtime.provider_id,
@@ -467,44 +688,60 @@ async def _run_segment(
         try:
             result = await chat.complete(messages, bind_usage(request, usage.id))
         except ChatResponseError as exc:
-            await _owned_checkpoint(db, blob, actor, row, run, token)
             if exc.raw_body:
                 await artifacts.store_segment(db, blob, row, segment, "raw_response", exc.raw_body)
             segment.usage_tokens = exc.usage_tokens
             await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
-            await _owned_checkpoint(db, blob, actor, row, run, token)
             await _fail_segment(db, segment, exc.code)
+            await _owned_checkpoint(db, blob, actor, row, run, token)
             raise
-        except (Exception, asyncio.CancelledError):
+        except (Exception, asyncio.CancelledError) as exc:
             await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
+            if isinstance(exc, AppException) and "uncertain" in exc.code:
+                segment.status = "uncertain"
+                segment.error_code = exc.code
+                segment.finished_at = utcnow()
+            await db.commit()
             raise
         await usage_service.settle(db, usage.id, total_tokens=result.total_tokens)
-        await _owned_checkpoint(db, blob, actor, row, run, token)
         segment.usage_tokens = result.total_tokens
         if result.raw_body:
             await artifacts.store_segment(db, blob, row, segment, "raw_response", result.raw_body)
         segment.status = "received"
         await db.commit()
+        await _owned_checkpoint(db, blob, actor, row, run, token)
         content = result.content
     await _owned_checkpoint(db, blob, actor, row, run, token)
     if structured:
         content = decode_keyed(content, plan.payload)
     try:
-        validate_content(content, plan.payload)
+        checked = validate_content(content, plan.payload)
     except AppException:
         await _fail_segment(db, segment, "compilation_review_invalid")
         raise
     await artifacts.store_segment(
         db, blob, row, segment, "assessment_json", content.encode("utf-8")
     )
+    await artifacts.store_segment(
+        db,
+        blob,
+        row,
+        segment,
+        "markdown",
+        segment_markdown_for(
+            row,
+            segment,
+            checked,
+            material.payload,
+            parent_index=(segment.scope or {}).get("parent_segment_index"),
+        ),
+    )
     segment.status, segment.error_code = "completed", None
     segment.finished_at = utcnow()
     await db.commit()
 
 
-async def _fail_segment(
-    db: AsyncSession, segment: CompilationReviewSegment, code: str
-) -> None:
+async def _fail_segment(db: AsyncSession, segment: CompilationReviewSegment, code: str) -> None:
     segment.status, segment.error_code, segment.finished_at = "failed", code, utcnow()
     await db.commit()
 
@@ -540,17 +777,31 @@ async def _mark_uncertain(db: AsyncSession, review_id: str, token: str) -> None:
         await db.commit()
 
 
-async def _has_uncertain(db: AsyncSession, review_id: str) -> bool:
-    return any(
-        segment.status == "uncertain" for segment in await _load_segments(db, review_id)
-    )
+async def _anything_sent(db: AsyncSession, review_id: str) -> bool:
+    """Did any part reach the provider? Only then is the review's outcome unknown."""
+    return not await service.untouched(db, review_id)
 
 
 async def _merged_assessments(
-    db: AsyncSession, blob: BlobStore, segments: list[CompilationReviewSegment], material
+    db: AsyncSession,
+    blob: BlobStore,
+    row: CompilationReview,
+    segments: list[CompilationReviewSegment],
+    material,
 ) -> "ReviewContent":
-    assembled = {"source_assessments": [], "draft_assessments": []}
-    for segment in segments:
+    refinement.verify_parent_child_coverage(segments)
+    leaves = refinement.ordered_leaves(segments)
+    if not leaves or any(leaf.status != "completed" for leaf in leaves):
+        raise AppException(
+            "Còn phần review chưa hoàn tất; không thể hợp nhất báo cáo.",
+            code="compilation_review_segment_incomplete",
+            status_code=409,
+        )
+    source_assessments_list: list[dict] = []
+    draft_assessments_list: list[dict] = []
+    by_source_id: dict[str, dict] = {}
+    by_draft_id: dict[str, dict] = {}
+    for segment in leaves:
         _, payload = await artifacts.read_segment(db, blob, segment, "assessment_json")
         plan = parts.plan_from_scope(segment.scope)
         part_payload = parts.payload_for(
@@ -561,28 +812,95 @@ async def _merged_assessments(
             plan.context_draft_ids,
         )
         value = validate_content(payload.decode("utf-8"), part_payload)
-        assembled["source_assessments"].extend(
-            assessment.model_dump() for assessment in value.source_assessments
-        )
-        assembled["draft_assessments"].extend(
-            assessment.model_dump() for assessment in value.draft_assessments
-        )
-    value = ReviewContent.model_validate(assembled)
+        if await artifacts.segment_artifact(db, segment.id, "markdown") is None:
+            await artifacts.store_segment(
+                db,
+                blob,
+                row,
+                segment,
+                "markdown",
+                segment_markdown_for(
+                    row,
+                    segment,
+                    value,
+                    material.payload,
+                    parent_index=(segment.scope or {}).get("parent_segment_index"),
+                ),
+            )
+        for s_item in value.source_assessments:
+            dumped = s_item.model_dump()
+            source_assessments_list.append(dumped)
+            by_source_id[s_item.source_id] = dumped
+        for d_item in value.draft_assessments:
+            dumped = d_item.model_dump()
+            draft_assessments_list.append(dumped)
+            by_draft_id[d_item.draft_id] = dumped
     source_ids = [unit["id"] for unit in material.payload["source_units"]]
     draft_ids = [unit["id"] for unit in material.payload["draft_units"]]
-    if Counter(a.source_id for a in value.source_assessments) != Counter(source_ids):
+    if Counter(a["source_id"] for a in source_assessments_list) != Counter(source_ids):
         raise AppException(
             "Báo cáo review ghép không phủ đủ nguồn.",
             code="compilation_review_coverage_invalid",
             status_code=409,
         )
-    if Counter(a.draft_id for a in value.draft_assessments) != Counter(draft_ids):
+    if Counter(a["draft_id"] for a in draft_assessments_list) != Counter(draft_ids):
         raise AppException(
             "Báo cáo review ghép không phủ đủ bản nháp.",
             code="compilation_review_coverage_invalid",
             status_code=409,
         )
-    return value
+    parent_ids = refinement.parent_ids_for(segments)
+    for parent in sorted(
+        (seg for seg in segments if seg.id in parent_ids),
+        key=lambda item: refinement.segment_depth(item),
+        reverse=True,
+    ):
+        p_plan = parts.plan_from_scope(parent.scope)
+        p_payload = parts.payload_for(
+            material.payload,
+            p_plan.source_ids,
+            p_plan.draft_ids,
+            p_plan.context_source_ids,
+            p_plan.context_draft_ids,
+        )
+        p_assembled = {
+            "source_assessments": [by_source_id[key] for key in p_plan.source_ids],
+            "draft_assessments": [by_draft_id[key] for key in p_plan.draft_ids],
+        }
+        p_checked = validate_content(
+            json.dumps(p_assembled, ensure_ascii=False),
+            p_payload,
+        )
+        await artifacts.store_segment(
+            db, blob, row, parent, "assessment_json", json_bytes(p_checked.model_dump())
+        )
+        await artifacts.store_segment(
+            db,
+            blob,
+            row,
+            parent,
+            "markdown",
+            segment_markdown_for(
+                row,
+                parent,
+                p_checked,
+                material.payload,
+                parent_index=(parent.scope or {}).get("parent_segment_index"),
+                child_indices=[
+                    child.segment_index
+                    for child in segments
+                    if child.parent_segment_id == parent.id
+                ],
+            ),
+        )
+        parent.status = "completed"
+        parent.error_code = None
+        parent.finished_at = parent.finished_at or utcnow()
+    ordered_assembled = {
+        "source_assessments": [by_source_id[key] for key in source_ids],
+        "draft_assessments": [by_draft_id[key] for key in draft_ids],
+    }
+    return ReviewContent.model_validate(ordered_assembled)
 
 
 async def require_provider(

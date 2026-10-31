@@ -130,6 +130,72 @@ async def segment_raw(
     )
 
 
+@router.get("/{review_id}/segments/{segment_index}/assessment")
+async def segment_assessment(
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    review_id: str,
+    segment_index: int,
+    db: DB,
+    actor: Actor,
+    blob: Blob,
+) -> Response:
+    content_type, sha256, payload = await service.read_segment_artifact(
+        db,
+        blob,
+        actor,
+        workspace_id,
+        collection_id,
+        run_id,
+        review_id,
+        segment_index,
+        "assessment_json",
+    )
+    return Response(
+        payload,
+        media_type=content_type,
+        headers={
+            "ETag": f'"{sha256}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/{review_id}/segments/{segment_index}/markdown")
+async def segment_markdown(
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    review_id: str,
+    segment_index: int,
+    db: DB,
+    actor: Actor,
+    blob: Blob,
+) -> Response:
+    content_type, sha256, payload = await service.read_segment_artifact(
+        db,
+        blob,
+        actor,
+        workspace_id,
+        collection_id,
+        run_id,
+        review_id,
+        segment_index,
+        "markdown",
+    )
+    return Response(
+        payload,
+        media_type=content_type,
+        headers={
+            "ETag": f'"{sha256}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 async def output(
     workspace_id: str,
     collection_id: str,

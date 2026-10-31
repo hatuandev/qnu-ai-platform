@@ -1,6 +1,24 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
+- [Phiên755 — Review chia phần theo output và phục hồi truncated](2026-10-31_phien_755_review_chia_phan_va_phuc_hoi_truncated.md): planner v4 xét output/reasoning 4096, refinement cha–con, JSON/MD lá và E2E recovery; 25 unit trọng tâm + 16 FE PASS, live chờ Docker.
+
+- [Phiên754 — E2E alias model 9router](2026-10-31_phien_754_test_alias_model_9router.md): ánh xạ tên phản hồi cụ thể; giữ kiểm model, 14 regression và build PASS.
+
+- [Phiên753 — Sửa discovery catalog 9router](2026-10-31_phien_753_sua_catalog_9router.md): 638 model vượt trần cũ 500; regression/live discovery đạt, giữ phiên/key.
+
+- [Phiên752 — E2E9router và model mặc định](2026-10-30_phien_752_e2e_9router_model_mac_dinh.md): hai keyẩn, chọnQwen/GPT-OSS, capacity thật,21script/28FE PASS; live chờkey.
+
+- [Phiên751 — Compiler chia tiếp cha–con](2026-10-30_phien_751_compiler_refinement.md): refinement có giới hạn, artifact tree và kiểm chứng thực.
+
+- [Phiên749 — Chẩn đoán admissions uncertain](2026-10-30_phien_749_chan_doan_admissions_uncertain.md): run6/15 cũ, lỗi provider và E2E chưa replan uncertain; chỉ chẩn đoán.
+
+- [Phiên748 — Dừng E2E mồ côi](2026-10-30_phien_748_dung_tien_trinh_e2e_mo_coi.md): xác minh/dừng con giữ cổng, giữ checkpoint; chưa chạy lại compiler.
+
+- [Phiên747 — Sửa P1/P2 compiler song song](2026-10-30_phien_747_sua_compiler_p1_p2.md): claim/usage fence, scheduler dừng, context v4, Redis admission, reasoning và E2E deadline; NOT RUN.
+
+- [Phiên746 — Compiler chia phần song song có giới hạn](2026-10-30_phien_746_compiler_chia_phan_song_song.md): projection v3, reasoning có hợp đồng, bounded concurrency; 8trang/105hàng →2phần; NOT RUN sau sửa.
+
 - [Phiên745 — Compiler hết output](2026-10-30_phien_745_compiler_output_truncated.md): xác nhận8192reasoning, chia phần theo output và phục hồi có giới hạn; NOT RUN sau sửa.
 
 - [Phiên744 — Hoàn thiện compiler chia phần](2026-10-30_phien_744_hoan_thien_compiler_chia_phan.md): tiếp tục OpenCode, migration/regression chưa chạy.

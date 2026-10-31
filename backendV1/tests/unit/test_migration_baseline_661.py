@@ -13,8 +13,19 @@ from qnu.platform.schema import SCHEMA_HEAD
 def test_single_initial_revision_has_no_dependencies():
     scripts = ScriptDirectory.from_config(Config("alembic.ini"))
     revisions = list(scripts.walk_revisions())
-    assert len(revisions) == 7
-    assert scripts.get_heads() == ["0007_native_extraction"]
+    assert len(revisions) == 10
+    assert scripts.get_heads() == ["0010_review_refinement"]
+    assert (
+        scripts.get_revision("0010_review_refinement").down_revision
+        == "0009_compiler_refinement"
+    )
+    assert (
+        scripts.get_revision("0009_compiler_refinement").down_revision
+        == "0008_compilation_segments"
+    )
+    assert (
+        scripts.get_revision("0008_compilation_segments").down_revision == "0007_native_extraction"
+    )
     assert SCHEMA_HEAD == scripts.get_current_head()
     assert scripts.get_revision("0007_native_extraction").down_revision == "0006_kb_folders"
     baseline = scripts.get_revision("0001_initial_schema")
@@ -33,10 +44,7 @@ def test_single_initial_revision_has_no_dependencies():
         scripts.get_revision("0005_provider_connections").down_revision
         == "0004_application_api_keys"
     )
-    assert (
-        scripts.get_revision("0006_kb_folders").down_revision
-        == "0005_provider_connections"
-    )
+    assert scripts.get_revision("0006_kb_folders").down_revision == "0005_provider_connections"
 
 
 def test_initial_schema_offline_sql_creates_v1_without_touching_legacy():
@@ -50,7 +58,10 @@ def test_initial_schema_offline_sql_creates_v1_without_touching_legacy():
     assert "CREATE TABLE alembic_version (" not in sql
     assert "DROP TABLE" not in sql
     assert "0001_initial_schema" in sql
-    assert len(list(Path("alembic/versions").glob("[0-9]*.py"))) == 7
+    assert len(list(Path("alembic/versions").glob("[0-9]*.py"))) == 10
+    assert "ADD COLUMN parent_segment_id" in sql
+    assert "fk_compiler_parent" in sql
+    assert "fk_review_segment_parent" in sql
     assert "CREATE TABLE app_api_keys" in sql
     assert "CREATE UNIQUE INDEX ix_app_api_keys_idempotency_key" in sql
     assert "ADD COLUMN rag_policy JSONB" in sql

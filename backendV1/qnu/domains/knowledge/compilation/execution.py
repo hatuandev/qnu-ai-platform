@@ -1,4 +1,10 @@
-"""Execute one durable compilation: reauthorize, call once, retain raw, validate draft."""
+"""Execute one durable compilation: reauthorize, call once, retain raw, validate draft.
+
+Independent parts may overlap up to ``COMPILER_SEGMENT_CONCURRENCY``. Each task owns
+its own session and lease check; only this coroutine writes output generations, so
+two parts can never interleave a draft/Markdown pair. Parts are merged in source
+order, never in completion order.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.identity.background import background_actor
+from qnu.domains.knowledge.compilation import outputs as compilation_outputs
+from qnu.domains.knowledge.compilation import refinement
+from qnu.domains.knowledge.compilation import segments as split
 from qnu.domains.knowledge.compilation.artifacts import (
     artifact,
     json_bytes,
@@ -41,12 +50,14 @@ from qnu.domains.knowledge.compilation.models import (
     CompilationSegment,
     utcnow,
 )
-from qnu.domains.knowledge.compilation import outputs as compilation_outputs
-from qnu.domains.knowledge.compilation import segments as split
+from qnu.domains.knowledge.compilation.scheduler import effective_concurrency, run_bounded
 from qnu.domains.knowledge.compilation.service import authorize_collection
 from qnu.domains.modelops.inference.service import prepare_chat_request
+from qnu.domains.modelops.models import ModelUsageRecord
+from qnu.domains.modelops.reasoning import ReasoningDirective
 from qnu.domains.modelops.usage.service import usage_service
 from qnu.platform.config import get_settings
+from qnu.platform.database import AsyncSessionFactory
 from qnu.platform.errors import AppException, Conflict
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
@@ -154,6 +165,47 @@ async def _compile(db: AsyncSession, blob: BlobStore, run: CompilationRun, model
     return await finish(db, run, "completed")
 
 
+def _stored_reasoning(segment: CompilationSegment) -> tuple[bool, ReasoningDirective | None]:
+    """Return (recorded, directive). A legacy part recorded nothing and keeps the default."""
+    if "reasoning" not in (segment.config or {}):
+        return False, None
+    return True, ReasoningDirective.from_public_dict(segment.config.get("reasoning"))
+
+
+async def _settle_part_usage(usage_id: str, tokens: int | None, *, failed: bool) -> None:
+    """Accounting may outlive the claim; never commit it with stale part objects."""
+    async with AsyncSessionFactory() as accounting:
+        try:
+            await usage_service.settle(accounting, usage_id, total_tokens=tokens, failed=failed)
+        except Conflict as exc:
+            await accounting.rollback()
+            if tokens is None and exc.code == "usage_already_settled":
+                known = await accounting.get(ModelUsageRecord, usage_id)
+                if known is not None and known.status in {"completed", "failed"}:
+                    # Recovery cannot replace an observed result with unknown usage.
+                    return
+            raise
+
+
+async def _record_segment_error(
+    db: AsyncSession,
+    blob: BlobStore,
+    run: CompilationRun,
+    segment: CompilationSegment,
+    usage_id: str,
+    exc: ChatResponseError,
+) -> None:
+    await _settle_part_usage(usage_id, exc.usage_tokens, failed=True)
+    await assert_claim(db, run)
+    if exc.raw_body:
+        await store_segment(db, blob, run, segment, "raw_response", exc.raw_body)
+    segment.usage_tokens = exc.usage_tokens
+    segment.status = "uncertain" if exc.code == "chat_provider_uncertain" else "failed"
+    segment.error_code = exc.code
+    segment.finished_at = utcnow()
+    await commit_owned(db, run)
+
+
 async def _call(
     db: AsyncSession,
     blob: BlobStore,
@@ -164,6 +216,8 @@ async def _call(
 ) -> str:
     messages = messages_for(run.topic, documents)
     schema = output_schema(documents) if run.config.get("structured_output") else None
+    recorded = "reasoning_directive" in run.config
+    reasoning = ReasoningDirective.from_public_dict(run.config.get("reasoning_directive"))
     runtime, request, budget = await prepare_chat_request(
         db,
         actor,
@@ -172,7 +226,13 @@ async def _call(
         provider_id=run.provider_id,
         max_output_tokens=run.config["max_output_tokens"],
         output_schema=schema,
+        task="compiler",
+        reasoning=reasoning,
     )
+    if recorded:
+        live = runtime.reasoning_directive("compiler")
+        if (live.public_dict() if live else None) != run.config["reasoning_directive"]:
+            raise Conflict("Chính sách reasoning đã đổi.", code="compilation_reasoning_changed")
     if (
         runtime.configuration_hash != run.config["provider"]["configuration_hash"]
         or hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest() != run.config["prompt_sha256"]
@@ -235,7 +295,9 @@ async def _segments(db: AsyncSession, run_id: str) -> list[CompilationSegment]:
             await db.scalars(
                 select(CompilationSegment)
                 .where(CompilationSegment.run_id == run_id)
+                .where(CompilationSegment.parent_segment_id.is_(None))
                 .order_by(CompilationSegment.segment_index)
+                .execution_options(populate_existing=True)
             )
         ).all()
     )
@@ -248,6 +310,8 @@ def _scope_key(scope: dict) -> tuple:
         json.dumps(scope.get("context"), sort_keys=True),
         scope.get("input_sha256"),
         scope.get("schema_sha256"),
+        # Missing on legacy v2 scopes on both sides, so the comparison stays exact.
+        scope.get("projection_version"),
     )
 
 
@@ -285,6 +349,22 @@ async def _resume_segment(
 ) -> None:
     if segment.status == "completed":
         return
+    if await refinement.children(db, run, segment):
+        return  # This parent performs no more inference; resume its durable children.
+    if (
+        segment.status == "failed"
+        and segment.error_code == "chat_output_truncated"
+        and run.config.get("refinement")
+    ):
+        # A process can die after committing diagnostic raw but before planning
+        # children. Recovery plans from those bytes, never resends this request.
+        saved = await segment_artifact(db, segment.id, "raw_response")
+        if saved is not None:
+            _, raw_body = await read_segment(db, blob, segment, "raw_response")
+            await refinement.create_children(
+                db, run, segment, documents=await _inputs(db, blob, run), raw=raw_body
+            )
+        return
     raw = await segment_artifact(db, segment.id, "raw_response")
     if segment.status == "running":
         # The part artifact may have been written before an interrupted status
@@ -292,18 +372,14 @@ async def _resume_segment(
         draft = await segment_artifact(db, segment.id, "draft_json")
         if draft is not None and segment.usage_tokens is not None:
             if segment.usage_id:
-                await usage_service.settle(
-                    db, segment.usage_id, total_tokens=segment.usage_tokens
-                )
+                await _settle_part_usage(segment.usage_id, segment.usage_tokens, failed=False)
             segment.status, segment.error_code = "completed", None
             segment.finished_at = utcnow()
             await commit_owned(db, run)
             return
         if segment.request_started_at is not None and raw is None:
             if segment.usage_id:
-                await usage_service.settle(
-                    db, segment.usage_id, total_tokens=None, failed=True
-                )
+                await _settle_part_usage(segment.usage_id, None, failed=True)
             segment.status = "uncertain"
             segment.error_code = "compilation_request_interrupted"
             segment.finished_at = utcnow()
@@ -316,9 +392,7 @@ async def _resume_segment(
         draft = await segment_artifact(db, segment.id, "draft_json")
         if draft is not None and segment.usage_tokens is not None:
             if segment.usage_id:
-                await usage_service.settle(
-                    db, segment.usage_id, total_tokens=segment.usage_tokens
-                )
+                await _settle_part_usage(segment.usage_id, segment.usage_tokens, failed=False)
             segment.status, segment.error_code = "completed", None
             segment.finished_at = utcnow()
             await commit_owned(db, run)
@@ -326,7 +400,7 @@ async def _resume_segment(
         # A response marked received cannot be resent safely without its raw body
         # or an already validated part artifact.
         if segment.usage_id:
-            await usage_service.settle(db, segment.usage_id, total_tokens=None, failed=True)
+            await _settle_part_usage(segment.usage_id, None, failed=True)
         segment.status = "uncertain"
         segment.error_code = "compilation_segment_raw_missing"
         segment.finished_at = utcnow()
@@ -334,6 +408,73 @@ async def _resume_segment(
 
 
 async def _run_segment(
+    db,
+    blob,
+    run,
+    segment,
+    documents,
+    model,
+    actor,
+    total,
+) -> None:
+    if segment.status == "completed":
+        return
+    parts = await refinement.children(db, run, segment)
+    if not parts:
+        try:
+            await _run_leaf(db, blob, run, segment, documents, model, actor, total)
+            return
+        except ChatResponseError as exc:
+            if exc.code != "chat_output_truncated":
+                raise
+            parts = await refinement.create_children(db, run, segment, documents, exc.raw_body)
+            if not parts:
+                raise
+    drafts = []
+    for child in parts:
+        policy = run.config["refinement"]
+        if (utcnow() - run.started_at).total_seconds() > policy["max_seconds"]:
+            raise AppException(
+                "Đã hết ngân sách thời gian chia phần.",
+                code="compilation_refinement_time_exhausted",
+            )
+        await _resume_segment(db, blob, run, child)
+        if child.status in {"failed", "uncertain"}:
+            raise AppException(
+                "Phần con chưa có kết quả hợp lệ.",
+                code=child.error_code or "compilation_child_incomplete",
+            )
+        await _run_segment(
+            db, blob, run, child, documents, model, actor, child.config["request_total"]
+        )
+        _, payload = await read_segment(db, blob, child, "draft_json")
+        drafts.append(json.loads(payload))
+    draft = {
+        "title": drafts[0]["title"],
+        "sections": split._merge_sections(drafts),
+        "unknowns": list(dict.fromkeys(item for d in drafts for item in d["unknowns"])),
+    }
+    own = segment.config["refined_usage_tokens"]
+    segment.usage_tokens = (
+        own + sum(child.usage_tokens for child in parts)
+        if own is not None and all(c.usage_tokens is not None for c in parts)
+        else None
+    )
+    await refinement.save_pair(
+        db,
+        blob,
+        run,
+        segment,
+        refinement.node_content(
+            segment,
+            draft,
+            documents,
+            [c.id for c in parts],
+        ),
+    )
+
+
+async def _run_leaf(
     db: AsyncSession,
     blob: BlobStore,
     run: CompilationRun,
@@ -343,19 +484,27 @@ async def _run_segment(
     actor: AuthActor,
     total: int,
 ) -> None:
+    """One part in its own session; the caller owns the session and the lease."""
     if segment.status == "completed":
         return
     plan = split.plan_from_scope(segment.scope)
     payload, citations = split.build_projection(
-        run.topic, documents, plan.owned, plan.context, segment.segment_index
+        run.topic,
+        documents,
+        plan.owned,
+        plan.context,
+        segment.segment_index,
+        total=total,
+        projection=plan.projection,
     )
-    messages = split.segment_messages(payload, segment.segment_index, total)
+    messages = split.segment_messages(
+        payload, segment.segment_index, total, projection=plan.projection
+    )
     structured = bool(segment.config.get("structured_output"))
     schema = split.segment_schema(citations) if structured else None
     if (
-        hashlib.sha256(messages[-1].content.encode("utf-8")).hexdigest()
-        != segment.input_sha256
-        or segment.prompt_version != split.PROMPT_VERSION
+        hashlib.sha256(messages[-1].content.encode("utf-8")).hexdigest() != segment.input_sha256
+        or segment.prompt_version != split.prompt_version_for(plan.projection)
         or (
             schema is not None
             and hashlib.sha256(json_bytes(schema)).hexdigest() != segment.schema_sha256
@@ -365,6 +514,7 @@ async def _run_segment(
             "Phần biên soạn không còn khớp kế hoạch đã lưu.",
             code="compilation_segment_mismatch",
         )
+    recorded, reasoning = _stored_reasoning(segment)
     raw = await segment_artifact(db, segment.id, "raw_response")
     if raw is not None:
         _, raw_payload = await read_segment(db, blob, segment, "raw_response")
@@ -380,9 +530,7 @@ async def _run_segment(
                     "Phần biên soạn đã nhận phản hồi nhưng thiếu usage.",
                     code="compilation_segment_usage_unknown",
                 )
-            await usage_service.settle(
-                db, segment.usage_id, total_tokens=segment.usage_tokens
-            )
+            await _settle_part_usage(segment.usage_id, segment.usage_tokens, failed=False)
     else:
         if segment.attempt_count >= 3:
             raise AppException(
@@ -398,6 +546,7 @@ async def _run_segment(
             task="compiler",
             max_output_tokens=segment.config["max_output_tokens"],
             output_schema=schema,
+            reasoning=reasoning,
         )
         if (
             runtime.configuration_hash != run.config["provider"]["configuration_hash"]
@@ -407,6 +556,26 @@ async def _run_segment(
                 "Model hoặc prompt đã đổi so với yêu cầu.",
                 code="compilation_provider_changed",
             )
+        if recorded:
+            live = runtime.reasoning_directive("compiler")
+            if (live.public_dict() if live is not None else None) != (
+                reasoning.public_dict() if reasoning is not None else None
+            ):
+                raise Conflict(
+                    "Chính sách reasoning đã đổi so với yêu cầu của phần này.",
+                    code="compilation_reasoning_changed",
+                )
+        policy = run.config.get("refinement")
+        if policy and run.started_at is not None:
+            elapsed = (utcnow() - run.started_at).total_seconds()
+            if (
+                elapsed + request.timeout_seconds + get_settings().MODEL_CHAT_QUEUE_TIMEOUT_SECONDS
+                > policy["max_seconds"]
+            ):
+                raise AppException(
+                    "Không đủ thời gian cho lượt gọi tiếp theo.",
+                    code="compilation_refinement_time_exhausted",
+                )
         usage = await usage_service.reserve(
             db,
             actor,
@@ -427,43 +596,118 @@ async def _run_segment(
         try:
             result = await model.complete(messages, bind_usage(request, usage.id))
         except ChatResponseError as exc:
-            if exc.raw_body:
-                await store_segment(db, blob, run, segment, "raw_response", exc.raw_body)
-            segment.usage_tokens = exc.usage_tokens
-            await usage_service.settle(
-                db, usage.id, total_tokens=exc.usage_tokens, failed=True
-            )
-            segment.status = "failed"
-            segment.error_code = exc.code
-            segment.finished_at = utcnow()
-            await commit_owned(db, run)
+            await _record_segment_error(db, blob, run, segment, usage.id, exc)
             raise
         except (Exception, asyncio.CancelledError):
-            await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
+            await _settle_part_usage(usage.id, None, failed=True)
             raise
         try:
             await assert_claim(db, run)
         except ClaimLost:
-            await usage_service.settle(db, usage.id, total_tokens=result.total_tokens, failed=True)
+            await _settle_part_usage(usage.id, result.total_tokens, failed=True)
             raise
         if result.raw_body:
             await store_segment(db, blob, run, segment, "raw_response", result.raw_body)
         segment.usage_tokens = result.total_tokens
         segment.status = "received"
         await commit_owned(db, run)
-        await usage_service.settle(db, usage.id, total_tokens=result.total_tokens)
+        await _settle_part_usage(usage.id, result.total_tokens, failed=False)
         content = result.content
     draft = split.parse_segment_draft(content, set(citations))
-    await store_segment(
-        db, blob, run, segment, "draft_json", json_bytes(draft)
-    )
+    if run.config.get("refinement"):
+        await refinement.save_pair(
+            db, blob, run, segment, refinement.node_content(segment, draft, documents)
+        )
+        return
+    await assert_claim(db, run)
+    await store_segment(db, blob, run, segment, "draft_json", json_bytes(draft))
     segment.status, segment.error_code = "completed", None
     segment.finished_at = utcnow()
     await commit_owned(db, run)
-    completed = await _segments(db, run.id)
-    parts = await _completed_parts(db, blob, completed)
-    coverage = _coverage(completed)
-    merged = split.merge_drafts(
+
+
+async def _completed_parts(
+    db: AsyncSession, blob: BlobStore, segments: list[CompilationSegment]
+) -> list[tuple[int, dict]]:
+    """Parts keyed by source index; the merge sorts by it, never by completion."""
+    parts: list[tuple[int, dict]] = []
+    for segment in segments:
+        if segment.status != "completed":
+            continue
+        _, payload = await read_segment(db, blob, segment, "draft_json")
+        parts.append((segment.segment_index, json.loads(payload)))
+    return parts
+
+
+def _coverage(segments: list[CompilationSegment]) -> dict:
+    counts: dict[str, int] = {}
+    for segment in segments:
+        counts[segment.status] = counts.get(segment.status, 0) + 1
+    completed = counts.get("completed", 0)
+    return {
+        "state": "completed" if completed == len(segments) else "partial",
+        "segments_total": len(segments),
+        "segments_completed": completed,
+        "segments_pending": counts.get("pending", 0),
+        "segments_running": counts.get("running", 0),
+        "segments_received": counts.get("received", 0),
+        "segments_failed": counts.get("failed", 0),
+        "segments_uncertain": counts.get("uncertain", 0),
+        "segments": [
+            {"index": segment.segment_index, "status": segment.status} for segment in segments
+        ],
+    }
+
+
+async def _store_generation(
+    db: AsyncSession,
+    blob: BlobStore,
+    run: CompilationRun,
+    draft: dict,
+    coverage: dict,
+    *,
+    partial: bool,
+) -> None:
+    draft_payload = json_bytes(draft)
+    markdown_payload = (
+        split.partial_markdown(draft) if partial else markdown_for(draft).encode("utf-8")
+    )
+    if draft.get("compilation_nodes"):
+        markdown_payload += (
+            "\n## Các phần biên soạn\n\n"
+            + "\n".join(
+                f"- [Phần {node['index']}](segments/{node['index']}/artifacts/markdown)"
+                for node in draft["compilation_nodes"]
+            )
+            + "\n"
+        ).encode()
+    if not partial:
+        # Old readers and publication continue to use the original artifact kinds.
+        await store(db, blob, run, "draft_json", draft_payload)
+        await store(db, blob, run, "markdown", markdown_payload)
+        await read(db, blob, run, "draft_json")
+        await read(db, blob, run, "markdown")
+    await compilation_outputs.store_output(
+        db,
+        blob,
+        run,
+        draft_payload=draft_payload,
+        markdown_payload=markdown_payload,
+        coverage=coverage,
+        partial=partial,
+    )
+
+
+async def _write_partial(
+    db: AsyncSession, blob: BlobStore, run: CompilationRun, documents: list[dict]
+) -> None:
+    """Single writer for partial generations; called only by the orchestrator."""
+    segments = await _segments(db, run.id)
+    if not any(segment.status == "completed" for segment in segments):
+        return
+    parts = await _completed_parts(db, blob, segments)
+    coverage = _coverage(segments)
+    merged = split.merge_parts_in_order(
         parts,
         run.topic,
         documents,
@@ -483,66 +727,93 @@ async def _run_segment(
     await commit_owned(db, run)
 
 
-async def _completed_parts(
-    db: AsyncSession, blob: BlobStore, segments: list[CompilationSegment]
-) -> list[dict]:
-    parts = []
-    for segment in segments:
-        if segment.status != "completed":
-            continue
-        _, payload = await read_segment(db, blob, segment, "draft_json")
-        parts.append(json.loads(payload))
-    return parts
+async def _run_part(
+    run_id: str,
+    worker_id: str,
+    segment_id: str,
+    blob: BlobStore,
+    documents: list[dict],
+    model: ChatModel,
+    total: int,
+) -> str:
+    """One independent part in its own session; never shares a session or lease row."""
+    async with AsyncSessionFactory() as db:
+        run = await db.get(CompilationRun, run_id, populate_existing=True)
+        if run is None or run.worker_id != worker_id:
+            return "claim_lost"
+        segment = await db.get(CompilationSegment, segment_id, populate_existing=True)
+        if segment is None:
+            return "missing"
+        if segment.status == "completed":
+            return "completed"
+        try:
+            await _run_segment(
+                db,
+                blob,
+                run,
+                segment,
+                documents,
+                model,
+                background_actor(run.requested_by),
+                total,
+            )
+        except ClaimLost:
+            await db.rollback()
+            return "claim_lost"
+        except asyncio.CancelledError:
+            await db.rollback()
+            raise
+        except AppException as exc:
+            await db.rollback()
+            await _fail_part(run_id, worker_id, segment_id, exc.code)
+            raise
+        except Exception:
+            await db.rollback()
+            raise
+        return segment.status
 
 
-def _coverage(segments: list[CompilationSegment]) -> dict:
-    counts: dict[str, int] = {}
-    for segment in segments:
-        counts[segment.status] = counts.get(segment.status, 0) + 1
-    completed = counts.get("completed", 0)
-    return {
-        "state": "completed" if completed == len(segments) else "partial",
-        "segments_total": len(segments),
-        "segments_completed": completed,
-        "segments_pending": counts.get("pending", 0),
-        "segments_running": counts.get("running", 0),
-        "segments_failed": counts.get("failed", 0),
-        "segments_uncertain": counts.get("uncertain", 0),
-        "segments": [
-            {"index": segment.segment_index, "status": segment.status}
-            for segment in segments
-        ],
-    }
+async def _fail_part(run_id: str, worker_id: str, segment_id: str, code: str) -> None:
+    """Record a terminal validation failure; the raw bytes stay for diagnosis."""
+    async with AsyncSessionFactory() as db:
+        run = await db.get(CompilationRun, run_id, populate_existing=True)
+        segment = await db.get(CompilationSegment, segment_id, populate_existing=True)
+        if run is None or segment is None or run.worker_id != worker_id:
+            return
+        if segment.status not in {"running", "received"}:
+            return
+        status = (
+            "uncertain"
+            if code in {"chat_provider_uncertain", "compilation_request_interrupted"}
+            else "failed"
+        )
+        segment.status, segment.error_code, segment.finished_at = status, code, utcnow()
+        try:
+            await commit_owned(db, run)
+        except ClaimLost:
+            await db.rollback()
 
 
-async def _store_generation(
+async def _run_parts(
     db: AsyncSession,
     blob: BlobStore,
     run: CompilationRun,
-    draft: dict,
-    coverage: dict,
+    documents: list[dict],
+    model: ChatModel,
+    segment_ids: list[str],
     *,
-    partial: bool,
-) -> None:
-    draft_payload = json_bytes(draft)
-    markdown_payload = (
-        split.partial_markdown(draft) if partial else markdown_for(draft).encode("utf-8")
-    )
-    if not partial:
-        # Old readers and publication continue to use the original artifact kinds.
-        await store(db, blob, run, "draft_json", draft_payload)
-        await store(db, blob, run, "markdown", markdown_payload)
-        await read(db, blob, run, "draft_json")
-        await read(db, blob, run, "markdown")
-    await compilation_outputs.store_output(
-        db,
-        blob,
-        run,
-        draft_payload=draft_payload,
-        markdown_payload=markdown_payload,
-        coverage=coverage,
-        partial=partial,
-    )
+    total: int,
+) -> list[BaseException]:
+    """Bounded overlap; stop launching new parts after the first failure."""
+    limit = effective_concurrency(run.config)
+
+    async def worker(segment_id: str) -> str:
+        return await _run_part(run.id, run.worker_id, segment_id, blob, documents, model, total)
+
+    async def settled() -> None:
+        await _write_partial(db, blob, run, documents)
+
+    return await run_bounded(segment_ids, worker, limit=limit, on_settled=settled)
 
 
 async def _compile_segmented(
@@ -552,7 +823,6 @@ async def _compile_segmented(
     documents: list[dict],
     model: ChatModel,
 ) -> str:
-    actor = background_actor(run.requested_by)
     segments = await _segments(db, run.id)
     if not segments:
         return await finish(db, run, "failed", "compilation_segment_manifest_mismatch")
@@ -568,13 +838,67 @@ async def _compile_segmented(
                 "uncertain" if segment.status == "uncertain" else "failed",
                 segment.error_code,
             )
-        await _run_segment(db, blob, run, segment, documents, model, actor, len(segments))
     segments = await _segments(db, run.id)
+    pending = [segment.id for segment in segments if segment.status != "completed"]
+    if pending:
+        logger.info(
+            "compilation_parts_started",
+            run_id=run.id,
+            parts=len(pending),
+            concurrency=effective_concurrency(run.config),
+        )
+        failures = await _run_parts(db, blob, run, documents, model, pending, total=len(segments))
+        # No part is in flight here: the scheduler waited for every worker it started.
+        # A part that still reads "running" lost its worker on an unexpected error, so
+        # its request is in doubt and must not be shown as live progress.
+        await _mark_uncertain_segments(db, run)
+        if run.config.get("refinement"):
+            nodes = list(
+                (
+                    await db.scalars(
+                        select(CompilationSegment).where(
+                            CompilationSegment.run_id == run.id,
+                        )
+                    )
+                ).all()
+            )
+            run.usage_tokens = refinement.total_usage(nodes)
+        segments = await _segments(db, run.id)
+        coverage = _coverage(segments)
+        if coverage["state"] != "completed":
+            failed_part = next(
+                (segment for segment in segments if segment.status == "failed"), None
+            )
+            uncertain_part = next(
+                (segment for segment in segments if segment.status == "uncertain"), None
+            )
+            stopped = failed_part or uncertain_part
+            code = (
+                stopped.error_code
+                if stopped is not None and stopped.error_code
+                else "compilation_segments_incomplete"
+            )
+            uncertain = uncertain_part is not None
+            if failures and not uncertain:
+                first = failures[0]
+                code = first.code if isinstance(first, AppException) else "compilation_failed"
+            return await finish(db, run, "uncertain" if uncertain else "failed", code)
+    if not pending and run.config.get("refinement"):
+        nodes = list(
+            (
+                await db.scalars(
+                    select(CompilationSegment).where(
+                        CompilationSegment.run_id == run.id,
+                    )
+                )
+            ).all()
+        )
+        run.usage_tokens = refinement.total_usage(nodes)
     coverage = _coverage(segments)
     if coverage["state"] != "completed":
         return await finish(db, run, "failed", "compilation_segments_incomplete")
     parts = await _completed_parts(db, blob, segments)
-    draft = split.merge_drafts(
+    draft = split.merge_parts_in_order(
         parts,
         run.topic,
         documents,
@@ -583,24 +907,59 @@ async def _compile_segmented(
         segmentation=coverage,
     )
     await assert_claim(db, run)
+    draft["compilation_nodes"] = [
+        {
+            "segment_id": segment.id,
+            "index": segment.segment_index,
+            "json": f"segments/{segment.segment_index}/artifacts/draft_json",
+            "markdown": f"segments/{segment.segment_index}/artifacts/markdown",
+        }
+        for segment in segments
+    ]
     await _store_generation(db, blob, run, draft, coverage, partial=False)
-    tokens = [segment.usage_tokens for segment in segments if segment.usage_tokens]
-    run.usage_tokens = sum(tokens) if tokens else None
+    if not run.config.get("refinement"):
+        tokens = [segment.usage_tokens for segment in segments if segment.usage_tokens]
+        run.usage_tokens = sum(tokens) if tokens else None
     await commit_owned(db, run)
     return await finish(db, run, "completed")
 
 
 async def _uncertain_segment(db: AsyncSession, run_id: str) -> bool:
-    segments = await _segments(db, run_id)
+    segments = list(
+        (
+            await db.scalars(
+                select(CompilationSegment).where(
+                    CompilationSegment.run_id == run_id,
+                )
+            )
+        ).all()
+    )
     for segment in segments:
-        if segment.status == "running" and segment.request_started_at is not None:
-            if await segment_artifact(db, segment.id, "raw_response") is None:
-                return True
+        if segment.status == "uncertain":
+            return True
+        if (
+            segment.status == "running"
+            and segment.request_started_at is not None
+            and await segment_artifact(db, segment.id, "raw_response") is None
+        ):
+            return True
     return False
 
 
 async def _mark_uncertain_segments(db: AsyncSession, run: CompilationRun) -> None:
-    for segment in await _segments(db, run.id):
+    all_nodes = list(
+        (
+            await db.scalars(
+                select(CompilationSegment).where(
+                    CompilationSegment.run_id == run.id,
+                )
+            )
+        ).all()
+    )
+    parents = {node.parent_segment_id for node in all_nodes if node.parent_segment_id}
+    for segment in all_nodes:
+        if segment.id in parents:
+            continue
         if segment.status != "running" or segment.request_started_at is None:
             continue
         draft = await segment_artifact(db, segment.id, "draft_json")
@@ -614,12 +973,25 @@ async def _mark_uncertain_segments(db: AsyncSession, run: CompilationRun) -> Non
             segment.worker_id = None
             continue
         if segment.usage_id:
-            await usage_service.settle(
-                db, segment.usage_id, total_tokens=None, failed=True
-            )
+            await _settle_part_usage(segment.usage_id, None, failed=True)
         segment.status = "uncertain"
         segment.error_code = "compilation_request_interrupted"
         segment.finished_at = utcnow()
+
+    by_id = {node.id: node for node in all_nodes}
+    for node in all_nodes:
+        if node.status != "uncertain":
+            continue
+        parent_id, visited = node.parent_segment_id, set()
+        while parent_id in by_id and parent_id not in visited:
+            visited.add(parent_id)
+            parent = by_id[parent_id]
+            parent.status, parent.error_code, parent.finished_at = (
+                "uncertain",
+                node.error_code,
+                utcnow(),
+            )
+            parent_id = parent.parent_segment_id
 
 
 async def execute_run(
@@ -660,9 +1032,7 @@ async def execute_run(
                     )
                     if uncertain:
                         await _mark_uncertain_segments(db, run)
-                    return await finish(
-                        db, run, "uncertain" if uncertain else "failed", code
-                    )
+                    return await finish(db, run, "uncertain" if uncertain else "failed", code)
                 raw = await artifact(db, run.id, "raw_response")
                 uncertain = code == "chat_provider_uncertain" or (
                     run.request_started_at is not None

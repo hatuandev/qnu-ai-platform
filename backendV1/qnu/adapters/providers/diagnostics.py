@@ -39,6 +39,9 @@ from qnu.ports.provider_diagnostics import (
     DiscoveredModel,
 )
 
+# Gateways aggregate many providers; bound the snapshot without truncating it.
+MAX_DISCOVERED_MODELS = 5000
+
 
 def models_url(endpoint: str) -> str:
     base = endpoint.strip().rstrip("/")
@@ -133,9 +136,14 @@ def validate(
         result.observed_model = observed
     if kind == "discovery":
         rows = data.get("data") if isinstance(data, dict) else None
-        if not isinstance(rows, list) or len(rows) > 500:
+        if not isinstance(rows, list):
             raise ValueError("Invalid model catalog")
-        ids = []
+        if len(rows) > MAX_DISCOVERED_MODELS:
+            return failed(
+                "provider_catalog_too_large",
+                f"Danh sách vượt giới hạn {MAX_DISCOVERED_MODELS} model; chưa nhập danh sách.",
+            )
+        ids: set[str] = set()
         for row in rows:
             model = row.get("id") if isinstance(row, dict) else None
             if not isinstance(model, str) or not 0 < len(model) <= 200 or not model.isprintable():
@@ -144,7 +152,7 @@ def validate(
                 raise ValueError("Credential reflected by upstream")
             if model in ids:
                 raise ValueError("Duplicate model ID")
-            ids.append(model)
+            ids.add(model)
             result.model_metadata.append(
                 DiscoveredModel(
                     id=model,
@@ -153,7 +161,7 @@ def validate(
                     embedding_dimension=row.get("embedding_dimension"),
                 )
             )
-        result.models = sorted(set(ids))
+        result.models = sorted(ids)
         result.detail = "Đã lấy danh sách; các model chưa được kiểm tra inference."
     elif kind == "embedding":
         vectors, result.total_tokens = decode_embeddings(

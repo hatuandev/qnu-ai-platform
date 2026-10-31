@@ -62,6 +62,11 @@ Cancellation không bị đổi thành thành công. Retry-After chỉ là thôn
 chưa triển khai key cooldown runtime. Model do gateway báo là quan sát response,
 không là bằng chứng độc lập về model upstream thực tế.
 
+Discovery chấp nhận tối đa 5000 model để hỗ trợ gateway tổng hợp nhiều nhà cung cấp.
+Vượt mức này trả `provider_catalog_too_large`, không cắt danh sách hoặc báo thành công
+một phần. Mỗi ID/metadata vẫn được kiểm tra; ID trùng hoặc dữ liệu sai làm thất bại
+toàn lượt. Tra cứu ID trùng dùng set, tránh chi phí bậc hai khi catalog lớn.
+
 ## Giao diện
 
 Trang chi tiết provider có Lấy danh sách model và Thử theo capability. Bộ chọn

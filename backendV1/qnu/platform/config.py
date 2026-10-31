@@ -73,6 +73,13 @@ class Settings(BaseSettings):
     # Workflow request defaults; actual limits come from the selected ModelOps model.
     COMPILER_MAX_OUTPUT_TOKENS: int = Field(default=8192, ge=1)
     COMPILER_LEASE_SECONDS: int = Field(default=900, ge=60)
+    # Independent parts may overlap, but the provider is shared with every other
+    # caller: keep this small and below the server's own concurrency.
+    COMPILER_SEGMENT_CONCURRENCY: int = Field(default=2, ge=1, le=4)
+    # Shared Redis admission for all managed chat calls to the same endpoint/model.
+    # Operational policy, not a claim about discovered server max_num_seqs.
+    MODEL_CHAT_CONCURRENCY: int = Field(default=4, ge=1, le=64)
+    MODEL_CHAT_QUEUE_TIMEOUT_SECONDS: int = Field(default=300, ge=1, le=3600)
     PUBLICATION_PREVIEW_TTL_SECONDS: int = Field(default=300, ge=1, le=3600)
     INDEX_CHUNK_MAX_BYTES: int = Field(default=3000, ge=256)
     INDEX_EMBED_BATCH_SIZE: int = Field(default=16, ge=1, le=128)

@@ -1,9 +1,8 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import {
-  configureTestModelCapacity,
-  type ProviderSetupProfile,
-} from "./provider-capacity";
+import type { LiveProfile } from "./live-profile";
+import { configureTestModelCapacity } from "./provider-capacity";
+import { verifyRouterProvider } from "./router-provider";
 import { authenticate, checkpoint, save } from "./session";
 
 test.use({ trace: "off", video: "off", screenshot: "off" });
@@ -11,7 +10,7 @@ test.use({ trace: "off", video: "off", screenshot: "off" });
 test("QNU nhà cung cấp: tạo, khóa, kết nối, model và sidebar", async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(360_000);
   const state = checkpoint();
   if (state.mode !== "live" || !state.providerSetup)
     throw new Error(
@@ -19,9 +18,7 @@ test("QNU nhà cung cấp: tạo, khóa, kết nối, model và sidebar", async 
     );
   const profileFile = process.env.E2E_MODEL_PROFILE;
   if (!profileFile) throw new Error("Thiếu profile.");
-  const profile = JSON.parse(
-    readFileSync(profileFile, "utf8"),
-  ) as ProviderSetupProfile;
+  const profile = JSON.parse(readFileSync(profileFile, "utf8")) as LiveProfile;
   const api = await authenticate(page);
   const id = state.providerSetup.connectionId;
   const base = `/modelops/connections/${id}`;
@@ -186,5 +183,9 @@ test("QNU nhà cung cấp: tạo, khóa, kết nối, model và sidebar", async 
   for (const model of Object.values(profile.models))
     await expect(page.getByText(model, { exact: true }).first()).toBeVisible();
   state.providerSetup.modelsRegistered = true;
+  await verifyRouterProvider(api, state, profile);
+  console.info(
+    `Mặc định chat/biên soạn: ${state.chatSelection === "router" ? profile.additional_chat_provider?.models.chat : profile.models.chat}`,
+  );
   save(state);
 });

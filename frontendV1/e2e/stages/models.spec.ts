@@ -1,14 +1,16 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import {
+  acceptsModelObservation,
+  configuredProfiles,
+  type LiveProfile,
+  profileForCapability,
+} from "./live-profile";
+import type { ProviderSetupProfile } from "./provider-capacity";
 import { type Api, authenticate, checkpoint, directory } from "./session";
 
 type Capability = "chat" | "embedding" | "rerank" | "ocr";
-interface Profile {
-  name: string;
-  base_url: string;
-  models: Record<Capability, string>;
-}
 interface Provider {
   id: string;
   parent_id: string | null;
@@ -42,28 +44,33 @@ if (!stage?.startsWith("model-"))
   throw new Error("Chọn chặng model-* bằng runner.");
 const profilePath = process.env.E2E_MODEL_PROFILE;
 if (!profilePath) throw new Error("BLOCKED: chưa chọn profile kiểm tra model.");
-const profile = JSON.parse(readFileSync(profilePath, "utf8")) as Profile;
-const endpoint = new URL(profile.base_url);
-if (
-  !/^(http|https):$/.test(endpoint.protocol) ||
-  endpoint.username ||
-  endpoint.password ||
-  endpoint.search ||
-  endpoint.hash
-) {
-  throw new Error("BLOCKED: profile endpoint không hợp lệ.");
+const profile = JSON.parse(readFileSync(profilePath, "utf8")) as LiveProfile;
+for (const configured of configuredProfiles(profile)) {
+  const endpoint = new URL(configured.base_url);
+  if (
+    !/^(http|https):$/.test(endpoint.protocol) ||
+    endpoint.username ||
+    endpoint.password ||
+    endpoint.search ||
+    endpoint.hash
+  ) {
+    throw new Error("BLOCKED: profile endpoint không hợp lệ.");
+  }
 }
 const normalize = (url: string) => url.replace(/\/+$/, "");
-const sameEndpoint = (url: string) =>
-  normalize(url) === normalize(profile.base_url);
+const sameEndpoint = (url: string, target: ProviderSetupProfile) =>
+  normalize(url) === normalize(target.base_url);
 
 // Diagnostic APIs keep credentials in ModelOps; do not capture network tokens in traces.
 test.use({ trace: "off", video: "off", screenshot: "off" });
 
-async function connectionFor(api: Api): Promise<Connection> {
+async function connectionFor(
+  api: Api,
+  target: ProviderSetupProfile,
+): Promise<Connection> {
   const rows = await api.get<Connection[]>("/modelops/connections");
   const matches = rows.filter(
-    (row) => row.is_active && sameEndpoint(row.base_url),
+    (row) => row.is_active && sameEndpoint(row.base_url, target),
   );
   if (matches.length !== 1) {
     throw new Error(
@@ -107,12 +114,17 @@ async function requireDiagnostic(
   expect(recorded?.outcome).toBe("ok");
 }
 
-test(`Model QNU thật: ${stage}`, async ({ page }) => {
-  test.setTimeout(180_000);
-  if (checkpoint().mode !== "live")
-    throw new Error("BLOCKED: cần init --mode live.");
+test(`Model thật đã chọn: ${stage}`, async ({ page }) => {
+  test.setTimeout(360_000);
+  const state = checkpoint();
+  if (state.mode !== "live") throw new Error("BLOCKED: cần init --mode live.");
   const api = await authenticate(page);
-  const connection = await connectionFor(api);
+  const target = profileForCapability(
+    profile,
+    state.chatSelection,
+    stage === "model-chat" ? "chat" : "ocr",
+  );
+  const connection = await connectionFor(api, target);
   const capabilities: Capability[] = ["chat", "embedding", "rerank", "ocr"];
   for (const capability of capabilities) {
     if (!profile.models[capability]?.trim())
@@ -129,6 +141,16 @@ test(`Model QNU thật: ${stage}`, async ({ page }) => {
     await requireDiagnostic(api, providerId, result, "discovery");
     for (const model of Object.values(profile.models))
       expect(result.models).toContain(model);
+    for (const additional of configuredProfiles(profile).slice(1)) {
+      const extra = await connectionFor(api, additional);
+      const discovered = await api.post<Diagnostic>(
+        `/modelops/providers/${extra.id}/discover`,
+        {},
+      );
+      await requireDiagnostic(api, extra.id, discovered, "discovery");
+      for (const model of Object.values(additional.models))
+        expect(discovered.models).toContain(model);
+    }
   } else {
     const capability = capabilities.find((value) => stage === `model-${value}`);
     if (!capability) throw new Error("Chặng model không được hỗ trợ.");
@@ -139,13 +161,13 @@ test(`Model QNU thật: ${stage}`, async ({ page }) => {
       (provider) =>
         provider.is_active &&
         provider.parent_id === connection.id &&
-        sameEndpoint(provider.base_url) &&
-        provider.model_name === profile.models[capability] &&
+        sameEndpoint(provider.base_url, target) &&
+        provider.model_name === target.models[capability] &&
         provider.capabilities.includes(capability),
     );
     if (matches.length !== 1)
       throw new Error(
-        `BLOCKED: thêm đúng một model ${profile.models[capability]} có chức năng ${capability} dưới nhà cung cấp đã chọn.`,
+        `BLOCKED: thêm đúng một model ${target.models[capability]} có chức năng ${capability} dưới nhà cung cấp đã chọn.`,
       );
     providerId = matches[0].id;
     result = await api.post<Diagnostic>(
@@ -153,9 +175,16 @@ test(`Model QNU thật: ${stage}`, async ({ page }) => {
       { capability },
     );
     await requireDiagnostic(api, providerId, result, capability);
-    expect(result.requested_model).toBe(profile.models[capability]);
-    if (result.observed_model !== null)
-      expect(result.observed_model).toBe(profile.models[capability]);
+    expect(result.requested_model).toBe(target.models[capability]);
+    expect(
+      acceptsModelObservation(
+        target,
+        capability,
+        result.requested_model,
+        result.observed_model,
+      ),
+      "Model phản hồi phải trùng model yêu cầu hoặc alias khai báo riêng của provider.",
+    ).toBe(true);
     if (capability === "embedding") {
       expect(result.observed_dimension).not.toBeNull();
       expect(result.observed_dimension).toBeGreaterThan(0);

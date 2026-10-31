@@ -23,6 +23,7 @@ ReasoningMode = Literal["server_default", "effort", "toggle", "chat_template_kwa
 ReasoningLevel = Literal["off", "low"]
 # Tasks whose prompt is owned by QNU and where reasoning can be tuned safely.
 REASONING_TASKS = ("compiler", "compiler_review")
+REASONING_LEVELS = ("off", "low")
 PARAMETER_PATTERN = r"^[a-z][a-z0-9_]{0,63}$"
 
 
@@ -67,12 +68,19 @@ class ReasoningPolicy(BaseModel):
         if self.parameter is None:
             raise ValueError("Cần khai báo đúng tên tham số do provider hỗ trợ.")
         levels = self.tasks or {}
-        unknown = set(levels) - set(REASONING_TASKS)
-        if unknown:
-            raise ValueError("Chỉ cấu hình reasoning cho tác vụ compiler/compiler_review.")
+        # ``tasks`` maps a level to the tasks using it; a task may not appear twice.
+        seen: dict[str, str] = {}
         for level, tasks in levels.items():
+            if level not in REASONING_LEVELS:
+                raise ValueError("Mức reasoning chỉ nhận 'off' hoặc 'low'.")
+            if not tasks:
+                raise ValueError("Mỗi mức reasoning phải nêu ít nhất một tác vụ.")
             if len(tasks) != len(set(tasks)) or set(tasks) - set(REASONING_TASKS):
                 raise ValueError("Danh sách tác vụ reasoning không hợp lệ hoặc bị trùng.")
+            for task in tasks:
+                if task in seen:
+                    raise ValueError("Một tác vụ chỉ được khai báo ở một mức reasoning.")
+                seen[task] = level
             if level == "off" and self.off_value is None:
                 raise ValueError("Thiếu giá trị 'off' cho tham số đã khai báo.")
             if level == "low" and self.low_value is None:

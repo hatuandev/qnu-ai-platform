@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { type APIResponse, expect, type Page } from "@playwright/test";
+import { progressWaitMs } from "./progress-budget";
 
 export interface Source {
   id: string;
@@ -16,6 +17,8 @@ export interface Publication {
   run: string;
   compilationRecoveryOf?: string;
   review?: string;
+  reviewAttempts?: number;
+  reviewHistory?: string[];
   document?: string;
   version?: string;
   index?: string;
@@ -32,6 +35,8 @@ export interface Checkpoint {
     createdKey?: boolean;
     modelsRegistered?: boolean;
   };
+  chatSelection?: "qnu" | "router";
+  routerProviderSetup?: Checkpoint["providerSetup"];
   workspace?: string;
   collection?: string;
   folder?: string;
@@ -215,24 +220,61 @@ export class Api {
   /**
    * Poll a durable progress endpoint and grant one model call per observed part.
    * The part count is read before polling; it is never inferred from elapsed time.
+   * A line is printed only when the observed state changes, never on every poll.
    */
   async waitProgress<
     T extends {
       status: string;
       total: number;
+      completed?: number;
+      running?: number;
+      active_segments?: number[];
+      concurrency?: number;
+      elapsed_seconds?: number | null;
+      queue_timeout_seconds?: number;
+      refinement_timeout_seconds?: number;
+      nodes?: { index: number; status: string }[];
       segments?: { status: string; error_code?: string | null }[];
     },
   >(suffix: string, perPartMs: number, minMs = 240_000): Promise<T> {
     let last = await this.get<T>(suffix);
     const timeoutMs = Math.max(
-      minMs,
-      perPartMs * Math.max(1, last.total) + 60_000,
+      (last.refinement_timeout_seconds ?? 0) * 1000 + 60_000,
+      progressWaitMs(
+        last.total,
+        last.concurrency ?? 1,
+        perPartMs,
+        (last.queue_timeout_seconds ?? 0) * 1000,
+        minMs,
+      ),
     );
+    const describe = (value: T) =>
+      [
+        `status=${value.status}`,
+        `parts=${value.completed ?? 0}/${value.total}`,
+        `running=${value.running ?? 0}`,
+        `concurrency=${value.concurrency ?? 1}`,
+        `active=[${(value.active_segments ?? []).join(",")}]`,
+        `nodes=[${(value.nodes ?? []).map((node) => `${node.index}:${node.status}`).join(",")}]`,
+      ].join(" ");
+    let seen = describe(last);
+    console.info(`Tiến độ: ${seen} elapsed=${last.elapsed_seconds ?? 0}s`);
     await expect
       .poll(
         async () => {
           last = await this.get<T>(suffix);
-          if (["failed", "cancelled", "rejected", "uncertain"].includes(last.status)) {
+          const current = describe(last);
+          if (current !== seen) {
+            seen = current;
+            console.info(
+              `Tiến độ: ${current} elapsed=${last.elapsed_seconds ?? 0}s`,
+            );
+          }
+          if (
+            ["failed", "cancelled", "rejected", "uncertain"].includes(
+              last.status,
+            )
+          ) {
             const part = last.segments?.find(
               (segment) => segment.status === last.status || segment.error_code,
             );
@@ -248,8 +290,15 @@ export class Api {
       .toBe("completed");
     return last;
   }
-  async upload(state: Checkpoint, file: string, idempotencyKey: string, sourcePath?: string) {
-    const bytes = readFileSync(sourcePath ?? path.join(directory, "fixtures", file));
+  async upload(
+    state: Checkpoint,
+    file: string,
+    idempotencyKey: string,
+    sourcePath?: string,
+  ) {
+    const bytes = readFileSync(
+      sourcePath ?? path.join(directory, "fixtures", file),
+    );
     const response = await this.page.request.post(
       `${apiRoot}${collection(state)}/sources`,
       {

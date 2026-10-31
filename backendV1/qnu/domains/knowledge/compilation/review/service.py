@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.models import CompilationRun, utcnow
-from qnu.domains.knowledge.compilation.review import artifacts, parts
+from qnu.domains.knowledge.compilation.review import artifacts, parts, refinement
 from qnu.domains.knowledge.compilation.review.material import ReviewMaterial, load_material
 from qnu.domains.knowledge.compilation.review.models import (
     CompilationReview,
@@ -51,6 +51,7 @@ SEGMENTED_CODES = {
     "model_context_limit_exceeded",
     "model_input_limit_exceeded",
     "model_output_limit_exceeded",
+    "compilation_review_output_requires_segments",
 }
 
 
@@ -165,6 +166,61 @@ async def target_matches(
     return material
 
 
+async def _can_resume_segmented(db: AsyncSession, previous: CompilationReview) -> bool:
+    if previous.status not in {"failed", "uncertain"}:
+        return False
+    has_manifest = bool((previous.trace.get("segmentation") or {}).get("manifest_sha256"))
+    if not has_manifest:
+        return await untouched(db, previous.id)
+    if previous.status == "uncertain" or await untouched(db, previous.id):
+        return True
+    segments = list(
+        (
+            await db.scalars(
+                select(CompilationReviewSegment)
+                .where(CompilationReviewSegment.review_id == previous.id)
+                .order_by(CompilationReviewSegment.segment_index)
+            )
+        ).all()
+    )
+    if not segments:
+        return False
+    leaves = refinement.ordered_leaves(segments)
+    if any(leaf.status == "uncertain" for leaf in leaves):
+        return False
+    return any(
+        leaf.status in {"pending", "running", "received"}
+        or (
+            leaf.status == "failed"
+            and leaf.error_code == "chat_output_truncated"
+            and not (leaf.config or {}).get("refinement_exhausted")
+        )
+        for leaf in leaves
+    )
+
+
+async def untouched(db: AsyncSession, review_id: str) -> bool:
+    """True only when no part ever reached the provider, so a replay cannot duplicate work."""
+    segments = list(
+        (
+            await db.scalars(
+                select(CompilationReviewSegment).where(
+                    CompilationReviewSegment.review_id == review_id
+                )
+            )
+        ).all()
+    )
+    if not segments:
+        return False
+    for segment in segments:
+        if segment.attempt_count or segment.request_started_at is not None:
+            return False
+        for kind in ("raw_response", "assessment_json"):
+            if await artifacts.segment_artifact(db, segment.id, kind) is not None:
+                return False
+    return True
+
+
 async def checkpoint(
     db: AsyncSession, blob: BlobStore, actor: AuthActor, row: CompilationReview, run: CompilationRun
 ) -> None:
@@ -214,10 +270,9 @@ async def prepare(
             raise Conflict("Idempotency-Key đã dùng cho review khác.", code="idempotency_conflict")
         await expire(db, previous)
         # Never resume a request that may still be in flight; a concurrent replay
-        # could send the same part twice. Only a stopped review can continue.
-        if previous.status == "uncertain" and (
-            previous.trace.get("segmentation") or {}
-        ).get("manifest_sha256"):
+        # could send the same part twice. Only a stopped review can continue, and a
+        # stop before the first request is replayed because it sent nothing.
+        if await _can_resume_segmented(db, previous):
             segment_count = await db.scalar(
                 select(func.count())
                 .select_from(CompilationReviewSegment)
@@ -250,7 +305,9 @@ async def prepare(
         return PreparedReview(run, previous, None, None)
     material = await load_material(db, blob, run)
     messages = messages_for(material.payload, structured=req.structured_output)
-    schema = output_schema(material.payload) if req.structured_output else None
+    schema = (
+        output_schema(material.payload, require_references=2) if req.structured_output else None
+    )
     runtime: ChatRuntime
     budget = None
     plans: list[parts.ReviewPartPlan] = []
@@ -264,7 +321,21 @@ async def prepare(
             task="compiler_review",
             max_output_tokens=req.max_output_tokens,
             output_schema=schema,
+            reasoning_task="compiler_review",
         )
+        reasoning_dir = runtime.reasoning_directive("compiler_review")
+        reasoning_shares = reasoning_dir is None or reasoning_dir.level != "off"
+        if parts.requires_output_segmentation(
+            material.payload,
+            output_tokens=budget.max_output_tokens,
+            structured=req.structured_output,
+            reasoning_shares_budget=reasoning_shares,
+        ):
+            raise AppException(
+                "Ước lượng đầu ra review vượt ngân sách an toàn một lần gọi; chuyển sang chia phần.",
+                code="compilation_review_output_requires_segments",
+                status_code=422,
+            )
         single_call = (request, messages)
     except AppException as exc:
         if exc.code not in SEGMENTED_CODES:
@@ -284,13 +355,28 @@ async def prepare(
                 code="model_capacity_required",
                 status_code=422,
             ) from exc
+        reasoning_dir = runtime.reasoning_directive("compiler_review")
+        reasoning_shares = reasoning_dir is None or reasoning_dir.level != "off"
         plans = await asyncio.to_thread(
             parts.plan_parts,
-            material.payload, capacity=capacity, structured=req.structured_output
+            material.payload,
+            capacity=capacity,
+            output_tokens=budget.max_output_tokens,
+            structured=req.structured_output,
+            reasoning_shares_budget=reasoning_shares,
         )
         single_call = (None, None)
     assert budget is not None
+    reasoning = runtime.reasoning_directive("compiler_review")
+    reasoning_shares = reasoning is None or reasoning.level != "off"
+    out_budget = parts.output_budget(
+        budget.max_output_tokens, reasoning_shares_budget=reasoning_shares
+    )
     trace = {
+        "literal_check_version": 1,
+        "review_concurrency": 2,
+        "context_resolution_version": 2,
+        "reference_contract_version": 2,
         "execution_token": new_id("rex"),
         "prompt_version": PROMPT_VERSION,
         "prompt_sha256": digest(SYSTEM),
@@ -298,10 +384,15 @@ async def prepare(
         "model_name": runtime.model_name,
         "configuration_hash": runtime.configuration_hash,
         "routing": list(runtime.routing_trace),
+        "reasoning": reasoning.public_dict() if reasoning is not None else None,
+        "reasoning_trace": runtime.reasoning_trace("compiler_review"),
         "compiler_provider_id": run.provider_id,
         "source_unit_count": len(material.payload["source_units"]),
         "draft_unit_count": len(material.payload["draft_units"]),
         "max_output_tokens": budget.max_output_tokens,
+        "usable_output_tokens": out_budget.usable_output_tokens,
+        "reasoning_reserve_tokens": out_budget.reasoning_reserve_tokens,
+        "framing_reserve_tokens": out_budget.framing_reserve_tokens,
         "total_reserved_tokens": budget.total_reserved_tokens,
         "structured_output": req.structured_output,
         "output_schema_sha256": digest(schema) if schema is not None else None,
@@ -318,6 +409,9 @@ async def prepare(
                         runtime.token_limits, budget.max_output_tokens
                     ),
                     "output_tokens": budget.max_output_tokens,
+                    "usable_output_tokens": out_budget.usable_output_tokens,
+                    "reasoning_reserve_tokens": out_budget.reasoning_reserve_tokens,
+                    "framing_reserve_tokens": out_budget.framing_reserve_tokens,
                     "manifest_sha256": None,
                 },
             }
@@ -380,12 +474,15 @@ async def _store_segments(
     runtime: ChatRuntime,
     budget,
 ) -> None:
+    reasoning_dir = runtime.reasoning_directive("compiler_review")
+    reasoning_shares = reasoning_dir is None or reasoning_dir.level != "off"
     manifest = parts.manifest_for(
         row,
         plans,
         material.payload,
         capacity=available_input_tokens(runtime.token_limits, budget.max_output_tokens) or 0,
         output_tokens=budget.max_output_tokens,
+        reasoning_shares_budget=reasoning_shares,
     )
     payload = json_bytes(manifest)
     await artifacts.store(db, blob, row, "segment_manifest", payload)
@@ -401,6 +498,7 @@ async def _store_segments(
         "configuration_hash": runtime.configuration_hash,
         "max_output_tokens": budget.max_output_tokens,
         "structured_output": bool(row.trace.get("structured_output")),
+        "reasoning": row.trace.get("reasoning"),
     }
     for plan in plans:
         db.add(
@@ -409,6 +507,7 @@ async def _store_segments(
                 review_id=row.id,
                 segment_index=plan.index,
                 status="pending",
+                attempt_count=0,
                 scope=plan.scope_dict(),
                 input_sha256=plan.input_sha256,
                 prompt_version=parts.SEGMENT_PROMPT_VERSION,
@@ -480,8 +579,10 @@ async def progress(
             )
         ).all()
     )
+    leaves = refinement.ordered_leaves(segments)
+    parent_ids = refinement.parent_ids_for(segments)
     counts: dict[str, int] = {}
-    for segment in segments:
+    for segment in leaves:
         counts[segment.status] = counts.get(segment.status, 0) + 1
     segmented = bool(row.trace.get("segmentation")) or bool(segments)
     if segmented:
@@ -492,7 +593,8 @@ async def progress(
         failed = counts.get("failed", 0)
         uncertain = counts.get("uncertain", 0)
         cancelled = counts.get("cancelled", 0)
-        observed = [segment.usage_tokens for segment in segments if segment.usage_tokens is not None]
+        any_called = any(refinement.request_usage(segment)[0] for segment in segments)
+        usage_tokens = refinement.total_usage(segments) if any_called else row.usage_tokens
     else:
         completed = int(row.status == "completed")
         pending = 0
@@ -500,26 +602,30 @@ async def progress(
         failed = int(row.status == "failed")
         uncertain = int(row.status == "uncertain")
         cancelled = int(row.status == "cancelled")
-        observed = []
+        usage_tokens = row.usage_tokens
     return ReviewProgress(
         review_id=row.id,
         status=row.status,
         verdict=row.verdict,
         segmented=segmented,
-        total=len(segments) if segmented else 1,
+        total=len(leaves) if segmented else 1,
         completed=completed,
         pending=pending,
         running=running,
         failed=failed,
         uncertain=uncertain,
         cancelled=cancelled,
-        usage_tokens=sum(observed) if observed else row.usage_tokens,
+        usage_tokens=usage_tokens,
         created_at=row.created_at,
         request_started_at=row.request_started_at,
         finished_at=row.finished_at,
         segments=[
             ReviewSegmentProgress(
+                id=segment.id,
                 index=segment.segment_index,
+                parent_segment_id=segment.parent_segment_id,
+                depth=refinement.segment_depth(segment),
+                is_leaf=segment.id not in parent_ids,
                 status=segment.status,
                 attempt_count=segment.attempt_count,
                 usage_tokens=segment.usage_tokens,
@@ -532,7 +638,7 @@ async def progress(
     )
 
 
-async def read_segment_raw(
+async def read_segment_artifact(
     db: AsyncSession,
     blob: BlobStore,
     actor: AuthActor,
@@ -541,6 +647,7 @@ async def read_segment_raw(
     run_id: str,
     review_id: str,
     segment_index: int,
+    kind: str,
 ) -> tuple[str, str, bytes]:
     row = await get_review(db, actor, workspace_id, collection_id, run_id, review_id)
     segment = await db.scalar(
@@ -553,5 +660,32 @@ async def read_segment_raw(
         raise EntityNotFound(
             "Không tìm thấy phần review.", code="compilation_review_segment_not_found"
         )
-    artifact, payload = await artifacts.read_segment(db, blob, segment, "raw_response")
+    if kind in {"assessment_json", "markdown"} and segment.status != "completed":
+        raise Conflict(
+            "Phần review chưa hoàn tất.", code="compilation_review_segment_not_completed"
+        )
+    artifact, payload = await artifacts.read_segment(db, blob, segment, kind)
     return artifact.content_type, artifact.sha256, payload
+
+
+async def read_segment_raw(
+    db: AsyncSession,
+    blob: BlobStore,
+    actor: AuthActor,
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    review_id: str,
+    segment_index: int,
+) -> tuple[str, str, bytes]:
+    return await read_segment_artifact(
+        db,
+        blob,
+        actor,
+        workspace_id,
+        collection_id,
+        run_id,
+        review_id,
+        segment_index,
+        "raw_response",
+    )

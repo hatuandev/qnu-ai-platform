@@ -55,6 +55,12 @@ PowerShell thứ hai — chạy từng dòng, chỉ sang dòng sau khi PASS:
 
 Nhập key tại lời nhắc ẩn trong terminal. **provider-setup hiện tự lấy và lưu capacity từ server**, đồng thời bổ sung các mục E2E đã khai báo trong profile QNU (timeout, giới hạn input thử và ngân sách ảnh OCR đã xác minh). Sau khi PASS, tiếp tục các lệnh model bên dưới; **không còn bước bắt buộc nhập capacity thủ công trong giao diện**.
 
+Profile mới hỏi **key QNU → key 9router → chọn 1 Qwen hoặc 2 GPT-OSS (`ollama/gpt-oss:120b`)**. Chat/Compiler/review dùng lựa chọn đó; OCR/embedding/rerank giữ QNU. Nếu chọn 9router mà catalog thiếu context/output, terminal sẽ hỏi thông số Ollama thực tế, không tự đoán; để trống thì dừng an toàn. Không gửi key vào chat/source/.env. Chi tiết tại [chọn provider chat](./V1_TEST_TOAN_LUONG_MODEL_QNU.md#chọn-qwen-hoặc-gpt-oss-qua-9router).
+
+Nếu gặp lỗi 9router trả HTTP 200 nhưng danh sách không hợp lệ ở bản trước phiên 753: backend cũ chỉ nhận tối đa 500 model, trong khi catalog đã quan sát có 638 model. Bản sửa nhận tối đa 5000 model, vẫn kiểm tra từng ID/metadata và không cắt mất model cuối danh sách. Nhấn Ctrl+C tại cửa sổ `serve`, chạy lại `.\test-v1-e2e.ps1 serve`, đợi dòng `E2E live`, rồi chạy lại `.\test-v1-e2e.ps1 run provider-setup --headed` ở cửa sổ thứ hai. **Không cleanup/init**; key đang hoạt động được dùng lại. Chọn `2` và nhập context/output Ollama thực tế nếu được hỏi. Hai thông số này chưa có trong catalog 9router đã kiểm tra; không lấy giới hạn Qwen để điền thay.
+
+Nếu `model-chat` chỉ lỗi so sánh `ollama/gpt-oss:120b` với `gpt-oss:120b`, bản sửa phiên 754 khai báo cặp tên này trong profile 9router. Tên yêu cầu vẫn phải khớp hoàn toàn; phản hồi chỉ được nhận tên gốc hoặc alias đã khai báo đúng provider/model. Sau khi chặng đang chạy kết thúc, chạy lại `.\test-v1-e2e.ps1 run model-chat --headed`; không cần restart serve, cleanup/init hoặc chạy lại các chặng đã PASS. Báo cáo giữ cả requested_model và observed_model; tên upstream do gateway báo không tự chứng minh danh tính model thực tế.
+
 Phiên mới có DB ModelOps mới. Script đăng ký model mới kèm snapshot discovery và đồng bộ model đã có; không tự đoán capacity khi server thiếu metadata. Profile QNU chỉ phục vụ endpoint/model này, không áp dụng thành mặc định cho nhà cung cấp khác.
 
 ### Kiểm tra thông số đã lưu (tùy chọn)

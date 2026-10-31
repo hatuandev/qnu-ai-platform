@@ -191,3 +191,36 @@ test("the QNU profile OCR declaration is pinned to the actual backend prompt", (
     createHash("sha256").update(prompt, "utf8").digest("hex"),
   );
 });
+
+test("an unselected chat alternative may remain unknown without fabricating limits", async () => {
+  const { api, models } = fixture();
+  models[0].capacity_status = "unknown";
+  models[0].token_limits = null;
+  const chatOnly = { ...profile, models: { chat: profile.models.chat } };
+  await configureTestModelCapacity(
+    api,
+    "connection_test",
+    chatOnly,
+    "diag_current",
+    false,
+  );
+  expect(api.json).not.toHaveBeenCalled();
+  await expect(
+    configureTestModelCapacity(
+      api,
+      "connection_test",
+      chatOnly,
+      "diag_current",
+    ),
+  ).rejects.toThrow("chưa đồng bộ đúng capacity");
+  models[0].parent_id = "another_connection";
+  await expect(
+    configureTestModelCapacity(
+      api,
+      "connection_test",
+      chatOnly,
+      "diag_current",
+      false,
+    ),
+  ).rejects.toThrow("chưa đồng bộ đúng capacity");
+});

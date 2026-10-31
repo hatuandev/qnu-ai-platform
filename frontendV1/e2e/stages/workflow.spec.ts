@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { canRecoverTruncatedReview } from "./admissions-recovery";
 import {
   type CompilationDraft,
   needsUnreadBlockUpgrade,
@@ -443,32 +444,36 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
           ? await api.get<{
               timeout_seconds: number;
               token_limits?: { max_output_tokens?: number | null } | null;
-            }>(
-              `/modelops/providers/${state.runtimeDefaults.chat}`,
-            )
+            }>(`/modelops/providers/${state.runtimeDefaults.chat}`)
           : undefined;
         const reviewBase = `${collection(state)}/compilation-runs/${publication.run}/reviews`;
-        type ReviewRun = Run & { trace?: { max_output_tokens?: number } };
+        type ReviewRun = Run & {
+          trace?: {
+            max_output_tokens?: number;
+            segmentation?: { planner_version?: string | null } | null;
+          };
+        };
         const previous = publication.review
           ? await api.get<ReviewRun>(`${reviewBase}/${publication.review}`)
           : (await api.get<ReviewRun[]>(`${reviewBase}?limit=1`))[0];
-        const previousLimit = previous?.trace?.max_output_tokens;
         const modelLimit = reviewProvider?.token_limits?.max_output_tokens;
-        // A new, explicit stage run may recover truncation only after budget increases.
-        // Uncertain requests and same-budget failures keep their original review.
-        const recoverTruncated =
-          previous?.status === "failed" &&
-          previous.error_code === "chat_output_truncated" &&
-          previous.provider_id === state.runtimeDefaults?.chat &&
-          typeof previousLimit === "number" &&
-          typeof modelLimit === "number" &&
-          previousLimit < modelLimit;
-        if (previous && !recoverTruncated) {
+        const recovery = canRecoverTruncatedReview(
+          previous,
+          state.runtimeDefaults?.chat,
+          modelLimit,
+        );
+        if (previous && !recovery.recover) {
           publication.review = previous.id;
         } else {
+          if (previous && recovery.recover) {
+            publication.reviewHistory = [
+              ...(publication.reviewHistory ?? []),
+              previous.id,
+            ].filter((id, idx, arr) => arr.indexOf(id) === idx);
+          }
           if (reviewProvider)
             console.info(
-              `Đang review nguồn ${index + 1}; chờ tối đa ${reviewProvider.timeout_seconds}s, trả kết quả ngay khi xử lý xong.`,
+              `Đang review nguồn ${index + 1}; chờ tối đa ${reviewProvider.timeout_seconds}s mỗi phần, trả kết quả ngay khi xử lý xong.`,
             );
           const review = await api.post<Run>(
             reviewBase,
@@ -478,9 +483,9 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
                   structured_output: true,
                 }
               : {},
-            `${state.runId}-review-${index}-${publication.run}${recoverTruncated ? `-budget-${modelLimit}` : ""}`,
+            `${state.runId}-review-${index}-${publication.run}${recovery.suffix}`,
             reviewProvider
-              ? (reviewProvider.timeout_seconds + 30) * 1000
+              ? Math.max((reviewProvider.timeout_seconds + 30) * 1000, 300_000)
               : undefined,
           );
           publication.review = review.id;

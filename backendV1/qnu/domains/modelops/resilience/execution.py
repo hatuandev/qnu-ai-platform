@@ -9,6 +9,7 @@ import time
 import uuid
 from dataclasses import replace
 
+from qnu.domains.modelops.resilience.admission import chat_slot
 from qnu.domains.modelops.resilience.key_pool import acquire, finish
 from qnu.platform.database import AsyncSessionFactory
 from qnu.platform.errors import AppException
@@ -20,6 +21,19 @@ class CredentialExecutor:
         self.sessions = sessions
 
     async def call(self, capability, request, invoke):
+        if capability == "chat":
+            async with chat_slot(request):
+                try:
+                    async with asyncio.timeout(request.timeout_seconds):
+                        return await self._call(capability, request, invoke)
+                except TimeoutError as exc:
+                    raise AppException(
+                        "Hết thời gian gọi model; không tự gửi lại.",
+                        code="chat_provider_uncertain", status_code=504,
+                    ) from exc
+        return await self._call(capability, request, invoke)
+
+    async def _call(self, capability, request, invoke):
         if request.execution is None:
             return await invoke(request)
         excluded, started, call_id = set(), time.monotonic(), uuid.uuid4().hex

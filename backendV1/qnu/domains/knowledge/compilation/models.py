@@ -227,9 +227,10 @@ class CompilationSegment(Base):
         index=True,
     )
     segment_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="pending", index=True
+    parent_segment_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("kb_compilation_segments.id"), nullable=True, index=True
     )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", index=True)
     scope: Mapped[dict] = mapped_column(JSONB, nullable=False)
     input_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     prompt_version: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -256,7 +257,7 @@ class CompilationSegmentArtifact(Base):
     __table_args__ = (
         UniqueConstraint("segment_id", "kind", name="uq_compilation_segment_artifact"),
         CheckConstraint(
-            "kind IN ('raw_response','draft_json')",
+            "kind IN ('raw_response','draft_json','markdown')",
             name="ck_compilation_segment_artifact_kind",
         ),
         CheckConstraint(
