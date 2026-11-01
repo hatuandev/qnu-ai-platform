@@ -130,6 +130,8 @@ export function DecisionConfirmDialog({
               <DialogDescription className="text-xs text-muted-foreground">
                 Kiểm tra thông tin xem trước quyết định trước khi ghi nhận bất
                 biến vào hệ thống.
+                {preview.review_ack?.mode === "skipped" &&
+                  " Bản này chưa qua review; bạn đang chọn duyệt nhanh."}
               </DialogDescription>
             </div>
           </div>

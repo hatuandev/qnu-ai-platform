@@ -9,7 +9,10 @@ from qnu.domains.knowledge.compilation.review import artifacts
 from qnu.domains.knowledge.compilation.review.models import CompilationReview
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.knowledge.publication.models import CompiledVersion
-from qnu.domains.knowledge.publication.schemas import ReviewAcknowledgement
+from qnu.domains.knowledge.publication.schemas import (
+    ReviewAcknowledgement,
+    ReviewSkipAcknowledgement,
+)
 from qnu.platform.errors import Conflict, DependencyUnavailable
 from qnu.ports.blob_store import BlobStore
 
@@ -91,6 +94,27 @@ async def acknowledge(
     return {**ack.model_dump(), "bundle_sha256": target.bundle_sha256}
 
 
+def acknowledge_skip(target: CompiledVersion, skip: ReviewSkipAcknowledgement, reason: str) -> dict:
+    """Called only after publication approve authorization, with immutable preview binding."""
+    if skip.version_id != target.id or skip.bundle_sha256 != target.bundle_sha256:
+        raise Conflict("Phiên bản đã đổi; cần xác nhận lại.", code="publication_review_stale")
+    if target.retrieval_metadata and skip.retrieval_metadata_sha256 != digest(
+        target.retrieval_metadata
+    ):
+        raise Conflict(
+            "Cần xác nhận đúng metadata của phiên bản.",
+            code="publication_metadata_review_required",
+        )
+    if len(reason.strip()) < 10:
+        raise Conflict("Thiếu lý do bỏ qua review.", code="publication_review_required")
+    return {
+        **skip.model_dump(),
+        "mode": "skipped",
+        "reason": reason,
+        "compilation_run_id": target.compilation_run_id,
+    }
+
+
 async def recheck(
     db: AsyncSession, blob: BlobStore, target: CompiledVersion, saved: dict | None
 ) -> None:
@@ -99,5 +123,11 @@ async def recheck(
             "Chưa có xác nhận review khớp phiên bản; cần thu hồi và duyệt lại.",
             code="publication_review_required",
         )
+    if saved.get("mode") == "skipped":
+        fields = {key: saved.get(key) for key in ReviewSkipAcknowledgement.model_fields}
+        skip = ReviewSkipAcknowledgement.model_validate(fields)
+        if acknowledge_skip(target, skip, saved.get("reason", "")) != saved:
+            raise Conflict("Xác nhận bỏ qua review đã đổi.", code="publication_review_stale")
+        return
     fields = {key: value for key, value in saved.items() if key != "bundle_sha256"}
     await acknowledge(db, blob, target, ReviewAcknowledgement.model_validate(fields))

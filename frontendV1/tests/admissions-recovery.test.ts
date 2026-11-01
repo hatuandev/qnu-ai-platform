@@ -195,6 +195,41 @@ describe("rerun decision for an existing compilation run", () => {
   });
 });
 
+it("quota recovery requires every part to be undispatched and the same unpublished provider", () => {
+  const facts = {
+    status: "failed",
+    error_code: "quota_not_configured",
+    provider_id: "provider",
+    planner_version: PLANNER_VERSION,
+    parts: [{ status: "pending", attempt_count: 0 }],
+  };
+  expect(decideCompilationRecovery(facts, {}, "provider", null)).toEqual({
+    action: "new_run",
+    reason: "quota_not_configured",
+  });
+  for (const parts of [
+    [],
+    [{ status: "pending" }],
+    [{ status: "pending", attempt_count: 1 }],
+    [{ status: "running", attempt_count: 1 }],
+  ]) {
+    expect(
+      decideCompilationRecovery({ ...facts, parts }, {}, "provider", null),
+    ).toEqual({ action: "wait" });
+  }
+  expect(decideCompilationRecovery(facts, {}, "other", null)).toEqual({
+    action: "wait",
+  });
+  expect(
+    decideCompilationRecovery(
+      facts,
+      { version: "published" },
+      "provider",
+      null,
+    ),
+  ).toEqual({ action: "wait" });
+});
+
 describe("review replacement", () => {
   const changed =
     "POST /reviews: HTTP 409, code=compilation_review_provider_changed";

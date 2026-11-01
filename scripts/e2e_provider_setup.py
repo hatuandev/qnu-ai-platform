@@ -1,4 +1,4 @@
-"""Secure, interactive key bootstrap for isolated provider E2E stages."""
+"""Bootstrap isolated E2E credentials into ModelOps from local .env or hidden input."""
 
 from __future__ import annotations
 
@@ -9,7 +9,46 @@ import sys
 import warnings
 
 import httpx
-from v1_e2e_session import read, save
+from dotenv.parser import parse_stream
+from v1_e2e_session import ROOT, read, save
+
+KEY_ENV_FILE = ROOT / ".env"
+KEY_ENV_NAMES = {
+    "providerSetup": "E2E_QNU_API_KEY",
+    "routerProviderSetup": "E2E_9ROUTER_API_KEY",
+}
+
+
+def key_from_env(field):
+    """Operator-authorized E2E bootstrap only; never export keys to child environments."""
+    name = KEY_ENV_NAMES[field]
+    try:
+        with KEY_ENV_FILE.open(encoding="utf-8-sig") as source:
+            secret = ""
+            found = False
+            for binding in parse_stream(source):
+                if binding.error:
+                    raise RuntimeError(
+                        "Không đọc được .env E2E; kiểm tra cú pháp, không gửi nội dung khóa."
+                    )
+                if binding.key == name:
+                    if found:
+                        raise RuntimeError(
+                            f".env có biến {name} trùng; giữ một khai báo."
+                        )
+                    found = True
+                    secret = (binding.value or "").strip()
+            if secret and (len(secret) < 8 or any(ord(c) < 32 for c in secret)):
+                raise RuntimeError(
+                    f"Biến {name} không hợp lệ; cần khóa một dòng ít nhất 8 ký tự."
+                )
+            return secret
+    except FileNotFoundError:
+        return ""
+    except (OSError, UnicodeError):
+        raise RuntimeError(
+            "Không đọc được .env E2E; kiểm tra quyền truy cập và UTF-8."
+        ) from None
 
 
 def request(client, method, suffix, body=None):
@@ -26,7 +65,7 @@ def require_terminal():
     if not sys.stdin.isatty():
         raise RuntimeError(
             "Chạy provider-setup trong PowerShell tương tác để nhập khóa ẩn/chọn model; "
-            "không truyền key qua lệnh hoặc .env."
+            "hoặc điền E2E_QNU_API_KEY/E2E_9ROUTER_API_KEY trong .env ở root để nạp khóa."
         )
 
 
@@ -70,12 +109,14 @@ def prepare_connection(client, directory, state, profile, field, label, family):
     if active:
         setup["keyId"] = active[0]["id"]
     else:
-        require_terminal()
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", getpass.GetPassWarning)
-            secret = getpass.getpass(
-                f"API key {label} (nhập ẩn, chỉ lưu qua ModelOps): "
-            ).strip()
+        secret = key_from_env(field)
+        if not secret:
+            require_terminal()
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", getpass.GetPassWarning)
+                secret = getpass.getpass(
+                    f"API key {label} (nhập ẩn, chỉ lưu qua ModelOps): "
+                ).strip()
         if len(secret) < 8:
             raise RuntimeError("Khóa trống/quá ngắn; chưa thêm vào ModelOps.")
         try:

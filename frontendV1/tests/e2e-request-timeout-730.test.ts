@@ -87,3 +87,25 @@ test("uncertain review response surfaces its error without automatic resubmissio
   );
   assert.equal(fetch.mock.calls.length, 1);
 });
+
+test("transport failure never exposes Authorization or the Playwright request log", async () => {
+  const { api, fetch } = fixture();
+  fetch.mockRejectedValue(
+    new Error(
+      "connect ECONNREFUSED\nAuthorization: Bearer synthetic-session-token\nprivate request body",
+    ),
+  );
+  try {
+    await api.get("/workspaces/synthetic");
+    assert.fail("Expected transport failure");
+  } catch (error) {
+    assert.ok(error instanceof Error);
+    assert.match(error.message, /không kết nối được API/);
+    assert.doesNotMatch(
+      error.message,
+      /Bearer|synthetic-session-token|private request body/,
+    );
+    assert.equal(error.cause, undefined);
+  }
+  assert.equal(fetch.mock.calls.length, 1);
+});

@@ -8,6 +8,7 @@ import {
   modelTimeout,
 } from "./admissions-context";
 import {
+  compileAdmissionDrafts,
   compileAdmissionSource,
   publishAdmissionDraft,
 } from "./admissions-publication";
@@ -21,6 +22,7 @@ const stage = process.env.E2E_STAGE;
 const steps = {
   "admissions-upload": uploadAdmissionSource,
   "admissions-extraction": extractAdmissionSource,
+  "admissions-draft": compileAdmissionDrafts,
   "admissions-compilation": compileAdmissionSource,
   "admissions-publication": publishAdmissionDraft,
   "admissions-chat": questionAdmissionDraft,

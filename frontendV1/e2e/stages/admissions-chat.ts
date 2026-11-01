@@ -287,6 +287,10 @@ export async function questionAdmissionDraft(api: Api, state: Checkpoint) {
           combined_index: state.admissions?.combinedIndex,
           label_status: benchmark.label_status,
           semantic_review: "NOT_RUN",
+          compilation_review:
+            state.results["admissions-publication"]?.review_mode === "skipped"
+              ? "SKIPPED_BY_USER"
+              : "reviewed",
           prompt_versions: [
             ...new Set(
               records

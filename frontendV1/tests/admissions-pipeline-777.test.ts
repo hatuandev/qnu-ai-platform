@@ -11,6 +11,7 @@ import {
   verifyAdmissionsIndex,
 } from "../e2e/stages/admissions-policy";
 import {
+  compileAdmissionDrafts,
   compileAdmissionSource,
   publishAdmissionDraft,
 } from "../e2e/stages/admissions-publication";
@@ -88,6 +89,7 @@ function fixture() {
     wrongText: false,
     inactiveIndex: false,
     stalePlanner: false,
+    missingQuota: false,
   };
   const captured = (
     method: string,
@@ -111,6 +113,14 @@ function fixture() {
     }));
   const get = vi.fn(async (url: string): Promise<unknown> => {
     if (url.startsWith("/modelops/")) return provider;
+    if (url.endsWith("/quota"))
+      return {
+        configured: !options.missingQuota,
+        is_blocked: false,
+        monthly_token_limit: 20_000_000,
+        tokens_used: 0,
+        tokens_reserved: 0,
+      };
     captured("GET", url);
     const key = Object.keys(benchmark.documents).find((key) =>
       url.includes(key),
@@ -190,7 +200,11 @@ function fixture() {
         content: {},
       };
     if (url.includes("/versions/"))
-      return { status: statuses.get(key || "") || "draft" };
+      return {
+        id: `ver_${key}`,
+        bundle_sha256: "a".repeat(64),
+        status: statuses.get(key || "") || "draft",
+      };
     if (url.includes("/compilation-runs/"))
       return { id: `cmp_${key}`, status: "completed", provider_id: "chat" };
     if (url.endsWith("/assistants/assistant")) return assistant;
@@ -334,6 +348,64 @@ test("actual three-document runner requests conform to backend routes through pu
       [0],
     );
   }
+  expect(contracts(f.requests).checked).toHaveLength(f.requests.length);
+}, 30_000);
+
+test("draft-only compiles all documents without review/publication and normal compilation reuses them", async () => {
+  const f = fixture();
+  await compileAdmissionDrafts(f.api, f.state);
+  const posts = () => f.requests.filter((r) => r.method === "POST");
+  expect(posts()).toHaveLength(3);
+  expect(posts().every((r) => r.path.endsWith("/compilation-runs"))).toBe(true);
+  expect(posts().every((r) => (r.body as Body).auto_review === false)).toBe(
+    true,
+  );
+  const before = f.requests.length;
+  await expect(publishAdmissionDraft(f.api, f.state)).rejects.toThrow(
+    /thiếu review/,
+  );
+  expect(f.requests.length).toBe(before);
+  await compileAdmissionSource(f.api, f.state);
+  expect(
+    posts().filter((r) => r.path.endsWith("/compilation-runs")),
+  ).toHaveLength(3);
+  expect(posts().filter((r) => r.path.endsWith("/reviews"))).toHaveLength(3);
+});
+
+test("draft-only checks provenance even when review is disabled", async () => {
+  const f = fixture();
+  await compileAdmissionDrafts(f.api, f.state);
+  f.options.wrongText = true;
+  const before = f.post.mock.calls.length;
+  await expect(compileAdmissionDrafts(f.api, f.state)).rejects.toThrow(/OCR/);
+  expect(f.post.mock.calls.length).toBe(before);
+});
+
+test("draft-only refuses missing monthly quota before creating any model job", async () => {
+  const f = fixture();
+  f.options.missingQuota = true;
+  await expect(compileAdmissionDrafts(f.api, f.state)).rejects.toThrow(/quota/);
+  expect(f.post).not.toHaveBeenCalled();
+});
+
+test("explicit fast publication uses skip acknowledgements and never creates reviews", async () => {
+  const f = fixture();
+  await compileAdmissionDrafts(f.api, f.state);
+  vi.stubEnv("E2E_SKIP_REVIEW", "1");
+  await publishAdmissionDraft(f.api, f.state);
+  const posts = f.requests.filter((r) => r.method === "POST");
+  expect(posts.some((r) => r.path.endsWith("/reviews"))).toBe(false);
+  const approvals = posts.filter(
+    (r) =>
+      r.path.endsWith("/decision-preview") &&
+      (r.body as Body).action === "approve",
+  );
+  expect(approvals).toHaveLength(3);
+  expect(
+    approvals.every(
+      (r) => !!(r.body as Body).review_skip && !(r.body as Body).review_ack,
+    ),
+  ).toBe(true);
   expect(contracts(f.requests).checked).toHaveLength(f.requests.length);
 }, 30_000);
 

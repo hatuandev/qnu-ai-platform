@@ -135,8 +135,8 @@ export function planAdmissionsBudget(provider: Provider) {
     (!limits.max_input_tokens && !limits.context_window_tokens)
   )
     throw new Error("BLOCKED: capacity model chưa xác minh.");
-  const output = Math.min(4096, limits.max_output_tokens);
-  if (output < 4096)
+  const output = limits.max_output_tokens;
+  if (!Number.isSafeInteger(output) || output < 4096)
     throw new Error(
       "BLOCKED: profile benchmark cần output tối thiểu 4096 token.",
     );

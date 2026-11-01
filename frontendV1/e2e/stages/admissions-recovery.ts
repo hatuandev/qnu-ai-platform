@@ -16,14 +16,17 @@ export const REVIEW_PLANNER_VERSION = "qnu.compiler.review.plan/v2";
 export type Decision =
   | { action: "wait" }
   | { action: "raise_output"; output: number }
-  | { action: "new_run"; reason: "stale_planner" | "unresumable_parts" };
+  | {
+      action: "new_run";
+      reason: "stale_planner" | "unresumable_parts" | "quota_not_configured";
+    };
 
 export type RunFacts = {
   status: string;
   error_code?: string | null;
   provider_id?: string | null;
   planner_version?: string | null;
-  parts?: { status: string }[];
+  parts?: { status: string; attempt_count?: number }[];
 };
 
 const ACTIVE = new Set(["queued", "running", "dispatched"]);
@@ -81,6 +84,19 @@ export function decideCompilationRecovery(
   }
   if (ACTIVE.has(facts.status) || facts.status === "completed")
     return { action: "wait" };
+  if (
+    facts.status === "failed" &&
+    facts.error_code === "quota_not_configured" &&
+    providerId &&
+    facts.provider_id === providerId &&
+    !publication.review &&
+    !publication.version &&
+    facts.parts?.length &&
+    facts.parts.every(
+      (part) => part.status === "pending" && part.attempt_count === 0,
+    )
+  )
+    return { action: "new_run", reason: "quota_not_configured" };
   if (
     canRecoverAdmissionCompilation(facts, publication, providerId, outputLimit)
   ) {

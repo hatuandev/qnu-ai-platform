@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from qnu.domains.knowledge.metadata import RetrievalAnnotation
 
@@ -25,6 +25,16 @@ class ReviewAcknowledgement(BaseModel):
     report_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     confirmed_reviewed: Literal[True]
     resolutions: list[FindingResolution] = Field(default_factory=list, max_length=10000)
+    retrieval_metadata_sha256: str | None = Field(None, pattern=r"^[0-9a-f]{64}$")
+
+
+class ReviewSkipAcknowledgement(BaseModel):
+    """An explicit human choice, never a claim that a review took place."""
+
+    model_config = ConfigDict(extra="forbid")
+    confirmed_skip: Literal[True]
+    version_id: str = Field(min_length=1, max_length=64)
+    bundle_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     retrieval_metadata_sha256: str | None = Field(None, pattern=r"^[0-9a-f]{64}$")
 
 
@@ -49,6 +59,16 @@ class PreviewRequest(BaseModel):
     action: Action
     reason: str = Field(min_length=1, max_length=1000)
     review_ack: ReviewAcknowledgement | None = None
+    review_skip: ReviewSkipAcknowledgement | None = None
+
+    @model_validator(mode="after")
+    def explicit_skip(self):
+        if self.review_skip is not None:
+            if self.action != "approve" or self.review_ack is not None:
+                raise ValueError("Chỉ chọn một cách duyệt cho hành động approve.")
+            if len(self.reason.strip()) < 10:
+                raise ValueError("Cần lý do bỏ qua review ít nhất 10 ký tự.")
+        return self
 
     @field_validator("reason", mode="before")
     @classmethod

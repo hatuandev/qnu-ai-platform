@@ -5,7 +5,10 @@ import {
   context,
   modelTimeout,
 } from "./admissions-context";
-import { verifyAdmissionsIndex } from "./admissions-policy";
+import {
+  requireAdmissionsQuota,
+  verifyAdmissionsIndex,
+} from "./admissions-policy";
 import {
   decideCompilationRecovery,
   invalidReviewCanBeReplanned,
@@ -36,19 +39,38 @@ type Progress = {
   elapsed_seconds?: number | null;
   queue_timeout_seconds?: number;
   planner_version?: string | null;
-  segments?: { status: string; error_code?: string | null }[];
+  segments?: {
+    status: string;
+    error_code?: string | null;
+    attempt_count?: number;
+  }[];
 };
 
 const NEW_RUN_MESSAGE: Record<string, string> = {
   stale_planner:
     "lượt cũ do planner khác lập, không resume được theo contract hiện tại",
   unresumable_parts: "lượt cũ còn phần uncertain/failed, không được gửi lại",
+  quota_not_configured: "lượt cũ bị chặn quota trước mọi lần gọi model",
 };
 
 export async function compileAdmissionSource(api: Api, state: Checkpoint) {
+  await compileAdmissionDocuments(api, state, true);
+}
+
+export async function compileAdmissionDrafts(api: Api, state: Checkpoint) {
+  await compileAdmissionDocuments(api, state, false);
+  console.info("Chỉ kiểm tra bản nháp compiler; chưa review, chưa xuất bản.");
+}
+
+async function compileAdmissionDocuments(
+  api: Api,
+  state: Checkpoint,
+  shouldReview: boolean,
+) {
   if (!state.admissions?.documents) {
     throw new Error("BLOCKED: thiếu bộ tài liệu tuyển sinh.");
   }
+  await requireAdmissionsQuota(api, state);
   const timeout = await modelTimeout(api, state);
 
   // Validate every source before spending tokens on the first document.
@@ -79,6 +101,7 @@ export async function compileAdmissionSource(api: Api, state: Checkpoint) {
       docMeta,
       entry.source,
       timeout,
+      shouldReview,
     );
   }
 
@@ -122,6 +145,7 @@ async function compileOneAdmissionSource(
   docMeta: BenchmarkDoc,
   source: Source,
   timeout: number,
+  shouldReview: boolean,
 ) {
   const base = collection(context(state));
   const entry = state.admissions?.documents?.[docKey];
@@ -245,6 +269,7 @@ async function compileOneAdmissionSource(
     Object.keys(draft.citations).every((id) => id.startsWith(`${source.run}:`)),
   ).toBe(true);
 
+  if (!shouldReview) return;
   await reviewOneAdmissionDraft(
     api,
     state,
@@ -375,13 +400,27 @@ async function decide(
   docKey: string,
   publication: Publication,
   action: "approve" | "publish",
+  skipReview = false,
 ) {
   const base = versionBase(context(state), publication);
   const body: Record<string, unknown> = {
     action,
     reason: `E2E ${docKey} tuyển sinh`,
   };
-  if (action === "approve") {
+  if (action === "approve" && skipReview) {
+    const version = await api.get<{
+      id: string;
+      bundle_sha256: string;
+      retrieval_metadata_sha256?: string;
+    }>(base);
+    body.reason = "Người dùng chọn xuất bản nhanh bộ E2E, bỏ qua model review.";
+    body.review_skip = {
+      confirmed_skip: true,
+      version_id: version.id,
+      bundle_sha256: version.bundle_sha256,
+      retrieval_metadata_sha256: version.retrieval_metadata_sha256,
+    };
+  } else if (action === "approve") {
     const gate = await api.get<{
       review_id: string;
       report_sha256: string;
@@ -417,10 +456,20 @@ export async function publishAdmissionDraft(api: Api, state: Checkpoint) {
     throw new Error("BLOCKED: chưa có tài liệu nào được biên soạn.");
   }
   const base = collection(context(state));
+  const skipReview = process.env.E2E_SKIP_REVIEW === "1";
 
   // No document is published if another document is known to have no valid review.
   for (const key of Object.keys(benchmark.documents)) {
     const publication = state.admissions.documents[key]?.publication;
+    if (skipReview) {
+      if (!publication) throw new Error(`BLOCKED: thiếu bản nháp ${key}.`);
+      const run = await api.get<Run>(
+        `${base}/compilation-runs/${publication.run}`,
+      );
+      if (run.status !== "completed")
+        throw new Error(`BLOCKED: compiler ${key} chưa hoàn tất.`);
+      continue;
+    }
     if (!publication?.review)
       throw new Error(`BLOCKED: thiếu review của ${key}.`);
     const reviewBase = `${base}/compilation-runs/${publication.run}/reviews/${publication.review}`;
@@ -472,7 +521,7 @@ export async function publishAdmissionDraft(api: Api, state: Checkpoint) {
       versionBase(context(state), publication),
     );
     if (version.status === "draft") {
-      await decide(api, state, key, publication, "approve");
+      await decide(api, state, key, publication, "approve", skipReview);
     }
     version = await api.get<{ status: string }>(
       versionBase(context(state), publication),

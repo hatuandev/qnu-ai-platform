@@ -10,6 +10,7 @@ import {
   HelpCircle,
   Layers,
   Loader2,
+  MoreHorizontal,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
@@ -21,6 +22,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +31,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -45,6 +53,7 @@ import {
   canWithdrawCompiledVersion,
 } from "./permissions";
 import {
+  useCompiledDocumentHistoryQuery,
   useCompiledDocumentQuery,
   useCompiledVersionDraftQuery,
   useCompiledVersionQuery,
@@ -89,6 +98,11 @@ export function CompiledVersionDetailPage({
     collectionId,
     documentId,
   );
+  const historyQuery = useCompiledDocumentHistoryQuery(
+    workspaceId,
+    collectionId,
+    documentId,
+  );
   const versionQuery = useCompiledVersionQuery(
     workspaceId,
     collectionId,
@@ -116,10 +130,11 @@ export function CompiledVersionDetailPage({
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
   // Quick Action Dialog (for Publish / Withdraw)
-  const [quickAction, setQuickAction] = useState<"publish" | "withdraw" | null>(
-    null,
-  );
+  const [quickAction, setQuickAction] = useState<
+    "approve" | "publish" | "withdraw" | null
+  >(null);
   const [quickReason, setQuickReason] = useState("");
+  const [confirmedSkip, setConfirmedSkip] = useState(false);
   const [quickActionError, setQuickActionError] = useState<string | null>(null);
 
   // Citation Drawer
@@ -136,6 +151,12 @@ export function CompiledVersionDetailPage({
   const doc = documentQuery.data;
   const ver = versionQuery.data;
   const draft = draftQuery.data;
+  const approval = historyQuery.data?.find(
+    (entry) => entry.version_id === versionId && entry.action === "approve",
+  );
+  const skippedReview =
+    (approval?.after.review_ack as Record<string, unknown> | null)?.mode ===
+    "skipped";
 
   if (
     documentQuery.isLoading ||
@@ -212,9 +233,12 @@ export function CompiledVersionDetailPage({
     setIsCitationDrawerOpen(true);
   };
 
-  const handleOpenQuickAction = (action: "publish" | "withdraw") => {
+  const handleOpenQuickAction = (
+    action: "approve" | "publish" | "withdraw",
+  ) => {
     setQuickAction(action);
     setQuickReason("");
+    setConfirmedSkip(false);
     setQuickActionError(null);
   };
 
@@ -226,12 +250,31 @@ export function CompiledVersionDetailPage({
       setQuickActionError("Vui lòng nhập lý do thực hiện quyết định.");
       return;
     }
+    if (
+      quickAction === "approve" &&
+      (!confirmedSkip || quickReason.trim().length < 10)
+    ) {
+      setQuickActionError(
+        "Xác nhận bỏ qua review và nhập lý do ít nhất 10 ký tự.",
+      );
+      return;
+    }
 
     try {
       const preview = await previewMutation.mutateAsync({
         input: {
           action: quickAction,
           reason: quickReason.trim(),
+          ...(quickAction === "approve"
+            ? {
+                review_skip: {
+                  confirmed_skip: true as const,
+                  version_id: ver.id,
+                  bundle_sha256: ver.bundle_sha256,
+                  retrieval_metadata_sha256: ver.retrieval_metadata_sha256,
+                },
+              }
+            : {}),
         },
       });
 
@@ -333,6 +376,9 @@ export function CompiledVersionDetailPage({
                     </Badge>
                   )
                 ) : null}
+                {skippedReview && (
+                  <Badge variant="warning">Chưa qua review</Badge>
+                )}
               </div>
 
               <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono flex-wrap">
@@ -365,6 +411,26 @@ export function CompiledVersionDetailPage({
                   <ShieldCheck className="size-3.5" />
                   <span>Duyệt phiên bản (Approve)</span>
                 </Button>
+              )}
+              {canPerformApprove && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Thao tác khác"
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onSelect={() => handleOpenQuickAction("approve")}
+                    >
+                      Duyệt nhanh, bỏ qua review
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
 
               {canPerformPublish && (
@@ -427,7 +493,7 @@ export function CompiledVersionDetailPage({
           <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             <strong className="text-foreground">Điều kiện chuyển bước:</strong>{" "}
             {ver.status === "draft"
-              ? 'Cần vượt qua cổng Rà soát chất lượng (Review Gate) và bấm "Duyệt phiên bản" trước khi được phép phát hành.'
+              ? 'Duyệt với báo cáo review, hoặc chọn "Duyệt nhanh, bỏ qua review" trong menu. Sau khi xác nhận duyệt, có thể xuất bản.'
               : ver.status === "approved"
                 ? 'Phiên bản đã được duyệt. Bấm "Xuất bản (Publish)" để đưa phiên bản này thành bản phát hành chính thức của tài liệu.'
                 : ver.status === "published"
@@ -652,18 +718,35 @@ export function CompiledVersionDetailPage({
                 <DialogTitle className="text-base font-semibold">
                   {quickAction === "withdraw"
                     ? `Thu hồi phiên bản v${ver.version_no}`
-                    : `Xuất bản phiên bản v${ver.version_no}`}
+                    : quickAction === "approve"
+                      ? `Duyệt nhanh phiên bản v${ver.version_no}`
+                      : `Xuất bản phiên bản v${ver.version_no}`}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
                   {quickAction === "withdraw"
                     ? "Nhập lý do thu hồi để chuẩn bị bản xem trước quyết định."
-                    : "Nhập lý do xuất bản để chuẩn bị bản xem trước quyết định."}
+                    : quickAction === "approve"
+                      ? "Bỏ lần kiểm tra của model review. Quyết định này được ghi rõ là chưa qua review."
+                      : "Nhập lý do xuất bản để chuẩn bị bản xem trước quyết định."}
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
           <form onSubmit={handleQuickActionSubmit} className="space-y-4 pt-2">
+            {quickAction === "approve" && (
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="skip-review"
+                  checked={confirmedSkip}
+                  onCheckedChange={(value) => setConfirmedSkip(value === true)}
+                />
+                <Label htmlFor="skip-review">
+                  Tôi xác nhận bỏ qua review cho bản này và chịu trách nhiệm
+                  quyết định xuất bản.
+                </Label>
+              </div>
+            )}
             {quickActionError && (
               <Alert variant="destructive" className="py-2.5">
                 <AlertCircle className="size-4" />

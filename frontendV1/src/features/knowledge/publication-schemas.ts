@@ -70,19 +70,39 @@ export const reviewAckSchema = z.object({
     .optional(),
 });
 
-export const decisionPreviewSchema = z.object({
-  action: z.enum(["approve", "publish", "withdraw"]),
-  reason: z
-    .string()
-    .transform((val) => val.trim())
-    .pipe(
-      z
-        .string()
-        .min(1, "Lý do quyết định không được để trống")
-        .max(1000, "Lý do tối đa 1000 ký tự"),
-    ),
-  review_ack: reviewAckSchema.optional().nullable(),
-});
+export const decisionPreviewSchema = z
+  .object({
+    action: z.enum(["approve", "publish", "withdraw"]),
+    reason: z
+      .string()
+      .transform((val) => val.trim())
+      .pipe(
+        z
+          .string()
+          .min(1, "Lý do quyết định không được để trống")
+          .max(1000, "Lý do tối đa 1000 ký tự"),
+      ),
+    review_ack: reviewAckSchema.optional().nullable(),
+    review_skip: z
+      .object({
+        confirmed_skip: z.literal(true),
+        version_id: z.string().min(1).max(64),
+        bundle_sha256: z.string().regex(SHA256_HEX_REGEX),
+        retrieval_metadata_sha256: z
+          .string()
+          .regex(SHA256_HEX_REGEX)
+          .optional(),
+      })
+      .optional(),
+  })
+  .refine(
+    (value) =>
+      !value.review_skip ||
+      (value.action === "approve" &&
+        !value.review_ack &&
+        value.reason.length >= 10),
+    "Cần xác nhận và lý do bỏ qua review; chỉ chọn một cách duyệt.",
+  );
 
 export const decisionCommitSchema = z.object({
   preview_id: z.string().min(1, "Mã preview không được để trống").max(64),

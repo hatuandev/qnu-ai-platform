@@ -46,6 +46,7 @@ MODEL_STAGES = (
 ADMISSIONS_STAGES = (
     "admissions-upload",
     "admissions-extraction",
+    "admissions-draft",
     "admissions-compilation",
     "admissions-publication",
     "admissions-chat",
@@ -551,7 +552,7 @@ def _serve(directory, manifest):
         save(directory / "server.json", {"running": False})
 
 
-def run_stage(directory, manifest, stage, headed, recover=False):
+def run_stage(directory, manifest, stage, headed, recover=False, skip_review=False):
     state = read(directory / "checkpoint.json")
     model_test = stage in MODEL_STAGES
     admissions_test = stage in ADMISSIONS_STAGES
@@ -567,9 +568,17 @@ def run_stage(directory, manifest, stage, headed, recover=False):
         if stage != "provider-setup" and stage != "model-discovery":
             prerequisites.append("model-discovery")
     else:
-        prerequisites = ("navigation", *ADMISSIONS_STAGES[:index]) if admissions_test else STAGES[:index]
+        prerequisites = (
+            ("navigation", *(s for s in ADMISSIONS_STAGES[:index] if s != "admissions-draft"))
+            if admissions_test
+            else STAGES[:index]
+        )
     if manifest["mode"] == "live" and not model_test:
         prerequisites = (*MODEL_STAGES, *prerequisites)
+    fast_publication = skip_review and stage == "admissions-publication"
+    fast_chat = stage == "admissions-chat" and state["results"].get("admissions-publication", {}).get("review_mode") == "skipped"
+    if fast_publication or fast_chat:
+        prerequisites = tuple(x for x in prerequisites if x != "admissions-compilation") + ("admissions-draft",)
     missing = [
         x for x in prerequisites if state["results"].get(x, {}).get("status") != "PASS"
     ]
@@ -616,6 +625,8 @@ def run_stage(directory, manifest, stage, headed, recover=False):
             # Explicit operator choice: replace a terminal compilation run with a
             # new one built from the completed OCR source. Never a silent retry.
             env["E2E_RECOVER_COMPILATION"] = "1"
+        # An inherited shell value must not silently change the reviewed workflow.
+        env["E2E_SKIP_REVIEW"] = "1" if fast_publication else "0"
         args = [
             shutil.which("node"),
             FE / "node_modules/@playwright/test/cli.js",
@@ -667,6 +678,8 @@ def run_stage(directory, manifest, stage, headed, recover=False):
             "at": datetime.now(UTC).isoformat(),
             "report": str(output),
         }
+        if fast_publication:
+            state["results"][stage]["review_mode"] = "skipped"
         if model_test:
             dependents = (
                 (*MODEL_STAGES[index + 1 :], *STAGES, *ADMISSIONS_STAGES)
@@ -717,7 +730,10 @@ def main(argv=None):
         action="store_true",
         help="Cho phép thay lượt biên soạn đã kết thúc bằng lượt mới từ nguồn OCR đã xong.",
     )
+    parser.add_argument("--skip-review", action="store_true", help="Xuất bản nhanh bản nháp E2E, ghi rõ bỏ qua model review.")
     args = parser.parse_args(argv)
+    if args.skip_review and (args.command != "run" or args.stage != "admissions-publication"):
+        parser.error("--skip-review chỉ áp dụng cho run admissions-publication")
     try:
         if args.command == "help":
             parser.print_help()
@@ -738,7 +754,7 @@ def main(argv=None):
                     else [args.stage]
                 )
                 for stage in sequence:
-                    code = run_stage(directory, manifest, stage, args.headed, args.recover)
+                    code = run_stage(directory, manifest, stage, args.headed, args.recover, args.skip_review)
                     if code:
                         return code
             elif args.command in {"status", "report"}:

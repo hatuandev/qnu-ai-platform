@@ -1,6 +1,25 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
+- [Phiên785 — Answer off và output tối đa](2026-11-01_phien_785_tat_thinking_answer_output_max.md): ModelOps answer off, giữ compiler; output16384/context98304byte, helper lấy capacity động. 58 targeted/TS/build/probe thật PASS; benchmark chưa chạy lại.
+
+- [Phiên784 — Kiểm tra retest16](2026-11-01_phien_784_review_ket_qua_retest16.md): xác minh7PASS9FAIL/16lượt/attempt1/535208token; P1Playwrightfalsegreen,P2scope/fingerprint/nhậtkýsai,chỉreviewkhôngsửaapp/gọimodel.
+
+- [Phiên 783 — Review độc lập và Retest 16 câu hỏi lỗi](2026-11-01_phien_783_review_doc_lap_va_retest_16_cau.md): Xác minh 8 nhận định kỹ thuật (parser, catalog ô số, compiler lược qualifier, single-query retrieval đa tài liệu, JSON Schema vs JSON object, reasoning policy answer task, evaluator false negative F13, turn MX-01 timeout). Chạy cohort độc lập `retest16-782` bằng model thật `qwen3.8-27b-q4`: 16/16 dispatched, 7 PASS / 9 FAIL / 0 NOT_RUN, thời gian 11.5m, quota tiêu thụ 535k tokens, giữ nguyên kết quả gốc 53 câu (37 PASS / 16 FAIL).
+
+- [Phiên782 — Key .env cho E2E](2026-11-01_phien_782_key_env_e2e.md): ngoại lệ bootstrap QNU/9router qua ModelOps, ưu tiên key active, ô trống local/example, không override runtime; 33 script tests/Ruff PASS, không gọi model hoặc đổi phiên.
+
+- [Phiên781 — Chẩn đoán16FAIL](2026-11-01_phien_781_phan_tich_16_cau_loi.md): header/numeric-axis, compiler mất qualifier/nhầm metric, retrieval nhiều ý thiếu fact, hợp đồng model/output, checker F13 và MX-01 gián đoạn. Chỉ đọc/probe offline, không sửa app/gọi model.
+
+- [Phiên780 — Tiếp tục53 câu](2026-11-01_phien_780_chay_het_53_cau.md): gửiđủ53,37PASS16FAIL0NOT_RUN;1MX-01giánđoạnvẫnrunning,sốlượtDB53key/0duplicate. Giữ14recordscũ/config,khôngretry/đổicodeapp;servebậtlạisauuserngắt.
+
+- [Phiên779 — Xuất bản nhanh](2026-11-01_phien_779_xuat_ban_nhanh.md): lựa chọn bỏ qua review có quyền/xác nhận/hash/audit, giữ default; live publication3PDF/179chunksPASS30s, chatFAIL12PASS2FAIL39NOT_RUN; API33/unit6/FE38/script4PASS, fullunit593PASS1FAIL/fullFE567PASS33FAIL nền.
+
+- [Phiên778 — Compiler không review](2026-11-01_phien_778_compiler_khong_review.md): chặng draft riêng; giữ review gate; quota tháng11=20M; thinkingoffcompiler được duyệt,live3PDF/17partsPASS5.1m;33focused/15scriptPASS,full565PASS/33FAIL.
+
+- [Phiên777 — Rà compiler đến chat](2026-11-01_phien_777_ra_contract_compiler_den_chat.md): payload/OCRpin/auto-review/history/gate/index;9casepipeline/API-schema thật,88case liênquanPASS;full560PASS/33FAIL;livechưachạy,giữphiên.
+
+
 - [Phiên 776 — Quota E2E 20M](2026-10-31_phien_776_tang_quota_e2e_20m.md): profile/validator đồng bộ20M;14test, TS, Biome, build PASS; chạy lại navigation để áp dụng DB.
 
 

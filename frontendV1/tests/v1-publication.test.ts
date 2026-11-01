@@ -214,6 +214,34 @@ test("reviewAckSchema enforces confirmed_reviewed to be true", () => {
   assert.equal(reviewAckSchema.safeParse(invalid).success, false);
 });
 
+test("fast approval requires an explicit confirmation, reason and version binding", () => {
+  const input = {
+    action: "approve",
+    reason: "Bỏ qua model review theo quyết định người duyệt.",
+    review_skip: {
+      confirmed_skip: true,
+      version_id: "v1",
+      bundle_sha256: "a".repeat(64),
+    },
+  };
+  assert.equal(decisionPreviewSchema.safeParse(input).success, true);
+  assert.equal(
+    decisionPreviewSchema.safeParse({ ...input, action: "publish" }).success,
+    false,
+  );
+  assert.equal(
+    decisionPreviewSchema.safeParse({ ...input, reason: "short" }).success,
+    false,
+  );
+  assert.equal(
+    decisionPreviewSchema.safeParse({
+      ...input,
+      review_skip: { ...input.review_skip, confirmed_skip: false },
+    }).success,
+    false,
+  );
+});
+
 test("decisionPreviewSchema accepts valid approve, publish, withdraw actions", () => {
   for (const action of ["approve", "publish", "withdraw"] as const) {
     const res = decisionPreviewSchema.safeParse({

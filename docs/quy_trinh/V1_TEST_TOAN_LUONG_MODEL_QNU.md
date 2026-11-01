@@ -51,14 +51,23 @@ Không cần tự tạo nhà cung cấp/key/model trước. Trong phiên live đ
 .\test-v1-e2e.ps1 run provider-setup --headed
 ```
 
-Lệnh tự tạo QNU provider tại `http://100.105.13.53:8000/v1` nếu thiếu, kiểm tra API sửa/lưu và trạng thái. Nếu chưa có khóa active, terminal yêu cầu **nhập API key ẩn**; dán khóa rồi Enter. Không truyền key trong tham số, `.env`, source hoặc file checkpoint. Key đi từ bộ nhớ tới API ModelOps local, lưu mã hóa trong DB thử; trình duyệt test không nhận raw key. Nếu đã thêm key qua UI, lệnh dùng khóa đang bật và không hỏi lại. Key sai thì thay/xoay trong giao diện rồi chạy lại provider-setup.
+Lệnh tự tạo QNU provider tại `http://100.105.13.53:8000/v1` nếu thiếu, kiểm tra API sửa/lưu và trạng thái. Key active trong ModelOps được dùng lại trước. Nếu thiếu, runner đọc hai biến E2E trong `.env` ở root theo ngoại lệ người dùng xác nhận ngày 01/11/2026; biến chưa điền thì hỏi **nhập API key ẩn**. Key được nạp qua API ModelOps local và lưu có bảo vệ trong DB thử; không đưa vào tham số lệnh, source, checkpoint, report hoặc trình duyệt. Runtime vẫn phân giải key từ ModelOps, không đọc `.env` để override. Key sai thì thay/xoay trong giao diện rồi chạy lại provider-setup.
+
+Điền một lần trong `.env` ở root (không commit hoặc gửi nội dung file vào chat):
+
+```dotenv
+E2E_QNU_API_KEY=
+E2E_9ROUTER_API_KEY=
+```
+
+Mỗi khóa là một dòng; có thể bọc bằng dấu nháy đơn. Runner không nội suy `${...}` trong giá trị, không thay khóa đã active, không thay endpoint/model từ file. Sau cleanup/init, provider-setup sẽ nạp lại hai khóa vào ModelOps mới. Bước chọn model và nhập capacity 9router nếu thiếu vẫn giữ. Thiếu biến thì dùng lời nhắc ẩn như trước.
 
 ### Chọn Qwen hoặc GPT-OSS qua 9router
 
 Trong phiên mới, cùng lệnh `provider-setup` sẽ lần lượt:
 
-1. Hỏi key **server QNU** (nhập ẩn).
-2. Hỏi key **9router** tại `https://qnu-9router.duckdns.org/v1` (nhập ẩn, key riêng).
+1. Dùng key **server QNU** đã active, hoặc biến E2E_QNU_API_KEY; thiếu thì hỏi nhập ẩn.
+2. Dùng key **9router** tại `https://qnu-9router.duckdns.org/v1` đã active, hoặc biến E2E_9ROUTER_API_KEY; thiếu thì hỏi nhập ẩn, key riêng.
 3. Cho chọn **1 — Qwen trên QNU** hoặc **2 — ollama/gpt-oss:120b qua 9router** làm chat/biên soạn mặc định. Enter chọn Qwen lần đầu; chạy lại trước upload thì mặc định là lựa chọn đã lưu.
 
 Key đang active được tái dùng, không hỏi lại. Lựa chọn lưu trong checkpoint chỉ gồm mã lựa chọn/ID; key chỉ lưu qua ModelOps. Nếu chọn 9router, script lấy capacity từ discovery hiện tại. Thiếu context/output thì hỏi số token thực tế theo cấu hình Ollama của bạn; Enter trống sẽ dừng để cấu hình trong ModelOps, không đoán theo tên model hay lấy giới hạn Qwen.

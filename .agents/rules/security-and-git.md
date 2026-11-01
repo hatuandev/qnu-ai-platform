@@ -1,5 +1,7 @@
 # Bảo mật, dữ liệu và Git
 
+- Ngoại lệ E2E được người dùng xác nhận ngày 01/11/2026: runner provider-setup được đọc riêng E2E_QNU_API_KEY và E2E_9ROUTER_API_KEY từ .env ở root để nạp khóa qua API ModelOps của phiên thử khi chưa có key active. Không export các giá trị từ file này sang tiến trình con, checkpoint hoặc report; không dùng làm fallback/override runtime DB/UI. .env vẫn bị Git ignore, chỉ .env.example chứa giá trị trống. Khóa đã active trong ModelOps được ưu tiên và không tự xoay theo file. Ngoại lệ không áp dụng production hoặc các biến LLM key khác.
+
 - Không hardcode secret/key/password/connection string; không log hoặc trả secret qua DTO/error. LLM credential quản lý qua ModelOps DB có mã hóa/quyền phù hợp, không thêm API key LLM trong .env để vượt cấu hình UI. Bí mật hạ tầng lấy từ cơ chế môi trường/secret store đã có; .env không được commit. Không công bố raw reference nếu nó chứa credential.
 - Giữ `DEV_AUTH_ENABLED=False` ở production. Actor/tenant/workspace lấy và kiểm tra ở server. Custom endpoint, discovery, probe và runtime áp cùng egress/auth policy; model không được chọn URL/secret tùy ý.
 - Không xuất bản, gửi corpus nội bộ ra ngoài, chạy công cụ ghi, reindex/chuyển active publication, reset DB, deploy hoặc restart dịch vụ nếu ngoài phạm vi người dùng đã cho phép. Có phê duyệt trước đó thì dùng đúng phạm vi, không hỏi lặp. Ngoại lệ trong repo khác không áp dụng ở đây.

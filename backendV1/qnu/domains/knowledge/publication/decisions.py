@@ -69,7 +69,11 @@ async def create_preview(
     if req.action == "publish":
         await assert_approval_receipt(db, target, blob)
     acknowledgement = (
-        await review_gate.acknowledge(db, blob, target, req.review_ack)
+        (
+            review_gate.acknowledge_skip(target, req.review_skip, req.reason)
+            if req.review_skip is not None
+            else await review_gate.acknowledge(db, blob, target, req.review_ack)
+        )
         if req.action == "approve"
         else None
     )
@@ -324,6 +328,9 @@ async def _apply(
             "version_id": target.id,
             "decision_id": row.id,
             "bundle_sha256": target.bundle_sha256,
+            "review_mode": (preview.review_ack or {}).get("mode", "reviewed")
+            if preview.action == "approve"
+            else None,
         },
     )
     if commit:

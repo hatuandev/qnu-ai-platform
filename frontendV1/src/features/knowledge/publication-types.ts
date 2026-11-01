@@ -104,6 +104,12 @@ export interface DecisionPreviewRequest {
   action: DecisionAction;
   reason: string;
   review_ack?: ReviewAckInput | null;
+  review_skip?: {
+    confirmed_skip: true;
+    version_id: string;
+    bundle_sha256: string;
+    retrieval_metadata_sha256?: string;
+  };
 }
 
 export interface DecisionPreviewResponse {

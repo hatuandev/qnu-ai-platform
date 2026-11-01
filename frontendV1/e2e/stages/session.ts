@@ -33,7 +33,10 @@ export interface AdmissionsDocEntry {
 export interface Checkpoint {
   runId: string;
   mode: "workflow" | "live";
-  results: Record<string, { status: string; report?: string }>;
+  results: Record<
+    string,
+    { status: string; report?: string; review_mode?: "skipped" }
+  >;
   runtimeDefaults?: Record<"chat" | "embedding" | "rerank" | "ocr", string>;
   providerSetup?: {
     connectionId: string;
@@ -191,15 +194,22 @@ export class Api {
   ) {
     if (!suffix.startsWith("/") || suffix.includes("://"))
       throw new Error("API path ngoài phiên.");
-    return this.page.request.fetch(`${apiRoot}${suffix}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...(key ? { "Idempotency-Key": key } : {}),
-      },
-      data: body,
-      timeout: timeoutMs,
-    });
+    try {
+      return await this.page.request.fetch(`${apiRoot}${suffix}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(key ? { "Idempotency-Key": key } : {}),
+        },
+        data: body,
+        timeout: timeoutMs,
+      });
+    } catch {
+      // Playwright's transport error includes the full Authorization call log.
+      throw new Error(
+        `${method} ${suffix}: không kết nối được API; kiểm tra serve.`,
+      );
+    }
   }
   async json<T>(
     method: string,

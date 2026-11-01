@@ -1,5 +1,50 @@
 # Kiểm thử PDF thật — TB điểm sàn 26
 
+## Ngân sách trả lời mới — phiên785
+
+Theo yêu cầu người dùng, Qwen hiện được cấu hình task `answer` tắt suy luận (`enable_thinking=false`), giữ compiler off. Assistant tuyển sinh hiện tại dùng output tối đa model công bố **16384 token**, context **131072**, ngân sách evidence **98304 byte** và overhead dự toán **16384**. Output là trần; model hoàn tất sớm trả kết quả ngay.
+
+Helper tạo assistant E2E mới lấy output tối đa đã khai báo trong ModelOps, không còn cap4096. Capacity thiếu/chưa đủ chỗ input, overhead và output vẫn BLOCKED; không tự tăng capacity hoặc quota. Cận byte không thay tokenizer; guard toàn payload của ModelOps vẫn kiểm trước dispatch.
+
+Probe cấu hình ngắn PASS; **chưa chạy lại benchmark16/53 câu**. Cấu hình khác cohort cũ nên lần đánh giá tiếp theo phải tạo cohort mới và ghim fingerprint mới; giữ nguyên kết quả/histories cũ. Không cleanup/index lại chỉ vì thay output. Các kết quả/cấu hình4096 ghi ở phần lịch sử bên dưới phản ánh thời điểm cũ. Xem [nhật ký785](../nhat_ky/2026-11-01_phien_785_tat_thinking_answer_output_max.md).
+
+## Xuất bản nhanh sau compiler, không gọi review — phiên779
+
+Luồng mặc định vẫn là compiler → review → duyệt → xuất bản → lập chỉ mục → hỏi đáp. Có thêm lựa chọn chủ động compiler → duyệt bỏ qua review → xuất bản → lập chỉ mục → hỏi đáp. Bỏ qua review không tự cấp quyền, không bỏ xác nhận duyệt/xuất bản và không chứng nhận chất lượng nội dung.
+
+Trong giao diện chi tiết phiên bản đã biên soạn, mở menu `⋯` → **Duyệt nhanh, bỏ qua review**. Tích xác nhận, nhập lý do ít nhất 10 ký tự, xem trước và xác nhận duyệt. Sau đó dùng **Xuất bản** như thường lệ. Phiên bản hiển thị **Chưa qua review**; quyết định lưu người thực hiện, lý do và hash đúng phiên bản. Nút duyệt có review vẫn giữ nguyên.
+
+Trong E2E, sau khi `admissions-draft` PASS, chạy:
+
+```powershell
+.\test-v1-e2e.ps1 run admissions-publication --headed --skip-review
+.\test-v1-e2e.ps1 run admissions-chat --headed
+```
+
+Chỉ `admissions-publication` nhận `--skip-review`. Không đánh dấu `admissions-compilation` PASS thay cho review; checkpoint xuất bản lưu `review_mode=skipped`, báo cáo hỏi đáp ghi `compilation_review=SKIPPED_BY_USER`. Chat chỉ được mở sau publication/index PASS thực tế. Không truyền cờ này thì vẫn cần review đầy đủ.
+
+Backend kiểm tra quyền, compiler hoàn tất, bundle/phiên bản/metadata nguồn, preview hash, idempotency và xác nhận duyệt/xuất bản như trước. Không tạo review hoặc finding giả. Khi máy vừa bật lại, dùng phiên cũ và bật serve theo hướng dẫn; không cleanup/init hoặc upload/OCR lại chỉ để bỏ qua review.
+
+Kiểm chứng phiên779: xuất bản nhanh ba PDF/28 trang và lập chỉ mục 179 đoạn PASS (30 giây tổng chặng). Kiểm tra API/PostgreSQL cô lập 33 PASS; 6 unit kiểm ràng buộc bỏ qua review PASS; 38 kiểm tra frontend liên quan và 4 script PASS. Lượt model thật FAIL sau 5.8 phút: 12 PASS, F13/F14 FAIL, 39 NOT_RUN, không retry. Xem [nhật ký779](../nhat_ky/2026-11-01_phien_779_xuat_ban_nhanh.md); publication PASS không đồng nghĩa hỏi đáp PASS.
+
+## Chạy riêng compiler, tạm chưa review — phiên778
+
+Sau khi khởi động máy, giữ phiên hiện có nếu chưa cleanup. Bật Docker và các container của phiên, rồi chạy `serve` nếu API/worker/frontend chưa hoạt động. Không cần init, upload hay OCR lại khi các chặng đó đã PASS.
+
+Để chỉ biên soạn bản nháp của ba tài liệu, bỏ qua review trong lượt kiểm tra:
+
+```powershell
+.\test-v1-e2e.ps1 run admissions-draft --headed
+```
+
+`admissions-draft` vẫn kiểm tra quota tháng hiện tại, hash nguồn, số trang, version/hash OCR và citation của draft; request `auto_review=false`. PASS của chặng này chỉ chứng minh compiler hoàn tất, không thay thế `admissions-compilation` (compiler + review). Publication/chat mặc định cần review; lựa chọn bỏ qua review phải dùng cờ tường minh của phiên779 ở trên. Khi cần review, chạy `admissions-compilation` bình thường để dùng lại các draft đã hoàn tất.
+
+Nếu máy tắt khi job đang chạy, chờ hệ thống đối soát: lượt bị gián đoạn giữ trạng thái `uncertain`, không gửi lại các phần đang dở. Sau khi xác nhận nguyên nhân, dùng `--recover` chủ đích để tạo lượt mới và giữ lịch sử. Lượt `quota_not_configured` chỉ được thay khi đúng provider, chưa review/publish và mọi part còn pending/attempt_count=0; không tự retry lỗi model. Kiểm tra quota của đúng tháng: hạn mức tháng trước không tự áp sang tháng mới. Chặng draft chỉ đọc quota, không tự tăng/reset.
+
+Theo xác nhận trong phiên778, provider Qwen đang dùng đã có ModelOps reasoning off riêng task `compiler` (probe JSON thành công, không reasoning). Cấu hình gắn với provider trong DB của phiên; cleanup/init mới không tự sao chép chính sách này. Review vẫn là lựa chọn mặc định trước xuất bản.
+
+Kiểm chứng phiên778: cả ba tài liệu đã compiler PASS (17/17 phần, khoảng5.1phút); raw17lượt đều reasoning0,không có review. Đây chỉ là kiểm chứng tạo draft, không thay kiểm tra chất lượng/publish/RAG. Giữ phiên hiện tại; chạy `admissions-compilation` khi muốn thực hiện review.
+
 ## Sửa hợp đồng compiler → hỏi đáp — phiên777
 
 Request compiler phải dùng `topic`, `ocr_run_ids`, `text_versions`, `provider_id`; `source_id`/`revision_id` không phải trường được nhận. Runner kiểm tra đủ cả ba nguồn/hash/trang OCR trước lượt model đầu, ghim version/hash văn bản canonical qua API text-review, bật structured output và tắt auto_review vì chặng gọi review riêng.
@@ -15,6 +60,8 @@ Với lỗi422 trước đây, request bị chặn trước khi tạo compilatio
 .\test-v1-e2e.ps1 run admissions-publication --headed
 .\test-v1-e2e.ps1 run admissions-chat --headed
 ```
+
+Kiểm chứng phiên777:88case liênquanPASS, TypeScript/build/Biome/RuffPASS. Fullfrontend560PASS/33FAIL ở9fileUI/fixture, chưa xanh toàn bộ; model thật chưa chạy ở lượt rà này.
 
 Bản sửa chỉ nằm trong runner/test, không cần restart backend/serve. Không bỏ finding hoặc tự tạo lượt hỏi mới để làm xanh kết quả. Chất lượng model thật vẫn cần đánh giá riêng qua53câu.
 

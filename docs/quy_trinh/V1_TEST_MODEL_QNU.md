@@ -22,7 +22,7 @@ Trước discovery, chạy bài test quản lý nhà cung cấp:
 .\test-v1-e2e.ps1 run provider-setup --headed
 ```
 
-Bài này tạo QNU provider/key và đăng ký bốn model nếu thiếu. Khóa nhập ẩn trong PowerShell rồi lưu qua ModelOps DB, không đưa vào source hoặc `.env`. Đồng thời kiểm API sửa/bật/tắt, kết nối, sidebar và form tạo provider UI tạm. Nhà cung cấp/key/model đã có được dùng lại; không cần làm tay để vượt BLOCKED. Xem [hướng dẫn tổng hợp](./V1_TEST_TOAN_LUONG_MODEL_QNU.md) để biết chi tiết và giới hạn kiểm tra UI.
+Bài này tạo QNU provider/key và đăng ký bốn model nếu thiếu. Key active được dùng lại; nếu chưa có, runner đọc E2E_QNU_API_KEY/E2E_9ROUTER_API_KEY trong `.env` ở root hoặc hỏi nhập ẩn khi biến trống. Đây là ngoại lệ bootstrap E2E được người dùng xác nhận ngày 01/11/2026: khóa vẫn lưu qua ModelOps DB, không vào source/checkpoint/report và không override runtime. Đồng thời kiểm API sửa/bật/tắt, kết nối, sidebar và form tạo provider UI tạm. Nhà cung cấp/key/model đã có được dùng lại; không cần làm tay để vượt BLOCKED. Xem [hướng dẫn tổng hợp](./V1_TEST_TOAN_LUONG_MODEL_QNU.md) để biết cách điền `.env` và giới hạn kiểm tra UI.
 
 provider-setup tự lưu capacity/dimension từ server và bổ sung thông số vận hành có căn cứ trong profile E2E QNU trước các probe. Chỉ context/output/dimension lấy từ metadata; OCR bound và input override là khai báo tường minh của profile, không phải inference verified. Không cần nhập lại bằng tay sau mỗi init.
 

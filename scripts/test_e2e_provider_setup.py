@@ -17,6 +17,11 @@ class ProviderSetupTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.directory = Path(self.temporary.name)
+        env_patch = patch.object(
+            setup, "KEY_ENV_FILE", self.directory / ".env", create=True
+        )
+        env_patch.start()
+        self.addCleanup(env_patch.stop)
         self.profile = self.directory / "profile.json"
         save(self.profile, {"base_url": "http://example.test/v1"})
         save(
@@ -112,7 +117,7 @@ class ProviderSetupTests(unittest.TestCase):
             )
         client.assert_not_called()
 
-    def run_two_providers(self, *, limits, answers):
+    def run_two_providers(self, *, limits, answers, from_env=False):
         profile = read(self.profile)
         profile.update(
             models={"chat": "qwen-test"},
@@ -188,6 +193,12 @@ class ProviderSetupTests(unittest.TestCase):
             transport=httpx.MockTransport(handle),
         )
         output = io.StringIO()
+        if from_env:
+            (self.directory / ".env").write_text(
+                "E2E_QNU_API_KEY=synthetic-qnu-secret\n"
+                "E2E_9ROUTER_API_KEY='synthetic-router-secret'\n",
+                encoding="utf-8",
+            )
         with (
             patch.object(setup.httpx, "Client", return_value=client),
             patch.object(setup.sys.stdin, "isatty", return_value=True),
@@ -200,13 +211,88 @@ class ProviderSetupTests(unittest.TestCase):
             setup.prepare_provider(
                 self.directory, {"DEV_ACCESS_PASSWORD": "test-password"}, self.profile
             )
-        self.assertIn("server QNU", prompt.call_args_list[0].args[0])
-        self.assertIn("9router", prompt.call_args_list[1].args[0])
+        if from_env:
+            prompt.assert_not_called()
+        else:
+            self.assertIn("server QNU", prompt.call_args_list[0].args[0])
+            self.assertIn("9router", prompt.call_args_list[1].args[0])
         for value in secrets.values():
             self.assertNotIn(value, output.getvalue())
             for file in self.directory.iterdir():
+                if file.name == ".env":
+                    continue
                 self.assertNotIn(value, file.read_text())
         return read(self.directory / "checkpoint.json"), sent, choice
+
+    def test_dotenv_bootstraps_both_keys_via_modelops_without_key_prompts(self):
+        state, sent, _ = self.run_two_providers(
+            limits={"context_window_tokens": 65536, "max_output_tokens": 4096},
+            answers=["1"],
+            from_env=True,
+        )
+        self.assertEqual(sent, ["conn_qnu", "conn_router"])
+        self.assertEqual(state["chatSelection"], "qnu")
+
+    def test_dotenv_keys_are_literal_and_missing_keys_fall_back(self):
+        (self.directory / ".env").write_text(
+            'UNRELATED=synthetic-other-secret\nE2E_QNU_API_KEY="literal-${UNRELATED}-secret"\n',
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            setup.key_from_env("providerSetup"), "literal-${UNRELATED}-secret"
+        )
+        self.assertEqual(setup.key_from_env("routerProviderSetup"), "")
+
+    def test_dotenv_parse_errors_are_safe(self):
+        (self.directory / ".env").write_text(
+            "E2E_QNU_API_KEY='synthetic-broken-secret\n", encoding="utf-8"
+        )
+        with self.assertRaises(RuntimeError) as raised:
+            setup.key_from_env("providerSetup")
+        self.assertNotIn("synthetic-broken-secret", str(raised.exception))
+
+    def test_dotenv_missing_file_returns_empty_without_prompt(self):
+        self.assertEqual(setup.key_from_env("providerSetup"), "")
+
+    def test_dotenv_rejects_duplicate_or_multiline_keys_without_echoing_values(self):
+        for contents in (
+            "E2E_QNU_API_KEY=synthetic-first-secret\nE2E_QNU_API_KEY=synthetic-second-secret\n",
+            'E2E_QNU_API_KEY="synthetic-first-secret\\nsynthetic-second-secret"\n',
+        ):
+            with self.subTest(contents_type="invalid key"):
+                (self.directory / ".env").write_text(contents, encoding="utf-8")
+                with self.assertRaises(RuntimeError) as raised:
+                    setup.key_from_env("providerSetup")
+                self.assertNotIn("synthetic-first-secret", str(raised.exception))
+                self.assertNotIn("synthetic-second-secret", str(raised.exception))
+
+    def test_existing_modelops_key_never_reads_dotenv_or_rotates(self):
+        self.key_added = True
+        client = httpx.Client(
+            base_url="http://127.0.0.1:1234/platform/v1alpha1/",
+            transport=httpx.MockTransport(self.handler),
+        )
+        with patch.object(
+            setup,
+            "key_from_env",
+            create=True,
+            side_effect=AssertionError("must not read"),
+        ):
+            setup.prepare_connection(
+                client,
+                self.directory,
+                {"runId": "e00000000000"},
+                read(self.profile),
+                "providerSetup",
+                "server QNU",
+                "qnu",
+            )
+        self.assertFalse(
+            any(
+                method == "POST" and suffix.endswith("/keys")
+                for method, suffix in self.calls
+            )
+        )
 
     def test_two_hidden_keys_and_selected_router_use_distinct_modelops_connections(
         self,

@@ -259,13 +259,45 @@ test("explicit assistant budget fits both input and shared context", () => {
     capacity_status: "configured",
     token_limits: { context_window_tokens: 131072, max_output_tokens: 16384 },
   });
-  expect(p.context_max_bytes).toBe(110592);
+  expect(p.max_output_tokens).toBe(16384);
+  expect(p.context_max_bytes).toBe(98304);
   expect(p.input_tokens_plan + p.max_output_tokens).toBe(131072);
   expect(() =>
     planAdmissionsBudget({
       model_name: "unknown",
       capacity_status: "unknown",
       token_limits: null,
+    }),
+  ).toThrow(/BLOCKED/);
+});
+
+test.each([
+  [4096, 131072, 110592],
+  [8192, 65536, 40960],
+  [32768, 262144, 128000],
+])(
+  "assistant uses the declared output maximum %i within context %i",
+  (output, context, bytes) => {
+    const p = planAdmissionsBudget({
+      model_name: "dynamic",
+      capacity_status: "configured",
+      token_limits: {
+        context_window_tokens: context,
+        max_output_tokens: output,
+      },
+    });
+    expect(p.max_output_tokens).toBe(output);
+    expect(p.context_max_bytes).toBe(bytes);
+    expect(p.input_tokens_plan + output).toBeLessThanOrEqual(context);
+  },
+);
+
+test("declared maximum cannot silently consume the evidence reserve", () => {
+  expect(() =>
+    planAdmissionsBudget({
+      model_name: "small-context",
+      capacity_status: "configured",
+      token_limits: { context_window_tokens: 32768, max_output_tokens: 16384 },
     }),
   ).toThrow(/BLOCKED/);
 });

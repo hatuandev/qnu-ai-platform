@@ -1,5 +1,22 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- **Context785 — Tắt suy luận answer, output tối đa:** theo yêu cầu user, Qwen answer off, giữ compiler off; assistant revision2/output16384/evidence98304byte trong128K. Helper bỏ cap4096,58 targeted/TS/build/probe thật PASS (0.62s,reasoning0). Chưa retest benchmark, giữ lịch sử/cohort cũ. [Nhật ký785](./nhat_ky/2026-11-01_phien_785_tat_thinking_answer_output_max.md).
+
+- **Context784 — Review kết quả783:** DB16turn16key16conv/attempt1/535208token;7PASS9FAILkhớpevaluatoroffline. P1harnesskhôngassertcuốifalsegreen;P2scopefailopen/fingerprintchépcũ/nhậtkýmô tảsai. Giữ53cũ37/16,khôngmodelcall/đổiapp. [Nhật ký784](./nhat_ky/2026-11-01_phien_784_review_ket_qua_retest16.md).
+
+- **Context782 — Key E2E từ .env theo yêu cầu:** hai biến E2E riêng, bootstrap ModelOps khi thiếu key active; giữ nhập ẩn/model/capacity/guard, không export hoặc runtime override. Thêm ô trống, ghi ngoại lệ/hướng dẫn. RED→33 script tests PASS/Ruff; live NOT_RUN, không lấy key DB. [Nhật ký782](./nhat_ky/2026-11-01_phien_782_key_env_e2e.md).
+
+- **Context781 — Chẩn đoán16FAIL:** đọc chunk/DB/3 canonical S3 kiểm hash; native header/numeric-axis, compiler mất qualifier/nhầm metric, câu nhiều ý thiếu coverage, JSON object chưa schema; F13 checker và MX-01 gián đoạn. Không sửa/gọi model/retry/chấm đổi kết quả. [Nhật ký781](./nhat_ky/2026-11-01_phien_781_phan_tich_16_cau_loi.md).
+
+- **Context780 — Chạy hết53 theo yêu cầu:** gửi53/53,37PASS16FAIL0NOT_RUN;MX-01giánđoạnkhônggửilại/serverrunning,52terminal. DB53key0duplicate,14record779giữnguyên,cùngconfig. Lỗioutput2/contract6/abstain6/checker1/giánđoạn1;khôngđổiapp/model/gold. Userngắtserve,bậtlạicùngphiên30640. [Nhật ký780](./nhat_ky/2026-11-01_phien_780_chay_het_53_cau.md).
+
+- **Context779 — Xuất bản nhanh tùy chọn:** backend review_skip/UI menu, quyền/xác nhận/phiên bản/hash/audit và defaultreview giữ nguyên. Live publication3PDF/28trang/179chunksPASS30s; chatFAIL5.8m12PASS2FAILF13/F14/39NOT_RUN,khôngretry. F13checker1statement/modeltách2;F14responseinvalid502. API33/unit6/FE38/script4/build/TS/lintPASS; fullunit593PASS1FAILpurge716/fullFE567PASS33FAIL exact778. [Nhật ký779](./nhat_ky/2026-11-01_phien_779_xuat_ban_nhanh.md).
+
+- **Context778 — Compiler riêng PASS3PDF:** admissions-draft/17parts5.1m,tắtthinking riêngcompiler sauprobe/userxácnhận,0review;quota tháng11=20M;giữhistory vàgate.33focused/15script/TS/build/lintPASS,full565PASS/33FAIL nềnexact777. Giữphiên93faa11f0caf/serve33356chạy. [Nhật ký778](./nhat_ky/2026-11-01_phien_778_compiler_khong_review.md).
+
+- **Context777 — Rà compiler→chat:** sửa payload, ghimOCR, tránhreviewtrùng, recoverykey,3review/gate/indexactive;88case liênquanPASS,full560PASS/33FAIL;TS/build/Biome/RuffPASS. Không gọi model thật; chạy lại từ compilation. [Nhật ký777](./nhat_ky/2026-11-01_phien_777_ra_contract_compiler_den_chat.md).
+
+
 - **Context776 — Quota E2E20M được người dùng duyệt:** sửa profile/validator;14test/E2ETS/Biome/build/diffPASS; navigation/DB chưa chạy. [Nhật ký776](./nhat_ky/2026-10-31_phien_776_tang_quota_e2e_20m.md).
 
 
@@ -1186,6 +1203,7 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 | **2026-09-19 17:55** | AI Senior Full-Stack Specialist | Triển Khai Giai Đoạn 7: Responsive App Shell (Mobile Drawer & 3 Layout Variants - P0.1), Dọn Dẹp Dev Junk (P0.3), Khung Chuẩn Hóa Trạng Thái Dữ Liệu (P0.2): Mobile Drawer Sheet tự đóng, 3 Layout Variants (full-bleed, wide, standard), real auth session, StateBanner, EmptyState filter-empty | **TS: 0 \| Build ✓ \| Biome: 0**<br>**Pytest: 232/232 Pass (100%)**<br>Ruff: 0 error | [2026-09-19_phien_117_trien_khai_giai_doan_7_responsive_shell_dev_cleanup_state_banner.md](./nhat_ky/2026-09-19_phien_117_trien_khai_giai_doan_7_responsive_shell_dev_cleanup_state_banner.md) |
 | **2026-09-19 18:40** | AI Senior Full-Stack Specialist | Triển Khai Giai Đoạn 9: Knowledge Workspace Deep Modularization & Monolithic Page Decomposition (P1.3, P0.4, P1.4): Phân rã collection-detail-page.tsx từ 1.718 dòng xuống 485 dòng, xây dựng 11 components độc lập chuyên trách (header, 4 tabs, 5 dialogs), chuẩn hóa a11y semantic buttons và typography text-xs/text-sm | **TS: 0 \| Build ✓ \| Biome: 0**<br>**Pytest: 232/232 Pass (100%)**<br>Ruff: 0 error | [2026-09-19_phien_119_trien_khai_giai_doan_9_knowledge_workspace_decomposition.md](./nhat_ky/2026-09-19_phien_119_trien_khai_giai_doan_9_knowledge_workspace_decomposition.md) |
 | **2026-10-02** | AI Senior Full-Stack Architect | Triển khai Giai đoạn 2 ModelOps: tách `ProviderApiKey` khỏi JSONB, migration backfill, atomic lease `FOR UPDATE SKIP LOCKED`, xoay khóa dùng chung cho Chat/Streaming/OCR/Embedding/Reranker, CRUD dual-write và fallback JSONB tương thích chuyển tiếp | **46 test trọng điểm Passed**<br>**Full backend: 492 passed, 5 lỗi tồn tại trước phiên**<br>Ruff file thay đổi: 0 lỗi | [2026-10-02_phien_240_modelops_relational_key_pool_atomic_lease.md](./nhat_ky/2026-10-02_phien_240_modelops_relational_key_pool_atomic_lease.md) |
+| **2026-11-01** | AI Verifier & RAG Architect | Phiên 783: Review độc lập luồng E2E (Compiler -> Review -> Publication -> RAG), xác minh 8 nhận định kỹ thuật (parser table, catalog ô số, compiler lược qualifier, single-query retrieval, JSON schema, reasoning policy, evaluator F13, lease timeout MX-01) và Retest 16 câu hỏi lỗi trên phiên live `93faa11f0caf` với model thật `qwen3.8-27b-q4` | **Retest16: 7 PASS / 9 FAIL / 0 NOT_RUN**<br>16/16 dispatched độc lập, không retry, quota tiêu thụ 535k tokens, giữ nguyên kết quả gốc 53 câu (37/16) | [2026-11-01_phien_783_review_doc_lap_va_retest_16_cau.md](./nhat_ky/2026-11-01_phien_783_review_doc_lap_va_retest_16_cau.md) |
 
 ---
 
