@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from datetime import UTC, datetime
 
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.modelops.capacity.automatic import capacity_identity, operational_budget
 from qnu.domains.modelops.capacity.policy import plan_token_budget
 from qnu.domains.modelops.capacity.schemas import (
     CapacityBasis,
@@ -29,6 +28,7 @@ def set_capacity(
     limits: ModelTokenLimits | None,
     *,
     basis: CapacityBasis = "operator_configured",
+    field_sources: dict[str, CapacityBasis] | None = None,
 ) -> None:
     config = dict(provider.extra_config or {})
     if limits is None:
@@ -39,6 +39,10 @@ def set_capacity(
             "model_name": provider.model_name,
             "token_limits": limits.model_dump(),
             "basis": basis,
+            "field_sources": {
+                field: (field_sources or {}).get(field, basis)
+                for field in limits.model_dump(exclude_none=True)
+            },
             "recorded_at": datetime.now(UTC).isoformat(),
         }
     provider.extra_config = config
@@ -69,11 +73,20 @@ def read_capacity(provider: Provider) -> ModelCapacity:
         limits = ModelTokenLimits.model_validate(raw["token_limits"])
         if raw.get("basis") not in ("operator_configured", "server_reported"):
             raise ValueError("Invalid capacity basis")
+        sources = raw.get("field_sources", {})
+        if not isinstance(sources, dict) or any(
+            field not in limits.model_dump(exclude_none=True)
+            or value not in ("operator_configured", "server_reported")
+            for field, value in sources.items()
+        ):
+            raise ValueError("Invalid capacity sources")
     except (ValidationError, KeyError, ValueError) as exc:
         raise AppException(
             "Capacity đã lưu không hợp lệ.", code="model_token_limits_invalid", status_code=422
         ) from exc
-    return ModelCapacity(status="configured", token_limits=limits, basis=raw["basis"])
+    return ModelCapacity(
+        status="configured", token_limits=limits, basis=raw["basis"], field_sources=sources
+    )
 
 
 async def resolve_model_capacity(
@@ -90,28 +103,24 @@ async def resolve_model_capacity(
         db, actor, workspace_id, capability, provider_id
     )
     state = read_capacity(provider)
-    if state.status != "configured":
+    effective = operational_budget(state, capability)
+    if effective.status == "blocked":
         raise AppException(
-            "Cần cấu hình lại capacity." if state.status == "stale" else "Chưa cấu hình capacity.",
-            code="model_token_limits_stale"
+            "Cần cấu hình lại capacity."
             if state.status == "stale"
-            else "model_capacity_required",
+            else "Chưa có cách tính token ảnh.",
+            code=effective.reason_code,
             status_code=409 if state.status == "stale" else 422,
         )
-    material = {
-        "provider_id": provider.id,
-        "endpoint": provider.base_url.rstrip("/"),
-        "model_name": provider.model_name,
-        "limits": state.token_limits.model_dump(),
-    }
     return CapacitySnapshot(
         provider_id=provider.id,
         model_name=provider.model_name,
-        token_limits=state.token_limits,
-        basis=state.basis,
-        configuration_hash=hashlib.sha256(
-            json.dumps(material, sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest(),
+        token_limits=effective.token_limits,
+        basis="application_default" if effective.status == "provisional" else state.basis,
+        operational_budget=effective,
+        configuration_hash=capacity_identity(
+            provider.id, provider.base_url, provider.model_name, effective.token_limits, effective
+        ),
     )
 
 

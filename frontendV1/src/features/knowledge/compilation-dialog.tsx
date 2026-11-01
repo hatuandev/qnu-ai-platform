@@ -35,6 +35,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { ConsumerModelBudgetNotice } from "@/features/modelops/capacity-badge";
 import { useCatalogQuery } from "@/features/modelops/queries";
 import { useCreateCompilationMutation } from "./compilation-queries";
 import {
@@ -524,6 +525,10 @@ export function CompilationDialog({
                   <p className="text-[11px] text-muted-foreground">
                     Để trống sẽ dùng model Chat mặc định của workspace.
                   </p>
+                  <ConsumerModelBudgetNotice
+                    model={chatProviders.find((p) => p.id === providerId)}
+                    capability="chat"
+                  />
                 </div>
 
                 <div className="space-y-1.5">
@@ -623,6 +628,12 @@ export function CompilationDialog({
                         Với auto-review, để trống sẽ dùng đúng provider được
                         ghim của Compiler.
                       </p>
+                      <ConsumerModelBudgetNotice
+                        model={chatProviders.find(
+                          (p) => p.id === reviewProviderId,
+                        )}
+                        capability="chat"
+                      />
                     </div>
 
                     <div className="space-y-1">
@@ -640,7 +651,8 @@ export function CompilationDialog({
                         }}
                       />
                       <p className="text-[10px] text-muted-foreground">
-                        Để trống để tự chọn theo giới hạn model và dung lượng đầu vào.
+                        Để trống để tự chọn theo giới hạn model và dung lượng
+                        đầu vào.
                       </p>
                     </div>
                   </div>

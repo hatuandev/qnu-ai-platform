@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTimeValue } from "@/lib/date-utils";
+import { describeDiagnosticFailure } from "./capacity-badge";
 import {
   type DiagnosticCheck,
   useDiagnostics,
@@ -24,6 +25,15 @@ import { CAPABILITIES, CAPABILITY_LABELS, type Provider } from "./types";
 
 function Result({ check }: { check: DiagnosticCheck }) {
   const stale = check.configuration_status === "stale";
+  const failureInfo =
+    check.outcome === "failed"
+      ? describeDiagnosticFailure({
+          code: check.code,
+          httpStatus: check.http_status,
+          detail: check.detail,
+        })
+      : null;
+
   return (
     <div className="space-y-2 rounded-lg border p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -60,6 +70,21 @@ function Result({ check }: { check: DiagnosticCheck }) {
         </p>
       )}
       <p>{check.detail}</p>
+      {failureInfo && failureInfo.category !== "general" && (
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">
+            {failureInfo.title}:
+          </span>{" "}
+          {failureInfo.guidance}
+        </p>
+      )}
+      {check.outcome === "ok" && check.kind !== "discovery" && (
+        <p className="text-xs text-muted-foreground">
+          Mẫu thử chỉ xác nhận kết nối và định dạng phản hồi; không chứng minh
+          giới hạn token tối đa và không chuyển ngân sách tạm tính thành đã kiểm
+          chứng.
+        </p>
+      )}
       <p className="break-all font-mono text-xs text-muted-foreground">
         {check.requested_model} · {check.code}
         {check.http_status !== null ? ` · HTTP ${check.http_status}` : ""}

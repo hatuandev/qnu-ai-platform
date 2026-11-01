@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 PositiveTokens = Annotated[int, Field(strict=True, gt=0)]
 CapacityBasis = Literal["operator_configured", "server_reported"]
+BudgetSource = Literal["operator_configured", "server_reported", "application_default"]
 
 
 class OcrPageInputBudget(BaseModel):
@@ -49,6 +50,18 @@ class ModelCapacity(BaseModel):
     status: Literal["unknown", "configured", "stale"]
     token_limits: ModelTokenLimits | None = None
     basis: CapacityBasis | None = None
+    field_sources: dict[str, CapacityBasis] = Field(default_factory=dict)
+
+
+class OperationalBudget(BaseModel):
+    """Finite application policy; provisional values are not model declarations."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    version: Literal["qnu.operational-budget/v1"] = "qnu.operational-budget/v1"
+    status: Literal["declared", "provisional", "blocked"]
+    token_limits: ModelTokenLimits | None = None
+    sources: dict[str, BudgetSource] = Field(default_factory=dict)
+    reason_code: str | None = None
 
 
 class CapacitySnapshot(BaseModel):
@@ -56,8 +69,9 @@ class CapacitySnapshot(BaseModel):
     provider_id: str
     model_name: str
     token_limits: ModelTokenLimits
-    basis: CapacityBasis
+    basis: BudgetSource
     configuration_hash: str
+    operational_budget: OperationalBudget | None = None
 
 
 class RequestTokenBudget(BaseModel):

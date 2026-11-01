@@ -6,6 +6,8 @@ Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thu�
 
 ## 📌 Danh Mục Kế Hoạch
 
+- [Prompt FE — ModelOps tự động791](./PROMPT_FE_MODELOPS_TU_DONG_791.md): hoàn thiện giao diện thêm model, thông số nâng cao và trạng thái ngân sách theo hợp đồng BE mới.
+
 1. [**`01_ke_hoach_phat_trien_fe.md`**](./01_ke_hoach_phat_trien_fe.md):
    - **Tên kế hoạch**: Kế hoạch phát triển Frontend QNU AI Platform chuẩn Design System QLKTX.
    - **Mục tiêu**: Xây dựng lại Frontend bằng **Vite 8 + React 19 + TanStack Suite + Tailwind CSS v4 + Biome**, kế thừa 100% tokens màu OKLCH, khung vỏ `AdminShell` (Sidebar, Topbar, Breadcrumbs, CommandMenu) từ dự án `qnu-ktx`, và bổ sung bộ components chuyên trách AI (`ChatMessage`, `MessageScroller`, `Attachment`, `QuestionnaireCard`, `CitationSheet`, `DAGCanvas`).

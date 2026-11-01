@@ -2,6 +2,7 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from qnu.domains.modelops.capacity.automatic import operational_budget
 from qnu.domains.modelops.capacity.service import read_capacity
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.public_api import OcrRuntime, _active_key
@@ -26,6 +27,7 @@ async def resolve(
     if key is None:
         raise DependencyUnavailable("Thiếu credential rerank.", code="rerank_credentials_missing")
     capacity = read_capacity(provider)
+    effective = operational_budget(capacity, "rerank")
     return OcrRuntime(
         workspace_id=workspace_id,
         session_factory=async_sessionmaker(db.bind, expire_on_commit=False),
@@ -37,8 +39,9 @@ async def resolve(
         base_url=provider.base_url,
         timeout_seconds=provider.timeout_seconds,
         api_key=decrypt(key.secret_encrypted),
-        token_limits=capacity.token_limits,
-        capacity_status=capacity.status,
+        token_limits=effective.token_limits,
+        capacity_status="provisional" if effective.status == "provisional" else capacity.status,
+        operational_budget=effective,
     )
 
 
@@ -50,7 +53,7 @@ def budget(runtime: OcrRuntime, query: str, documents: list[str]) -> int:
         if limits
         else []
     )
-    if runtime.capacity_status != "configured" or not available:
+    if runtime.capacity_status not in ("configured", "provisional") or not available:
         raise Conflict("Cần cấu hình capacity rerank.", code="rerank_capacity_required")
     if any(n > min(available) for n in bounds):
         raise Conflict("Ứng viên vượt capacity rerank.", code="rerank_input_limit_exceeded")

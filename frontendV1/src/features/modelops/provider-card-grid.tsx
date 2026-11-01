@@ -12,6 +12,10 @@ import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
+  CapacityBadge,
+  ProviderOperationalBudgetsSummary,
+} from "@/features/modelops/capacity-badge";
+import {
   CAPABILITY_LABELS,
   type Capability,
   PROVIDER_TYPE_LABELS,
@@ -167,8 +171,9 @@ function ProviderCard({ provider, onClick }: ProviderCardProps) {
                 {provider.name}
               </h4>
             </div>
-            <p className="font-mono text-[11px] text-muted-foreground mt-0.5 truncate">
-              {provider.id}
+            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+              {PROVIDER_TYPE_LABELS[provider.provider_type] ??
+                provider.provider_type}
             </p>
           </div>
 
@@ -186,7 +191,7 @@ function ProviderCard({ provider, onClick }: ProviderCardProps) {
         </div>
 
         {/* Model & Base URL */}
-        <div className="rounded-lg bg-muted/40 p-2.5 space-y-1.5 border border-border/50 text-xs">
+        <div className="rounded-lg bg-muted/40 p-2.5 space-y-1.5 text-xs">
           <div className="flex items-center gap-2">
             <Cpu className="size-3.5 text-primary shrink-0" />
             <span
@@ -207,23 +212,29 @@ function ProviderCard({ provider, onClick }: ProviderCardProps) {
           </div>
         </div>
 
-        {/* Capabilities Badges */}
-        <div className="flex flex-wrap gap-1">
-          {provider.capabilities.length > 0 ? (
-            provider.capabilities.map((cap) => (
-              <Badge
-                key={cap}
-                variant="outline"
-                className="text-[10px] px-1.5 py-0 font-normal bg-background/50 border-border"
-              >
-                {CAPABILITY_LABELS[cap as Capability] ?? cap}
-              </Badge>
-            ))
-          ) : (
-            <span className="text-[11px] text-muted-foreground">
-              Chưa có chức năng
-            </span>
-          )}
+        {/* Capabilities & Capacity / Operational Budget Badges */}
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap gap-1">
+            {provider.capabilities.length > 0 ? (
+              provider.capabilities.map((cap) => (
+                <Badge
+                  key={cap}
+                  variant="outline"
+                  className="text-[10px] px-1.5 py-0 font-normal bg-background/50 border-border"
+                >
+                  {CAPABILITY_LABELS[cap as Capability] ?? cap}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-[11px] text-muted-foreground">
+                Chưa có chức năng
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <CapacityBadge status={provider.capacity_status} />
+            <ProviderOperationalBudgetsSummary provider={provider} compact />
+          </div>
         </div>
       </div>
 

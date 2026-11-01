@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from qnu.domains.modelops.capacity.automatic import operational_budget
 from qnu.domains.modelops.capacity.service import read_capacity
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.embedding.configuration import read_dimension
@@ -55,7 +56,7 @@ class EmbeddingRuntime(OcrRuntime):
         )
 
     def budget(self, texts: list[str]) -> int:
-        if self.capacity_status != "configured" or self.token_limits is None:
+        if self.capacity_status not in ("configured", "provisional") or self.token_limits is None:
             raise Conflict(
                 "Cần cấu hình capacity embedding đúng endpoint/model.",
                 code="embedding_capacity_required",
@@ -115,6 +116,7 @@ async def resolve_embedding_runtime(
             "Không giải mã được credential embedding.", code="embedding_credentials_unreadable"
         ) from exc
     capacity = read_capacity(provider)
+    effective = operational_budget(capacity, "embedding")
     return EmbeddingRuntime(
         workspace_id=workspace_id,
         session_factory=async_sessionmaker(db.bind, expire_on_commit=False),
@@ -126,6 +128,7 @@ async def resolve_embedding_runtime(
         timeout_seconds=provider.timeout_seconds,
         api_key=secret,
         dimension=dimension,
-        capacity_status=capacity.status,
-        token_limits=capacity.token_limits,
+        capacity_status="provisional" if effective.status == "provisional" else capacity.status,
+        token_limits=effective.token_limits,
+        operational_budget=effective,
     )

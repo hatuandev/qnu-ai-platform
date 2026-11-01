@@ -1,4 +1,4 @@
-import { Download, Loader2, RefreshCw } from "lucide-react";
+import { Download, Loader2, Plus, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -9,8 +9,10 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/admin/responsive-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -27,15 +29,26 @@ import {
 import { CAPABILITY_LABELS, type Capability } from "../types";
 import { useAddConnectionModel, useSyncConnectionCapacity } from "./api";
 
+export function hasDiscoveredCapacity(row?: DiscoveredModel): boolean {
+  return Boolean(
+    row &&
+      (row.context_window_tokens != null ||
+        row.max_output_tokens != null ||
+        row.embedding_dimension != null),
+  );
+}
+
 function describeMetadata(row?: DiscoveredModel) {
   const values = [
-    row?.context_window_tokens
+    row?.context_window_tokens != null
       ? `Context ${row.context_window_tokens.toLocaleString("vi-VN")}`
       : null,
-    row?.max_output_tokens
+    row?.max_output_tokens != null
       ? `Đầu ra ${row.max_output_tokens.toLocaleString("vi-VN")}`
       : null,
-    row?.embedding_dimension ? `${row.embedding_dimension} chiều` : null,
+    row?.embedding_dimension != null
+      ? `${row.embedding_dimension} chiều`
+      : null,
   ].filter(Boolean);
   return values.length ? values.join(" · ") : "Server chưa công bố giới hạn";
 }
@@ -64,6 +77,8 @@ export function ImportModelsDialog({
   const [capabilities, setCapabilities] = useState<Record<string, Capability>>(
     {},
   );
+  const [customName, setCustomName] = useState("");
+  const [customCapability, setCustomCapability] = useState<Capability>("chat");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const existingSet = new Set(existingModels);
@@ -80,6 +95,8 @@ export function ImportModelsDialog({
     if (!open) {
       setCheck(undefined);
       setSelected([]);
+      setCustomName("");
+      setCustomCapability("chat");
       setError(null);
       return;
     }
@@ -105,6 +122,30 @@ export function ImportModelsDialog({
     }
   };
 
+  const handleAddCustomModel = async () => {
+    const trimmed = customName.trim();
+    if (!trimmed) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      await addModelMutation.mutateAsync({
+        model_name: trimmed,
+        capabilities: [customCapability],
+      });
+      setCustomName("");
+      toast.success(`Đã thêm model ${trimmed}.`);
+      onModelAdded?.();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Không thêm được model tùy chỉnh.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleApply = async () => {
     if (!check) return;
     setIsSaving(true);
@@ -117,12 +158,12 @@ export function ImportModelsDialog({
           model_names: registered,
         });
       for (const name of selected.filter((item) => !existingSet.has(item))) {
+        const metadata = check.model_metadata?.find((row) => row.id === name);
+        const hasMetadata = hasDiscoveredCapacity(metadata);
         await addModelMutation.mutateAsync({
           model_name: name,
           capabilities: [capabilities[name] ?? "chat"],
-          ...(check.model_metadata?.some((row) => row.id === name)
-            ? { discovery_check_id: check.id }
-            : {}),
+          ...(hasMetadata ? { discovery_check_id: check.id } : {}),
         });
         setSelected((current) => current.filter((item) => item !== name));
       }
@@ -155,7 +196,8 @@ export function ImportModelsDialog({
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
             Thông số do {connectionName} công bố; chưa phải kết quả kiểm định.
-            Chọn model để thêm hoặc đồng bộ.
+            Chọn model để thêm hoặc đồng bộ. Model chưa công bố giới hạn vẫn
+            được thêm và dùng ngân sách vận hành tạm tính.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
@@ -191,11 +233,7 @@ export function ImportModelsDialog({
               const metadata = check.model_metadata?.find(
                 (row) => row.id === name,
               );
-              const hasMetadata =
-                metadata &&
-                (metadata.context_window_tokens ||
-                  metadata.max_output_tokens ||
-                  metadata.embedding_dimension);
+              const hasMetadata = hasDiscoveredCapacity(metadata);
               return (
                 <div key={name} className="flex items-start gap-3 py-3">
                   <Checkbox
@@ -214,12 +252,24 @@ export function ImportModelsDialog({
                     }
                   />
                   <div className="min-w-0 flex-1 space-y-1">
-                    <label
-                      htmlFor={`import-${name}`}
-                      className="break-all text-sm font-medium"
-                    >
-                      {name}
-                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label
+                        htmlFor={`import-${name}`}
+                        className="break-all text-sm font-medium"
+                      >
+                        {name}
+                      </label>
+                      <Badge
+                        variant={hasMetadata ? "outline" : "secondary"}
+                        className="text-[10px] font-normal"
+                      >
+                        {hasMetadata
+                          ? "Server công bố"
+                          : existingSet.has(name)
+                            ? "Chưa công bố"
+                            : "Đang dùng ngân sách tạm tính"}
+                      </Badge>
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {describeMetadata(metadata)}
                     </p>
@@ -259,6 +309,52 @@ export function ImportModelsDialog({
                 </div>
               );
             })}
+          </div>
+
+          <div className="space-y-2 border-t pt-4">
+            <p className="text-xs font-medium text-foreground">
+              Nhập model tùy chỉnh (khi server không hỗ trợ liệt kê /models)
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="Nhập mã model tùy chỉnh..."
+                aria-label="Mã model tùy chỉnh"
+                className="h-8 flex-1 font-mono text-xs"
+                disabled={isSaving}
+              />
+              <Select
+                value={customCapability}
+                disabled={isSaving}
+                onValueChange={(v) => setCustomCapability(v as Capability)}
+              >
+                <SelectTrigger
+                  aria-label="Chức năng model tùy chỉnh"
+                  className="h-8 w-full text-xs sm:w-36"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CAPABILITY_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0 gap-1.5 text-xs"
+                disabled={!customName.trim() || isSaving}
+                onClick={() => void handleAddCustomModel()}
+              >
+                <Plus className="size-3.5" />
+                <span>Thêm tùy chỉnh</span>
+              </Button>
+            </div>
           </div>
         </div>
         <ResponsiveDialogFooter className="border-t bg-card p-4">

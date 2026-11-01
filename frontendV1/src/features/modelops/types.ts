@@ -34,6 +34,15 @@ export const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
 /** `unknown` means "chưa khai báo"; `stale` means the endpoint/model changed. */
 export type CapacityStatus = "unknown" | "configured" | "stale";
 
+export type CapacityBasis = "operator_configured" | "server_reported";
+
+export type BudgetSource =
+  | "operator_configured"
+  | "server_reported"
+  | "application_default";
+
+export type OperationalBudgetStatus = "declared" | "provisional" | "blocked";
+
 export type OcrPageInputBudget = {
   max_image_width: number;
   max_image_height: number;
@@ -46,6 +55,14 @@ export type TokenLimits = {
   max_input_tokens: number | null;
   max_output_tokens: number | null;
   ocr_page_input: OcrPageInputBudget | null;
+};
+
+export type OperationalBudget = {
+  version: "qnu.operational-budget/v1";
+  status: OperationalBudgetStatus;
+  token_limits: TokenLimits | null;
+  sources: Partial<Record<string, BudgetSource>>;
+  reason_code: string | null;
 };
 
 export type Provider = {
@@ -62,9 +79,10 @@ export type Provider = {
   timeout_seconds: number;
   token_limits: TokenLimits | null;
   capacity_status: CapacityStatus;
-  capacity_basis: "operator_configured" | "server_reported" | null;
+  capacity_basis: CapacityBasis | null;
   embedding_dimension: number | null;
   embedding_dimension_status: CapacityStatus;
+  operational_budgets?: Partial<Record<Capability, OperationalBudget>>;
   created_at: string;
   updated_at: string;
 };
@@ -143,6 +161,12 @@ export type CatalogItem = {
   model_name: string;
   capabilities: string[];
   default_capabilities: string[];
+  capacity_status?: CapacityStatus;
+  capacity_basis?: CapacityBasis | null;
+  token_limits?: TokenLimits | null;
+  embedding_dimension?: number | null;
+  embedding_dimension_status?: CapacityStatus;
+  operational_budgets?: Partial<Record<Capability, OperationalBudget>>;
 };
 
 export type ModelOpsEvent = {

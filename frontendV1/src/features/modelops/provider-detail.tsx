@@ -6,6 +6,7 @@ import {
   Cpu,
   History,
   Pencil,
+  RotateCcw,
   ShieldAlert,
   TriangleAlert,
 } from "lucide-react";
@@ -20,7 +21,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CapacityBadge } from "@/features/modelops/capacity-badge";
+import {
+  BUDGET_SOURCE_LABELS,
+  BUDGET_STATUS_LABELS,
+  CapacityBadge,
+  formatTokenLimitValue,
+  OperationalBudgetBadge,
+  ProviderOperationalBudgetsSummary,
+  resolveCapabilityBudgetState,
+} from "@/features/modelops/capacity-badge";
+import { buildClearTokenLimitsPatch } from "@/features/modelops/capacity-patch";
 import { ProviderDiagnosticsPanel } from "@/features/modelops/diagnostics-panel";
 import { KeyEventsPanel } from "@/features/modelops/key-events-panel";
 import { KeysPanel } from "@/features/modelops/keys-panel";
@@ -31,6 +41,7 @@ import {
 } from "@/features/modelops/queries";
 import { ProviderResiliencePanel } from "@/features/modelops/resilience-panel";
 import {
+  type BudgetSource,
   CAPABILITY_LABELS,
   type Capability,
   PROVIDER_TYPE_LABELS,
@@ -38,118 +49,352 @@ import {
 } from "@/features/modelops/types";
 import { formatDateTimeValue } from "@/lib/date-utils";
 
-function DeclaredValue({
+function LimitRow({
   label,
   value,
+  source,
 }: {
   label: string;
-  value: number | string | null;
+  value: string;
+  source?: BudgetSource | null;
 }) {
+  const isUnknown = value === "Chưa công bố";
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b py-1.5 last:border-b-0">
-      <dt className="font-mono text-[11px] text-muted-foreground">{label}</dt>
-      <dd className="break-all text-xs font-medium">
-        {value === null ? (
-          <span className="text-muted-foreground">chưa khai báo</span>
-        ) : (
-          value
-        )}
+    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b py-2 last:border-b-0">
+      <dt className="font-mono text-xs text-muted-foreground">{label}</dt>
+      <dd className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
+        <span
+          className={isUnknown ? "text-muted-foreground" : "text-foreground"}
+        >
+          {value}
+        </span>
+        {source ? (
+          <Badge variant="outline" className="text-[10px] font-normal">
+            {BUDGET_SOURCE_LABELS[source]}
+          </Badge>
+        ) : null}
       </dd>
     </div>
   );
 }
 
-function CapacityPanel({ provider }: { provider: Provider }) {
+export function CapacityPanel({
+  provider,
+  canManage = false,
+  onEdit,
+  onClearDeclaredLimits,
+  isClearing = false,
+}: {
+  provider: Provider;
+  canManage?: boolean;
+  onEdit?: () => void;
+  onClearDeclaredLimits?: () => void;
+  isClearing?: boolean;
+}) {
+  const updateMutation = useUpdateProvider(provider.id);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+
   const limits = provider.token_limits;
   const ocr = limits?.ocr_page_input ?? null;
+  const capabilities = (provider.capabilities ?? []) as Capability[];
+  const hasOperationalBudgets = Boolean(
+    provider.operational_budgets &&
+      Object.keys(provider.operational_budgets).length > 0,
+  );
+  const clearing = isClearing || updateMutation.isPending;
+
+  const handleConfirmClear = async () => {
+    try {
+      await updateMutation.mutateAsync(buildClearTokenLimitsPatch());
+      toast.success(
+        "Đã xóa khai báo giới hạn; model chuyển sang dùng ngân sách vận hành tự động.",
+      );
+      setConfirmClearOpen(false);
+    } catch (error) {
+      toast.error(
+        error instanceof ApiProblemError
+          ? error.message
+          : "Không thể xóa khai báo giới hạn.",
+      );
+    }
+  };
 
   return (
     <Card className="rounded-xl shadow-2xs">
-      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-        <CardTitle className="text-sm">Năng lực đã khai báo</CardTitle>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <CapacityBadge status={provider.capacity_status} />
-          {provider.capacity_basis ? (
-            <Badge variant="outline" className="text-[10px]">
-              {provider.capacity_basis === "server_reported"
-                ? "Server công bố"
-                : "Khai báo tay"}
-            </Badge>
+      <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <CardTitle className="text-sm">
+            Giới hạn model & Ngân sách vận hành
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Phân biệt thông số kỹ thuật đã biết của model với ngân sách vận hành
+            đang áp dụng theo từng chức năng (đơn vị: token).
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <CapacityBadge
+            status={provider.capacity_status}
+            basis={provider.capacity_basis}
+          />
+          {canManage && onEdit ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={onEdit}
+            >
+              <Pencil className="size-3.5" />
+              <span>Khai báo / cập nhật</span>
+            </Button>
+          ) : null}
+          {canManage && provider.token_limits !== null ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              disabled={clearing}
+              onClick={() => {
+                if (onClearDeclaredLimits) {
+                  onClearDeclaredLimits();
+                } else {
+                  setConfirmClearOpen(true);
+                }
+              }}
+            >
+              <RotateCcw className="size-3.5" />
+              <span>Xóa khai báo giới hạn</span>
+            </Button>
           ) : null}
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-[11px] leading-5 text-muted-foreground">
-          Thông số từ server hoặc khai báo quản trị, chưa phải kết quả kiểm
-          định. &quot;Chưa khai báo&quot; không có nghĩa là không giới hạn.
-        </p>
 
+      <CardContent className="space-y-6 text-sm">
         {provider.capacity_status === "stale" ? (
-          <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-[11px] leading-5">
-            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+          <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs leading-5">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
             <span>
               Endpoint hoặc model đã thay đổi sau lần khai báo trước, nên số
-              liệu cũ không còn áp dụng. Cần khai báo lại để dùng cho tính toán.
+              liệu cũ không còn áp dụng. Cần lấy lại hoặc cập nhật thông số
+              trước khi chạy.
             </span>
           </p>
         ) : null}
 
-        <dl className="grid gap-x-6 sm:grid-cols-2">
-          <DeclaredValue
-            label="context_window_tokens"
-            value={limits?.context_window_tokens ?? null}
-          />
-          <DeclaredValue
-            label="max_input_tokens"
-            value={limits?.max_input_tokens ?? null}
-          />
-          <DeclaredValue
-            label="max_output_tokens"
-            value={limits?.max_output_tokens ?? null}
-          />
-          <DeclaredValue
-            label="embedding_dimension"
-            value={provider.embedding_dimension}
-          />
-        </dl>
-
-        <div className="rounded-md border bg-muted/30 px-3 py-2">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            ocr_page_input
-          </p>
-          {ocr ? (
-            <dl className="grid gap-x-6 sm:grid-cols-2">
-              <DeclaredValue
-                label="max_image_width"
-                value={ocr.max_image_width}
-              />
-              <DeclaredValue
-                label="max_image_height"
-                value={ocr.max_image_height}
-              />
-              <DeclaredValue
-                label="input_tokens_upper_bound"
-                value={ocr.input_tokens_upper_bound}
-              />
-              <DeclaredValue label="prompt_sha256" value={ocr.prompt_sha256} />
-            </dl>
-          ) : (
-            <p className="text-[11px] text-muted-foreground">
-              Chưa khai báo ngân sách token cho một trang ảnh.
-            </p>
-          )}
-        </div>
-
         {provider.embedding_dimension_status === "stale" ? (
-          <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-[11px] leading-5">
-            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+          <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs leading-5">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
             <span>
-              embedding_dimension cần khai báo lại: model hoặc endpoint đã đổi
+              embedding_dimension cần cập nhật lại: model hoặc endpoint đã đổi
               sau lần khai báo trước.
             </span>
           </p>
         ) : null}
+
+        {/* Phần 1: Giới hạn đã biết của model */}
+        <section className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-1.5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+              Giới hạn đã biết của model
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              Nguồn:{" "}
+              {provider.capacity_basis
+                ? BUDGET_SOURCE_LABELS[provider.capacity_basis]
+                : "Chưa công bố"}
+            </span>
+          </div>
+
+          <dl className="grid gap-x-6 sm:grid-cols-2">
+            <LimitRow
+              label="context_window_tokens"
+              value={formatTokenLimitValue(limits?.context_window_tokens)}
+              source={
+                limits?.context_window_tokens != null
+                  ? provider.capacity_basis
+                  : null
+              }
+            />
+            <LimitRow
+              label="max_input_tokens"
+              value={formatTokenLimitValue(limits?.max_input_tokens)}
+              source={
+                limits?.max_input_tokens != null
+                  ? provider.capacity_basis
+                  : null
+              }
+            />
+            <LimitRow
+              label="max_output_tokens"
+              value={formatTokenLimitValue(limits?.max_output_tokens)}
+              source={
+                limits?.max_output_tokens != null
+                  ? provider.capacity_basis
+                  : null
+              }
+            />
+            <LimitRow
+              label="embedding_dimension"
+              value={
+                provider.embedding_dimension != null
+                  ? `${provider.embedding_dimension.toLocaleString("vi-VN")} chiều`
+                  : "Chưa công bố"
+              }
+            />
+          </dl>
+
+          <div className="pt-2">
+            <p className="mb-1 font-mono text-xs font-medium text-muted-foreground">
+              ocr_page_input
+            </p>
+            {ocr ? (
+              <dl className="grid gap-x-6 sm:grid-cols-2">
+                <LimitRow
+                  label="max_image_width"
+                  value={`${ocr.max_image_width.toLocaleString("vi-VN")} px`}
+                />
+                <LimitRow
+                  label="max_image_height"
+                  value={`${ocr.max_image_height.toLocaleString("vi-VN")} px`}
+                />
+                <LimitRow
+                  label="input_tokens_upper_bound"
+                  value={formatTokenLimitValue(ocr.input_tokens_upper_bound)}
+                  source={provider.capacity_basis}
+                />
+                <LimitRow label="prompt_sha256" value={ocr.prompt_sha256} />
+              </dl>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Chưa công bố ngân sách token cho một trang ảnh.
+              </p>
+            )}
+          </div>
+        </section>
+
+        {/* Phần 2: Ngân sách đang áp dụng */}
+        <section className="space-y-3 border-t pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+              Ngân sách đang áp dụng
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              Chính sách vận hành từ backend theo từng chức năng
+            </span>
+          </div>
+
+          {!hasOperationalBudgets ? (
+            <p className="text-xs text-muted-foreground">
+              {BUDGET_STATUS_LABELS.missing_info}
+            </p>
+          ) : (
+            <div className="divide-y">
+              {capabilities.map((cap) => {
+                const resolved = resolveCapabilityBudgetState(provider, cap);
+                const budget = resolved.budget;
+                const budgetLimits = budget?.token_limits ?? null;
+                const sources = budget?.sources ?? {};
+                return (
+                  <div
+                    key={cap}
+                    className="space-y-2 py-3 first:pt-1 last:pb-0"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-foreground">
+                        {CAPABILITY_LABELS[cap] ?? cap}
+                      </span>
+                      <OperationalBudgetBadge
+                        model={provider}
+                        capability={cap}
+                      />
+                    </div>
+
+                    {resolved.isBlocked ? (
+                      <div className="rounded-md bg-warning/10 px-3 py-2 text-xs text-foreground">
+                        <p>{resolved.reason}</p>
+                        {resolved.reasonCode ? (
+                          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                            Mã lý do: {resolved.reasonCode}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : budgetLimits ? (
+                      <dl className="grid gap-x-6 sm:grid-cols-2">
+                        <LimitRow
+                          label="context_window_tokens"
+                          value={formatTokenLimitValue(
+                            budgetLimits.context_window_tokens,
+                          )}
+                          source={sources.context_window_tokens ?? null}
+                        />
+                        <LimitRow
+                          label="max_input_tokens"
+                          value={formatTokenLimitValue(
+                            budgetLimits.max_input_tokens,
+                          )}
+                          source={sources.max_input_tokens ?? null}
+                        />
+                        <LimitRow
+                          label="max_output_tokens"
+                          value={formatTokenLimitValue(
+                            budgetLimits.max_output_tokens,
+                          )}
+                          source={sources.max_output_tokens ?? null}
+                        />
+                        {cap === "ocr" ? (
+                          <LimitRow
+                            label="ocr_page_input"
+                            value={
+                              budgetLimits.ocr_page_input
+                                ? formatTokenLimitValue(
+                                    budgetLimits.ocr_page_input
+                                      .input_tokens_upper_bound,
+                                  )
+                                : "Chưa công bố"
+                            }
+                            source={sources.ocr_page_input ?? null}
+                          />
+                        ) : null}
+                      </dl>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {BUDGET_STATUS_LABELS.missing_info}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </CardContent>
+
+      <ConfirmDialog
+        open={confirmClearOpen}
+        onOpenChange={(next) => {
+          if (!clearing) setConfirmClearOpen(next);
+        }}
+        title="Xóa giới hạn token đã khai báo?"
+        description={
+          <div className="space-y-2 text-xs">
+            <p>
+              Thao tác này gửi{" "}
+              <code className="font-mono">token_limits: null</code> để xóa giới
+              hạn đã khai báo của model{" "}
+              <strong className="font-mono">{provider.model_name}</strong>.
+            </p>
+            <p>
+              Sau khi xóa, model sẽ chuyển sang dùng ngân sách vận hành tự động
+              (tạm tính) của hệ thống cho đến khi được đồng bộ từ server hoặc
+              khai báo lại.
+            </p>
+          </div>
+        }
+        confirmLabel="Xác nhận xóa khai báo"
+        isLoading={clearing}
+        onConfirm={() => void handleConfirmClear()}
+      />
     </Card>
   );
 }
@@ -160,6 +405,7 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
   const updateMutation = useUpdateProvider(providerId);
   const [editOpen, setEditOpen] = useState(false);
   const [toggleOpen, setToggleOpen] = useState(false);
+  const [clearLimitsOpen, setClearLimitsOpen] = useState(false);
 
   const canManage = isModelAdmin(actor);
   const provider = query.data;
@@ -213,8 +459,8 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
         </Button>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <p className="type-metadata mb-2 font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="min-w-0 space-y-1.5">
+            <p className="type-metadata font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               QNU AI · ModelOps · Model
             </p>
             <div className="flex flex-wrap items-center gap-2">
@@ -226,16 +472,19 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
               ) : (
                 <Badge variant="secondary">Đang tắt</Badge>
               )}
+              <ProviderOperationalBudgetsSummary
+                provider={provider}
+                showBasis
+              />
             </div>
-            <p className="mt-1.5 font-mono text-xs text-muted-foreground">
+            <p className="font-mono text-xs text-muted-foreground">
               {PROVIDER_TYPE_LABELS[provider.provider_type]} ·{" "}
-              {provider.model_name} · {provider.id}
+              {provider.model_name}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              variant="outline"
               size="sm"
               className="gap-1.5 text-xs"
               disabled={!canManage || updateMutation.isPending}
@@ -335,20 +584,20 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
             Cấu hình nâng cao & Lịch sử
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Các chính sách phục hồi, giới hạn token đã khai báo và nhật ký kiểm
-            toán khóa.
+            Các chính sách phục hồi, giới hạn token đã biết, ngân sách đang áp
+            dụng và nhật ký kiểm toán khóa.
           </p>
         </div>
 
-        <Tabs defaultValue="resilience" className="w-full">
+        <Tabs defaultValue="capacity" className="w-full">
           <TabsList className="w-full justify-start">
+            <TabsTrigger value="capacity" className="gap-1.5 text-xs">
+              <Cpu className="size-3.5" />
+              <span>Giới hạn & Ngân sách</span>
+            </TabsTrigger>
             <TabsTrigger value="resilience" className="gap-1.5 text-xs">
               <Activity className="size-3.5" />
               <span>Dự phòng & Phục hồi</span>
-            </TabsTrigger>
-            <TabsTrigger value="capacity" className="gap-1.5 text-xs">
-              <Cpu className="size-3.5" />
-              <span>Năng lực đã khai báo</span>
             </TabsTrigger>
             <TabsTrigger value="events" className="gap-1.5 text-xs">
               <History className="size-3.5" />
@@ -356,12 +605,17 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="resilience">
-            <ProviderResiliencePanel provider={provider} />
+          <TabsContent value="capacity">
+            <CapacityPanel
+              provider={provider}
+              canManage={canManage}
+              isClearing={updateMutation.isPending}
+              onClearDeclaredLimits={() => setClearLimitsOpen(true)}
+            />
           </TabsContent>
 
-          <TabsContent value="capacity">
-            <CapacityPanel provider={provider} />
+          <TabsContent value="resilience">
+            <ProviderResiliencePanel provider={provider} />
           </TabsContent>
 
           <TabsContent value="events">
@@ -374,6 +628,48 @@ export function ProviderDetail({ providerId }: { providerId: string }) {
         open={editOpen}
         onOpenChange={setEditOpen}
         provider={provider}
+      />
+
+      <ConfirmDialog
+        open={clearLimitsOpen}
+        onOpenChange={(open) => {
+          if (!updateMutation.isPending) setClearLimitsOpen(open);
+        }}
+        title="Xóa giới hạn token đã khai báo?"
+        description={
+          <div className="space-y-2 text-xs">
+            <p>
+              Thao tác này gửi{" "}
+              <code className="font-mono">token_limits: null</code> để xóa thông
+              số giới hạn đã lưu của model{" "}
+              <strong className="font-mono">{provider.model_name}</strong>.
+            </p>
+            <p>
+              Model sẽ chuyển sang dùng ngân sách vận hành tự động (tạm tính) do
+              backend quyết định cho đến khi được đồng bộ từ server hoặc khai
+              báo lại.
+            </p>
+          </div>
+        }
+        confirmLabel="Xác nhận xóa khai báo"
+        isLoading={updateMutation.isPending}
+        onConfirm={() => {
+          void updateMutation
+            .mutateAsync(buildClearTokenLimitsPatch())
+            .then(() => {
+              setClearLimitsOpen(false);
+              toast.success(
+                "Đã xóa khai báo giới hạn; model dùng ngân sách vận hành tự động.",
+              );
+            })
+            .catch((error: unknown) =>
+              toast.error(
+                error instanceof ApiProblemError
+                  ? error.message
+                  : "Không xóa được khai báo giới hạn.",
+              ),
+            );
+        }}
       />
 
       <ConfirmDialog

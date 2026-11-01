@@ -43,6 +43,7 @@ import {
   type SearchResponse,
 } from "@/features/knowledge/index-types";
 import { LifecycleActions } from "@/features/lifecycle/lifecycle-actions";
+import { ConsumerModelBudgetNotice } from "@/features/modelops/capacity-badge";
 import { useCatalogQuery } from "@/features/modelops/queries";
 import {
   draftToFilter,
@@ -331,6 +332,16 @@ function IndexSession({
               )}
               <span>Tạo index generation</span>
             </Button>
+            {providerId !== NO_PROVIDER_VALUE ? (
+              <div className="w-full">
+                <ConsumerModelBudgetNotice
+                  model={embeddingCatalog.find(
+                    (item) => item.id === providerId,
+                  )}
+                  capability="embedding"
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

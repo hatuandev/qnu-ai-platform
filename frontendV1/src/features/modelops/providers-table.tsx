@@ -10,7 +10,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CapacityBadge } from "@/features/modelops/capacity-badge";
+import {
+  CapacityBadge,
+  ProviderOperationalBudgetsSummary,
+} from "@/features/modelops/capacity-badge";
 import {
   CAPABILITY_LABELS,
   type Capability,
@@ -96,7 +99,13 @@ export function ProvidersTable({
               </div>
             </TableCell>
             <TableCell className="hidden xl:table-cell">
-              <CapacityBadge status={provider.capacity_status} />
+              <div className="flex flex-col items-start gap-1">
+                <CapacityBadge status={provider.capacity_status} />
+                <ProviderOperationalBudgetsSummary
+                  provider={provider}
+                  compact
+                />
+              </div>
             </TableCell>
             <TableCell>
               {provider.is_active ? (

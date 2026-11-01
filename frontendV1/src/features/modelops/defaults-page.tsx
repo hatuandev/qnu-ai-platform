@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConsumerModelBudgetNotice } from "@/features/modelops/capacity-badge";
 import {
   useDefaultsQuery,
   useProvidersQuery,
@@ -237,14 +238,21 @@ export function DefaultsPage() {
                       ) : null}
                     </div>
 
+                    <ConsumerModelBudgetNotice
+                      model={selected}
+                      capability={capability}
+                    />
+
                     {selectedUnavailable ? (
                       <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-[11px] leading-5">
                         <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
                         <span>
                           Mặc định đang trỏ tới provider{" "}
-                          <code className="font-mono">{providerId}</code> nhưng
-                          provider này không còn trong danh sách hoặc đã bị tắt.
-                          Chọn provider khác hoặc bỏ mặc định.
+                          <code className="font-mono">
+                            {selected?.name ?? providerId}
+                          </code>{" "}
+                          nhưng provider này không còn trong danh sách hoặc đã
+                          bị tắt. Chọn provider khác hoặc bỏ mặc định.
                         </span>
                       </p>
                     ) : null}

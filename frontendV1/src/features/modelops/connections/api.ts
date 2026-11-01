@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { v1Client } from "@/app/api/v1";
 import { useV1Auth } from "@/app/auth/v1";
-import type { Capability, Provider, ProviderKey } from "../types";
+import type { DiscoveredModel } from "../diagnostic-queries";
+import type { Capability, Provider, ProviderKey, TokenLimits } from "../types";
 
 export type ConnectionFamily =
   | "openai"
@@ -55,7 +56,63 @@ export type ConnectionTestResult = {
   latency_ms?: number | null;
   detail: string;
   models?: string[];
+  model_metadata?: DiscoveredModel[];
 };
+
+export type ConnectionModelCreateInput = {
+  model_name: string;
+  capabilities: Capability[];
+  token_limits?: TokenLimits | null;
+  embedding_dimension?: number | null;
+  discovery_check_id?: string | null;
+};
+
+export function buildConnectionModelPayload(
+  input: ConnectionModelCreateInput,
+): {
+  model_name: string;
+  capabilities: Capability[];
+  token_limits?: TokenLimits;
+  embedding_dimension?: number;
+  discovery_check_id?: string;
+} {
+  const hasManualLimits =
+    input.token_limits !== undefined && input.token_limits !== null;
+  const hasManualDimension =
+    input.embedding_dimension !== undefined &&
+    input.embedding_dimension !== null;
+  const hasDiscoveryCheckId = Boolean(input.discovery_check_id?.trim());
+
+  if (hasDiscoveryCheckId && (hasManualLimits || hasManualDimension)) {
+    throw new Error(
+      "Không gửi đồng thời thông số giới hạn thủ công với discovery_check_id.",
+    );
+  }
+
+  const payload: {
+    model_name: string;
+    capabilities: Capability[];
+    token_limits?: TokenLimits;
+    embedding_dimension?: number;
+    discovery_check_id?: string;
+  } = {
+    model_name: input.model_name.trim(),
+    capabilities: [...input.capabilities],
+  };
+
+  if (hasDiscoveryCheckId && input.discovery_check_id) {
+    payload.discovery_check_id = input.discovery_check_id.trim();
+  } else {
+    if (hasManualLimits && input.token_limits) {
+      payload.token_limits = input.token_limits;
+    }
+    if (hasManualDimension && typeof input.embedding_dimension === "number") {
+      payload.embedding_dimension = input.embedding_dimension;
+    }
+  }
+
+  return payload;
+}
 
 export const FAMILIES: Record<ConnectionFamily, string> = {
   openai: "OpenAI Compatible",
@@ -160,12 +217,11 @@ export function useAddConnectionModel(connectionId: string) {
   const cache = useQueryClient();
   const { sessionId } = useV1Auth();
   return useMutation({
-    mutationFn: (input: {
-      model_name: string;
-      capabilities: Capability[];
-      embedding_dimension?: number;
-      discovery_check_id?: string;
-    }) => v1Client.post<Provider>(`${path}/${connectionId}/models`, input),
+    mutationFn: (input: ConnectionModelCreateInput) =>
+      v1Client.post<Provider>(
+        `${path}/${connectionId}/models`,
+        buildConnectionModelPayload(input),
+      ),
     onSuccess: () => {
       void cache.invalidateQueries({ queryKey: ["v1", sessionId, "modelops"] });
     },
@@ -201,19 +257,12 @@ export function useAddConnectionKey(connectionId: string) {
   const cache = useQueryClient();
   const { sessionId } = useV1Auth();
   return useMutation({
-    mutationFn: (input: {
-      name: string;
-      secret: string;
-      priority: number;
-    }) =>
-      v1Client.post<ProviderKey>(
-        `/modelops/providers/${connectionId}/keys`,
-        {
-          name: input.name,
-          secret: input.secret,
-          priority: input.priority,
-        },
-      ),
+    mutationFn: (input: { name: string; secret: string; priority: number }) =>
+      v1Client.post<ProviderKey>(`/modelops/providers/${connectionId}/keys`, {
+        name: input.name,
+        secret: input.secret,
+        priority: input.priority,
+      }),
     onSuccess: () => {
       void cache.invalidateQueries({ queryKey: ["v1", sessionId, "modelops"] });
     },

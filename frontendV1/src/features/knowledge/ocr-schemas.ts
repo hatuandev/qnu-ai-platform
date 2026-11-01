@@ -336,6 +336,15 @@ export function formatOcrError(
         detail ||
         "Gợi ý kiểm tra chính tả từ model không khớp văn bản hiện hành."
       );
+    case "model_token_limits_stale":
+      return "Thông số giới hạn của model OCR đã cũ do mới đổi tên model. Vui lòng cập nhật hoặc xóa giới hạn cũ trong ModelOps.";
+    case "model_input_budget_unknown":
+      return "Model OCR chưa có thông tin giới hạn đầu vào (context window / max input / trang OCR tối đa) để lập lịch an toàn.";
+    case "quota_exceeded":
+    case "provider_rate_limited":
+      return "Hết hạn mức (Quota) hoặc bị giới hạn tần suất (HTTP 429) từ nhà cung cấp OCR.";
+    case "provider_response_malformed":
+      return "Nhà cung cấp OCR trả về kết quả không đúng định dạng cấu trúc.";
     default:
       return detail || code || "Đã xảy ra lỗi trong quá trình xử lý OCR.";
   }

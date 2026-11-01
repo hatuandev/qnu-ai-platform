@@ -8,9 +8,11 @@ import {
   Download,
   FileText,
   FlaskConical,
+  Gauge,
   Key,
   Layers,
   Loader2,
+  MoreHorizontal,
   Pencil,
   Play,
   Plus,
@@ -21,6 +23,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { v1Client } from "@/app/api/v1";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ErrorState } from "@/components/admin/error-state";
 import {
   ResponsiveDialog,
@@ -33,6 +36,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -44,7 +54,12 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { updateProvider } from "@/features/modelops/requests";
+import {
+  CapacityBadge,
+  ProviderOperationalBudgetsSummary,
+} from "../capacity-badge";
 import { useDiagnostics } from "../diagnostic-queries";
+import { CapacityPanel } from "../provider-detail";
 import { ProviderFormDialog } from "../provider-form-dialog";
 import type { Capability, Provider, ProviderKey } from "../types";
 import {
@@ -87,6 +102,9 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
   const [importModelsOpen, setImportModelsOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [modelToTest, setModelToTest] = useState<Provider | null>(null);
+  const [modelToInspect, setModelToInspect] = useState<Provider | null>(null);
+  const [modelToDelete, setModelToDelete] = useState<Provider | null>(null);
+  const [keyToDelete, setKeyToDelete] = useState<ProviderKey | null>(null);
 
   // New model input & capability
   const [newModelId, setNewModelId] = useState("");
@@ -200,21 +218,23 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
     }
   };
 
-  const handleDeleteModel = async (model: Provider) => {
-    if (!confirm(`Bạn có chắc muốn xóa model ${model.model_name}?`)) return;
+  const handleConfirmDeleteModel = async () => {
+    if (!modelToDelete) return;
     try {
-      await deleteModelMutation.mutateAsync(model.id);
-      toast.success(`Đã xóa model ${model.model_name}.`);
+      await deleteModelMutation.mutateAsync(modelToDelete.id);
+      toast.success(`Đã xóa model ${modelToDelete.model_name}.`);
+      setModelToDelete(null);
     } catch {
       toast.error("Không thể xóa model.");
     }
   };
 
-  const handleDeleteKey = async (key: ProviderKey) => {
-    if (!confirm(`Bạn có chắc muốn xóa API Key '${key.name}'?`)) return;
+  const handleConfirmDeleteKey = async () => {
+    if (!keyToDelete) return;
     try {
-      await deleteKeyMutation.mutateAsync(key.id);
-      toast.success(`Đã xóa API Key ${key.name}.`);
+      await deleteKeyMutation.mutateAsync(keyToDelete.id);
+      toast.success(`Đã xóa API Key ${keyToDelete.name}.`);
+      setKeyToDelete(null);
     } catch {
       toast.error("Không thể xóa API Key.");
     }
@@ -433,7 +453,7 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                 return (
                   <div
                     key={key.id}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-lg border border-border/80 bg-muted/10 hover:bg-muted/20 transition-colors"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <Key className="size-4 text-muted-foreground shrink-0" />
@@ -513,7 +533,7 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                         size="sm"
                         variant="ghost"
                         className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDeleteKey(key)}
+                        onClick={() => setKeyToDelete(key)}
                         title="Xóa API Key"
                       >
                         <Trash2 className="size-3.5" />
@@ -670,7 +690,6 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                           </Badge>
                         ),
                       };
-                    case "chat":
                     default:
                       return {
                         icon: <Bot className="size-4 text-blue-500" />,
@@ -689,40 +708,32 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                 return (
                   <div
                     key={m.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border/80 bg-muted/10 hover:bg-muted/20 transition-colors"
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="flex size-7 shrink-0 items-center justify-center rounded bg-muted/60">
                         {visual.icon}
                       </div>
-                      <div className="min-w-0 space-y-0.5">
+                      <div className="min-w-0 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-mono text-xs font-semibold text-foreground truncate">
                             {m.model_name}
                           </p>
                           {visual.badge}
+                          <CapacityBadge status={m.capacity_status} />
                         </div>
+                        <ProviderOperationalBudgetsSummary
+                          provider={m}
+                          compact
+                        />
                         <p className="font-mono text-[11px] text-muted-foreground truncate">
                           Endpoint: {m.base_url}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      {/* Copy Model ID */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="size-7 p-0 text-muted-foreground hover:text-foreground"
-                        onClick={() =>
-                          copyToClipboard(fullModelPath, "tên model")
-                        }
-                        title="Sao chép tên model"
-                      >
-                        <Copy className="size-3.5" />
-                      </Button>
-
-                      {/* Edit Model */}
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                      {/* Edit Model (kept directly accessible for quick edit & test compatibility) */}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -733,27 +744,47 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                         <Pencil className="size-3.5" />
                       </Button>
 
-                      {/* Test Model Flask Icon */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="size-7 p-0 text-primary hover:text-primary hover:bg-primary/10"
-                        onClick={() => setModelToTest(m)}
-                        title="Chạy thử nghiệm / test model này"
-                      >
-                        <FlaskConical className="size-3.5" />
-                      </Button>
-
-                      {/* Delete Model */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="size-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDeleteModel(m)}
-                        title="Xóa model khỏi nhà cung cấp"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
+                      {/* Grouped secondary actions in 1 DropdownMenu per ui-standards.md */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="size-7 p-0 text-muted-foreground hover:text-foreground"
+                            aria-label={`Tác vụ khác cho model ${m.model_name}`}
+                          >
+                            <MoreHorizontal className="size-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="text-xs">
+                          <DropdownMenuItem
+                            onClick={() => setModelToInspect(m)}
+                          >
+                            <Gauge className="size-3.5 mr-2" />
+                            <span>Giới hạn &amp; Ngân sách đang áp dụng</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setModelToTest(m)}>
+                            <FlaskConical className="size-3.5 mr-2" />
+                            <span>Chạy thử nghiệm model</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              copyToClipboard(fullModelPath, "tên model")
+                            }
+                          >
+                            <Copy className="size-3.5 mr-2" />
+                            <span>Sao chép tên model</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setModelToDelete(m)}
+                          >
+                            <Trash2 className="size-3.5 mr-2" />
+                            <span>Xóa model</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 );
@@ -808,12 +839,99 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
       />
 
       {/* MODAL 5: Edit Model Dialog */}
-      <ProviderFormDialog
-        open={Boolean(modelToEdit)}
-        provider={modelToEdit}
+      {modelToEdit ? (
+        <ProviderFormDialog
+          open={Boolean(modelToEdit)}
+          provider={modelToEdit}
+          onOpenChange={(open) => {
+            if (!open) setModelToEdit(null);
+          }}
+        />
+      ) : null}
+
+      {/* MODAL 6: Inspect Model Capacity & Operational Budgets */}
+      <ResponsiveDialog
+        open={Boolean(modelToInspect)}
         onOpenChange={(open) => {
-          if (!open) setModelToEdit(null);
+          if (!open) setModelToInspect(null);
         }}
+      >
+        <ResponsiveDialogContent className="max-w-2xl p-5 space-y-4">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>
+              Giới hạn &amp; Ngân sách xử lý:{" "}
+              <span className="font-mono">{modelToInspect?.model_name}</span>
+            </ResponsiveDialogTitle>
+            <ResponsiveDialogDescription className="text-xs">
+              Phân biệt thông số giới hạn đã biết của model với ngân sách vận
+              hành mà ứng dụng đang áp dụng.
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
+          {modelToInspect ? (
+            <CapacityPanel
+              provider={
+                models.find((item) => item.id === modelToInspect.id) ??
+                modelToInspect
+              }
+              canManage={true}
+              onEdit={() => {
+                const target =
+                  models.find((item) => item.id === modelToInspect.id) ??
+                  modelToInspect;
+                setModelToInspect(null);
+                setModelToEdit(target);
+              }}
+            />
+          ) : null}
+          <ResponsiveDialogFooter className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setModelToInspect(null)}
+            >
+              Đóng
+            </Button>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
+
+      {/* Delete Model Confirmation Dialog */}
+      <ConfirmDialog
+        open={Boolean(modelToDelete)}
+        onOpenChange={(open) => {
+          if (!open) setModelToDelete(null);
+        }}
+        title="Xóa model khỏi nhà cung cấp"
+        description={
+          <>
+            Bạn có chắc chắn muốn xóa model{" "}
+            <strong className="font-mono">{modelToDelete?.model_name}</strong>{" "}
+            khỏi nhà cung cấp <strong>{connection.name}</strong>?
+          </>
+        }
+        confirmLabel="Xóa model"
+        confirmVariant="destructive"
+        isLoading={deleteModelMutation.isPending}
+        onConfirm={() => void handleConfirmDeleteModel()}
+      />
+
+      {/* Delete API Key Confirmation Dialog */}
+      <ConfirmDialog
+        open={Boolean(keyToDelete)}
+        onOpenChange={(open) => {
+          if (!open) setKeyToDelete(null);
+        }}
+        title="Xóa API Key"
+        description={
+          <>
+            Bạn có chắc chắn muốn xóa API Key{" "}
+            <strong>{keyToDelete?.name}</strong>?
+          </>
+        }
+        confirmLabel="Xóa khóa"
+        confirmVariant="destructive"
+        isLoading={deleteKeyMutation.isPending}
+        onConfirm={() => void handleConfirmDeleteKey()}
       />
 
       {/* Delete Connection Confirmation Dialog */}

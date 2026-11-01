@@ -118,7 +118,7 @@ def test_public_runtime_budget_resolves_workspace_and_rechecks_provider(client):
     assert disabled.value.code == "provider_inactive"
 
 
-def test_runtime_capacity_requires_configuration_and_rejects_stale_binding(client):
+def test_runtime_uses_provisional_budget_but_rejects_stale_binding(client):
     ws, provider = setup_policy(client)
     _as(PLATFORM)
     url = f"{URL}/{provider['id']}"
@@ -127,9 +127,10 @@ def test_runtime_capacity_requires_configuration_and_rejects_stale_binding(clien
         async with AsyncSessionFactory() as db:
             return await resolve_model_capacity(db, MEMBER_A, ws["id"], "chat")
 
-    with pytest.raises(AppException) as unknown:
-        client.portal.call(resolve)
-    assert unknown.value.code == "model_capacity_required"
+    provisional = client.portal.call(resolve)
+    assert provisional.basis == "application_default"
+    assert provisional.operational_budget.status == "provisional"
+    assert client.get(url).json()["capacity_status"] == "unknown"
     assert client.patch(url, json={"token_limits": LIMITS}).status_code == 200
     first = client.portal.call(resolve)
     assert (

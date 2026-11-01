@@ -58,6 +58,7 @@ function text(value: number | null | undefined): string {
 }
 
 export function draftFromProvider(provider: Provider): CapacityDraft {
+  // Strictly read declared `token_limits`, never `operational_budgets` (provisional defaults).
   const limits = provider.token_limits;
   const ocr = limits?.ocr_page_input ?? null;
   return {
@@ -70,6 +71,20 @@ export function draftFromProvider(provider: Provider): CapacityDraft {
     ocrInputTokensUpperBound: text(ocr?.input_tokens_upper_bound),
     ocrPromptSha256: ocr?.prompt_sha256 ?? "",
   };
+}
+
+export function hasManualCapacityDraft(draft: CapacityDraft): boolean {
+  return Boolean(
+    draft.contextWindowTokens.trim() ||
+      draft.maxInputTokens.trim() ||
+      draft.maxOutputTokens.trim() ||
+      draft.embeddingDimension.trim() ||
+      hasOcrBudgetInput(draft),
+  );
+}
+
+export function buildClearTokenLimitsPatch(): ProviderUpdateInput {
+  return { token_limits: null };
 }
 
 export function formValuesFromProvider(provider: Provider): ProviderFormValues {

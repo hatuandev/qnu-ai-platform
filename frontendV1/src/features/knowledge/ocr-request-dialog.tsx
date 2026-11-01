@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { useRequestProcessingRunMutation } from "@/features/knowledge/ocr-queries";
 import { formatOcrError } from "@/features/knowledge/ocr-schemas";
+import { ConsumerModelBudgetNotice } from "@/features/modelops/capacity-badge";
 import { useCatalogQuery } from "@/features/modelops/queries";
 
 export function OcrRequestDialog({
@@ -125,7 +126,7 @@ export function OcrRequestDialog({
                   </SelectItem>
                   {ocrProviders.map((p) => (
                     <SelectItem key={p.id} value={p.id} className="text-xs">
-                      {p.name} ({p.id})
+                      {p.name} ({p.model_name})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -134,6 +135,10 @@ export function OcrRequestDialog({
                 Chỉ hiển thị các nhà cung cấp đang hoạt động và có năng lực OCR
                 trong ModelOps.
               </p>
+              <ConsumerModelBudgetNotice
+                model={ocrProviders.find((p) => p.id === providerId)}
+                capability="ocr"
+              />
             </div>
 
             {/* Force checkbox with warning */}

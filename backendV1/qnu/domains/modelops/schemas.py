@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from qnu.domains.modelops.capacity.schemas import ModelTokenLimits
+from qnu.domains.modelops.capacity.schemas import ModelTokenLimits, OperationalBudget
 from qnu.domains.modelops.reasoning import ReasoningPolicy
 
 ProviderType = Literal["openai_compatible", "gemini", "local", "nemotron", "paddleocr"]
@@ -85,6 +85,7 @@ class ProviderResponse(BaseModel):
     token_limits: ModelTokenLimits | None = None
     capacity_status: Literal["unknown", "configured", "stale"] = "unknown"
     capacity_basis: Literal["operator_configured", "server_reported"] | None = None
+    operational_budgets: dict[Capability, OperationalBudget] = Field(default_factory=dict)
     embedding_dimension: int | None = None
     embedding_dimension_status: Literal["unknown", "configured", "stale"] = "unknown"
     reasoning: dict[str, Any] | None = None

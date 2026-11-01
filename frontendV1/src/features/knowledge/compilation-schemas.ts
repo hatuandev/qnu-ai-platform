@@ -335,6 +335,21 @@ export function formatCompilationError(
       return "Chưa có yêu cầu review tự động cho lượt này.";
     case "compilation_review_invalid":
       return "Reviewer trả kết quả không đúng schema hoặc thiếu đối chiếu ID.";
+    case "model_token_limits_stale":
+      return "Thông số giới hạn của model đã cũ do mới đổi tên model. Vui lòng cập nhật hoặc xóa giới hạn cũ trong ModelOps.";
+    case "model_input_budget_unknown":
+      return "Chưa xác định được ngân sách đầu vào của model đã chọn.";
+    case "model_output_limit_exceeded":
+      return "Số token đầu ra yêu cầu vượt quá giới hạn tối đa đã khai báo của model.";
+    case "model_context_limit_exceeded":
+      return "Tổng ngữ cảnh và đầu ra vượt quá cửa sổ ngữ cảnh (context window) của model.";
+    case "quota_exceeded":
+    case "provider_rate_limited":
+      return "Hết hạn mức (Quota) hoặc bị giới hạn tần suất (HTTP 429) từ nhà cung cấp AI.";
+    case "provider_timeout":
+      return "Quá thời gian chờ phản hồi từ nhà cung cấp AI (Timeout).";
+    case "provider_response_malformed":
+      return "Model trả về dữ liệu không đúng định dạng JSON/schema yêu cầu.";
     default:
       return (
         fallbackMessage || "Đã xảy ra lỗi trong quá trình xử lý biên soạn."

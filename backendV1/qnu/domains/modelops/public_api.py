@@ -12,7 +12,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from qnu.domains.identity.actor import AuthActor
-from qnu.domains.modelops.capacity.schemas import ModelTokenLimits
+from qnu.domains.modelops.capacity.automatic import operational_budget
+from qnu.domains.modelops.capacity.schemas import ModelTokenLimits, OperationalBudget
 from qnu.domains.modelops.capacity.service import (
     plan_model_request,
     read_capacity,
@@ -60,6 +61,7 @@ class OcrRuntime:
     reasoning_policy: ReasoningPolicy | None = field(default=None, repr=False)
     session_factory: Any = field(default=None, repr=False, compare=False)
     wait_for_completion: bool = False
+    operational_budget: OperationalBudget | None = None
 
     @property
     def execution_scope(self) -> ProviderExecution | None:
@@ -82,6 +84,8 @@ class OcrRuntime:
         }
         if self.wait_for_completion:
             material["wait_for_completion"] = True
+        if self.operational_budget and self.operational_budget.status == "provisional":
+            material["operational_budget"] = self.operational_budget.model_dump()
         return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
 
     def public_dict(self) -> dict[str, Any]:
@@ -95,6 +99,11 @@ class OcrRuntime:
             "timeout_seconds": self.timeout_seconds,
             "configuration_hash": self.configuration_hash,
             **({"wait_for_completion": True} if self.wait_for_completion else {}),
+            **(
+                {"operational_budget": self.operational_budget.model_dump()}
+                if self.operational_budget and self.operational_budget.status == "provisional"
+                else {}
+            ),
         }
 
     def reasoning_directive(self, task: str):
@@ -249,6 +258,7 @@ async def resolve_chat_runtime(
             "Không giải mã được credential chat.", code="chat_credentials_unreadable"
         ) from exc
     capacity = read_capacity(provider)
+    effective = operational_budget(capacity, "chat")
     return ChatRuntime(
         workspace_id=workspace_id,
         session_factory=async_sessionmaker(db.bind, expire_on_commit=False),
@@ -260,8 +270,9 @@ async def resolve_chat_runtime(
         timeout_seconds=provider.timeout_seconds,
         api_key=secret,
         extra=dict(provider.extra_config or {}),
-        token_limits=capacity.token_limits,
-        capacity_status=capacity.status,
+        token_limits=effective.token_limits,
+        capacity_status="provisional" if effective.status == "provisional" else capacity.status,
+        operational_budget=effective,
         reasoning_policy=parse_policy((provider.extra_config or {}).get(EXTRA_CONFIG_KEY)),
         wait_for_completion=_wait_for_completion(provider),
     )

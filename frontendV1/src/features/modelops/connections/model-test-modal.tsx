@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowUpDown,
   Bot,
   CheckCircle2,
@@ -11,6 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ApiProblemError } from "@/app/api/v1";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -30,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { describeDiagnosticFailure } from "../capacity-badge";
 import { useRunDiagnostic } from "../diagnostic-queries";
 import type { Capability, Provider } from "../types";
 
@@ -98,7 +101,8 @@ export function ModelTestModal({
   connectionName: string;
   onUpdated?: () => void;
 }) {
-  const [selectedCapability, setSelectedCapability] = useState<Capability>("chat");
+  const [selectedCapability, setSelectedCapability] =
+    useState<Capability>("chat");
 
   const [result, setResult] = useState<{
     outcome: "ok" | "failed" | "unsupported" | null;
@@ -107,6 +111,10 @@ export function ModelTestModal({
     tokens?: number | null;
     dimension?: number | null;
     observedModel?: string | null;
+    code?: string | null;
+    httpStatus?: number | null;
+    configurationStatus?: "current" | "stale";
+    retryAfter?: string | null;
   }>({ outcome: null });
 
   const runDiagnostic = useRunDiagnostic(model?.id ?? "");
@@ -145,14 +153,29 @@ export function ModelTestModal({
         tokens: check.total_tokens,
         dimension: check.observed_dimension,
         observedModel: check.observed_model,
+        code: check.code,
+        httpStatus: check.http_status,
+        configurationStatus: check.configuration_status,
+        retryAfter: check.retry_after,
       });
     } catch (err: unknown) {
       setResult({
         outcome: "failed",
+        code: err instanceof ApiProblemError ? err.code : null,
+        httpStatus: err instanceof ApiProblemError ? err.status : null,
         detail: err instanceof Error ? err.message : "Kiểm tra thất bại.",
       });
     }
   };
+
+  const failureInfo =
+    result.outcome === "failed"
+      ? describeDiagnosticFailure({
+          code: result.code,
+          httpStatus: result.httpStatus,
+          detail: result.detail,
+        })
+      : null;
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
@@ -185,7 +208,9 @@ export function ModelTestModal({
                 </span>
               </div>
               <Badge variant="outline" className="text-[10px]">
-                {model.capabilities.map((c) => CAPABILITY_CONFIG[c as Capability]?.name ?? c).join(", ")}
+                {model.capabilities
+                  .map((c) => CAPABILITY_CONFIG[c as Capability]?.name ?? c)
+                  .join(", ")}
               </Badge>
             </div>
             <p className="text-[11px] text-muted-foreground font-mono truncate">
@@ -196,7 +221,10 @@ export function ModelTestModal({
           {/* Capability Selector if model has multiple or user wants to switch */}
           {model.capabilities.length > 1 && (
             <div className="space-y-1.5">
-              <label className="text-[11px] font-medium text-muted-foreground">
+              <label
+                htmlFor="model-test-capability"
+                className="text-[11px] font-medium text-muted-foreground"
+              >
                 Chức năng kiểm thử
               </label>
               <Select
@@ -206,7 +234,10 @@ export function ModelTestModal({
                   setResult({ outcome: null });
                 }}
               >
-                <SelectTrigger className="h-8 text-xs">
+                <SelectTrigger
+                  id="model-test-capability"
+                  className="h-8 text-xs"
+                >
                   <SelectValue placeholder="Chọn chức năng..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -247,13 +278,45 @@ export function ModelTestModal({
 
           {/* Result Display */}
           {result.outcome === "ok" && (
-            <Alert className="border-success/40 bg-success/10 p-3.5 space-y-1">
-              <div className="flex items-center gap-2 text-success font-semibold">
-                <CheckCircle2 className="size-4" />
-                <span>Kiểm thử thành công!</span>
+            <Alert
+              className={
+                result.configurationStatus === "stale"
+                  ? "border-warning/40 bg-warning/10 p-3.5 space-y-1"
+                  : "border-success/40 bg-success/10 p-3.5 space-y-1"
+              }
+            >
+              <div
+                className={`flex items-center gap-2 font-semibold ${
+                  result.configurationStatus === "stale"
+                    ? "text-warning"
+                    : "text-success"
+                }`}
+              >
+                {result.configurationStatus === "stale" ? (
+                  <>
+                    <AlertTriangle className="size-4" />
+                    <span>Cần kiểm tra lại (Stale)</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="size-4" />
+                    <span>Kiểm thử thành công!</span>
+                  </>
+                )}
               </div>
               <AlertDescription className="text-foreground text-xs space-y-2 mt-1">
+                {result.configurationStatus === "stale" && (
+                  <p className="text-warning font-medium">
+                    Cấu hình model hoặc giới hạn đã thay đổi sau lần kiểm tra
+                    này. Vui lòng chạy kiểm thử lại.
+                  </p>
+                )}
                 <p>{result.detail}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Mẫu thử chỉ kiểm tra kết nối và phản hồi mẫu; không xác minh
+                  giới hạn token tối đa và không chuyển ngân sách tạm tính thành
+                  đã kiểm chứng.
+                </p>
                 <div className="flex flex-wrap items-center gap-4 text-muted-foreground font-mono text-[11px] pt-1 border-t border-border/60">
                   {result.latencyMs != null && (
                     <span className="flex items-center gap-1">
@@ -277,20 +340,31 @@ export function ModelTestModal({
             </Alert>
           )}
 
-          {result.outcome === "failed" && (
+          {result.outcome === "failed" && failureInfo && (
             <Alert variant="destructive" className="p-3.5 space-y-1">
               <div className="flex items-center gap-2 font-semibold">
                 <XCircle className="size-4" />
-                <span>Kiểm thử thất bại</span>
+                <span>{failureInfo.title}</span>
               </div>
-              <AlertDescription className="text-xs mt-1">
-                {result.detail}
+              <AlertDescription className="text-xs mt-1 space-y-1">
+                <p>{failureInfo.message}</p>
+                {result.code && (
+                  <p className="font-mono text-[11px] opacity-80">
+                    Mã lỗi: {result.code}
+                    {result.httpStatus != null
+                      ? ` · HTTP ${result.httpStatus}`
+                      : ""}
+                  </p>
+                )}
               </AlertDescription>
             </Alert>
           )}
 
           {result.outcome === "unsupported" && (
-            <Alert variant="warning" className="p-3.5 space-y-1 border-amber-500/50 bg-amber-500/10">
+            <Alert
+              variant="warning"
+              className="p-3.5 space-y-1 border-amber-500/50 bg-amber-500/10"
+            >
               <div className="flex items-center gap-2 font-semibold text-amber-600">
                 <XCircle className="size-4" />
                 <span>Chưa hỗ trợ kiểm thử</span>

@@ -1,6 +1,12 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
+- [Phiên793 — Review FE ModelOps792](2026-11-01_phien_793_review_fe_modelops_tu_dong.md):4P2 catalog/confirmation/error mapping/provenance đã tái hiện;53targeted/build/BiomePASS,full611/26exact0new7fixed705; chưa sửa sản phẩm hoặc gọi model thật.
+
+- [Phiên792 — FE ModelOps ngân sách tự động](2026-11-01_phien_792_fe_modelops_ngan_sach_tu_dong.md): tạo/khám phá model không bắt nhập token limits, tách giới hạn model với `operational_budgets`, xóa khai báo tay, thông báo consumer & phân loại lỗi; 10 file test ModelOps (53PASS), build/TS/Biome 21 file PASS, full FE 611PASS/26FAIL nền. Giữ BE791 và phiên live.
+
+- [Phiên791 — BE ModelOps tự động và prompt FE](2026-11-01_phien_791_modelops_ngan_sach_tu_dong.md): operational budget tách declaration, cache discovery hợp lệ, nguồn từng trường; API38PASS/targeted63/RuffPASS, full658PASS1FAIL716/74SKIP. Chưa FE/model thật/restart.
+
 - [Phiên790 — Ngữ cảnh chunk và phạm vi có nguồn](2026-11-01_phien_790_rag_ngu_canh_va_pham_vi.md): metadata đúng target, index opt-in/glossary/catalog/hỏi lại/UI/promptv14; API7PASS, unit645/1FAILnền, FE594/33FAILexact789. Chưa reindex/chạy model thật.
 
 - [Phiên789 — F14/MX-05 và trả lời hỗn hợp](2026-11-01_phien_789_dieu_kien_va_tra_loi_hon_hop.md): promptv13/source-order/citationclosure/schema theo nguồn/reference facet;v13 **8PASS1UNCERTAIN**,F14/MX-05PASS,I25-04processinterruptedkhônggửilại. Giữv11/v12FAIL,khônggộpkếtquả;630unitPASS1FAILnền/API66PASS/FE591PASS33FAIL.

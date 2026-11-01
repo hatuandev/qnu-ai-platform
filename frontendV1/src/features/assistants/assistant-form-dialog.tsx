@@ -59,6 +59,7 @@ import type {
   AssistantUpdateInput,
 } from "@/features/assistants/types";
 import { useCollectionsQuery } from "@/features/knowledge/queries";
+import { ConsumerModelBudgetNotice } from "@/features/modelops/capacity-badge";
 import { useCatalogQuery } from "@/features/modelops/queries";
 import { toRagPolicy, toRagPolicyForm } from "@/features/rag/schemas";
 import {
@@ -136,7 +137,7 @@ export function AssistantFormDialog({
       expected_revision: assistant?.revision ?? 1,
     },
     validators: {
-      onSubmit: assistantFormSchema,
+      onSubmit: assistantFormSchema as never,
     },
     onSubmit: async ({ value }) => {
       setServerError(null);
@@ -592,6 +593,12 @@ export function AssistantFormDialog({
                           ? "Hệ thống sẽ dùng model chat mặc định được gán cho workspace này."
                           : "Chỉ định provider cụ thể trong số các provider có capability chat được cấp phép."}
                       </FieldDescription>
+                      <ConsumerModelBudgetNotice
+                        model={chatCatalog.find(
+                          (item) => item.id === field.state.value,
+                        )}
+                        capability="chat"
+                      />
                       {error ? <FieldError>{error}</FieldError> : null}
                     </Field>
                   );

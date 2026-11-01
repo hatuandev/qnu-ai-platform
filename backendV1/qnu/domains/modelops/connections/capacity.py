@@ -36,6 +36,18 @@ async def current_discovery(
     return latest
 
 
+async def cached_metadata(
+    db: AsyncSession, actor: AuthActor, parent: Provider, model_name: str
+) -> tuple[DiagnosticCheck, DiscoveredModel] | None:
+    """Use only the latest successful, identity-matched snapshot; never send HTTP."""
+    checks = (await read_diagnostics(db, parent.id, actor)).checks
+    latest = next((check for check in checks if check.kind == "discovery"), None)
+    if latest is None or latest.outcome != "ok" or latest.configuration_status != "current":
+        return None
+    row = next((item for item in latest.model_metadata if item.id == model_name), None)
+    return (latest, row) if row else None
+
+
 def metadata_for(check: DiagnosticCheck, model_name: str) -> DiscoveredModel:
     row = next((item for item in check.model_metadata if item.id == model_name), None)
     if row is None:
@@ -121,6 +133,13 @@ def apply_metadata(
     ):
         return
     if limits and (row.context_window_tokens or row.max_output_tokens):
-        set_capacity(model, limits, basis="server_reported")
+        sources = {
+            field: state.field_sources.get(field, state.basis or "operator_configured")
+            for field in limits.model_dump(exclude_none=True)
+        }
+        for field in ("context_window_tokens", "max_output_tokens"):
+            if getattr(row, field) is not None:
+                sources[field] = "server_reported"
+        set_capacity(model, limits, basis="server_reported", field_sources=sources)
     model.extra_config = {**(model.extra_config or {}), "capacity_discovery_v1": source}
     record_event(db, actor, "provider.capacity.synced", model.id, [check.id])

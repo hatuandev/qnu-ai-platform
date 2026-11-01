@@ -13,6 +13,7 @@ from sqlalchemy.orm import aliased
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.modelops.access import require_model_admin
 from qnu.domains.modelops.audit import record_event
+from qnu.domains.modelops.capacity.automatic import operational_budget
 from qnu.domains.modelops.capacity.schemas import CapacityBasis
 from qnu.domains.modelops.capacity.service import invalidate_capacity, read_capacity, set_capacity
 from qnu.domains.modelops.embedding.configuration import read_dimension, set_dimension
@@ -260,6 +261,10 @@ def provider_payload(provider: Provider) -> dict[str, Any]:
         "token_limits": capacity.token_limits.model_dump() if capacity.token_limits else None,
         "capacity_status": capacity.status,
         "capacity_basis": capacity.basis,
+        "operational_budgets": {
+            capability: operational_budget(capacity, capability).model_dump(mode="json")
+            for capability in (provider.capabilities or [])
+        },
         "embedding_dimension": dimension,
         "embedding_dimension_status": dimension_status,
         "reasoning": policy.public_dict() if policy is not None else None,

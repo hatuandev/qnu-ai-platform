@@ -7,6 +7,8 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [V1 — Ngân sách ModelOps tự động](./V1_MODELOPS_NGAN_SACH_TU_DONG.md): thêm model không bắt nhập context, nguồn thông số và giới hạn ngân sách tạm tính.
+
 - [V1 — Ngữ cảnh chunk và phạm vi có bằng chứng](./V1_RAG_NGU_CANH_VA_PHAM_VI.md): recipe có phiên bản, nhận diện scope, hỏi lại, glossary và kiểm chứng trước khi áp dụng.
 
 - [V1 — Chạy tiếp sau tắt máy hoặc test mới từ đầu](./V1_QUY_TRINH_TEST_LAI.md): hai cách chạy, thứ tự14chặng, cấu hình đang dùng và giải thích ba nhận xét hình ảnh.

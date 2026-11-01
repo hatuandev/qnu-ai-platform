@@ -53,7 +53,8 @@ async def inspect(
         try:
             runtime = await resolver(db, workspace_id)
             checks[name] = {
-                "ok": runtime.capacity_status == "configured",
+                "ok": runtime.capacity_status in ("configured", "provisional"),
+                "budget_status": runtime.capacity_status,
                 "provider_id": runtime.provider_id,
                 "model": runtime.model_name,
                 "inference_verified": False,

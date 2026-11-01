@@ -228,19 +228,26 @@ async def add_model(
         "operator_configured",
         None,
     )
-    if req.discovery_check_id:
+    if req.discovery_check_id or (limits is None and dimension is None):
         from qnu.domains.modelops.connections.capacity import (
+            cached_metadata,
             current_discovery,
             merge_limits,
             metadata_for,
             source_for,
         )
 
-        check = await current_discovery(db, actor, parent, req.discovery_check_id)
-        metadata = metadata_for(check, req.model_name)
-        limits = merge_limits(None, metadata)
-        dimension = metadata.embedding_dimension if "embedding" in req.capabilities else None
-        basis, source = "server_reported", source_for(check, metadata)
+        cached = None
+        if req.discovery_check_id:
+            check = await current_discovery(db, actor, parent, req.discovery_check_id)
+            cached = check, metadata_for(check, req.model_name)
+        else:
+            cached = await cached_metadata(db, actor, parent, req.model_name)
+        if cached:
+            check, metadata = cached
+            limits = merge_limits(None, metadata)
+            dimension = metadata.embedding_dimension if "embedding" in req.capabilities else None
+            basis, source = "server_reported", source_for(check, metadata)
     # ProviderCreateRequest applies existing capability/capacity validations.
     model = await provider_service.create(
         db,

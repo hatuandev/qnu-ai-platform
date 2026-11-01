@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import replace
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.modelops.capacity.automatic import capacity_identity
 from qnu.domains.modelops.capacity.schemas import RequestTokenBudget
 from qnu.domains.modelops.public_api import ChatRuntime, plan_model_request, resolve_chat_runtime
 from qnu.domains.modelops.resilience.routing import choose_target
@@ -78,15 +78,13 @@ async def prepare_chat_limits(
     )
     runtime = await resolve_chat_runtime(db, workspace_id, provider_id)
     runtime = replace(runtime, routing_trace=routing)
-    material = {
-        "provider_id": runtime.provider_id,
-        "endpoint": runtime.base_url.rstrip("/"),
-        "model_name": runtime.model_name,
-        "limits": runtime.token_limits.model_dump() if runtime.token_limits else None,
-    }
-    current = hashlib.sha256(
-        json.dumps(material, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    current = capacity_identity(
+        runtime.provider_id,
+        runtime.base_url,
+        runtime.model_name,
+        runtime.token_limits,
+        runtime.operational_budget,
+    )
     if current != snapshot.configuration_hash:
         raise Conflict("Model thay đổi trong lúc lập ngân sách.", code="chat_provider_changed")
     return runtime, budget
@@ -121,15 +119,13 @@ async def prepare_chat_request(
     effective_reasoning_task = reasoning_task or (task if isinstance(task, str) else None)
     if reasoning is None and effective_reasoning_task is not None:
         reasoning = runtime.reasoning_directive(effective_reasoning_task)
-    material = {
-        "provider_id": runtime.provider_id,
-        "endpoint": runtime.base_url.rstrip("/"),
-        "model_name": runtime.model_name,
-        "limits": runtime.token_limits.model_dump() if runtime.token_limits else None,
-    }
-    current = hashlib.sha256(
-        json.dumps(material, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    current = capacity_identity(
+        runtime.provider_id,
+        runtime.base_url,
+        runtime.model_name,
+        runtime.token_limits,
+        runtime.operational_budget,
+    )
     if current != snapshot.configuration_hash:
         raise Conflict("Model thay đổi trong lúc lập ngân sách.", code="chat_provider_changed")
     return (

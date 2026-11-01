@@ -2,6 +2,8 @@
 
 Áp dụng cho `backendV1/` và `frontendV1/`, Context702 ngày 28/10/2026.
 
+Cập nhật BE Context791: giới hạn token khi thêm model là tùy chọn; runtime text có ngân sách dự phòng được ghi rõ provisional. Xem [ngân sách tự động](V1_MODELOPS_NGAN_SACH_TU_DONG.md) và [prompt hoàn thiện FE](../ke_hoach/PROMPT_FE_MODELOPS_TU_DONG_791.md). Ngân sách tạm không phải thông số model đã đo; OCR ảnh/dimension vẫn có điều kiện riêng. Phần luồng UI dưới đây mô tả phiên702/733, chưa phải kết quả nghiệm thu FE791.
+
 ## Luồng sử dụng
 
 1. Mở **ModelOps → Nhà cung cấp → Thêm nhà cung cấp**. Chọn OpenAI / ChatGPT, Google Gemini, Server AI QNU hoặc nhà cung cấp khác; nhập tên và địa chỉ API. Chưa cần model hoặc API key ở bước tạo.
