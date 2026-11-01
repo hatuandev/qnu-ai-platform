@@ -8,9 +8,16 @@ const session = vi.hoisted(() => ({
   authenticated: true,
   scope: {} as { workspaceId?: string; collectionId?: string },
 }));
-vi.mock("@/app/auth/v1", () => ({
-  useV1Auth: () => ({ isAuthenticated: session.authenticated }),
-}));
+vi.mock("@/app/auth/v1", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/app/auth/v1")>();
+  return {
+    ...actual,
+    useV1Auth: () => ({
+      isAuthenticated: session.authenticated,
+      actor: session.authenticated ? { roles: ["AI.Admin"] } : null,
+    }),
+  };
+});
 vi.mock("@/navigation/use-feature-scope", () => ({
   useFeatureScope: () => session.scope,
 }));
@@ -64,21 +71,8 @@ afterEach(() => {
 
 test("without workspace the available actions guide the user to workspace selection", () => {
   render(<WorkspaceSidebar />);
-  for (const group of ["Tri thức", "Trợ lý", "Quản trị", "Vận hành"]) {
-    expect(screen.getByText(group)).toBeTruthy();
-  }
-  for (const label of [
-    "Kho tri thức",
-    "OCR & chính tả",
-    "Biên soạn",
-    "Tìm kiếm",
-    "Hỏi đáp",
-    "Đánh giá RAG",
-    "Trợ lý AI",
-    "Hội thoại",
-    "Thành viên",
-    "Sao lưu",
-  ]) {
+  expect(screen.getByText("Điều hướng")).toBeTruthy();
+  for (const label of ["Kho tri thức", "Trợ lý AI", "Hội thoại", "Tác vụ"]) {
     expect(
       screen.getByRole("link", { name: label }).getAttribute("data-route"),
     ).toBe("/workspaces/choose/$feature");
@@ -99,12 +93,12 @@ test("workspace shortcuts use the selected workspace and operations view", () =>
       workspaceId: "ws-example",
     },
   );
-  const backups = screen.getByRole("link", { name: "Sao lưu" });
-  expect(JSON.parse(backups.getAttribute("data-search") ?? "null").view).toBe(
-    "backups",
+  const jobs = screen.getByRole("link", { name: "Tác vụ" });
+  expect(JSON.parse(jobs.getAttribute("data-search") ?? "null").view).toBe(
+    "jobs",
   );
   expect(
-    JSON.parse(backups.getAttribute("data-params") ?? "null").workspaceId,
+    JSON.parse(jobs.getAttribute("data-params") ?? "null").workspaceId,
   ).toBe("ws-example");
 });
 

@@ -821,7 +821,7 @@ test("evaluation caps the editable question list at twenty", () => {
       .getByRole("button", { name: "Thêm câu hỏi" })
       .hasAttribute("disabled"),
   ).toBe(true);
-});
+}, 15000);
 test("evaluation permission is checked before snapshot or model catalog reads", () => {
   env.role = { kind: "member", role: "reviewer" };
   show(

@@ -46,14 +46,18 @@ vi.mock("@/features/knowledge/queries", () => ({
     data: { items: [{ id: "col-test", name: "Kho thử" }], meta: { total: 1 } },
   }),
 }));
-vi.mock("@/app/auth/v1", () => ({
-  useV1Auth: () => ({
-    isAuthenticated: true,
-    sessionId: 1,
-    actor: { roles: ["AI.Admin"] },
-  }),
-  isPlatformWorkspaceAdmin: () => true,
-}));
+vi.mock("@/app/auth/v1", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/app/auth/v1")>();
+  return {
+    ...actual,
+    useV1Auth: () => ({
+      isAuthenticated: true,
+      sessionId: 1,
+      actor: { roles: ["AI.Admin"] },
+    }),
+    isPlatformWorkspaceAdmin: () => true,
+  };
+});
 vi.mock("@/components/ui/sidebar", () => ({
   SidebarGroup: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
@@ -97,18 +101,26 @@ test("clicking the sidebar opens the chosen feature selection page", async () =>
     path: "/choose/$feature",
     getParentRoute: () => workspaces,
   } as never);
+  const knowledge = createRoute({
+    getParentRoute: () => workspaces,
+    path: "/$workspaceId/knowledge",
+    component: () => <p>Trang kho tri thức</p>,
+  });
   const router = createRouter({
-    routeTree: root.addChildren([home, workspaces.addChildren([choose])]),
+    routeTree: root.addChildren([
+      home,
+      workspaces.addChildren([choose, knowledge]),
+    ]),
     history: createMemoryHistory({ initialEntries: ["/"] }),
   });
   render(<RouterProvider router={router} />);
-  fireEvent.click(await screen.findByRole("link", { name: "Biên soạn" }));
+  fireEvent.click(await screen.findByRole("link", { name: "Kho tri thức" }));
   await waitFor(() =>
-    expect(router.state.location.pathname).toBe("/workspaces/choose/compiler"),
+    expect(router.state.location.pathname).toBe(
+      "/workspaces/ws-test/knowledge",
+    ),
   );
-  expect(
-    await screen.findByRole("link", { name: "Chọn Workspace thử" }),
-  ).toBeTruthy();
+  expect(await screen.findByText("Trang kho tri thức")).toBeTruthy();
 });
 
 test.each([

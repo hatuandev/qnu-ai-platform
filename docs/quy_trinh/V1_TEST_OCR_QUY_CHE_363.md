@@ -1,0 +1,68 @@
+# Kiểm tra PDF scan Quy chế tuyển sinh 363
+
+Chặng này kiểm riêng OCR, không thay bộ 53 câu, collection đã xuất bản hoặc index hiện tại.
+
+Nguồn: `docs/tai_lieu/tuyen_sinh/Quy chế tuyển sinh đại học 2026 - 363.pdf`, 32 trang,
+SHA256 `59444d277a5e904808537ce70544c1fc83c0bf0a2f2653b78af362af59d5cccc`.
+PDF không có lớp chữ. Nhãn trong `frontendV1/e2e/data/admissions-scan-ocr.json`
+là mẫu được đối chiếu ảnh ở 7 trang, không phải bản chép đủ để tính CER/WER.
+
+## Chạy
+
+Giữ phiên E2E live đang có. Cần `provider-setup`, `model-discovery`, `model-ocr`,
+`navigation` đạt và `serve` đã nạp mã backend hiện tại. Không cần cleanup/init hoặc
+chạy lại compiler/review của các tài liệu cũ.
+
+```powershell
+.\test-v1-e2e.ps1 run admissions-scan-ocr --headed
+```
+
+Chặng upload vào collection thử riêng, lưu raw OCR, canonical JSON, Markdown,
+manifest và báo cáo. Lượt đã có được đọc lại, không tự gọi lại model khi chất lượng
+không đạt. Mỗi report nằm trong thư mục `runs` riêng của phiên.
+
+Thí nghiệm thay mật độ ảnh phải được chọn rõ ràng, ví dụ:
+
+```powershell
+.\test-v1-e2e.ps1 run admissions-scan-ocr --headed --ocr-dpi 176
+```
+
+176 DPI phù hợp kích thước PDF này trong biên ảnh 1664 × 2048 đang khai báo; không
+phải mặc định cho mọi PDF/model. API vẫn kiểm ngân sách và giới hạn ảnh. Lượt DPI
+khác tạo thế hệ có cấu hình ghim riêng; checkpoint giữ lượt đầu và `experiments`.
+Không gỡ cờ `dispatched` khi chưa rõ kết quả để gửi lại.
+
+## Đọc kết quả
+
+- `technical_pass`: đủ trang, đúng hash, có nội dung, bbox hợp lệ và evidence mapping.
+- `sample_quality_pass`: chữ trên các mẫu đúng dấu, số, ký hiệu; bảng có cấu trúc và ô rỗng.
+- HTTP hoàn tất không chứng minh OCR chính xác. Chặng vẫn FAIL khi mẫu chữ hoặc bảng sai.
+- `column_spec_reconciled` là cảnh báo cần đối chiếu: các hàng cùng số ô nhưng khai báo
+  số cột mâu thuẫn. Parser v2 giữ ô và raw, không tự sửa chính tả hay đoán bảng lệch hàng.
+
+Nemotron được gọi bằng alias trong ModelOps. Tên model gốc/revision cần căn cứ vận
+hành; alias riêng không chứng minh checkpoint nào đang chạy. Tham khảo
+[model card NVIDIA](https://huggingface.co/nvidia/Nemotron-3.5-Parse) để đối chiếu
+prompt và giới hạn hình ảnh.
+
+## Chính tả và các bước sau
+
+Ứng dụng đã có luồng `text-review/checks` → gợi ý → lưu `text-review`. Lượt kiểm tra
+chính tả tự nó không ghi văn bản. Phiên test797 được người dùng cho phép áp dụng
+các gợi ý hợp lệ tự động, chỉ với nguồn thử này; không đổi quy trình hoặc mặc định UI.
+
+Lưu thay đổi qua API hiện có với version/hash trước sửa và idempotency key. Giữ số,
+mã, năm, đơn vị; không tự điền ô trống hoặc sửa cấu trúc bảng bằng chính tả. Giữ raw
+và canonical gốc; bản sửa là JSON/Markdown dẫn xuất có version riêng. Compiler nhận
+`text_versions[ocr_run_id]` của bản đã lưu. Kết quả OCR gốc và bản sau sửa phải báo
+riêng, không thay nhãn tham chiếu để đạt PASS.
+
+Kiểm tra chính tả dùng JSON Schema và giới hạn evidence ID trong các đoạn đã chọn
+(`qnu.ocr.spelling/v3`). Máy chủ kiểm vị trí bằng chuỗi gốc khớp chính xác; chỉ căn
+lại vị trí khi chuỗi xuất hiện duy nhất, hoặc mọi lần xuất hiện đều được đề xuất một
+lần với cùng bản sửa. Chuỗi mơ hồ, khác số, chồng lấn hoặc không thuộc đoạn nguồn
+vẫn bị chặn. Không có fuzzy match hoặc từ điển sửa theo câu test.
+
+ModelOps hỗ trợ cấu hình reasoning riêng cho tác vụ `ocr_review`; thêm khả năng này
+không tự tắt reasoning cho provider. Lượt test797 tạm dùng chính sách đã khai báo
+để tắt suy luận, giữ nguyên nhà cung cấp/model và các tác vụ khác.

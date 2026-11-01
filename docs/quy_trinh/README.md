@@ -7,6 +7,8 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [V1 — Kiểm tra OCR PDF scan Quy chế 363](./V1_TEST_OCR_QUY_CHE_363.md): nguồn 32 trang, kiểm mẫu chữ/bảng, thí nghiệm DPI riêng và lưu bản sửa chính tả.
+
 - [V1 — Ngân sách ModelOps tự động](./V1_MODELOPS_NGAN_SACH_TU_DONG.md): thêm model không bắt nhập context, nguồn thông số và giới hạn ngân sách tạm tính.
 
 - [V1 — Ngữ cảnh chunk và phạm vi có bằng chứng](./V1_RAG_NGU_CANH_VA_PHAM_VI.md): recipe có phiên bản, nhận diện scope, hỏi lại, glossary và kiểm chứng trước khi áp dụng.

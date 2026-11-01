@@ -60,6 +60,7 @@ import {
   type Capability,
   type Provider,
   type ProviderType,
+  type ProviderUpdateInput,
 } from "@/features/modelops/types";
 import { getFormErrorMessage } from "@/lib/form-errors";
 import { useTransportRegistry } from "./resilience-queries";
@@ -87,6 +88,8 @@ export function ProviderFormDialog({
   const [serverError, setServerError] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [confirmClearLimits, setConfirmClearLimits] = useState(false);
+  const [pendingClearLimitsPatch, setPendingClearLimitsPatch] =
+    useState<ProviderUpdateInput | null>(null);
   const [providerType, setProviderType] = useState<ProviderType>(
     provider?.provider_type ?? "openai_compatible",
   );
@@ -148,8 +151,14 @@ export function ProviderFormDialog({
             onOpenChange(false);
             return;
           }
+          if (patch.token_limits === null && provider.token_limits !== null) {
+            setPendingClearLimitsPatch(patch);
+            setConfirmClearLimits(true);
+            return;
+          }
           await updateMutation.mutateAsync(patch);
           toast.success("Đã cập nhật provider.");
+          onOpenChange(false);
         } else {
           const limits = tokenLimitsFromDraft(capacity);
           const dimension = embeddingDimensionFromDraft(capacity);
@@ -178,6 +187,7 @@ export function ProviderFormDialog({
   });
 
   useEffect(() => {
+    setPendingClearLimitsPatch(null);
     if (open) {
       const cap = provider ? draftFromProvider(provider) : EMPTY_CAPACITY_DRAFT;
       setProviderType(provider?.provider_type ?? "openai_compatible");
@@ -200,13 +210,16 @@ export function ProviderFormDialog({
     if (!provider) return;
     setServerError(null);
     try {
-      await updateMutation.mutateAsync(buildClearTokenLimitsPatch());
+      const patch = pendingClearLimitsPatch ?? buildClearTokenLimitsPatch();
+      await updateMutation.mutateAsync(patch);
       toast.success(
         "Đã xóa khai báo giới hạn; model chuyển sang dùng ngân sách vận hành tự động.",
       );
+      setPendingClearLimitsPatch(null);
       setConfirmClearLimits(false);
       onOpenChange(false);
     } catch (error) {
+      setPendingClearLimitsPatch(null);
       setConfirmClearLimits(false);
       setServerError(
         error instanceof ApiProblemError
@@ -222,7 +235,11 @@ export function ProviderFormDialog({
     <ResponsiveDialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) setServerError(null);
+        if (!next) {
+          setServerError(null);
+          setPendingClearLimitsPatch(null);
+          setConfirmClearLimits(false);
+        }
         onOpenChange(next);
       }}
     >
@@ -567,7 +584,10 @@ export function ProviderFormDialog({
                       size="sm"
                       className="h-8 shrink-0 gap-1.5 text-xs"
                       disabled={isSubmitting}
-                      onClick={() => setConfirmClearLimits(true)}
+                      onClick={() => {
+                        setPendingClearLimitsPatch(null);
+                        setConfirmClearLimits(true);
+                      }}
                     >
                       <RotateCcw className="size-3.5" />
                       <span>Xóa khai báo giới hạn</span>
@@ -772,7 +792,10 @@ export function ProviderFormDialog({
         <ConfirmDialog
           open={confirmClearLimits}
           onOpenChange={(next) => {
-            if (!isSubmitting) setConfirmClearLimits(next);
+            if (!isSubmitting) {
+              setConfirmClearLimits(next);
+              if (!next) setPendingClearLimitsPatch(null);
+            }
           }}
           title="Xóa giới hạn token đã khai báo?"
           description={

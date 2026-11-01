@@ -46,8 +46,25 @@ import {
   type Capability,
   PROVIDER_TYPE_LABELS,
   type Provider,
+  type TokenLimits,
 } from "@/features/modelops/types";
 import { formatDateTimeValue } from "@/lib/date-utils";
+
+function resolveFieldSource(
+  provider: Provider,
+  field: keyof TokenLimits,
+): BudgetSource | null {
+  if (provider.field_sources?.[field]) {
+    return provider.field_sources[field];
+  }
+  if (provider.operational_budgets) {
+    for (const budget of Object.values(provider.operational_budgets)) {
+      const src1 = budget?.sources?.[field];
+      if (src1) return src1;
+    }
+  }
+  return provider.capacity_basis ?? null;
+}
 
 function LimitRow({
   label,
@@ -212,7 +229,7 @@ export function CapacityPanel({
               value={formatTokenLimitValue(limits?.context_window_tokens)}
               source={
                 limits?.context_window_tokens != null
-                  ? provider.capacity_basis
+                  ? resolveFieldSource(provider, "context_window_tokens")
                   : null
               }
             />
@@ -221,7 +238,7 @@ export function CapacityPanel({
               value={formatTokenLimitValue(limits?.max_input_tokens)}
               source={
                 limits?.max_input_tokens != null
-                  ? provider.capacity_basis
+                  ? resolveFieldSource(provider, "max_input_tokens")
                   : null
               }
             />
@@ -230,7 +247,7 @@ export function CapacityPanel({
               value={formatTokenLimitValue(limits?.max_output_tokens)}
               source={
                 limits?.max_output_tokens != null
-                  ? provider.capacity_basis
+                  ? resolveFieldSource(provider, "max_output_tokens")
                   : null
               }
             />
@@ -261,7 +278,7 @@ export function CapacityPanel({
                 <LimitRow
                   label="input_tokens_upper_bound"
                   value={formatTokenLimitValue(ocr.input_tokens_upper_bound)}
-                  source={provider.capacity_basis}
+                  source={resolveFieldSource(provider, "ocr_page_input")}
                 />
                 <LimitRow label="prompt_sha256" value={ocr.prompt_sha256} />
               </dl>

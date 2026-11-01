@@ -92,6 +92,15 @@ export interface Checkpoint {
       error_code?: string;
     }[];
   };
+  scanOcr?: {
+    collection?: string;
+    source?: Source;
+    uploadDispatched?: boolean;
+    providerId?: string;
+    modelName?: string;
+    providerSnapshotSha256?: string;
+    experiments?: Record<string, { dispatched: boolean; source?: Source }>;
+  };
   assistant?: string;
   conversation?: string;
   deletion?: string;

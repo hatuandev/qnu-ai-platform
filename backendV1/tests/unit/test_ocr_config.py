@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from qnu.domains.ocr.config import (
@@ -25,7 +27,10 @@ BASE = ProcessingConfig(
 
 
 def test_fingerprint_is_stable_for_the_same_config() -> None:
-    assert BASE.fingerprint == processing_config(Settings()).fingerprint
+    current = processing_config(Settings(_env_file=None))
+    assert current == replace(BASE, table_layout_version="nemotron-tabular/v2")
+    assert current.fingerprint == processing_config(Settings(_env_file=None)).fingerprint
+    assert current.fingerprint != BASE.fingerprint
 
 
 @pytest.mark.parametrize(
@@ -116,4 +121,5 @@ def test_pdf_keeps_legacy_fingerprint() -> None:
             ensure_ascii=False,
         ).encode()
     ).hexdigest()
-    assert processing_config(Settings(_env_file=None), ".pdf").fingerprint == expected
+    assert config_from_run(config_payload(BASE)).fingerprint == expected
+    assert processing_config(Settings(_env_file=None), ".pdf").fingerprint != expected

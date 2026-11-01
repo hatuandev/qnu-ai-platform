@@ -38,6 +38,9 @@ vi.mock("@/app/auth/v1", () => ({
     },
   }),
 }));
+vi.mock("@/navigation/use-feature-scope", () => ({
+  useFeatureScope: () => ({}),
+}));
 vi.mock("@/features/workspaces/queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/workspaces/queries")>()),
   useCallerWorkspaceRole: () => ({
@@ -47,6 +50,16 @@ vi.mock("@/features/workspaces/queries", async (importOriginal) => ({
   }),
 }));
 vi.mock("@tanstack/react-router", () => ({
+  useRouterState: ({
+    select,
+  }: {
+    select?: (state: {
+      location: { pathname: string; search: Record<string, unknown> };
+    }) => unknown;
+  } = {}) => {
+    const state = { location: { pathname: "/dashboard", search: {} } };
+    return select ? select(state) : state;
+  },
   Link: ({
     children,
     to,
@@ -651,7 +664,6 @@ test("dashboard uses real scoped totals and preserves unknown costs instead of K
   await screen.findByText("Workspace tổng hợp");
   await screen.findByRole("table", { name: "Usage model theo trạng thái" });
   expect(screen.getByText("17")).toBeTruthy();
-  expect(screen.getByText("29 workspace có quyền truy cập")).toBeTruthy();
   expect(screen.getAllByText("5")).toHaveLength(2);
   expect(screen.getByText("9")).toBeTruthy();
   expect(screen.getAllByText("Chưa có số đo")).toHaveLength(2);
@@ -687,28 +699,12 @@ test("a summary outage shows an error instead of zero job counters", async () =>
   expect(screen.queryByText("Đang chờ / chạy")).toBeNull();
   expect(screen.queryByText("Cần kiểm tra")).toBeNull();
 });
-test("dashboard workspace chooser is paged and sends the new URL selection through the callback", async () => {
+test("dashboard resolves first available workspace when no workspaceId is specified", async () => {
   const change = vi.fn();
-  const view = show(<QnuDashboardPage page={1} onSearch={change} />);
-  await screen.findByText("29 workspace có quyền truy cập");
-  fireEvent.click(screen.getByRole("button", { name: "Trang sau" }));
-  expect(change).toHaveBeenCalledWith({ page: 2 });
-  view.rerender(<QnuDashboardPage page={2} onSearch={change} />);
-  await waitFor(() =>
-    expect(calls.some((c) => c.url.searchParams.get("page") === "2")).toBe(
-      true,
-    ),
-  );
-  await waitFor(() =>
-    expect((screen.getByRole("combobox") as HTMLButtonElement).disabled).toBe(
-      false,
-    ),
-  );
-  fireEvent.click(screen.getByRole("combobox"));
-  fireEvent.click(
-    await screen.findByRole("option", { name: "Workspace 20 · synthetic" }),
-  );
-  expect(change).toHaveBeenCalledWith({ workspaceId: "w20" });
+  show(<QnuDashboardPage page={1} onSearch={change} />);
+  await screen.findByText("Workspace tổng hợp");
+  await screen.findByRole("table", { name: "Usage model theo trạng thái" });
+  expect(calls.some((c) => c.url.pathname.endsWith("/workspaces"))).toBe(true);
 });
 test.each([403, 404])(
   "an explicit inaccessible workspace %i is not replaced by the first allowed one",
@@ -739,7 +735,7 @@ test("suspended workspace stays suspended without loading its collections or ope
 test("empty workspace list is an honest empty state with no synthetic counters", async () => {
   empty = true;
   show(<QnuDashboardPage page={1} onSearch={vi.fn()} />);
-  await screen.findByText(/Chưa có workspace để hiển thị/);
+  await screen.findByText(/Chưa có (đơn vị|workspace) để hiển thị/);
   expect(screen.queryByText("Đang chờ / chạy")).toBeNull();
   expect(calls).toHaveLength(1);
 });

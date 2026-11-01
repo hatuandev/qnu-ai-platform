@@ -21,7 +21,7 @@ PROMPT_VERSION = "nemotron-parse/v1"
 CANONICAL_SCHEMA = "qnu.ocr.document/v1"
 MANIFEST_SCHEMA = "qnu.ocr.manifest/v1"
 MARKDOWN_VERSION = "qnu.ocr.markdown/v1"
-TABLE_LAYOUT_VERSION = "nemotron-tabular/v1"
+TABLE_LAYOUT_VERSION = "nemotron-tabular/v2"
 
 OCR_PROMPT = "</s><s><predict_bbox><predict_classes><output_markdown><predict_text_in_pic>"
 

@@ -1,6 +1,20 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
+- [Phiên799 — Chẩn đoán AI sửa chính tả sai nghĩa](2026-11-01_phien_799_chan_doan_sua_chinh_ta_sai_nghia.md): đối chiếu trang15; đúng `cấp cơ bản`, AI sửa sai `bán → huyên`; chưa sửa ứng dụng hoặc DB.
+
+- [Phiên 799 — Rà soát chính tả 32 trang và compiler lại Quy chế 363](2026-11-01_phien_799_ra_soat_chinh_ta_va_compiler_363.md): Rà soát 32 trang đối chiếu ảnh gốc, sửa 55 lỗi chính tả tại 42 units; lưu Version 28 qua API text-review; chạy compiler `cmp_9d0b9f63f911` hoàn tất 8/8 phần (304s, 38 mục, 644 citations); giữ cảnh báo bảng trang 32; chưa xuất bản, lập chỉ mục hoặc chạy lại F01–F19.
+
+- [Phiên798 — Xem OCR MD/JSON có đánh dấu](2026-11-01_phien_798_xem_ocr_md_json_danh_dau.md):32trang,170gợi ý đã sửa +1lỗi đối chiếu ảnh,40gợi ý bị loại tách riêng; giữ chữ gốc, không gọi model mới hoặc đổi ứng dụng.
+
+- [Phiên797 — Fix3P2 và OCR scan363](2026-11-01_phien_797_fix_p2_va_test_ocr_363.md): FE663/0; OCR32trang, sửaAIversion27 vàcompiler8/8xong; chấtlượngmẫu15/16chữ1/2bảng,chưađạthoàntoàn. FullBE1FAILcũ716; giữ53câu/index,policyđãrestore.
+
+- [Phiên 796 — Review độc lập bản sửa795](2026-11-01_phien_796_review_fix_fe_795.md): FE651/0, build/Biome/Ruff và API4 PASS; còn3 P2 pending patch cũ/nguồn OCR/fixture sai hợp đồng19 lỗi kiểu. Full unit655/1 FAIL cũ716; giữ live, chưa sửa ứng dụng.
+
+- [Phiên 795 — Khắc phục 4 P2 ModelOps và 26 frontend test về 0 FAIL](2026-11-01_phien_795_fix_fe_26_test_va_4_p2.md): sửa triệt để 4 khiếm khuyết ModelOps (P2-1 catalog wire, P2-2 clear confirmation, P2-3 error mapping, P2-4 field provenance); sửa toàn bộ 26 test FAIL (32/32 final functions, 13/13 knowledge actions, 21/21 scope, 3/3 sidebar, 7/7 nav, 6/6 rag, 19/19 lifecycle, 30/30 maintenance/eval, 4/4 capacity); thêm 14 test hồi quy P2; full Vitest 95/95 suites (651/651 tests PASS, 0 FAIL); Biome & Build PASS; backend Ruff & 170 pytest PASS; bảo toàn E2E session 93faa11f0caf.
+
+- [Phiên 794 — Prompt sửa 26 test FE và 4 P2](2026-11-01_phien_794_prompt_fix_fe_26_va_4_p2.md): bàn giao đầy đủ tình huống lỗi, thứ tự sửa và tiêu chí kiểm chứng; chỉ sửa tài liệu, chưa sửa ứng dụng hoặc chạy lại test.
+
 - [Phiên793 — Review FE ModelOps792](2026-11-01_phien_793_review_fe_modelops_tu_dong.md):4P2 catalog/confirmation/error mapping/provenance đã tái hiện;53targeted/build/BiomePASS,full611/26exact0new7fixed705; chưa sửa sản phẩm hoặc gọi model thật.
 
 - [Phiên792 — FE ModelOps ngân sách tự động](2026-11-01_phien_792_fe_modelops_ngan_sach_tu_dong.md): tạo/khám phá model không bắt nhập token limits, tách giới hạn model với `operational_budgets`, xóa khai báo tay, thông báo consumer & phân loại lỗi; 10 file test ModelOps (53PASS), build/TS/Biome 21 file PASS, full FE 611PASS/26FAIL nền. Giữ BE791 và phiên live.

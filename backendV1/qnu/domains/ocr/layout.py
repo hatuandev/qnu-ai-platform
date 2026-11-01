@@ -20,6 +20,7 @@ import math
 import re
 from dataclasses import dataclass, field
 
+from qnu.domains.ocr.config import TABLE_LAYOUT_VERSION
 from qnu.platform.errors import AppException
 
 BLOCK_PATTERN = re.compile(
@@ -48,6 +49,7 @@ _THEAD = re.compile(r"^\\thead\{(.*)\}$", re.DOTALL)
 _MULTICOLUMN = re.compile(r"^\\multicolumn\{(\d+)\}\{[^}]*\}\{(.*)\}$", re.DOTALL)
 _MULTIROW = re.compile(r"^\\multirow\{(\d+)\}\{[^}]*\}\{(.*)\}$", re.DOTALL)
 _INLINE = re.compile(r"\\(?:textbf|textit|emph)\{([^{}]*)\}")
+_INLINE_V2 = re.compile(r"\\(?:textbf|textit|emph|mbox|text|textrm)\{([^{}]*)\}")
 _ESCAPES = {"&": "&", "%": "%", "_": "_", "$": "$", "#": "#", "{": "{", "}": "}", "\\": "\\"}
 _LINEBREAK = re.compile(r"\\(?:linebreak|newline)(?:\{\})?")
 
@@ -133,11 +135,11 @@ def _split_top_level(text: str, separator: str) -> list[str]:
     return pieces
 
 
-def _inline_text(raw: str) -> str:
+def _inline_text(raw: str, *, legacy: bool = False) -> str:
     """Unescape LaTeX while preserving the literal characters the model produced."""
     text = _LINEBREAK.sub("\n", raw.strip())
     for _ in range(8):
-        reduced = _INLINE.sub(r"\1", text)
+        reduced = (_INLINE if legacy else _INLINE_V2).sub(r"\1", text)
         if reduced == text:
             break
         text = reduced
@@ -159,7 +161,7 @@ def _inline_text(raw: str) -> str:
     return "".join(output)
 
 
-def _unwrap(cell: str) -> tuple[str, int, int, bool]:
+def _unwrap(cell: str, *, legacy: bool = False) -> tuple[str, int, int, bool]:
     """Return (text, colspan, rowspan, header) for one raw cell."""
     text = cell.strip()
     colspan = 1
@@ -182,10 +184,12 @@ def _unwrap(cell: str) -> tuple[str, int, int, bool]:
             text = match.group(1).strip()
             continue
         break
-    return _inline_text(text), colspan, rowspan, header
+    return _inline_text(text, legacy=legacy), colspan, rowspan, header
 
 
-def _place_rows(rows: list[list[Cell]], column_count: int) -> list[list[Cell]] | None:
+def _place_rows(
+    rows: list[list[Cell]], column_count: int, *, legacy: bool = False
+) -> list[list[Cell]] | None:
     """Place cells on the grid, absorbing empty placeholders left by a vertical merge.
 
     ``\\multirow`` keeps one empty placeholder cell in the following rows, while Word's
@@ -200,6 +204,9 @@ def _place_rows(rows: list[list[Cell]], column_count: int) -> list[list[Cell]] |
         cells = list(row)
         if len(cells) > len(free):
             extra = len(cells) - len(free)
+            if not legacy and extra > column_count - len(free):
+                # Empty cells may stand for a vertical merge, never extra columns.
+                return None
             placeholders = cells[:extra]
             if not all(
                 cell.text == "" and cell.col_span == 1 and cell.row_span == 1
@@ -239,12 +246,19 @@ def _place_rows(rows: list[list[Cell]], column_count: int) -> list[list[Cell]] |
 
 
 def _table_grid(rows: list[list[Cell]], column_count: int) -> bool:
-    """Verify spans tile the grid exactly; an untileable table is not reconstructed."""
+    """Validate a projected canonical grid without changing any cells."""
     return _place_rows(rows, column_count) is not None
 
 
-def parse_table(raw: str) -> Table:
+def _legacy_version(version: str) -> bool:
+    if version not in {"nemotron-tabular/v1", TABLE_LAYOUT_VERSION}:
+        raise _invalid("Phiên bản parser bảng OCR chưa được hỗ trợ.")
+    return version == "nemotron-tabular/v1"
+
+
+def parse_table(raw: str, *, table_layout_version: str = TABLE_LAYOUT_VERSION) -> Table:
     """Project explicit tabular cells; keep ``unsupported`` instead of guessing."""
+    legacy = _legacy_version(table_layout_version)
     match = _TABULAR.match(raw)
     if not match:
         return Table(status="unsupported", reason="unsupported_layout")
@@ -266,24 +280,36 @@ def parse_table(raw: str) -> Table:
         for raw_row in raw_rows:
             cells: list[Cell] = []
             for raw_cell in _split_top_level(raw_row, "&"):
-                text, colspan, rowspan, header = _unwrap(raw_cell)
+                text, colspan, rowspan, header = _unwrap(raw_cell, legacy=legacy)
                 cells.append(Cell(text=text, row_span=rowspan, col_span=colspan, header=header))
             rows.append(cells)
     except ValueError as exc:
         return Table(status="unsupported", reason=f"unsupported_cell:{exc}")
 
-    if not _table_grid(rows, column_count):
+    reason = None
+    if not legacy and all(c.col_span == c.row_span == 1 for row in rows for c in row):
+        widths = {len(row) for row in rows}
+        if widths != {column_count}:
+            # Reconcile a declaration only when every explicit row agrees. Do not
+            # invent/drop cells, repair ragged rows, or infer merged-cell geometry.
+            if len(rows) < 2 or len(widths) != 1 or not 0 < len(rows[0]) <= MAX_TABLE_COLUMNS:
+                return Table(status="unsupported", reason="grid_mismatch")
+            column_count = len(rows[0])
+            reason = "column_spec_reconciled"
+    placed = _place_rows(rows, column_count, legacy=legacy)
+    if placed is None:
         return Table(status="unsupported", reason="grid_mismatch")
-    placed = _place_rows(rows, column_count) or rows
     return Table(
         status="parsed",
         rows=tuple(tuple(cell for cell in row) for row in placed),
         column_count=column_count,
+        reason=reason,
     )
 
 
-def parse_page(raw: str) -> PageLayout:
+def parse_page(raw: str, *, table_layout_version: str = TABLE_LAYOUT_VERSION) -> PageLayout:
     """Parse one page response, preserving order and literal text."""
+    _legacy_version(table_layout_version)
     if not isinstance(raw, str):
         raise _invalid()
     blocks: list[Block] = []
@@ -308,9 +334,12 @@ def parse_page(raw: str) -> PageLayout:
         table: Table | None = None
         text = source.strip()
         if label == "Table":
-            table = parse_table(source)
+            table = parse_table(source, table_layout_version=table_layout_version)
             if table.status == "parsed":
                 text = "\n".join("\t".join(cell.text for cell in row) for row in table.rows)
+                if table.reason:
+                    requires_review = True
+                    warnings.append(f"table_reconciled:{table.reason}")
             else:
                 requires_review = True
                 warnings.append(f"table_unsupported:{table.reason}")

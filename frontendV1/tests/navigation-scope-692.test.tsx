@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -119,7 +120,14 @@ test("scope follows chooser URL, keeps collection within workspace, clears acros
     component: ScopeProbe,
   });
   const router = createRouter({ routeTree: root.addChildren([page]), history });
-  const result = render(<RouterProvider router={router} />);
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const result = render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
   const value = () =>
     JSON.parse(screen.getByTestId("scope").textContent ?? "{}");
   await waitFor(() => expect(value()).toEqual({ workspaceId: "ws1" }));
@@ -138,7 +146,11 @@ test("scope follows chooser URL, keeps collection within workspace, clears acros
   await go("/modelops/providers");
   expect(value()).toEqual({ workspaceId: "ws1", collectionId: "col1" });
   auth.sessionId = 2;
-  result.rerender(<RouterProvider router={router} />);
+  result.rerender(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
   await go("/modelops/defaults");
   expect(value()).toEqual({});
   await go("/workspaces/ws2/assistants");
@@ -170,7 +182,14 @@ test("closing and reopening mobile navigation preserves the shell selection", as
     component: () => null,
   });
   const router = createRouter({ routeTree: root.addChildren([page]), history });
-  render(<RouterProvider router={router} />);
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
   await waitFor(() =>
     expect(screen.getByTestId("scope").textContent).toBe(
       '{"workspaceId":"ws","collectionId":"col"}',

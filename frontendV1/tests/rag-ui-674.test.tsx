@@ -5,6 +5,7 @@
  * acknowledgement required by the approval gate (G2).
  */
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   cleanup,
   fireEvent,
@@ -17,6 +18,18 @@ import { ChatMessageItem } from "@/features/conversations/chat-message-item";
 import { CompiledDocumentDetailPage } from "@/features/knowledge/compiled-document-detail-page";
 import { ReviewGateDialog } from "@/features/knowledge/review-gate-dialog";
 import type { RetrievalAnnotation } from "@/features/rag/types";
+
+vi.mock("@/app/auth/v1", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/app/auth/v1")>();
+  return {
+    ...actual,
+    useV1Auth: () => ({
+      isAuthenticated: true,
+      sessionId: 1,
+      actor: { id: "test-user", roles: ["AI.Admin"] },
+    }),
+  };
+});
 
 const previewMutateAsync = vi.hoisted(() => vi.fn());
 const reviewGateRefetch = vi.hoisted(() => vi.fn());
@@ -267,12 +280,17 @@ test("G3: a supported verdict is described as an automatic check, not a guarante
 });
 
 test("F3: a failed publication fetch must not claim the document has no publication", () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   render(
-    <CompiledDocumentDetailPage
-      workspaceId="w"
-      collectionId="c"
-      documentId="doc"
-    />,
+    <QueryClientProvider client={queryClient}>
+      <CompiledDocumentDetailPage
+        workspaceId="w"
+        collectionId="c"
+        documentId="doc"
+      />
+    </QueryClientProvider>,
   );
 
   expect(

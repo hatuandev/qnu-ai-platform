@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -16,6 +17,17 @@ const state = vi.hoisted(() => ({
   refetch: vi.fn(),
   remove: vi.fn(),
 }));
+vi.mock("@/app/auth/v1", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/app/auth/v1")>()),
+  useV1Auth: () => ({
+    isAuthenticated: true,
+    sessionId: 1,
+    actor:
+      state.role.kind === "platform-admin"
+        ? { roles: ["AI.Admin"] }
+        : { roles: [] },
+  }),
+}));
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
   Link: ({ children, to }: { children: ReactNode; to: string }) => (
@@ -24,6 +36,45 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("@/features/workspaces/queries", () => ({
   useCallerWorkspaceRole: () => ({ role: state.role, isPending: false }),
+}));
+vi.mock("@/features/knowledge/compilation-queries", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/features/knowledge/compilation-queries")
+  >()),
+  useCompilationRunsQuery: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+  }),
+  useCreateCompilationMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+}));
+vi.mock("@/features/knowledge/publication-queries", () => ({
+  useCompiledDocumentsQuery: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+  }),
+}));
+vi.mock("@/features/knowledge/index-queries", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/features/knowledge/index-queries")
+  >()),
+  useIndexRunsQuery: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+  }),
+  useRequestIndexMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useSearchMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
 }));
 vi.mock("@/features/knowledge/queries", () => ({
   useCollectionQuery: () => ({
@@ -120,21 +171,29 @@ beforeEach(() => {
   state.impactCount = 0;
   state.revisionsError = false;
 });
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+  },
+});
 afterEach(() => {
   cleanup();
+  queryClient.clear();
   vi.clearAllMocks();
 });
 function page(
   stage: "files" | "compiler" | "publication" | "serving" = "files",
 ) {
   return render(
-    <KnowledgeDetailPage
-      workspaceId="w"
-      knowledgeId="c"
-      onPageChange={vi.fn()}
-      onPageSizeChange={vi.fn()}
-      activeStage={stage}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <KnowledgeDetailPage
+        workspaceId="w"
+        knowledgeId="c"
+        onPageChange={vi.fn()}
+        onPageSizeChange={vi.fn()}
+        activeStage={stage}
+      />
+    </QueryClientProvider>,
   );
 }
 
@@ -160,18 +219,18 @@ test("member source menu keeps read actions without delete", () => {
 });
 
 test.each(["compiler", "publication", "serving"] as const)(
-  "stage %s links to its working page",
-  (stage) => {
+  "stage %s displays its embedded working panel",
+  async (stage) => {
     page(stage);
-    expect(
-      screen.getByRole("link", { name: /^Mở / }).getAttribute("href"),
-    ).toContain(
-      stage === "compiler"
-        ? "/compilations"
-        : stage === "publication"
-          ? "/documents"
-          : "/search",
-    );
+    if (stage === "compiler") {
+      expect(
+        await screen.findByText("Chưa có lượt biên soạn nào"),
+      ).toBeTruthy();
+    } else if (stage === "publication") {
+      expect(await screen.findByText(/Chưa có tài liệu/)).toBeTruthy();
+    } else {
+      expect(await screen.findByText("Chỉ mục & Tìm kiếm")).toBeTruthy();
+    }
   },
 );
 
@@ -221,7 +280,7 @@ test("table view has the same document management menu", () => {
     { button: 0, ctrlKey: false, pointerType: "mouse" },
   );
   expect(screen.getByRole("menuitem", { name: "Tải xuống" })).toBeTruthy();
-  expect(screen.getByRole("menuitem", { name: "Xóa" })).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: /Xóa/ })).toBeTruthy();
 });
 
 test("editor may archive sources but cannot delete them", () => {

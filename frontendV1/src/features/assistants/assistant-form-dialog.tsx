@@ -597,6 +597,12 @@ export function AssistantFormDialog({
                         model={chatCatalog.find(
                           (item) => item.id === field.state.value,
                         )}
+                        defaultModel={chatCatalog.find((item) =>
+                          item.default_capabilities?.includes("chat"),
+                        )}
+                        isDefaultSelection={
+                          field.state.value === null || field.state.value === ""
+                        }
                         capability="chat"
                       />
                       {error ? <FieldError>{error}</FieldError> : null}

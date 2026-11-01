@@ -185,3 +185,20 @@ def test_invalid_stored_json_is_never_applied():
     assert parse_policy({"mode": "toggle"}) is None
     assert parse_policy("not-a-dict") is None
     assert parse_policy(None) is None
+
+
+def test_ocr_spelling_policy_is_explicit_verified_and_task_scoped():
+    policy = ReasoningPolicy(
+        mode="chat_template_kwarg",
+        parameter="enable_thinking",
+        off_value=False,
+        tasks={"off": ["ocr_review"]},
+        verified=True,
+    )
+    directive = resolve_directive(policy, "ocr_review")
+    assert directive is not None and directive.level == "off"
+    assert build_payload(MESSAGES, request(reasoning=directive))["chat_template_kwargs"] == {
+        "enable_thinking": False,
+    }
+    assert resolve_directive(policy, "answer") is None
+    assert resolve_directive(policy.model_copy(update={"verified": False}), "ocr_review") is None

@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import {
   type Connection,
   type ConnectionFamily,
+  type ConnectionInput,
   PRESET_PREFIXES,
   PRESET_URLS,
   useSaveConnection,
@@ -38,9 +39,12 @@ export function ConnectionForm({
     defaultValues: {
       family: connection?.family ?? initialFamily,
       name: connection?.name ?? "",
-      prefix: connection?.prefix ?? (connection ? "" : PRESET_PREFIXES[initialFamily]),
+      prefix:
+        connection?.prefix ??
+        (connection ? "" : PRESET_PREFIXES[initialFamily]),
       apiType: connection?.api_type ?? "",
-      url: connection?.base_url ?? (connection ? "" : PRESET_URLS[initialFamily]),
+      url:
+        connection?.base_url ?? (connection ? "" : PRESET_URLS[initialFamily]),
     },
   });
 
@@ -61,10 +65,21 @@ export function ConnectionForm({
       const activeFamily = connection?.family ?? initialFamily;
       form.reset({
         family: activeFamily,
-        name: connection?.name ?? (connection ? "" : (activeFamily === "custom" ? "" : (activeFamily === "qnu" ? "QNU Server" : "OpenAI Compatible"))),
-        prefix: connection?.prefix ?? (connection ? "" : PRESET_PREFIXES[activeFamily]),
+        name:
+          connection?.name ??
+          (connection
+            ? ""
+            : activeFamily === "custom"
+              ? ""
+              : activeFamily === "qnu"
+                ? "QNU Server"
+                : "OpenAI Compatible"),
+        prefix:
+          connection?.prefix ??
+          (connection ? "" : PRESET_PREFIXES[activeFamily]),
         apiType: connection?.api_type ?? "",
-        url: connection?.base_url ?? (connection ? "" : PRESET_URLS[activeFamily]),
+        url:
+          connection?.base_url ?? (connection ? "" : PRESET_URLS[activeFamily]),
       });
       mutation.reset();
     }
@@ -78,7 +93,9 @@ export function ConnectionForm({
             {connection ? "Chỉnh sửa nhà cung cấp" : "Thêm nhà cung cấp mới"}
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-xs">
-            Thiết lập kết nối với nhà cung cấp mô hình AI (OpenAI Compatible). Sau khi lưu, bạn có thể thêm API Key và cấu hình Model LLM trong trang chi tiết.
+            Thiết lập kết nối với nhà cung cấp mô hình AI (OpenAI Compatible).
+            Sau khi lưu, bạn có thể thêm API Key và cấu hình Model LLM trong
+            trang chi tiết.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
@@ -87,14 +104,14 @@ export function ConnectionForm({
           onSubmit={async (e) => {
             e.preventDefault();
             try {
-              const payload: any = {
+              const payload: ConnectionInput = {
                 name: name.trim(),
                 family,
                 base_url: url.trim(),
                 timeout_seconds: connection?.timeout_seconds ?? 30,
+                ...(prefix.trim() ? { prefix: prefix.trim() } : {}),
+                ...(apiType.trim() ? { api_type: apiType.trim() } : {}),
               };
-              if (prefix.trim()) payload.prefix = prefix.trim();
-              if (apiType.trim()) payload.api_type = apiType.trim();
 
               const saved = await mutation.mutateAsync(payload);
               onOpenChange(false);

@@ -299,16 +299,26 @@ async def catalog(
 ) -> list[CatalogItem]:
     providers = await catalog_service.visible_providers(db, actor, workspace_id)
     defaults = await catalog_service.workspace_defaults(db, workspace_id) if workspace_id else {}
-    return [
-        CatalogItem(
-            id=item.id,
-            name=item.name,
-            model_name=item.model_name,
-            capabilities=item.capabilities,
-            default_capabilities=[cap for cap, pid in defaults.items() if pid == item.id],
+    items: list[CatalogItem] = []
+    for item in providers:
+        payload = provider_payload(item)
+        items.append(
+            CatalogItem(
+                id=item.id,
+                name=item.name,
+                model_name=item.model_name,
+                capabilities=item.capabilities,
+                default_capabilities=[cap for cap, pid in defaults.items() if pid == item.id],
+                token_limits=payload["token_limits"],
+                capacity_status=payload["capacity_status"],
+                capacity_basis=payload["capacity_basis"],
+                operational_budgets=payload["operational_budgets"],
+                field_sources=payload["field_sources"],
+                embedding_dimension=payload["embedding_dimension"],
+                embedding_dimension_status=payload["embedding_dimension_status"],
+            )
         )
-        for item in providers
-    ]
+    return items
 
 
 @workspace_router.get(

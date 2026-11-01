@@ -1,11 +1,4 @@
-import {
-  Bot,
-  Cpu,
-  Plus,
-  Search,
-  Server,
-  Sparkles,
-} from "lucide-react";
+import { Bot, Cpu, Plus, Search, Server, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { EmptyState } from "@/components/admin/empty-state";
 import { ErrorState } from "@/components/admin/error-state";
@@ -27,7 +20,12 @@ import {
   ViewModeToggle,
 } from "@/components/ui/view-mode-toggle";
 import { cn } from "@/lib/utils";
-import { type Connection, type ConnectionFamily, FAMILIES, useConnections } from "./api";
+import {
+  type Connection,
+  type ConnectionFamily,
+  FAMILIES,
+  useConnections,
+} from "./api";
 import { ConnectionForm } from "./connection-form";
 
 export function ConnectionList({
@@ -39,7 +37,8 @@ export function ConnectionList({
   const connections = Array.isArray(query.data) ? query.data : [];
 
   const [formOpen, setFormOpen] = useState(false);
-  const [initialFamily, setInitialFamily] = useState<ConnectionFamily>("openai");
+  const [initialFamily, setInitialFamily] =
+    useState<ConnectionFamily>("openai");
   const [filter, setFilter] = useState("");
   const [mode, setMode] = useState<ViewMode>("grid");
 
@@ -119,7 +118,11 @@ export function ConnectionList({
 
             {visible.length === 0 ? (
               <EmptyState
-                title={filter ? "Không tìm thấy nhà cung cấp phù hợp" : "Chưa có nhà cung cấp nào"}
+                title={
+                  filter
+                    ? "Không tìm thấy nhà cung cấp phù hợp"
+                    : "Chưa có nhà cung cấp nào"
+                }
                 description="Nhấn vào 'Thêm mới' ở trên để kết nối nhà cung cấp đầu tiên."
               />
             ) : mode === "grid" ? (
@@ -168,12 +171,18 @@ export function ConnectionList({
                             )}
 
                             {/* Badge type */}
-                            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-normal">
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] py-0 px-1.5 font-normal"
+                            >
                               Trò chuyện
                             </Badge>
 
                             {row.prefix && (
-                              <Badge variant="outline" className="text-[10px] py-0 px-1 font-mono text-muted-foreground">
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] py-0 px-1 font-mono text-muted-foreground"
+                              >
                                 {row.prefix}/
                               </Badge>
                             )}
@@ -183,11 +192,16 @@ export function ConnectionList({
 
                       {/* Card Footer detail */}
                       <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
-                        <span className="truncate max-w-[140px]" title={row.base_url}>
+                        <span
+                          className="truncate max-w-[140px]"
+                          title={row.base_url}
+                        >
                           {row.base_url.replace(/^https?:\/\//, "")}
                         </span>
                         <div className="flex items-center gap-2">
-                          <span className="shrink-0">{row.model_count} model</span>
+                          <span className="shrink-0">
+                            {row.model_count} model
+                          </span>
                           <Button
                             size="sm"
                             variant="ghost"

@@ -51,6 +51,7 @@ ADMISSIONS_STAGES = (
     "admissions-publication",
     "admissions-chat",
 )
+OCR_STAGES = ("admissions-scan-ocr",)
 
 
 def save(path, value):
@@ -523,7 +524,9 @@ def _serve(directory, manifest):
             raise RuntimeError("API chưa nạp hợp đồng purge mới.")
         wait_http(f"http://127.0.0.1:{assigned['frontend']}")
         if backend_source_hash() != backend_sha256:
-            raise RuntimeError("Mã backend thay đổi trong lúc khởi động. Chạy lại serve.")
+            raise RuntimeError(
+                "Mã backend thay đổi trong lúc khởi động. Chạy lại serve."
+            )
         save(
             directory / "server.json",
             {"running": True, "backend_source_sha256": backend_sha256},
@@ -552,33 +555,55 @@ def _serve(directory, manifest):
         save(directory / "server.json", {"running": False})
 
 
-def run_stage(directory, manifest, stage, headed, recover=False, skip_review=False):
+def run_stage(
+    directory, manifest, stage, headed, recover=False, skip_review=False, ocr_dpi=None
+):
     state = read(directory / "checkpoint.json")
     model_test = stage in MODEL_STAGES
     admissions_test = stage in ADMISSIONS_STAGES
-    if (model_test or admissions_test) and manifest["mode"] != "live":
+    scan_test = stage in OCR_STAGES
+    if (model_test or admissions_test or scan_test) and manifest["mode"] != "live":
         print(
             "BLOCKED: model-* và admissions-* cần phiên init --mode live, không dùng AI giả lập."
         )
         return 2
-    sequence = MODEL_STAGES if model_test else ADMISSIONS_STAGES if admissions_test else STAGES
+    sequence = (
+        MODEL_STAGES
+        if model_test
+        else OCR_STAGES
+        if scan_test
+        else ADMISSIONS_STAGES
+        if admissions_test
+        else STAGES
+    )
     index = sequence.index(stage)
-    if model_test:
+    if scan_test:
+        prerequisites = ("provider-setup", "model-discovery", "model-ocr", "navigation")
+    elif model_test:
         prerequisites = [] if stage == "provider-setup" else ["provider-setup"]
         if stage != "provider-setup" and stage != "model-discovery":
             prerequisites.append("model-discovery")
     else:
         prerequisites = (
-            ("navigation", *(s for s in ADMISSIONS_STAGES[:index] if s != "admissions-draft"))
+            (
+                "navigation",
+                *(s for s in ADMISSIONS_STAGES[:index] if s != "admissions-draft"),
+            )
             if admissions_test
             else STAGES[:index]
         )
-    if manifest["mode"] == "live" and not model_test:
+    if manifest["mode"] == "live" and not model_test and not scan_test:
         prerequisites = (*MODEL_STAGES, *prerequisites)
     fast_publication = skip_review and stage == "admissions-publication"
-    fast_chat = stage == "admissions-chat" and state["results"].get("admissions-publication", {}).get("review_mode") == "skipped"
+    fast_chat = (
+        stage == "admissions-chat"
+        and state["results"].get("admissions-publication", {}).get("review_mode")
+        == "skipped"
+    )
     if fast_publication or fast_chat:
-        prerequisites = tuple(x for x in prerequisites if x != "admissions-compilation") + ("admissions-draft",)
+        prerequisites = tuple(
+            x for x in prerequisites if x != "admissions-compilation"
+        ) + ("admissions-draft",)
     missing = [
         x for x in prerequisites if state["results"].get(x, {}).get("status") != "PASS"
     ]
@@ -588,7 +613,9 @@ def run_stage(directory, manifest, stage, headed, recover=False, skip_review=Fal
     if missing:
         print("BLOCKED: cần chạy đạt các chặng trước: " + ", ".join(missing))
         return 2
-    server = read(directory / "server.json") if (directory / "server.json").exists() else {}
+    server = (
+        read(directory / "server.json") if (directory / "server.json").exists() else {}
+    )
     if not server.get("running"):
         print("BLOCKED: chạy serve ở cửa sổ khác trước.")
         return 2
@@ -626,6 +653,7 @@ def run_stage(directory, manifest, stage, headed, recover=False, skip_review=Fal
             # new one built from the completed OCR source. Never a silent retry.
             env["E2E_RECOVER_COMPILATION"] = "1"
         # An inherited shell value must not silently change the reviewed workflow.
+        env["E2E_SCAN_OCR_DPI"] = str(ocr_dpi) if ocr_dpi is not None else ""
         env["E2E_SKIP_REVIEW"] = "1" if fast_publication else "0"
         args = [
             shutil.which("node"),
@@ -649,7 +677,12 @@ def run_stage(directory, manifest, stage, headed, recover=False, skip_review=Fal
                     "exit_code": 2,
                     "report": str(output),
                 }
-                for dependent in (*MODEL_STAGES[1:], *STAGES, *ADMISSIONS_STAGES):
+                for dependent in (
+                    *MODEL_STAGES[1:],
+                    *STAGES,
+                    *ADMISSIONS_STAGES,
+                    *OCR_STAGES,
+                ):
                     state["results"].pop(dependent, None)
                 save(directory / "checkpoint.json", state)
                 print("BLOCKED:", exc)
@@ -682,14 +715,14 @@ def run_stage(directory, manifest, stage, headed, recover=False, skip_review=Fal
             state["results"][stage]["review_mode"] = "skipped"
         if model_test:
             dependents = (
-                (*MODEL_STAGES[index + 1 :], *STAGES, *ADMISSIONS_STAGES)
+                (*MODEL_STAGES[index + 1 :], *STAGES, *ADMISSIONS_STAGES, *OCR_STAGES)
                 if stage in {"provider-setup", "model-discovery"}
-                else (*STAGES, *ADMISSIONS_STAGES)
+                else (*STAGES, *ADMISSIONS_STAGES, *OCR_STAGES)
             )
         else:
             dependents = sequence[index + 1 :]
             if stage == "navigation":
-                dependents = (*dependents, *ADMISSIONS_STAGES)
+                dependents = (*dependents, *ADMISSIONS_STAGES, *OCR_STAGES)
         for dependent in dependents:
             state["results"].pop(dependent, None)
         if stage == "lifecycle" and verdict == "PASS":
@@ -721,18 +754,39 @@ def main(argv=None):
             "cleanup",
         ),
     )
-    parser.add_argument("stage", nargs="?", choices=STAGES + MODEL_STAGES + ADMISSIONS_STAGES)
+    parser.add_argument(
+        "stage",
+        nargs="?",
+        choices=STAGES + MODEL_STAGES + ADMISSIONS_STAGES + OCR_STAGES,
+    )
     parser.add_argument("--session")
     parser.add_argument("--mode", choices=("workflow", "live"), default="workflow")
     parser.add_argument("--headed", action="store_true")
+    parser.add_argument(
+        "--ocr-dpi",
+        type=int,
+        help="Thử mật độ ảnh riêng cho admissions-scan-ocr; giữ lượt đầu.",
+    )
     parser.add_argument(
         "--recover",
         action="store_true",
         help="Cho phép thay lượt biên soạn đã kết thúc bằng lượt mới từ nguồn OCR đã xong.",
     )
-    parser.add_argument("--skip-review", action="store_true", help="Xuất bản nhanh bản nháp E2E, ghi rõ bỏ qua model review.")
+    parser.add_argument(
+        "--skip-review",
+        action="store_true",
+        help="Xuất bản nhanh bản nháp E2E, ghi rõ bỏ qua model review.",
+    )
     args = parser.parse_args(argv)
-    if args.skip_review and (args.command != "run" or args.stage != "admissions-publication"):
+    if args.ocr_dpi is not None and (
+        args.command != "run"
+        or args.stage != "admissions-scan-ocr"
+        or not 72 <= args.ocr_dpi <= 300
+    ):
+        parser.error("--ocr-dpi 72..300 chỉ áp dụng cho run admissions-scan-ocr")
+    if args.skip_review and (
+        args.command != "run" or args.stage != "admissions-publication"
+    ):
         parser.error("--skip-review chỉ áp dụng cho run admissions-publication")
     try:
         if args.command == "help":
@@ -754,16 +808,25 @@ def main(argv=None):
                     else [args.stage]
                 )
                 for stage in sequence:
-                    code = run_stage(directory, manifest, stage, args.headed, args.recover, args.skip_review)
+                    code = run_stage(
+                        directory,
+                        manifest,
+                        stage,
+                        args.headed,
+                        args.recover,
+                        args.skip_review,
+                        args.ocr_dpi,
+                    )
                     if code:
                         return code
             elif args.command in {"status", "report"}:
                 state = read(directory / "checkpoint.json")
                 print("Phiên:", manifest["run_id"], "Mode:", manifest["mode"])
-                for stage in STAGES + (
-                    MODEL_STAGES if manifest["mode"] == "live" else ()
-                ) + (
-                    ADMISSIONS_STAGES if state.get("admissions") else ()
+                for stage in (
+                    STAGES
+                    + (MODEL_STAGES if manifest["mode"] == "live" else ())
+                    + (ADMISSIONS_STAGES if state.get("admissions") else ())
+                    + (OCR_STAGES if manifest["mode"] == "live" else ())
                 ):
                     row = state["results"].get(stage, {})
                     print(stage, row.get("status", "NOT RUN"), row.get("report", ""))

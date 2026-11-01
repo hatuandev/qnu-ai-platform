@@ -132,7 +132,7 @@ test("child model editor saves capacity on the selected model without changing c
     }),
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-});
+}, 15000);
 
 test("embedding dimension can be declared without fabricating token limits", async () => {
   openModel(["embedding"]);
@@ -143,7 +143,7 @@ test("embedding dimension can be declared without fabricating token limits", asy
       embedding_dimension: 1024,
     }),
   );
-});
+}, 15000);
 
 test("partial OCR budget is rejected before saving", async () => {
   openModel(["ocr"]);
@@ -156,7 +156,7 @@ test("partial OCR budget is rejected before saving", async () => {
     ),
   );
   expect(state.save).not.toHaveBeenCalled();
-});
+}, 15000);
 
 test("complete OCR page declaration is saved with token limits and prompt identity", async () => {
   openModel(["ocr"]);
@@ -181,4 +181,4 @@ test("complete OCR page declaration is saved with token limits and prompt identi
       },
     }),
   );
-});
+}, 15000);

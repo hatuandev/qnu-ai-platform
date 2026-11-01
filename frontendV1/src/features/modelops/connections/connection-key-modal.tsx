@@ -50,7 +50,9 @@ export function ConnectionKeyModal({
   const [priority, setPriority] = useState(5);
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
 
-  const allModels = Array.from(new Set([...availableModels, ...discoveredModels]));
+  const allModels = Array.from(
+    new Set([...availableModels, ...discoveredModels]),
+  );
 
   const [testResult, setTestResult] = useState<{
     status: "idle" | "testing" | "success" | "error";
@@ -71,7 +73,10 @@ export function ConnectionKeyModal({
       return;
     }
 
-    setTestResult({ status: "testing", message: "Đang kiểm tra kết nối tới nhà cung cấp..." });
+    setTestResult({
+      status: "testing",
+      message: "Đang kiểm tra kết nối tới nhà cung cấp...",
+    });
     try {
       const modelToTest =
         defaultModel.trim() && defaultModel !== "__all__"
@@ -100,7 +105,10 @@ export function ConnectionKeyModal({
     } catch (err: unknown) {
       setTestResult({
         status: "error",
-        message: err instanceof Error ? err.message : "Không thể kết nối đến nhà cung cấp.",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Không thể kết nối đến nhà cung cấp.",
       });
     }
   };
@@ -163,15 +171,21 @@ export function ConnectionKeyModal({
               <Key className="size-4" />
             </div>
             <div>
-              <ResponsiveDialogTitle>Thêm API Key / Kết nối</ResponsiveDialogTitle>
+              <ResponsiveDialogTitle>
+                Thêm API Key / Kết nối
+              </ResponsiveDialogTitle>
               <ResponsiveDialogDescription className="text-xs">
-                Cấu hình API Key cho {connectionName}. Khóa được lưu trữ mã hóa an toàn.
+                Cấu hình API Key cho {connectionName}. Khóa được lưu trữ mã hóa
+                an toàn.
               </ResponsiveDialogDescription>
             </div>
           </div>
         </ResponsiveDialogHeader>
 
-        <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 text-xs">
+        <form
+          onSubmit={handleSubmit}
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 text-xs"
+        >
           {/* Tên kết nối / Key Name */}
           <div className="space-y-1.5">
             <Label htmlFor="key-name">Tên kết nối / Gợi nhớ *</Label>
@@ -230,7 +244,9 @@ export function ConnectionKeyModal({
           {/* Default Model & Priority */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="key-default-model">Mô hình mặc định (Default Model)</Label>
+              <Label htmlFor="key-default-model">
+                Mô hình mặc định (Default Model)
+              </Label>
               {allModels.length > 0 ? (
                 <div className="space-y-1">
                   <Select value={defaultModel} onValueChange={setDefaultModel}>
@@ -344,4 +360,3 @@ export function ConnectionKeyModal({
     </ResponsiveDialog>
   );
 }
-

@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["vite/client"] },
+  "include": ["src/vite-env.d.ts", "tests/modelops-p2-regressions-795.test.tsx"]
+}

@@ -6,6 +6,8 @@ Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thu�
 
 ## 📌 Danh Mục Kế Hoạch
 
+- [Prompt sửa 26 test FE và 4 P2 — phiên 794](./PROMPT_FIX_FE_26_TEST_VA_4_P2_794.md): danh sách test chính xác, sửa catalog BE–FE/confirmation/error mapping/provenance và kiểm chứng offline, không retry để làm xanh kết quả.
+
 - [Prompt FE — ModelOps tự động791](./PROMPT_FE_MODELOPS_TU_DONG_791.md): hoàn thiện giao diện thêm model, thông số nâng cao và trạng thái ngân sách theo hợp đồng BE mới.
 
 1. [**`01_ke_hoach_phat_trien_fe.md`**](./01_ke_hoach_phat_trien_fe.md):

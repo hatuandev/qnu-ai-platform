@@ -12,6 +12,7 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "test": "vitest run",
+    "test:modelops:typecheck": "tsc --noEmit -p tsconfig.modelops-tests.json",
     "test:e2e": "powershell -NoProfile -File ../test-v1-e2e.ps1",
     "test:e2e:live": "powershell -NoProfile -File ../test-v1-e2e.ps1 init --mode live",
     "test:e2e:report": "powershell -NoProfile -File ../test-v1-e2e.ps1 report",

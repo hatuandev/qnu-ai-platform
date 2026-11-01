@@ -265,6 +265,7 @@ def provider_payload(provider: Provider) -> dict[str, Any]:
             capability: operational_budget(capacity, capability).model_dump(mode="json")
             for capability in (provider.capabilities or [])
         },
+        "field_sources": getattr(capacity, "field_sources", {}) or {},
         "embedding_dimension": dimension,
         "embedding_dimension_status": dimension_status,
         "reasoning": policy.public_dict() if policy is not None else None,

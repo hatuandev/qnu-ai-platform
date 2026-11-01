@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import pymupdf
 from sqlalchemy import func, select
@@ -67,6 +67,7 @@ class ProcessingService:
         job_queue: JobQueue | None,
         force: bool = False,
         strategy: str = "ocr",
+        render_dpi: int | None = None,
         commit: bool = True,
     ) -> RequestOutcome:
         if scope.extension not in SUPPORTED_PROCESSING_EXTENSIONS:
@@ -76,6 +77,14 @@ class ProcessingService:
             )
 
         config = processing_config(get_settings(), scope.extension)
+        if render_dpi is not None:
+            if not 72 <= render_dpi <= 300:
+                raise AppException(
+                    "Mật độ render OCR phải từ 72 đến 300 DPI.",
+                    code="processing_render_dpi_invalid",
+                    status_code=422,
+                )
+            config = replace(config, dpi=render_dpi)
         payload = config_payload(config)
         if provider_id:
             payload["provider_requested"] = provider_id

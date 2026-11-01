@@ -527,6 +527,10 @@ export function CompilationDialog({
                   </p>
                   <ConsumerModelBudgetNotice
                     model={chatProviders.find((p) => p.id === providerId)}
+                    defaultModel={chatProviders.find((p) =>
+                      p.default_capabilities?.includes("chat"),
+                    )}
+                    isDefaultSelection={!providerId}
                     capability="chat"
                   />
                 </div>
@@ -632,6 +636,13 @@ export function CompilationDialog({
                         model={chatProviders.find(
                           (p) => p.id === reviewProviderId,
                         )}
+                        defaultModel={
+                          chatProviders.find((p) => p.id === providerId) ??
+                          chatProviders.find((p) =>
+                            p.default_capabilities?.includes("chat"),
+                          )
+                        }
+                        isDefaultSelection={!reviewProviderId}
                         capability="chat"
                       />
                     </div>

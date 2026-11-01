@@ -49,21 +49,18 @@ function useRouteFeatureScope(): FeatureScopeContextValue {
     scope: FeatureScope;
   }>();
   const previous = last?.sessionId === sessionId ? last.scope : {};
-  const workspaceId =
-    current?.workspaceId ?? previous.workspaceId ?? firstAvailableWorkspaceId;
+  const isChooser = location.pathname.startsWith("/workspaces/choose/");
+  const selectedWorkspace = isChooser
+    ? current?.workspaceId
+    : (current?.workspaceId ??
+      previous.workspaceId ??
+      firstAvailableWorkspaceId);
   const collectionId = current
     ? (current.collectionId ??
-      (!location.pathname.startsWith("/workspaces/choose/") &&
-      current.workspaceId === previous.workspaceId
+      (!isChooser && current.workspaceId === previous.workspaceId
         ? previous.collectionId
         : undefined))
     : previous.collectionId;
-  const selectedWorkspace =
-    current !== undefined
-      ? (current.workspaceId ??
-        previous.workspaceId ??
-        firstAvailableWorkspaceId)
-      : workspaceId;
 
   const setWorkspaceId = useCallback(
     (nextWorkspaceId: string) => {

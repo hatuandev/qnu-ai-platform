@@ -7,9 +7,11 @@ export default defineConfig({
       ? "**/providers.spec.ts"
       : process.env.E2E_STAGE?.startsWith("model-")
         ? "**/models.spec.ts"
-        : process.env.E2E_STAGE?.startsWith("admissions-")
-          ? "**/admissions.spec.ts"
-        : "**/workflow.spec.ts",
+        : process.env.E2E_STAGE === "admissions-scan-ocr"
+          ? "**/scan-ocr.spec.ts"
+          : process.env.E2E_STAGE?.startsWith("admissions-")
+            ? "**/admissions.spec.ts"
+            : "**/workflow.spec.ts",
   timeout: 300 * 1000,
   expect: {
     timeout: 15 * 1000,

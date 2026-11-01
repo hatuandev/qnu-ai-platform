@@ -11,12 +11,13 @@ from qnu.domains.ocr.models import ACTIVE_RUN_STATUSES, OcrProcessingRun
 
 
 class ProcessingRunRequest(BaseModel):
-    """Optional provider choice; everything else is resolved server-side."""
+    """Optional provider and rendering density; effective limits stay server-side."""
 
     model_config = ConfigDict(extra="forbid")
 
     provider_id: str | None = Field(None, min_length=1, max_length=64)
     strategy: Literal["ocr", "auto"] = "ocr"
+    render_dpi: int | None = Field(None, ge=72, le=300)
     force: bool = Field(
         False,
         description=(

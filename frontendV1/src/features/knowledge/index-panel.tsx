@@ -332,16 +332,20 @@ function IndexSession({
               )}
               <span>Tạo index generation</span>
             </Button>
-            {providerId !== NO_PROVIDER_VALUE ? (
-              <div className="w-full">
-                <ConsumerModelBudgetNotice
-                  model={embeddingCatalog.find(
-                    (item) => item.id === providerId,
-                  )}
-                  capability="embedding"
-                />
-              </div>
-            ) : null}
+            <div className="w-full">
+              <ConsumerModelBudgetNotice
+                model={
+                  providerId !== NO_PROVIDER_VALUE
+                    ? embeddingCatalog.find((item) => item.id === providerId)
+                    : undefined
+                }
+                defaultModel={embeddingCatalog.find((item) =>
+                  item.default_capabilities?.includes("embedding"),
+                )}
+                isDefaultSelection={providerId === NO_PROVIDER_VALUE}
+                capability="embedding"
+              />
+            </div>
           </div>
         ) : null}
       </div>

@@ -137,6 +137,10 @@ export function OcrRequestDialog({
               </p>
               <ConsumerModelBudgetNotice
                 model={ocrProviders.find((p) => p.id === providerId)}
+                defaultModel={ocrProviders.find((p) =>
+                  p.default_capabilities?.includes("ocr"),
+                )}
+                isDefaultSelection={!providerId}
                 capability="ocr"
               />
             </div>

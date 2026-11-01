@@ -34,6 +34,7 @@ import { BackupsPanel } from "./backups-panel";
 import { JobDetails } from "./job-details";
 import { OperationReceipt } from "./operation-receipt";
 import { useJobs, useOperationsSummary } from "./queries";
+import { ReadinessPanel } from "./readiness-panel";
 import { RecoveryDialog } from "./recovery-dialog";
 import type { OperationsSearch } from "./search";
 import { StoragePanel } from "./storage-panel";
@@ -302,6 +303,9 @@ function OperationsJobs({ workspaceId, search, onSearch }: Props) {
           )}
         </CardContent>
       </Card>
+      {isLifecycleAdmin(role) ? (
+        <ReadinessPanel workspaceId={workspaceId} />
+      ) : null}
       {search.jobId && search.jobKind ? (
         <JobDetails
           workspaceId={workspaceId}

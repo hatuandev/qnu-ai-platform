@@ -83,6 +83,7 @@ export type Provider = {
   embedding_dimension: number | null;
   embedding_dimension_status: CapacityStatus;
   operational_budgets?: Partial<Record<Capability, OperationalBudget>>;
+  field_sources?: Record<string, CapacityBasis>;
   created_at: string;
   updated_at: string;
 };
@@ -167,6 +168,7 @@ export type CatalogItem = {
   embedding_dimension?: number | null;
   embedding_dimension_status?: CapacityStatus;
   operational_budgets?: Partial<Record<Capability, OperationalBudget>>;
+  field_sources?: Record<string, CapacityBasis>;
 };
 
 export type ModelOpsEvent = {

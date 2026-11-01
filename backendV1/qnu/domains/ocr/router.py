@@ -137,6 +137,7 @@ async def request_processing_run(
         job_queue=job_queue,
         force=body.force if body else False,
         strategy=body.strategy if body else "ocr",
+        render_dpi=body.render_dpi if body else None,
     )
     if not outcome.created:
         response.status_code = status.HTTP_200_OK

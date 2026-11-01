@@ -694,7 +694,7 @@ async def _ocr_pages(
             with observe_stage(
                 run, "parse_page", logger=logger, page_number=page.page_number
             ) as observation:
-                layout = parse_page(call.text)
+                layout = parse_page(call.text, table_layout_version=config.table_layout_version)
                 observation.item_count = len(layout.blocks)
         except AppException as exc:
             row.status = "failed"
@@ -762,7 +762,7 @@ async def _assemble_result(
             _, raw = await read_artifact_bytes(
                 db, blob_store, run, "raw_response", page.page_number
             )
-            layout = parse_page(_raw_text(raw))
+            layout = parse_page(_raw_text(raw), table_layout_version=config.table_layout_version)
         if (run.config or {}).get("extraction"):
             from qnu.domains.ocr.native import merge_layout, page_from_payload
 

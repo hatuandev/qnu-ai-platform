@@ -393,19 +393,45 @@ export function ProviderOperationalBudgetsSummary({
 
 export function ConsumerModelBudgetNotice({
   model,
+  defaultModel,
+  isDefaultSelection,
   capability,
 }: {
-  model: Partial<Provider & CatalogItem> | null | undefined;
+  model?: Partial<Provider & CatalogItem> | null | undefined;
+  defaultModel?: Partial<Provider & CatalogItem> | null | undefined;
+  isDefaultSelection?: boolean;
   capability: Capability;
 }) {
-  if (!model) return null;
-  const resolved = resolveCapabilityBudgetState(model, capability);
+  const targetModel = isDefaultSelection ? defaultModel : model;
+
+  if (isDefaultSelection && !targetModel) {
+    return (
+      <div
+        role="status"
+        className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground pt-1"
+      >
+        <Info className="size-3.5 text-muted-foreground shrink-0" />
+        <span>
+          Chưa cấu hình model mặc định cho {CAPABILITY_LABELS[capability]} trong
+          workspace này.
+        </span>
+      </div>
+    );
+  }
+
+  if (!targetModel) return null;
+  const resolved = resolveCapabilityBudgetState(targetModel, capability);
+  const defaultPrefix =
+    isDefaultSelection && targetModel.name
+      ? `(Mặc định: ${targetModel.name}) `
+      : "";
 
   if (resolved.isBlocked) {
     return (
       <Alert variant="warning" className="py-2.5 px-3 text-xs">
         <AlertCircle className="size-4 text-warning" />
         <AlertTitle className="text-xs font-semibold">
+          {defaultPrefix}
           {BUDGET_STATUS_LABELS.blocked} ({CAPABILITY_LABELS[capability]})
         </AlertTitle>
         <AlertDescription className="text-xs space-y-1">
@@ -427,7 +453,10 @@ export function ConsumerModelBudgetNotice({
         className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground pt-1"
       >
         <Info className="size-3.5 text-primary shrink-0" />
-        <span>{BUDGET_STATUS_LABELS.provisional}</span>
+        <span>
+          {defaultPrefix}
+          {BUDGET_STATUS_LABELS.provisional}
+        </span>
         {resolved.basisLabel ? (
           <Badge variant="outline" className="text-[10px] font-normal">
             {resolved.basisLabel}
@@ -443,12 +472,30 @@ export function ConsumerModelBudgetNotice({
         role="status"
         className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground pt-1"
       >
-        <span>{BUDGET_STATUS_LABELS.declared}</span>
+        <span>
+          {defaultPrefix}
+          {BUDGET_STATUS_LABELS.declared}
+        </span>
         {resolved.basisLabel ? (
           <Badge variant="outline" className="text-[10px] font-normal">
             {resolved.basisLabel}
           </Badge>
         ) : null}
+      </div>
+    );
+  }
+
+  if (resolved.status === "missing_info") {
+    return (
+      <div
+        role="status"
+        className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground pt-1"
+      >
+        <Info className="size-3.5 text-muted-foreground shrink-0" />
+        <span>
+          {defaultPrefix}
+          {BUDGET_STATUS_LABELS.missing_info}
+        </span>
       </div>
     );
   }
@@ -459,9 +506,11 @@ export function ConsumerModelBudgetNotice({
 export type DiagnosticFailureCategory =
   | "quota_rate_limit"
   | "token_budget"
+  | "output_truncated"
   | "malformed_response"
   | "timeout"
   | "auth"
+  | "unavailable"
   | "general";
 
 export function describeDiagnosticFailure(input: {
@@ -499,6 +548,22 @@ export function describeDiagnosticFailure(input: {
   }
 
   if (
+    code.includes("truncated") ||
+    code.includes("output_truncated") ||
+    code === "chat_output_truncated"
+  ) {
+    const guidance =
+      "Đầu ra của model bị cắt do chạm giới hạn token xuất ra (max_output_tokens hoặc kết thúc bằng length). Chưa nhận được bản nháp hoặc câu trả lời hoàn chỉnh.";
+    return {
+      category: "output_truncated",
+      title: "Đầu ra model bị cắt ngắn (Output truncated)",
+      guidance,
+      message: guidance,
+      detail: rawDetail,
+    };
+  }
+
+  if (
     code.includes("token_limit") ||
     code.includes("input_limit") ||
     code.includes("output_limit") ||
@@ -520,6 +585,7 @@ export function describeDiagnosticFailure(input: {
   if (
     code.includes("malformed") ||
     code.includes("invalid_response") ||
+    code.includes("response_invalid") ||
     code.includes("schema") ||
     code.includes("json")
   ) {
@@ -534,12 +600,19 @@ export function describeDiagnosticFailure(input: {
     };
   }
 
-  if (status === 408 || status === 504 || code.includes("timeout")) {
+  if (
+    status === 408 ||
+    status === 504 ||
+    code.includes("timeout") ||
+    code.includes("uncertain") ||
+    code === "chat_provider_uncertain"
+  ) {
     const guidance =
-      "Máy chủ model không phản hồi trong thời gian giới hạn. Kiểm tra kết nối mạng, trạng thái model hoặc thời gian chờ (timeout).";
+      "Máy chủ model không phản hồi trong thời gian giới hạn hoặc chưa rõ kết quả. Hệ thống giữ trạng thái chờ, không tự động gửi lại inference.";
     return {
       category: "timeout",
-      title: "Quá thời gian chờ phản hồi (Timeout)",
+      title:
+        "Quá thời gian chờ phản hồi hoặc chưa rõ kết quả (Timeout / Uncertain)",
       guidance,
       message: guidance,
       detail: rawDetail,
@@ -552,6 +625,23 @@ export function describeDiagnosticFailure(input: {
     return {
       category: "auth",
       title: "Lỗi xác thực khóa API hoặc quyền truy cập",
+      guidance,
+      message: guidance,
+      detail: rawDetail,
+    };
+  }
+
+  if (
+    status === 502 ||
+    status === 503 ||
+    code.includes("unavailable") ||
+    code.includes("connection_refused")
+  ) {
+    const guidance =
+      "Không thể kết nối đến máy chủ provider hoặc dịch vụ đang tạm ngưng. Kiểm tra mạng và trạng thái server.";
+    return {
+      category: "unavailable",
+      title: "Dịch vụ provider không khả dụng (Unavailable)",
       guidance,
       message: guidance,
       detail: rawDetail,
