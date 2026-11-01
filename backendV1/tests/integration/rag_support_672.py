@@ -28,6 +28,24 @@ class ParagraphChat(FakeChat):
         draft["sections"][0]["paragraphs"] = [
             {**original, "text": f"{original['text']} Đoạn kiểm thử {i + 1}."} for i in range(4)
         ]
+        # Source-backed metadata must be cited by the annotated unit itself;
+        # being anywhere in the same OCR document is insufficient.
+        incoming = json.loads(self.requests[index]["body"]["messages"][-1]["content"])
+        proofs = {}
+        for doc in incoming["documents"]:
+            for page in doc["pages"]:
+                for block in page["blocks"]:
+                    for row in (block.get("table") or {}).get("rows", []):
+                        for cell in row:
+                            year = re.search(r"\b(20\d{2})\b", cell["text"])
+                            if year:
+                                proofs[int(year.group(1))] = (
+                                    doc["ocr_run_id"] + ":" + cell["evidence_id"]
+                                )
+        for paragraph, year in zip(
+            draft["sections"][0]["paragraphs"], (2024, 2024, 2023), strict=False
+        ):
+            paragraph["citations"] = [*paragraph["citations"], proofs[year]]
         draft["sections"].append({"heading": "Mục khác", "paragraphs": [dict(original)]})
         body["choices"][0]["message"]["content"] = json.dumps(draft)
         return status, json.dumps(body).encode()
@@ -81,7 +99,7 @@ def register(client, data, annotations=None, *, key="register-metadata"):
 
 
 @pytest.fixture
-def metadata_index(client):
+def metadata_index(client, request):
     data = prepared(client)
     created = register(client, data)
     assert created.status_code == 201, created.text
@@ -96,13 +114,13 @@ def metadata_index(client):
     data["version_url"] = version_url
     as_actor(PLATFORM)
     for action in ("approve", "publish"):
-        request = {"action": action, "reason": "Controlled scope fixture review."}
+        decision_request = {"action": action, "reason": "Controlled scope fixture review."}
         if action == "approve":
-            request["review_ack"] = acknowledgement(client, version_url)
-            request["review_ack"]["retrieval_metadata_sha256"] = created.json()["version"][
+            decision_request["review_ack"] = acknowledgement(client, version_url)
+            decision_request["review_ack"]["retrieval_metadata_sha256"] = created.json()["version"][
                 "retrieval_metadata_sha256"
             ]
-        preview = client.post(version_url + "/decision-preview", json=request)
+        preview = client.post(version_url + "/decision-preview", json=decision_request)
         assert preview.status_code == 200, preview.text
         result = client.post(
             version_url + "/decisions",
@@ -117,7 +135,9 @@ def metadata_index(client):
     with FakeEmbedding() as embedding:
         provider = embedding_provider(client, data, embedding.base_url)
         requested = client.post(
-            data["base"] + "/indexing-runs", headers={"Idempotency-Key": "index"}, json={}
+            data["base"] + "/indexing-runs",
+            headers={"Idempotency-Key": "index"},
+            json={"contextual_search": True} if getattr(request, "param", False) else {},
         )
         assert requested.status_code == 201, requested.text
         run_id = requested.json()["run"]["id"]

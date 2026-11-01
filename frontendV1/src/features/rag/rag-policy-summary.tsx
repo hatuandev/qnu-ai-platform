@@ -84,6 +84,14 @@ export function RagPolicySummary({ policy }: { policy?: RagPolicy | null }) {
         </div>
       ) : null}
 
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-muted-foreground">Phạm vi câu hỏi</span>
+        <span>
+          {value.scope_resolution === "catalog"
+            ? "Nhận diện từ tài liệu"
+            : "Theo bộ lọc đã chọn"}
+        </span>
+      </div>
       <div className="flex items-start justify-between gap-2 border-t pt-2">
         <span className="text-muted-foreground">Phạm vi metadata</span>
         <span className="text-right text-foreground">

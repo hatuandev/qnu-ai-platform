@@ -2,6 +2,7 @@
 
 import json
 
+from qnu.domains.knowledge.index.contextual import original_text
 from qnu.domains.knowledge.index.schemas import SearchHit
 
 TABLE_FIELDS = (
@@ -24,13 +25,14 @@ def table_prefix(hit: SearchHit) -> str | None:
     duplicate = json.dumps(
         {key: structure[key] for key in TABLE_FIELDS}, ensure_ascii=False, sort_keys=True
     )
-    return hit.text[: -len(duplicate)] if hit.text.endswith(duplicate) else None
+    text = original_text(hit)
+    return text[: -len(duplicate)] if text.endswith(duplicate) else None
 
 
 def reading_text(hit: SearchHit) -> str:
     prefix = table_prefix(hit)
     if prefix is None:
-        return hit.text
+        return original_text(hit)
     structure = hit.structure
     lines = [prefix.rstrip()]
     for index, row in zip(structure["row_indices"], structure["rows"], strict=True):
@@ -44,4 +46,5 @@ def reading_text(hit: SearchHit) -> str:
 def rerank_text(hit: SearchHit) -> str:
     # JSON-escaped newlines separate words inside table cells. Models should see
     # natural text, not cell IDs, serialization keys or duplicate JSON.
-    return " ".join(reading_text(hit).split())
+    context = (hit.structure or {}).get("search_context", {})
+    return " ".join((context.get("prefix", "") + reading_text(hit)).split())

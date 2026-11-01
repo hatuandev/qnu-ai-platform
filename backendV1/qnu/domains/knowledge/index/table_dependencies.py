@@ -1,6 +1,41 @@
 """Derived native table boundaries; never change canonical evidence."""
 
 BASIS = "native_numbered_table_boundary/v1"
+TYPED_BASIS = "native_typed_columns/v1"
+
+
+def typed_header(table: dict) -> bool:
+    """Single native header proven by repeated column type contrast, not vocabulary.
+
+    Cross-page joins still require the numbered boundary proof below. This rule
+    only labels row zero of one complete, rectangular, unmerged source table.
+    """
+    rows, columns = table["rows"], table["column_count"]
+    if (
+        len(rows) < 3
+        or columns < 2
+        or any(
+            len(row) != columns or any(c["row_span"] != 1 or c["col_span"] != 1 for c in row)
+            for row in rows
+        )
+    ):
+        return False
+    if not all(
+        c["text"].strip()
+        and any(ch.isalpha() for ch in c["text"])
+        and not any(ch.isdigit() for ch in c["text"])
+        for c in rows[0]
+    ):
+        return False
+    # At least one column has repeated numeric observations where row zero is a label.
+    return any(
+        all(
+            any(ch.isdigit() for ch in row[col]["text"])
+            and not any(ch.isalpha() for ch in row[col]["text"])
+            for row in rows[1:]
+        )
+        for col in range(columns)
+    )
 
 
 def sequence(table: dict) -> list[int] | None:
@@ -65,6 +100,15 @@ def dependencies(document: dict) -> dict[str, dict]:
                 previous, header, chain = None, None, []
                 continue
             ref = run + ":" + block["evidence_id"]
+            if not header_row(table) and typed_header(table):
+                result[ref] = {
+                    "basis": TYPED_BASIS,
+                    "header": ref,
+                    "chain": [ref],
+                    "previous": None,
+                }
+                previous, header, chain = None, None, []
+                continue
             start = 1 if header_row(table) else 0
             numbers = sequence({**table, "rows": table["rows"][start:]})
             if numbers is None:

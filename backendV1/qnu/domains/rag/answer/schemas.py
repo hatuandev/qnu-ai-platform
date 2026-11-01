@@ -27,6 +27,7 @@ class AnswerRequest(RagPolicy):
             candidate_k=self.candidate_k,
             rerank_provider_id=self.rerank_provider_id,
             metadata_filter=self.metadata_filter,
+            scope_resolution=self.scope_resolution,
             rrf_k=self.rrf_k,
         )
         return self
@@ -77,6 +78,7 @@ class ModelAnswer(BaseModel):
 
 class EvidenceSource(SearchHit):
     evidence_id: str
+    source_passages: list[dict[str, str]] = Field(default_factory=list)
 
 
 class AnswerTrace(BaseModel):
@@ -96,6 +98,7 @@ class AnswerTrace(BaseModel):
     stage_ms: dict[str, float] = Field(default_factory=dict)
     context: dict = Field(default_factory=dict)
     grounding: dict = Field(default_factory=dict)
+    contract: dict = Field(default_factory=dict)
     verification: dict = Field(default_factory=lambda: {"mode": "off", "status": "not_run"})
 
 

@@ -1,14 +1,44 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
-  TARGET_RETEST9_IDS,
   assertRunnerCompletion,
   buildCohortConfigFingerprint,
   checkConfigDrift,
-  resolveDocumentBinding,
+  dispatchRetestOnce,
+  mustHaltRetest,
+  type Retest9Record,
   type Retest9Report,
+  resolveDocumentBinding,
+  TARGET_RETEST9_IDS,
 } from "../e2e/stages/retest9-core";
 
 describe("Retest9 Runner Integrity Tests (Offline)", () => {
+  it("drift and uncertainty halt instead of continuing", () => {
+    expect(mustHaltRetest("DRIFT_DETECTED: changed")).toBe(true);
+    expect(mustHaltRetest("uncertain")).toBe(true);
+  });
+  it("persists before dispatch and cannot resend an ambiguous request", async () => {
+    const r = {
+      dispatched: false,
+      conversation_id: "conv",
+      turn_key: "key",
+    } as Retest9Record;
+    const order: string[] = [];
+    const persist = () => {
+      order.push("saved");
+    };
+    const post = vi.fn(async () => {
+      order.push("sent");
+      throw new Error("timeout");
+    });
+    await expect(dispatchRetestOnce(r, persist, post)).rejects.toThrow(
+      "timeout",
+    );
+    await expect(dispatchRetestOnce(r, persist, post)).rejects.toThrow(
+      "BLOCKED",
+    );
+    expect(order).toEqual(["saved", "sent"]);
+    expect(post).toHaveBeenCalledTimes(1);
+  });
   // Test 1: Scope single thiếu binding phải bị chặn (BLOCKED), tuyệt đối không mở thành all
   describe("1. Scope binding fail-closed", () => {
     it("ném lỗi BLOCKED khi scope single nhưng thiếu target_doc", () => {
@@ -16,21 +46,23 @@ describe("Retest9 Runner Integrity Tests (Offline)", () => {
         resolveDocumentBinding({
           id: "F13",
           scope: "single",
-          target_doc: undefined as any,
+          target_doc: "",
         });
       }).toThrow(/BLOCKED: Case F13 có scope 'single' nhưng thiếu target_doc/);
     });
 
     it("ném lỗi BLOCKED khi scenarioDocuments không có binding cho target_doc", () => {
       const scenarioDocs = {
-        floor2026: { key: "floor2026" }, // không có publication.document
+        floor2026: {}, // không có publication.document
       };
       expect(() => {
         resolveDocumentBinding(
           { id: "F13", scope: "single", target_doc: "floor2026" },
-          scenarioDocs as any,
+          scenarioDocs,
         );
-      }).toThrow(/BLOCKED: Không tìm thấy document binding cho target_doc 'floor2026'/);
+      }).toThrow(
+        /BLOCKED: Không tìm thấy document binding cho target_doc 'floor2026'/,
+      );
     });
 
     it("trả về mảng 1 phần tử khi scope single có binding hợp lệ", () => {
@@ -42,7 +74,7 @@ describe("Retest9 Runner Integrity Tests (Offline)", () => {
       };
       const binding = resolveDocumentBinding(
         { id: "F13", scope: "single", target_doc: "floor2026" },
-        scenarioDocs as any,
+        scenarioDocs,
       );
       expect(binding).toEqual(["cdoc_123"]);
     });
@@ -166,8 +198,15 @@ describe("Retest9 Runner Integrity Tests (Offline)", () => {
           dispatched: true,
           client_elapsed_ms: 1000,
           inference_ms: 800,
-          tokens: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
-          response: {},
+          tokens: {
+            prompt_tokens: 100,
+            completion_tokens: 50,
+            total_tokens: 150,
+          },
+          response: {} as Retest9Record["response"],
+          turn_id: `turn-${id}`,
+          conversation_id: `conv-${id}`,
+          turn_key: `key-${id}`,
         })),
         ...overrides,
       };
@@ -177,12 +216,18 @@ describe("Retest9 Runner Integrity Tests (Offline)", () => {
       const rep = mockReport();
       expect(() => assertRunnerCompletion(rep)).not.toThrow();
     });
+    it("rejects PASS without actual dispatch", () => {
+      const rep = mockReport({ dispatched: 0 });
+      expect(() => assertRunnerCompletion(rep)).toThrow(/dispatch/);
+    });
 
     it("ném lỗi RUNNER_HALTED khi cohort bị halt do hạ tầng/drift", () => {
       const rep = mockReport({
         halted: "Quota exceeded",
       });
-      expect(() => assertRunnerCompletion(rep)).toThrow(/RUNNER_HALTED: Cohort bị dừng do lỗi hạ tầng\/drift: Quota exceeded/);
+      expect(() => assertRunnerCompletion(rep)).toThrow(
+        /RUNNER_HALTED: Cohort bị dừng do lỗi hạ tầng\/drift: Quota exceeded/,
+      );
     });
 
     it("ném lỗi RUNNER_INCOMPLETE khi có câu bị FAIL (khắc phục false-green P1)", () => {
@@ -198,20 +243,26 @@ describe("Retest9 Runner Integrity Tests (Offline)", () => {
         passed: 8,
         failed: 1,
       });
-      expect(() => assertRunnerCompletion(rep)).toThrow(/RUNNER_INCOMPLETE: Có 1\/9 câu chưa đạt tiêu chuẩn PASS: F13:FAIL\[chat_output_truncated\]/);
+      expect(() => assertRunnerCompletion(rep)).toThrow(
+        /RUNNER_INCOMPLETE: Có 1\/9 câu chưa đạt tiêu chuẩn PASS: F13:FAIL\[chat_output_truncated\]/,
+      );
     });
 
     it("ném lỗi RUNNER_FAILURE khi thiếu câu hỏi hoặc trùng lặp", () => {
       const records = mockReport().records.slice(0, 8); // Chỉ có 8 câu
       const rep = mockReport({ records, expected: 9, passed: 8 });
-      expect(() => assertRunnerCompletion(rep)).toThrow(/RUNNER_FAILURE: Số lượng records không khớp 9/);
+      expect(() => assertRunnerCompletion(rep)).toThrow(
+        /RUNNER_FAILURE: Số lượng records không khớp 9/,
+      );
     });
 
     it("ném lỗi RUNNER_FAILURE khi có ID lạ", () => {
       const records = mockReport().records;
       records[0] = { ...records[0], id: "UNKNOWN-99" };
       const rep = mockReport({ records });
-      expect(() => assertRunnerCompletion(rep)).toThrow(/RUNNER_FAILURE: Gặp ID không thuộc phạm vi retest9: 'UNKNOWN-99'/);
+      expect(() => assertRunnerCompletion(rep)).toThrow(
+        /RUNNER_FAILURE: Gặp ID không thuộc phạm vi retest9: 'UNKNOWN-99'/,
+      );
     });
   });
 });

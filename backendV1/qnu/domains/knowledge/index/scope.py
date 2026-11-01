@@ -11,9 +11,16 @@ from qnu.platform.errors import Conflict
 
 
 async def metadata_chunk_ids(
-    db: AsyncSession, run: IndexRun, allowed: list[IndexInput], scope: MetadataFilter, sealed: dict
+    db: AsyncSession,
+    run: IndexRun,
+    allowed: list[IndexInput],
+    scope: MetadataFilter,
+    sealed: dict,
+    *,
+    alternatives: list[MetadataFilter] | None = None,
 ) -> list[str] | None:
-    if not scope.model_dump(exclude_none=True):
+    scopes = alternatives or [scope]
+    if any(not item.model_dump(exclude_none=True) for item in scopes):
         return None
     rows = (
         await db.execute(
@@ -32,6 +39,6 @@ async def metadata_chunk_ids(
     for identifier, structure in rows:
         if digest(structure) != proofs.get(identifier):
             raise Conflict("Metadata khác manifest đã ghim.", code="index_metadata_changed")
-        if matches_metadata(structure, scope):
+        if any(matches_metadata(structure, item) for item in scopes):
             matched.append(identifier)
     return matched

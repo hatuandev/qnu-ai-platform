@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.index.models import IndexChunk, IndexInput, IndexRun
+from qnu.domains.knowledge.index.query_scope import plan
 from qnu.domains.knowledge.index.schemas import SearchHit, SearchRequest, SearchResponse
 from qnu.domains.knowledge.index.scope import metadata_chunk_ids
 from qnu.domains.knowledge.index.snapshots import publication_identity, published_versions
@@ -235,7 +236,16 @@ async def search(
                 "metadata_filter": req.metadata_filter.model_dump(mode="json", exclude_none=True),
             },
         )
-    chunk_ids = await metadata_chunk_ids(db, run, allowed, req.metadata_filter, sealed)
+    scope_trace, scopes = {}, None
+    original_query = req.query
+    if req.scope_resolution == "catalog":
+        expanded, scopes, scope_trace = await plan(
+            db, run, allowed, sealed, original_query, req.metadata_filter
+        )
+        req = req.model_copy(update={"query": expanded})
+    chunk_ids = await metadata_chunk_ids(
+        db, run, allowed, req.metadata_filter, sealed, alternatives=scopes
+    )
     if chunk_ids == []:
         return SearchResponse(
             index_run_id=run.id,
@@ -248,6 +258,7 @@ async def search(
                 "mode": req.mode,
                 "metadata_filter": req.metadata_filter.model_dump(mode="json", exclude_none=True),
                 "metadata_eligible_chunks": 0,
+                **({"scope_resolution": scope_trace} if scope_trace else {}),
             },
         )
     started = time.monotonic()
@@ -278,7 +289,15 @@ async def search(
             skipped_documents=skipped,
         )
     sealed = await manifest(db, blob, run)
-    chunk_ids = await metadata_chunk_ids(db, run, allowed, req.metadata_filter, sealed)
+    if scope_trace:
+        _, _, current_scope = await plan(
+            db, run, allowed, sealed, original_query, req.metadata_filter
+        )
+        if current_scope != scope_trace:
+            raise Conflict("Danh mục phạm vi đã thay đổi.", code="answer_evidence_changed")
+    chunk_ids = await metadata_chunk_ids(
+        db, run, allowed, req.metadata_filter, sealed, alternatives=scopes
+    )
     if chunk_ids == []:
         return SearchResponse(
             index_run_id=run.id,
@@ -291,6 +310,7 @@ async def search(
                 "mode": req.mode,
                 "metadata_filter": req.metadata_filter.model_dump(mode="json", exclude_none=True),
                 "metadata_eligible_chunks": 0,
+                **({"scope_resolution": scope_trace} if scope_trace else {}),
             },
         )
     dense_started = time.monotonic()
@@ -313,6 +333,7 @@ async def search(
             "Vector trả chunk ngoài phạm vi metadata.", code="vector_response_invalid"
         )
     trace = {
+        **({"scope_resolution": scope_trace} if scope_trace else {}),
         "mode": req.mode,
         "dense_count": len(hits),
         "manifest_sha256": run.manifest_sha256,

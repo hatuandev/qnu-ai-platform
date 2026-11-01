@@ -9,8 +9,8 @@ from collections.abc import Awaitable, Callable
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.knowledge.index.query_scope import result_scopes
 from qnu.domains.knowledge.index.schemas import SearchRequest
-from qnu.domains.knowledge.index.search import search
 from qnu.domains.knowledge.index.validation import validate_results
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.modelops.inference.service import prepare_chat_request
@@ -19,9 +19,20 @@ from qnu.domains.modelops.usage.service import usage_service
 from qnu.domains.rag.answer.cells import PROJECTION_VERSION, catalog, materialize
 from qnu.domains.rag.answer.cells import VERSION as CELLS_VERSION
 from qnu.domains.rag.answer.context import expand_context
-from qnu.domains.rag.answer.drafting import PROMPT_VERSION, messages_for, parse_answer, sources_for
+from qnu.domains.rag.answer.drafting import (
+    PROMPT_VERSION,
+    messages_for,
+    output_schema,
+    parse_answer,
+    response_observation,
+    sources_for,
+)
+from qnu.domains.rag.answer.narrative import continuation_supports
+from qnu.domains.rag.answer.retrieval import search
 from qnu.domains.rag.answer.schemas import AnswerRequest, AnswerResponse, AnswerTrace
+from qnu.domains.rag.answer.source_text import attach_source_text
 from qnu.domains.rag.answer.verification import verify
+from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException, Conflict
 from qnu.platform.logging import get_logger
@@ -73,6 +84,7 @@ async def answer(
             candidate_k=req.candidate_k,
             rerank_provider_id=req.rerank_provider_id,
             metadata_filter=req.metadata_filter,
+            scope_resolution=req.scope_resolution,
             rrf_k=req.rrf_k,
         ),
         reranker=reranker,
@@ -96,6 +108,7 @@ async def answer(
         trace.verification["skip_reason"] = "no_evidence"
         return response
     sources = sources_for(retrieval)
+    await attach_source_text(db, blob, workspace_id, collection_id, sources)
     cells = catalog(sources, trace.context.get("table_links"))
     messages = messages_for(
         req.question,
@@ -104,7 +117,16 @@ async def answer(
         table_cells=cells,
         resolved_question=retrieval_query,
         persona=persona,
-        metadata_filter=req.metadata_filter.model_dump(mode="json", exclude_none=True),
+        metadata_filter=(
+            {
+                "any_of": [
+                    s.model_dump(mode="json", exclude_none=True)
+                    for s in result_scopes(retrieval, req.metadata_filter)
+                ]
+            }
+            if req.scope_resolution == "catalog"
+            else req.metadata_filter.model_dump(mode="json", exclude_none=True)
+        ),
     )
     # Count the actual evidence envelope, including the derived cell catalog and
     # dependency links. Question/style/history are bounded separately by ModelOps.
@@ -113,7 +135,7 @@ async def answer(
         json.dumps(
             {
                 key: envelope[key]
-                for key in ("evidence", "table_cells", "table_context")
+                for key in ("evidence", "table_cells", "table_context", "narrative_context")
                 if key in envelope
             },
             ensure_ascii=False,
@@ -121,6 +143,8 @@ async def answer(
         ).encode("utf-8")
     )
     trace.context["bytes_used"] = evidence_bytes
+    trace.context["narrative_groups"] = len(envelope.get("narrative_context", []))
+    trace.context["narrative_context_sha256"] = digest(envelope.get("narrative_context", []))
     if evidence_bytes > req.context_max_bytes:
         raise AppException(
             "Bằng chứng và danh mục ô vượt ngân sách context.",
@@ -136,6 +160,7 @@ async def answer(
     proof = await validate_results(
         db, blob, vectors, actor, workspace_id, collection_id, retrieval, req.document_ids
     )
+    answer_schema = output_schema(sources)
     runtime, request, budget = await prepare_chat_request(
         db,
         actor,
@@ -145,6 +170,7 @@ async def answer(
         task="answer",
         reasoning_task="answer",
         max_output_tokens=req.max_output_tokens or get_settings().RAG_MAX_OUTPUT_TOKENS,
+        output_schema=answer_schema,
     )
     inference_hash = runtime.inference_configuration_hash("answer")
     trace.inference_configuration_hash = inference_hash
@@ -205,13 +231,52 @@ async def answer(
         result.completion_tokens,
         result.total_tokens,
     )
-    proposed = parse_answer(result.content, sources)
-    draft = materialize(proposed, sources, cells)
+    trace.contract = {
+        "schema_sha256": digest(answer_schema),
+        "finish_reason": result.finish_reason,
+        **response_observation(result),
+    }
+    try:
+        proposed = parse_answer(result.content, sources)
+        draft = materialize(proposed, sources, cells)
+    except AppException as exc:
+        await record_workspace_event(
+            db,
+            workspace_id=workspace_id,
+            actor=actor,
+            action="answer.validation_failed",
+            detail={
+                "answer_id": answer_id,
+                "usage_id": usage.id,
+                "code": exc.code,
+                "issues": getattr(exc, "validation_issues", []),
+                "output_sha256": digest(result.content),
+                "finish_reason": result.finish_reason,
+                "prompt_tokens": result.prompt_tokens,
+                "completion_tokens": result.completion_tokens,
+                "total_tokens": result.total_tokens,
+                "max_output_tokens": request.max_output_tokens,
+                "inference_configuration_hash": inference_hash,
+                "prompt_version": PROMPT_VERSION,
+                "reasoning": trace.reasoning,
+                "contract": trace.contract,
+            },
+        )
+        await db.commit()
+        raise
     trace.grounding["selected_cells"] = [item.cell_id for item in proposed.lookups]
+    trace.grounding["narrative_supports"] = continuation_supports(sources)
     trace.grounding["projection"] = {
         "version": PROJECTION_VERSION,
-        "mode": "selected_cells" if proposed.lookups else "narrative",
-        "omitted_model_statements": len(proposed.statements) if proposed.lookups else 0,
+        "mode": (
+            "mixed"
+            if proposed.lookups and len(draft.statements) > len(proposed.lookups)
+            else "selected_cells"
+            if proposed.lookups
+            else "narrative"
+        ),
+        "omitted_model_statements": len(proposed.statements)
+        - (len(draft.statements) - len(proposed.lookups)),
     }
     trace.grounding["cell_proofs"] = [
         {key: cell[key] for key in ("cell_id", "evidence_ids", "source_cells")}

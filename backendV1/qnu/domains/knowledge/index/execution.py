@@ -13,6 +13,7 @@ from qnu.domains.identity.background import background_actor
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.index.chunking import CHUNKER_VERSION
+from qnu.domains.knowledge.index.contextual import VERSION as CONTEXT_VERSION
 from qnu.domains.knowledge.index.lease import (
     ClaimLost,
     assert_claim,
@@ -45,6 +46,7 @@ async def validate_target(db: AsyncSession, run: IndexRun, actor: AuthActor, vec
         runtime.configuration_hash != run.config["provider"]["configuration_hash"]
         or vectors.target_hash != run.config["vector_target_hash"]
         or run.config["chunker_version"] != CHUNKER_VERSION
+        or run.config.get("search_context_version") not in (None, CONTEXT_VERSION)
     ):
         raise Conflict(
             "Model/vector target/chunker đã thay đổi.", code="index_configuration_changed"

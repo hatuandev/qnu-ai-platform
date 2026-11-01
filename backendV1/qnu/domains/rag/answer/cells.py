@@ -5,11 +5,12 @@ import re
 from pydantic import ValidationError
 
 from qnu.domains.knowledge.index.table_layout import header_rows, layout
+from qnu.domains.rag.answer.narrative import complete_citations
 from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer, Statement
 from qnu.platform.errors import AppException
 
-VERSION = "qnu.answer-cells/v2"
-PROJECTION_VERSION = "qnu.answer-projection/v1"
+VERSION = "qnu.answer-cells/v3"
+PROJECTION_VERSION = "qnu.answer-projection/v3"
 
 
 def _same_input(left, right):
@@ -57,7 +58,10 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
                 header_positions, errors = layout(header_source.structure)
                 # Legacy native dependency proof verifies a single unmarked header row.
                 headers = header_rows(header_source.structure) or (
-                    [0] if link.get("basis") == "native_numbered_table_boundary/v1" else []
+                    [0]
+                    if link.get("basis")
+                    in {"native_numbered_table_boundary/v1", "native_typed_columns/v1"}
+                    else []
                 )
                 if (
                     errors
@@ -114,7 +118,13 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
             ]
             # A value without a named subject is ambiguous; never label it with row number.
             if not labels:
-                continue
+                # Numeric lookup keys are subjects too (e.g. a conversion grid).
+                # Require a nonempty leading source cell and its resolved header;
+                # never manufacture an ordinal for an anonymous row.
+                first = identity[0]
+                if first.column != 0 or not fields.get("0") or not _ref(origin, first):
+                    continue
+                labels = [first]
             label = labels[0]
             # Keep the leading textual row path (e.g. group + item/phase) rather
             # than collapsing every child of a row-spanned group to one subject.
@@ -127,6 +137,8 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
                 if not _ref(origin, candidate):
                     break
                 subjects.append(candidate)
+            if not subjects:
+                subjects = [label]
             for p in body:
                 row_subjects = [s for s in subjects if s.column < p.column] or [label]
                 field = fields.get(str(p.column))
@@ -150,7 +162,12 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
                         # Physical columns remain unique when a preceding row's
                         # spanning cell and a new cell share the same list index.
                         "cell_id": f"{source.evidence_id}:r{row}:k{p.column}",
-                        "subject": " / ".join(s.cell["text"] for s in row_subjects),
+                        "subject": " / ".join(
+                            s.cell["text"]
+                            if any(ch.isalpha() for ch in s.cell["text"])
+                            else " / ".join(fields[str(s.column)]) + ": " + s.cell["text"]
+                            for s in row_subjects
+                        ),
                         "column": p.column,
                         "value": p.cell["text"],
                         "evidence_ids": ids,
@@ -159,6 +176,11 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
                                 [
                                     ref,
                                     *[_ref(origin, s) for s in row_subjects],
+                                    *[
+                                        ref
+                                        for s in row_subjects
+                                        for ref in field_refs.get(str(s.column), [])
+                                    ],
                                     *field_refs[str(p.column)],
                                 ]
                             )
@@ -179,8 +201,8 @@ def materialize(answer: ModelAnswer, sources: list[EvidenceSource], cells: dict)
             "Ô được chọn không thuộc bằng chứng.", code="answer_cell_invalid", status_code=502
         )
     structured = {s.evidence_id for s in sources if s.kind == "table"}
-    # Lookups form an extractive response: prose is never an additional authority.
-    # Without a selection, numeric narrative still cannot bypass table grounding.
+    # Table values remain extractive. Paragraph prose retains the same citation
+    # contract as narrative-only answers; table prose is never another authority.
     if not selected and any(
         re.search(r"\d", s.text) and structured.intersection(s.evidence_ids)
         for s in answer.statements
@@ -190,7 +212,12 @@ def materialize(answer: ModelAnswer, sources: list[EvidenceSource], cells: dict)
             code="answer_cell_selection_required",
             status_code=502,
         )
-    statements = [] if selected else list(answer.statements)
+    statements = [
+        s.model_copy(deep=True)
+        for s in answer.statements
+        if not selected or not structured.intersection(s.evidence_ids)
+    ]
+    complete_citations(statements, sources)
     for key in selected:
         table, cell = allowed[key]
         field = " / ".join(table["fields"][str(cell["column"])])

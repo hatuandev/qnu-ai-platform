@@ -66,6 +66,7 @@ export type SearchResponse = {
 };
 
 export type SearchRequestInput = {
+  scope_resolution?: "explicit" | "catalog";
   query: string;
   top_k: number;
   document_ids?: string[] | null;
@@ -93,6 +94,9 @@ export function searchInputFromPolicy(
   topK: number,
 ): SearchRequestInput {
   return {
+    ...(policy.scope_resolution === "catalog"
+      ? { scope_resolution: "catalog" as const }
+      : {}),
     query,
     top_k: topK,
     mode: policy.retrieval_mode,

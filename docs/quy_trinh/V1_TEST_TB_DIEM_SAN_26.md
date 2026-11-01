@@ -1,5 +1,25 @@
 # Kiểm thử PDF thật — TB điểm sàn 26
 
+## Kết quả mới phiên789 — F14/MX-05
+
+Promptv13 hỗ trợ thứ tự đọc/citation cho đoạn liên tiếp cùng snapshot và kết hợp văn bản với ô bảng; schema chỉ cho statements dẫn văn bản. Không cần recompile/reindex để nạp thay đổi RAG này, chỉ serve phải dùng backend hiện tại.
+
+Cohortv13 gửi9câu đúng một lượt/câu: **8 PASS/1 UNCERTAIN**, F14/MX-05 PASS. I25-04 bị ngắt tiến trình API/test trước khi ghi kết quả, không gửi lại để làm xanh. Sau khôi phục chỉ chạy sáu ID chưa dispatch với fingerprint cũ; báo cáo vẫn exit1. Đây không phải9/9PASS, không trộn các kết quả v11/v12. Khi tiến trình mất, `server.json=true` và DBturn=running chưa chứng minh model vẫn xử lý; kiểm port/process và đối soát trước khi chạy tiếp. Không tự xóa lock hoặc gửi lại uncertain turn chỉ vì lâu. Xem [nhật ký789](../nhat_ky/2026-11-01_phien_789_dieu_kien_va_tra_loi_hon_hop.md).
+
+## Chạy riêng chín câu lỗi, không retry — phiên788
+
+Sau khi publication/index của phiên hiện tại đã PASS và serve đã nạp backend hiện tại, chạy từ root:
+
+```powershell
+.\backendV1\.venv\Scripts\python.exe -X utf8 scripts/run_admissions_retest.py --headed
+```
+
+Runner chỉ dành cho F13/F14/I25-04/I25-05/BC24-05/BC24-08/MX-02/MX-05/MX-10 của snapshot tuyển sinh hiện tại. Tạo thư mục cohort mới, không đổi checkpoint cũ; một POST turn/câu, không gửi lại khi kết quả chưa rõ. Drift/uncertain/hạ tầng dừng chặng, có FAIL thì exit1. Runtime cần answer off, output16384/context98304byte, provider không retry/fallback; runner kiểm trước khi gửi. Thiếu publication/binding/capacity/quota thì BLOCKED, không tự thay cấu hình.
+
+Mỗi lần gọi lệnh là một thí nghiệm mới có chi phí; không chạy liên tục để chọn kết quả đẹp. Khi lỗi, đọc report trong thư mục được in ra. Không cleanup/init/upload/recompile/reindex chỉ để chạy nhóm câu này.
+
+Kiểm chứng phiên788: **7 PASS/2 FAIL**,0 NOT_RUN/UNCERTAIN,177.7s; F14/MX-05 còn model_abstained dù căn cứ vào context. Audit9chat attempt1, không retry, không lỗi schema/output truncation trong cohort này. Kết quả không thay full53 cũ. Xem [nhật ký788](../nhat_ky/2026-11-01_phien_788_sua_rag_va_retest9.md).
+
 ## Ngân sách trả lời mới — phiên785
 
 Theo yêu cầu người dùng, Qwen hiện được cấu hình task `answer` tắt suy luận (`enable_thinking=false`), giữ compiler off. Assistant tuyển sinh hiện tại dùng output tối đa model công bố **16384 token**, context **131072**, ngân sách evidence **98304 byte** và overhead dự toán **16384**. Output là trần; model hoàn tất sớm trả kết quả ngay.

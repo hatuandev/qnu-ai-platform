@@ -14,6 +14,7 @@ from qnu.domains.knowledge.compilation.artifacts import read
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.compilation.service import get_run as get_compilation_run
 from qnu.domains.knowledge.index.chunking import CHUNKER_VERSION, build_chunks
+from qnu.domains.knowledge.index.contextual import RESERVE_BYTES, VERSION, enrich
 from qnu.domains.knowledge.index.models import IndexChunk, IndexInput, IndexRun
 from qnu.domains.knowledge.index.schemas import IndexRequest
 from qnu.domains.knowledge.index.snapshots import current_snapshot, publication_identity
@@ -77,7 +78,10 @@ async def request_index(
     commit: bool = True,
 ) -> RequestedIndex:
     await authorize(db, actor, workspace_id, collection_id, write=True)
-    request_hash = digest({"collection_id": collection_id, **req.model_dump()})
+    options = req.model_dump()
+    if not req.contextual_search:
+        options.pop("contextual_search")  # Existing idempotency receipts remain replayable.
+    request_hash = digest({"collection_id": collection_id, **options})
     if replacement_action_id:
         request_hash = digest(
             {
@@ -138,6 +142,7 @@ async def request_index(
             "chunk_max_bytes": maximum,
             "embedding_batch_size": settings.INDEX_EMBED_BATCH_SIZE,
             "vector_target_hash": vector_store.target_hash,
+            **({"search_context_version": VERSION} if req.contextual_search else {}),
         },
         input_sha256=digest([publication_identity(p) for p in published]),
         requested_by=actor_ref(actor),
@@ -169,15 +174,25 @@ async def request_index(
             db, actor, workspace_id, collection_id, publication.version.compilation_run_id
         )
         _, payload = await read(db, blob, compilation, "input_snapshot")
+        documents = json.loads(payload)["documents"]
+        # Preserve room for a real table row group at the default 3000-byte cap.
+        # The final enriched bytes are still checked exactly, never truncated.
+        chunk_budget = (
+            maximum - min(RESERVE_BYTES, maximum // 4) if req.contextual_search else maximum
+        )
+        if chunk_budget < 64:
+            raise Conflict("Capacity không đủ cho ngữ cảnh nguồn.", code="index_context_too_large")
         chunks = build_chunks(
             publication.content,
-            json.loads(payload)["documents"],
-            maximum,
+            documents,
+            chunk_budget,
             [
                 a.model_dump(mode="json", exclude_none=True)
                 for a in publication.version.retrieval_metadata
             ],
         )
+        if req.contextual_search:
+            chunks = enrich(chunks, publication.content, documents, maximum)
         reports = [
             c.structure["reading_quality"]
             for c in chunks

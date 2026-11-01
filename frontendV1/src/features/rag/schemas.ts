@@ -9,6 +9,7 @@ import { DEFAULT_RAG_POLICY } from "./types";
  * TanStack Form field with its own error message, and no one has to type JSON.
  */
 export type RagPolicyFormValues = {
+  scope_resolution: "explicit" | "catalog";
   retrieval_mode: RagPolicy["retrieval_mode"];
   candidate_k: number;
   rrf_k: number;
@@ -43,6 +44,7 @@ const isoDateSchema = z
 
 export const ragPolicyFormSchema = z
   .object({
+    scope_resolution: z.enum(["explicit", "catalog"]).default("explicit"),
     retrieval_mode: z.enum(["dense", "hybrid", "hybrid_rerank"]),
     candidate_k: z
       .number()
@@ -114,6 +116,9 @@ export function toRagPolicy(values: RagPolicyFormValues): RagPolicy {
   if (values.filter_intake) filter.intake = values.filter_intake;
 
   return {
+    ...(values.scope_resolution === "catalog"
+      ? { scope_resolution: "catalog" as const }
+      : {}),
     retrieval_mode: values.retrieval_mode,
     candidate_k: values.candidate_k,
     rrf_k: values.rrf_k,
@@ -142,6 +147,7 @@ export function toRagPolicyForm(
   const source = policy ?? DEFAULT_RAG_POLICY;
   const filter = source.metadata_filter ?? {};
   return {
+    scope_resolution: source.scope_resolution ?? "explicit",
     retrieval_mode: source.retrieval_mode ?? "dense",
     candidate_k: source.candidate_k ?? 30,
     rrf_k: source.rrf_k ?? 60,

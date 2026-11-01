@@ -11,6 +11,7 @@ from qnu.domains.knowledge.metadata import MetadataFilter
 class IndexRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     provider_id: str | None = Field(None, min_length=1, max_length=64)
+    contextual_search: bool = Field(False, strict=True)
 
 
 class IndexResponse(BaseModel):
@@ -50,6 +51,7 @@ class SearchRequest(BaseModel):
     rrf_k: int = Field(60, strict=True, ge=1, le=1000)
     rerank_provider_id: str | None = Field(None, min_length=1, max_length=64)
     metadata_filter: MetadataFilter = Field(default_factory=MetadataFilter)
+    scope_resolution: Literal["explicit", "catalog"] = "explicit"
 
     @model_validator(mode="after")
     def candidate_budget(self):

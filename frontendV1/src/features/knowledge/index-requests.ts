@@ -52,11 +52,14 @@ export async function requestIndex(
   collectionId: string,
   providerId: string | null,
   idempotencyKey: string,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; contextualSearch?: boolean },
 ): Promise<IndexCreated> {
   return client.post<IndexCreated>(
     indexingPaths.runs(workspaceId, collectionId),
-    { provider_id: providerId },
+    {
+      provider_id: providerId,
+      ...(options?.contextualSearch ? { contextual_search: true } : {}),
+    },
     { idempotencyKey, signal: options?.signal },
   );
 }
@@ -83,6 +86,7 @@ export async function searchCollection(
   if (input.metadata_filter && Object.keys(input.metadata_filter).length > 0) {
     body.metadata_filter = input.metadata_filter;
   }
+  if (input.scope_resolution === "catalog") body.scope_resolution = "catalog";
   return client.post<SearchResponse>(
     indexingPaths.search(workspaceId, collectionId),
     body,

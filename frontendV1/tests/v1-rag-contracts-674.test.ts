@@ -340,3 +340,36 @@ test("only the exact no-publication 404 becomes an empty publication state", asy
     await getPublishedCompiledDocument(client, "ws", "col", "doc"),
   ).toBeNull();
 });
+
+test("catalog scope survives assistant form round trip while old defaults stay explicit", () => {
+  const policy = {
+    ...DEFAULT_RAG_POLICY,
+    scope_resolution: "catalog" as const,
+  };
+  expect(
+    toRagPolicy(ragPolicyFormSchema.parse(toRagPolicyForm(policy))),
+  ).toEqual(policy);
+  expect(toRagPolicyForm(null).scope_resolution).toBe("explicit");
+  expect(toRagPolicy(DEFAULT_RAG_POLICY_FORM).scope_resolution).toBeUndefined();
+});
+
+test("new contextual generation and scoped search are explicit transport choices", async () => {
+  const { client, calls } = recordingClient(() => ({}));
+  await requestIndex(client, "ws", "col", null, "new-context", {
+    contextualSearch: true,
+  });
+  expect(calls[0].body).toEqual({ provider_id: null, contextual_search: true });
+  await searchCollection(client, "ws", "col", {
+    query: "Nguồn",
+    top_k: 5,
+    mode: "dense",
+    candidate_k: 30,
+    rrf_k: 60,
+    scope_resolution: "catalog",
+    metadata_filter: { data_year: 2031 },
+  });
+  expect(calls[1].body).toMatchObject({
+    scope_resolution: "catalog",
+    metadata_filter: { data_year: 2031 },
+  });
+});

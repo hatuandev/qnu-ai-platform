@@ -110,12 +110,22 @@ def validate_annotations(annotations: list[dict], content: dict, documents: list
             raise _invalid("Target metadata bị trùng; gộp các trường vào một annotation.")
         seen.add(item.target)
         refs = target_refs(content, item.target)
-        runs = {r.split(":", 1)[0] for r in refs}
+        # A proof in the same OCR run is not necessarily a proof for this unit.
+        # For parsed table rows/cells the table-wide text is also too broad.
+        local_texts = texts
+        table = re.fullmatch(r"table:(.+):row:(\d+)(?::column:(\d+))?", item.target)
+        if table:
+            table_ref = table.group(1)
+            local_texts = {
+                **texts,
+                table_ref: "\n".join(texts.get(r, "") for r in sorted(refs - {table_ref})),
+            }
         for evidence in item.evidence:
             if (
                 evidence.citation not in content["citations"]
-                or evidence.citation.split(":", 1)[0] not in runs
+                or evidence.citation not in refs
                 or evidence.quote not in texts.get(evidence.citation, "")
+                or evidence.quote not in local_texts.get(evidence.citation, "")
             ):
                 raise _invalid("Trích đoạn metadata không thuộc nguồn đã ghim của target.")
         quotes = "\n".join(e.quote for e in item.evidence).casefold()

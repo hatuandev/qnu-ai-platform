@@ -15,6 +15,7 @@ from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.modelops.inference.service import prepare_chat_request
 from qnu.domains.modelops.public_api import resolve_chat_runtime
 from qnu.domains.modelops.usage.service import usage_service
+from qnu.domains.rag.answer.projection import evidence_item
 from qnu.domains.rag.answer.schemas import AnswerRequest, EvidenceSource, Statement
 from qnu.platform.errors import AppException, Conflict
 from qnu.ports.chat_model import ChatMessage, ChatModel, ChatResponseError
@@ -101,7 +102,7 @@ def parse_report(
 def evidence_texts(source: EvidenceSource) -> list[str]:
     structure = source.structure or {}
     return [
-        source.text,
+        *([p["text"] for p in source.source_passages] if source.source_passages else [source.text]),
         *[cell["text"] for row in structure.get("rows", []) for cell in row],
         *[note["text"] for note in structure.get("page_notes", [])],
     ]
@@ -130,9 +131,7 @@ async def verify(
                         {"statement_index": i, **s.model_dump()} for i, s in enumerate(statements)
                     ],
                     "evidence": [
-                        {"evidence_id": s.evidence_id, "text": s.text, "structure": s.structure}
-                        for s in sources
-                        if s.evidence_id in used
+                        evidence_item(s, s.evidence_id) for s in sources if s.evidence_id in used
                     ],
                 },
                 ensure_ascii=False,

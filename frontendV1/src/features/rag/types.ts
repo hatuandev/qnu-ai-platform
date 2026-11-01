@@ -60,6 +60,7 @@ export type RetrievalAnnotation = {
 };
 
 export type RagPolicy = {
+  scope_resolution?: "explicit" | "catalog";
   retrieval_mode: RetrievalMode;
   candidate_k: number;
   rrf_k: number;
@@ -160,6 +161,7 @@ export function isDefaultRagPolicy(
   if (!policy) return true;
   return (
     policy.retrieval_mode === "dense" &&
+    (policy.scope_resolution ?? "explicit") === "explicit" &&
     policy.context_window === 0 &&
     policy.verification_mode === "off" &&
     policy.rerank_provider_id === null &&

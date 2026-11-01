@@ -182,6 +182,90 @@ test("accepts separate proven cells for each document", () => {
   ).not.toThrow();
 });
 
+test.each([false, true])(
+  "split source fact needs proven consecutive blocks: gap=%s",
+  (gap) => {
+    const { state, item, answer } = fixture();
+    const base = answer.sources[0];
+    const refs = Object.keys(base.citations);
+    answer.sources = ["Teams need a certificate", "score 27 or 9."].map(
+      (text, i) => ({
+        ...base,
+        evidence_id: `E${i + 1}`,
+        text,
+        structure: null,
+        citations: { [refs[i]]: base.citations[refs[i]] },
+        source_passages: [
+          { citation: refs[i], text, position: String(i && gap ? 2 : i) },
+        ],
+      }),
+    );
+    const claim = {
+      text: "Teams need a certificate score 27 or 9.",
+      evidence_ids: ["E1", "E2"],
+    };
+    answer.statements = [claim];
+    answer.answer = claim.text;
+    const query: AdmissionCase = {
+      ...item,
+      scope: "single",
+      target_doc: "info2025",
+      expected_patterns: [],
+      facts: [
+        {
+          document: "info2025",
+          pages: [2],
+          data_year: 2025,
+          support: "text",
+          subject_patterns: ["Teams"],
+          metric_patterns: ["certificate"],
+          values: [
+            { value: 27, kind: "integer" },
+            { value: 9, kind: "integer" },
+          ],
+          locator: "synthetic source",
+        },
+      ],
+    };
+    const verify = () =>
+      checkAdmissionAnswer(answer, query, state, benchmark.documents);
+    if (gap) expect(verify).toThrow();
+    else expect(verify).not.toThrow();
+  },
+);
+
+test.each(["same", "different", "wrong_year"])(
+  "text rule spans claims only with one source group: %s",
+  (mode) => {
+    const { state, answer } = fixture();
+    const item = structuredClone(
+      present(benchmark.cases.find((c) => c.id === "F13")),
+    );
+    const source = answer.sources[1];
+    source.text =
+      "Thí sinh tốt nghiệp THPT năm 2026 tối thiểu 15/30, trừ các ngành giáo viên và Luật.";
+    for (const citation of Object.values(source.citations)) citation.page = 7;
+    answer.sources = [source];
+    answer.statements = [
+      {
+        text: "Thí sinh tốt nghiệp THPT năm 2026 tối thiểu 15/30.",
+        evidence_ids: [source.evidence_id],
+      },
+      {
+        text: "Ngoại lệ: các ngành giáo viên và Luật.",
+        evidence_ids: [source.evidence_id],
+      },
+    ];
+    if (mode === "different") answer.statements[1].evidence_ids = ["E99"];
+    if (mode === "wrong_year") answer.statements[1].text += " năm 2025";
+    answer.answer = answer.statements.map((s) => s.text).join(" ");
+    const check = () =>
+      checkAdmissionAnswer(answer, item, state, benchmark.documents);
+    if (mode === "same") expect(check).not.toThrow();
+    else expect(check).toThrow();
+  },
+);
+
 test.each([
   "wrong_document",
   "wrong_revision",

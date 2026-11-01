@@ -27,6 +27,16 @@ def judging(data, outcome="supported"):
         if outcome == "withdraw":
             withdraw(data["client"], data)
         source = next(s for s in incoming["evidence"] if "150" in s["text"])
+        # The extractive statement includes its field/header (which can contain a
+        # year). A supported fake judge must quote those numbers too, not only
+        # the value "150"; production correctly rejects such an incomplete proof.
+        texts = [
+            cell["text"]
+            for row in (source.get("structure") or {}).get("rows", [])
+            for cell in row
+            if cell["text"].strip()
+        ] or [source["text"]]
+        assert len(texts) <= 20
         value = {
             "findings": [
                 {
@@ -35,7 +45,9 @@ def judging(data, outcome="supported"):
                     if outcome in {"supported", "unsupported", "uncertain"}
                     else "supported",
                     "reason": "Controlled judge fixture.",
-                    "quotes": [{"evidence_id": source["evidence_id"], "quote": "150"}],
+                    "quotes": [
+                        {"evidence_id": source["evidence_id"], "quote": text} for text in texts
+                    ],
                 }
                 for s in incoming["statements"]
             ]

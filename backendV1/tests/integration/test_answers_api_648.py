@@ -22,7 +22,7 @@ class FakeAnswerChat(FakeNemotron):
         }
         # The fake follows the production table contract; negative modes below
         # deliberately keep malformed prose/citations to exercise rejection.
-        if self.mode in {"ok", "mixed_lookup"}:
+        if self.mode in {"ok", "mixed_lookup", "mixed_narrative"}:
             choices = [
                 {"cell_id": f"{t['evidence_id']}:{row}:{key}", "value": value[1]}
                 for t in incoming["table_cells"]["tables"]
@@ -42,6 +42,11 @@ class FakeAnswerChat(FakeNemotron):
                             "text": "Chỉ tiêu là 999, phải nộp thêm phí.",
                             "evidence_ids": [source["evidence_id"]],
                         }
+                    ]
+                if self.mode == "mixed_narrative":
+                    paragraph = next(e for e in incoming["evidence"] if e["kind"] != "table")
+                    value["statements"] = [
+                        {"text": paragraph["text"], "evidence_ids": [paragraph["evidence_id"]]}
                     ]
         if self.mode == "foreign_cell":
             value = {"status": "answered", "statements": [], "lookups": [{"cell_id": "E999:r1:k2"}]}
@@ -145,7 +150,10 @@ def test_answer_returns_only_server_bound_sources(client, ready):
     assert body["trace"]["total_tokens"] == 190
     assert response.headers["cache-control"] == "private, no-store"
     sent = ready["answer_chat"].requests[0]["body"]
-    assert sent["response_format"] == {"type": "json_object"}
+    assert sent["response_format"]["type"] == "json_schema"
+    contract = sent["response_format"]["json_schema"]
+    assert contract["strict"] is True
+    assert set(contract["schema"]["required"]) == {"status", "statements", "lookups"}
     assert sent["model"] == "test-chat"
     assert "revision_id" not in sent["messages"][-1]["content"]
 
@@ -154,9 +162,16 @@ def test_answer_projection_preserves_published_table_and_prompt_contract(client,
     response = ask(client, ready)
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["trace"]["prompt_version"] == "qnu.rag.answer/v9"
+    assert body["trace"]["prompt_version"] == "qnu.rag.answer/v14"
     assert body["trace"]["grounding"]["selected_cells"]
     sent = json.loads(ready["answer_chat"].requests[0]["body"]["messages"][-1]["content"])
+    schema = ready["answer_chat"].requests[0]["body"]["response_format"]["json_schema"]["schema"]
+    assert schema["$defs"]["Statement"]["properties"]["evidence_ids"]["items"]["enum"] == [
+        s["evidence_id"] for s in sent["evidence"] if s["kind"] != "table"
+    ]
+    from qnu.domains.knowledge.publication.evidence import digest
+
+    assert body["trace"]["contract"]["schema_sha256"] == digest(schema)
     source = next(s for s in body["sources"] if s["kind"] == "table")
     projected = next(e for e in sent["evidence"] if e["evidence_id"] == source["evidence_id"])
     assert projected["structure"] == source["structure"]
@@ -196,6 +211,22 @@ def test_model_can_abstain_without_fabricated_answer(client, ready):
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "insufficient_evidence"
     assert response.json()["answer"] is None and not response.json()["sources"]
+
+
+def test_invalid_contract_has_safe_audit_without_retry(client, ready):
+    ready["answer_chat"].mode = "schema"
+    response = ask(client, ready)
+    assert response.status_code == 502
+    as_actor(PLATFORM)
+    events = client.get(f"{API}/workspaces/{ready['workspace']['id']}/events").json()
+    rows = events["items"] if isinstance(events, dict) else events
+    event = next(row for row in rows if row["action"] == "answer.validation_failed")
+    detail = event["detail"]
+    assert detail["code"] == "answer_response_invalid"
+    assert detail["issues"] and detail["output_sha256"]
+    assert "answer-test-secret" not in json.dumps(detail)
+    assert all("input" not in issue for issue in detail["issues"])
+    assert len(ready["answer_chat"].requests) == 1
 
 
 def test_withdrawn_content_does_not_call_chat(client, ready):
@@ -344,9 +375,30 @@ def test_mixed_lookup_returns_only_original_cells_with_projection_trace(client, 
     assert "999" not in body["answer"] and "phí" not in body["answer"]
     assert len(body["statements"]) == 1
     assert body["trace"]["grounding"]["projection"] == {
-        "version": "qnu.answer-projection/v1",
+        "version": "qnu.answer-projection/v3",
         "mode": "selected_cells",
         "omitted_model_statements": 1,
+    }
+    assert len(ready["answer_chat"].requests) == 1
+
+
+def test_mixed_paragraph_and_selected_cell_survive_one_provider_call(client, ready):
+    ready["answer_chat"].mode = "mixed_narrative"
+    response = ask(client, ready)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "answered" and len(body["statements"]) == 2
+    incoming = json.loads(ready["answer_chat"].requests[0]["body"]["messages"][-1]["content"])
+    paragraph = next(e for e in incoming["evidence"] if e["kind"] != "table")
+    assert body["statements"][0] == {
+        "text": paragraph["text"],
+        "evidence_ids": [paragraph["evidence_id"]],
+    }
+    assert "150" in body["statements"][1]["text"]
+    assert body["trace"]["grounding"]["projection"] == {
+        "version": "qnu.answer-projection/v3",
+        "mode": "mixed",
+        "omitted_model_statements": 0,
     }
     assert len(ready["answer_chat"].requests) == 1
 

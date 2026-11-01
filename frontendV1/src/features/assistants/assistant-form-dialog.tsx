@@ -777,6 +777,40 @@ export function AssistantFormDialog({
                       nguyên snapshot cũ.
                     </p>
 
+                    <form.Field name="rag_policy.scope_resolution">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel htmlFor="assistant-scope-resolution">
+                            Phạm vi câu hỏi
+                          </FieldLabel>
+                          <Select
+                            value={field.state.value}
+                            onValueChange={(value) =>
+                              field.handleChange(
+                                value === "catalog" ? "catalog" : "explicit",
+                              )
+                            }
+                          >
+                            <SelectTrigger id="assistant-scope-resolution">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="explicit">
+                                Theo bộ lọc đã chọn
+                              </SelectItem>
+                              <SelectItem value="catalog">
+                                Nhận diện từ dữ liệu đã xuất bản
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FieldDescription>
+                            Khi chưa rõ ngành, khóa hoặc năm, hệ thống yêu cầu
+                            làm rõ trước khi trả lời. Chỉ nhận diện giá trị có
+                            căn cứ; giữ nguyên bộ lọc đã chọn.
+                          </FieldDescription>
+                        </Field>
+                      )}
+                    </form.Field>
                     <form.Field name="rag_policy.retrieval_mode">
                       {(field) => {
                         const error = fieldError(field.state.meta.errors);

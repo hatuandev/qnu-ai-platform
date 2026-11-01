@@ -94,6 +94,30 @@ test("a valid year is sent unchanged", async () => {
   );
 });
 
+test("catalog scope requires an explicit choice and preserves the manual year", async () => {
+  mocks.search.mockResolvedValue({ ...oldResult, hits: [] });
+  render(<IndexPanel workspaceId="w" collectionId="a" canManage />);
+  const toggle = screen.getByRole("checkbox", { name: /Nhận diện phạm vi/ });
+  expect(toggle.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(toggle);
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Câu truy vấn tìm kiếm thử" }),
+    { target: { value: "Nguồn dữ liệu" } },
+  );
+  fireEvent.change(screen.getByLabelText("Năm dữ liệu"), {
+    target: { value: "2031" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Tìm thử" }));
+  await waitFor(() =>
+    expect(mocks.search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope_resolution: "catalog",
+        metadata_filter: { data_year: 2031 },
+      }),
+    ),
+  );
+});
+
 test("completed search results must not stay visible under another collection", async () => {
   mocks.search.mockResolvedValue(oldResult);
   const view = render(

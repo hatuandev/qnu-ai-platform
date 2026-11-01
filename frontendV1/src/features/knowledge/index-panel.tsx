@@ -22,6 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -135,6 +136,8 @@ function IndexSession({
   );
 
   const [providerId, setProviderId] = useState<string>(NO_PROVIDER_VALUE);
+  const [contextualSearch, setContextualSearch] = useState(false);
+  const [catalogScope, setCatalogScope] = useState(false);
   const [requestKey, setRequestKey] = useState(() => createIdempotencyKey());
 
   const [query, setQuery] = useState("");
@@ -178,6 +181,7 @@ function IndexSession({
       const outcome = await requestMutation.mutateAsync({
         providerId: providerId === NO_PROVIDER_VALUE ? null : providerId,
         idempotencyKey: requestKey,
+        contextualSearch,
       });
       if (!isCurrentSession()) return;
       if (outcome.created) {
@@ -235,6 +239,7 @@ function IndexSession({
         rrf_k: rrfK,
         rerank_provider_id: mode === "hybrid_rerank" ? rerankProviderId : null,
         metadata_filter: draftToFilter(filterDraft),
+        scope_resolution: catalogScope ? "catalog" : "explicit",
       });
       if (!isCurrentSession() || searchAttemptRef.current !== attempt) return;
       setResult(response);
@@ -264,6 +269,23 @@ function IndexSession({
 
         {canManage ? (
           <div className="flex flex-wrap items-end gap-2">
+            <Field className="w-full">
+              <FieldLabel htmlFor="index-contextual" className="text-xs">
+                <Checkbox
+                  id="index-contextual"
+                  checked={contextualSearch}
+                  disabled={requestMutation.isPending}
+                  onCheckedChange={(value) => {
+                    setContextualSearch(value === true);
+                    setRequestKey(createIdempotencyKey());
+                  }}
+                />
+                Gắn ngữ cảnh có nguồn cho chỉ mục mới
+              </FieldLabel>
+              <FieldDescription className="text-xs">
+                Chỉ mục mới sẽ thay bản đang hoạt động sau khi hoàn tất.
+              </FieldDescription>
+            </Field>
             <div className="w-[200px]">
               <FieldLabel htmlFor="index-provider" className="text-[11px]">
                 Provider embedding
@@ -602,6 +624,14 @@ function IndexSession({
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Phạm vi metadata
             </p>
+            <FieldLabel htmlFor="search-catalog-scope" className="text-xs">
+              <Checkbox
+                id="search-catalog-scope"
+                checked={catalogScope}
+                onCheckedChange={(value) => setCatalogScope(value === true)}
+              />
+              Nhận diện phạm vi từ câu hỏi; yêu cầu làm rõ khi mơ hồ
+            </FieldLabel>
             <MetadataFilterFields
               value={filterDraft}
               onChange={setFilterDraft}

@@ -1,6 +1,16 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
+- [Phiên790 — Ngữ cảnh chunk và phạm vi có nguồn](2026-11-01_phien_790_rag_ngu_canh_va_pham_vi.md): metadata đúng target, index opt-in/glossary/catalog/hỏi lại/UI/promptv14; API7PASS, unit645/1FAILnền, FE594/33FAILexact789. Chưa reindex/chạy model thật.
+
+- [Phiên789 — F14/MX-05 và trả lời hỗn hợp](2026-11-01_phien_789_dieu_kien_va_tra_loi_hon_hop.md): promptv13/source-order/citationclosure/schema theo nguồn/reference facet;v13 **8PASS1UNCERTAIN**,F14/MX-05PASS,I25-04processinterruptedkhônggửilại. Giữv11/v12FAIL,khônggộpkếtquả;630unitPASS1FAILnền/API66PASS/FE591PASS33FAIL.
+
+- [Phiên788 — Sửa RAG và retest9 một lượt/câu](2026-11-01_phien_788_sua_rag_va_retest9.md): promptv10/schema, header ô số, nguồn gốc văn bản, retrieval nhiều ý và runner trung thực. Live7PASS2FAIL(F14/MX-05 abstain),9chat attempt1/366452token; không retry, giữ lịch sử. Full suite vẫn có lỗi nền.
+
+- [Phiên787 — Review độc lập retest9](2026-11-01_phien_787_review_retest9.md): xác minh0PASS9FAIL/9turn/attempt1/314421token,5responseoff/4schemaerror; P2drift/uncertain/dispatchguard và báo cáo quá chắc.12unitPASS,không modelcall/sửaapp. Đối chiếu giới hạn các nhận định786 bên dưới.
+
+- [Phiên 786 — Retest 9 câu hỏi FAIL sau khi tắt suy luận và tăng output tối đa](2026-11-01_phien_786_retest9_answer_no_thinking.md): Triển khai runner trung thực (khắc phục false-green P1, scope fail-closed, khóa cấu hình, kiểm drift runtime); chạy 9 câu tuần tự 1 lượt với model thật Qwen (enable_thinking=false, max_output_tokens=16384). Kết quả 0 PASS / 9 FAIL (exit 1), thời gian 2.7m; triệt tiêu 100% lỗi `chat_output_truncated`; xác nhận 1 evaluator false negative (F13), 4 schema validation lỗi, 4 abstain do thiếu evidence upstream.
+
 - [Phiên785 — Answer off và output tối đa](2026-11-01_phien_785_tat_thinking_answer_output_max.md): ModelOps answer off, giữ compiler; output16384/context98304byte, helper lấy capacity động. 58 targeted/TS/build/probe thật PASS; benchmark chưa chạy lại.
 
 - [Phiên784 — Kiểm tra retest16](2026-11-01_phien_784_review_ket_qua_retest16.md): xác minh7PASS9FAIL/16lượt/attempt1/535208token; P1Playwrightfalsegreen,P2scope/fingerprint/nhậtkýsai,chỉreviewkhôngsửaapp/gọimodel.

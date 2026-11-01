@@ -3,6 +3,7 @@
 from sqlalchemy import select
 
 from qnu.domains.knowledge.index.models import IndexChunk, IndexRun
+from qnu.domains.knowledge.index.query_scope import result_scopes
 from qnu.domains.knowledge.index.search import _eligible, _hits, manifest
 from qnu.domains.knowledge.metadata import matches_metadata
 from qnu.domains.knowledge.publication.access import authorize
@@ -11,7 +12,7 @@ from qnu.platform.errors import Conflict
 from qnu.ports.vector_store import VectorHit
 
 
-def supports(primary, rows, relationships, metadata_filter):
+def supports(primary, rows, relationships, metadata_filter, scopes=None):
     selected, links = {}, []
     by_id = {r.id: r for r in rows}
     for hit in primary:
@@ -36,7 +37,9 @@ def supports(primary, rows, relationships, metadata_filter):
                     break
             else:
                 row = max(options, key=lambda r: max(r.structure["row_indices"]))
-            if not matches_metadata(row.structure, metadata_filter):
+            if not any(
+                matches_metadata(row.structure, scope) for scope in (scopes or [metadata_filter])
+            ):
                 break
             needed.append(row)
         else:
@@ -68,18 +71,26 @@ async def attach_table_support(db, blob, actor, workspace_id, collection_id, res
         )
     )
     relationships = await bound_dependencies(db, blob, allowed, rows)
-    needed, links = supports(result.hits, rows, relationships, req.metadata_filter)
+    needed, links = supports(
+        result.hits,
+        rows,
+        relationships,
+        req.metadata_filter,
+        result_scopes(result, req.metadata_filter),
+    )
     known = {h.chunk_id for h in result.hits}
-    additions = [r for key, r in needed.items() if key not in known]
     # Do not silently discard a primary result to make dependencies fit.
     # Four additional dependencies are a separate, bounded allowance. Top-k
     # remains unchanged; every item still consumes the shared byte/token budget.
-    room = 4
-    if len(additions) > room:
-        return result, {
-            "table_support": "no_room",
-            "unresolved_support_ids": [r.id for r in additions],
-        }
+    room, selected, resolved, unresolved = 4, {}, [], []
+    for link in links:
+        extra = [key for key in link["support_ids"] if key not in known and key not in selected]
+        if len(selected) + len(extra) > room:
+            unresolved.extend(extra)
+            continue
+        selected.update({key: needed[key] for key in extra})
+        resolved.append(link)
+    additions = list(selected.values())
     raw = [
         VectorHit(
             r.point_id,
@@ -97,7 +108,8 @@ async def attach_table_support(db, blob, actor, workspace_id, collection_id, res
     ]
     added = await _hits(db, run, allowed, raw, await manifest(db, blob, run)) if raw else []
     return result.model_copy(update={"hits": [*result.hits, *added]}), {
-        "table_support": "resolved",
-        "table_links": links,
+        "table_support": "partial" if unresolved else "resolved",
+        "unresolved_support_ids": list(dict.fromkeys(unresolved)),
+        "table_links": resolved,
         "support_ids": [r.id for r in additions],
     }

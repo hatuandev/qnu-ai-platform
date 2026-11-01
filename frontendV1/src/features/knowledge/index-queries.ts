@@ -118,15 +118,20 @@ export function useRequestIndexMutation(
   return useMutation<
     IndexCreated,
     Error,
-    { providerId: string | null; idempotencyKey: string }
+    {
+      providerId: string | null;
+      idempotencyKey: string;
+      contextualSearch?: boolean;
+    }
   >({
-    mutationFn: ({ providerId, idempotencyKey }) =>
+    mutationFn: ({ providerId, idempotencyKey, contextualSearch }) =>
       requestIndex(
         v1Client,
         workspaceId,
         collectionId,
         providerId,
         idempotencyKey,
+        { contextualSearch },
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({

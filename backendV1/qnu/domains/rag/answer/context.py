@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.index.models import IndexChunk, IndexRun
+from qnu.domains.knowledge.index.query_scope import result_scopes
 from qnu.domains.knowledge.index.schemas import SearchHit, SearchResponse
 from qnu.domains.knowledge.index.search import _eligible, _hits, manifest
 from qnu.domains.knowledge.metadata import matches_metadata
@@ -100,7 +101,10 @@ async def expand_context(
             max(0, position - req.context_window) : position + req.context_window + 1
         ]
         for row in neighbors:
-            if row.id in known or not matches_metadata(row.structure, req.metadata_filter):
+            if row.id in known or not any(
+                matches_metadata(row.structure, scope)
+                for scope in result_scopes(result, req.metadata_filter)
+            ):
                 continue
             raw = VectorHit(
                 row.point_id,

@@ -17,6 +17,7 @@ export interface Answer {
     version_id: string;
     publication_decision_id: string;
     text: string;
+    source_passages?: { citation: string; text: string; position?: string }[];
     structure?: {
       source_table_citation?: string;
       rows?: { evidence_id: string; text: string }[][];
@@ -76,6 +77,65 @@ export function hasNumber(
 
 const valuesMatch = (text: string, fact: AdmissionFact) =>
   fact.values.every(({ value, kind }) => hasNumber(text, value, kind));
+
+/** Text rules may span sentences, but only inside an identical citation group.
+ * Never pool unrelated evidence, and never use this grouping for cell facts.
+ */
+function claimGroups(statements: Answer["statements"]): Answer["statements"] {
+  const groups = new Map<string, Answer["statements"][number]>();
+  for (const statement of statements) {
+    const ids = [...new Set(statement.evidence_ids)].sort();
+    const key = JSON.stringify(ids);
+    const group = groups.get(key);
+    if (group) group.text += ` ${statement.text}`;
+    else groups.set(key, { text: statement.text, evidence_ids: ids });
+  }
+  return [...groups.values()];
+}
+
+/** Join only consecutive original blocks inside one cited published identity. */
+function citedTextRuns(cited: Answer["sources"]): string[] {
+  const texts: string[] = [];
+  const buckets = new Map<
+    string,
+    Map<number, { citation: string; text: string }>
+  >();
+  for (const source of cited) {
+    const passages = source.source_passages?.filter(
+      (p) => p.citation in source.citations,
+    );
+    texts.push(
+      passages?.length ? passages.map((p) => p.text).join(" ") : source.text,
+    );
+    for (const p of passages || []) {
+      if (!p.position || !/^\d+$/.test(p.position)) continue;
+      const key = JSON.stringify([
+        source.document_id,
+        source.version_id,
+        source.publication_decision_id,
+        p.citation.split(":", 1)[0],
+      ]);
+      const blocks =
+        buckets.get(key) ||
+        new Map<number, { citation: string; text: string }>();
+      const index = Number(p.position);
+      const old = blocks.get(index);
+      if (old && (old.text !== p.text || old.citation !== p.citation))
+        return texts;
+      blocks.set(index, p);
+      buckets.set(key, blocks);
+    }
+  }
+  for (const blocks of buckets.values()) {
+    let previous = -2;
+    for (const [index, p] of [...blocks].sort(([a], [b]) => a - b)) {
+      if (index === previous + 1) texts[texts.length - 1] += ` ${p.text}`;
+      else texts.push(p.text);
+      previous = index;
+    }
+  }
+  return texts;
+}
 
 export function checkAdmissionAnswer(
   answer: Answer,
@@ -160,15 +220,20 @@ export function checkAdmissionAnswer(
       "Nhãn năm nguồn không khớp.",
     );
     const entry = scenario?.documents?.[fact.document];
-    const candidates = answer.statements.filter(
+    const claims =
+      fact.support === "text"
+        ? claimGroups(answer.statements)
+        : answer.statements;
+    const candidates = claims.filter(
       (s) =>
         valuesMatch(s.text, fact) &&
         matches(s.text, fact.subject_patterns) &&
         matches(s.text, fact.metric_patterns) &&
         // Source binding proves the year even when the backend's copied cell
         // statement omits it. An explicitly different year cannot pass.
-        (!/\b20\d{2}\b/.test(s.text) ||
-          hasNumber(s.text, fact.data_year, "integer")),
+        (s.text.match(/\b20\d{2}\b/g) || []).every(
+          (year) => Number(year) === fact.data_year,
+        ),
     );
     const supported = candidates.some((statement) => {
       const cited = statement.evidence_ids
@@ -182,12 +247,13 @@ export function checkAdmissionAnswer(
       if (!cited.length) return false;
       if (fact.support === "text") {
         // Rule check only; semantic entailment remains a separate human gate.
-        return cited.some(
-          (s) =>
-            s &&
-            valuesMatch(s.text, fact) &&
-            matches(s.text, fact.subject_patterns) &&
-            matches(s.text, fact.metric_patterns),
+        return citedTextRuns(
+          cited.filter((s): s is Answer["sources"][number] => !!s),
+        ).some(
+          (text) =>
+            valuesMatch(text, fact) &&
+            matches(text, fact.subject_patterns) &&
+            matches(text, fact.metric_patterns),
         );
       }
       return (answer.trace.grounding?.cell_proofs || []).some((proof) => {
