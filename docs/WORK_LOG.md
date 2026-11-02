@@ -1,5 +1,9 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- **Context828 — MinerU VRAM 0.17:** 61 trang OCR thật, 129,11s/11,61s; CER mẫu 0,116%/0,262% và 34 bảng giữ nguyên. Trang30 có thêm một lỗi ngoài mẫu; không khẳng định tương đương tuyệt đối/nhân quả VRAM. Không retry/appchange. [Nhật ký828](nhat_ky/2026-11-02_phien_828_test_mineru_vram_017.md), [Snapshot828](memory/snapshots/2026-11-02_session_828.md).
+
+- **Context827 — Gỡ legacy và test V1:** backend/frontendvắng,archivegiữ1.799tracked+ignored;BE1306PASS/FE701PASS/build/Docker/runner52/liveUIAPIworkerđạt,4DBtestdọn0. Chưa commit/push/LLMtest. [Nhật ký827](nhat_ky/2026-11-02_phien_827_go_legacy_va_kiem_chung_v1.md), [Snapshot827](memory/snapshots/2026-11-02_session_827.md).
+
 - **Context826 — Docker/Make mặc định V1:** runneraliases/foreground8002/3001,legacywritesblocked;DockerBEFEV1/Nginx/bootstrapV1.52tests/PSguard/wrappers/build/proxy7+APIhealth/preflightđạt. Khôngrestart/migrateDB/deletelegacy/push. [Nhật ký826](nhat_ky/2026-11-02_phien_826_chuyen_docker_make_mac_dinh_v1.md), [Snapshot826](memory/snapshots/2026-11-02_session_826.md).
 
 - **Context825 — Rà dọn sau MinerU:** DBdefaultđãMinerU, Nemotroncatalogactive/E2Eprofilecũ. Cache37,30MiB, giữraw/report/DB/tmpworktree; chỉaudit,chưaxóa/disable/codechange. [Nhật ký825](nhat_ky/2026-11-02_phien_825_ra_don_dep_sau_mineru.md), [Snapshot825](memory/snapshots/2026-11-02_session_825.md).

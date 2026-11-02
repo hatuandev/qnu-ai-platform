@@ -50,4 +50,4 @@ Bootstrap không seed, không tạo provider/key mặc định và không OCR/re
 
 Không dùng `down -v`, volume prune hoặc reset DB để sửa lỗi deploy. Dừng đúng app container khi cần; giữ named volumes và các bản backup. Image tag V1 tách riêng `qnu-ai-platform-v1`/`qnu-ai-platform-frontend-v1`; lưu commit/tag trước khi nâng. Rollback image không tự rollback schema; nếu migration đã chuyển dữ liệu, dùng kế hoạch khôi phục đã kiểm trên bản sao.
 
-Thư mục backend/frontend cũ chưa bị xóa trong đợt này. Muốn xóa phải lưu các tệp ignored như backend/storage, cấu hình cá nhân và dữ liệu test cần giữ; lịch sử Git chỉ khôi phục được tệp đã commit. [Local V1](../quy_trinh/38_huong_dan_chay_qnu_v1.md) dùng API8002/FE3001 với runner foreground, khác Compose server.
+Hai thư mục backend/frontend cũ đã được gỡ khỏi checkout sau khi lưu riêng toàn bộ mã và tệp ignored. Lịch sử Git chỉ khôi phục được tệp đã commit; giữ bản lưu riêng cho cấu hình cá nhân, storage và dữ liệu test cũ. [Local V1](../quy_trinh/38_huong_dan_chay_qnu_v1.md) dùng API8002/FE3001 với runner foreground, khác Compose server.

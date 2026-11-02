@@ -15,7 +15,7 @@ Tài liệu này là cẩm nang bắt buộc cho mọi kỹ sư Frontend và AI 
 
 - Trước thay đổi lớn, làm rõ tác vụ chính từ ngữ cảnh sẵn có: đọc/sửa OCR, duyệt Compiler, tìm nguồn hoặc cấu hình model. Phác thảo ngắn ngay trong trao đổi; lỗi nhỏ chỉ sửa phần cần thiết, không mặc định mở thêm vòng phê duyệt hay thiết kế lại cả trang.
 - Ưu tiên nội dung giúp hoàn thành tác vụ: đoạn văn và chỗ cần sửa ở màn OCR; nguồn và quyết định duyệt ở Compiler; cấu hình và lỗi có thể xử lý ở ModelOps. Chỉ thêm KPI hoặc card khi dữ liệu đó hỗ trợ quyết định thật.
-- Dùng font, màu Teal, semantic tokens và primitives của đúng `frontend/` hoặc `frontendV1/` đang sửa. Tạo thứ bậc bằng cách nhóm và khoảng cách trong hệ thống hiện có; không tự đổi nhận diện vì tham khảo phong cách mới.
+- Dùng font, màu Teal, semantic tokens và primitives của `frontendV1/`. Tạo thứ bậc bằng cách nhóm và khoảng cách trong hệ thống hiện có; không tự đổi nhận diện vì tham khảo phong cách mới.
 - Giữ thuật ngữ nhất quán từ nút đến toast/trạng thái. Khi sửa UI, tự đối chiếu ảnh chụp desktop/mobile và các trạng thái liên quan nếu có công cụ; báo phần chưa kiểm thay vì suy kết quả từ build. Kiểm chứng theo mục8, không chạy test ứng dụng cho task chỉ sửa skill/tài liệu.
 
 Tham khảo tư duy thiết kế từ [frontend-design của Anthropic](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md), áp dụng trong các giới hạn QNU dưới đây; giữ nguyên kiến trúc, luồng API và quy tắc dữ liệu thật.
@@ -42,7 +42,7 @@ Tham khảo tư duy thiết kế từ [frontend-design của Anthropic](https://
 Mọi thành phần giao diện phải được phân loại và đặt đúng vị trí theo kiến trúc 3 tầng:
 
 ```text
-frontend/src/
+frontendV1/src/
 ├── components/
 │   ├── ui/             # TẦNG 1: Primitives (Radix UI + shadcn/ui)
 │   │   ├── button.tsx, input.tsx, card.tsx, badge.tsx, dialog.tsx,
@@ -301,4 +301,4 @@ Khi viết mã TSX/TS, **bắt buộc tuân thủ các quy tắc sau** để tr�
 
 Dùng [bảng kiểm chứng chung](../../rules/verification.md): Biome trên file sửa và production build; thêm test hành vi khi đổi logic, auth, API hoặc SSE. Build không chứng minh layout, quyền hoặc luồng server đã đúng. Không chạy backend suite cho thay đổi UI thuần túy.
 
-Các quy định bố cục, nhãn ngắn, filter bar, KPI và ViewModeToggle chuyển từ root tại [admin-patterns](references/admin-patterns.md). Đọc thêm `frontend/AGENTS.md` theo đường dẫn tính từ root repo; token thực ở `frontend/src/styles/tokens.css` ưu tiên hơn số minh họa.
+Các quy định bố cục, nhãn ngắn, filter bar, KPI và ViewModeToggle chuyển từ root tại [admin-patterns](references/admin-patterns.md). Đọc thêm `frontendV1/AGENTS.md` theo đường dẫn tính từ root repo; token thực ở `frontendV1/src/styles/tokens.css` ưu tiên hơn số minh họa.

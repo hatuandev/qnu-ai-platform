@@ -11,9 +11,9 @@
 | Auth/tenant/secret/dữ liệu/concurrency | Test tái hiện đúng lỗi trước sửa; thêm kiểm chứng ở ranh giới handler/API/adapter liên quan và negative cases |
 | Retrieval/model/chunk/index | Regression scope/provenance/ranking và thí nghiệm so sánh cùng snapshot; đổi hành vi tìm kiếm không được nghiệm thu chỉ bằng unit test |
 
-Backend: từ `backend`, dùng `uv run ruff check <files>` và `uv run --extra dev pytest <tests>`; full gate `uv run --extra dev pytest -v`. Dùng môi trường test cô lập; kiểm tra fixture trước khi chạy script có thể gọi DB/model/network. Không tự cài thêm gói hoặc chạy live benchmark chỉ để sửa Markdown.
+Backend V1: Ruff chạy từ `backendV1` bằng `uv run ruff check <files>`. Từ root dùng `make test-be` cho harness DB cô lập; khi cần pytest trực tiếp phải thiết lập `TEST_DATABASE_URL` thuộc `qnu_v1_test_*` và xác minh fixture trước. Full gate gồm toàn bộ test V1 trong môi trường cô lập, không chạy test trên DB ứng dụng. Kiểm tra fixture trước khi chạy script có thể gọi DB/model/network. Không tự cài thêm gói hoặc chạy live benchmark chỉ để sửa Markdown.
 
-Frontend: từ `frontend`, dùng Biome cục bộ đã cài (`npm exec -- biome check <files>`) và `npm run build`. `frontend/AGENTS.md` chứa hợp đồng component chi tiết. Không dùng auto-fix toàn repo hoặc sửa file sinh tự động để che lỗi.
+Frontend: từ `frontendV1`, dùng Biome cục bộ đã cài (`npm exec -- biome check <files>`) và `npm run build`. `frontendV1/AGENTS.md` chứa hợp đồng component chi tiết. Không dùng auto-fix toàn repo hoặc sửa file sinh tự động để che lỗi.
 
 Chạy full suite một lần ở cuối batch; chỉ lặp khi thay đổi mới, failure hoặc nghi vấn chưa giải quyết cần nó. Không chạy lại toàn bộ backend cho UI thuần túy. Nếu thiếu binary/dependency/quyền, ghi NOT RUN và lý do; không coi đọc tĩnh là build/test PASS.
 

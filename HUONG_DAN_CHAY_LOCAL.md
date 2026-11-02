@@ -14,4 +14,4 @@ Máy mới, cấu hình SSO/ModelOps, migration và xử lý lỗi: [hướng d�
 
 `dev` không mở cửa sổ ẩn, không tự dừng app đang có và không tự migrate/seed. Ctrl+C dừng các thành phần của phiên vừa mở. Có thể chạy `be`, `worker`, `fe` ở ba cửa sổ nếu cần log riêng. Tên `v1-*` vẫn dùng được.
 
-Đã chuyển các runner root, nhưng chưa xóa thư mục legacy hoặc dữ liệu. Đường triển khai server khác local: xem [Docker/Dokploy V1](docs/trien_khai/02_quy_trinh_trien_khai_dokploy.md).
+Hai thư mục legacy đã được gỡ khỏi checkout sau khi lưu riêng; dữ liệu DB/object store không bị xóa. Đường triển khai server khác local: xem [Docker/Dokploy V1](docs/trien_khai/02_quy_trinh_trien_khai_dokploy.md).

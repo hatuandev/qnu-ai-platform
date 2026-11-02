@@ -1,6 +1,6 @@
 # QNU AI Platform — V1
 
-Mã đang được phát triển và các lệnh mặc định dùng **backendV1/** (FastAPI/Python3.12) và **frontendV1/** (React/TypeScript/Vite). Backend/frontend cũ còn trong repository để giữ dữ liệu và lịch sử; lệnh mặc định không chạy chúng.
+Mã và các lệnh chạy dùng **backendV1/** (FastAPI/Python3.12) và **frontendV1/** (React/TypeScript/Vite). Hai thư mục backend/frontend cũ đã được gỡ khỏi checkout; mã đã commit còn trong lịch sử Git, dữ liệu ignored được lưu riêng trước khi gỡ.
 
 ## Chạy trên laptop
 

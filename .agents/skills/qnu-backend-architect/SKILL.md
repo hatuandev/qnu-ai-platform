@@ -12,10 +12,10 @@ Tài liệu này là cẩm nang bắt buộc cho mọi kỹ sư Backend phát tr
 
 ## 1. Cấu Trúc Module Chuẩn Hóa (Quy Tắc 4 Tệp Tin)
 
-Mỗi tính năng/domain nghiệp vụ phải là một module khép kín nằm trong `app/modules/<module_name>/`, tuyệt đối không viết file "quái vật" nghìn dòng:
+Mỗi tính năng/domain nghiệp vụ là module trong `backendV1/qnu/domains/<domain>/`, theo ranh giới module hiện có; không dựng lại `backend/app` legacy đã gỡ. Tránh viết file "quái vật" nghìn dòng:
 
 ```text
-app/modules/<module_name>/
+backendV1/qnu/domains/<domain>/
 ├── __init__.py      # Export router và service
 ├── models.py        # SQLAlchemy ORM Models (Khai báo bảng CSDL PostgreSQL)
 ├── schemas.py       # Pydantic v2 DTOs (Request / Response validation)
@@ -52,7 +52,7 @@ Nếu module có các logic phức tạp chuyên biệt, tách thành các file 
    - Toàn bộ kết nối Database phải dùng `AsyncSession` qua `asyncpg`.
    - Gọi Redis, Qdrant, S3, hoặc HTTP API bên thứ 3 phải dùng `await` (sử dụng `httpx.AsyncClient` hoặc async client của thư viện).
 2. **Mã Lỗi Chuẩn Hóa RFC 7807 (Problem Details)**:
-   - Khi có lỗi nghiệp vụ, ném ra các exception kế thừa từ `AppException` trong `app.core.exceptions`.
+   - Khi có lỗi nghiệp vụ, dùng `AppException` trong `qnu.platform.errors` theo module hiện có.
    - Định dạng trả về client:
      ```json
      {
@@ -66,7 +66,7 @@ Nếu module có các logic phức tạp chuyên biệt, tách thành các file 
      }
      ```
 3. **Structured JSON Logging & Correlation ID**:
-   - Luôn sử dụng logger từ `app.core.logging`.
+   - Luôn sử dụng logger từ `qnu.platform.logging`.
    - Luôn truyền `correlation_id` vào log context để dễ dàng trace request trên hệ thống giám sát tập trung.
 4. **Kiểm thử theo phạm vi và rủi ro**:
    - Dùng [bảng kiểm chứng chung](../../rules/verification.md): regression phù hợp, Ruff có phạm vi và full Pytest một lần cuối batch backend.

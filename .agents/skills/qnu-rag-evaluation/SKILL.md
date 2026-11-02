@@ -5,7 +5,7 @@ description: Build or independently review QNU RAG benchmark labels, fair retrie
 
 # Đánh giá RAG độc lập
 
-Mục tiêu là bằng chứng chất lượng và giới hạn của nó, không làm đẹp chỉ số. Đọc `backend/app/modules/evaluation`, tests/report hiện có, retrieval API và snapshot trước khi thêm runner. Có service evaluation không đồng nghĩa đã đo đủ mọi biến thể.
+Mục tiêu là bằng chứng chất lượng và giới hạn của nó, không làm đẹp chỉ số. Đọc `backendV1/qnu/domains/evaluation`, tests/report hiện có, retrieval API và snapshot trước khi thêm runner. Có service evaluation không đồng nghĩa đã đo đủ mọi biến thể.
 
 ## Thiết lập thí nghiệm
 

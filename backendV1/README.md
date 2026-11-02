@@ -1,6 +1,6 @@
 # QNU AI Platform — Backend v1
 
-Backend đang dùng mặc định, chạy ở cổng 8002. Lệnh root và Docker dùng V1; mã `backend/` cũ chưa bị xóa. Workspace là biên giới quyền của đơn vị theo ngoại lệ trong AGENTS.md; DB/Redis/storage có thể dùng chung hạ tầng nhưng quyền và ownership phải rõ ràng.
+Backend hiện hành, chạy ở cổng 8002. Lệnh root và Docker dùng V1; mã `backend/` cũ đã được gỡ khỏi checkout. Workspace là biên giới quyền của đơn vị theo ngoại lệ trong AGENTS.md; DB/Redis/storage có thể dùng chung hạ tầng nhưng quyền và ownership phải rõ ràng.
 
 ## Đã triển khai
 

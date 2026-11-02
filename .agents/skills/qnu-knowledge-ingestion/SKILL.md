@@ -5,7 +5,7 @@ description: Implement or review QNU PDF, DOCX, XLSX and OCR extraction, table r
 
 # Ingestion và bằng chứng tài liệu
 
-Đọc luồng thật ở `backend/app/modules/knowledge`, parser/normalization/services, StorageDriver, OCR adapter và model/index publication liên quan. Tuân [workflow](../../rules/workflow-and-memory.md) và [gate](../../rules/verification.md).
+Đọc luồng thật ở `backendV1/qnu/domains/knowledge`, `backendV1/qnu/domains/ocr`, các adapter/storage port và model/index publication liên quan. Tuân [workflow](../../rules/workflow-and-memory.md) và [gate](../../rules/verification.md).
 
 1. Lưu nguồn qua StorageDriver trước xử lý; checksum/dedup phải tính cả collection và tenant/version cần thiết. Giữ local/S3 parity, retry/idempotency và trạng thái tiến trình trung thực.
 2. Giữ nguyên bytes nguồn, raw OCR JSON, thứ tự trang/block, bbox, bảng/ô, rowspan/colspan, footnote và config/model parser. Mọi bản clean/canonical/record/chunk là dẫn xuất có source revision/hash và mapping ngược.

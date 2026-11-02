@@ -5,7 +5,7 @@ description: Configure or review QNU AI providers, model selection, protected cr
 
 # ModelOps theo cấu hình thực tế
 
-Đọc `backend/app/modules/modelops`, inference/adapters, schema và nơi runtime phân giải model; tìm file thực trước khi đặt tên lớp. Đọc [quy định bảo mật](../../rules/security-and-git.md) khi liên quan credential/network, và [gate](../../rules/verification.md) khi kiểm thử.
+Đọc `backendV1/qnu/domains/modelops`, `backendV1/qnu/adapters/providers`, schema và nơi runtime phân giải model; tìm file thực trước khi đặt tên lớp. Đọc [quy định bảo mật](../../rules/security-and-git.md) khi liên quan credential/network, và [gate](../../rules/verification.md) khi kiểm thử.
 
 1. Phân biệt provider/endpoint, credential, model/capability và task routing theo schema thật. Giữ model động từ DB/UI; chuyển preferred provider/model qua assistant/workflow/DAG đến adapter trong phạm vi quyền, không thay model cũ âm thầm.
 2. LLM credential đi qua ModelOps DB được bảo vệ và quy trình hiện có; không thêm .env key để override UI. DTO/log/error chỉ trả trạng thái an toàn; test ở API/handler/runtime, không chỉ helper masking. Tenant không được chọn tùy ý secret/config của máy chủ để gửi tới endpoint riêng.

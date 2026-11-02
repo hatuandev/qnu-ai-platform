@@ -1,5 +1,9 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên828 — Test MinerU VRAM 0.17](2026-11-02_phien_828_test_mineru_vram_017.md): 61 trang, CER mẫu/bảng giữ nguyên; trang30 thêm một lỗi chữ ngoài mẫu, không retry/đổi app.
+
+- [Phiên827 — Gỡ legacy, kiểm V1](2026-11-02_phien_827_go_legacy_va_kiem_chung_v1.md): archivengoàirepo/1.799trackedgiữ,BE1306/FE701PASS/buildDocker/liveđạt;khôngpush/LLMtest.
+
 - [Phiên826 — Docker/Make mặc định V1](2026-11-02_phien_826_chuyen_docker_make_mac_dinh_v1.md): chuyểnrootentry/buildserverV1,52tests/Dockerbuild/proxy/APIhealth/preflightđạt;khôngxóalegacy/restart/push.
 
 - [Phiên825 — Rà dọn sau MinerU](2026-11-02_phien_825_ra_don_dep_sau_mineru.md): DBdefaultMinerU; E2Eprofilecũ/catalognemotroncònbật, cacheđo37,30MiB; auditkhôngxóa.

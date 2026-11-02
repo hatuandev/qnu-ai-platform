@@ -2,11 +2,11 @@
 
 ## Phạm vi và ngữ cảnh
 
-- Luồng chạy mặc định hiện hành là `backendV1/` và `frontendV1/`; root Docker/Make/run đã chuyển sang V1. `backend/` và `frontend/` là mã legacy chưa xóa, không dùng các lệnh seed/reset của chúng để khởi động V1. Phiên bản Python hiện hành theo `backendV1/pyproject.toml` và `uv.lock`.
+- Luồng chạy hiện hành là `backendV1/` và `frontendV1/`; root Docker/Make/run dùng V1. `backend/` và `frontend/` đã được gỡ khỏi checkout sau khi lưu riêng bản legacy. Các nhắc đến chúng trong lịch sử/ADR mô tả bản cũ, không phải đường dẫn chạy hiện tại. Phiên bản Python theo `backendV1/pyproject.toml` và `uv.lock`.
 
 - Áp dụng cho repo này; đọc thêm AGENTS.md ở thư mục con trước khi sửa phần tương ứng.
 - Đọc [PROJECT_CONTEXT](docs/memory/PROJECT_CONTEXT.md), kiểm tra Git/diff và file thực tế trước khi kết luận hiện trạng. Memory và báo cáo cũ là ngữ cảnh, không thay thế bằng chứng mã/test hiện tại.
-- Backend Python/FastAPI, SQLAlchemy async và Pydantic; phiên bản Python theo `backend/pyproject.toml` và lockfile. Frontend React/TypeScript/Vite, TanStack, Radix/shadcn, Tailwind và Biome.
+- Backend V1 Python/FastAPI, SQLAlchemy async và Pydantic; phiên bản Python theo `backendV1/pyproject.toml` và lockfile. Frontend V1 React/TypeScript/Vite, TanStack, Radix/shadcn, Tailwind và Biome.
 - Không áp nguyên kiến trúc .NET/CQRS từ bộ tài liệu tham khảo hoặc repo Nexora sang repo này.
 - Giữ thay đổi chưa commit của người dùng. Mọi dòng sửa phải phục vụ yêu cầu hiện tại; không tự refactor, sửa cấu hình đang chạy, reindex, restart, deploy hay Git push ngoài phạm vi được giao.
 - Chỉ dẫn và ngoại lệ người dùng đã xác nhận trong phiên có ưu tiên hơn mặc định trong tài liệu. Ghi phạm vi ngoại lệ; không mở rộng ngoại lệ của repo khác sang repo này.

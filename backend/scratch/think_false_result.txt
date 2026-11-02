@@ -1,4 +1,0 @@
-Duration: 24.15s
-Content len: 0
-Thinking len: 12962
-

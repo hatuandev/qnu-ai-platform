@@ -5,7 +5,7 @@ description: Tune or debug QNU retrieval, scope, fusion, reranking, evidence con
 
 # Retrieval có phạm vi và bằng chứng
 
-Đọc mã/config/snapshot trước. Điểm vào thường ở `backend/app/modules/rag/service.py`, `retriever.py`, `vector_indexer.py`, `fusion.py`, `reranker.py`, `evidence_pipeline.py`, `evidence_runtime.py` và `facts.py`; pipeline chọn theo assistant/policy, không mặc định mọi request đi cùng một nhánh.
+Đọc mã/config/snapshot trước. Điểm vào hiện hành ở `backendV1/qnu/domains/rag`, cùng publication/index trong `backendV1/qnu/domains/knowledge` và conversation runtime. Tìm module retrieval/fusion/rerank/evidence thực tế trước khi sửa; pipeline chọn theo assistant/policy, không mặc định mọi request đi cùng một nhánh.
 
 ## Cách làm
 
