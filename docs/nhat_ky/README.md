@@ -1,6 +1,8 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
+- [Phiên811 — Live thay tài liệu và timeout](2026-11-02_phien_811_live_thay_tai_lieu_va_timeout.md): Gitea v1.0.3 code f0a7ca39 đã xác minh; FE686/build/TS/lint đạt. Live kho riêng: native PDF2trang đạt; compiler attempt1 uncertain sau300,56s, provider snapshot còn timeout300, thinkingoff. Không retry; thay bản/publish/index/chat chưa chạy, giữ dữ liệu và lịch sử.
+
 - [Phiên810 — Review FE và chốt v1.0.3](2026-11-02_phien_810_review_fe_va_chot_v1_0_3.md): fixzoom;FE686/build/TS/Biome19đạt, giữmain và chưa nghiệm thu live replacement.
 
 - [Phiên 809 — Fix chuyển phiên bản và người dùng rà soát](2026-11-02_phien_809_fix_chuyen_phien_ban_va_nguoi_dung_ra_soat.md): hai P2 có regression; giữ bước xem/sửa thủ công sau OCR/compiler/review; FE684 PASS, build/TS/lint đạt, không live inference.

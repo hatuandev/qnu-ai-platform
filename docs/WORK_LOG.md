@@ -1,5 +1,7 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- **Context811 — Chốt FE và thử thay tài liệu:** Gitea v1.0.3 code f0a7ca39 đã xác minh; FE686/build/TS/lint đạt. Live kho riêng: native PDF2trang đạt; compiler attempt1 uncertain sau300,56s, provider snapshot còn timeout300, thinkingoff. Không retry; thay bản/publish/index/chat chưa chạy, giữ dữ liệu và lịch sử. [Nhật ký811](nhat_ky/2026-11-02_phien_811_live_thay_tai_lieu_va_timeout.md), [Snapshot811](memory/snapshots/2026-11-02_session_811.md).
+
 - **Context810 — Chốt FE v1.0.3:** review/fixzoom,FE686/77suites/build/TS/Biome19PASS; snapshot riêng,mainv1.0.2giữ. ChỉGitea/GitHubhoãn806; live replacement sẽ chạy sau commit, chưađạt tại mốc này. [Nhật ký810](nhat_ky/2026-11-02_phien_810_review_fe_va_chot_v1_0_3.md), [Snapshot810](memory/snapshots/2026-11-02_session_810.md).
 
 - **Context809 — Fix 2 P2 và bước người dùng xem/sửa:** save chọn bản server vừa lưu, cache đúng snapshot; dialog giữ form khi parent render lại. Sau AI review có nút sang chỉnh sửa, preview rồi xác nhận bản mới; không auto-publish. FE684/77suites/build/TS/Biome10 PASS, preview cô lập4/4; không BE/DB/model/live/restart/push. [Nhật ký809](nhat_ky/2026-11-02_phien_809_fix_chuyen_phien_ban_va_nguoi_dung_ra_soat.md), [Snapshot809](memory/snapshots/2026-11-02_session_809.md).
