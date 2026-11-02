@@ -59,3 +59,11 @@ Push tường minh Gitea trước, chỉ sau thành công mới GitHub; không d
 nhiều pushURL và không forcepush. Đối chiếu remote tip với local sau push.
 Receipt kết quả thực tế ở tmp/release806; final bàn giao nêu hash/remote thực đạt
 hoặc lỗi nếu có. Snapshot806 ghi rõ các gate chưa đạt, không gọi checkpoint làGA.
+
+Kết quả thực tế: code checkpoint711b1bc96b401bc8593c12f9210ca3b030d3dc8b
+đãpushGitea thành công và ls-remote xác nhận đúng hash. GitHubpush exit1,
+GH001/pre-receive hook declined: PDF Cẩm Nang Tuyển Sinh Đại Học Năm2025(1)
+162.41MiB đã có trong lịch sử cũ, vượt100MiB. Không phải sourcefile thêm ở806.
+Người dùng xác nhận giữ Gitea, để xử lý lịch sử GitHub thành việc riêng; không
+rewritehistory, forcepush, LFSmigration hoặc xóaPDF. Commit tài liệu tiếp theo
+chỉ bổ sung biên nhận này trên Gitea; GitHub chưa có nhánh v1.0.3.

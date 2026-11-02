@@ -1,7 +1,7 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
-- [Phiên806 — Chốt v1.0.3 riêng với FE đang chạy](2026-11-02_phien_806_chot_nhanh_v1_0_3.md):fixignorestorage,BEcòn1FAIL716,FE663/buildPASS;checkpointkhôngGA,cleanupbịchặn0file.
+- [Phiên806 — Chốt v1.0.3 trênGitea, FE đang chạy giữ riêng](2026-11-02_phien_806_chot_nhanh_v1_0_3.md):code711b1bc9/GiteaPASS,GitHubchặnPDF162.41MiB/userđểsau;BE1FAIL716,FE663/buildPASS,cleanupbịchặn0file.
 
 - [Phiên805 — Đổi9router sang Luna và testOCR](2026-11-02_phien_805_doi_9router_luna_va_test_ocr.md):4completed4invalid/10gợiýcontract,probe cơbán→cơbảnđúngảnh;cohortFAIL,khôngretry/save,giữbản30/compiler.
 
