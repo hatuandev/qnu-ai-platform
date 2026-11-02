@@ -3,7 +3,10 @@ import type {
   PageStatus,
   ProcessingRunStatus,
   Suggestion,
+  TextUnit,
 } from "@/features/knowledge/ocr-types";
+
+export const MAX_SPELL_CHECK_UNITS = 100;
 
 // ============================================================================
 // Unicode Code Point Utilities (Strict Python Parity)
@@ -204,6 +207,7 @@ export const saveReviewSchema = z
 
 export const detectRequestSchema = z
   .object({
+    source_version: z.number().int().min(0).nullable().optional(),
     expected_version: z
       .number()
       .int("Phiên bản phải là số nguyên")
@@ -214,7 +218,10 @@ export const detectRequestSchema = z
     evidence_ids: z
       .array(z.string().min(1))
       .min(1, "Chọn ít nhất 1 đoạn văn bản để kiểm tra")
-      .max(100, "Tối đa 100 đoạn văn bản trong một lượt kiểm tra"),
+      .max(
+        MAX_SPELL_CHECK_UNITS,
+        "Tối đa 100 đoạn văn bản trong một lượt kiểm tra",
+      ),
     provider_id: z.string().min(1).max(64).nullable().optional(),
     max_output_tokens: z
       .number()
@@ -238,6 +245,98 @@ export const detectRequestSchema = z
 // ============================================================================
 
 export { generateIdempotencyKey, isDocx } from "@/features/knowledge/schemas";
+
+export interface NormalizedBbox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * Extracts a verified normalized [0, 1] bounding box from a TextUnit's bbox record.
+ * Never fabricates or estimates coordinates when the unit has no valid bbox.
+ */
+export function extractNormalizedBbox(
+  bbox: Record<string, unknown> | null | undefined,
+): NormalizedBbox | null {
+  if (!bbox || typeof bbox !== "object") return null;
+  const x0 = typeof bbox.x0 === "number" ? bbox.x0 : null;
+  const y0 = typeof bbox.y0 === "number" ? bbox.y0 : null;
+  const x1 = typeof bbox.x1 === "number" ? bbox.x1 : null;
+  const y1 = typeof bbox.y1 === "number" ? bbox.y1 : null;
+  if (
+    x0 === null ||
+    y0 === null ||
+    x1 === null ||
+    y1 === null ||
+    !Number.isFinite(x0) ||
+    !Number.isFinite(y0) ||
+    !Number.isFinite(x1) ||
+    !Number.isFinite(y1)
+  ) {
+    return null;
+  }
+  if (x0 < 0 || y0 < 0 || x1 > 1 || y1 > 1 || x1 <= x0 || y1 <= y0) {
+    return null;
+  }
+  return { x0, y0, x1, y1 };
+}
+
+export function formatUnitKindLabel(kind: string): string {
+  switch (kind.toLowerCase()) {
+    case "heading":
+    case "title":
+    case "section_header":
+      return "Tiêu đề";
+    case "table":
+    case "table_cell":
+    case "cell":
+      return "Ô bảng";
+    case "list":
+    case "list_item":
+      return "Mục danh sách";
+    case "footnote":
+    case "footer":
+      return "Chú thích";
+    default:
+      return "Đoạn văn";
+  }
+}
+
+/**
+ * Formats a human-friendly unit location label for non-technical document officers
+ * without exposing raw internal `evidence_id` strings.
+ */
+export function formatUnitLocator(
+  unit: Pick<TextUnit, "evidence_id" | "page" | "kind" | "row" | "column">,
+  allUnits?: ReadonlyArray<
+    Pick<TextUnit, "evidence_id" | "page" | "kind" | "row" | "column">
+  >,
+  options?: { includePage?: boolean },
+): string {
+  const includePage = options?.includePage ?? true;
+  const pagePrefix = includePage ? `Trang ${unit.page} · ` : "";
+
+  if (unit.row !== null && unit.column !== null) {
+    return `${pagePrefix}Ô bảng (Hàng ${unit.row + 1}, Cột ${unit.column + 1})`;
+  }
+  if (unit.row !== null) {
+    return `${pagePrefix}Ô bảng (Hàng ${unit.row + 1})`;
+  }
+
+  const kindLabel = formatUnitKindLabel(unit.kind);
+  if (allUnits && allUnits.length > 0) {
+    const pageUnits = allUnits.filter(
+      (u) => u.page === unit.page && u.row === null,
+    );
+    const idx = pageUnits.findIndex((u) => u.evidence_id === unit.evidence_id);
+    if (idx >= 0) {
+      return `${pagePrefix}${kindLabel} ${idx + 1}`;
+    }
+  }
+  return `${pagePrefix}${kindLabel}`;
+}
 
 export function formatRunStatus(status: ProcessingRunStatus): {
   label: string;
@@ -334,8 +433,20 @@ export function formatOcrError(
     case "ocr_spelling_invalid":
       return (
         detail ||
-        "Gợi ý kiểm tra chính tả từ model không khớp văn bản hiện hành."
+        "Một hoặc nhiều gợi ý từ mô hình không khớp nguyên văn đoạn văn bản hoặc làm thay đổi số liệu; toàn bộ lượt kiểm tra này bị từ chối an toàn và chưa thay đổi văn bản."
       );
+    case "ocr_spelling_interrupted":
+      return "Lượt kiểm tra chính tả bị gián đoạn hoặc quá thời gian chờ phản hồi từ mô hình.";
+    case "ocr_spelling_expired":
+      return "Lượt kiểm tra đã hết thời gian chờ; hệ thống không nhận kết quả muộn.";
+    case "ocr_spelling_not_found":
+      return "Không tìm thấy lượt kiểm tra chính tả này trên máy chủ.";
+    case "ocr_text_conflict":
+      return "Một số đoạn được chọn không thuộc phiên bản văn bản đang kiểm tra. Vui lòng tải lại dữ liệu.";
+    case "chat_provider_changed":
+      return "Cấu hình mô hình Chat đã thay đổi trong lúc chuẩn bị hoặc xử lý. Vui lòng kiểm tra lại lựa chọn mô hình.";
+    case "chat_output_truncated":
+      return "Phản hồi của mô hình bị cắt giữa chừng do vượt giới hạn độ dài đầu ra. Vui lòng chọn ít đoạn văn hơn trong một lượt kiểm tra.";
     case "model_token_limits_stale":
       return "Thông số giới hạn của model OCR đã cũ do mới đổi tên model. Vui lòng cập nhật hoặc xóa giới hạn cũ trong ModelOps.";
     case "model_input_budget_unknown":

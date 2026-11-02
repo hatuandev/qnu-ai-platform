@@ -489,7 +489,23 @@ export function useSaveTextReviewMutation(
         body,
         idempotencyKey,
       ),
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      // The server response is the saved snapshot; selecting it must never show
+      // the old query while invalidation/refetch is still in flight.
+      for (const version of [saved.version, null]) {
+        queryClient.setQueryData(
+          ocrQueryKeys.review(
+            sessionId,
+            workspaceId,
+            collectionId,
+            sourceId,
+            revisionId,
+            runId,
+            version,
+          ),
+          saved,
+        );
+      }
       void queryClient.invalidateQueries({
         queryKey: ocrQueryKeys.root(
           sessionId,

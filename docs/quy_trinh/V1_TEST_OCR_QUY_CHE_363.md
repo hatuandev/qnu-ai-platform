@@ -47,6 +47,24 @@ prompt và giới hạn hình ảnh.
 
 ## Chính tả và các bước sau
 
+### Người dùng xem và xác nhận trước khi chuyển bước
+
+1. Mở văn bản OCR, đối chiếu ảnh và sửa trực tiếp vào nháp; kiểm tra chính tả AI
+   là bước hỗ trợ, không tự lưu thay đổi. Xem trước các sửa đổi rồi xác nhận lưu.
+2. Sau khi lưu, màn hình chuyển sang đúng phiên bản server vừa trả về. Bấm
+   **Dùng để biên soạn** sẽ ghim phiên bản này; nếu còn nháp chưa lưu thì phải lưu
+   hoặc hủy nháp trước. Việc chọn lịch sử để xem lại vẫn được giữ riêng.
+3. Compiler hoàn tất: xem bản biên soạn, dẫn chứng và báo cáo AI nếu có. Trong tab
+   **Rà soát & Đánh giá**, nút **Xem và chỉnh sửa bản biên soạn** đưa người có quyền
+   vào trình sửa. Có thể sửa chính tả, tiêu đề, mục và đoạn văn; giữ nguồn trích dẫn.
+4. Bấm **Xem trước thay đổi**, đối chiếu nội dung rồi **Xác nhận tạo bản mới**.
+   Bản sửa là lượt dẫn xuất mới có liên kết bản trước; không ghi đè bản cũ và không
+   tự xuất bản. Đăng ký đúng bản mới đã kiểm tra, sau đó Duyệt & Phát hành theo quyền.
+
+Người chỉ có quyền xem không được chuyển sang sửa. Bỏ qua AI review theo chế độ
+đã được cho phép vẫn giữ quyết định xác nhận của người dùng; không đồng nghĩa
+AI tự phê duyệt nội dung. Không cần sửa nếu bản biên soạn đã đúng.
+
 Ứng dụng đã có luồng `text-review/checks` → gợi ý → lưu `text-review`. Lượt kiểm tra
 chính tả tự nó không ghi văn bản. Phiên test797 được người dùng cho phép áp dụng
 các gợi ý hợp lệ tự động, chỉ với nguồn thử này; không đổi quy trình hoặc mặc định UI.

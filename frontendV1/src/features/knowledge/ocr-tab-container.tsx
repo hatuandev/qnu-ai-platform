@@ -77,6 +77,9 @@ export function OcrTabContainer({
     initialRunId ?? null,
   );
   const [activePage, setActivePage] = useState<number>(initialPage ?? 1);
+  const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(
+    null,
+  );
   const [activeSubTab, setActiveSubTab] = useState<OcrSubTab>(
     initialSubTab ?? "runs",
   );
@@ -188,7 +191,16 @@ export function OcrTabContainer({
   );
   // Read-only view of the stored draft so the container can warn before the
   // scope changes and mark the review tab.
-  const currentDraft = useOcrDraft(draftScope, null).draft;
+  const draftHandle = useOcrDraft(
+    draftScope,
+    textReviewQuery.data
+      ? {
+          version: textReviewQuery.data.version,
+          sha256: textReviewQuery.data.canonical_sha256,
+        }
+      : null,
+  );
+  const currentDraft = draftHandle.draft;
   const draftCount = currentDraft?.changes.size ?? 0;
   const hasUnsavedDraft = draftCount > 0;
   const draftCountId = useId();
@@ -367,6 +379,26 @@ export function OcrTabContainer({
               onPageChange={handlePageChange}
               reviewDoc={textReviewQuery.data}
               isDocx={isDocxFile}
+              canManage={canManage}
+              draftChanges={draftHandle.changes}
+              onSaveDraftChange={(evidenceId, _before, after) => {
+                if (!canManage) return;
+                draftHandle.update((prev) => {
+                  const next = new Map(prev);
+                  next.set(evidenceId, after);
+                  return next;
+                });
+              }}
+              onRevertUnitDraft={(evidenceId) => {
+                if (!canManage) return;
+                draftHandle.update((prev) => {
+                  const next = new Map(prev);
+                  next.delete(evidenceId);
+                  return next;
+                });
+              }}
+              focusedEvidenceId={focusedEvidenceId}
+              onFocusUnit={setFocusedEvidenceId}
             />
           ) : (
             <Card className="p-8 text-center text-xs text-muted-foreground">
@@ -393,6 +425,18 @@ export function OcrTabContainer({
                   checkId: id,
                 })
               }
+              onLocateUnit={(target) => {
+                if (target.page) {
+                  setActivePage(target.page);
+                }
+                setFocusedEvidenceId(target.evidenceId);
+                setActiveSubTab("comparison");
+                onDeepLinkChange?.({
+                  runId: activeRun.id,
+                  page: target.page ?? activePage,
+                  subTab: "comparison",
+                });
+              }}
             />
           ) : activeRun && activeRun.status !== "completed" ? (
             <Card className="p-6 text-center text-xs text-muted-foreground">

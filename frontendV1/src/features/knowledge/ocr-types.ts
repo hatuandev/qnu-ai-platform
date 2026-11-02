@@ -134,6 +134,7 @@ export interface SaveReviewInput {
 }
 
 export interface DetectRequestInput {
+  source_version?: number | null;
   expected_version: number;
   expected_sha256: string;
   evidence_ids: string[];
@@ -148,6 +149,9 @@ export interface Suggestion {
   original: string;
   replacement: string;
   reason: string;
+  context_before?: string | null;
+  context_after?: string | null;
+  review_reason?: string | null;
 }
 
 export interface DetectionResponse {
@@ -156,6 +160,7 @@ export interface DetectionResponse {
   version: number;
   canonical_sha256: string;
   suggestions: Suggestion[];
+  withheld_suggestions?: Suggestion[];
   checked_evidence_ids: string[];
   error_code: string | null;
   usage_id: string | null;

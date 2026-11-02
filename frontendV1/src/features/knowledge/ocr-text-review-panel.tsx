@@ -7,10 +7,10 @@ import {
   Download,
   Edit3,
   History,
-  Info,
   Loader2,
   RotateCcw,
   Save,
+  ScanSearch,
   Sparkles,
   Undo2,
 } from "lucide-react";
@@ -26,15 +26,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -55,9 +47,15 @@ import {
   downloadReviewMarkdownBlob,
 } from "@/features/knowledge/ocr-requests";
 import {
+  OcrSaveConfirmDialog,
+  OcrSpellCheckDialog,
+} from "@/features/knowledge/ocr-review-dialogs";
+import {
   applySuggestionsToText,
   formatOcrError,
+  formatUnitLocator,
   generateIdempotencyKey,
+  MAX_SPELL_CHECK_UNITS,
   validateSuggestionSpan,
 } from "@/features/knowledge/ocr-schemas";
 import type {
@@ -68,7 +66,6 @@ import type {
   TextUnit,
 } from "@/features/knowledge/ocr-types";
 import { useActionScope } from "@/features/lifecycle/action-scope";
-import { useCatalogQuery } from "@/features/modelops/queries";
 import { SpellingResultPanel } from "./spelling-result-panel";
 
 type OcrTextReviewProps = {
@@ -80,7 +77,9 @@ type OcrTextReviewProps = {
   canManage: boolean;
   checkId?: string;
   onCheckChange?: (checkId: string) => void;
+  onLocateUnit?: (target: { evidenceId: string; page?: number }) => void;
 };
+
 export function OcrTextReviewPanel(props: OcrTextReviewProps) {
   const { sessionId } = useSyncExternalStore(
     subscribeToken,
@@ -94,6 +93,7 @@ export function OcrTextReviewPanel(props: OcrTextReviewProps) {
     />
   );
 }
+
 function OcrTextReviewSession({
   workspaceId,
   collectionId,
@@ -103,15 +103,13 @@ function OcrTextReviewSession({
   canManage,
   checkId,
   onCheckChange,
+  onLocateUnit,
 }: OcrTextReviewProps) {
   const navigate = useNavigate();
   const current = useActionScope();
   // Selected version: null means latest saved; 0 means original OCR; 1, 2...
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
 
-  // Draft changes live in a store keyed by
-  // session/workspace/collection/source/revision/run, so switching to the
-  // scan-comparison tab (which unmounts this panel) does not lose them.
   const draftScope = useMemo(
     () => ({ workspaceId, collectionId, sourceId, revisionId, runId: run.id }),
     [workspaceId, collectionId, sourceId, revisionId, run.id],
@@ -175,14 +173,6 @@ function OcrTextReviewSession({
     run.id,
   );
 
-  // Catalog for chat providers for spelling check
-  const catalogQuery = useCatalogQuery(workspaceId, {
-    enabled: spellCheckModalOpen,
-  });
-  const chatProviders = (catalogQuery.data ?? []).filter((p) =>
-    p.capabilities.includes("chat"),
-  );
-
   const doc = reviewQuery.data;
   const units = useMemo(() => doc?.units ?? [], [doc]);
 
@@ -216,6 +206,7 @@ function OcrTextReviewSession({
 
   // Handle inline edit start
   const handleStartEdit = (unit: TextUnit) => {
+    if (!canManage) return;
     const currentDraft = draftChanges.get(unit.evidence_id) ?? unit.text;
     setEditingEvidenceId(unit.evidence_id);
     setEditingInputText(currentDraft);
@@ -223,7 +214,7 @@ function OcrTextReviewSession({
 
   // Handle inline edit save into local draft
   const handleApplyLocalEdit = () => {
-    if (!editingEvidenceId) return;
+    if (!canManage || !editingEvidenceId) return;
     const trimmed = editingInputText.trim();
     if (!trimmed) {
       toast.error("Không được để trống nội dung đoạn.");
@@ -235,6 +226,7 @@ function OcrTextReviewSession({
       next.set(editingEvidenceId, editingInputText);
       return next;
     });
+    setActiveSaveKey(generateIdempotencyKey());
 
     setEditingEvidenceId(null);
     setEditingInputText("");
@@ -243,11 +235,13 @@ function OcrTextReviewSession({
 
   // Revert a single unit draft back to loaded version
   const handleRevertUnitDraft = (evidenceId: string) => {
+    if (!canManage) return;
     draft.update((prev) => {
       const next = new Map(prev);
       next.delete(evidenceId);
       return next;
     });
+    setActiveSaveKey(generateIdempotencyKey());
     if (editingEvidenceId === evidenceId) {
       setEditingEvidenceId(null);
     }
@@ -255,7 +249,9 @@ function OcrTextReviewSession({
 
   // Discard all pending drafts
   const handleDiscardAllDrafts = () => {
+    if (!canManage) return;
     draft.clear();
+    setActiveSaveKey(generateIdempotencyKey());
     setEditingEvidenceId(null);
     setConflictError(null);
     toast.info("Đã hủy bỏ toàn bộ thay đổi nháp.");
@@ -263,7 +259,7 @@ function OcrTextReviewSession({
 
   // Save changes to backend
   const handleConfirmSave = async () => {
-    if (!doc || pendingChanges.length === 0) return;
+    if (!canManage || !doc || pendingChanges.length === 0) return;
     if (
       draft.baseMovedOn({ version: doc.version, sha256: doc.canonical_sha256 })
     ) {
@@ -275,7 +271,7 @@ function OcrTextReviewSession({
     }
 
     try {
-      await saveMutation.mutateAsync({
+      const updated = await saveMutation.mutateAsync({
         body: {
           expected_version: draft.draft?.baseVersion ?? doc.version,
           expected_sha256: draft.draft?.baseSha256 ?? doc.canonical_sha256,
@@ -284,19 +280,21 @@ function OcrTextReviewSession({
         idempotencyKey: activeSaveKey,
       });
 
+      if (!current()) return;
+      setSelectedVersion(updated.version);
       toast.success(
-        `Đã lưu thành công phiên bản dẫn xuất mới (v${doc.version + 1}).`,
+        `Đã lưu thành công phiên bản dẫn xuất mới (v${updated.version}).`,
       );
       draft.clear();
       setSaveModalOpen(false);
       setConflictError(null);
-      // Generate fresh key for next mutation
       setActiveSaveKey(generateIdempotencyKey());
     } catch (error: unknown) {
+      if (!current()) return;
       if (error instanceof ApiProblemError) {
         if (error.code === "ocr_text_version_conflict") {
           setConflictError(
-            "Xung đột phiên bản: Nội dung đã có bản mới được lưu trên server. Bạn vẫn đang giữ bản nháp hiện tại, vui lòng tải lại để đối chiếu.",
+            "Xung đột phiên bản: Nội dung đã có bản mới được lưu trên máy chủ. Bạn vẫn đang giữ bản nháp hiện tại, vui lòng tải lại để đối chiếu.",
           );
         } else {
           toast.error(formatOcrError(error.code, error.message));
@@ -309,16 +307,21 @@ function OcrTextReviewSession({
 
   // Trigger AI Spell Check
   const handleRunSpellCheck = async () => {
-    if (!doc) return;
+    if (!canManage || !doc) return;
     const ids = Array.from(selectedUnitsForCheck);
-    if (ids.length === 0 || ids.length > 100) {
-      toast.error("Vui lòng chọn từ 1 đến 100 đoạn văn bản.");
+    if (ids.length === 0 || ids.length > MAX_SPELL_CHECK_UNITS) {
+      toast.error(
+        `Vui lòng chọn từ 1 đến ${MAX_SPELL_CHECK_UNITS} đoạn văn bản để kiểm tra.`,
+      );
       return;
     }
 
     try {
       const res = await detectMutation.mutateAsync({
         body: {
+          ...(selectedVersion !== null
+            ? { source_version: selectedVersion }
+            : {}),
           expected_version: doc.version,
           expected_sha256: doc.canonical_sha256,
           evidence_ids: ids,
@@ -333,14 +336,26 @@ function OcrTextReviewSession({
       setLocalCheck(res);
       onCheckChange?.(res.id);
       setSpellCheckModalOpen(false);
+      setActiveSpellKey(generateIdempotencyKey());
+
+      if (res.status === "failed") {
+        toast.error(
+          `Lượt kiểm tra chính tả thất bại: ${formatOcrError(res.error_code)}`,
+        );
+        return;
+      }
       if (res.status !== "completed") {
-        toast.info(
-          "Lần kiểm tra chưa hoàn tất. Đọc lại trạng thái từ biên nhận; chưa có kết luận chính tả.",
+        toast.warning(
+          "Lần kiểm tra chưa hoàn tất (quá thời gian chờ hoặc đang xử lý). Hệ thống không tự gọi lại mô hình.",
         );
         return;
       }
 
-      if (res.suggestions.length === 0) {
+      if (res.withheld_suggestions?.length) {
+        toast.info(
+          `Có ${res.withheld_suggestions.length} chỗ cần đối chiếu ảnh; ${res.suggestions.length} gợi ý sửa chữ để xem xét.`,
+        );
+      } else if (res.suggestions.length === 0) {
         toast.info(
           `Hoàn tất kiểm tra ${res.checked_evidence_ids.length} đoạn: Không có đề xuất sửa nào.`,
         );
@@ -349,9 +364,6 @@ function OcrTextReviewSession({
           `Tìm thấy ${res.suggestions.length} đề xuất sửa chính tả.`,
         );
       }
-
-      // Generate next key for fresh check intent
-      setActiveSpellKey(generateIdempotencyKey());
     } catch (error: unknown) {
       if (!current()) return;
       if (error instanceof ApiProblemError) {
@@ -369,7 +381,6 @@ function OcrTextReviewSession({
 
     const currentText = draftChanges.get(s.evidence_id) ?? unit.text;
 
-    // Validate span with code points
     if (!validateSuggestionSpan(currentText, s)) {
       toast.error(
         "Gợi ý không còn khớp với văn bản hiện hành (có thể đoạn này đã được chỉnh sửa).",
@@ -388,6 +399,7 @@ function OcrTextReviewSession({
       next.set(s.evidence_id, updatedText);
       return next;
     });
+    setActiveSaveKey(generateIdempotencyKey());
 
     toast.success("Đã áp dụng gợi ý vào bản nháp. Vui lòng bấm Lưu thay đổi.");
     return true;
@@ -476,12 +488,14 @@ function OcrTextReviewSession({
     );
   }
 
+  const firstPage = units[0]?.page ?? 1;
+
   return (
     <div className="space-y-4">
       {/* Top Action Toolbar */}
       <Card className="rounded-xl shadow-2xs">
         <CardContent className="p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
-          {/* Version Switcher */}
+          {/* Version Switcher & Draft Status */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-foreground flex items-center gap-1.5">
               <History className="size-3.5 text-primary" />
@@ -531,9 +545,21 @@ function OcrTextReviewSession({
               </SelectContent>
             </Select>
 
-            <span className="text-muted-foreground font-mono text-[11px] hidden sm:inline">
-              SHA: {doc.canonical_sha256.slice(0, 10)}...
-            </span>
+            {pendingChanges.length > 0 ? (
+              <Badge variant="warning" className="text-[11px] py-0">
+                Đang có {pendingChanges.length} đoạn nháp chưa lưu
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="text-[11px] py-0">
+                Đã lưu trên máy chủ (v{doc.version})
+              </Badge>
+            )}
+
+            {!canManage ? (
+              <Badge variant="outline" className="text-[11px] py-0">
+                Chế độ chỉ xem
+              </Badge>
+            ) : null}
           </div>
 
           {/* Action Buttons */}
@@ -545,16 +571,19 @@ function OcrTextReviewSession({
                 variant="outline"
                 className="h-8 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
                 onClick={() => {
-                  if (pendingChanges.length > 0) {
-                    toast.warning(
-                      "Vui lòng Lưu hoặc Hủy các thay đổi nháp trước khi chạy kiểm tra chính tả bằng AI.",
+                  if (selectedUnitsForCheck.size === 0) {
+                    const defaultPageUnits = units.filter(
+                      (u) =>
+                        u.page === firstPage &&
+                        u.kind !== "image" &&
+                        u.kind !== "figure" &&
+                        u.text.trim().length > 0,
                     );
-                    return;
+                    setSelectedUnitsForCheck(
+                      new Set(defaultPageUnits.map((u) => u.evidence_id)),
+                    );
                   }
-                  // Default select all prose units on current review doc
-                  setSelectedUnitsForCheck(
-                    new Set(units.map((u) => u.evidence_id)),
-                  );
+                  setActiveSpellKey(generateIdempotencyKey());
                   setSpellCheckModalOpen(true);
                 }}
               >
@@ -635,11 +664,11 @@ function OcrTextReviewSession({
                 size="sm"
                 variant="outline"
                 className="h-8 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
-                title="Sử dụng lượt OCR và phiên bản văn bản đang xem để tạo bản biên soạn"
+                title="Sử dụng lượt OCR và phiên bản văn bản đã lưu để tạo bản biên soạn"
                 onClick={() => {
                   if (pendingChanges.length > 0) {
                     toast.warning(
-                      "Bạn đang có thay đổi chưa lưu. Vui lòng lưu thay đổi hậu OCR trước khi dùng để biên soạn.",
+                      "Bạn đang có thay đổi nháp chưa lưu. Trình biên soạn chỉ dùng phiên bản đã lưu trên máy chủ — vui lòng bấm Lưu trước khi dùng để biên soạn.",
                     );
                     return;
                   }
@@ -696,6 +725,7 @@ function OcrTextReviewSession({
                       version: doc.version,
                       sha256: doc.canonical_sha256,
                     });
+                    setActiveSaveKey(generateIdempotencyKey());
                   }
                 }}
               >
@@ -758,6 +788,12 @@ function OcrTextReviewSession({
           draftChanges={draftChanges}
           canManage={canManage && !baseMovedOn}
           onApply={handleApplySuggestion}
+          onLocateUnit={onLocateUnit}
+          onManualEditUnit={(evidenceId) => {
+            const unit = units.find((u) => u.evidence_id === evidenceId);
+            if (unit) handleStartEdit(unit);
+          }}
+          onRevertUnitDraft={handleRevertUnitDraft}
         />
       ) : null}
 
@@ -765,44 +801,51 @@ function OcrTextReviewSession({
       <div className="space-y-3">
         {units.map((unit) => {
           const isEditing = editingEvidenceId === unit.evidence_id;
-          const hasDraft = draftChanges.has(unit.evidence_id);
+          const hasDraft =
+            draftChanges.has(unit.evidence_id) &&
+            draftChanges.get(unit.evidence_id) !== unit.text;
           const currentText = draftChanges.get(unit.evidence_id) ?? unit.text;
           const wasModifiedFromOriginal = unit.text !== unit.original_text;
+          const locator = formatUnitLocator(unit, units);
+          const isSelectedForCheck = selectedUnitsForCheck.has(
+            unit.evidence_id,
+          );
 
           return (
             <Card
               key={unit.evidence_id}
               className={`rounded-xl shadow-2xs transition-colors ${
-                hasDraft ? "border-primary/50 bg-primary/2" : ""
+                hasDraft ? "border-warning/60 bg-warning/5" : ""
               }`}
             >
               <CardContent className="p-3 sm:p-4 space-y-2">
                 {/* Unit Header */}
                 <div className="flex items-center justify-between text-xs flex-wrap gap-2">
-                  <div className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-                    <Badge variant="outline" className="text-[10px] py-0">
-                      Trang {unit.page}
-                    </Badge>
-                    <span>·</span>
-                    <span className="capitalize">{unit.kind}</span>
-                    {unit.row !== null ? (
-                      <>
-                        <span>·</span>
-                        <span>
-                          R{unit.row}:C{unit.column}
-                        </span>
-                      </>
+                  <div className="flex items-center gap-2">
+                    {canManage && currentText.trim().length > 0 ? (
+                      <Checkbox
+                        checked={isSelectedForCheck}
+                        onCheckedChange={() => {
+                          setSelectedUnitsForCheck((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(unit.evidence_id)) {
+                              next.delete(unit.evidence_id);
+                            } else {
+                              next.add(unit.evidence_id);
+                            }
+                            return next;
+                          });
+                          setActiveSpellKey(generateIdempotencyKey());
+                        }}
+                        aria-label={`Chọn ${locator} để kiểm tra chính tả`}
+                      />
                     ) : null}
-                    <span>·</span>
-                    <span
-                      className="truncate max-w-[120px]"
-                      title={unit.evidence_id}
-                    >
-                      {unit.evidence_id.slice(0, 16)}...
+                    <span className="font-semibold text-foreground">
+                      {locator}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     {hasDraft ? (
                       <Badge variant="warning" className="text-[10px] py-0">
                         Bản nháp chưa lưu
@@ -811,6 +854,23 @@ function OcrTextReviewSession({
                       <Badge variant="secondary" className="text-[10px] py-0">
                         Đã sửa so với OCR gốc
                       </Badge>
+                    ) : null}
+
+                    {onLocateUnit ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-1.5 text-[11px] gap-1 text-muted-foreground hover:text-primary"
+                        onClick={() =>
+                          onLocateUnit({
+                            evidenceId: unit.evidence_id,
+                            page: unit.page,
+                          })
+                        }
+                      >
+                        <ScanSearch className="size-3" />
+                        <span>Đối chiếu ảnh</span>
+                      </Button>
                     ) : null}
 
                     {canManage && !isEditing ? (
@@ -850,12 +910,12 @@ function OcrTextReviewSession({
                     <Textarea
                       value={editingInputText}
                       onChange={(e) => setEditingInputText(e.target.value)}
-                      className="min-h-[80px] text-xs font-sans leading-relaxed"
+                      className="min-h-[80px] text-sm font-sans leading-relaxed"
                       placeholder="Nhập nội dung chỉnh sửa..."
                       autoFocus
                     />
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-xs text-muted-foreground">
                         Ban đầu: &ldquo;{unit.text}&rdquo;
                       </span>
                       <div className="flex items-center gap-1.5">
@@ -879,7 +939,7 @@ function OcrTextReviewSession({
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap font-sans">
+                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap font-sans">
                     {currentText}
                   </p>
                 )}
@@ -890,196 +950,37 @@ function OcrTextReviewSession({
       </div>
 
       {/* Save Diff Confirmation Dialog */}
-      <Dialog open={saveModalOpen} onOpenChange={setSaveModalOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-base font-semibold flex items-center gap-2">
-              <Save className="size-4 text-primary" />
-              Xác nhận lưu thay đổi ({pendingChanges.length} đoạn)
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Lưu các thay đổi vào server sẽ sinh phiên bản văn bản dẫn xuất mới
-              (v
-              {doc.version + 1}). Tệp OCR gốc và tài liệu nguồn được bảo toàn
-              bất biến.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-auto space-y-3 py-2 pr-1">
-            {pendingChanges.map((change) => (
-              <div
-                key={change.evidence_id}
-                className="p-3 rounded-lg border text-xs space-y-1.5 bg-muted/10"
-              >
-                <span className="font-mono text-[10px] text-muted-foreground block">
-                  Đoạn: {change.evidence_id.slice(0, 24)}...
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <div className="p-2 rounded bg-destructive/5 border border-destructive/20 text-destructive">
-                    <span className="font-semibold block text-[10px] uppercase mb-0.5">
-                      Trước khi sửa:
-                    </span>
-                    <p className="whitespace-pre-wrap">{change.before}</p>
-                  </div>
-                  <div className="p-2 rounded bg-success/5 border border-success/20 text-success">
-                    <span className="font-semibold block text-[10px] uppercase mb-0.5">
-                      Sau khi sửa:
-                    </span>
-                    <p className="whitespace-pre-wrap">{change.after}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0 border-t pt-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSaveModalOpen(false)}
-              disabled={saveMutation.isPending}
-            >
-              Hủy
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => void handleConfirmSave()}
-              disabled={saveMutation.isPending || baseMovedOn}
-              className="gap-1.5"
-            >
-              {saveMutation.isPending ? (
-                <>
-                  <Loader2 className="size-3.5 animate-spin" />
-                  <span>Đang lưu...</span>
-                </>
-              ) : (
-                <>
-                  <Check className="size-3.5" />
-                  <span>Xác nhận lưu v{doc.version + 1}</span>
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <OcrSaveConfirmDialog
+        open={saveModalOpen}
+        onOpenChange={setSaveModalOpen}
+        doc={doc}
+        pendingChanges={pendingChanges}
+        baseMovedOn={baseMovedOn}
+        isSaving={saveMutation.isPending}
+        onConfirmSave={() => void handleConfirmSave()}
+      />
 
       {/* AI Spell Check Range & Provider Dialog */}
-      <Dialog open={spellCheckModalOpen} onOpenChange={setSpellCheckModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base font-semibold flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" />
-              Kiểm tra chính tả bằng AI
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Gửi một tập hợp các đoạn văn bản đến mô hình ngôn ngữ (Chat) để đề
-              xuất các lỗi chính tả tiếng Việt nghi ngờ.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2 text-xs">
-            {/* Provider Selector */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">
-                Mô hình kiểm tra (Chat)
-              </Label>
-              <Select
-                value={spellCheckProviderId}
-                onValueChange={setSpellCheckProviderId}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Chọn model chat" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default" className="text-xs">
-                    Theo mặc định workspace
-                  </SelectItem>
-                  {chatProviders.map((p) => (
-                    <SelectItem key={p.id} value={p.id} className="text-xs">
-                      {p.name} ({p.id})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Scope selection summary */}
-            <div className="rounded-lg border p-3 space-y-2 bg-muted/20">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-foreground">
-                  Số đoạn được chọn: {selectedUnitsForCheck.size} /{" "}
-                  {units.length}
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 text-[11px]"
-                  onClick={() => {
-                    if (selectedUnitsForCheck.size === units.length) {
-                      setSelectedUnitsForCheck(new Set());
-                    } else {
-                      setSelectedUnitsForCheck(
-                        new Set(units.slice(0, 100).map((u) => u.evidence_id)),
-                      );
-                    }
-                  }}
-                >
-                  {selectedUnitsForCheck.size === units.length
-                    ? "Bỏ chọn tất cả"
-                    : "Chọn tối đa 100 đoạn"}
-                </Button>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Backend giới hạn từ 1 đến tối đa 100 đoạn cho mỗi lượt kiểm tra
-                để đảm bảo ngân sách token và hiệu năng.
-              </p>
-            </div>
-
-            <Alert className="text-xs py-2 border-info/40 bg-info/5 text-info">
-              <Info className="size-3.5" />
-              <AlertDescription className="text-[11px]">
-                Thao tác này sẽ gọi API model và có thể tiêu hao hạn mức token
-                trong workspace của bạn.
-              </AlertDescription>
-            </Alert>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSpellCheckModalOpen(false)}
-              disabled={detectMutation.isPending}
-            >
-              Hủy
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => void handleRunSpellCheck()}
-              disabled={
-                detectMutation.isPending ||
-                selectedUnitsForCheck.size === 0 ||
-                selectedUnitsForCheck.size > 100
-              }
-              className="gap-1.5"
-            >
-              {detectMutation.isPending ? (
-                <>
-                  <Loader2 className="size-3.5 animate-spin" />
-                  <span>Đang phân tích...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="size-3.5" />
-                  <span>
-                    Bắt đầu kiểm tra ({selectedUnitsForCheck.size} đoạn)
-                  </span>
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <OcrSpellCheckDialog
+        open={spellCheckModalOpen}
+        onOpenChange={setSpellCheckModalOpen}
+        workspaceId={workspaceId}
+        doc={doc}
+        activePage={firstPage}
+        selectedUnitIds={selectedUnitsForCheck}
+        onChangeSelectedUnitIds={(next) => {
+          setSelectedUnitsForCheck(next);
+          setActiveSpellKey(generateIdempotencyKey());
+        }}
+        providerId={spellCheckProviderId}
+        onChangeProviderId={(nextProvider) => {
+          setSpellCheckProviderId(nextProvider);
+          setActiveSpellKey(generateIdempotencyKey());
+        }}
+        pendingDraftCount={pendingChanges.length}
+        isSubmitting={detectMutation.isPending}
+        onSubmit={() => void handleRunSpellCheck()}
+      />
     </div>
   );
 }

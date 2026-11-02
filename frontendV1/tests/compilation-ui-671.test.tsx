@@ -232,3 +232,67 @@ test("New publication: human reviewers can read the actual finding and source ex
   expect(screen.getByText("Source condition")).toBeTruthy();
   expect(screen.getByText("Restore the condition")).toBeTruthy();
 });
+
+test("completed AI review leads to human editing without automatically saving changes", async () => {
+  ports.autoReview.data = {
+    notScheduled: false,
+    status: "completed",
+    review_id: "r1",
+  };
+  const edit = vi.fn();
+  render(<CompilationReviewTab {...props} canReview={false} onEdit={edit} />);
+  expect(
+    await screen.findByText("Người dùng kiểm tra trước khi duyệt"),
+  ).toBeTruthy();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Xem và chỉnh sửa bản biên soạn" }),
+  );
+  expect(edit).toHaveBeenCalledTimes(1);
+  expect(ports.preview).not.toHaveBeenCalled();
+  expect(ports.accept).not.toHaveBeenCalled();
+});
+
+test("a viewer can read the review but has no transition to editing", async () => {
+  ports.autoReview.data = {
+    notScheduled: false,
+    status: "completed",
+    review_id: "r1",
+  };
+  render(<CompilationReviewTab {...props} canReview={false} />);
+  expect(await screen.findByText("Missing admission condition")).toBeTruthy();
+  expect(
+    screen.queryByRole("button", { name: "Xem và chỉnh sửa bản biên soạn" }),
+  ).toBeNull();
+});
+
+test("human compiler edits require preview then explicit save of the new version", async () => {
+  ports.accept.mockResolvedValue({ run: { id: "child" }, created: true });
+  const onChild = vi.fn();
+  render(<CompilationEditorTab {...props} onNavigateToChild={onChild} />);
+  fireEvent.change(await screen.findByLabelText(/Tiêu đề bản biên soạn/), {
+    target: { value: "Corrected title" },
+  });
+  fireEvent.change(screen.getByLabelText(/Lý do/), {
+    target: { value: "Corrected after reading the evidence" },
+  });
+  expect(ports.accept).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: /Xem trước thay đổi/ }));
+  await screen.findByRole("dialog");
+  expect(ports.preview).toHaveBeenCalledWith(
+    expect.objectContaining({
+      expected_bundle_sha256: "A".padEnd(64, "a"),
+      content: expect.objectContaining({ title: "Corrected title" }),
+    }),
+  );
+  expect(ports.accept).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Xác nhận tạo bản mới" }));
+  await waitFor(() => expect(onChild).toHaveBeenCalledWith("child"));
+  expect(ports.accept).toHaveBeenCalledWith(
+    expect.objectContaining({
+      input: {
+        preview_id: "p",
+        preview_sha256: "a".repeat(64),
+      },
+    }),
+  );
+});

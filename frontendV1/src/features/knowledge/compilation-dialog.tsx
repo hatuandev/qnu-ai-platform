@@ -7,7 +7,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ApiProblemError } from "@/app/api/v1";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -134,8 +134,23 @@ export function CompilationDialog({
     );
   }, [catalogQuery.data]);
 
-  // Prepopulate initial run if provided
+  const initializedScope = useRef<string | null>(null);
+  const initialScope = JSON.stringify([
+    workspaceId,
+    collectionId,
+    initialRun?.runId,
+    initialRun?.revisionId,
+    initialRun?.textVersion ?? 0,
+  ]);
+
+  // Initialize once per opening/pinned source, not per parent object allocation.
   useEffect(() => {
+    if (!isOpen) {
+      initializedScope.current = null;
+      return;
+    }
+    if (initializedScope.current === initialScope) return;
+    initializedScope.current = initialScope;
     if (isOpen) {
       if (initialRun) {
         setSelectedRuns([
@@ -164,7 +179,7 @@ export function CompilationDialog({
       setPickerSourceId("");
       setPickerRevisionId("");
     }
-  }, [isOpen, initialRun]);
+  }, [isOpen, initialRun, initialScope]);
 
   const handleTopicChange = (value: string) => {
     setTopic(value);

@@ -1,6 +1,14 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
+- [Phiên810 — Review FE và chốt v1.0.3](2026-11-02_phien_810_review_fe_va_chot_v1_0_3.md): fixzoom;FE686/build/TS/Biome19đạt, giữmain và chưa nghiệm thu live replacement.
+
+- [Phiên 809 — Fix chuyển phiên bản và người dùng rà soát](2026-11-02_phien_809_fix_chuyen_phien_ban_va_nguoi_dung_ra_soat.md): hai P2 có regression; giữ bước xem/sửa thủ công sau OCR/compiler/review; FE684 PASS, build/TS/lint đạt, không live inference.
+
+- [Phiên 808 — Rà thứ tự quy trình V1](2026-11-02_phien_808_ra_soat_thu_tu_quy_trinh.md): hai P2 tái hiện về bàn giao phiên bản OCR sau save và reset form compiler; chưa sửa, không live inference.
+
+- [Phiên 807 — Cải thiện UI/UX luồng rà soát và sửa chính tả sau OCR (`frontendV1`)](2026-11-02_phien_807_cai_thien_ux_ra_soat_chinh_ta_ocr.md): bố cục đối chiếu 2 cột ảnh + văn bản/gợi ý trên Desktop và 3 vùng chuyển đổi trên Mobile; chọn phạm vi 1..100 đoạn (không `.slice()`) và model từ catalog ModelOps; đánh dấu `bbox` thật khi đối chiếu ảnh; tách riêng nhóm `Cần đối chiếu ảnh gốc` không áp tự động; preview trước/sau khi lưu, giữ `Idempotency-Key` khi retry; 8/8 suites OCR (63/63 tests PASS), Biome/TS/Build PASS.
+
 - [Phiên806 — Chốt v1.0.3 trênGitea, FE đang chạy giữ riêng](2026-11-02_phien_806_chot_nhanh_v1_0_3.md):code711b1bc9/GiteaPASS,GitHubchặnPDF162.41MiB/userđểsau;BE1FAIL716,FE663/buildPASS,cleanupbịchặn0file.
 
 - [Phiên805 — Đổi9router sang Luna và testOCR](2026-11-02_phien_805_doi_9router_luna_va_test_ocr.md):4completed4invalid/10gợiýcontract,probe cơbán→cơbảnđúngảnh;cohortFAIL,khôngretry/save,giữbản30/compiler.

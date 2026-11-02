@@ -2,6 +2,7 @@ import {
   AlertCircle,
   CheckCircle2,
   FileCheck2,
+  FileEdit,
   Filter,
   Info,
   Loader2,
@@ -70,6 +71,7 @@ export function CompilationReviewTab({
   pageSize = 20,
   reviewId,
   onSearchChange,
+  onEdit,
 }: {
   workspaceId: string;
   collectionId: string;
@@ -83,6 +85,7 @@ export function CompilationReviewTab({
     reviewPageSize?: number;
     reviewId?: string;
   }) => void;
+  onEdit?: () => void;
 }) {
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -354,10 +357,30 @@ export function CompilationReviewTab({
           </p>
         </Card>
       ) : (
-        <ReportViewer
-          report={reportQuery.data}
-          review={activeReviewQuery.data}
-        />
+        <>
+          <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1 text-sm">
+              <p className="font-semibold">
+                Người dùng kiểm tra trước khi duyệt
+              </p>
+              <p className="text-muted-foreground">
+                Đối chiếu nội dung và dẫn chứng với nhận xét của AI. Bạn có thể
+                sửa chính tả và nội dung, xem trước rồi xác nhận lưu thành bản
+                mới. Báo cáo AI không tự sửa hoặc xuất bản tài liệu.
+              </p>
+            </div>
+            {onEdit ? (
+              <Button variant="outline" size="sm" onClick={onEdit}>
+                <FileEdit className="size-4" />
+                Xem và chỉnh sửa bản biên soạn
+              </Button>
+            ) : null}
+          </div>
+          <ReportViewer
+            report={reportQuery.data}
+            review={activeReviewQuery.data}
+          />
+        </>
       )}
 
       {/* Manual Review Creation Dialog */}

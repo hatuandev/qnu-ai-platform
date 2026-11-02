@@ -1,6 +1,7 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
+  AlertTriangle,
   Archive,
   ArrowLeft,
   ChevronRight,
@@ -8,6 +9,7 @@ import {
   Download,
   FilePlus2,
   FileText,
+  History,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -16,10 +18,22 @@ import {
   Save,
   Sparkles,
   Trash2,
+  Undo2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { toast } from "sonner";
-import { ApiProblemError, v1Client } from "@/app/api/v1";
+import {
+  ApiProblemError,
+  getTokenState,
+  subscribeToken,
+  v1Client,
+} from "@/app/api/v1";
 import { ErrorState } from "@/components/admin/error-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -40,9 +54,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompilationDialog } from "@/features/knowledge/compilation-dialog";
-import { OcrComparisonView } from "@/features/knowledge/ocr-comparison-view";
+import {
+  type MobileReviewPane,
+  OcrComparisonView,
+} from "@/features/knowledge/ocr-comparison-view";
 import {
   type OcrDraftScope,
   useOcrDraft,
@@ -62,10 +86,15 @@ import {
   readRenderedPdfBlob,
 } from "@/features/knowledge/ocr-requests";
 import {
+  OcrSaveConfirmDialog,
+  OcrSpellCheckDialog,
+} from "@/features/knowledge/ocr-review-dialogs";
+import {
   applySuggestionsToText,
   formatOcrError,
   generateIdempotencyKey,
   isDocx,
+  MAX_SPELL_CHECK_UNITS,
   validateSuggestionSpan,
 } from "@/features/knowledge/ocr-schemas";
 import type {
@@ -90,6 +119,7 @@ import { SourceRenameDialog } from "@/features/knowledge/source-rename-dialog";
 import { SpellingResultPanel } from "@/features/knowledge/spelling-result-panel";
 import type { KBRevision } from "@/features/knowledge/types";
 import { LifecycleActionDialog } from "@/features/lifecycle/action-dialog";
+import { useActionScope } from "@/features/lifecycle/action-scope";
 import { canLifecycleAction } from "@/features/lifecycle/permissions";
 import type { LifecycleOperation } from "@/features/lifecycle/types";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
@@ -103,7 +133,27 @@ export interface SourceDetailSearchParams {
   subTab?: "runs" | "comparison" | "review" | "artifacts";
 }
 
-export function SourceDetailPage({
+export function SourceDetailPage(props: {
+  workspaceId: string;
+  collectionId: string;
+  sourceId: string;
+  search?: SourceDetailSearchParams;
+  onSearchChange?: (params: Partial<SourceDetailSearchParams>) => void;
+}) {
+  const { sessionId } = useSyncExternalStore(
+    subscribeToken,
+    getTokenState,
+    getTokenState,
+  );
+  return (
+    <SourceDetailSession
+      key={`${sessionId}:${props.workspaceId}:${props.collectionId}:${props.sourceId}`}
+      {...props}
+    />
+  );
+}
+
+function SourceDetailSession({
   workspaceId,
   collectionId,
   sourceId,
@@ -117,6 +167,7 @@ export function SourceDetailPage({
   onSearchChange?: (params: Partial<SourceDetailSearchParams>) => void;
 }) {
   const navigate = useNavigate();
+  const current = useActionScope();
   const { role, isPending: rolePending } = useCallerWorkspaceRole(workspaceId);
 
   // Queries for Source and Collection
@@ -139,30 +190,65 @@ export function SourceDetailPage({
   const activeRevisionNo =
     activeRevision?.revision_no ?? source?.current_revision_no ?? 1;
 
-  // Active Run Queries
+  // Active Run & Page State
   const [selectedRunId, setSelectedRunId] = useState<string | null>(
     search?.runId ?? null,
   );
   const [activePage, setActivePage] = useState<number>(search?.page ?? 1);
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
+  const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(
+    null,
+  );
+  const [externalEditUnitId, setExternalEditUnitId] = useState<string | null>(
+    null,
+  );
+  const [mobilePane, setMobilePane] = useState<MobileReviewPane>("content");
+
+  // Sync URL search params when they change externally
+  useEffect(() => {
+    if (search?.runId) {
+      setSelectedRunId(search.runId);
+    }
+  }, [search?.runId]);
+
+  useEffect(() => {
+    if (search?.page) {
+      setActivePage(search.page);
+    }
+  }, [search?.page]);
 
   // Modals & Dialogs
   const [uploadRevisionOpen, setUploadRevisionOpen] = useState(false);
   const [renameSourceOpen, setRenameSourceOpen] = useState(false);
   const [reRunConfirmOpen, setReRunConfirmOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [spellCheckModalOpen, setSpellCheckModalOpen] = useState(false);
+  const [spellCheckConfigOpen, setSpellCheckConfigOpen] = useState(false);
   const [compilationDialogOpen, setCompilationDialogOpen] = useState(false);
   const [lifecycleOp, setLifecycleOp] = useState<LifecycleOperation | null>(
     null,
   );
 
+  // Idempotency keys & conflict state
+  const [activeSaveKey, setActiveSaveKey] = useState<string>(() =>
+    generateIdempotencyKey(),
+  );
+  const [activeSpellKey, setActiveSpellKey] = useState<string>(() =>
+    generateIdempotencyKey(),
+  );
+  const [conflictError, setConflictError] = useState<string | null>(null);
+
+  // Spell checking state
+  const [selectedUnitsForCheck, setSelectedUnitsForCheck] = useState<
+    Set<string>
+  >(() => new Set());
+  const [spellCheckProviderId, setSpellCheckProviderId] =
+    useState<string>("default");
+  const [localCheck, setLocalCheck] = useState<DetectionResponse | null>(null);
+
   // Downloading derivative state
   const [downloadingType, setDownloadingType] = useState<
     "md" | "json" | "zip" | "raw" | "pdf" | null
   >(null);
-
-  // Spell checking state
-  const [localCheck, setLocalCheck] = useState<DetectionResponse | null>(null);
 
   // Fetch runs of current revision
   const runsQuery = useProcessingRunsQuery(
@@ -205,7 +291,7 @@ export function SourceDetailPage({
     sourceId,
     activeRevisionId,
     selectedRunId,
-    null,
+    selectedVersion,
     { enabled: Boolean(selectedRunId && activeRun?.status === "completed") },
   );
 
@@ -231,8 +317,45 @@ export function SourceDetailPage({
     doc ? { version: doc.version, sha256: doc.canonical_sha256 } : null,
   );
   const draftChanges = draft.changes;
-  const draftCount = draftChanges.size;
+  const baseMovedOn = doc
+    ? draft.baseMovedOn({ version: doc.version, sha256: doc.canonical_sha256 })
+    : false;
+
+  // Compute pending changes strictly where after !== unit.text
+  const pendingChanges = useMemo<TextChange[]>(() => {
+    if (!doc) return [];
+    const changes: TextChange[] = [];
+    for (const unit of doc.units) {
+      if (draftChanges.has(unit.evidence_id)) {
+        const after = draftChanges.get(unit.evidence_id);
+        if (after !== undefined && after !== unit.text) {
+          changes.push({
+            evidence_id: unit.evidence_id,
+            before: unit.text,
+            after,
+          });
+        }
+      }
+    }
+    return changes;
+  }, [doc, draftChanges]);
+
+  const draftCount = pendingChanges.length;
   const hasUnsavedDraft = draftCount > 0;
+
+  // Warn before leaving page when unsaved draft exists
+  const shouldBlockLeave = useCallback(() => {
+    if (!hasUnsavedDraft) return false;
+    return !window.confirm(
+      "Bạn có thay đổi hiệu đính chưa lưu. Bản nháp vẫn được giữ trong phiên làm việc này nhưng chưa ghi lên máy chủ. Tiếp tục rời trang?",
+    );
+  }, [hasUnsavedDraft]);
+
+  useBlocker({
+    shouldBlockFn: shouldBlockLeave,
+    enableBeforeUnload: () => hasUnsavedDraft,
+    disabled: !hasUnsavedDraft,
+  });
 
   // Mutations
   const requestRunMutation = useRequestProcessingRunMutation(
@@ -270,12 +393,14 @@ export function SourceDetailPage({
 
   // Start extraction (native-first)
   const handleStartExtraction = async (force = false) => {
+    if (!canManage) return;
     try {
       const res = await requestRunMutation.mutateAsync({
         strategy: "auto",
         force,
       });
 
+      if (!current()) return;
       setSelectedRunId(res.run.id);
       onSearchChange?.({
         revisionId: activeRevisionId,
@@ -291,6 +416,7 @@ export function SourceDetailPage({
       void runsQuery.refetch();
       void sourceQuery.refetch();
     } catch (err) {
+      if (!current()) return;
       toast.error(
         err instanceof ApiProblemError
           ? err.message
@@ -299,74 +425,174 @@ export function SourceDetailPage({
     }
   };
 
+  // Revert single unit draft
+  const handleRevertUnitDraft = (evidenceId: string) => {
+    if (!canManage) return;
+    draft.update((prev) => {
+      const next = new Map(prev);
+      next.delete(evidenceId);
+      return next;
+    });
+    setActiveSaveKey(generateIdempotencyKey());
+  };
+
+  // Discard all drafts
+  const handleDiscardAllDrafts = () => {
+    if (!canManage) return;
+    draft.clear();
+    setActiveSaveKey(generateIdempotencyKey());
+    setConflictError(null);
+    toast.info("Đã hủy toàn bộ thay đổi nháp.");
+  };
+
   // Save Review Drafts to Server
   const handleConfirmSave = async () => {
-    if (!doc || !selectedRunId) return;
-
-    const changesPayload: TextChange[] = Array.from(draftChanges.entries()).map(
-      ([evidence_id, after]) => {
-        const unit = doc.units.find((u) => u.evidence_id === evidence_id);
-        return { evidence_id, before: unit?.text ?? "", after };
-      },
-    );
-    if (changesPayload.length === 0) return;
+    if (!canManage || !doc || !selectedRunId || pendingChanges.length === 0) {
+      return;
+    }
+    if (
+      draft.baseMovedOn({ version: doc.version, sha256: doc.canonical_sha256 })
+    ) {
+      setSaveModalOpen(false);
+      toast.error(
+        "Căn cứ của bản nháp đã thay đổi. Hãy đối chiếu và chọn cách xử lý trước khi lưu.",
+      );
+      return;
+    }
 
     try {
       const updated = await saveMutation.mutateAsync({
         body: {
-          expected_version: doc.version,
-          expected_sha256: doc.canonical_sha256,
-          changes: changesPayload,
+          expected_version: draft.draft?.baseVersion ?? doc.version,
+          expected_sha256: draft.draft?.baseSha256 ?? doc.canonical_sha256,
+          changes: pendingChanges,
         },
-        idempotencyKey: generateIdempotencyKey(),
+        idempotencyKey: activeSaveKey,
       });
 
+      if (!current()) return;
+      setSelectedVersion(updated.version);
       draft.clear();
       setSaveModalOpen(false);
+      setConflictError(null);
+      setActiveSaveKey(generateIdempotencyKey());
       toast.success(`Đã lưu phiên bản hiệu đính mới (v${updated.version}).`);
-      void textReviewQuery.refetch();
     } catch (err) {
-      toast.error(
-        err instanceof ApiProblemError
-          ? err.message
-          : "Không thể lưu thay đổi hiệu đính.",
-      );
+      if (!current()) return;
+      if (err instanceof ApiProblemError) {
+        if (err.code === "ocr_text_version_conflict") {
+          setConflictError(
+            "Xung đột phiên bản: Nội dung đã có bản mới được lưu trên máy chủ. Bản nháp của bạn vẫn được giữ nguyên — vui lòng tải lại dữ liệu mới nhất để đối chiếu.",
+          );
+        } else {
+          toast.error(formatOcrError(err.code, err.message));
+        }
+      } else {
+        toast.error("Không thể lưu thay đổi hiệu đính.");
+      }
     }
   };
 
-  // Trigger Spell Check
-  const handleStartSpellCheck = async (unitIds: string[]) => {
-    if (!doc || !selectedRunId) return;
-    if (unitIds.length === 0) {
-      toast.error("Vui lòng chọn ít nhất một đoạn văn để kiểm tra.");
+  // Open Spell Check configuration dialog (never dispatches or slices silently)
+  const handleOpenSpellCheckConfig = (initialUnitIds?: string[]) => {
+    if (!canManage || !doc) return;
+    if (initialUnitIds && initialUnitIds.length > 0) {
+      setSelectedUnitsForCheck(new Set(initialUnitIds));
+    } else if (selectedUnitsForCheck.size === 0) {
+      const pageSelectable = doc.units
+        .filter(
+          (u) =>
+            u.page === activePage &&
+            u.kind !== "image" &&
+            u.kind !== "figure" &&
+            u.text.trim().length > 0,
+        )
+        .map((u) => u.evidence_id);
+      setSelectedUnitsForCheck(new Set(pageSelectable));
+    }
+    setActiveSpellKey(generateIdempotencyKey());
+    setSpellCheckConfigOpen(true);
+  };
+
+  // Execute Spell Check after user confirms scope & model in dialog
+  const handleRunSpellCheck = async () => {
+    if (!canManage || !doc || !selectedRunId) return;
+    const unitIds = Array.from(selectedUnitsForCheck);
+    if (unitIds.length === 0 || unitIds.length > MAX_SPELL_CHECK_UNITS) {
+      toast.error(
+        `Vui lòng chọn từ 1 đến tối đa ${MAX_SPELL_CHECK_UNITS} đoạn văn bản để kiểm tra.`,
+      );
       return;
     }
 
     try {
       const checkRes = await detectMutation.mutateAsync({
         body: {
+          ...(selectedVersion !== null
+            ? { source_version: selectedVersion }
+            : {}),
           expected_version: doc.version,
           expected_sha256: doc.canonical_sha256,
-          evidence_ids: unitIds.slice(0, 50), // Respect API limit of 50
+          evidence_ids: unitIds,
+          provider_id:
+            spellCheckProviderId === "default" ? null : spellCheckProviderId,
+          max_output_tokens: 4096,
         },
-        idempotencyKey: generateIdempotencyKey(),
+        idempotencyKey: activeSpellKey,
       });
 
+      if (!current()) return;
       setLocalCheck(checkRes);
-      setSpellCheckModalOpen(true);
-      toast.success("Đã hoàn tất kiểm tra chính tả các đoạn đã chọn.");
+      onSearchChange?.({
+        revisionId: activeRevisionId,
+        runId: selectedRunId,
+        checkId: checkRes.id,
+        page: activePage,
+      });
+      setSpellCheckConfigOpen(false);
+      setMobilePane("spelling");
+      setActiveSpellKey(generateIdempotencyKey());
+
+      if (checkRes.status === "failed") {
+        toast.error(
+          `Lượt kiểm tra chính tả thất bại: ${formatOcrError(checkRes.error_code)}`,
+        );
+        return;
+      }
+      if (checkRes.status !== "completed") {
+        toast.warning(
+          "Lượt kiểm tra chưa xác định kết quả (quá thời gian chờ hoặc đang xử lý). Hệ thống không tự động gửi lại.",
+        );
+        return;
+      }
+
+      if (checkRes.withheld_suggestions?.length) {
+        toast.info(
+          `Có ${checkRes.withheld_suggestions.length} mục cần đối chiếu ảnh gốc và ${checkRes.suggestions.length} gợi ý sửa chữ để xem xét.`,
+        );
+      } else if (checkRes.suggestions.length === 0) {
+        toast.info(
+          `Hoàn tất kiểm tra ${checkRes.checked_evidence_ids.length} đoạn: Không có đề xuất sửa nào.`,
+        );
+      } else {
+        toast.success(
+          `Tìm thấy ${checkRes.suggestions.length} đề xuất sửa chính tả.`,
+        );
+      }
     } catch (err) {
-      toast.error(
-        err instanceof ApiProblemError
-          ? err.message
-          : "Không thể thực hiện kiểm tra chính tả.",
-      );
+      if (!current()) return;
+      if (err instanceof ApiProblemError) {
+        toast.error(formatOcrError(err.code, err.message));
+      } else {
+        toast.error("Không thể thực hiện kiểm tra chính tả.");
+      }
     }
   };
 
   // Apply suggestion from spell check into draft
   const handleApplySuggestion = (s: Suggestion): boolean => {
-    const targetUnit = doc?.units.find((u) => u.evidence_id === s.evidence_id);
+    if (!canManage || !doc || baseMovedOn || !current()) return false;
+    const targetUnit = doc.units.find((u) => u.evidence_id === s.evidence_id);
     if (!targetUnit) return false;
 
     const currentText = draftChanges.get(s.evidence_id) ?? targetUnit.text;
@@ -389,8 +615,45 @@ export function SourceDetailPage({
       next.set(s.evidence_id, result.updatedText);
       return next;
     });
-    toast.success(`Đã áp dụng thay đổi cho từ "${s.original}".`);
+    setActiveSaveKey(generateIdempotencyKey());
+    toast.success(
+      `Đã áp dụng thay đổi "${s.original}" → "${s.replacement}" vào bản nháp.`,
+    );
     return true;
+  };
+
+  // Locate unit on page and highlight bbox
+  const handleLocateUnit = ({
+    evidenceId,
+    page,
+  }: {
+    evidenceId: string;
+    page?: number;
+  }) => {
+    const unit = doc?.units.find((u) => u.evidence_id === evidenceId);
+    const targetPage = page ?? unit?.page;
+    if (targetPage && targetPage !== activePage) {
+      handlePageChange(targetPage);
+    }
+    setFocusedEvidenceId(evidenceId);
+    if (mobilePane === "spelling") {
+      setMobilePane("image");
+    }
+  };
+
+  // Jump to unit and open manual edit dialog
+  const handleManualEditUnit = (evidenceId: string, page?: number) => {
+    if (!canManage) return;
+    const unit = doc?.units.find((u) => u.evidence_id === evidenceId);
+    const targetPage = page ?? unit?.page;
+    if (targetPage && targetPage !== activePage) {
+      handlePageChange(targetPage);
+    }
+    setFocusedEvidenceId(evidenceId);
+    setExternalEditUnitId(evidenceId);
+    if (mobilePane === "spelling") {
+      setMobilePane("content");
+    }
   };
 
   // Download Handler
@@ -403,6 +666,7 @@ export function SourceDetailPage({
     try {
       let blob: Blob;
       let filename = `${source?.title ?? "document"}`;
+      const versionParam = selectedVersion ?? doc?.version;
 
       if (type === "md") {
         const res = await downloadReviewMarkdownBlob(
@@ -412,10 +676,10 @@ export function SourceDetailPage({
           sourceId,
           activeRevisionId,
           selectedRunId,
-          doc?.version,
+          versionParam,
         );
         blob = res.blob;
-        filename += doc?.version ? `_v${doc.version}.md` : ".md";
+        filename += versionParam !== undefined ? `_v${versionParam}.md` : ".md";
       } else if (type === "json") {
         const res = await downloadReviewDocumentBlob(
           v1Client,
@@ -424,10 +688,11 @@ export function SourceDetailPage({
           sourceId,
           activeRevisionId,
           selectedRunId,
-          doc?.version,
+          versionParam,
         );
         blob = res.blob;
-        filename += doc?.version ? `_v${doc.version}.json` : ".json";
+        filename +=
+          versionParam !== undefined ? `_v${versionParam}.json` : ".json";
       } else if (type === "zip") {
         const res = await downloadRunBundleBlob(
           v1Client,
@@ -487,6 +752,12 @@ export function SourceDetailPage({
     activeRevision?.content_type ?? source?.content_type,
     activeRevision?.file_name ?? source?.file_name,
   );
+  const activeCheckId = search?.checkId;
+  const hasActiveSpellingResult = Boolean(doc && (activeCheckId || localCheck));
+  const spellingSuggestionsCount =
+    (localCheck?.suggestions.length ?? 0) +
+    (localCheck?.withheld_suggestions?.length ?? 0);
+
   const lifecycleDialog = lifecycleOp ? (
     <LifecycleActionDialog
       key="source-lifecycle"
@@ -572,7 +843,7 @@ export function SourceDetailPage({
               search={{ page: 1, pageSize: 20 }}
               className="hover:text-foreground transition-colors truncate max-w-[180px]"
             >
-              {collection?.name ?? collectionId}
+              {collection?.name ?? "Bộ sưu tập"}
             </Link>
             <ChevronRight className="size-3 text-muted-foreground/60" />
             <span className="font-semibold text-foreground truncate max-w-[220px]">
@@ -580,14 +851,14 @@ export function SourceDetailPage({
             </span>
           </div>
 
-          {/* Tiêu đề, phiên bản & badge trạng thái */}
+          {/* Tiêu đề, phiên bản tệp & badge trạng thái */}
           <div className="flex items-center gap-2.5 flex-wrap">
             <FileText className="size-5 text-primary shrink-0" />
             <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate max-w-[400px]">
               {source.title}
             </h1>
             <Badge variant="outline" className="text-xs font-mono h-5">
-              v{activeRevisionNo}
+              Tệp v{activeRevisionNo}
             </Badge>
 
             <Badge
@@ -599,12 +870,18 @@ export function SourceDetailPage({
               ) : null}
               {statusInfo.label}
             </Badge>
+
+            {!canManage ? (
+              <Badge variant="outline" className="text-xs font-normal h-5">
+                Chế độ chỉ xem
+              </Badge>
+            ) : null}
           </div>
         </div>
 
         {/* Hàng hành động tinh gọn: Hành động chính theo ngữ cảnh + Menu phụ ⋯ */}
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          {statusInfo.status === "unprocessed" ? (
+          {canManage && statusInfo.status === "unprocessed" ? (
             <Button
               size="sm"
               className="h-9 text-xs gap-1.5 shadow-xs"
@@ -620,21 +897,15 @@ export function SourceDetailPage({
             </Button>
           ) : null}
 
-          {/* Kiểm tra chính tả (khi đã có kết quả) */}
-          {statusInfo.status === "completed" && (
+          {/* Kiểm tra chính tả (mở hộp thoại chọn phạm vi & mô hình) */}
+          {canManage && statusInfo.status === "completed" && doc ? (
             <Button
+              type="button"
               size="sm"
               variant="outline"
               className="h-9 text-xs gap-1.5"
               disabled={detectMutation.isPending}
-              onClick={() => {
-                const currentUnits = (doc?.units ?? []).filter(
-                  (u) => u.page === activePage,
-                );
-                void handleStartSpellCheck(
-                  currentUnits.map((u) => u.evidence_id),
-                );
-              }}
+              onClick={() => handleOpenSpellCheckConfig()}
             >
               {detectMutation.isPending ? (
                 <Loader2 className="size-3.5 animate-spin text-primary" />
@@ -643,15 +914,18 @@ export function SourceDetailPage({
               )}
               <span>Kiểm tra chính tả</span>
             </Button>
-          )}
+          ) : null}
 
           {/* Lưu thay đổi (nổi bật khi có nháp hiệu đính) */}
-          {statusInfo.status === "completed" && (
+          {canManage && statusInfo.status === "completed" ? (
             <Button
+              type="button"
               size="sm"
               variant={hasUnsavedDraft ? "default" : "outline"}
               className="h-9 text-xs gap-1.5"
-              disabled={!hasUnsavedDraft || saveMutation.isPending}
+              disabled={
+                !hasUnsavedDraft || saveMutation.isPending || baseMovedOn
+              }
               onClick={() => setSaveModalOpen(true)}
             >
               <Save className="size-3.5" />
@@ -665,15 +939,24 @@ export function SourceDetailPage({
                 </Badge>
               ) : null}
             </Button>
-          )}
+          ) : null}
 
-          {/* Dùng để biên soạn (khi đã bóc tách xong và không vướng nháp chưa lưu) */}
+          {/* Dùng để biên soạn (từ đúng phiên bản đã lưu) */}
           {canCompile && statusInfo.status === "completed" && selectedRunId ? (
             <Button
+              type="button"
               size="sm"
               variant={hasUnsavedDraft ? "outline" : "default"}
               className="h-9 text-xs gap-1.5"
-              onClick={() => setCompilationDialogOpen(true)}
+              onClick={() => {
+                if (hasUnsavedDraft) {
+                  toast.warning(
+                    `Bạn đang có ${draftCount} đoạn sửa nháp chưa lưu. Trình biên soạn chỉ sử dụng phiên bản đã lưu trên máy chủ (v${doc?.version ?? 0}). Vui lòng bấm "Lưu thay đổi" trước khi biên soạn.`,
+                  );
+                  return;
+                }
+                setCompilationDialogOpen(true);
+              }}
             >
               <ClipboardList className="size-3.5" />
               <span>Dùng để biên soạn</span>
@@ -748,35 +1031,37 @@ export function SourceDetailPage({
                 </DropdownMenuItem>
               )}
 
-              <DropdownMenuSeparator />
+              {canManage ? (
+                <>
+                  <DropdownMenuSeparator />
 
-              {statusInfo.status !== "unprocessed" &&
-              statusInfo.status !== "running" ? (
-                <DropdownMenuItem
-                  className="gap-2"
-                  onClick={() => setReRunConfirmOpen(true)}
-                >
-                  <RotateCcw className="size-3.5 text-muted-foreground" />
-                  <span>Bóc tách lại</span>
-                </DropdownMenuItem>
+                  {statusInfo.status !== "unprocessed" &&
+                  statusInfo.status !== "running" ? (
+                    <DropdownMenuItem
+                      className="gap-2"
+                      onClick={() => setReRunConfirmOpen(true)}
+                    >
+                      <RotateCcw className="size-3.5 text-muted-foreground" />
+                      <span>Bóc tách lại</span>
+                    </DropdownMenuItem>
+                  ) : null}
+
+                  <DropdownMenuItem
+                    className="gap-2"
+                    onClick={() => setUploadRevisionOpen(true)}
+                  >
+                    <FilePlus2 className="size-3.5 text-muted-foreground" />
+                    <span>Tải phiên bản mới</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="gap-2"
+                    onClick={() => setRenameSourceOpen(true)}
+                  >
+                    <Pencil className="size-3.5 text-muted-foreground" />
+                    <span>Đổi tên tài liệu</span>
+                  </DropdownMenuItem>
+                </>
               ) : null}
-
-              <DropdownMenuItem
-                className="gap-2"
-                onClick={() => setUploadRevisionOpen(true)}
-              >
-                <FilePlus2 className="size-3.5 text-muted-foreground" />
-                <span>Tải phiên bản mới</span>
-              </DropdownMenuItem>
-              {canManage && (
-                <DropdownMenuItem
-                  className="gap-2"
-                  onClick={() => setRenameSourceOpen(true)}
-                >
-                  <Pencil className="size-3.5 text-muted-foreground" />
-                  <span>Đổi tên tài liệu</span>
-                </DropdownMenuItem>
-              )}
               {canLifecycleAction(role, "source", "archive") && (
                 <DropdownMenuItem
                   className="gap-2"
@@ -803,7 +1088,181 @@ export function SourceDetailPage({
         </div>
       </div>
 
-      {/* Thanh tiến độ dùng chung khi đang bóc tách / chờ xử lý hoặc vừa lưu kết quả */}
+      {/* Thanh trạng thái Phiên bản Văn bản & Bản nháp Hiệu đính */}
+      {statusInfo.status === "completed" && doc ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-3.5 py-2.5 text-xs shadow-2xs">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="font-semibold text-foreground flex items-center gap-1.5">
+              <History className="size-3.5 text-primary" />
+              <span>Phiên bản văn bản:</span>
+            </span>
+            <Select
+              value={
+                selectedVersion === null ? "latest" : String(selectedVersion)
+              }
+              onValueChange={(val) => {
+                if (hasUnsavedDraft) {
+                  if (
+                    !window.confirm(
+                      "Bạn đang có thay đổi nháp chưa lưu. Chuyển phiên bản xem sẽ xóa các thay đổi nháp này. Tiếp tục?",
+                    )
+                  ) {
+                    return;
+                  }
+                  draft.clear();
+                }
+                setSelectedVersion(val === "latest" ? null : Number(val));
+              }}
+            >
+              <SelectTrigger
+                aria-label="Phiên bản văn bản"
+                className="h-8 text-xs w-[170px]"
+              >
+                <SelectValue placeholder="Chọn phiên bản" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="latest" className="text-xs">
+                  Mới nhất (v{doc.version})
+                </SelectItem>
+                <SelectItem value="0" className="text-xs">
+                  v0 (OCR gốc ban đầu)
+                </SelectItem>
+                {doc.version > 0
+                  ? Array.from({ length: doc.version }, (_, i) => i + 1).map(
+                      (v) => (
+                        <SelectItem
+                          key={`v_${v}`}
+                          value={String(v)}
+                          className="text-xs"
+                        >
+                          Phiên bản v{v}{" "}
+                          {v === doc.version ? "(Hiện hành)" : ""}
+                        </SelectItem>
+                      ),
+                    )
+                  : null}
+              </SelectContent>
+            </Select>
+
+            {hasUnsavedDraft ? (
+              <div className="flex items-center gap-1.5">
+                <Badge variant="warning" className="text-[11px] py-0">
+                  Bản nháp: {draftCount} đoạn chưa lưu
+                </Badge>
+                {canManage ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-destructive"
+                    onClick={handleDiscardAllDrafts}
+                  >
+                    <Undo2 className="size-3" />
+                    <span>Hủy nháp</span>
+                  </Button>
+                ) : null}
+              </div>
+            ) : (
+              <Badge variant="secondary" className="text-[11px] py-0">
+                Đã lưu (v{doc.version}) · Không có nháp chưa lưu
+              </Badge>
+            )}
+          </div>
+
+          <p className="text-[11px] text-muted-foreground">
+            Quy trình: AI gợi ý sửa → Áp dụng vào{" "}
+            <strong className="text-foreground">Bản nháp</strong> →{" "}
+            <strong className="text-foreground">Lưu thay đổi</strong> tạo phiên
+            bản mới →{" "}
+            <strong className="text-foreground">Dùng để biên soạn</strong>.
+          </p>
+        </div>
+      ) : null}
+
+      {/* Cảnh báo khi phiên bản trên máy chủ đã tiến lên sau khi tạo nháp */}
+      {baseMovedOn && doc ? (
+        <Alert className="border-warning/50 bg-warning/10 text-foreground py-3">
+          <AlertTriangle className="size-4 text-warning" />
+          <AlertTitle className="text-xs font-semibold">
+            Bản nháp thuộc phiên bản v{draft.draft?.baseVersion} nhưng máy chủ
+            đã có v{doc.version}
+          </AlertTitle>
+          <AlertDescription className="text-xs mt-1 space-y-2">
+            <p>
+              Nội dung trên máy chủ đã thay đổi sau khi bạn bắt đầu sửa. Hệ
+              thống không tự động đổi căn cứ của bản nháp để tránh ghi đè thay
+              đổi của người khác.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Áp dụng bản nháp hiện tại lên phiên bản v${doc.version}?`,
+                    )
+                  ) {
+                    draft.rebase({
+                      version: doc.version,
+                      sha256: doc.canonical_sha256,
+                    });
+                    setActiveSaveKey(generateIdempotencyKey());
+                  }
+                }}
+              >
+                Áp dụng nháp lên v{doc.version}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                onClick={() => draft.clear()}
+              >
+                Hủy nháp và dùng bản mới
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {/* Cảnh báo xung đột phiên bản khi bấm Lưu */}
+      {conflictError ? (
+        <Alert variant="destructive" className="py-3">
+          <AlertCircle className="size-4" />
+          <AlertTitle className="text-xs font-semibold">
+            Xung đột phiên bản khi lưu
+          </AlertTitle>
+          <AlertDescription className="text-xs mt-1 space-y-2">
+            <p>{conflictError}</p>
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={() => void textReviewQuery.refetch()}
+              >
+                Tải lại dữ liệu mới nhất
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => setConflictError(null)}
+              >
+                Đóng
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {/* Thanh tiến độ dùng chung khi đang bóc tách / chờ xử lý */}
       {activeProcessing &&
       (activeProcessing.status === "queued" ||
         activeProcessing.status === "running" ||
@@ -839,18 +1298,25 @@ export function SourceDetailPage({
         <Alert variant="destructive" role="alert">
           <AlertCircle className="size-4" />
           <AlertTitle>Bóc tách chưa thành công</AlertTitle>
-          <AlertDescription className="text-xs mt-1">
-            {formatOcrError(activeRun.error_code, activeRun.error_detail)}
+          <AlertDescription className="text-xs mt-1 space-y-1">
+            <p>
+              {formatOcrError(activeRun.error_code, activeRun.error_detail)}
+            </p>
             {activeRun.error_code && (
-              <span className="block font-mono text-xs mt-0.5">
-                Mã lỗi: {activeRun.error_code}
-              </span>
+              <details className="text-muted-foreground">
+                <summary className="cursor-pointer select-none">
+                  Chi tiết kỹ thuật
+                </summary>
+                <span className="block font-mono text-xs mt-0.5">
+                  Mã lỗi: {activeRun.error_code}
+                </span>
+              </details>
             )}
           </AlertDescription>
         </Alert>
       )}
 
-      {/* 2. MÀN ĐỐI CHIẾU HAI CỘT: Cột trái: Bản gốc | Cột phải: Kết quả đúng trang */}
+      {/* 2. MÀN ĐỐI CHIẾU HAI CỘT: Cột trái: Bản gốc | Cột phải: Văn bản & Gợi ý chính tả */}
       {activeRun ? (
         <OcrComparisonView
           workspaceId={workspaceId}
@@ -863,15 +1329,76 @@ export function SourceDetailPage({
           onPageChange={handlePageChange}
           reviewDoc={doc}
           isDocx={isDocxFile}
+          canManage={canManage}
           draftChanges={draftChanges}
           onSaveDraftChange={(evidenceId, _before, after) => {
+            if (!canManage) return;
             draft.update((prev) => {
               const next = new Map(prev);
               next.set(evidenceId, after);
               return next;
             });
+            setActiveSaveKey(generateIdempotencyKey());
           }}
-          onStartSpellCheck={handleStartSpellCheck}
+          onRevertUnitDraft={handleRevertUnitDraft}
+          onStartSpellCheck={(unitIds) => handleOpenSpellCheckConfig(unitIds)}
+          selectedUnitIds={selectedUnitsForCheck}
+          onToggleUnitSelection={(evidenceId) => {
+            if (!canManage) return;
+            setSelectedUnitsForCheck((prev) => {
+              const next = new Set(prev);
+              if (next.has(evidenceId)) {
+                next.delete(evidenceId);
+              } else {
+                next.add(evidenceId);
+              }
+              return next;
+            });
+            setActiveSpellKey(generateIdempotencyKey());
+          }}
+          onSelectPageUnits={(evidenceIds, selected) => {
+            if (!canManage) return;
+            setSelectedUnitsForCheck((prev) => {
+              const next = new Set(prev);
+              for (const id of evidenceIds) {
+                if (selected) {
+                  next.add(id);
+                } else {
+                  next.delete(id);
+                }
+              }
+              return next;
+            });
+            setActiveSpellKey(generateIdempotencyKey());
+          }}
+          focusedEvidenceId={focusedEvidenceId}
+          onFocusUnit={setFocusedEvidenceId}
+          externalEditUnitId={externalEditUnitId}
+          onClearExternalEditUnit={() => setExternalEditUnitId(null)}
+          mobilePane={mobilePane}
+          onMobilePaneChange={setMobilePane}
+          spellingSuggestionsCount={spellingSuggestionsCount}
+          spellingPanel={
+            hasActiveSpellingResult && doc ? (
+              <SpellingResultPanel
+                workspaceId={workspaceId}
+                collectionId={collectionId}
+                sourceId={sourceId}
+                revisionId={activeRevisionId}
+                runId={selectedRunId ?? ""}
+                checkId={activeCheckId}
+                localCheck={localCheck}
+                doc={doc}
+                draftChanges={draftChanges}
+                canManage={canManage && !baseMovedOn}
+                onApply={handleApplySuggestion}
+                onLocateUnit={handleLocateUnit}
+                onManualEditUnit={handleManualEditUnit}
+                onRevertUnitDraft={handleRevertUnitDraft}
+                focusedEvidenceId={focusedEvidenceId}
+              />
+            ) : null
+          }
         />
       ) : (
         /* Trạng thái chưa bóc tách: Giới thiệu & Kêu gọi bóc tách chủ động */
@@ -889,19 +1416,21 @@ export function SourceDetailPage({
               đối chiếu bằng phương pháp native-first.
             </p>
           </div>
-          <Button
-            size="sm"
-            className="gap-1.5 text-xs shadow-xs"
-            disabled={requestRunMutation.isPending}
-            onClick={() => void handleStartExtraction(false)}
-          >
-            {requestRunMutation.isPending ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Play className="size-3.5" />
-            )}
-            <span>Bắt đầu bóc tách ngay</span>
-          </Button>
+          {canManage ? (
+            <Button
+              size="sm"
+              className="gap-1.5 text-xs shadow-xs"
+              disabled={requestRunMutation.isPending}
+              onClick={() => void handleStartExtraction(false)}
+            >
+              {requestRunMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Play className="size-3.5" />
+              )}
+              <span>Bắt đầu bóc tách ngay</span>
+            </Button>
+          ) : null}
         </Card>
       )}
 
@@ -915,9 +1444,9 @@ export function SourceDetailPage({
               <span>Xác nhận bóc tách lại</span>
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Thao tác này sẽ tạo một lượt bóc tách mới (generation mới) cho
-              phiên bản tài liệu hiện hành. Kết quả và bằng chứng của các lượt
-              trước được bảo toàn bất biến trong lịch sử.
+              Thao tác này sẽ tạo một lượt bóc tách mới cho phiên bản tài liệu
+              hiện hành. Kết quả và bằng chứng của các lượt trước được bảo toàn
+              bất biến trong lịch sử.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -942,106 +1471,41 @@ export function SourceDetailPage({
       </Dialog>
 
       {/* Modal Xác nhận Lưu thay đổi Hiệu đính */}
-      <Dialog open={saveModalOpen} onOpenChange={setSaveModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-semibold flex items-center gap-2">
-              <Save className="size-4 text-primary" />
-              <span>Lưu phiên bản hiệu đính</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Bạn có {draftCount} thay đổi nháp đang chờ lưu. Hành động này sẽ
-              tạo một phiên bản hiệu đính mới trên máy chủ (v
-              {(doc?.version ?? 0) + 1}).
-            </DialogDescription>
-          </DialogHeader>
+      {doc ? (
+        <OcrSaveConfirmDialog
+          open={saveModalOpen}
+          onOpenChange={setSaveModalOpen}
+          doc={doc}
+          pendingChanges={pendingChanges}
+          baseMovedOn={baseMovedOn}
+          isSaving={saveMutation.isPending}
+          onConfirmSave={() => void handleConfirmSave()}
+        />
+      ) : null}
 
-          <div className="max-h-48 overflow-y-auto space-y-2 p-3 bg-muted/20 rounded-lg border text-xs">
-            {Array.from(draftChanges.entries()).map(([evidence_id, after]) => {
-              const unit = doc?.units.find(
-                (u) => u.evidence_id === evidence_id,
-              );
-              return (
-                <div
-                  key={evidence_id}
-                  className="space-y-0.5 border-b pb-1.5 last:border-none"
-                >
-                  <span className="font-mono text-[10px] text-muted-foreground block">
-                    {evidence_id}
-                  </span>
-                  {unit ? (
-                    <p className="line-through text-destructive text-[11px] truncate">
-                      {unit.text}
-                    </p>
-                  ) : null}
-                  <p className="text-success text-[11px] truncate font-medium">
-                    {after}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSaveModalOpen(false)}
-            >
-              Hủy
-            </Button>
-            <Button
-              size="sm"
-              disabled={saveMutation.isPending}
-              onClick={() => void handleConfirmSave()}
-            >
-              {saveMutation.isPending ? (
-                <Loader2 className="size-3.5 animate-spin mr-1" />
-              ) : null}
-              <span>Xác nhận lưu</span>
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal Kết quả Kiểm tra Chính tả */}
-      <Dialog open={spellCheckModalOpen} onOpenChange={setSpellCheckModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-4">
-          <DialogHeader className="pb-2">
-            <DialogTitle className="text-sm font-semibold flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" />
-              <span>Gợi ý sửa lỗi chính tả</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Rà soát các lỗi nghi ngờ sai chính tả theo mô hình AI. Bạn có thể
-              bấm Áp dụng hoặc Bỏ qua từng gợi ý.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto py-2">
-            {doc && (
-              <SpellingResultPanel
-                workspaceId={workspaceId}
-                collectionId={collectionId}
-                sourceId={sourceId}
-                revisionId={activeRevisionId}
-                runId={selectedRunId ?? ""}
-                localCheck={localCheck}
-                doc={doc}
-                draftChanges={draftChanges}
-                canManage={canManage}
-                onApply={handleApplySuggestion}
-              />
-            )}
-          </div>
-
-          <DialogFooter className="pt-2 border-t">
-            <Button size="sm" onClick={() => setSpellCheckModalOpen(false)}>
-              Đóng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Modal Cấu hình & Gửi Kiểm tra Chính tả AI */}
+      {doc ? (
+        <OcrSpellCheckDialog
+          open={spellCheckConfigOpen}
+          onOpenChange={setSpellCheckConfigOpen}
+          workspaceId={workspaceId}
+          doc={doc}
+          activePage={activePage}
+          selectedUnitIds={selectedUnitsForCheck}
+          onChangeSelectedUnitIds={(next) => {
+            setSelectedUnitsForCheck(next);
+            setActiveSpellKey(generateIdempotencyKey());
+          }}
+          providerId={spellCheckProviderId}
+          onChangeProviderId={(nextProvider) => {
+            setSpellCheckProviderId(nextProvider);
+            setActiveSpellKey(generateIdempotencyKey());
+          }}
+          pendingDraftCount={pendingChanges.length}
+          isSubmitting={detectMutation.isPending}
+          onSubmit={() => void handleRunSpellCheck()}
+        />
+      ) : null}
 
       {/* Modal Upload Phiên bản mới */}
       <RevisionUploadDialog
@@ -1063,7 +1527,7 @@ export function SourceDetailPage({
         onSuccess={() => void sourceQuery.refetch()}
       />
 
-      {/* Compilation Dialog (để nối mượt sang Compiler) */}
+      {/* Compilation Dialog (từ đúng phiên bản đã lưu) */}
       {selectedRunId && (
         <CompilationDialog
           isOpen={compilationDialogOpen}
@@ -1077,6 +1541,7 @@ export function SourceDetailPage({
             revisionId: activeRevisionId,
             revisionNo: activeRevisionNo,
             generation: activeRun?.generation ?? 1,
+            textVersion: selectedVersion ?? doc?.version ?? 0,
           }}
           onSuccess={(runId) => {
             void navigate({
@@ -1086,8 +1551,6 @@ export function SourceDetailPage({
           }}
         />
       )}
-
-      {/* Lifecycle Actions (Lưu trữ / Xóa) */}
     </div>
   );
 }

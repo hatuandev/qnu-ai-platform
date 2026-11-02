@@ -358,7 +358,7 @@ export function CompilationDetailPage({
                 Điều kiện chuyển bước:
               </strong>{" "}
               {isCompleted
-                ? '1. Kiểm tra trích dẫn và hoàn tất rà soát chất lượng → 2. Bấm "Đăng ký thành tài liệu biên soạn" để chuyển sang bước Duyệt & Phát hành.'
+                ? "1. Xem nội dung, dẫn chứng và báo cáo AI nếu có → 2. Chỉnh sửa nếu cần, xem trước và xác nhận lưu bản mới → 3. Đăng ký đúng bản đã kiểm tra để Duyệt & Phát hành."
                 : run.status === "running" || run.status === "queued"
                   ? "Đang chờ tiến trình biên soạn hoàn tất sinh bản thảo có trích dẫn…"
                   : "Lượt biên soạn chưa hoàn tất. Hãy kiểm tra thông báo lỗi hoặc tạo lượt biên soạn mới."}
@@ -676,6 +676,14 @@ export function CompilationDetailPage({
             collectionId={collectionId}
             runId={runId}
             canReview={canReview}
+            onEdit={
+              canEdit && isCompleted
+                ? () => {
+                    setCurrentTab("edit");
+                    onReviewSearch?.({ tab: "edit" });
+                  }
+                : undefined
+            }
             page={reviewPage}
             pageSize={reviewPageSize}
             reviewId={reviewId}

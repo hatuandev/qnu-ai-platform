@@ -13,15 +13,24 @@ import {
   Loader2,
   Maximize2,
   RotateCcw,
+  ScanSearch,
+  Sparkles,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Group, Panel, Separator, useGroupRef } from "react-resizable-panels";
+import {
+  type ReactZoomPanPinchContentRef,
+  TransformComponent,
+  TransformWrapper,
+} from "react-zoom-pan-pinch";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +39,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -45,6 +55,11 @@ import {
   usePageImageBlobUrl,
   usePageRawText,
 } from "@/features/knowledge/ocr-queries";
+import { OcrWordDiffView } from "@/features/knowledge/ocr-review-dialogs";
+import {
+  extractNormalizedBbox,
+  formatUnitLocator,
+} from "@/features/knowledge/ocr-schemas";
 import type {
   PageStatusResponse,
   ProcessingRunResponse,
@@ -59,7 +74,8 @@ export type SequentialBlock =
       type: "prose";
       unit: TextUnit;
       blockId: string;
-      isEdited: boolean;
+      hasUnsavedDraft: boolean;
+      wasSavedPreviously: boolean;
       currentText: string;
     }
   | {
@@ -69,7 +85,8 @@ export type SequentialBlock =
         rowIdx: number;
         cells: Array<{
           unit: TextUnit;
-          isEdited: boolean;
+          hasUnsavedDraft: boolean;
+          wasSavedPreviously: boolean;
           currentText: string;
         }>;
       }>;
@@ -80,6 +97,8 @@ export type SequentialBlock =
       assetNo: number;
       unit?: TextUnit;
     };
+
+export type MobileReviewPane = "image" | "content" | "spelling";
 
 export function OcrComparisonView({
   workspaceId,
@@ -92,9 +111,22 @@ export function OcrComparisonView({
   onPageChange,
   reviewDoc,
   isDocx,
+  canManage = true,
   draftChanges,
   onSaveDraftChange,
-  onStartSpellCheck: _onStartSpellCheck,
+  onRevertUnitDraft,
+  onStartSpellCheck,
+  selectedUnitIds,
+  onToggleUnitSelection,
+  onSelectPageUnits,
+  focusedEvidenceId,
+  onFocusUnit,
+  externalEditUnitId,
+  onClearExternalEditUnit,
+  spellingPanel,
+  spellingSuggestionsCount = 0,
+  mobilePane: controlledMobilePane,
+  onMobilePaneChange,
 }: {
   workspaceId: string;
   collectionId: string;
@@ -106,49 +138,89 @@ export function OcrComparisonView({
   onPageChange: (newPage: number) => void;
   reviewDoc: ReviewDocument | undefined;
   isDocx: boolean;
+  canManage?: boolean;
   draftChanges?: ReadonlyMap<string, string>;
   onSaveDraftChange?: (
     evidenceId: string,
     before: string,
     after: string,
   ) => void;
+  onRevertUnitDraft?: (evidenceId: string) => void;
   onStartSpellCheck?: (evidenceIds: string[]) => void;
+  selectedUnitIds?: ReadonlySet<string>;
+  onToggleUnitSelection?: (evidenceId: string) => void;
+  onSelectPageUnits?: (evidenceIds: string[], selected: boolean) => void;
+  focusedEvidenceId?: string | null;
+  onFocusUnit?: (evidenceId: string | null) => void;
+  externalEditUnitId?: string | null;
+  onClearExternalEditUnit?: () => void;
+  spellingPanel?: ReactNode;
+  spellingSuggestionsCount?: number;
+  mobilePane?: MobileReviewPane;
+  onMobilePaneChange?: (pane: MobileReviewPane) => void;
 }) {
   // Zoom mode: "fit-width" (default 100% width), "fit-page" (trọn trang), "custom"
-  const [zoomMode, setZoomMode] = useState<"fit-width" | "fit-page" | "custom">(
+  const [zoomMode, setZoomMode] = useState<"fit-width" | "fit-page">(
     "fit-width",
   );
   const [customZoom, setCustomZoom] = useState<number>(100);
   const [inputPage, setInputPage] = useState<string>(String(activePageNumber));
+  const [internalMobilePane, setInternalMobilePane] =
+    useState<MobileReviewPane>("content");
+
+  const activeMobilePane = controlledMobilePane ?? internalMobilePane;
+  const setMobilePane = (pane: MobileReviewPane) => {
+    setInternalMobilePane(pane);
+    onMobilePaneChange?.(pane);
+  };
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const splitGroupRef = useGroupRef();
+  const transformRef = useRef<ReactZoomPanPinchContentRef | null>(null);
+  const bboxHighlightRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setInputPage(String(activePageNumber));
   }, [activePageNumber]);
 
   const handleZoomIn = () => {
-    setZoomMode("custom");
-    setCustomZoom((prev) => Math.min(250, prev + 20));
+    transformRef.current?.zoomIn(0.25, 180);
   };
 
   const handleZoomOut = () => {
-    setZoomMode("custom");
-    setCustomZoom((prev) => Math.max(50, prev - 20));
+    transformRef.current?.zoomOut(0.25, 180);
   };
 
   const handleResetZoom = () => {
     setZoomMode("fit-width");
     setCustomZoom(100);
+    transformRef.current?.resetTransform(180);
   };
 
   const handleToggleFit = () => {
     setZoomMode((prev) => (prev === "fit-width" ? "fit-page" : "fit-width"));
+    setCustomZoom(100);
+    transformRef.current?.resetTransform(180);
+  };
+
+  const handleZoomToBbox = () => {
+    const el = bboxHighlightRef.current;
+    if (el && el.offsetWidth > 0 && transformRef.current) {
+      transformRef.current.zoomToElement(el, 2.2, 220);
+    }
+  };
+
+  const handleSetSplitRatio = (leftPct: number) => {
+    splitGroupRef.current?.setLayout({
+      "ocr-image-panel": leftPct,
+      "ocr-content-panel": 100 - leftPct,
+    });
   };
 
   const [rawDialogOpen, setRawDialogOpen] = useState<boolean>(false);
   const [fullscreenImageOpen, setFullscreenImageOpen] =
     useState<boolean>(false);
-  const [activeTabDesktop, setActiveTabDesktop] = useState<string>("content");
-  const [activeTabMobile, setActiveTabMobile] = useState<string>("content");
+  const [activeTabRight, setActiveTabRight] = useState<string>("content");
   const [copiedType, setCopiedType] = useState<"md" | "json" | null>(null);
 
   // Inline edit state
@@ -191,6 +263,72 @@ export function OcrComparisonView({
     return (reviewDoc?.units ?? []).filter((u) => u.page === activePageNumber);
   }, [reviewDoc, activePageNumber]);
 
+  // Selectable non-empty text units on the current page
+  const selectablePageUnits = useMemo(() => {
+    return pageUnits.filter(
+      (u) =>
+        u.kind !== "image" &&
+        u.kind !== "figure" &&
+        (draftChanges?.get(u.evidence_id) ?? u.text).trim().length > 0,
+    );
+  }, [pageUnits, draftChanges]);
+
+  const selectedOnPageCount = useMemo(() => {
+    if (!selectedUnitIds) return 0;
+    return selectablePageUnits.filter((u) => selectedUnitIds.has(u.evidence_id))
+      .length;
+  }, [selectablePageUnits, selectedUnitIds]);
+
+  const allPageUnitsSelected =
+    selectablePageUnits.length > 0 &&
+    selectedOnPageCount === selectablePageUnits.length;
+
+  // Focused unit on the active page (for bbox highlighting and scroll)
+  const focusedUnitOnPage = useMemo(() => {
+    if (!focusedEvidenceId) return null;
+    return pageUnits.find((u) => u.evidence_id === focusedEvidenceId) ?? null;
+  }, [pageUnits, focusedEvidenceId]);
+
+  const focusedBbox = useMemo(() => {
+    if (!focusedUnitOnPage) return null;
+    return extractNormalizedBbox(focusedUnitOnPage.bbox);
+  }, [focusedUnitOnPage]);
+
+  // Scroll focused unit into view when focusedEvidenceId changes
+  useEffect(() => {
+    if (!focusedEvidenceId || !containerRef.current) return;
+    const escaped =
+      typeof CSS !== "undefined" && typeof CSS.escape === "function"
+        ? CSS.escape(focusedEvidenceId)
+        : focusedEvidenceId.replace(/"/g, '\\"');
+    const el = containerRef.current.querySelector<HTMLElement>(
+      `[data-evidence-id="${escaped}"]`,
+    );
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [focusedEvidenceId]);
+
+  // Handle external edit trigger (e.g. "Sửa tay" clicked from SpellingResultPanel)
+  useEffect(() => {
+    if (!externalEditUnitId || !canManage) return;
+    const unit = (reviewDoc?.units ?? []).find(
+      (u) => u.evidence_id === externalEditUnitId,
+    );
+    if (unit) {
+      const current = draftChanges?.get(unit.evidence_id) ?? unit.text;
+      setEditingUnit(unit);
+      setEditingText(current);
+      onClearExternalEditUnit?.();
+    }
+  }, [
+    externalEditUnitId,
+    canManage,
+    reviewDoc,
+    draftChanges,
+    onClearExternalEditUnit,
+  ]);
+
   // Construct sequential blocks preserving exact source order
   const sequentialBlocks = useMemo<SequentialBlock[]>(() => {
     if (pageUnits.length === 0) return [];
@@ -199,7 +337,12 @@ export function OcrComparisonView({
     let currentTableBlockId: string | null = null;
     let currentTableRowsMap = new Map<
       number,
-      Array<{ unit: TextUnit; isEdited: boolean; currentText: string }>
+      Array<{
+        unit: TextUnit;
+        hasUnsavedDraft: boolean;
+        wasSavedPreviously: boolean;
+        currentText: string;
+      }>
     >();
 
     const flushTable = () => {
@@ -224,17 +367,14 @@ export function OcrComparisonView({
     };
 
     for (const u of pageUnits) {
-      // Get base block ID
       const baseBlockId = u.evidence_id.includes("_c")
         ? u.evidence_id.slice(0, u.evidence_id.indexOf("_c"))
         : u.evidence_id;
 
-      // Determine text with draft if available
       const draftText = draftChanges?.get(u.evidence_id);
       const currentText = draftText !== undefined ? draftText : u.text;
-      const isEdited = Boolean(
-        draftText !== undefined || u.text !== u.original_text,
-      );
+      const hasUnsavedDraft = draftText !== undefined && draftText !== u.text;
+      const wasSavedPreviously = !hasUnsavedDraft && u.text !== u.original_text;
 
       const isTableCell =
         u.kind === "table_cell" || u.row !== null || u.column !== null;
@@ -247,12 +387,16 @@ export function OcrComparisonView({
         currentTableBlockId = baseBlockId;
         const rowIdx = u.row ?? 0;
         const existingRow = currentTableRowsMap.get(rowIdx) ?? [];
-        existingRow.push({ unit: u, isEdited, currentText });
+        existingRow.push({
+          unit: u,
+          hasUnsavedDraft,
+          wasSavedPreviously,
+          currentText,
+        });
         currentTableRowsMap.set(rowIdx, existingRow);
       } else {
         flushTable();
         if (isImage) {
-          // Extract asset number from block or fallback to 1
           const assetNo =
             ((u.bbox as Record<string, unknown>)?.asset_no as number) ?? 1;
           blocks.push({
@@ -266,7 +410,8 @@ export function OcrComparisonView({
             type: "prose",
             unit: u,
             blockId: baseBlockId,
-            isEdited,
+            hasUnsavedDraft,
+            wasSavedPreviously,
             currentText,
           });
         }
@@ -313,7 +458,7 @@ export function OcrComparisonView({
     return lines.join("\n");
   }, [sequentialBlocks, activePageNumber]);
 
-  // Derived JSON for this page
+  // Derived JSON for this page (for diagnostic view)
   const pageJson = useMemo(() => {
     return JSON.stringify(
       {
@@ -354,26 +499,78 @@ export function OcrComparisonView({
   };
 
   const handleStartEdit = (unit: TextUnit, currentText: string) => {
+    if (!canManage) return;
     setEditingUnit(unit);
     setEditingText(currentText);
   };
 
   const handleSaveEdit = () => {
-    if (!editingUnit) return;
+    if (!canManage || !editingUnit) return;
+    if (editingText.trim().length === 0) {
+      toast.error(
+        "Không được xóa trắng hoàn toàn nội dung của đoạn/ô văn bản.",
+      );
+      return;
+    }
     onSaveDraftChange?.(editingUnit.evidence_id, editingUnit.text, editingText);
     setEditingUnit(null);
-    toast.success("Đã ghi thay đổi vào bản nháp.");
+    toast.success("Đã ghi thay đổi vào bản nháp (chưa lưu lên máy chủ).");
   };
 
   const activePageInfo = pages.find((p) => p.page_number === activePageNumber);
   const totalPages = run.pages_total ?? pages.length;
 
+  // Phím tắt [ và ] để chuyển nhanh Trang trước / Trang sau khi rà soát
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      if (editingUnit || fullscreenImageOpen || rawDialogOpen) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (event.key === "[" && activePageNumber > 1) {
+        event.preventDefault();
+        onPageChange(activePageNumber - 1);
+      } else if (
+        event.key === "]" &&
+        totalPages > 0 &&
+        activePageNumber < totalPages
+      ) {
+        event.preventDefault();
+        onPageChange(activePageNumber + 1);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    activePageNumber,
+    totalPages,
+    editingUnit,
+    fullscreenImageOpen,
+    rawDialogOpen,
+    onPageChange,
+  ]);
+
   return (
-    <div className="space-y-3">
+    <div ref={containerRef} className="space-y-3">
       {/* Thanh điều hướng trang phẳng dùng chung cho cả 2 cột (Không đóng hộp chồng hộp) */}
       <div className="flex flex-wrap items-center justify-between gap-3 py-1 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-foreground">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-semibold text-foreground text-sm">
             Trang {activePageNumber} / {totalPages > 0 ? totalPages : "?"}
           </span>
           {activePageInfo ? (
@@ -387,10 +584,10 @@ export function OcrComparisonView({
                       ? "destructive"
                       : "outline"
               }
-              className="text-[10px] py-0 font-normal"
+              className="text-[11px] py-0 font-normal"
             >
               {activePageInfo.status === "blank"
-                ? "Trang trắng"
+                ? "Trang trắng (không có chữ)"
                 : activePageInfo.status === "completed"
                   ? "Đã bóc tách"
                   : activePageInfo.status === "in_flight" ||
@@ -403,30 +600,94 @@ export function OcrComparisonView({
           {activePageInfo?.has_tables ? (
             <Badge
               variant="outline"
-              className="text-[10px] py-0 gap-1 font-normal"
+              className="text-[11px] py-0 gap-1 font-normal"
             >
               <FileSpreadsheet className="size-3 text-primary" />
-              <span>Có bảng</span>
+              <span>Có bảng biểu</span>
+            </Badge>
+          ) : null}
+
+          {focusedUnitOnPage ? (
+            <Badge
+              variant="outline"
+              className="text-[11px] py-0 gap-1 border-primary/40 bg-primary/5 text-primary"
+            >
+              <ScanSearch className="size-3" />
+              <span>
+                Đang đối chiếu:{" "}
+                {formatUnitLocator(focusedUnitOnPage, reviewDoc?.units, {
+                  includePage: false,
+                })}
+              </span>
+              {!focusedBbox ? (
+                <span className="text-muted-foreground">
+                  (không có tọa độ vùng ảnh)
+                </span>
+              ) : null}
             </Badge>
           ) : null}
         </div>
 
-        {/* Nút chuyển trang tinh gọn */}
+        {/* Nút chuyển trang tinh gọn & tỷ lệ chia cột trên Desktop */}
         <div className="flex items-center gap-1.5 flex-wrap">
+          <fieldset
+            className="hidden lg:flex items-center gap-0.5 rounded-lg border bg-muted/20 p-0.5 mr-1"
+            aria-label="Tỷ lệ chia hai cột ảnh và văn bản"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[11px]"
+              onClick={() => handleSetSplitRatio(50)}
+              title="Chia đều 50% ảnh : 50% văn bản"
+            >
+              50:50
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[11px]"
+              onClick={() => handleSetSplitRatio(62)}
+              title="Mở rộng vùng ảnh gốc (62% ảnh : 38% văn bản)"
+            >
+              Rộng ảnh
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[11px]"
+              onClick={() => handleSetSplitRatio(38)}
+              title="Mở rộng vùng văn bản và gợi ý (38% ảnh : 62% văn bản)"
+            >
+              Rộng chữ
+            </Button>
+          </fieldset>
+
           <Button
+            type="button"
             size="sm"
             variant="outline"
             className="h-8 px-2.5 text-xs gap-1"
             disabled={activePageNumber <= 1}
             onClick={() => onPageChange(activePageNumber - 1)}
+            title="Trang trước (Phím tắt: [)"
           >
             <ChevronLeft className="size-3.5" />
             <span className="hidden sm:inline">Trang trước</span>
           </Button>
 
           <div className="flex items-center gap-1.5 font-mono text-xs px-1">
-            <span className="text-muted-foreground font-sans">Trang</span>
-            <input
+            <label
+              htmlFor="ocr-page-number-input"
+              className="text-muted-foreground font-sans"
+            >
+              Trang
+            </label>
+            <Input
+              id="ocr-page-number-input"
               type="number"
               min={1}
               max={totalPages || 1}
@@ -448,8 +709,8 @@ export function OcrComparisonView({
                   setInputPage(String(activePageNumber));
                 }
               }}
-              className="w-12 h-8 text-center rounded-md border border-input bg-background font-mono text-xs focus:ring-1 focus:ring-primary focus:outline-hidden"
-              title="Nhập số trang và nhấn Enter"
+              className="w-14 h-8 px-1.5 text-center font-mono text-xs"
+              aria-label="Số trang hiện tại"
             />
             <span className="text-muted-foreground font-sans">
               / {totalPages > 0 ? totalPages : 1}
@@ -457,514 +718,908 @@ export function OcrComparisonView({
           </div>
 
           <Button
+            type="button"
             size="sm"
             variant="outline"
             className="h-8 px-2.5 text-xs gap-1"
             disabled={totalPages > 0 && activePageNumber >= totalPages}
             onClick={() => onPageChange(activePageNumber + 1)}
+            title="Trang sau (Phím tắt: ])"
           >
             <span className="hidden sm:inline">Trang sau</span>
             <ChevronRight className="size-3.5" />
           </Button>
-
-          {/* Raw Response trigger */}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 px-2 text-xs gap-1 ml-1 text-muted-foreground hover:text-foreground"
-            onClick={() => setRawDialogOpen(true)}
-            title="Xem raw response nguyên bản của trang"
-          >
-            <Code className="size-3.5" />
-            <span className="hidden sm:inline">Raw JSON</span>
-          </Button>
         </div>
       </div>
 
-      {/* Bố cục Hai Cột Đối Chiếu (Desktop: lg:grid-cols-2 | Mobile: Tabs Bản gốc / Kết quả) */}
-      <div className="hidden lg:grid lg:grid-cols-2 gap-4 items-start">
-        {/* CỘT TRÁI: Bản gốc của trang đang chọn */}
-        <Card className="rounded-xl shadow-2xs overflow-hidden flex flex-col h-[calc(100vh-14rem)] min-h-[580px] border-border/80">
-          <div className="p-2.5 border-b bg-muted/20 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5 font-medium text-foreground">
-              <ImageIcon className="size-3.5 text-primary" />
-              <span>Bản gốc trang {activePageNumber}</span>
-            </div>
-
-            {/* Điều khiển Phóng to / Thu nhỏ / Vừa chiều ngang / Mở rộng */}
-            <div className="flex items-center gap-1">
-              <Button
-                variant={zoomMode === "fit-width" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-6 px-2 text-[11px] font-medium"
-                onClick={handleToggleFit}
-                title={
-                  zoomMode === "fit-width"
-                    ? "Đang vừa bề ngang (nhấp để chuyển sang vừa trọn trang)"
-                    : "Đang vừa trọn trang (nhấp để chuyển sang vừa bề ngang)"
-                }
-              >
-                <span>
-                  {zoomMode === "fit-width" ? "Vừa ngang" : "Trọn trang"}
-                </span>
-              </Button>
-
-              <div className="h-3.5 w-px bg-border/60 mx-0.5" />
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-6 p-0 text-muted-foreground hover:text-foreground"
-                onClick={handleZoomOut}
-                title="Thu nhỏ"
-              >
-                <ZoomOut className="size-3.5" />
-              </Button>
-              <span className="text-[10px] font-mono min-w-8 text-center text-muted-foreground">
-                {zoomMode === "custom"
-                  ? `${customZoom}%`
-                  : zoomMode === "fit-width"
-                    ? "Ngang"
-                    : "Trọn"}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-6 p-0 text-muted-foreground hover:text-foreground"
-                onClick={handleZoomIn}
-                title="Phóng to"
-              >
-                <ZoomIn className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-6 p-0 text-muted-foreground hover:text-foreground"
-                onClick={handleResetZoom}
-                title="Đặt lại vừa chiều ngang"
-              >
-                <RotateCcw className="size-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-6 p-0 text-muted-foreground hover:text-foreground ml-1"
-                onClick={() => setFullscreenImageOpen(true)}
-                title="Mở rộng toàn màn hình"
-              >
-                <Maximize2 className="size-3.5" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-auto p-4 bg-muted/10 flex items-center justify-center relative">
-            {imageLoading ? (
-              <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground py-12">
-                <Loader2 className="size-6 animate-spin text-primary" />
-                <span>Đang tải ảnh trang {activePageNumber}...</span>
-              </div>
-            ) : run.status === "running" || run.status === "queued" ? (
-              <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground py-12 text-center max-w-xs">
-                <Loader2 className="size-6 animate-spin text-primary" />
-                <span className="font-medium text-foreground">
-                  Đang bóc tách và tạo bản xem trước...
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  Hệ thống đang chuyển đổi tài liệu và kết xuất các trang. Ảnh
-                  sẽ tự động hiển thị khi hoàn tất.
-                </span>
-              </div>
-            ) : imageError ? (
-              <Alert variant="destructive" className="max-w-md">
-                <AlertCircle className="size-4" />
-                <AlertTitle>
-                  Không tải được ảnh trang {activePageNumber}
-                </AlertTitle>
-                <AlertDescription className="text-xs mt-1 space-y-2">
-                  <p>{imageError}</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs bg-card"
-                    onClick={() => void refetchImage()}
-                  >
-                    <RotateCcw className="size-3 mr-1" />
-                    <span>Thử tải lại</span>
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            ) : imageBlobUrl ? (
-              <div
-                className={cn(
-                  "w-full h-full flex transition-all duration-150",
-                  zoomMode === "fit-page"
-                    ? "items-center justify-center"
-                    : "items-start justify-center",
-                )}
-              >
-                <img
-                  src={imageBlobUrl}
-                  alt={`Bản gốc trang ${activePageNumber}`}
-                  className={cn(
-                    "shadow-sm rounded border bg-white select-none transition-all duration-150",
-                    zoomMode === "fit-width" && "w-full max-w-full h-auto",
-                    zoomMode === "fit-page" &&
-                      "max-w-full max-h-full w-auto h-auto object-contain",
-                    zoomMode === "custom" && "max-w-none h-auto",
-                  )}
-                  style={
-                    zoomMode === "custom"
-                      ? { width: `${customZoom}%` }
-                      : undefined
-                  }
-                />
-              </div>
-            ) : (
-              <div className="text-xs text-muted-foreground">
-                {activePageInfo?.status === "in_flight" ||
-                activePageInfo?.status === "pending"
-                  ? "Trang đang chờ kết xuất..."
-                  : "Chưa có ảnh cho trang này."}
-              </div>
-            )}
-          </div>
-
-          {/* DOCX Note */}
-          {isDocx ? (
-            <div className="p-2 border-t bg-muted/20 text-[11px] text-muted-foreground flex items-center gap-1.5">
-              <Info className="size-3.5 text-info shrink-0" />
-              <span>
-                Ảnh trang là bản hiển thị được chuyển đổi từ Word (.docx) qua
-                Gotenberg (LibreOffice) sang PDF chuẩn xác.
-              </span>
-            </div>
-          ) : null}
-        </Card>
-
-        {/* CỘT PHẢI: Kết quả bóc tách đúng trang (Nội dung / Markdown / JSON) */}
-        <Card className="rounded-xl shadow-2xs overflow-hidden flex flex-col h-[calc(100vh-14rem)] min-h-[580px] border-border/80">
-          <Tabs
-            value={activeTabDesktop}
-            onValueChange={setActiveTabDesktop}
-            className="flex-1 flex flex-col h-full"
-          >
-            {/* Header Tabs: Nội dung | Markdown | JSON */}
-            <div className="p-2 border-b bg-muted/20 flex items-center justify-between">
-              <TabsList className="h-8">
-                <TabsTrigger value="content" className="text-xs gap-1.5 h-7">
-                  <FileText className="size-3 text-primary" />
-                  <span>Nội dung</span>
-                </TabsTrigger>
-                <TabsTrigger value="markdown" className="text-xs gap-1.5 h-7">
-                  <FileText className="size-3 text-primary" />
-                  <span>Markdown</span>
-                </TabsTrigger>
-                <TabsTrigger value="json" className="text-xs gap-1.5 h-7">
-                  <Code className="size-3 text-primary" />
-                  <span>JSON</span>
-                </TabsTrigger>
-              </TabsList>
-
-              {/* Actions on active view */}
-              <div className="flex items-center gap-1.5 text-xs">
-                {activeTabDesktop === "markdown" ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-xs gap-1"
-                    onClick={() => handleCopy(pageMarkdown, "md")}
-                  >
-                    {copiedType === "md" ? (
-                      <Check className="size-3 text-success" />
-                    ) : (
-                      <Copy className="size-3" />
-                    )}
-                    <span>
-                      {copiedType === "md" ? "Đã chép" : "Sao chép MD"}
-                    </span>
-                  </Button>
-                ) : null}
-
-                {activeTabDesktop === "json" ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-xs gap-1"
-                    onClick={() => handleCopy(pageJson, "json")}
-                  >
-                    {copiedType === "json" ? (
-                      <Check className="size-3 text-success" />
-                    ) : (
-                      <Copy className="size-3" />
-                    )}
-                    <span>
-                      {copiedType === "json" ? "Đã chép" : "Sao chép JSON"}
-                    </span>
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-
-            {/* TAB 1: NỘI DUNG TUẦN TỰ (Mặt giấy văn bản liền mạch) */}
-            <TabsContent
-              value="content"
-              className="flex-1 overflow-auto p-4 sm:p-5 m-0 bg-muted/15"
-            >
-              {sequentialBlocks.length === 0 ? (
-                <div className="p-8 text-center text-xs text-muted-foreground space-y-1">
-                  {activePageInfo?.status === "blank" ? (
-                    <p>
-                      Trang này được xác định là trang trắng (không chứa mực
-                      in).
-                    </p>
-                  ) : activePageInfo?.status === "in_flight" ||
-                    activePageInfo?.status === "pending" ? (
-                    <div className="flex flex-col items-center gap-2 py-4">
-                      <Loader2 className="size-5 animate-spin text-primary" />
-                      <p>Trang đang trong quá trình bóc tách…</p>
-                    </div>
-                  ) : (
-                    <p>Chưa có nội dung nào được trích xuất cho trang này.</p>
-                  )}
-                </div>
-              ) : (
-                <div className="mx-auto max-w-2xl bg-card border border-border/60 rounded-xl p-5 sm:p-7 shadow-2xs space-y-2.5 font-sans min-h-full">
-                  {sequentialBlocks.map((block) => {
-                    if (block.type === "prose") {
-                      return (
-                        <div
-                          key={block.unit.evidence_id}
-                          className={cn(
-                            "group relative py-1 px-2.5 -mx-2.5 rounded-md transition-colors",
-                            block.isEdited
-                              ? "bg-amber-500/10 border-l-2 border-amber-500 pl-3"
-                              : "hover:bg-muted/50",
-                          )}
-                        >
-                          {/* Nút Sửa nổi nhẹ nhàng khi di chuột qua đoạn */}
-                          <div className="absolute right-2 top-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 bg-background/95 backdrop-blur-xs px-1.5 py-0.5 rounded-md border border-border/80 shadow-2xs z-10">
-                            {block.isEdited ? (
-                              <span className="text-[9px] text-amber-600 dark:text-amber-400 font-medium pl-1">
-                                Đã sửa
-                              </span>
-                            ) : null}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-5 px-1.5 text-[11px] gap-1 text-primary hover:text-primary hover:bg-primary/10"
-                              onClick={() =>
-                                handleStartEdit(block.unit, block.currentText)
-                              }
-                              title="Chỉnh sửa đoạn này"
-                            >
-                              <Edit3 className="size-3" />
-                              <span>Sửa</span>
-                            </Button>
-                          </div>
-
-                          {/* Hiển thị phân cấp theo loại đoạn văn */}
-                          {block.unit.kind === "heading" ? (
-                            <h3 className="text-sm sm:text-base font-bold text-foreground leading-snug">
-                              {block.currentText}
-                            </h3>
-                          ) : (
-                            <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed font-sans whitespace-pre-wrap">
-                              {block.currentText}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    }
-
-                    if (block.type === "table") {
-                      return (
-                        <div
-                          key={block.blockId}
-                          className="my-3 rounded-lg border border-border/70 bg-card overflow-hidden shadow-2xs"
-                        >
-                          <div className="px-3 py-1.5 bg-muted/30 border-b border-border/60 flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5 font-medium text-foreground">
-                              <FileSpreadsheet className="size-3.5 text-primary" />
-                              <span>
-                                Bảng số liệu ({block.rows.length} hàng)
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="overflow-x-auto">
-                            <Table className="text-xs">
-                              <TableHeader>
-                                <TableRow>
-                                  {block.rows[0]?.cells.map(
-                                    ({ unit, currentText }) => (
-                                      <TableHead
-                                        key={unit.evidence_id}
-                                        className="font-semibold text-foreground text-xs whitespace-nowrap bg-muted/20 py-2 px-3"
-                                      >
-                                        {currentText || "—"}
-                                      </TableHead>
-                                    ),
-                                  )}
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {block.rows.slice(1).map((row) => (
-                                  <TableRow key={row.rowIdx}>
-                                    {row.cells.map(
-                                      ({ unit, currentText, isEdited }) => (
-                                        <TableCell
-                                          key={unit.evidence_id}
-                                          className={cn(
-                                            "text-xs py-2 px-3 leading-normal cursor-pointer hover:bg-muted/40 transition-colors",
-                                            isEdited
-                                              ? "bg-amber-500/10 font-medium"
-                                              : "",
-                                          )}
-                                          onClick={() =>
-                                            handleStartEdit(unit, currentText)
-                                          }
-                                          title="Nhấp để sửa ô này"
-                                        >
-                                          {currentText === "" ? (
-                                            <span className="text-muted-foreground/60 italic">
-                                              (trống)
-                                            </span>
-                                          ) : (
-                                            currentText
-                                          )}
-                                        </TableCell>
-                                      ),
-                                    )}
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    if (block.type === "image") {
-                      return (
-                        <div
-                          key={block.blockId}
-                          className="my-3 p-3 rounded-lg border border-border/70 bg-muted/10 flex flex-col items-center gap-2"
-                        >
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground self-start">
-                            <ImageIcon className="size-3.5 text-primary" />
-                            <span>Ảnh trích xuất #{block.assetNo}</span>
-                          </div>
-
-                          <div className="flex justify-center p-2 bg-background rounded border">
-                            <AuthenticatedEmbeddedImage
-                              workspaceId={workspaceId}
-                              collectionId={collectionId}
-                              sourceId={sourceId}
-                              revisionId={revisionId}
-                              runId={run.id}
-                              assetNo={block.assetNo}
-                            />
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return null;
-                  })}
-                </div>
-              )}
-            </TabsContent>
-
-            {/* TAB 2: MARKDOWN DẪN XUẤT */}
-            <TabsContent
-              value="markdown"
-              className="flex-1 overflow-auto p-4 m-0 font-mono text-xs whitespace-pre-wrap bg-muted/10 text-foreground leading-relaxed"
-            >
-              {pageMarkdown || "Chưa có nội dung Markdown cho trang này."}
-            </TabsContent>
-
-            {/* TAB 3: JSON CẤU TRÚC */}
-            <TabsContent
-              value="json"
-              className="flex-1 overflow-auto p-4 m-0 font-mono text-[11px] whitespace-pre-wrap bg-muted/10 text-foreground"
-            >
-              {pageJson}
-            </TabsContent>
-          </Tabs>
-        </Card>
+      {/* Thanh chuyển vùng rõ ràng cho Mobile / Tablet (< lg) — Giữ nguyên trang, nháp và gợi ý */}
+      <div
+        role="tablist"
+        aria-label="Chuyển vùng hiển thị trên màn hình nhỏ"
+        className="grid lg:hidden grid-cols-3 gap-1 rounded-xl border bg-muted/30 p-1"
+      >
+        <Button
+          type="button"
+          role="tab"
+          aria-selected={activeMobilePane === "image"}
+          variant={activeMobilePane === "image" ? "default" : "ghost"}
+          size="sm"
+          className="h-8 text-xs gap-1.5"
+          onClick={() => setMobilePane("image")}
+        >
+          <ImageIcon className="size-3.5 shrink-0" />
+          <span className="truncate">Ảnh trang {activePageNumber}</span>
+        </Button>
+        <Button
+          type="button"
+          role="tab"
+          aria-selected={activeMobilePane === "content"}
+          variant={activeMobilePane === "content" ? "default" : "ghost"}
+          size="sm"
+          className="h-8 text-xs gap-1.5"
+          onClick={() => setMobilePane("content")}
+        >
+          <FileText className="size-3.5 shrink-0" />
+          <span className="truncate">Văn bản ({pageUnits.length})</span>
+        </Button>
+        <Button
+          type="button"
+          role="tab"
+          aria-selected={activeMobilePane === "spelling"}
+          variant={activeMobilePane === "spelling" ? "default" : "ghost"}
+          size="sm"
+          className="h-8 text-xs gap-1.5"
+          onClick={() => setMobilePane("spelling")}
+        >
+          <Sparkles className="size-3.5 shrink-0" />
+          <span className="truncate">
+            Gợi ý
+            {spellingSuggestionsCount > 0
+              ? ` (${spellingSuggestionsCount})`
+              : ""}
+          </span>
+        </Button>
       </div>
 
-      {/* Mobile view: Chuyển đổi linh hoạt giữa Bản gốc / Kết quả thay vì ép 2 cột */}
-      <div className="lg:hidden">
-        <Tabs
-          value={activeTabMobile}
-          onValueChange={setActiveTabMobile}
-          className="w-full space-y-3"
+      {/* Bố cục Hai Cột Đối Chiếu có thanh kéo điều chỉnh độ rộng (Desktop: Resizable Split | Mobile: Chuyển vùng 1 DOM) */}
+      <Group
+        id="ocr-split-group"
+        groupRef={splitGroupRef}
+        orientation="horizontal"
+        className={cn(
+          "w-full items-stretch",
+          activeMobilePane === "image"
+            ? "max-lg:[&>#ocr-content-panel]:hidden max-lg:[&>#ocr-panel-separator]:hidden max-lg:[&>#ocr-image-panel]:!basis-full"
+            : "max-lg:[&>#ocr-image-panel]:hidden max-lg:[&>#ocr-panel-separator]:hidden max-lg:[&>#ocr-content-panel]:!basis-full",
+        )}
+      >
+        {/* CỘT TRÁI: Bản gốc của trang đang chọn */}
+        <Panel
+          id="ocr-image-panel"
+          defaultSize="50%"
+          minSize="28%"
+          maxSize="72%"
+          className="flex flex-col"
         >
-          <TabsList className="grid grid-cols-2 w-full h-9">
-            <TabsTrigger value="content" className="text-xs">
-              Nội dung
-            </TabsTrigger>
-            <TabsTrigger value="image" className="text-xs">
-              Bản gốc trang {activePageNumber}
-            </TabsTrigger>
-          </TabsList>
+          <Card
+            className={cn(
+              "rounded-xl shadow-2xs overflow-hidden flex-col lg:h-[calc(100vh-14rem)] min-h-[480px] lg:min-h-[580px] border-border/80 w-full",
+              activeMobilePane === "image" ? "flex" : "hidden lg:flex",
+            )}
+          >
+            <div className="p-2.5 border-b bg-muted/20 flex items-center justify-between gap-2 flex-wrap text-xs">
+              <div className="flex items-center gap-1.5 font-medium text-foreground flex-wrap">
+                <ImageIcon className="size-3.5 text-primary" />
+                <span>Ảnh gốc trang {activePageNumber}</span>
+                {focusedBbox ? (
+                  <>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] py-0 px-1.5 border-primary/40 text-primary"
+                    >
+                      Đang đánh dấu vùng văn bản
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-1.5 text-[11px] gap-1 text-primary hover:bg-primary/10"
+                      onClick={handleZoomToBbox}
+                      title="Phóng to trực tiếp vào vùng văn bản đang đối chiếu trên ảnh"
+                    >
+                      <ScanSearch className="size-3" />
+                      <span>Phóng vào vùng này</span>
+                    </Button>
+                  </>
+                ) : null}
+              </div>
 
-          <TabsContent value="content" className="mt-0">
-            <div className="bg-card border border-border/60 rounded-xl p-4 shadow-2xs space-y-2 font-sans">
-              {sequentialBlocks.map((block) => {
-                if (block.type === "prose") {
-                  return (
+              {/* Điều khiển Phóng to / Thu nhỏ / Vừa chiều ngang / Mở rộng */}
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant={zoomMode === "fit-width" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 px-2 text-xs font-medium"
+                  onClick={handleToggleFit}
+                  title={
+                    zoomMode === "fit-width"
+                      ? "Đang vừa bề ngang (nhấp để chuyển sang vừa trọn trang)"
+                      : "Đang vừa trọn trang (nhấp để chuyển sang vừa bề ngang)"
+                  }
+                >
+                  <span>
+                    {zoomMode === "fit-width" ? "Vừa ngang" : "Trọn trang"}
+                  </span>
+                </Button>
+
+                <div className="h-3.5 w-px bg-border/60 mx-0.5" />
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="size-7 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={handleZoomOut}
+                  aria-label="Thu nhỏ ảnh"
+                  title="Thu nhỏ"
+                >
+                  <ZoomOut className="size-3.5" />
+                </Button>
+                <span className="text-[11px] font-mono min-w-9 text-center text-muted-foreground">
+                  {customZoom !== 100
+                    ? `${customZoom}%`
+                    : zoomMode === "fit-width"
+                      ? "Ngang"
+                      : "Trọn"}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="size-7 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={handleZoomIn}
+                  aria-label="Phóng to ảnh"
+                  title="Phóng to"
+                >
+                  <ZoomIn className="size-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="size-7 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={handleResetZoom}
+                  aria-label="Đặt lại tỷ lệ phóng"
+                  title="Đặt lại vừa chiều ngang"
+                >
+                  <RotateCcw className="size-3" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="size-7 p-0 text-muted-foreground hover:text-foreground ml-0.5"
+                  onClick={() => setFullscreenImageOpen(true)}
+                  aria-label="Mở rộng ảnh toàn màn hình"
+                  title="Mở rộng toàn màn hình"
+                >
+                  <Maximize2 className="size-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-3 bg-muted/10 flex items-center justify-center relative">
+              {imageLoading ? (
+                <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground py-12">
+                  <Loader2 className="size-6 animate-spin text-primary" />
+                  <span>Đang tải ảnh trang {activePageNumber}...</span>
+                </div>
+              ) : run.status === "running" || run.status === "queued" ? (
+                <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground py-12 text-center max-w-xs">
+                  <Loader2 className="size-6 animate-spin text-primary" />
+                  <span className="font-medium text-foreground">
+                    Đang bóc tách và tạo bản xem trước...
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    Hệ thống đang chuyển đổi tài liệu và kết xuất các trang. Ảnh
+                    sẽ tự động hiển thị khi hoàn tất.
+                  </span>
+                </div>
+              ) : imageError ? (
+                <Alert variant="destructive" className="max-w-md">
+                  <AlertCircle className="size-4" />
+                  <AlertTitle>
+                    Không tải được ảnh trang {activePageNumber}
+                  </AlertTitle>
+                  <AlertDescription className="text-xs mt-1 space-y-2">
+                    <p>{imageError}</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs bg-card"
+                      onClick={() => void refetchImage()}
+                    >
+                      <RotateCcw className="size-3 mr-1" />
+                      <span>Thử tải lại</span>
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              ) : imageBlobUrl ? (
+                <TransformWrapper
+                  ref={transformRef}
+                  initialScale={1}
+                  minScale={0.5}
+                  maxScale={4}
+                  onTransform={(_ref, state) =>
+                    setCustomZoom(Math.round(state.scale * 100))
+                  }
+                  wheel={{ step: 0.15 }}
+                  doubleClick={{ mode: "reset" }}
+                  panning={{ velocityDisabled: true }}
+                >
+                  <TransformComponent
+                    wrapperClass="!w-full !h-full"
+                    contentClass={cn(
+                      "!w-full flex transition-all duration-150",
+                      zoomMode === "fit-page"
+                        ? "items-center justify-center !h-full"
+                        : "items-start justify-center",
+                    )}
+                  >
                     <div
-                      key={block.unit.evidence_id}
                       className={cn(
-                        "relative py-1 px-2 rounded-md",
-                        block.isEdited
-                          ? "bg-amber-500/10 border-l-2 border-amber-500 pl-2.5"
-                          : "",
+                        "relative inline-block",
+                        zoomMode === "fit-width" && "w-full max-w-full",
+                        zoomMode === "fit-page" && "max-w-full max-h-full",
                       )}
                     >
-                      <div className="flex items-center justify-end text-[10px] text-muted-foreground mb-0.5">
+                      <img
+                        src={imageBlobUrl}
+                        alt={`Bản gốc trang ${activePageNumber}`}
+                        className={cn(
+                          "shadow-sm rounded border bg-white select-none block",
+                          zoomMode === "fit-width" && "w-full h-auto",
+                          zoomMode === "fit-page" &&
+                            "max-w-full max-h-full w-auto h-auto object-contain",
+                        )}
+                      />
+                      {/* Chỉ đánh dấu vùng ảnh khi có bbox thật, không tạo vị trí ước đoán */}
+                      {focusedBbox ? (
+                        <div
+                          ref={bboxHighlightRef}
+                          data-testid="ocr-bbox-highlight"
+                          role="img"
+                          aria-label="Vùng văn bản đang đối chiếu trên ảnh gốc"
+                          className="absolute border-2 border-primary bg-primary/15 rounded-xs pointer-events-none transition-all duration-200"
+                          style={{
+                            left: `${focusedBbox.x0 * 100}%`,
+                            top: `${focusedBbox.y0 * 100}%`,
+                            width: `${(focusedBbox.x1 - focusedBbox.x0) * 100}%`,
+                            height: `${(focusedBbox.y1 - focusedBbox.y0) * 100}%`,
+                          }}
+                        />
+                      ) : null}
+                    </div>
+                  </TransformComponent>
+                </TransformWrapper>
+              ) : (
+                <div className="text-xs text-muted-foreground">
+                  {activePageInfo?.status === "in_flight" ||
+                  activePageInfo?.status === "pending"
+                    ? "Trang đang chờ kết xuất..."
+                    : "Chưa có ảnh cho trang này."}
+                </div>
+              )}
+            </div>
+
+            {isDocx ? (
+              <div className="p-2 border-t bg-muted/20 text-[11px] text-muted-foreground flex items-center gap-1.5">
+                <Info className="size-3.5 text-info shrink-0" />
+                <span>
+                  Ảnh trang là bản hiển thị được chuyển đổi từ tệp Word (.docx)
+                  sang PDF để đối chiếu trực quan.
+                </span>
+              </div>
+            ) : null}
+          </Card>
+        </Panel>
+
+        {/* Thanh kéo chia cột trên Desktop */}
+        <Separator
+          id="ocr-panel-separator"
+          aria-label="Kéo để thay đổi độ rộng cột ảnh và cột văn bản"
+          className="hidden lg:flex w-3 items-center justify-center group cursor-col-resize focus-visible:outline-none"
+        >
+          <div className="h-12 w-1 rounded-full bg-border group-hover:bg-primary/60 group-focus-visible:bg-primary transition-colors" />
+        </Separator>
+
+        {/* CỘT PHẢI: Văn bản bóc tách & Gợi ý chính tả */}
+        <Panel
+          id="ocr-content-panel"
+          defaultSize="50%"
+          minSize="28%"
+          maxSize="72%"
+          className="flex flex-col"
+        >
+          <Card
+            className={cn(
+              "rounded-xl shadow-2xs overflow-hidden flex-col lg:h-[calc(100vh-14rem)] min-h-[480px] lg:min-h-[580px] border-border/80 w-full",
+              activeMobilePane !== "image" ? "flex" : "hidden lg:flex",
+            )}
+          >
+            <Tabs
+              value={activeTabRight}
+              onValueChange={setActiveTabRight}
+              className="flex-1 flex flex-col h-full min-h-0"
+            >
+              {/* Header Tabs: Văn bản trang | Markdown | Chi tiết kỹ thuật */}
+              <div className="p-2 border-b bg-muted/20 flex items-center justify-between gap-2 flex-wrap">
+                <TabsList className="h-8">
+                  <TabsTrigger value="content" className="text-xs gap-1.5 h-7">
+                    <FileText className="size-3 text-primary" />
+                    <span>Văn bản trang {activePageNumber}</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="markdown" className="text-xs gap-1.5 h-7">
+                    <FileText className="size-3 text-primary" />
+                    <span>Markdown</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="json" className="text-xs gap-1.5 h-7">
+                    <Code className="size-3 text-primary" />
+                    <span>Dữ liệu kỹ thuật</span>
+                  </TabsTrigger>
+                </TabsList>
+
+                <div className="flex items-center gap-1.5 text-xs">
+                  {activeTabRight === "markdown" ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => handleCopy(pageMarkdown, "md")}
+                    >
+                      {copiedType === "md" ? (
+                        <Check className="size-3 text-success" />
+                      ) : (
+                        <Copy className="size-3" />
+                      )}
+                      <span>
+                        {copiedType === "md" ? "Đã chép" : "Sao chép MD"}
+                      </span>
+                    </Button>
+                  ) : null}
+
+                  {activeTabRight === "json" ? (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => handleCopy(pageJson, "json")}
+                      >
+                        {copiedType === "json" ? (
+                          <Check className="size-3 text-success" />
+                        ) : (
+                          <Copy className="size-3" />
+                        )}
+                        <span>
+                          {copiedType === "json" ? "Đã chép" : "Sao chép JSON"}
+                        </span>
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => setRawDialogOpen(true)}
+                      >
+                        <Code className="size-3" />
+                        <span>Phản hồi OCR gốc</span>
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* TAB 1: NỘI DUNG TUẦN TỰ & GỢI Ý CHÍNH TẢ */}
+              <TabsContent
+                value="content"
+                className="flex-1 overflow-auto p-3 sm:p-4 m-0 bg-muted/15 space-y-3"
+              >
+                {/* Khu vực Gợi ý chính tả: Hiển thị ngay bên cạnh ảnh trên Desktop, hoặc khi mở tab Gợi ý trên Mobile */}
+                {spellingPanel ? (
+                  <div
+                    className={cn(
+                      activeMobilePane === "spelling"
+                        ? "block"
+                        : "hidden lg:block",
+                    )}
+                  >
+                    {spellingPanel}
+                  </div>
+                ) : activeMobilePane === "spelling" ? (
+                  <div className="rounded-xl border border-dashed bg-card p-6 text-center space-y-2 text-xs text-muted-foreground lg:hidden">
+                    <Sparkles className="size-5 text-primary mx-auto" />
+                    <p className="font-medium text-foreground text-sm">
+                      Chưa có lượt kiểm tra chính tả nào đang mở
+                    </p>
+                    <p>
+                      Hãy chọn các đoạn văn trên trang rồi bấm nút{" "}
+                      <strong className="text-foreground">
+                        Kiểm tra chính tả
+                      </strong>{" "}
+                      ở thanh điều khiển phía trên để AI phân tích và đề xuất
+                      sửa lỗi.
+                    </p>
+                    {canManage &&
+                    onStartSpellCheck &&
+                    selectablePageUnits.length > 0 ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 text-xs gap-1.5 mt-2"
+                        onClick={() =>
+                          onStartSpellCheck(
+                            selectablePageUnits.map((u) => u.evidence_id),
+                          )
+                        }
+                      >
+                        <Sparkles className="size-3.5" />
+                        <span>
+                          Kiểm tra trang này ({selectablePageUnits.length} đoạn)
+                        </span>
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {/* Mặt giấy văn bản của trang */}
+                <div
+                  className={cn(
+                    "space-y-2.5",
+                    activeMobilePane === "spelling"
+                      ? "hidden lg:block"
+                      : "block",
+                  )}
+                >
+                  {/* Thanh chọn phạm vi đoạn văn trên trang để gửi AI kiểm tra chính tả */}
+                  {canManage &&
+                  selectablePageUnits.length > 0 &&
+                  (onToggleUnitSelection || onStartSpellCheck) ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-xs">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {onSelectPageUnits ? (
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id={`select-all-page-${activePageNumber}`}
+                              checked={allPageUnitsSelected}
+                              onCheckedChange={(checked) =>
+                                onSelectPageUnits(
+                                  selectablePageUnits.map((u) => u.evidence_id),
+                                  Boolean(checked),
+                                )
+                              }
+                              aria-label={`Chọn tất cả đoạn trên trang ${activePageNumber}`}
+                            />
+                            <label
+                              htmlFor={`select-all-page-${activePageNumber}`}
+                              className="font-medium text-foreground cursor-pointer select-none"
+                            >
+                              Chọn đoạn trên trang {activePageNumber}
+                            </label>
+                          </div>
+                        ) : (
+                          <span className="font-medium text-foreground">
+                            Trang {activePageNumber}:{" "}
+                            {selectablePageUnits.length} đoạn/ô có chữ
+                          </span>
+                        )}
+
+                        {selectedUnitIds ? (
+                          <Badge
+                            variant="secondary"
+                            className="text-[11px] py-0"
+                          >
+                            Đã chọn {selectedOnPageCount} /{" "}
+                            {selectablePageUnits.length} đoạn trên trang
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      {onStartSpellCheck ? (
                         <Button
+                          type="button"
                           size="sm"
-                          variant="ghost"
-                          className="h-5 px-1.5 text-[11px] text-primary"
+                          variant="outline"
+                          className="h-7 px-2.5 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
                           onClick={() =>
-                            handleStartEdit(block.unit, block.currentText)
+                            onStartSpellCheck(
+                              selectedOnPageCount > 0 && selectedUnitIds
+                                ? selectablePageUnits
+                                    .filter((u) =>
+                                      selectedUnitIds.has(u.evidence_id),
+                                    )
+                                    .map((u) => u.evidence_id)
+                                : selectablePageUnits.map((u) => u.evidence_id),
+                            )
                           }
                         >
-                          <Edit3 className="size-3 mr-1" />
-                          <span>Sửa</span>
+                          <Sparkles className="size-3.5" />
+                          <span>
+                            {selectedOnPageCount > 0
+                              ? `Kiểm tra ${selectedOnPageCount} đoạn đã chọn`
+                              : `Kiểm tra trang ${activePageNumber} (${selectablePageUnits.length} đoạn)`}
+                          </span>
                         </Button>
-                      </div>
-                      <p className="text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap">
-                        {block.currentText}
-                      </p>
+                      ) : null}
                     </div>
-                  );
-                }
-                return null;
-              })}
-            </div>
-          </TabsContent>
+                  ) : null}
 
-          <TabsContent value="image" className="mt-0">
-            <Card className="p-2 overflow-auto flex items-center justify-center">
-              {imageLoading ? (
-                <Loader2 className="size-6 animate-spin text-primary py-8" />
-              ) : imageBlobUrl ? (
-                <img
-                  src={imageBlobUrl}
-                  alt={`Trang ${activePageNumber}`}
-                  className="max-w-full h-auto rounded border"
-                />
-              ) : null}
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+                  {sequentialBlocks.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-muted-foreground space-y-1 bg-card rounded-xl border border-dashed">
+                      {activePageInfo?.status === "blank" ? (
+                        <p className="text-sm font-medium text-foreground">
+                          Trang này không có chữ (Trang trắng).
+                        </p>
+                      ) : activePageInfo?.status === "in_flight" ||
+                        activePageInfo?.status === "pending" ? (
+                        <div className="flex flex-col items-center gap-2 py-4">
+                          <Loader2 className="size-5 animate-spin text-primary" />
+                          <p>Trang đang trong quá trình bóc tách…</p>
+                        </div>
+                      ) : (
+                        <p>Chưa có nội dung văn bản nào cho trang này.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mx-auto max-w-2xl bg-card border border-border/60 rounded-xl p-4 sm:p-6 shadow-2xs space-y-3 font-sans">
+                      {sequentialBlocks.map((block) => {
+                        if (block.type === "prose") {
+                          const isFocused =
+                            focusedEvidenceId === block.unit.evidence_id;
+                          const isSelected = Boolean(
+                            selectedUnitIds?.has(block.unit.evidence_id),
+                          );
+                          const locator = formatUnitLocator(
+                            block.unit,
+                            reviewDoc?.units,
+                            { includePage: false },
+                          );
+                          const hasBbox = Boolean(
+                            extractNormalizedBbox(block.unit.bbox),
+                          );
 
-      {/* Modal Chỉnh sửa một khối văn bản */}
+                          return (
+                            <div
+                              key={block.unit.evidence_id}
+                              data-evidence-id={block.unit.evidence_id}
+                              className={cn(
+                                "group relative py-2 px-3 -mx-2 rounded-lg transition-colors border border-transparent",
+                                isFocused
+                                  ? "ring-2 ring-primary bg-primary/5 border-primary/30"
+                                  : block.hasUnsavedDraft
+                                    ? "bg-warning/10 border-l-2 border-l-warning pl-3"
+                                    : block.wasSavedPreviously
+                                      ? "bg-muted/40 border-l-2 border-l-primary/50 pl-3"
+                                      : "hover:bg-muted/40",
+                              )}
+                            >
+                              {/* Thanh мета nhỏ của đoạn: vị trí, trạng thái nháp và nút thao tác */}
+                              <div className="flex flex-wrap items-center justify-between gap-2 mb-1 text-xs">
+                                <div className="flex items-center gap-2">
+                                  {canManage &&
+                                  onToggleUnitSelection &&
+                                  block.currentText.trim().length > 0 ? (
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={() =>
+                                        onToggleUnitSelection(
+                                          block.unit.evidence_id,
+                                        )
+                                      }
+                                      aria-label={`Chọn ${locator} để kiểm tra chính tả`}
+                                    />
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 cursor-pointer"
+                                    onClick={() =>
+                                      onFocusUnit?.(
+                                        isFocused
+                                          ? null
+                                          : block.unit.evidence_id,
+                                      )
+                                    }
+                                    title={
+                                      hasBbox
+                                        ? "Nhấp để đánh dấu vị trí đoạn này trên ảnh gốc"
+                                        : "Đoạn này không có tọa độ vùng ảnh (bbox)"
+                                    }
+                                  >
+                                    <span>{locator}</span>
+                                    {hasBbox ? (
+                                      <ScanSearch className="size-3 text-primary/70" />
+                                    ) : null}
+                                  </button>
+
+                                  {block.hasUnsavedDraft ? (
+                                    <Badge
+                                      variant="warning"
+                                      className="text-[10px] py-0 px-1.5"
+                                    >
+                                      Nháp chưa lưu
+                                    </Badge>
+                                  ) : block.wasSavedPreviously ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-[10px] py-0 px-1.5"
+                                    >
+                                      Đã lưu hiệu đính
+                                    </Badge>
+                                  ) : null}
+                                </div>
+
+                                {canManage ? (
+                                  <div className="flex items-center gap-1">
+                                    {block.hasUnsavedDraft &&
+                                    onRevertUnitDraft ? (
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 px-1.5 text-[11px] gap-1 text-muted-foreground hover:text-destructive"
+                                        onClick={() =>
+                                          onRevertUnitDraft(
+                                            block.unit.evidence_id,
+                                          )
+                                        }
+                                        title="Khôi phục đoạn này về bản đã lưu"
+                                      >
+                                        <RotateCcw className="size-3" />
+                                        <span>Hoàn tác nháp</span>
+                                      </Button>
+                                    ) : null}
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary hover:bg-primary/10"
+                                      onClick={() =>
+                                        handleStartEdit(
+                                          block.unit,
+                                          block.currentText,
+                                        )
+                                      }
+                                      aria-label={`Sửa ${locator}`}
+                                    >
+                                      <Edit3 className="size-3" />
+                                      <span>Sửa</span>
+                                    </Button>
+                                  </div>
+                                ) : null}
+                              </div>
+
+                              {/* Nội dung văn bản giữ đúng cỡ chữ dễ đọc (14px) */}
+                              {block.unit.kind === "heading" ? (
+                                <h3 className="text-sm sm:text-base font-bold text-foreground leading-snug whitespace-pre-wrap">
+                                  {block.currentText}
+                                </h3>
+                              ) : (
+                                <p className="text-sm text-foreground leading-relaxed font-sans whitespace-pre-wrap">
+                                  {block.currentText}
+                                </p>
+                              )}
+
+                              {block.hasUnsavedDraft ? (
+                                <div className="mt-2 pt-2 border-t border-warning/30 space-y-1">
+                                  <span className="text-[11px] font-medium text-muted-foreground block">
+                                    So sánh từ đã thay đổi so với bản đã lưu:
+                                  </span>
+                                  <OcrWordDiffView
+                                    before={block.unit.text}
+                                    after={block.currentText}
+                                    className="text-xs bg-background/80 rounded-md p-2 border border-border/50"
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        }
+
+                        if (block.type === "table") {
+                          return (
+                            <div
+                              key={block.blockId}
+                              className="my-3 rounded-lg border border-border/70 bg-card overflow-hidden shadow-2xs"
+                            >
+                              <div className="px-3 py-1.5 bg-muted/30 border-b border-border/60 flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-1.5 font-medium text-foreground">
+                                  <FileSpreadsheet className="size-3.5 text-primary" />
+                                  <span>
+                                    Bảng dữ liệu ({block.rows.length} hàng)
+                                  </span>
+                                </div>
+                                {canManage ? (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    Nhấp vào ô bất kỳ để chỉnh sửa
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <div className="overflow-x-auto">
+                                <Table className="text-xs">
+                                  <TableHeader>
+                                    <TableRow>
+                                      {block.rows[0]?.cells.map(
+                                        ({
+                                          unit,
+                                          currentText,
+                                          hasUnsavedDraft,
+                                        }) => {
+                                          const isFocused =
+                                            focusedEvidenceId ===
+                                            unit.evidence_id;
+                                          return (
+                                            <TableHead
+                                              key={unit.evidence_id}
+                                              data-evidence-id={
+                                                unit.evidence_id
+                                              }
+                                              className={cn(
+                                                "font-semibold text-foreground text-xs bg-muted/20 py-2 px-3 transition-colors",
+                                                canManage &&
+                                                  "cursor-pointer hover:bg-muted/40",
+                                                hasUnsavedDraft &&
+                                                  "bg-warning/15",
+                                                isFocused &&
+                                                  "ring-2 ring-inset ring-primary bg-primary/10",
+                                              )}
+                                              onClick={() => {
+                                                onFocusUnit?.(unit.evidence_id);
+                                                if (canManage) {
+                                                  handleStartEdit(
+                                                    unit,
+                                                    currentText,
+                                                  );
+                                                }
+                                              }}
+                                              title={
+                                                canManage
+                                                  ? "Nhấp để đối chiếu và chỉnh sửa ô tiêu đề bảng"
+                                                  : "Nhấp để đối chiếu vị trí ô bảng"
+                                              }
+                                            >
+                                              {currentText || "—"}
+                                            </TableHead>
+                                          );
+                                        },
+                                      )}
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {block.rows.slice(1).map((row) => (
+                                      <TableRow key={row.rowIdx}>
+                                        {row.cells.map(
+                                          ({
+                                            unit,
+                                            currentText,
+                                            hasUnsavedDraft,
+                                            wasSavedPreviously,
+                                          }) => {
+                                            const isFocused =
+                                              focusedEvidenceId ===
+                                              unit.evidence_id;
+                                            return (
+                                              <TableCell
+                                                key={unit.evidence_id}
+                                                data-evidence-id={
+                                                  unit.evidence_id
+                                                }
+                                                className={cn(
+                                                  "text-xs py-2 px-3 leading-normal transition-colors",
+                                                  canManage &&
+                                                    "cursor-pointer hover:bg-muted/40",
+                                                  hasUnsavedDraft
+                                                    ? "bg-warning/15 font-medium"
+                                                    : wasSavedPreviously
+                                                      ? "bg-muted/30"
+                                                      : "",
+                                                  isFocused &&
+                                                    "ring-2 ring-inset ring-primary bg-primary/10",
+                                                )}
+                                                onClick={() => {
+                                                  onFocusUnit?.(
+                                                    unit.evidence_id,
+                                                  );
+                                                  if (canManage) {
+                                                    handleStartEdit(
+                                                      unit,
+                                                      currentText,
+                                                    );
+                                                  }
+                                                }}
+                                                title={
+                                                  canManage
+                                                    ? `Hàng ${(unit.row ?? 0) + 1}, Cột ${(unit.column ?? 0) + 1} — Nhấp để chỉnh sửa`
+                                                    : `Hàng ${(unit.row ?? 0) + 1}, Cột ${(unit.column ?? 0) + 1}`
+                                                }
+                                              >
+                                                {currentText === "" ? (
+                                                  <span className="text-muted-foreground/60 italic">
+                                                    (trống)
+                                                  </span>
+                                                ) : (
+                                                  currentText
+                                                )}
+                                              </TableCell>
+                                            );
+                                          },
+                                        )}
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        if (block.type === "image") {
+                          return (
+                            <div
+                              key={block.blockId}
+                              className="my-3 p-3 rounded-lg border border-border/70 bg-muted/10 flex flex-col items-center gap-2"
+                            >
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground self-start">
+                                <ImageIcon className="size-3.5 text-primary" />
+                                <span>Ảnh trích xuất #{block.assetNo}</span>
+                              </div>
+
+                              <div className="flex justify-center p-2 bg-background rounded border">
+                                <AuthenticatedEmbeddedImage
+                                  workspaceId={workspaceId}
+                                  collectionId={collectionId}
+                                  sourceId={sourceId}
+                                  revisionId={revisionId}
+                                  runId={run.id}
+                                  assetNo={block.assetNo}
+                                />
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return null;
+                      })}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* TAB 2: MARKDOWN DẪN XUẤT */}
+              <TabsContent
+                value="markdown"
+                className="flex-1 overflow-auto p-4 m-0 font-mono text-xs whitespace-pre-wrap bg-muted/10 text-foreground leading-relaxed"
+              >
+                {pageMarkdown || "Chưa có nội dung Markdown cho trang này."}
+              </TabsContent>
+
+              {/* TAB 3: DỮ LIỆU KỸ THUẬT */}
+              <TabsContent
+                value="json"
+                className="flex-1 overflow-auto p-4 m-0 font-mono text-[11px] whitespace-pre-wrap bg-muted/10 text-foreground"
+              >
+                {pageJson}
+              </TabsContent>
+            </Tabs>
+          </Card>
+        </Panel>
+      </Group>
+
+      {/* Modal Chỉnh sửa một khối văn bản / ô bảng */}
       <Dialog
         open={Boolean(editingUnit)}
         onOpenChange={(open) => {
@@ -975,16 +1630,22 @@ export function OcrComparisonView({
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold flex items-center gap-2">
               <Edit3 className="size-4 text-primary" />
-              <span>Chỉnh sửa khối văn bản</span>
+              <span>
+                Chỉnh sửa{" "}
+                {editingUnit
+                  ? formatUnitLocator(editingUnit, reviewDoc?.units)
+                  : "khối văn bản"}
+              </span>
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Thay đổi sẽ được lưu vào bản nháp. Bấm &ldquo;Lưu thay đổi&rdquo;
-              ở thanh công cụ chính để xác nhận ghi bản hiệu đính mới.
+              Thay đổi sẽ được ghi vào bản nháp của bạn. Bấm &ldquo;Lưu phiên
+              bản&rdquo; ở thanh công cụ chính để tạo phiên bản hiệu đính mới
+              trên máy chủ.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-2">
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label
                 htmlFor="edit-text-input"
                 className="text-xs font-medium text-foreground"
@@ -996,34 +1657,76 @@ export function OcrComparisonView({
                 rows={5}
                 value={editingText}
                 onChange={(e) => setEditingText(e.target.value)}
-                className="text-xs font-sans leading-relaxed"
+                className="text-sm font-sans leading-relaxed"
               />
             </div>
 
-            {editingUnit?.original_text && (
-              <div className="p-2 rounded bg-muted/30 border text-[11px] text-muted-foreground space-y-1">
-                <span className="font-semibold block">
-                  Văn bản OCR ban đầu:
+            {editingUnit && editingText !== editingUnit.text ? (
+              <div className="p-2.5 rounded-lg bg-muted/30 border text-xs space-y-1">
+                <span className="font-semibold text-foreground block">
+                  Xem trước các từ thay đổi so với bản đã lưu:
                 </span>
-                <p className="font-mono text-muted-foreground/80">
+                <OcrWordDiffView
+                  before={editingUnit.text}
+                  after={editingText}
+                />
+              </div>
+            ) : null}
+
+            {editingUnit && editingUnit.text !== editingUnit.original_text ? (
+              <div className="p-2.5 rounded-lg bg-muted/40 border text-xs text-muted-foreground space-y-1">
+                <span className="font-semibold text-foreground block">
+                  Nội dung ở phiên bản đã lưu (v{reviewDoc?.version ?? 0}):
+                </span>
+                <p className="whitespace-pre-wrap">{editingUnit.text}</p>
+              </div>
+            ) : null}
+
+            {editingUnit?.original_text ? (
+              <div className="p-2.5 rounded-lg bg-muted/20 border text-xs text-muted-foreground space-y-1">
+                <span className="font-semibold block">
+                  Văn bản OCR gốc ban đầu (v0):
+                </span>
+                <p className="whitespace-pre-wrap">
                   {editingUnit.original_text}
                 </p>
               </div>
-            )}
+            ) : null}
           </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setEditingUnit(null)}
-            >
-              Hủy
-            </Button>
-            <Button type="button" size="sm" onClick={handleSaveEdit}>
-              Lưu vào nháp
-            </Button>
+          <DialogFooter className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              {editingUnit &&
+              draftChanges?.has(editingUnit.evidence_id) &&
+              onRevertUnitDraft ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-destructive hover:text-destructive gap-1"
+                  onClick={() => {
+                    onRevertUnitDraft(editingUnit.evidence_id);
+                    setEditingUnit(null);
+                  }}
+                >
+                  <RotateCcw className="size-3.5" />
+                  <span>Hoàn tác nháp đoạn này</span>
+                </Button>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingUnit(null)}
+              >
+                Hủy
+              </Button>
+              <Button type="button" size="sm" onClick={handleSaveEdit}>
+                Áp dụng vào nháp
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1034,16 +1737,29 @@ export function OcrComparisonView({
           <DialogHeader className="p-2 pb-0">
             <DialogTitle className="text-sm font-semibold flex items-center gap-2">
               <ImageIcon className="size-4 text-primary" />
-              <span>Bản gốc trang {activePageNumber} (Phóng to)</span>
+              <span>Ảnh gốc trang {activePageNumber} (Phóng to)</span>
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-auto p-2 flex items-center justify-center">
             {imageBlobUrl ? (
-              <img
-                src={imageBlobUrl}
-                alt={`Trang ${activePageNumber} phóng to`}
-                className="max-w-full h-auto rounded border shadow-lg"
-              />
+              <div className="relative inline-block">
+                <img
+                  src={imageBlobUrl}
+                  alt={`Trang ${activePageNumber} phóng to`}
+                  className="max-w-full h-auto rounded border shadow-lg"
+                />
+                {focusedBbox ? (
+                  <div
+                    className="absolute border-2 border-primary bg-primary/15 rounded-xs pointer-events-none"
+                    style={{
+                      left: `${focusedBbox.x0 * 100}%`,
+                      top: `${focusedBbox.y0 * 100}%`,
+                      width: `${(focusedBbox.x1 - focusedBbox.x0) * 100}%`,
+                      height: `${(focusedBbox.y1 - focusedBbox.y0) * 100}%`,
+                    }}
+                  />
+                ) : null}
+              </div>
             ) : null}
           </div>
         </DialogContent>
@@ -1055,10 +1771,11 @@ export function OcrComparisonView({
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold flex items-center gap-2">
               <Code className="size-4 text-primary" />
-              <span>Raw OCR Response (Trang {activePageNumber})</span>
+              <span>Phản hồi OCR gốc (Trang {activePageNumber})</span>
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Dữ liệu JSON nguyên bản do provider trả về cho trang này.
+              Dữ liệu nguyên bản do mô hình OCR trả về cho trang này (dành cho
+              kiểm tra kỹ thuật).
             </DialogDescription>
           </DialogHeader>
 
@@ -1066,7 +1783,7 @@ export function OcrComparisonView({
             {rawLoading ? (
               <div className="p-8 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="size-4 animate-spin text-primary" />
-                <span>Đang tải raw response...</span>
+                <span>Đang tải dữ liệu...</span>
               </div>
             ) : rawError ? (
               <p className="text-destructive">{rawError}</p>
@@ -1074,7 +1791,7 @@ export function OcrComparisonView({
               rawText
             ) : (
               <p className="text-muted-foreground">
-                Không có dữ liệu raw response.
+                Không có dữ liệu phản hồi gốc.
               </p>
             )}
           </div>
