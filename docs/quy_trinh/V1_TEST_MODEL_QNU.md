@@ -26,7 +26,7 @@ Bài này tạo QNU provider/key và đăng ký bốn model nếu thiếu. Key a
 
 provider-setup tự lưu capacity/dimension từ server và bổ sung thông số vận hành có căn cứ trong profile E2E QNU trước các probe. Chỉ context/output/dimension lấy từ metadata; OCR bound và input override là khai báo tường minh của profile, không phải inference verified. Không cần nhập lại bằng tay sau mỗi init.
 
-Profile có thêm 9router: nhập key QNU rồi key 9router riêng, chọn chat Qwen hoặc `ollama/gpt-oss:120b`. Discovery kiểm cả hai connection; `model-chat` kiểm model đã chọn, ba capability khác giữ QNU. Nếu chọn 9router và thiếu metadata context/output, nhập cấu hình Ollama thực tế tại terminal hoặc dừng để cấu hình ModelOps. Xem [hướng dẫn lựa chọn](./V1_TEST_TOAN_LUONG_MODEL_QNU.md#chọn-qwen-hoặc-gpt-oss-qua-9router).
+Profile có thêm 9router: nhập key QNU rồi key 9router riêng, chọn chat Qwen hoặc `cx/gpt-6-luna`. Discovery kiểm cả hai connection; `model-chat` kiểm model đã chọn, ba capability khác giữ QNU. Nếu chọn 9router và thiếu metadata context/output, nhập cấu hình upstream thực tế tại terminal hoặc dừng để cấu hình ModelOps. Xem [hướng dẫn lựa chọn](./V1_TEST_TOAN_LUONG_MODEL_QNU.md#chọn-qwen-hoặc-luna-qua-9router).
 
 Model và nhà cung cấp phải được bật. Dùng giới hạn token/capacity do server thật khai báo khi cấu hình; không xem thông số của model giả lập là thông số server. Embedding test ghi chiều vector quan sát, không tự ghi đè dimension của model/chỉ mục. Endpoint/model ID mong đợi nằm trong [profile không chứa secret](../../scripts/e2e_profiles/qnu-server.json); nếu server đổi model ID, điều chỉnh profile và cấu hình ModelOps tương ứng trước khi chạy.
 

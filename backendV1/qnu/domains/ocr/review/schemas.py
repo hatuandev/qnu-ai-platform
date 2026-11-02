@@ -49,6 +49,8 @@ class SaveReview(BaseModel):
 
 class DetectRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
+    # Explicit immutable snapshot for read-only historical checks; None checks latest.
+    source_version: int | None = Field(None, ge=0)
     expected_version: int = Field(ge=0)
     expected_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     evidence_ids: list[str] = Field(min_length=1, max_length=100)
@@ -70,6 +72,19 @@ class Suggestion(BaseModel):
     original: str = Field(min_length=1, max_length=2000)
     replacement: str = Field(min_length=1, max_length=2000)
     reason: str = Field(min_length=1, max_length=1000)
+    context_before: str | None = Field(None, max_length=6000)
+    context_after: str | None = Field(None, max_length=6000)
+    review_reason: str | None = None
+
+
+class ContextSuggestion(Suggestion):
+    context_before: str = Field(min_length=1, max_length=6000)
+    context_after: str = Field(min_length=1, max_length=6000)
+
+
+class ContextSuggestedText(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    suggestions: list[ContextSuggestion] = Field(max_length=500)
 
 
 class SuggestedText(BaseModel):
@@ -84,6 +99,7 @@ class DetectionResponse(BaseModel):
     version: int
     canonical_sha256: str
     suggestions: list[Suggestion]
+    withheld_suggestions: list[Suggestion] = Field(default_factory=list)
     checked_evidence_ids: list[str]
     error_code: str | None
     usage_id: str | None

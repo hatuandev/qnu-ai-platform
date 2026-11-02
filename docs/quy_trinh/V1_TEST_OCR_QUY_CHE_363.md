@@ -58,11 +58,49 @@ và canonical gốc; bản sửa là JSON/Markdown dẫn xuất có version riê
 riêng, không thay nhãn tham chiếu để đạt PASS.
 
 Kiểm tra chính tả dùng JSON Schema và giới hạn evidence ID trong các đoạn đã chọn
-(`qnu.ocr.spelling/v3`). Máy chủ kiểm vị trí bằng chuỗi gốc khớp chính xác; chỉ căn
+(`qnu.ocr.spelling/v4`; lượt cũ v3 giữ nguyên lịch sử). Máy chủ kiểm vị trí bằng chuỗi gốc khớp chính xác; chỉ căn
 lại vị trí khi chuỗi xuất hiện duy nhất, hoặc mọi lần xuất hiện đều được đề xuất một
 lần với cùng bản sửa. Chuỗi mơ hồ, khác số, chồng lấn hoặc không thuộc đoạn nguồn
 vẫn bị chặn. Không có fuzzy match hoặc từ điển sửa theo câu test.
 
+V4 gửi nguyên văn các đoạn/ô được chọn, kèm tiêu đề gần nhất, đoạn lân cận và
+header/hàng thuộc đúng bảng của cùng bản nguồn. Ngữ cảnh chỉ đọc được giới hạn
+8.000 ký tự tổng, 1.500 ký tự/mục; nếu bị rút gọn có cờ rõ ràng, không cắt văn bản
+được sửa. Đoạn ở ranh giới trang chỉ là ngữ cảnh ứng viên, không mặc định nối câu
+hoặc ô bảng. Toàn bộ request vẫn qua kiểm ngân sách ModelOps.
+
+Mỗi gợi ý mới phải có `context_before` trích nguyên văn từ đoạn được sửa và
+`context_after` chỉ chứa đúng thay thế đó. Trích dẫn không khớp, đổi thêm dữ kiện,
+khác số, sai phạm vi hoặc chồng lấn làm lượt kiểm tra thất bại; không tự gửi lại.
+Gợi ý thay đổi chữ cơ sở, dấu câu hoặc ranh giới từ được giữ trong
+`withheld_suggestions` để đối chiếu ảnh; không xuất hiện trong danh sách áp dụng.
+Các thay đổi dấu/viết hoa còn lại vẫn chỉ là đề xuất, không phải xác nhận đúng nghĩa.
+Đây là kiểm tra bảo thủ theo Unicode, không phải từ điển tự thay thế.
+
+Model chat hiện chỉ nhận văn bản; chưa có inference đối chiếu ảnh tự động. Người
+dùng xem ảnh bằng luồng đọc nguồn hiện có, sửa nháp và Lưu để tạo phiên bản mới.
+Không tự thay nhà cung cấp hoặc giả cờ `source_image_verified`. V4 không làm tăng
+số lượt gọi model cho một lần kiểm tra; chưa có benchmark model thật chứng minh
+tỷ lệ cải thiện. Muốn dùng mã mới cần khởi động lại serve sau khi các tác vụ đang
+chạy hoàn tất; không đổi phiên bản đầu vào của compiler đã được tạo.
+
 ModelOps hỗ trợ cấu hình reasoning riêng cho tác vụ `ocr_review`; thêm khả năng này
 không tự tắt reasoning cho provider. Lượt test797 tạm dùng chính sách đã khai báo
 để tắt suy luận, giữ nguyên nhà cung cấp/model và các tác vụ khác.
+
+## Kiểm tra bản OCR gốc khi đã có bản sửa
+
+`POST /text-review/checks` nhận tùy chọn `source_version` (0 là OCR gốc). Khi
+không truyền/null, máy chủ vẫn kiểm tra bản mới nhất với optimistic lock như cũ.
+Khi chọn lịch sử, `expected_version` và `expected_sha256` phải khớp chính bản đó;
+không được lấy hash của bản khác, tự chuyển latest hoặc tự lưu kết quả. Lượt kiểm
+tra lưu đúng version/hash đã chọn, UI chỉ áp dụng vào bản nháp khớp version/hash.
+Idempotency của request cũ không có `source_version` được giữ nguyên.
+
+Lượt model thật802 dùng API thử riêng, không restart serve chính: nguồn gốc v0,
+7 trang/114 đoạn-ô,8 request/8 upstream attempt,17.571 tokens,60,95 giây cộng request.
+4 request hoàn tất và4 failed `ocr_spelling_invalid`; probe `cơ bán` bỏ sót.
+**Chất lượng chưa đạt**, không có lỗi token limit hoặc quota trong cohort này.
+Một gợi ý `he → hệ` đúng ảnh nhưng dòng đó còn lỗi khác bị bỏ sót. Không tự áp dụng
+hoặc lấy riêng gợi ý hợp lệ từ các batch failed. Bản29 và compiler cũ giữ nguyên;
+policy reasoning đã restore. Đây không phải nghiệm thu toàn32trang hoặc CER/WER.

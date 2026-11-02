@@ -174,6 +174,8 @@ class FakeSpeller(FakeChat):
             "original": unit["text"][:3],
             "replacement": "Phụ",
             "reason": "Gợi ý kiểm tra chữ",
+            "context_before": unit["text"],
+            "context_after": "Phụ" + unit["text"][3:],
         }
         if self.mode == "foreign":
             suggestion["evidence_id"] = "not-in-document"

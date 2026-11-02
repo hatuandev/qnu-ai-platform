@@ -18,7 +18,7 @@ test("9router is registered separately and only replaces the selected chat targe
   expect(configuredProfiles(profile)).toHaveLength(2);
   const chat = profileForCapability(profile, "router", "chat");
   expect(chat.base_url).toBe("https://qnu-9router.duckdns.org/v1");
-  expect(chat.models.chat).toBe("ollama/gpt-oss:120b");
+  expect(chat.models.chat).toBe("cx/gpt-6-luna");
   for (const capability of ["embedding", "rerank", "ocr"] as const) {
     const target = profileForCapability(profile, "router", capability);
     expect(target.base_url).toBe(profile.base_url);
@@ -45,33 +45,33 @@ test("selection cannot silently fall back and router capacity is not guessed", (
 
 test("gateway accepts only its explicitly declared upstream alias", () => {
   const target = profileForCapability(profile, "router", "chat");
-  const requested = "ollama/gpt-oss:120b";
-  expect(
-    acceptsModelObservation(target, "chat", requested, "gpt-oss:120b"),
-  ).toBe(true);
+  const requested = "cx/gpt-6-luna";
+  expect(acceptsModelObservation(target, "chat", requested, "gpt-6-luna")).toBe(
+    true,
+  );
   expect(acceptsModelObservation(target, "chat", requested, requested)).toBe(
     true,
   );
   expect(
-    acceptsModelObservation(target, "chat", requested, "gpt-oss:20b"),
+    acceptsModelObservation(target, "chat", requested, "gpt-oss:120b"),
   ).toBe(false);
   expect(
-    acceptsModelObservation(target, "chat", "gpt-oss:120b", "gpt-oss:120b"),
+    acceptsModelObservation(target, "chat", "gpt-6-luna", "gpt-6-luna"),
   ).toBe(false);
 });
 
 test("aliases do not apply to another provider, capability or unconfigured model", () => {
-  const requested = "ollama/gpt-oss:120b";
+  const requested = "cx/gpt-6-luna";
   const target = profileForCapability(profile, "router", "chat");
   expect(
-    acceptsModelObservation(profile, "chat", requested, "gpt-oss:120b"),
+    acceptsModelObservation(profile, "chat", requested, "gpt-6-luna"),
   ).toBe(false);
   expect(
-    acceptsModelObservation(target, "embedding", requested, "gpt-oss:120b"),
+    acceptsModelObservation(target, "embedding", requested, "gpt-6-luna"),
   ).toBe(false);
   const { observed_model_aliases: _aliases, ...withoutAliases } = target;
   expect(
-    acceptsModelObservation(withoutAliases, "chat", requested, "gpt-oss:120b"),
+    acceptsModelObservation(withoutAliases, "chat", requested, "gpt-6-luna"),
   ).toBe(false);
 });
 

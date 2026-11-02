@@ -1,7 +1,21 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
 
-- [Phiên799 — Chẩn đoán AI sửa chính tả sai nghĩa](2026-11-01_phien_799_chan_doan_sua_chinh_ta_sai_nghia.md): đối chiếu trang15; đúng `cấp cơ bản`, AI sửa sai `bán → huyên`; chưa sửa ứng dụng hoặc DB.
+- [Phiên806 — Chốt v1.0.3 riêng với FE đang chạy](2026-11-02_phien_806_chot_nhanh_v1_0_3.md):fixignorestorage,BEcòn1FAIL716,FE663/buildPASS;checkpointkhôngGA,cleanupbịchặn0file.
+
+- [Phiên805 — Đổi9router sang Luna và testOCR](2026-11-02_phien_805_doi_9router_luna_va_test_ocr.md):4completed4invalid/10gợiýcontract,probe cơbán→cơbảnđúngảnh;cohortFAIL,khôngretry/save,giữbản30/compiler.
+
+- [Phiên804 — Test GPT-OSS sửa chính tả](2026-11-01_phien_804_test_gpt_oss_sua_chinh_ta.md):7trang114units8calls;1completed rỗng,5outputlimit,2quoteinvalid,FAIL; khôngretry/save,giữbản30/compiler/grants/defaults.
+
+- [Phiên 803 — Rà soát toàn diện chính tả và ngữ cảnh 32 trang Quy chế 363 (Text Version 30)](2026-11-01_phien_803_ra_soat_chinh_ta_toan_dien_v30.md): Rà soát 32 trang đối chiếu ảnh gốc, khắc phục triệt để các lỗi AI suy đoán sai ngữ cảnh (trang 3 'mạng mang' → 'nối mạng', trang 5 'cơ hội tuyển sinh' → 'cơ hội dự tuyển', trang 11 'tay tay nghề' → 'thi tay nghề', 'môn tế' → 'môn thi', trang 13 'kiện tướng tương' → 'kiện tướng', trang 17 'tất tất' → 'tắt') và các lỗi dấu hệ thống ('tuyến' → 'tuyển' tại Điều 6 trang 7, trang 8, 14, 19, 21, 28; 'quy đối' → 'quy đổi' trang 9, 10, 16; 'tiêu chi' → 'tiêu chí' trang 4, 19; 'điểm công' → 'điểm cộng' trang 4, 5; 'Thể chat' → 'Thể chất' trang 14); lưu Text Version 30 (SHA256: `988fe0ae...`); chạy compiler `cmp_f5401a18cdcf`; giữ nguyên cảnh báo bảng trang 32; chưa xuất bản, lập chỉ mục hoặc chạy lại F01–F19.
+
+- [Phiên802 — Test sửa chính tả bằng model thật](2026-11-01_phien_802_test_model_that_sua_chinh_ta.md):7trang114đoạn/ô,8calls,4completed4failed, cơ bánmiss; chưa đạt, không retry hoặc lưu, giữ29/compiler/policy.
+
+- [Phiên801 — Cải thiện ngữ cảnh sửa chính tả](2026-11-01_phien_801_cai_thien_ngu_canh_sua_chinh_ta.md): spellingv4, quote và withheld để đối chiếu ảnh; không restart/livecall hoặc đổi bản29; kiểm tra còn lỗi716/654 được ghi riêng.
+
+- [Phiên 800 — Sửa lỗi chính tả bệnh viện cấp cơ bản và compiler lại Quy chế 363 (Version 29)](2026-11-01_phien_800_sua_loi_co_ban_va_recompile_363.md): Sửa `ev_p015_b007` thay lỗi `cơ huyên` thành `cơ bản` (sửa `bán → bản` đối chiếu ảnh gốc trang 15 và Điều 16 khoản 4 điểm b trang 20); lưu Text Version 29 (SHA256: `102a2004...`); chạy compiler `cmp_5b8a2375d0d9` hoàn tất 8/8 phần trong 252s (35 mục, 644 citations); Điều 10 draft hiển thị chuẩn xác trích dẫn; giữ cảnh báo bảng trang 32; chưa xuất bản, lập chỉ mục hoặc chạy lại F01–F19.
+
+- [Phiên 799 — Chẩn đoán AI sửa chính tả sai nghĩa](2026-11-01_phien_799_chan_doan_sua_chinh_ta_sai_nghia.md): đối chiếu trang 15; đúng `cấp cơ bản`, AI sửa sai `bán → huyên`; chưa sửa ứng dụng hoặc DB.
 
 - [Phiên 799 — Rà soát chính tả 32 trang và compiler lại Quy chế 363](2026-11-01_phien_799_ra_soat_chinh_ta_va_compiler_363.md): Rà soát 32 trang đối chiếu ảnh gốc, sửa 55 lỗi chính tả tại 42 units; lưu Version 28 qua API text-review; chạy compiler `cmp_9d0b9f63f911` hoàn tất 8/8 phần (304s, 38 mục, 644 citations); giữ cảnh báo bảng trang 32; chưa xuất bản, lập chỉ mục hoặc chạy lại F01–F19.
 

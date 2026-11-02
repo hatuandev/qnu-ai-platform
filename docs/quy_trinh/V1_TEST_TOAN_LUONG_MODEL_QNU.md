@@ -62,19 +62,19 @@ E2E_9ROUTER_API_KEY=
 
 Mỗi khóa là một dòng; có thể bọc bằng dấu nháy đơn. Runner không nội suy `${...}` trong giá trị, không thay khóa đã active, không thay endpoint/model từ file. Sau cleanup/init, provider-setup sẽ nạp lại hai khóa vào ModelOps mới. Bước chọn model và nhập capacity 9router nếu thiếu vẫn giữ. Thiếu biến thì dùng lời nhắc ẩn như trước.
 
-### Chọn Qwen hoặc GPT-OSS qua 9router
+### Chọn Qwen hoặc Luna qua 9router
 
 Trong phiên mới, cùng lệnh `provider-setup` sẽ lần lượt:
 
 1. Dùng key **server QNU** đã active, hoặc biến E2E_QNU_API_KEY; thiếu thì hỏi nhập ẩn.
 2. Dùng key **9router** tại `https://qnu-9router.duckdns.org/v1` đã active, hoặc biến E2E_9ROUTER_API_KEY; thiếu thì hỏi nhập ẩn, key riêng.
-3. Cho chọn **1 — Qwen trên QNU** hoặc **2 — ollama/gpt-oss:120b qua 9router** làm chat/biên soạn mặc định. Enter chọn Qwen lần đầu; chạy lại trước upload thì mặc định là lựa chọn đã lưu.
+3. Cho chọn **1 — Qwen trên QNU** hoặc **2 — cx/gpt-6-luna qua 9router** làm chat/biên soạn mặc định. Enter chọn Qwen lần đầu; chạy lại trước upload thì mặc định là lựa chọn đã lưu.
 
-Key đang active được tái dùng, không hỏi lại. Lựa chọn lưu trong checkpoint chỉ gồm mã lựa chọn/ID; key chỉ lưu qua ModelOps. Nếu chọn 9router, script lấy capacity từ discovery hiện tại. Thiếu context/output thì hỏi số token thực tế theo cấu hình Ollama của bạn; Enter trống sẽ dừng để cấu hình trong ModelOps, không đoán theo tên model hay lấy giới hạn Qwen.
+Key đang active được tái dùng, không hỏi lại. Lựa chọn lưu trong checkpoint chỉ gồm mã lựa chọn/ID; key chỉ lưu qua ModelOps. Nếu chọn 9router, script lấy capacity từ discovery hiện tại. Thiếu context/output thì hỏi số token thực tế theo cấu hình upstream của bạn; Enter trống sẽ dừng để cấu hình trong ModelOps, không đoán theo tên model hay lấy giới hạn Qwen.
 
 Hai provider/model đều được đăng ký và discovery. `model-chat` chỉ probe model chat đã chọn; `navigation` kiểm diagnostic còn current rồi đặt model đó làm chat mặc định của workspace thử. **Compiler, review và hỏi đáp** dùng model đã chọn. **Embedding, rerank và OCR** vẫn lần lượt dùng BGE-M3, BGE reranker và Nemotron ở QNU; không chuyển sang 9router.
 
-Muốn đổi lựa chọn, chạy lại provider-setup **trước upload**, rồi chạy lại model-discovery, model-chat và các chặng còn lại theo thứ tự. Phiên đã có nguồn (kể cả PDF admissions) bị chặn vì test provider có bật/tắt connection: dùng phiên mới cho lựa chọn khác. Không tự dọn phiên đang có draft/report cần giữ. Kết quả chạy thật với 9router chỉ có sau khi bạn nhập key và chạy; các test offline không chứng minh endpoint/model Ollama thật hoạt động.
+Muốn đổi lựa chọn, chạy lại provider-setup **trước upload**, rồi chạy lại model-discovery, model-chat và các chặng còn lại theo thứ tự. Phiên đã có nguồn (kể cả PDF admissions) bị chặn vì test provider có bật/tắt connection: dùng phiên mới cho lựa chọn khác. Không tự dọn phiên đang có draft/report cần giữ. Kết quả chạy thật với 9router chỉ có sau khi bạn nhập key và chạy; các test offline không chứng minh endpoint/model qua 9router thật hoạt động.
 
 Sau đó bài Playwright kiểm tra kết nối thật bằng key đã lưu, catalog bốn model, tự đăng ký bốn model nếu thiếu, chặn inference khi provider bị tắt và bật lại trong finally. Nó còn mở sidebar **Nhà cung cấp**, kiểm danh sách/chi tiết và thực sự submit form tạo một provider UI tạm không credential, xác nhận lưu rồi xóa provider tạm đó qua API. QNU provider và bốn model được giữ cho pipeline. Đây là test kết hợp API và UI, chưa tự nhập raw key vào form frontend.
 
@@ -84,7 +84,7 @@ Các model được đăng ký:
 
 | Chức năng | Model ID | Được dùng ở đâu trong pipeline |
 | --- | --- | --- |
-| Chat | Chọn `qwen3.8-27b-q4` (QNU) hoặc `ollama/gpt-oss:120b` (9router) | Compiler, Compiler Review, trả lời và gateway chat. |
+| Chat | Chọn `qwen3.8-27b-q4` (QNU) hoặc `cx/gpt-6-luna` (9router) | Compiler, Compiler Review, trả lời và gateway chat. |
 | Embedding | `bge-m3` | Tạo chỉ mục và vector truy vấn. |
 | Rerank | `bge-reranker-v2-m3` | Xếp hạng lại ứng viên sau hybrid search trong hỏi đáp. |
 | OCR | `nemotron-parse` | OCR trang scan hoặc trang không đủ text native. PDF/DOCX có chữ vẫn dùng native-first theo backend. |
