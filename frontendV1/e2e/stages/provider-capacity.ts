@@ -14,6 +14,7 @@ export type ProviderSetupProfile = {
       Capability,
       {
         timeout_seconds?: number;
+        wait_for_completion?: boolean;
         max_input_tokens?: number;
         ocr_page_input?: NonNullable<TokenLimits["ocr_page_input"]>;
       }
@@ -22,6 +23,36 @@ export type ProviderSetupProfile = {
 };
 
 type SetupApi = Pick<Api, "post" | "json">;
+type CompletionWaitPolicy = {
+  status: "configured" | "default" | "stale";
+  policy: Record<string, unknown> & { wait_for_completion?: boolean };
+};
+
+async function configureCompletionWait(
+  api: SetupApi,
+  providerId: string,
+  wait: boolean | undefined,
+) {
+  if (wait === undefined) return;
+  const path = `/modelops/providers/${providerId}/resilience`;
+  const current = await api.json<CompletionWaitPolicy>("GET", path);
+  if (
+    current.status !== "configured" ||
+    current.policy.wait_for_completion !== wait
+  ) {
+    await api.json("PUT", path, {
+      ...current.policy,
+      wait_for_completion: wait,
+    });
+  }
+  const saved = await api.json<CompletionWaitPolicy>("GET", path);
+  if (
+    saved.status !== "configured" ||
+    saved.policy.wait_for_completion !== wait
+  ) {
+    throw new Error("BLOCKED: chưa lưu được cấu hình chờ model hoàn tất.");
+  }
+}
 
 function runtimePatch(
   model: Provider,
@@ -98,6 +129,13 @@ export async function configureTestModelCapacity(
     const patch = runtimePatch(model, profile, capability);
     if (Object.keys(patch).length) {
       await api.json("PATCH", `/modelops/providers/${model.id}`, patch);
+    }
+    if (capability === "chat") {
+      await configureCompletionWait(
+        api,
+        model.id,
+        profile.model_runtime?.chat?.wait_for_completion,
+      );
     }
   }
 }

@@ -9,7 +9,9 @@
     "observed_model_aliases": {
       "cx/gpt-6-luna": ["gpt-6-luna"]
     },
-    "model_runtime": { "chat": { "timeout_seconds": 300 } }
+    "model_runtime": {
+      "chat": { "timeout_seconds": 300, "wait_for_completion": true }
+    }
   },
   "models": {
     "chat": "qwen3.8-27b-q4",
@@ -18,7 +20,7 @@
     "ocr": "nemotron-parse"
   },
   "model_runtime": {
-    "chat": { "timeout_seconds": 300 },
+    "chat": { "timeout_seconds": 300, "wait_for_completion": true },
     "embedding": { "timeout_seconds": 60 },
     "rerank": { "timeout_seconds": 60 },
     "ocr": {

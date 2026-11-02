@@ -1,5 +1,9 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- **Context813 — Push chờ model v1.0.3:** Chốt thay đổi812 trên worktree v1.0.3 để push Gitea; snapshot19test/TS/Biome4 đạt, mainv1.0.2 giữ nguyên. Không model/reindex/restart/GitHub; worker30phút còn nguyên. Receipt hash sau push ởtmp/push813. [Nhật ký813](nhat_ky/2026-11-02_phien_813_push_cho_model_v1_0_3.md), [Snapshot813](memory/snapshots/2026-11-02_session_813.md).
+
+- **Context812 — Bỏ timeout phản hồi300:** Bật ModelOps wait_for_completion cho Qwen phiên E2E, xác minh runtime thật; profile QNU/router áp lại khi init. Backend5/E2E19/typecheck/Biome4 PASS; không inference/retry/restart/push. HTTP read hết giới hạn300, worker vẫn30phút. [Nhật ký812](nhat_ky/2026-11-02_phien_812_bo_timeout_phan_hoi_qwen.md), [Snapshot812](memory/snapshots/2026-11-02_session_812.md).
+
 - **Context811 — Chốt FE và thử thay tài liệu:** Gitea v1.0.3 code f0a7ca39 đã xác minh; FE686/build/TS/lint đạt. Live kho riêng: native PDF2trang đạt; compiler attempt1 uncertain sau300,56s, provider snapshot còn timeout300, thinkingoff. Không retry; thay bản/publish/index/chat chưa chạy, giữ dữ liệu và lịch sử. [Nhật ký811](nhat_ky/2026-11-02_phien_811_live_thay_tai_lieu_va_timeout.md), [Snapshot811](memory/snapshots/2026-11-02_session_811.md).
 
 - **Context810 — Chốt FE v1.0.3:** review/fixzoom,FE686/77suites/build/TS/Biome19PASS; snapshot riêng,mainv1.0.2giữ. ChỉGitea/GitHubhoãn806; live replacement sẽ chạy sau commit, chưađạt tại mốc này. [Nhật ký810](nhat_ky/2026-11-02_phien_810_review_fe_va_chot_v1_0_3.md), [Snapshot810](memory/snapshots/2026-11-02_session_810.md).

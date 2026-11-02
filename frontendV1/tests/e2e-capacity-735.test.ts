@@ -58,9 +58,15 @@ function fixture() {
     async <T>(_path: string, _body: unknown): Promise<T> =>
       structuredClone(models) as T,
   );
+  let policy = { wait_for_completion: false };
   const json = vi.fn(
-    async <T>(_method: string, _path: string, _body?: unknown): Promise<T> =>
-      undefined as T,
+    async <T>(method: string, path: string, body?: unknown): Promise<T> => {
+      if (path.endsWith("/resilience")) {
+        if (method === "PUT") policy = body as typeof policy;
+        return { status: "configured", policy } as T;
+      }
+      return undefined as T;
+    },
   );
   return { models, api: { post, json } };
 }
