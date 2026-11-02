@@ -35,6 +35,16 @@ class IndexResponse(BaseModel):
     manifest_sha256: str | None
 
 
+class IndexReadiness(BaseModel):
+    status: Literal["ready", "not_indexed", "outdated", "unavailable"]
+    index_run_id: str | None = None
+    generation: int | None = None
+    version_id: str | None = None
+    publication_decision_id: str | None = None
+    bundle_sha256: str | None = None
+    version_state: int | None = None
+
+
 class IndexCreated(BaseModel):
     run: IndexResponse
     created: bool

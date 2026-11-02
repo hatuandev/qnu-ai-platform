@@ -6,6 +6,7 @@ timeout) so an adapter holds no per-provider state and the domain stays free of 
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
@@ -32,6 +33,28 @@ class OcrPageResponse:
     usage_tokens: int | None
     duration_ms: int
     raw_body: bytes | None = field(default=None, repr=False)
+
+
+@dataclass(frozen=True, slots=True)
+class OcrDocumentRequest:
+    endpoint: str
+    model: str
+    timeout_seconds: float
+    api_key: str | None = field(default=None, repr=False)
+    auth_optional: bool = False
+    execution: ProviderExecution | None = field(default=None, repr=False)
+    wait_for_completion: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class OcrDocumentResponse:
+    archive: bytes = field(repr=False)
+    duration_ms: int
+    usage_tokens: int | None = None
+
+
+DocumentCheckpoint = Callable[[dict[str, Any]], Awaitable[None]]
+DocumentGuard = Callable[[], Awaitable[None]]
 
 
 class OcrResponseError(AppException):

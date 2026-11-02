@@ -14,6 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   type Connection,
   type ConnectionFamily,
   type ConnectionInput,
@@ -93,7 +100,7 @@ export function ConnectionForm({
             {connection ? "Chỉnh sửa nhà cung cấp" : "Thêm nhà cung cấp mới"}
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-xs">
-            Thiết lập kết nối với nhà cung cấp mô hình AI (OpenAI Compatible).
+            Thiết lập kết nối với nhà cung cấp mô hình AI hoặc dịch vụ OCR PDF.
             Sau khi lưu, bạn có thể thêm API Key và cấu hình Model LLM trong
             trang chi tiết.
           </ResponsiveDialogDescription>
@@ -151,6 +158,33 @@ export function ConnectionForm({
             </p>
           </div>
 
+          <div className="space-y-1.5">
+            <Label htmlFor="connection-protocol">Giao thức</Label>
+            <Select
+              value={apiType || "openai_compatible"}
+              onValueChange={(value) => form.setFieldValue("apiType", value)}
+            >
+              <SelectTrigger id="connection-protocol">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="openai_compatible">
+                  OpenAI compatible
+                </SelectItem>
+                <SelectItem value="mineru">MinerU PDF OCR</SelectItem>
+                {apiType === "anthropic" && (
+                  <SelectItem value="anthropic">Anthropic</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            {apiType === "mineru" && (
+              <p className="text-[11px] text-muted-foreground">
+                Nhập URL kết thúc bằng /mineru; thêm model có chức năng OCR.
+                Không cần ngân sách token LLM.
+              </p>
+            )}
+          </div>
+
           {/* Base URL */}
           <div className="space-y-1.5">
             <Label htmlFor="connection-url">Địa chỉ API</Label>
@@ -163,7 +197,9 @@ export function ConnectionForm({
               placeholder="http://100.105.13.53:8000/v1 hoặc https://api.openai.com/v1"
             />
             <p className="text-[11px] text-muted-foreground">
-              Địa chỉ Base URL endpoint /chat/completions hoặc /models
+              {apiType === "mineru"
+                ? "Địa chỉ dịch vụ MinerU, ví dụ: https://server/mineru"
+                : "Địa chỉ Base URL endpoint /chat/completions hoặc /models"}
             </p>
           </div>
 

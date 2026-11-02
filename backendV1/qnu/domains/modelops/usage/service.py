@@ -141,12 +141,14 @@ class UsageService:
         request_hash: str,
         token_budget: int,
         provider_id: str | None = None,
+        *,
+        document_ocr: bool = False,
     ) -> ModelUsageRecord:
         if (
             not request_id
             or len(request_id) > 128
             or type(token_budget) is not int
-            or token_budget <= 0
+            or token_budget < (0 if document_ocr else 1)
             or token_budget > 10**15
             or not re.fullmatch(r"[0-9a-f]{64}", request_hash)
         ):
@@ -155,6 +157,10 @@ class UsageService:
         provider = await catalog_service.resolve_provider(
             db, actor, workspace_id, capability, provider_id
         )
+        if document_ocr and (
+            provider.provider_type != "mineru" or capability != "ocr" or token_budget != 0
+        ):
+            raise AppException("Reservation OCR không hợp lệ.", code="usage_request_invalid")
         ref = actor_ref(actor)
         quota = await locked_quota(db, workspace_id, month_start())
         old = (

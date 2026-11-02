@@ -25,6 +25,17 @@ TABLE_LAYOUT_VERSION = "nemotron-tabular/v2"
 
 OCR_PROMPT = "</s><s><predict_bbox><predict_classes><output_markdown><predict_text_in_pic>"
 
+
+def ocr_contract_hash(provider_type: str) -> str:
+    if provider_type == "mineru":
+        from qnu.domains.ocr.mineru_layout import VERSION
+
+        material = f"mineru_tasks/v1|standard|auto|default|{VERSION}"
+    else:
+        material = OCR_PROMPT
+    return hashlib.sha256(material.encode()).hexdigest()
+
+
 SUPPORTED_PROCESSING_EXTENSIONS = (".pdf", ".docx")
 
 

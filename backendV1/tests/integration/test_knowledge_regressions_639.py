@@ -14,6 +14,7 @@ from qnu.domains.knowledge.sources.service import source_service
 from qnu.domains.workspaces.models import Workspace
 from qnu.platform.config import get_settings
 from qnu.platform.database import AsyncSessionFactory
+from qnu.platform.schema import SCHEMA_HEAD
 from tests.integration.knowledge_support import (
     API,
     EDITOR,
@@ -156,7 +157,7 @@ def test_downgrade_cannot_mark_success_and_block_next_upgrade(client):
 
     # The failed downgrade must leave the recorded revision untouched, not half-applied.
     assert client.portal.call(current_version) == head_before
-    assert head_before == "0007_native_extraction"
+    assert head_before == SCHEMA_HEAD
 
     upgraded = alembic("upgrade", "head")
     assert upgraded.returncode == 0, (

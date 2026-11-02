@@ -29,7 +29,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from qnu.platform.database import Base
 
-PROVIDER_TYPES = ("openai_compatible", "gemini", "local", "nemotron", "paddleocr")
+PROVIDER_TYPES = ("openai_compatible", "gemini", "local", "nemotron", "paddleocr", "mineru")
 CAPABILITIES = ("chat", "embedding", "rerank", "ocr")
 KEY_STATUSES = ("active", "revoked")
 DEFAULT_ROW_ID = "system"
@@ -45,7 +45,7 @@ class Provider(Base):
     __tablename__ = "providers"
     __table_args__ = (
         CheckConstraint(
-            "provider_type IN ('openai_compatible','gemini','local','nemotron','paddleocr')",
+            "provider_type IN ('openai_compatible','gemini','local','nemotron','paddleocr','mineru')",
             name="ck_provider_type",
         ),
     )
@@ -212,7 +212,7 @@ class ModelUsageRecord(Base):
             "status IN ('reserved','completed','failed','unknown')", name="ck_model_usage_status"
         ),
         CheckConstraint(
-            "reserved_tokens > 0 AND (total_tokens IS NULL OR total_tokens >= 0)",
+            "reserved_tokens >= 0 AND (total_tokens IS NULL OR total_tokens >= 0)",
             name="ck_model_usage_tokens",
         ),
         CheckConstraint("cost_usd IS NULL OR cost_usd >= 0", name="ck_model_usage_cost"),

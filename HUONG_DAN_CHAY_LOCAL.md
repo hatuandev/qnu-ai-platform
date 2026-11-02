@@ -1,66 +1,17 @@
-# 🚀 HƯỚNG DẪN KHỞI CHẠY DỰ ÁN CỤC BỘ (LOCAL RUN GUIDE)
+# Chạy QNU V1 trên laptop
 
-> Tài liệu này hướng dẫn chi tiết cách khởi chạy toàn bộ nền tảng **QNU AI Platform** trên máy tính cá nhân (Localhost).  
-> Tệp gốc chi tiết: [`docs/huong_dan_chay_local.md`](./docs/huong_dan_chay_local.md)
+Lệnh mặc định đã chuyển sang V1: API8002, frontend3001 và worker riêng.
 
----
-
-## ⚡ KHỞI CHẠY NHANH TRONG 3 BƯỚC
-
-### 1. Chuẩn bị biến môi trường
 ```powershell
-# Copy tệp môi trường từ mẫu
-cp .env.example .env
+Set-Location D:\DuAnPhanMem\qnu-ai-platform
+.\make.ps1 check
+.\make.ps1 dev
 ```
 
-### 2. Khởi động cụm hạ tầng nền (Postgres, Qdrant, Redis, MinIO, Gotenberg)
-*(Chỉ cần mở Docker Desktop và chạy 1 dòng lệnh siêu nhẹ, mất ~3 giây)*:
-```powershell
-docker compose up -d
-# hoặc dùng: make infra-up / .\run.ps1 infra-up
-```
+Giữ cấu hình `.env` đang dùng và hạ tầng Docker hiện có. Nếu hạ tầng đang dừng, dùng `.\make.ps1 infra-up` sau khi kiểm cấu hình; không reset DB/volume.
 
-### 3. Khởi động Backend API (Port 8001) & Frontend Studio (Port 3000)
+Máy mới, cấu hình SSO/ModelOps, migration và xử lý lỗi: [hướng dẫn đầy đủ V1](docs/quy_trinh/38_huong_dan_chay_qnu_v1.md).
 
-> 💡 **Cách nhanh nhất (Khuyên dùng)**:
-> - Sử dụng Makefile: `make dev` (hoặc `make be` / `make fe` từng phân hệ)
-> - Sử dụng PowerShell: `.\run.ps1 dev` (hoặc `.\run.ps1 be` / `.\run.ps1 fe`)
-> Lệnh này sẽ tự động mở 2 cửa sổ chạy song song cả Backend và Frontend!
+`dev` không mở cửa sổ ẩn, không tự dừng app đang có và không tự migrate/seed. Ctrl+C dừng các thành phần của phiên vừa mở. Có thể chạy `be`, `worker`, `fe` ở ba cửa sổ nếu cần log riêng. Tên `v1-*` vẫn dùng được.
 
-Runner PowerShell `.\make.ps1 dev` (cả `dev1`/`dev2`) mở cửa sổ Backend/Frontend hiển thị để theo dõi log. ARQ worker chạy nền, log tại `backend/storage/worker_logs`; nếu worker đã chạy thì runner dùng lại, không tự restart worker để nhận code mới. Thay đổi chế độ cửa sổ không hiện lại các cửa sổ đã được mở ẩn trước đó.
-
-**Hoặc chạy thủ công trong 2 Terminal riêng biệt:**
-
-**Terminal 1 — Backend FastAPI**:
-```powershell
-cd backend
-uv sync
-uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
-```
-👉 Kiểm tra API Docs: [http://localhost:8001/docs](http://localhost:8001/docs)
-
-**Terminal 2 — Frontend Studio UI**:
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-👉 Mở giao diện ứng dụng: [http://localhost:3000](http://localhost:3000)
-
----
-
-## 📌 BẢNG ĐỊA CHỈ TRUY CẬP
-
-| Dịch Vụ | Địa Chỉ URL | Tài Khoản / Ghi Chú |
-| :--- | :--- | :--- |
-| **QNU Studio UI** | [http://localhost:3000](http://localhost:3000) | Giao diện Quản trị & Chat Studio (13 màn hình) |
-| **Backend REST API** | [http://localhost:8001](http://localhost:8001) | Endpoint FastAPI Core |
-| **Swagger API Docs** | [http://localhost:8001/docs](http://localhost:8001/docs) | 30+ endpoints tương tác |
-| **MinIO S3 Console** | [http://localhost:9001](http://localhost:9001) | User: `qnu_minio_admin` / Pass: `qnu_minio_secret_2026` |
-| **Qdrant Vector DB** | [http://localhost:6333](http://localhost:6333) | Vector DB REST API |
-| **Gotenberg 8 PDF** | [http://localhost:3005](http://localhost:3005) | Chuyển đổi PDF Nghị định 30 (LibreOffice headless) |
-
----
-
-📖 *Để xem hướng dẫn chi tiết về khắc phục sự cố, cài đặt UV, chạy Async Worker ngầm và kiểm thử chất lượng mã nguồn, vui lòng đọc tệp đầy đủ tại:*  
-👉 [**`docs/huong_dan_chay_local.md`**](./docs/huong_dan_chay_local.md)
+Đã chuyển các runner root, nhưng chưa xóa thư mục legacy hoặc dữ liệu. Đường triển khai server khác local: xem [Docker/Dokploy V1](docs/trien_khai/02_quy_trinh_trien_khai_dokploy.md).

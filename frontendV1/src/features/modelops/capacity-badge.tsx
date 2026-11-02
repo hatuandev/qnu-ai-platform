@@ -179,6 +179,18 @@ export function resolveCapabilityBudgetState(
 
   const budget = model.operational_budgets?.[capability] ?? null;
 
+  if (model.provider_type === "mineru" && capability === "ocr") {
+    return {
+      status: "missing_info",
+      isBlocked: false,
+      label: "OCR theo tài liệu, không áp dụng token LLM",
+      basisLabel: null,
+      reasonCode: null,
+      reason: null,
+      budget: null,
+    };
+  }
+
   if (budget) {
     if (budget.status === "blocked") {
       const reasonCode =
@@ -367,6 +379,9 @@ export function ProviderOperationalBudgetsSummary({
   showBasis?: boolean;
   compact?: boolean;
 }) {
+  if (provider.provider_type === "mineru") {
+    return <Badge variant="outline">OCR theo tài liệu</Badge>;
+  }
   const caps = (provider.capabilities ?? []) as Capability[];
   if (caps.length === 0) {
     return (
@@ -494,7 +509,7 @@ export function ConsumerModelBudgetNotice({
         <Info className="size-3.5 text-muted-foreground shrink-0" />
         <span>
           {defaultPrefix}
-          {BUDGET_STATUS_LABELS.missing_info}
+          {resolved.label}
         </span>
       </div>
     );

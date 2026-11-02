@@ -60,7 +60,10 @@ def identity(provider: Provider) -> str:
 def read_policy(provider: Provider) -> PolicyResponse:
     saved = (provider.extra_config or {}).get(POLICY_KEY)
     if not saved:
-        return PolicyResponse(provider_id=provider.id, status="default", policy=ResiliencePolicy())
+        return PolicyResponse(
+            provider_id=provider.id, status="default",
+            policy=ResiliencePolicy(wait_for_completion=provider.provider_type == "mineru"),
+        )
     return PolicyResponse(
         provider_id=provider.id,
         status="configured" if saved["identity"] == identity(provider) else "stale",
@@ -88,7 +91,11 @@ async def save_policy(
     if provider is None:
         await provider_service.get(db, provider_id)
     own_transport = transport_for(provider.provider_type)
-    if policy.wait_for_completion and "chat" not in provider.capabilities:
+    if (
+        policy.wait_for_completion
+        and "chat" not in provider.capabilities
+        and provider.provider_type != "mineru"
+    ):
         raise Conflict("Chỉ model chat được chờ hoàn tất.", code="chat_policy_capability_mismatch")
     if policy.key_pool_enabled and not own_transport.protocols:
         raise Conflict(

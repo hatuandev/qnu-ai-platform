@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { v1Client } from "@/app/api/v1";
 import { useV1Auth } from "@/app/auth/v1";
+import { conversationsQueryKeys } from "@/features/conversations/queries";
 import type { DraftDocumentResponse } from "./compilation-types.ts";
+import { indexingKeys } from "./index-queries";
 import { readArrayPage } from "./list-pagination";
 import {
   commitDecision,
@@ -637,6 +639,12 @@ export function useCommitDecisionMutation(
       ),
     retry: 0,
     onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: conversationsQueryKeys.root(sessionId, workspaceId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: indexingKeys.all(sessionId),
+      });
       // Invalidate versions, version detail, published, and history
       void queryClient.invalidateQueries({
         queryKey: publicationKeys.versions(

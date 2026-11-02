@@ -1,8 +1,15 @@
 .git
+.env*
 .venv
 __pycache__
+**/__pycache__
 .pytest_cache
 .ruff_cache
+.mypy_cache
+.local
+storage
 tests
 docs
+scripts
 *.log
+*.xml

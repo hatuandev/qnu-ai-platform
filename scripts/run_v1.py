@@ -1,4 +1,4 @@
-"""Shared, foreground task runner for QNU V1; legacy runners remain unchanged."""
+"""Default QNU task runner: V1 only, foreground services, explicit data operations."""
 
 from __future__ import annotations
 
@@ -20,18 +20,29 @@ COMMANDS = {
     "v1-fe": "Frontend only, foreground, port from frontendV1/.env.local",
     "v1-check": "Read-only dependency/schema/frontend check before startup",
     "v1-infra-up": "Start PostgreSQL/Redis/Qdrant/MinIO/Gotenberg; prepare and verify local storage",
+    "v1-infra-down": "Stop local infrastructure, preserve volumes",
+    "v1-infra-status": "Show local infrastructure containers",
+    "v1-infra-logs": "Follow local infrastructure logs",
     "v1-install-be": "Install backend dependencies from uv.lock",
     "v1-install-fe": "Install frontend dependencies from package-lock.json",
     "v1-migrate": "Explicit Alembic upgrade head; check target DB first",
     "v1-db-check": "Read current Alembic revision; no migration or seed",
     "v1-test-be": "Backend isolated-DB harness; creates/deletes its test DB",
     "v1-test-fe": "Frontend Vitest suite",
+    "v1-test": "Isolated backend tests then frontend tests; stop on failure",
     "v1-test-e2e": "Show staged E2E help; use make.ps1 v1-e2e init/serve/run <stage>",
     "v1-lint": "Backend Ruff then frontend Biome; no automatic fixes",
+    "v1-lint-fix": "Explicit Ruff/Biome fixes, V1 source only",
     "v1-typecheck": "Frontend TypeScript; run dev/build first on a fresh clone",
     "v1-build": "Frontend build including TypeScript",
     "v1-help": "Show V1 commands",
 }
+
+ALIASES = {name.removeprefix("v1-"): name for name in COMMANDS}
+ALIASES.update(
+    {"dev1": "v1-dev", "dev2": "v1-dev", "fe2": "v1-fe", "db-ready": "v1-check"}
+)
+REMOVED_COMMANDS = {"seed", "reset-db", "reseed", "reconcile", "reindex"}
 
 
 def command_plan(
@@ -64,9 +75,20 @@ def command_plan(
         *(["--env-file", (root / ".env").as_posix()] if env_dir == "root" else []),
         "alembic",
     ]
-    return {
+    infra = [
+        "docker",
+        "compose",
+        "-f",
+        str(root / "docker-compose.infra.yml"),
+        "--env-file",
+        str(runtime / ".env"),
+    ]
+    plans = {
         "v1-dev": [check, api, worker, fe],
         "v1-check": [check],
+        "v1-infra-down": [(root, [*infra, "down"])],
+        "v1-infra-status": [(root, [*infra, "ps"])],
+        "v1-infra-logs": [(root, [*infra, "logs", "-f"])],
         "v1-infra-up": [
             (
                 runtime,
@@ -121,9 +143,15 @@ def command_plan(
             (backend, [*uv, "ruff", "check", "."]),
             (frontend, ["npm", "run", "lint"]),
         ],
+        "v1-lint-fix": [
+            (backend, [*uv, "ruff", "check", "--fix", "."]),
+            (frontend, ["npm", "run", "lint:fix"]),
+        ],
         "v1-typecheck": [(frontend, ["npm", "run", "typecheck"])],
         "v1-build": [(frontend, ["npm", "run", "build"])],
-    }[command]
+    }
+    plans["v1-test"] = [*plans["v1-test-be"], *plans["v1-test-fe"]]
+    return plans[command]
 
 
 def stop_services(processes: list[subprocess.Popen]) -> None:
@@ -189,6 +217,21 @@ def run_services(plan: list[tuple[Path, list[str]]]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    selected = argv[0] if argv else "help"
+    if selected in REMOVED_COMMANDS:
+        print(
+            f"'{selected}' belongs to the retired backend and is not a V1 command. "
+            "Use ModelOps/knowledge operations in the V1 UI; no data was changed.",
+            file=sys.stderr,
+        )
+        return 2
+    if selected in {"e2e", "v1-e2e"}:
+        # Keep the staged runner's argument/approval and credential boundaries.
+        command = [sys.executable, str(ROOT / "scripts/v1_e2e_runner.py"), *argv[1:]]
+        return subprocess.run(command, cwd=ROOT, check=False).returncode
+    if argv:
+        argv[0] = ALIASES.get(selected, selected)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=COMMANDS, nargs="?", default="v1-help")
     parser.add_argument(
@@ -205,6 +248,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.env_dir not in {"root", "backend"}:
         parser.error("QNU_V1_ENV_DIR must be root or backend")
     if args.command == "v1-help":
+        print(
+            "QNU V1 is the default: make dev/check/build; v1-* aliases remain available."
+        )
         for name, description in COMMANDS.items():
             print(f"  make {name:<16} {description}")
         print("Default env: root .env. Set QNU_V1_ENV_DIR=backend for backendV1/.env.")
@@ -228,7 +274,11 @@ def main(argv: list[str] | None = None) -> int:
         "v1-migrate",
         "v1-db-check",
         "v1-test-be",
+        "v1-test",
         "v1-infra-up",
+        "v1-infra-down",
+        "v1-infra-status",
+        "v1-infra-logs",
     }:
         env_path = (ROOT if args.env_dir == "root" else ROOT / "backendV1") / ".env"
         if not env_path.is_file():

@@ -123,7 +123,11 @@ async def save_connection(
         duplicate = await db.scalar(select(Provider.id).where(Provider.name == req.name))
         if duplicate and (row is None or duplicate != row.id):
             raise Conflict("Tên nhà cung cấp đã tồn tại.", code="provider_name_exists")
-    if row is not None and req.base_url is not None and row.base_url.rstrip("/") != req.base_url.rstrip("/"):
+    if (
+        row is not None
+        and req.base_url is not None
+        and row.base_url.rstrip("/") != req.base_url.rstrip("/")
+    ):
         child = await db.scalar(select(Provider.id).where(Provider.parent_id == row.id).limit(1))
         if child:
             raise Conflict(
@@ -152,6 +156,19 @@ async def save_connection(
         row.timeout_seconds = req.timeout_seconds
 
     current_extra = dict(row.extra_config or {})
+    if req.api_type is not None:
+        api_type = req.api_type.strip()
+        target_type = "mineru" if api_type == "mineru" else "openai_compatible"
+        if target_type != row.provider_type and connection_id:
+            child = await db.scalar(
+                select(Provider.id).where(Provider.parent_id == row.id).limit(1)
+            )
+            if child:
+                raise Conflict(
+                    "Kết nối đã có model; tạo kết nối mới khi đổi giao thức.",
+                    code="connection_endpoint_bound",
+                )
+        row.provider_type = target_type
     if req.family is not None:
         current_extra["connection_family"] = req.family
     if req.prefix is not None:
@@ -228,7 +245,9 @@ async def add_model(
         "operator_configured",
         None,
     )
-    if req.discovery_check_id or (limits is None and dimension is None):
+    if parent.provider_type != "mineru" and (
+        req.discovery_check_id or (limits is None and dimension is None)
+    ):
         from qnu.domains.modelops.connections.capacity import (
             cached_metadata,
             current_discovery,
@@ -254,7 +273,9 @@ async def add_model(
         ProviderCreateRequest(
             name=f"{parent.name} · {req.model_name}",
             base_url=parent.base_url,
-            provider_type="openai_compatible",
+            provider_type=parent.provider_type
+            if parent.provider_type == "mineru"
+            else "openai_compatible",
             model_name=req.model_name,
             capabilities=req.capabilities,
             timeout_seconds=parent.timeout_seconds,

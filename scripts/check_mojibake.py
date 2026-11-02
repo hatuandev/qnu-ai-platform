@@ -32,8 +32,8 @@ MOJIBAKE_PATTERNS = [
 
 # Thư mục cần kiểm tra
 SCAN_DIRS = [
-    Path("frontend/src"),
-    Path("backend/app"),
+    Path("frontendV1/src"),
+    Path("backendV1/qnu"),
     Path(".agents/skills"),
 ]
 

@@ -8,7 +8,9 @@ if not os.environ.get("TEST_DATABASE_URL"):
     pytest.skip("PostgreSQL test database not configured", allow_module_level=True)
 
 from alembic.autogenerate import compare_metadata
+from alembic.config import Config
 from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
@@ -31,6 +33,7 @@ from qnu.domains.workspaces import models as workspace_models  # noqa: F401
 from qnu.platform.config import get_settings
 from qnu.platform.database import Base
 from qnu.platform.ownership import include_object
+from qnu.platform.schema import SCHEMA_HEAD
 
 
 @pytest.mark.asyncio
@@ -55,8 +58,9 @@ async def test_migrations_match_models_and_exclude_legacy():
             await connection.scalar(text("SELECT version_num FROM alembic_version"))
             == "legacy_head_preserved"
         )
-        assert (
-            await connection.scalar(text("SELECT version_num FROM alembic_version_backendv1"))
-            == "0007_native_extraction"
+        actual_head = await connection.scalar(
+            text("SELECT version_num FROM alembic_version_backendv1")
         )
+        migration_head = ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
+        assert actual_head == migration_head == SCHEMA_HEAD
     await engine.dispose()

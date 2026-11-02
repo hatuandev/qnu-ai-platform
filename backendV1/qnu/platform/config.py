@@ -93,6 +93,9 @@ class Settings(BaseSettings):
     CONVERSATION_REWRITE_MAX_OUTPUT_TOKENS: int = Field(default=1024, ge=1)
     # Ownership rule (docs/runtime-ownership.md): only one backend reconciles its own queue.
     OWN_RECONCILE: bool = True
+    # Model jobs may span many independent pages/parts. This is an operational
+    # safety ceiling, distinct from provider read timeouts and renewable leases.
+    WORKER_MODEL_JOB_TIMEOUT_SECONDS: int = Field(default=86400, ge=60)
 
     @property
     def allowed_origins(self) -> list[str]:

@@ -26,7 +26,7 @@ from qnu.domains.modelops.reasoning import (
 )
 from qnu.domains.modelops.schemas import ProviderCreateRequest, ProviderUpdateRequest
 from qnu.domains.workspaces.access import actor_ref
-from qnu.platform.errors import Conflict, EntityNotFound
+from qnu.platform.errors import AppException, Conflict, EntityNotFound
 from qnu.platform.network_policy import assert_allowed_endpoint
 
 
@@ -60,6 +60,14 @@ class ProviderService:
         capacity_source: dict | None = None,
     ) -> Provider:
         require_model_admin(actor)
+        if req.provider_type == "mineru" and (
+            set(req.capabilities) != {"ocr"} or req.token_limits is not None
+        ):
+            raise AppException(
+                "MinerU chỉ hỗ trợ OCR PDF, không khai báo token LLM.",
+                code="provider_capability_mismatch",
+                status_code=422,
+            )
         assert_allowed_endpoint(req.base_url, allow_private=True)
         existing = (
             (await db.execute(select(Provider.id).where(Provider.name == req.name)))
@@ -128,6 +136,15 @@ class ProviderService:
                 .execution_options(populate_existing=True)
             )
         ).scalar_one()
+        if provider.provider_type == "mineru" and (
+            (req.capabilities is not None and set(req.capabilities) != {"ocr"})
+            or req.token_limits is not None
+        ):
+            raise AppException(
+                "MinerU chỉ hỗ trợ OCR PDF, không khai báo token LLM.",
+                code="provider_capability_mismatch",
+                status_code=422,
+            )
         identity = (provider.base_url.rstrip("/"), provider.model_name)
         if provider.is_connection:
             raise Conflict(
@@ -264,7 +281,9 @@ def provider_payload(provider: Provider) -> dict[str, Any]:
         "operational_budgets": {
             capability: operational_budget(capacity, capability).model_dump(mode="json")
             for capability in (provider.capabilities or [])
-        },
+        }
+        if provider.provider_type != "mineru"
+        else {},
         "field_sources": getattr(capacity, "field_sources", {}) or {},
         "embedding_dimension": dimension,
         "embedding_dimension_status": dimension_status,

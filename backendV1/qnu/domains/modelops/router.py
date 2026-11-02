@@ -307,6 +307,7 @@ async def catalog(
                 id=item.id,
                 name=item.name,
                 model_name=item.model_name,
+                provider_type=item.provider_type,
                 capabilities=item.capabilities,
                 default_capabilities=[cap for cap, pid in defaults.items() if pid == item.id],
                 token_limits=payload["token_limits"],

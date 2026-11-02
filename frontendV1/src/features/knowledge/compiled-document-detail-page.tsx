@@ -35,7 +35,12 @@ import { isLifecycleAdmin } from "@/features/lifecycle/permissions";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { formatDateTimeValue } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
-import { useIndexRunsQuery, useRequestIndexMutation } from "./index-queries";
+import {
+  useDocumentIndexReadinessQuery,
+  useIndexRunsQuery,
+  useRequestIndexMutation,
+} from "./index-queries";
+import { matchesPublishedIndex } from "./index-readiness";
 import { ListPagination } from "./list-pagination";
 import {
   canPublishCompiledVersion,
@@ -160,12 +165,19 @@ export function CompiledDocumentDetailPage({
       r.status === "dispatched" ||
       r.status === "running",
   );
-  const isReadyForQA = Boolean(
-    published &&
-      activeIndexRun &&
-      new Date(activeIndexRun.requested_at).getTime() >=
-        new Date(published.decision.created_at).getTime(),
+  const readinessQuery = useDocumentIndexReadinessQuery(
+    workspaceId,
+    collectionId,
+    documentId,
+    published?.decision.id,
+    activeIndexRun?.id,
   );
+  const readinessError = indexRunsQuery.error ?? readinessQuery.error;
+  const isCheckingReadiness =
+    indexRunsQuery.isPending || readinessQuery.isPending;
+  const isReadyForQA =
+    !readinessError &&
+    matchesPublishedIndex(readinessQuery.data, published, activeIndexRun);
 
   if (documentQuery.isLoading || collectionQuery.isLoading) {
     return (
@@ -367,6 +379,10 @@ export function CompiledDocumentDetailPage({
                   <Badge variant="info" className="text-xs font-medium">
                     Sẵn sàng hỏi đáp (Index Gen #{activeIndexRun?.generation})
                   </Badge>
+                ) : readinessError ? (
+                  <Badge variant="warning">Không kiểm tra được chỉ mục</Badge>
+                ) : isCheckingReadiness ? (
+                  <Badge variant="secondary">Đang kiểm tra chỉ mục…</Badge>
                 ) : buildingIndexRun ? (
                   <Badge variant="warning" className="text-xs font-medium">
                     Đang cập nhật chỉ mục tìm kiếm…
@@ -388,14 +404,29 @@ export function CompiledDocumentDetailPage({
                 <strong className="text-foreground">
                   Trạng thái phục vụ AI:
                 </strong>{" "}
-                {isReadyForQA
-                  ? "Tài liệu đã phát hành và đã được đưa vào chỉ mục tìm kiếm hiện hành — sẵn sàng phục vụ hỏi đáp có trích dẫn."
-                  : "Tài liệu đã phát hành nhưng cần cập nhật chỉ mục tìm kiếm của kho để Trợ lý AI truy xuất được nội dung mới nhất."}
+                {readinessError
+                  ? "Chưa xác minh được trạng thái tìm kiếm. Hãy kiểm tra lại trước khi yêu cầu cập nhật chỉ mục."
+                  : isCheckingReadiness
+                    ? "Đang đối chiếu bản phát hành với chỉ mục hiện hành."
+                    : isReadyForQA
+                      ? "Tài liệu đã phát hành và đã được đưa vào chỉ mục tìm kiếm hiện hành — sẵn sàng phục vụ hỏi đáp có trích dẫn."
+                      : "Tài liệu đã phát hành nhưng cần cập nhật chỉ mục tìm kiếm của kho để Trợ lý AI truy xuất được nội dung mới nhất."}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              {!isReadyForQA && canPublish ? (
+              {readinessError ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    void indexRunsQuery.refetch();
+                    void readinessQuery.refetch();
+                  }}
+                >
+                  Kiểm tra lại chỉ mục
+                </Button>
+              ) : !isCheckingReadiness && !isReadyForQA && canPublish ? (
                 <Button
                   type="button"
                   size="sm"

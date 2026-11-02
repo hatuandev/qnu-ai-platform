@@ -5,6 +5,7 @@ export type ProviderType =
   | "gemini"
   | "local"
   | "nemotron"
+  | "mineru"
   | "paddleocr";
 
 export type Capability = "chat" | "embedding" | "rerank" | "ocr";
@@ -28,6 +29,7 @@ export const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
   gemini: "Gemini",
   local: "Local",
   nemotron: "Nemotron",
+  mineru: "MinerU PDF OCR",
   paddleocr: "PaddleOCR",
 };
 
@@ -160,6 +162,7 @@ export type CatalogItem = {
   id: string;
   name: string;
   model_name: string;
+  provider_type?: ProviderType;
   capabilities: string[];
   default_capabilities: string[];
   capacity_status?: CapacityStatus;

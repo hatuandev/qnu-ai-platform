@@ -9,6 +9,16 @@ import type {
  * `backendV1/qnu/domains/knowledge/index/schemas.py`.
  */
 
+export type IndexReadiness = {
+  status: "ready" | "not_indexed" | "outdated" | "unavailable";
+  index_run_id: string | null;
+  generation: number | null;
+  version_id: string | null;
+  publication_decision_id: string | null;
+  bundle_sha256: string | null;
+  version_state: number | null;
+};
+
 export type IndexRunStatus =
   | "queued"
   | "dispatched"

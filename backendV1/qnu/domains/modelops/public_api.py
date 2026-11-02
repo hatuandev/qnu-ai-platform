@@ -215,6 +215,9 @@ async def resolve_ocr_runtime(
         extra=extra,
         token_limits=capacity.token_limits,
         capacity_status=capacity.status,
+        wait_for_completion=_wait_for_completion(provider)
+        if provider.provider_type == "mineru"
+        else False,
     )
 
 

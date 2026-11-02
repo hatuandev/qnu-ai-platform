@@ -181,11 +181,17 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
     try {
       const created = await addModelMutation.mutateAsync({
         model_name: trimmed,
-        capabilities: [newModelCapability],
+        capabilities: [
+          connection.api_type === "mineru" ? "ocr" : newModelCapability,
+        ],
       });
 
       // Nếu là connection QNU AI trên máy 100.105.13.53: tự động gán port tương ứng cho embedding/ocr
-      if (connection.base_url.includes("100.105.13.53") && created?.id) {
+      if (
+        connection.api_type !== "mineru" &&
+        connection.base_url.includes("100.105.13.53") &&
+        created?.id
+      ) {
         let targetPort = "8000";
         if (newModelCapability === "embedding" || trimmed.includes("bge-m3")) {
           targetPort = "8001";
@@ -589,7 +595,10 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
 
             <div className="w-full sm:w-48 shrink-0">
               <Select
-                value={newModelCapability}
+                value={
+                  connection.api_type === "mineru" ? "ocr" : newModelCapability
+                }
+                disabled={connection.api_type === "mineru"}
                 onValueChange={(v) => setNewModelCapability(v as Capability)}
               >
                 <SelectTrigger className="h-9 text-xs">

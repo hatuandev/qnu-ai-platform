@@ -50,11 +50,13 @@ class CredentialExecutor:
             "rerank": "rerank_uncertain",
         }[capability]
         try:
-            wait = capability == "chat" and getattr(request, "wait_for_completion", False)
+            wait = capability in {"chat", "ocr"} and getattr(request, "wait_for_completion", False)
             async with asyncio.timeout(None if wait else request.timeout_seconds) as deadline:
                 for attempt in range(3):
-                    remaining = request.timeout_seconds if wait else (
-                        request.timeout_seconds - (time.monotonic() - started)
+                    remaining = (
+                        request.timeout_seconds
+                        if wait
+                        else (request.timeout_seconds - (time.monotonic() - started))
                     )
                     async with sessions() as db:
                         try:
@@ -78,6 +80,7 @@ class CredentialExecutor:
                     try:
                         live_request = replace(request, api_key=lease.secret, timeout_seconds=remaining)
                         if wait and lease.token:
+
                             async def renew(lease=lease, remaining=remaining):
                                 async with sessions() as db:
                                     return await renew_key(db, lease, remaining)
@@ -160,12 +163,24 @@ class ManagedChatModel:
 class ManagedOcrEngine:
     name = "nemotron"
 
-    def __init__(self, adapter, executor=None):
+    def __init__(self, adapter, executor=None, *, document_adapter=None):
         self.adapter, self.executor = adapter, executor or CredentialExecutor()
+        self.document_adapter = document_adapter
 
     async def extract_page(self, image_png, request):
         return await self.executor.call(
             "ocr", request, lambda req: self.adapter.extract_page(image_png, req)
+        )
+
+    async def extract_document(self, pdf, request, *, checkpoint, save, guard):
+        from qnu.adapters.providers.mineru import MineruOcrEngine
+
+        return await self.executor.call(
+            "ocr",
+            request,
+            lambda req: (self.document_adapter or MineruOcrEngine()).extract_document(
+                pdf, req, checkpoint=checkpoint, save=save, guard=guard
+            ),
         )
 
 

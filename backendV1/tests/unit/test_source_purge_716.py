@@ -99,7 +99,7 @@ async def test_accept_rechecks_publication_after_preview_before_preparing_purge(
             None,
             None,
             None,
-            AuthActor(username="actor"),
+            AuthActor(username="actor", actor_id="actor"),
             "w",
             AcceptRequest(preview_id="a", preview_sha256=row.preview_sha256),
             "same-key",

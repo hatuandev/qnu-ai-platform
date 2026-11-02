@@ -2,6 +2,7 @@ import type { V1Client } from "@/app/api/v1";
 import { indexingPaths } from "@/app/api/v1";
 import type {
   IndexCreated,
+  IndexReadiness,
   IndexRun,
   SearchRequestInput,
   SearchResponse,
@@ -26,6 +27,19 @@ export async function listIndexRuns(
     },
     signal: options?.signal,
   });
+}
+
+export async function getDocumentIndexReadiness(
+  client: V1Client,
+  workspaceId: string,
+  collectionId: string,
+  documentId: string,
+  options?: { signal?: AbortSignal },
+): Promise<IndexReadiness> {
+  return client.get<IndexReadiness>(
+    `/workspaces/${encodeURIComponent(workspaceId)}/collections/${encodeURIComponent(collectionId)}/compiled-documents/${encodeURIComponent(documentId)}/index-readiness`,
+    { signal: options?.signal },
+  );
 }
 
 export async function getIndexRun(

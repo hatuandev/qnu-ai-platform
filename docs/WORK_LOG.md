@@ -1,5 +1,29 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- **Context826 — Docker/Make mặc định V1:** runneraliases/foreground8002/3001,legacywritesblocked;DockerBEFEV1/Nginx/bootstrapV1.52tests/PSguard/wrappers/build/proxy7+APIhealth/preflightđạt. Khôngrestart/migrateDB/deletelegacy/push. [Nhật ký826](nhat_ky/2026-11-02_phien_826_chuyen_docker_make_mac_dinh_v1.md), [Snapshot826](memory/snapshots/2026-11-02_session_826.md).
+
+- **Context825 — Rà dọn sau MinerU:** DBdefaultđãMinerU, Nemotroncatalogactive/E2Eprofilecũ. Cache37,30MiB, giữraw/report/DB/tmpworktree; chỉaudit,chưaxóa/disable/codechange. [Nhật ký825](nhat_ky/2026-11-02_phien_825_ra_don_dep_sau_mineru.md), [Snapshot825](memory/snapshots/2026-11-02_session_825.md).
+
+- **Context824 — Chất lượng chữ MinerU:** mẫu14đoạn/755từ CER0,116%(4lỗi), nguồnR11chỉnhnhãn riêng/giữgoldcũ; trang1ngoàimẫu còn lỗi và thiếu chữ, khôngfull32CER. Offlineexit0, khônginference/app/DBchange. [Nhật ký824](nhat_ky/2026-11-02_phien_824_chat_luong_ocr_mineru.md), [Snapshot824](memory/snapshots/2026-11-02_session_824.md).
+
+- **Context823 — MinerU OCR mặc định:** app/root và E2E đã cấp provider/key DB, cả PDF một tác vụ, ZIP+canonical+MD, không giả token. Live36332trang36,89s/600reviewunits/8bảng/18checksPASS; unit16/API5/FE701/build đạt. Full1304PASS/2FAILassertmigrationcũ; đã sửa và kiểm18PASS riêng, khôngfullrerun; không restart/publish/index/push. [Nhật ký823](nhat_ky/2026-11-02_phien_823_mineru_ocr_mac_dinh.md), [Snapshot823](memory/snapshots/2026-11-02_session_823.md).
+
+- **Context822 — Test MinerU triển khai GPU:** cùng2PDF61trang/options/hash:363131sso906s(6,9×),269913,14sso1664s(126,6×). Đủtrang/ZIP/hash/bbox/ảnh; mẫuCERmỗifiletăng1lỗikýtự,gầntươngđương;chưadevicetelemetry/coldwarmcontrolled. Khôngapp/default/modelops/publish/retry/push. [Nhật ký822](nhat_ky/2026-11-02_phien_822_test_mineru_gpu.md), [Snapshot822](memory/snapshots/2026-11-02_session_822.md).
+
+- **Context821 — Sửa sáu ca test nền:** focused9PASS, fullbackend1.285/1.285PASS/0skip/error,exit0; migration/schema/quyền/provenance giữguard. DBtestdọn0. Cleanupcache bị automatic review blockedbypolicy: giữ3thưmục và2keyRedis test; chưa cleanupPASS. Khôngappchange/model/restartchính/push/deploy. [Nhật ký821](nhat_ky/2026-11-02_phien_821_fix_sau_ca_test_nen.md), [Snapshot821](memory/snapshots/2026-11-02_session_821.md).
+
+- **Context820 — Chạy lại backend sau restart:** đủ1.285 ca, 1.278PASS/7FAIL, khôngskip/error; full vẫnFAIL. Regression18PASS; recovery kiểm riêng đúng loop Windows1PASS, còn6ca test nền. Đã dọn DB819/820/cache riêng; không sửa app/test source, không model/restartchính/push. [Nhật ký820](nhat_ky/2026-11-02_phien_820_chay_lai_backend_sau_restart.md), [Snapshot820](memory/snapshots/2026-11-02_session_820.md).
+
+- **Context819 — Sửa quy trình ngược V1:** readiness theo binding/manifest, cache chat sau publish/withdraw; tác vụ model mặc định 24 giờ cấu hình được. FE700/79 suites/build/Biome/Ruff PASS; live model thật 47 kiểm tra duy nhất đạt, không retry. Backend bị ngắt30%:395PASS/3FAIL đã quan sát, chưa full PASS; cleanup DB lượt cuối chưa xác nhận do E2E Postgres đã dừng. Không restart chính/push/tích hợp MinerU. [Nhật ký819](nhat_ky/2026-11-02_phien_819_fix_quy_trinh_nguoc_v1.md), [Snapshot819](memory/snapshots/2026-11-02_session_819.md).
+
+- **Context818 — Rà quy trình ngược:** 2P2 FE tái hiện: replacement ready dùng thời gian sai, withdraw không invalidate cache chat. FE26PASS/2FAIL, chưa fix. Worker30phút còn/live replacement811 chưa trọn. Không app/DB/model/index/push. [Nhật ký818](nhat_ky/2026-11-02_phien_818_ra_quy_trinh_nguoc_v1.md), [Snapshot818](memory/snapshots/2026-11-02_session_818.md).
+
+- **Context817 — So OCR PDF2699:** Cả hai29/29; mẫu664từ MinerU7lỗi/CER0,229%, Nemotron15/CER0,491%. Probe22/22so21/22; MinerU26bảng8cột/5mẫu cùng hàng đạt, Nemotron26unsupported parser hiện tại. MinerU27phút44s; chưa đổi default/app. [Nhật ký817](nhat_ky/2026-11-02_phien_817_so_mineru_nemotron_qd2699.md), [Snapshot817](memory/snapshots/2026-11-02_session_817.md).
+
+- **Context816 — MinerU đủ 32 trang:** API completed 32/32 trong 906,47s, một create/upload; mẫu 755 từ: CER MinerU 0,145% so Nemotron gốc 0,667%, cả hai probe14/16. Bảng trang32 đúng4×8; MinerU còn nhầm dấu và bỏ vùng ký tên trang30. Chưa CER toàn file/so tốc độ có kiểm soát; không đổi app/publish/index. [Nhật ký816](nhat_ky/2026-11-02_phien_816_mineru_32_trang_so_nemotron.md), [Snapshot816](memory/snapshots/2026-11-02_session_816.md).
+
+- **Context815 — Test API MinerU:** MinerU API thật: native2trang6,42s/txt và scan363trang15/32 39,81s/ocr, create/upload1lần, ZIPđạt;5probe ảnh khớp,bảng4×8. Chưa CER/WER/toàn32trang/soNemotron;không appchange/ModelOps/reindex/push. Artifact tmp/mineru815. [Nhật ký815](nhat_ky/2026-11-02_phien_815_test_api_mineru.md), [Snapshot815](memory/snapshots/2026-11-02_session_815.md).
+
 - **Context813 — Push chờ model v1.0.3:** Chốt thay đổi812 trên worktree v1.0.3 để push Gitea; snapshot19test/TS/Biome4 đạt, mainv1.0.2 giữ nguyên. Không model/reindex/restart/GitHub; worker30phút còn nguyên. Receipt hash sau push ởtmp/push813. [Nhật ký813](nhat_ky/2026-11-02_phien_813_push_cho_model_v1_0_3.md), [Snapshot813](memory/snapshots/2026-11-02_session_813.md).
 
 - **Context812 — Bỏ timeout phản hồi300:** Bật ModelOps wait_for_completion cho Qwen phiên E2E, xác minh runtime thật; profile QNU/router áp lại khi init. Backend5/E2E19/typecheck/Biome4 PASS; không inference/retry/restart/push. HTTP read hết giới hạn300, worker vẫn30phút. [Nhật ký812](nhat_ky/2026-11-02_phien_812_bo_timeout_phan_hoi_qwen.md), [Snapshot812](memory/snapshots/2026-11-02_session_812.md).

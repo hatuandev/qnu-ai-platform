@@ -8,6 +8,7 @@ from tests.integration.knowledge_support import (
     MEMBER,
     OUTSIDER,
     PLATFORM,
+    add_member,
     as_actor,
     create_collection,
     upload_source,
@@ -82,6 +83,11 @@ def test_preview_is_bound_to_actor_and_state(client):
     as_actor(PLATFORM)
     assert accept(client, workspace, p).status_code == 404
     changed = preview(client, workspace, "source", source["id"], "delete")
+    # Platform access cannot substitute for the persisted worker's workspace grant.
+    denied = accept(client, workspace, changed, "delete")
+    assert denied.status_code == 404, denied.text
+    assert denied.json()["code"] == "workspace_not_found"
+    add_member(client, workspace["id"], PLATFORM.actor_id, "admin")
     assert accept(client, workspace, changed, "delete").status_code == 200
     as_actor(EDITOR)
     stale = accept(client, workspace, p, "stale")

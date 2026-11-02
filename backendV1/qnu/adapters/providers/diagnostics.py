@@ -215,6 +215,10 @@ class HttpProviderDiagnosticClient:
             )
         if not target.api_key and not target.auth_optional:
             return failed("credentials_missing", "Chưa có khóa đang hoạt động.")
+        if target.provider_type == "mineru":
+            from qnu.adapters.providers.mineru_diagnostic import check_mineru
+
+            return await check_mineru(target, self.transport)
         started = time.monotonic()
         sent = False
         try:

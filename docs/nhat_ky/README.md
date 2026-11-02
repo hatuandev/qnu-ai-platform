@@ -1,5 +1,29 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
+
+- [Phiên826 — Docker/Make mặc định V1](2026-11-02_phien_826_chuyen_docker_make_mac_dinh_v1.md): chuyểnrootentry/buildserverV1,52tests/Dockerbuild/proxy/APIhealth/preflightđạt;khôngxóalegacy/restart/push.
+
+- [Phiên825 — Rà dọn sau MinerU](2026-11-02_phien_825_ra_don_dep_sau_mineru.md): DBdefaultMinerU; E2Eprofilecũ/catalognemotroncònbật, cacheđo37,30MiB; auditkhôngxóa.
+
+- [Phiên824 — Kiểm chất lượng chữ MinerU](2026-11-02_phien_824_chat_luong_ocr_mineru.md): mẫu14đoạn/755từ CER0,116%; sửa nhãn nguồn riêng/giữgoldcũ, trang1ngoàimẫu còn lỗi; khôngfull32CER/khôngsửaOCR.
+
+- [Phiên823 — MinerU làm OCR mặc định, live32trang](2026-11-02_phien_823_mineru_ocr_mac_dinh.md): task checkpoint, raw ZIP, ModelOps tokenless; full1304PASS/2FAILmigrationtestcũ đã sửa/kiểm18PASS riêng; khôngfullrerun.
 ## Dự Án: QNU.AI Platform — Trường Đại Học Quy Nhơn
+
+- [Phiên822 — Test tốc độ MinerU GPU](2026-11-02_phien_822_test_mineru_gpu.md):36332trang131s(6,9×),269929trang13,14s(126,6×);đủ61trang,qualitymẫugầntươngđươngcònlỗi,khôngđổiapp/default.
+
+- [Phiên821 — Fix sáu ca test nền](2026-11-02_phien_821_fix_sau_ca_test_nen.md): focused9PASS; backend1.285/1.285PASS,exit0; chỉtestsource,guardgiữ. DBdọn0;cachecleanup bịpolicychặn, khôngbypass. Khôngmodel/restart/push/deploy.
+
+- [Phiên820 — Chạy lại backend sau restart Docker](2026-11-02_phien_820_chay_lai_backend_sau_restart.md): đủ1.285 ca,1.278PASS/7FAIL; regression18PASS, recovery đúng loop1PASS; còn6ca nền, full vẫnFAIL. DB/cache test đã dọn, không inference/sourcechange.
+
+- [Phiên819 — Sửa và kiểm chứng quy trình ngược V1](2026-11-02_phien_819_fix_quy_trinh_nguoc_v1.md): sửa readiness/cachechat; worker model 24h cấu hình được; FE700/build PASS, live 47 kiểm tra duy nhất đạt, backend bị ngắt30%:395PASS/3FAIL đã quan sát, chưa hoàn tất; cleanup DB cuối chưa xác nhận.
+
+- [Phiên818 — Rà quy trình ngược V1](2026-11-02_phien_818_ra_quy_trinh_nguoc_v1.md): 2P2FE tái hiện26PASS/2FAIL, chưa fix; readiness replacement/cachechatwithdraw, worker30phút vàlive811 còn nghiệm thu.
+
+- [Phiên817 — So MinerU/Nemotron PDF2699](2026-11-02_phien_817_so_mineru_nemotron_qd2699.md): 29/29trang, mẫu664từ CER0,229%so0,491%; bảng MinerU tốt hơn, mất27phút44s. Chưa đổi app/default; artifact tmp/ocr817.
+
+- [Phiên816 — MinerU đủ 32 trang, so Nemotron gốc](2026-11-02_phien_816_mineru_32_trang_so_nemotron.md): completed906,47s, mẫu755từ CER0,145% so0,667%; cùng14/16probe. MinerU bảng32đúng4×8 nhưng mất vùng ký tên trang30; không đổi app/ModelOps/publish/index.
+
+- [Phiên815 — Test API MinerU](2026-11-02_phien_815_test_api_mineru.md): MinerU API thật: native2trang6,42s/txt và scan363trang15/32 39,81s/ocr, create/upload1lần, ZIPđạt;5probe ảnh khớp,bảng4×8. Chưa CER/WER/toàn32trang/soNemotron;không appchange/ModelOps/reindex/push. Artifact tmp/mineru815.
 
 - [Phiên813 — Push chờ model v1.0.3](2026-11-02_phien_813_push_cho_model_v1_0_3.md): Chốt thay đổi812 trên worktree v1.0.3 để push Gitea; snapshot19test/TS/Biome4 đạt, mainv1.0.2 giữ nguyên. Không model/reindex/restart/GitHub; worker30phút còn nguyên. Receipt hash sau push ởtmp/push813.
 

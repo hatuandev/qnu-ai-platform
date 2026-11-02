@@ -325,6 +325,14 @@ def test_replacement_keeps_old_serving_until_index_completes(client, indexed, fa
     assert receipt["status"] == ("failed" if failure else "completed")
     active_id = client.get(data["document_url"] + "/published").json()["version"]["id"]
     assert active_id == (old_id if failure else version_id)
+    readiness = client.get(data["document_url"] + "/index-readiness")
+    assert readiness.status_code == 200, readiness.text
+    assert readiness.json()["status"] == "ready"
+    assert readiness.json()["version_id"] == active_id
+    if not failure:
+        # Candidate index is requested before its atomic publication decision.
+        # Readiness must follow the binding, not requested_at >= published_at.
+        assert readiness.json()["index_run_id"] == run_id
     data["embedding"].mode = "ok"
     hits = client.post(data["base"] + "/search", json={"query": "Q"}).json()["hits"]
     assert hits and all(h["version_id"] == active_id for h in hits)

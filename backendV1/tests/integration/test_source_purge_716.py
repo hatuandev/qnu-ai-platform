@@ -77,4 +77,8 @@ def test_unpublished_purge_is_durable_irreversible_and_keeps_other_uploads(clien
     assert client.get(prefix + other["id"]).status_code == 200
     assert accept(client, workspace, p).json()["status"] == "completed"
     assert preview(client, workspace, "source", source["id"], "restore").status_code == 404
-    assert client.get(lifecycle(workspace) + "/source-deletions").json() == []
+    pending = client.get(
+        lifecycle(workspace) + "/source-deletions", params={"collection_id": collection["id"]}
+    )
+    assert pending.status_code == 200, pending.text
+    assert pending.json() == []

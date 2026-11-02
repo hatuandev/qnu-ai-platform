@@ -2,6 +2,8 @@
 
 ## Phạm vi và ngữ cảnh
 
+- Luồng chạy mặc định hiện hành là `backendV1/` và `frontendV1/`; root Docker/Make/run đã chuyển sang V1. `backend/` và `frontend/` là mã legacy chưa xóa, không dùng các lệnh seed/reset của chúng để khởi động V1. Phiên bản Python hiện hành theo `backendV1/pyproject.toml` và `uv.lock`.
+
 - Áp dụng cho repo này; đọc thêm AGENTS.md ở thư mục con trước khi sửa phần tương ứng.
 - Đọc [PROJECT_CONTEXT](docs/memory/PROJECT_CONTEXT.md), kiểm tra Git/diff và file thực tế trước khi kết luận hiện trạng. Memory và báo cáo cũ là ngữ cảnh, không thay thế bằng chứng mã/test hiện tại.
 - Backend Python/FastAPI, SQLAlchemy async và Pydantic; phiên bản Python theo `backend/pyproject.toml` và lockfile. Frontend React/TypeScript/Vite, TanStack, Radix/shadcn, Tailwind và Biome.

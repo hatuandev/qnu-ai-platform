@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { v1Client } from "@/app/api/v1";
 import { useV1Auth } from "@/app/auth/v1";
 import {
+  getDocumentIndexReadiness,
   getIndexRun,
   listIndexRuns,
   requestIndex,
@@ -9,6 +10,7 @@ import {
 } from "./index-requests";
 import type {
   IndexCreated,
+  IndexReadiness,
   IndexRun,
   SearchRequestInput,
   SearchResponse,
@@ -81,6 +83,39 @@ export function useIndexRunsQuery(
       const runs = query.state.data;
       return runs?.some((run) => isIndexRunActive(run)) ? 3000 : false;
     },
+  });
+}
+
+export function useDocumentIndexReadinessQuery(
+  workspaceId: string,
+  collectionId: string,
+  documentId: string,
+  publicationDecisionId: string | undefined,
+  activeIndexId: string | undefined,
+) {
+  const { sessionId } = useV1Auth();
+  return useQuery<IndexReadiness>({
+    queryKey: [
+      ...indexingKeys.all(sessionId),
+      workspaceId,
+      collectionId,
+      "readiness",
+      documentId,
+      publicationDecisionId,
+      activeIndexId,
+    ],
+    queryFn: ({ signal }) =>
+      getDocumentIndexReadiness(
+        v1Client,
+        workspaceId,
+        collectionId,
+        documentId,
+        { signal },
+      ),
+    enabled: Boolean(
+      workspaceId && collectionId && documentId && publicationDecisionId,
+    ),
+    retry: false,
   });
 }
 

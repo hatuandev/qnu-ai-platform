@@ -1,6 +1,5 @@
 """Automatic native-first extraction on the existing durable run/lease/queue contract."""
 
-import hashlib
 import json
 from dataclasses import replace
 
@@ -13,7 +12,7 @@ from qnu.domains.knowledge.public_api import (
 )
 from qnu.domains.modelops.public_api import resolve_ocr_runtime
 from qnu.domains.modelops.resilience.routing import choose_target
-from qnu.domains.ocr.config import OCR_PROMPT
+from qnu.domains.ocr.config import ocr_contract_hash
 from qnu.domains.ocr.execution import (
     _assemble,
     _ocr_pages,
@@ -35,7 +34,7 @@ async def resolve_runtime(db, run):
         await resolve_ocr_runtime(db, run.workspace_id, selected), routing_trace=routing
     )
     pinned = (run.config or {}).get("provider")
-    prompt_hash = hashlib.sha256(OCR_PROMPT.encode()).hexdigest()
+    prompt_hash = ocr_contract_hash(runtime.provider_type)
     if run.provider_id is not None and (
         run.provider_id != runtime.provider_id
         or not pinned
@@ -118,7 +117,19 @@ async def execute_auto(db, blob, run, actor, engine, config, settings):
     runtime = None
     if any(p.needs_ocr for p in plan.pages):
         runtime = await resolve_runtime(db, run)
-        await _ocr_pages(db, blob, run, actor, runtime, config, rendered, rows, settings, engine)
+        await _ocr_pages(
+            db,
+            blob,
+            run,
+            actor,
+            runtime,
+            config,
+            rendered,
+            rows,
+            settings,
+            engine,
+            pdf=payload if scope.extension == ".pdf" else rendered.fixed_layout_pdf,
+        )
     await resolve_workspace_access(db, actor, run.workspace_id, required_roles=WRITE_ROLES)
     await resolve_revision_scope(
         db, run.workspace_id, run.collection_id, run.source_id, run.revision_id

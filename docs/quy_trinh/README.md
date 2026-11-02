@@ -1,4 +1,6 @@
 # HỆ THỐNG QUY TRÌNH VẬN HÀNH NỀN TẢNG (PROCESS DIRECTORY)
+
+- [V1 — MinerU làm OCR mặc định](./V1_MINERU_OCR_MAC_DINH.md): cấu hình ModelOps, PDF task, raw/canonical và tiếp tục rà soát hiện có.
 ## Nền Tảng Trí Tuệ Nhân Tạo Trường Đại Học Quy Nhơn (QNU AI Platform)
 
 Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của toàn bộ các quy trình nghiệp vụ, vòng đời vận hành và luồng luân chuyển dữ liệu của hệ thống.

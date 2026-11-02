@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from qnu.domains.modelops.capacity.schemas import ModelTokenLimits, OperationalBudget
 from qnu.domains.modelops.reasoning import ReasoningPolicy
 
-ProviderType = Literal["openai_compatible", "gemini", "local", "nemotron", "paddleocr"]
+ProviderType = Literal["openai_compatible", "gemini", "local", "nemotron", "paddleocr", "mineru"]
 Capability = Literal["chat", "embedding", "rerank", "ocr"]
 
 
@@ -222,6 +222,7 @@ class CatalogItem(BaseModel):
     id: str
     name: str
     model_name: str
+    provider_type: str | None = None
     capabilities: list[str]
     default_capabilities: list[str] = Field(default_factory=list)
     token_limits: ModelTokenLimits | None = None

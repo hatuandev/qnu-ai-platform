@@ -85,12 +85,12 @@ async def run_test(
     result = (
         DiagnosticResult("failed", "credentials_unreadable", "Không đọc được khóa đã lưu.")
         if credential_error
-        else await client.check("discovery", target)
+        else await client.check("ocr" if parent.provider_type == "mineru" else "discovery", target)
     )
     check = DiagnosticCheck(
         id="diag_" + uuid.uuid4().hex[:16],
         key_id=key_id,
-        kind="discovery",
+        kind="ocr" if parent.provider_type == "mineru" else "discovery",
         outcome=result.outcome,
         tested_at=datetime.now(UTC),
         latency_ms=result.latency_ms,

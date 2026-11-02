@@ -25,3 +25,16 @@ Nguyên tắc: **một job chỉ do một backend sở hữu**; v1 không bao gi
 `job_id` của v1 có dạng `qnu:v1:ocr:{run_id}:{attempt}` nên dispatch lặp là no-op.
 ARQ đặt `retry_jobs=False`, `max_tries=1`: retry thuộc về bản ghi run, không có hai lớp
 retry chồng nhau. Bật `OWN_RECONCILE` mới chạy cron, tránh hai backend cùng nhặt.
+
+## Thời gian chạy tác vụ model
+
+`ocr_process_run`, `compile_run`, `compiler_review_job` và `index_run` dùng
+`WORKER_MODEL_JOB_TIMEOUT_SECONDS` (mặc định `86400`, tức 24 giờ), thay cho trần
+30 phút chung của worker. Đây vẫn là giới hạn vận hành có thể cấu hình; không phải
+chế độ chạy vô hạn. Các tác vụ bảo trì giữ trần 30 phút.
+
+Giới hạn này độc lập với thời gian chờ phản hồi provider trong ModelOps và lease
+của từng run. Lease tiếp tục được gia hạn theo cơ chế hiện có; quyền hủy, khóa
+phiên bản, idempotency và quy tắc không gửi lại lời gọi uncertain vẫn giữ nguyên.
+Worker cần được khởi động lại để nhận cấu hình/mã mới. Không tự khởi động lại
+worker đang xử lý tài liệu chỉ để áp dụng thay đổi này.

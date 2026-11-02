@@ -19,6 +19,13 @@ class ProviderTransport(BaseModel):
 
 TRANSPORTS = (
     ProviderTransport(
+        provider_type="mineru",
+        label="MinerU PDF OCR",
+        protocols={"ocr": "mineru_tasks"},
+        discovery=False,
+        multi_item_input=["ocr_pdf_pages"],
+    ),
+    ProviderTransport(
         provider_type="openai_compatible",
         label="OpenAI compatible",
         protocols={

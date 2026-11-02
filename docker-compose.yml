@@ -1,152 +1,108 @@
-# ==============================================================================
-# QNU.AI Platform — Dokploy Production Application Stack
-# External infrastructure (PostgreSQL, Redis, Qdrant, MinIO, Gotenberg) is
-# supplied by Dokploy and reached through the shared dokploy-network.
-# ==============================================================================
-
-x-backend-build: &backend-build
-  context: .
-  dockerfile: backend/Dockerfile
-
-x-backend-environment: &backend-environment
+# QNU V1 application stack. Infrastructure remains external and retains its data.
+x-runtime: &runtime
   ENVIRONMENT: ${ENVIRONMENT:-production}
-  CONFIGS_DIR: /app/configs
-  APP_IMAGE_TAG: ${APP_IMAGE_TAG:-latest}
-  BACKUP_DIRECTORY: ${BACKUP_DIRECTORY:-/app/storage/backups}
-  BACKUP_PG_CONTAINER: ${BACKUP_PG_CONTAINER:-}
-  BACKUP_DRILL_ENABLED: ${BACKUP_DRILL_ENABLED:-false}
-  BACKUP_TIMEOUT_SECONDS: ${BACKUP_TIMEOUT_SECONDS:-3600}
-  BACKUP_DRAIN_SECONDS: ${BACKUP_DRAIN_SECONDS:-120}
-  BACKUP_MIN_FREE_BYTES: ${BACKUP_MIN_FREE_BYTES:-1073741824}
-  BACKUP_IMPORT_MAX_BYTES: ${BACKUP_IMPORT_MAX_BYTES:-21474836480}
-  BACKUP_SCHEDULE_SECRET_FILE: ${BACKUP_SCHEDULE_SECRET_FILE:-}
-  BACKUP_REMOTE_CREDENTIALS_FILE: ${BACKUP_REMOTE_CREDENTIALS_FILE:-}
-  BACKUP_DRILL_RELAY_IMAGE: ${BACKUP_DRILL_RELAY_IMAGE:-}
-  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in Dokploy Environment}
-  CONNECTION_STRING: ${CONNECTION_STRING:-}
-  REDIS_URL: ${REDIS_URL:?Set REDIS_URL in Dokploy Environment}
-  QDRANT_URL: ${QDRANT_URL:?Set QDRANT_URL in Dokploy Environment}
-  QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+  SERVICE_NAME: qnu-backend-v1
+  API_PREFIX: /platform/v1alpha1
+  PORT: "8002"
+  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+  REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
+  QUEUE_NAME: ${V1_QUEUE_NAME:-qnu:v1:jobs}
+  CACHE_NAMESPACE: ${V1_CACHE_NAMESPACE:-qnu:v1:cache:}
+  QDRANT_URL: ${QDRANT_URL:?Set QDRANT_URL}
   QDRANT_COLLECTION: ${QDRANT_COLLECTION:-qnu_knowledge_chunks}
+  VECTOR_SIZE: ${VECTOR_SIZE:-1024}
   STORAGE_DRIVER: ${STORAGE_DRIVER:-s3}
-  S3_ENDPOINT: ${S3_ENDPOINT:?Set S3_ENDPOINT in Dokploy Environment}
-  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in Dokploy Environment}
-  S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in Dokploy Environment}
-  S3_BUCKET: ${S3_BUCKET:-${FILE_STORAGE_BUCKET:-qnu-ai-documents}}
-  S3_SECURE: ${S3_SECURE:-${FILE_STORAGE_USE_SSL:-false}}
-  GOTENBERG_URL: ${GOTENBERG_URL:?Set GOTENBERG_URL in Dokploy Environment}
-  GOTENBERG_USERNAME: ${GOTENBERG_USERNAME:-}
-  GOTENBERG_PASSWORD: ${GOTENBERG_PASSWORD:-}
-  # Model names, endpoints and provider credentials are resolved from ModelOps DB.
-  SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in Dokploy Environment}
-  PROVIDER_ENCRYPTION_KEY: ${PROVIDER_ENCRYPTION_KEY:?Set PROVIDER_ENCRYPTION_KEY in Dokploy Environment}
-  OLD_PROVIDER_ENCRYPTION_KEYS: ${OLD_PROVIDER_ENCRYPTION_KEYS:-[]}
-  INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in Dokploy Environment}
+  LOCAL_STORAGE_PATH: /app/storage
+  S3_ENDPOINT: ${S3_ENDPOINT:?Set S3_ENDPOINT}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
+  S3_BUCKET: ${S3_BUCKET:-qnu-ai-documents}
+  S3_SECURE: ${S3_SECURE:-false}
+  GOTENBERG_URL: ${GOTENBERG_URL:?Set GOTENBERG_URL}
+  DOCX_CONVERTER: ${DOCX_CONVERTER:-gotenberg-libreoffice}
+  DOCX_RENDERER_REVISION: ${DOCX_RENDERER_REVISION:-qnu-docx/v2}
+  SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
+  PROVIDER_ENCRYPTION_KEY: ${PROVIDER_ENCRYPTION_KEY:?Keep the existing provider encryption key}
+  INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
   DEV_AUTH_ENABLED: ${DEV_AUTH_ENABLED:-false}
-  DEV_AUTH_ALLOW_IN_PRODUCTION: ${DEV_AUTH_ALLOW_IN_PRODUCTION:-false}
-  DEV_ACCESS_PASSWORD: ${DEV_ACCESS_PASSWORD:-}
   SSO_ENABLED: ${SSO_ENABLED:-true}
-  SSO_AUTHORITY: ${SSO_AUTHORITY:-https://sso.qnu.edu.vn}
-  SSO_CLIENT_ID: ${SSO_CLIENT_ID:-qnu-ai-platform}
+  SSO_AUTHORITY: ${SSO_AUTHORITY:?Set SSO_AUTHORITY}
   SSO_AUDIENCE: ${SSO_AUDIENCE:-ai.api}
+  SSO_JWKS_URL: ${SSO_JWKS_URL:-}
+  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Set comma-separated ALLOWED_ORIGINS}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set browser-visible PUBLIC_BASE_URL}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
-  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Set ALLOWED_ORIGINS in Dokploy Environment}
+  COMPILER_MAX_OUTPUT_TOKENS: ${COMPILER_MAX_OUTPUT_TOKENS:-8192}
+  COMPILER_SEGMENT_CONCURRENCY: ${COMPILER_SEGMENT_CONCURRENCY:-2}
+  MODEL_CHAT_CONCURRENCY: ${MODEL_CHAT_CONCURRENCY:-4}
+  RAG_MAX_OUTPUT_TOKENS: ${RAG_MAX_OUTPUT_TOKENS:-2048}
+  OCR_MAX_PAGES: ${OCR_MAX_PAGES:-300}
+  MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-62914560}
+  WORKER_MODEL_JOB_TIMEOUT_SECONDS: ${WORKER_MODEL_JOB_TIMEOUT_SECONDS:-86400}
+  OWN_RECONCILE: ${OWN_RECONCILE:-true}
 
-x-backend-service: &backend-service
-  image: qnu-ai-platform-backend:${APP_IMAGE_TAG:-latest}
-  build: *backend-build
-  networks:
-    - dokploy-network
-  extra_hosts:
-    - "host.docker.internal:host-gateway"
-  environment: *backend-environment
-  volumes:
-    - qnu_storage:/app/storage
-
-networks:
-  # Shared for Dokploy-managed infrastructure, internal API routing, and Traefik.
-  dokploy-network:
-    external: true
+x-api: &api
+  image: qnu-ai-platform-v1:${APP_IMAGE_TAG:-latest}
+  build:
+    context: ./backendV1
+    dockerfile: Dockerfile
+  networks: [dokploy-network]
+  extra_hosts: ["host.docker.internal:host-gateway"]
+  environment: *runtime
+  volumes: [qnu_storage:/app/storage]
 
 services:
-  # Runs exactly once per deployment. Backend/worker never migrate or seed.
   bootstrap:
-    <<: *backend-service
-    restart: "on-failure:5"
-    entrypoint: ["python", "-m", "app.cli"]
-    command: ["db", "bootstrap"]
-    environment:
-      <<: *backend-environment
-      BOOTSTRAP_MAX_ATTEMPTS: ${BOOTSTRAP_MAX_ATTEMPTS:-12}
-      BOOTSTRAP_RETRY_SECONDS: ${BOOTSTRAP_RETRY_SECONDS:-5}
-      BOOTSTRAP_SEED_ATTEMPTS: ${BOOTSTRAP_SEED_ATTEMPTS:-3}
-      SEED_VECTOR_RECOVERY_ENABLED: "false"
+    <<: *api
+    # Only the V1 migration chain. No legacy bootstrap or implicit data/model seed.
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
     healthcheck:
       disable: true
-
   backend:
-    <<: *backend-service
+    <<: *api
+    command: ["uvicorn", "qnu.main:app", "--host", "0.0.0.0", "--port", "8002"]
     restart: unless-stopped
-    command:
-      - uvicorn
-      - app.main:app
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8001"
-      - --workers
-      - ${BACKEND_WORKERS:-4}
-    networks:
-      dokploy-network:
-        aliases:
-          - qnu-backend
-    expose:
-      - "8001"
+    expose: ["8002"]
     depends_on:
       bootstrap:
         condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8001/health/live"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-
   worker:
-    <<: *backend-service
+    <<: *api
+    command: ["arq", "qnu.workers.settings.WorkerSettings"]
     restart: unless-stopped
-    entrypoint: []
-    command: ["arq", "app.workers.arq_worker.WorkerSettings"]
-    depends_on:
-      bootstrap:
-        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "arq", "--check", "app.workers.arq_worker.WorkerSettings"]
+      test: ["CMD", "arq", "--check", "qnu.workers.settings.WorkerSettings"]
       interval: 30s
       timeout: 10s
-      retries: 3
       start_period: 30s
-
+      retries: 3
+    depends_on:
+      backend:
+        condition: service_healthy
   frontend:
+    image: qnu-ai-platform-frontend-v1:${APP_IMAGE_TAG:-latest}
     build:
-      context: ./frontend
+      context: ./frontendV1
       dockerfile: Dockerfile
       args:
-        VITE_SSO_AUTHORITY: ${SSO_AUTHORITY:-https://sso.qnu.edu.vn}
+        VITE_QNU_API_BASE_URL: ${VITE_QNU_API_BASE_URL:-}
+        VITE_SSO_AUTHORITY: ${SSO_AUTHORITY:?Set SSO_AUTHORITY}
         VITE_SSO_CLIENT_ID: ${SSO_CLIENT_ID:-qnu-ai-platform}
         VITE_SSO_REDIRECT_URI: ${VITE_SSO_REDIRECT_URI:-/signin-oidc}
         VITE_SSO_POST_LOGOUT_REDIRECT_URI: ${VITE_SSO_POST_LOGOUT_REDIRECT_URI:-/sign-in}
         VITE_SSO_SCOPE: ${VITE_SSO_SCOPE:-openid profile email roles offline_access ai.api}
+        VITE_DEV_AUTH_ENABLED: "false"
     restart: unless-stopped
-    networks:
-      - dokploy-network
-    expose:
-      - "80"
+    networks: [dokploy-network]
+    expose: ["80"]
     depends_on:
       backend:
         condition: service_healthy
 
+networks:
+  dokploy-network:
+    external: true
 volumes:
-  # Preserve the existing production volume name across this Compose refactor.
   qnu_storage:
     name: qnu_platform_storage

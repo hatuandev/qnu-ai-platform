@@ -55,8 +55,11 @@ $script:DevTestCurrent = $null
 Stop-VerifiedDevProcess $Backend
 Assert-DevTest ($script:DevTestStopped.Count -eq 1) 'already exited process is harmless'
 $TestEntryRoot = Split-Path $PSScriptRoot -Parent
-foreach ($EntryPoint in 'make.ps1', 'make.bat', 'Makefile', 'make') {
-    $EntryText = Get-Content -LiteralPath (Join-Path $TestEntryRoot $EntryPoint) -Raw
-    Assert-DevTest ($EntryText.Contains('start-dev.ps1')) "shared dev launcher: $EntryPoint"
+foreach ($EntryPoint in 'make.ps1', 'run.ps1') {
+    $PlanJson = & powershell -NoProfile -File (Join-Path $TestEntryRoot $EntryPoint) dev --dry-run
+    Assert-DevTest ($LASTEXITCODE -eq 0) "V1 launcher dry run: $EntryPoint"
+    $Plan = $PlanJson | ConvertFrom-Json
+    $Arguments = @($Plan | ForEach-Object { $_.argv })
+    Assert-DevTest ('qnu.main:app' -in $Arguments -and 'qnu.workers.settings.WorkerSettings' -in $Arguments -and 'app.main:app' -notin $Arguments) "V1 services only: $EntryPoint"
 }
-Write-Host 'Dev process ownership regression checks passed (18 assertions).'
+Write-Host 'Process ownership and V1 launcher regression checks passed.'

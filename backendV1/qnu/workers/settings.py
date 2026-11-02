@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from arq import cron
+from arq import cron, func
 from arq.connections import RedisSettings
 
 from qnu.domains.lifecycle.purge import source_purge_job
@@ -28,13 +28,13 @@ class WorkerSettings:
     """Consumes only ``QUEUE_NAME`` of backendV1."""
 
     functions: list = [
-        ocr_process_run,
+        func(ocr_process_run, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         ocr_reconcile_queued,
-        compile_run,
+        func(compile_run, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         compilation_reconcile,
-        compiler_review_job,
+        func(compiler_review_job, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         compiler_review_reconcile,
-        index_run,
+        func(index_run, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         index_reconcile,
         evidence_backup_job,
         evidence_backup_delete,

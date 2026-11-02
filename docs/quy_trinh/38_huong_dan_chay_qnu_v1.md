@@ -1,6 +1,6 @@
 # Hướng dẫn chạy QNU AI Platform V1
 
-Áp dụng cho `backendV1/` và `frontendV1/` trên Windows/PowerShell, đối chiếu mã ngày **28/10/2026**. Thư mục dự án trong các lệnh dưới đây là `D:\DuAnPhanMem\qnu-ai-platform`; thay đường dẫn nếu đặt ở nơi khác.
+Áp dụng cho `backendV1/` và `frontendV1/` trên Windows/PowerShell. Từ **02/11/2026**, các lệnh ngắn `dev`, `be`, `worker`, `fe`, `check`, `build` cũng chạy V1; tên `v1-*` được giữ tương đương. Thư mục dự án trong các lệnh dưới đây là `D:\DuAnPhanMem\qnu-ai-platform`; thay đường dẫn nếu đặt ở nơi khác.
 
 ## 1. Chạy nhanh hằng ngày
 
@@ -97,8 +97,10 @@ Các lệnh thiết lập và kiểm tra bổ sung:
 | `make v1-lint` | Ruff BE rồi Biome FE, dừng nếu có lỗi, không tự sửa |
 | `make v1-typecheck` / `make v1-build` | TypeScript / build FE; clone mới cần dev/build để sinh route tree trước khi typecheck riêng |
 
-PowerShell thay `make` bằng `.\make.ps1` cho mọi lệnh trên. Các lệnh cũ không có
-tiền tố `v1-` vẫn chạy legacy; `make dev` chưa chuyển sang V1. Runner chung là
+PowerShell thay `make` bằng `.\make.ps1` cho mọi lệnh trên. Lệnh không có tiền tố
+`v1-` đã chuyển sang V1; `make dev` chạy cùng kế hoạch với `make v1-dev`. Các lệnh
+legacy `seed/reset-db/reseed/reconcile/reindex` bị từ chối, không gọi backend cũ.
+`db-ready` chỉ tương đương kiểm tra `check`, không tự tạo schema/seed. Runner chung là
 [`scripts/run_v1.py`](../../scripts/run_v1.py), cần Python có sẵn trên máy hoặc
 môi trường `.venv` V1 đã cài. Lệnh khởi động không tự migration/seed/reset DB.
 

@@ -51,6 +51,7 @@ from qnu.domains.ocr.config import (
     SUPPORTED_PROCESSING_EXTENSIONS,
     ProcessingConfig,
     config_from_run,
+    ocr_contract_hash,
 )
 from qnu.domains.ocr.errors import is_uncertain
 from qnu.domains.ocr.ids import new_id
@@ -72,6 +73,7 @@ logger = get_logger(__name__)
 
 RETRYABLE_CODES = frozenset({"storage_unavailable", "queue_unavailable", "dependency_unavailable"})
 ARTIFACT_CONTENT_TYPES = {
+    "provider_document": "application/zip",
     "native_page": "application/json",
     "embedded_image": "application/octet-stream",
     "render_pdf": "application/pdf",
@@ -82,6 +84,7 @@ ARTIFACT_CONTENT_TYPES = {
     "manifest": "application/json",
 }
 ARTIFACT_EXTENSIONS = {
+    "provider_document": "zip",
     "native_page": "json",
     "embedded_image": "bin",
     "render_pdf": "pdf",
@@ -420,8 +423,7 @@ async def _execute_claimed(
             run.provider_id != runtime.provider_id
             or not pinned
             or pinned.get("configuration_hash") != runtime.configuration_hash
-            or (run.config or {}).get("prompt_sha256")
-            != hashlib.sha256(OCR_PROMPT.encode()).hexdigest()
+            or (run.config or {}).get("prompt_sha256") != ocr_contract_hash(runtime.provider_type)
         ):
             raise AppException(
                 "Provider OCR đã thay đổi so với lúc bắt đầu run.",
@@ -433,7 +435,7 @@ async def _execute_claimed(
             run.provider_id = runtime.provider_id
             payload = dict(run.config or {})
             payload["provider"] = runtime.public_dict()
-            payload["prompt_sha256"] = hashlib.sha256(OCR_PROMPT.encode()).hexdigest()
+            payload["prompt_sha256"] = ocr_contract_hash(runtime.provider_type)
             run.config = payload
             await commit_owned(db, run)
 
@@ -466,7 +468,19 @@ async def _execute_claimed(
     await _persist_render(db, blob_store, run, rendered)
 
     rows = await _sync_pages(db, run, rendered)
-    await _ocr_pages(db, blob_store, run, actor, runtime, config, rendered, rows, settings, engine)
+    await _ocr_pages(
+        db,
+        blob_store,
+        run,
+        actor,
+        runtime,
+        config,
+        rendered,
+        rows,
+        settings,
+        engine,
+        pdf=payload_bytes if scope.extension == ".pdf" else rendered.fixed_layout_pdf,
+    )
     return await _assemble(db, blob_store, run, runtime, config, rendered)
 
 
@@ -582,7 +596,13 @@ async def _ocr_pages(
     rows: dict[int, OcrRunPage],
     settings,
     engine: OcrEngine,
+    *,
+    pdf: bytes | None = None,
 ) -> None:
+    if runtime.provider_type == "mineru":
+        from qnu.domains.ocr.mineru_execution import ocr_document
+
+        return await ocr_document(db, blob_store, run, actor, runtime, rendered, rows, engine, pdf)
     for page in rendered.pages:
         row = rows[page.page_number]
         if row.status in ("completed", "blank"):
@@ -762,7 +782,16 @@ async def _assemble_result(
             _, raw = await read_artifact_bytes(
                 db, blob_store, run, "raw_response", page.page_number
             )
-            layout = parse_page(_raw_text(raw), table_layout_version=config.table_layout_version)
+            if runtime and runtime.provider_type == "mineru":
+                import asyncio
+
+                from qnu.domains.ocr.mineru_layout import parse_mineru_page
+
+                layout = await asyncio.to_thread(parse_mineru_page, json.loads(raw))
+            else:
+                layout = parse_page(
+                    _raw_text(raw), table_layout_version=config.table_layout_version
+                )
         if (run.config or {}).get("extraction"):
             from qnu.domains.ocr.native import merge_layout, page_from_payload
 
@@ -817,6 +846,12 @@ async def _assemble_result(
     }
     if run.config.get("extraction"):
         processing["extraction"] = run.config["extraction"]
+    if runtime and runtime.provider_type == "mineru":
+        from qnu.domains.ocr.mineru_layout import VERSION
+
+        processing.update(
+            prompt_version=None, table_layout_version=VERSION, transport="mineru_tasks/v1"
+        )
     limits = {
         "max_pages": config.max_pages,
         "dpi": config.dpi,

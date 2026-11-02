@@ -35,6 +35,7 @@ const PROVIDER_FAMILY_ORDER: ProviderType[] = [
   "openai_compatible",
   "local",
   "nemotron",
+  "mineru",
   "paddleocr",
   "gemini",
 ];
@@ -51,6 +52,10 @@ const FAMILY_HEADERS: Record<ProviderType, { title: string; desc: string }> = {
   nemotron: {
     title: "NVIDIA Nemotron OCR",
     desc: "Công cụ trích xuất tài liệu và nhận dạng cấu trúc bảng",
+  },
+  mineru: {
+    title: "MinerU PDF OCR",
+    desc: "Nhận dạng cả PDF theo tác vụ, giữ trang, bảng và bằng chứng gốc",
   },
   paddleocr: {
     title: "PaddleOCR Engine",

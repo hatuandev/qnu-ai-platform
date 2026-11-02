@@ -10,8 +10,10 @@ from qnu.api.dependencies import get_actor, get_blob_store, get_db, get_job_queu
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.index import search as retrieval
 from qnu.domains.knowledge.index.models import IndexRun
+from qnu.domains.knowledge.index.readiness import document_readiness
 from qnu.domains.knowledge.index.schemas import (
     IndexCreated,
+    IndexReadiness,
     IndexRequest,
     IndexResponse,
     SearchRequest,
@@ -91,6 +93,20 @@ async def list_indexes(
             )
         ).all()
     )
+
+
+@router.get("/compiled-documents/{document_id}/index-readiness", response_model=IndexReadiness)
+async def index_readiness(
+    workspace_id: str,
+    collection_id: str,
+    document_id: str,
+    response: Response,
+    db: DB,
+    actor: Actor,
+    blob: Blob,
+) -> IndexReadiness:
+    response.headers["Cache-Control"] = "private, no-store"
+    return await document_readiness(db, blob, actor, workspace_id, collection_id, document_id)
 
 
 @router.get("/indexing-runs/{run_id}", response_model=IndexResponse)

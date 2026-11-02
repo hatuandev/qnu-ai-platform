@@ -15,6 +15,13 @@ from tests.integration.test_ocr_text_review_651 import edit_body, review_url, sa
 
 
 def test_exact_saved_text_is_pinned_despite_newer_saved_text(client):
+    from sqlalchemy import select
+
+    from qnu.domains.knowledge.compilation import artifacts
+    from qnu.domains.knowledge.compilation.models import CompilationInput, CompilationRun
+    from qnu.main import app
+    from qnu.platform.database import AsyncSessionFactory
+
     data = processed_input(client, code="selected-text")
     url = review_url(data)
     original = client.get(url).json()
@@ -32,7 +39,26 @@ def test_exact_saved_text_is_pinned_despite_newer_saved_text(client):
         assert execute_compile(client, run) == "completed"
         incoming = json.loads(chat.requests[0]["body"]["messages"][-1]["content"])["documents"][0]
         assert incoming["pages"][0]["blocks"][0]["text"] == "PHỤ LỤC ĐÃ SỬA"
-        assert incoming["text_version"]["id"] == saved["version_id"]
+
+        async def pinned_source():
+            async with AsyncSessionFactory() as db:
+                row = await db.get(CompilationRun, run)
+                _, payload = await artifacts.read(
+                    db, app.state.container.blob_store, row, "input_snapshot"
+                )
+                binding = await db.scalar(
+                    select(CompilationInput).where(
+                        CompilationInput.run_id == run,
+                        CompilationInput.ocr_run_id == data["ocr_run_id"],
+                    )
+                )
+                return json.loads(payload)["documents"][0], binding.text_version_id
+
+        snapshot, pinned_id = client.portal.call(pinned_source)
+        assert pinned_id == snapshot["text_version"]["id"] == saved["version_id"]
+        assert pinned_id != newer.json()["version_id"]
+        assert snapshot["text_version"]["canonical_sha256"] == saved["canonical_sha256"]
+        assert snapshot["pages"][0]["blocks"][0]["text"] == "PHỤ LỤC ĐÃ SỬA"
         draft = client.get(data["url"] + "/" + run + "/draft").json()
         citation = next(iter(draft["citations"].values()))
         assert citation["text_version"]["id"] == saved["version_id"]
