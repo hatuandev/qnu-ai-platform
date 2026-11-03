@@ -38,7 +38,6 @@ import { ErrorState } from "@/components/admin/error-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -204,6 +203,7 @@ function SourceDetailSession({
   const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(
     null,
   );
+  const [locateRequestNonce, setLocateRequestNonce] = useState<number>(0);
   const [externalEditUnitId, setExternalEditUnitId] = useState<string | null>(
     null,
   );
@@ -610,6 +610,7 @@ function SourceDetailSession({
       handlePageChange(targetPage);
     }
     setFocusedEvidenceId(evidenceId);
+    setLocateRequestNonce((n) => n + 1);
     if (mobilePane === "spelling") {
       setMobilePane("image");
     }
@@ -1299,140 +1300,140 @@ function SourceDetailSession({
         </Alert>
       )}
 
-      {/* 2. MÀN ĐỐI CHIẾU HAI CỘT: Cột trái: Bản gốc | Cột phải: Văn bản & Gợi ý chính tả */}
-      {activeRun ? (
-        <OcrComparisonView
-          workspaceId={workspaceId}
-          collectionId={collectionId}
-          sourceId={sourceId}
-          revisionId={activeRevisionId}
-          run={activeRun}
-          pages={activeRun.pages}
-          activePageNumber={activePage}
-          onPageChange={handlePageChange}
-          reviewDoc={doc}
-          isDocx={isDocxFile}
-          canManage={canManage}
-          draftChanges={draftChanges}
-          onSaveDraftChange={(evidenceId, _before, after) => {
-            if (!canManage) return;
-            draft.update((prev) => {
-              const next = new Map(prev);
-              next.set(evidenceId, after);
-              return next;
-            });
-            setActiveSaveKey(generateIdempotencyKey());
-          }}
-          onRevertUnitDraft={handleRevertUnitDraft}
-          onStartSpellCheck={(unitIds) => handleOpenSpellCheckConfig(unitIds)}
-          selectedUnitIds={selectedUnitsForCheck}
-          onToggleUnitSelection={(evidenceId) => {
-            if (!canManage) return;
-            setSelectedUnitsForCheck((prev) => {
-              const next = new Set(prev);
-              if (next.has(evidenceId)) {
-                next.delete(evidenceId);
+      {/* 2. MÀN ĐỐI CHIẾU HAI CỘT: Cột trái: Đối chiếu OCR / Xem tệp gốc | Cột phải: Văn bản & Gợi ý chính tả */}
+      <OcrComparisonView
+        workspaceId={workspaceId}
+        collectionId={collectionId}
+        sourceId={sourceId}
+        revisionId={activeRevisionId}
+        run={activeRun ?? null}
+        pages={activeRun?.pages ?? []}
+        activePageNumber={activePage}
+        onPageChange={handlePageChange}
+        reviewDoc={doc}
+        isDocx={isDocxFile}
+        canManage={canManage}
+        draftChanges={draftChanges}
+        onSaveDraftChange={(evidenceId, _before, after) => {
+          if (!canManage) return;
+          draft.update((prev) => {
+            const next = new Map(prev);
+            next.set(evidenceId, after);
+            return next;
+          });
+          setActiveSaveKey(generateIdempotencyKey());
+        }}
+        onRevertUnitDraft={handleRevertUnitDraft}
+        onStartSpellCheck={(unitIds) => handleOpenSpellCheckConfig(unitIds)}
+        selectedUnitIds={selectedUnitsForCheck}
+        onToggleUnitSelection={(evidenceId) => {
+          if (!canManage) return;
+          setSelectedUnitsForCheck((prev) => {
+            const next = new Set(prev);
+            if (next.has(evidenceId)) {
+              next.delete(evidenceId);
+            } else {
+              next.add(evidenceId);
+            }
+            return next;
+          });
+          setActiveSpellKey(generateIdempotencyKey());
+        }}
+        onSelectPageUnits={(evidenceIds, selected) => {
+          if (!canManage) return;
+          setSelectedUnitsForCheck((prev) => {
+            const next = new Set(prev);
+            for (const id of evidenceIds) {
+              if (selected) {
+                next.add(id);
               } else {
-                next.add(evidenceId);
+                next.delete(id);
               }
-              return next;
-            });
-            setActiveSpellKey(generateIdempotencyKey());
-          }}
-          onSelectPageUnits={(evidenceIds, selected) => {
-            if (!canManage) return;
-            setSelectedUnitsForCheck((prev) => {
-              const next = new Set(prev);
-              for (const id of evidenceIds) {
-                if (selected) {
-                  next.add(id);
-                } else {
-                  next.delete(id);
-                }
-              }
-              return next;
-            });
-            setActiveSpellKey(generateIdempotencyKey());
-          }}
-          focusedEvidenceId={focusedEvidenceId}
-          onFocusUnit={setFocusedEvidenceId}
-          externalEditUnitId={externalEditUnitId}
-          onClearExternalEditUnit={() => setExternalEditUnitId(null)}
-          mobilePane={mobilePane}
-          onMobilePaneChange={setMobilePane}
-          spellingSuggestionsCount={spellingSuggestionsCount}
-          spellingPanel={
-            documentSpelling.report && doc ? (
-              <DocumentSpellingReport
-                report={documentSpelling.report}
-                workspaceId={workspaceId}
-                collectionId={collectionId}
-                sourceId={sourceId}
-                revisionId={activeRevisionId}
-                runId={selectedRunId ?? ""}
-                doc={doc}
-                draftChanges={draftChanges}
-                canManage={canManage && !baseMovedOn}
-                onApply={handleApplySuggestion}
-                onLocateUnit={handleLocateUnit}
-                onManualEditUnit={handleManualEditUnit}
-                onRevertUnitDraft={handleRevertUnitDraft}
-                focusedEvidenceId={focusedEvidenceId}
-              />
-            ) : hasActiveSpellingResult && doc ? (
-              <SpellingResultPanel
-                workspaceId={workspaceId}
-                collectionId={collectionId}
-                sourceId={sourceId}
-                revisionId={activeRevisionId}
-                runId={selectedRunId ?? ""}
-                checkId={activeCheckId}
-                localCheck={localCheck}
-                doc={doc}
-                draftChanges={draftChanges}
-                canManage={canManage && !baseMovedOn}
-                onApply={handleApplySuggestion}
-                onLocateUnit={handleLocateUnit}
-                onManualEditUnit={handleManualEditUnit}
-                onRevertUnitDraft={handleRevertUnitDraft}
-                focusedEvidenceId={focusedEvidenceId}
-              />
-            ) : null
-          }
-        />
-      ) : (
-        /* Trạng thái chưa bóc tách: Giới thiệu & Kêu gọi bóc tách chủ động */
-        <Card className="rounded-xl border-dashed p-12 text-center space-y-4 bg-muted/10">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary mx-auto">
-            <Play className="size-7" />
+            }
+            return next;
+          });
+          setActiveSpellKey(generateIdempotencyKey());
+        }}
+        focusedEvidenceId={focusedEvidenceId}
+        onFocusUnit={setFocusedEvidenceId}
+        locateRequestNonce={locateRequestNonce}
+        externalEditUnitId={externalEditUnitId}
+        onClearExternalEditUnit={() => setExternalEditUnitId(null)}
+        mobilePane={mobilePane}
+        onMobilePaneChange={setMobilePane}
+        spellingSuggestionsCount={spellingSuggestionsCount}
+        unprocessedRightPanel={
+          <div className="p-6 text-center space-y-4 max-w-md mx-auto">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary mx-auto">
+              <Play className="size-7" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-semibold text-foreground">
+                Tài liệu đã được lưu trữ an toàn
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Tài liệu này chưa được bóc tách. Bạn có thể đọc trực tiếp ở chế
+                độ <strong className="text-foreground">Xem tệp gốc</strong> bên
+                trái, hoặc nhấn &ldquo;Bắt đầu bóc tách&rdquo; để trích xuất văn
+                bản, cấu trúc bảng và ảnh đối chiếu.
+              </p>
+            </div>
+            {canManage ? (
+              <Button
+                size="sm"
+                className="gap-1.5 text-xs shadow-xs"
+                disabled={requestRunMutation.isPending}
+                onClick={() => void handleStartExtraction(false)}
+              >
+                {requestRunMutation.isPending ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Play className="size-3.5" />
+                )}
+                <span>Bắt đầu bóc tách ngay</span>
+              </Button>
+            ) : null}
           </div>
-          <div className="space-y-1.5 max-w-md mx-auto">
-            <h3 className="text-base font-semibold text-foreground">
-              Tài liệu đã được lưu trữ an toàn
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Tài liệu này chưa được bóc tách. Nhấn &ldquo;Bắt đầu bóc
-              tách&rdquo; để tự động trích xuất văn bản, cấu trúc bảng và ảnh
-              đối chiếu bằng phương pháp native-first.
-            </p>
-          </div>
-          {canManage ? (
-            <Button
-              size="sm"
-              className="gap-1.5 text-xs shadow-xs"
-              disabled={requestRunMutation.isPending}
-              onClick={() => void handleStartExtraction(false)}
-            >
-              {requestRunMutation.isPending ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Play className="size-3.5" />
-              )}
-              <span>Bắt đầu bóc tách ngay</span>
-            </Button>
-          ) : null}
-        </Card>
-      )}
+        }
+        spellingPanel={
+          documentSpelling.report && doc ? (
+            <DocumentSpellingReport
+              report={documentSpelling.report}
+              workspaceId={workspaceId}
+              collectionId={collectionId}
+              sourceId={sourceId}
+              revisionId={activeRevisionId}
+              runId={selectedRunId ?? ""}
+              doc={doc}
+              draftChanges={draftChanges}
+              canManage={canManage && !baseMovedOn}
+              onApply={handleApplySuggestion}
+              onLocateUnit={handleLocateUnit}
+              onManualEditUnit={handleManualEditUnit}
+              onRevertUnitDraft={handleRevertUnitDraft}
+              focusedEvidenceId={focusedEvidenceId}
+            />
+          ) : hasActiveSpellingResult && doc ? (
+            <SpellingResultPanel
+              workspaceId={workspaceId}
+              collectionId={collectionId}
+              sourceId={sourceId}
+              revisionId={activeRevisionId}
+              runId={selectedRunId ?? ""}
+              checkId={activeCheckId}
+              localCheck={localCheck}
+              doc={doc}
+              draftChanges={draftChanges}
+              canManage={canManage && !baseMovedOn}
+              onApply={handleApplySuggestion}
+              onLocateUnit={handleLocateUnit}
+              onManualEditUnit={handleManualEditUnit}
+              onRevertUnitDraft={handleRevertUnitDraft}
+              focusedEvidenceId={focusedEvidenceId}
+            />
+          ) : null
+        }
+      />
 
       {/* 3. MODALS & DIALOGS */}
       {/* Modal xác nhận Bóc tách lại */}

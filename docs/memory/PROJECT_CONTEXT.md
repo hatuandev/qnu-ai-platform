@@ -7,6 +7,10 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-11-03 — Context836: Ngân sách chính tả theo ModelOps, chia nhóm lỗi token.** [Nhật ký](../nhat_ky/2026-11-03_phien_836_ngan_sach_chinh_ta.md), [Snapshot](./snapshots/2026-11-03_session_836.md).
+
+- **2026-11-03 — Context835: Chế độ Xem tệp gốc (`docx-preview` & `react-pdf`) và làm mới bố cục đối chiếu 2 khung V1.** Tích hợp `Xem tệp gốc` chung khung trái với `Đối chiếu OCR` trên `SourceDetailPage` / `OcrComparisonView`; `.docx` render trực tiếp bằng `docx-preview` (tắt `renderAltChunks`, cô lập CSS `.qnu-docx-preview-scope`, chặn URL ngoài, cuộn độc lập kèm chú thích giới hạn ngắt trang, không gọi Gotenberg), `.pdf` mở bằng `react-pdf` kèm `pdf.worker.min.mjs` đóng gói cục bộ và lớp chữ chọn được. Mở được cả khi chưa bóc tách hoặc bóc tách lỗi; bấm định vị đoạn tự chuyển về `Đối chiếu OCR` và cuộn tới `bbox`. Kiểm chứng: 10/10 suites OCR (59/59 PASS), Biome 9 files/TS/build PASS. [Nhật ký835](../nhat_ky/2026-11-03_phien_835_xem_tep_goc_va_doi_chieu_ocr.md), [Snapshot835](./snapshots/2026-11-03_session_835.md).
+
 - **2026-11-03 — Context834: Docling trong nhánh Gotenberg của DOCX V1.** [Nhật ký](../nhat_ky/2026-11-03_phien_834_docling_docx.md), [Snapshot](./snapshots/2026-11-03_session_834.md).
 
 - **2026-11-03 — Context833: Chia nhóm cho kiểm tra chính tả theo trang và đoạn.** Mọi phạm vi dùng chung tối đa hai nhóm đồng thời. POST kiểm tra chờ backend theo thời hạn ModelOps. [Nhật ký833](../nhat_ky/2026-11-03_phien_833_chinh_ta_pham_vi_va_thoi_han.md), [Snapshot833](./snapshots/2026-11-03_session_833.md).

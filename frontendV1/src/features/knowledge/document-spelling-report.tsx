@@ -39,8 +39,8 @@ export function DocumentSpellingProgress({
       />
       <p>
         Giữ trang này mở khi chạy. Tối đa 2 nhóm song song. Khi dừng, hệ thống
-        chờ các nhóm đang xử lý và không gửi nhóm mới; hệ thống không tự gửi lại
-        nhóm lỗi.
+        chờ các nhóm đang xử lý và không gửi nhóm mới. Nhóm vượt ngân sách token
+        sẽ được chia nhỏ nếu còn nhiều đoạn.
       </p>
       {!report.finished && (
         <Button
@@ -89,6 +89,7 @@ export function DocumentSpellingReport({
               status: b.status,
               check_id: b.check?.id,
               error_code: b.errorCode,
+              token_detail: b.tokenDetail,
               suggestions: b.check?.suggestions.length ?? 0,
               withheld: b.check?.withheld_suggestions?.length ?? 0,
             })),
@@ -132,7 +133,7 @@ export function DocumentSpellingReport({
             Trang {b.page} · {b.evidenceIds.length} đoạn:{" "}
             {b.errorCode === "model_not_configured"
               ? "Chưa đặt model Chat mặc định cho đơn vị."
-              : formatOcrError(b.errorCode)}{" "}
+              : (b.tokenDetail ?? formatOcrError(b.errorCode))}{" "}
             <span className="sr-only">Nhóm lỗi {i + 1}</span>
           </p>
         ))}

@@ -1,5 +1,9 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên836 — Ngân sách kiểm tra chính tả](2026-11-03_phien_836_ngan_sach_chinh_ta.md).
+
+- [Phiên835 — Xem tệp gốc và đối chiếu OCR V1](2026-11-03_phien_835_xem_tep_goc_va_doi_chieu_ocr.md): `docx-preview` & `react-pdf` trong khung trái cùng `Đối chiếu OCR`, mở được khi chưa bóc tách/lỗi, tự chuyển về OCR khi định vị `bbox`; 10 suites OCR (59/59 PASS), Biome/TS/build đạt.
+
 - [Phiên834 — Docling trong luồng DOCX V1](2026-11-03_phien_834_docling_docx.md).
 
 - [Phiên833 — Chính tả theo trang và đoạn](2026-11-03_phien_833_chinh_ta_pham_vi_va_thoi_han.md). Chia nhóm cho mọi phạm vi và chờ kết quả backend.

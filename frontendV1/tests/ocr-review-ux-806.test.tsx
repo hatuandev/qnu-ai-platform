@@ -222,6 +222,15 @@ vi.mock("@/features/knowledge/ocr-queries", () => ({
     error: null,
     refetch: vi.fn(),
   }),
+  useRevisionContentBlob: () => ({
+    blob: null,
+    blobUrl: null,
+    contentType: null,
+    fileName: null,
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
   usePageRawText: () => ({
     rawText: "Raw text",
     isLoading: false,

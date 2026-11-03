@@ -31,8 +31,11 @@ mỗi nhóm. Đây là quy tắc chia yêu cầu, không phải cam kết dung l
 ModelOps và server vẫn kiểm tra giới hạn thực. Đơn vị dài được giữ nguyên,
 không cắt bỏ chữ. Chỉ bỏ ảnh/figure và đơn vị không có chữ.
 
-Mỗi nhóm dùng API hiện hữu với version/hash và khóa idempotency riêng. Không
-tự retry model. Kết quả được tổng hợp thành báo cáo: nhóm hoàn tất, gợi ý sửa,
+Mỗi nhóm dùng API hiện hữu với version/hash và khóa idempotency riêng.
+ModelOps tính ngân sách đầu ra khi yêu cầu không chỉ định mức. Nhóm có nhiều
+đoạn bị cắt đầu ra hoặc vượt ngân sách đầu vào/context được chia đôi và gửi
+thành hai nhóm mới. Nhóm một đoạn còn lỗi xuất hiện trong báo cáo.
+Kết quả được tổng hợp thành báo cáo: nhóm hoàn tất, gợi ý sửa,
 mục cần đối chiếu ảnh, trang gặp lỗi và nhóm chưa chạy. Lỗi riêng một nhóm
 không xóa kết quả thành công. Lỗi quyền, quota, cấu hình/model, xung đột nguồn
 hoặc phản hồi chưa xác định sẽ dừng gửi nhóm mới. Từ phiên832, mỗi lượt kiểm tra

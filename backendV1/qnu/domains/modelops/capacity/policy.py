@@ -34,7 +34,12 @@ def plan_token_budget(
     if limits.max_input_tokens is None and limits.context_window_tokens is None:
         raise _invalid("Chưa có giới hạn đầu vào/context.", "model_capacity_required")
     if limits.max_input_tokens is not None and incoming > limits.max_input_tokens:
-        raise _invalid("Đầu vào vượt giới hạn model.", "model_input_limit_exceeded")
+        raise _invalid(
+            f"Đầu vào ước tính {incoming} token, vượt giới hạn "
+            f"{limits.max_input_tokens} token của model "
+            f"({incoming - limits.max_input_tokens} token).",
+            "model_input_limit_exceeded",
+        )
     available = []
     if limits.max_output_tokens is not None:
         available.append(limits.max_output_tokens)
@@ -44,7 +49,11 @@ def plan_token_budget(
         raise _invalid("Chưa có giới hạn đầu ra.", "model_output_capacity_required")
     ceiling = min(available)
     if ceiling < minimum_output_tokens:
-        raise _invalid("Không đủ context cho đầu ra.", "model_context_limit_exceeded")
+        raise _invalid(
+            f"Context thiếu {minimum_output_tokens - ceiling} token "
+            "theo ngân sách đầu vào ước tính.",
+            "model_context_limit_exceeded",
+        )
     output = requested_output_tokens if requested_output_tokens is not None else ceiling
     if output > ceiling or output < minimum_output_tokens:
         raise _invalid("Ngân sách đầu ra vượt giới hạn.", "model_output_limit_exceeded")

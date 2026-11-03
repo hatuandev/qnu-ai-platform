@@ -55,7 +55,7 @@ class DetectRequest(BaseModel):
     expected_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     evidence_ids: list[str] = Field(min_length=1, max_length=100)
     provider_id: str | None = Field(None, min_length=1, max_length=64)
-    max_output_tokens: int = Field(4096, gt=0)
+    max_output_tokens: int | None = Field(None, gt=0)
 
     @model_validator(mode="after")
     def unique_units(self):

@@ -1,5 +1,9 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context836 — Ngân sách kiểm tra chính tả](nhat_ky/2026-11-03_phien_836_ngan_sach_chinh_ta.md).
+
+- **Context835 — Xem tệp gốc và đối chiếu OCR V1:** thêm chế độ `Xem tệp gốc` (`docx-preview` cho `.docx`, `react-pdf` kèm worker cục bộ cho `.pdf`) cùng khung trái với `Đối chiếu OCR`, mở được trước khi bóc tách hoặc khi bóc tách lỗi mà không gọi Gotenberg; tự chuyển về `Đối chiếu OCR` khi bấm định vị đoạn có `bbox`. 10/10 suites OCR (59/59 PASS), Biome 9 files/TS/build PASS. [Nhật ký835](nhat_ky/2026-11-03_phien_835_xem_tep_goc_va_doi_chieu_ocr.md), [Snapshot835](memory/snapshots/2026-11-03_session_835.md).
+
 - **Context834 — Docling trong luồng DOCX V1.** [Nhật ký](nhat_ky/2026-11-03_phien_834_docling_docx.md), [Snapshot](memory/snapshots/2026-11-03_session_834.md).
 
 - **Context833 — Chính tả theo trang và đoạn.** Phạm vi đã chọn dùng chung bộ chia nhóm và chờ kết quả backend. [Nhật ký833](nhat_ky/2026-11-03_phien_833_chinh_ta_pham_vi_va_thoi_han.md), [Snapshot833](memory/snapshots/2026-11-03_session_833.md).

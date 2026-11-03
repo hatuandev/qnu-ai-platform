@@ -80,6 +80,7 @@ export function OcrTabContainer({
   const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(
     null,
   );
+  const [locateRequestNonce, setLocateRequestNonce] = useState<number>(0);
   const [activeSubTab, setActiveSubTab] = useState<OcrSubTab>(
     initialSubTab ?? "runs",
   );
@@ -399,6 +400,7 @@ export function OcrTabContainer({
               }}
               focusedEvidenceId={focusedEvidenceId}
               onFocusUnit={setFocusedEvidenceId}
+              locateRequestNonce={locateRequestNonce}
             />
           ) : (
             <Card className="p-8 text-center text-xs text-muted-foreground">
@@ -430,6 +432,7 @@ export function OcrTabContainer({
                   setActivePage(target.page);
                 }
                 setFocusedEvidenceId(target.evidenceId);
+                setLocateRequestNonce((n) => n + 1);
                 setActiveSubTab("comparison");
                 onDeepLinkChange?.({
                   runId: activeRun.id,

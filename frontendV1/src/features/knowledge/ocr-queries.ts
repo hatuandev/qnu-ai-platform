@@ -29,6 +29,7 @@ import type {
   ReviewDocument,
   SaveReviewInput,
 } from "@/features/knowledge/ocr-types";
+import { downloadRevisionContent } from "@/features/knowledge/requests";
 
 // ============================================================================
 // Query Key Factory
@@ -623,6 +624,8 @@ export function usePageImageBlobUrl(
     }
     void retryKey;
     let isSubscribed = true;
+    const controller = new AbortController();
+    setBlobUrl(null);
     setIsLoading(true);
     setError(null);
 
@@ -634,6 +637,7 @@ export function usePageImageBlobUrl(
       revisionId,
       runId,
       pageNumber,
+      { signal: controller.signal },
     )
       .then((res) => {
         if (!isSubscribed) return;
@@ -642,7 +646,7 @@ export function usePageImageBlobUrl(
         setIsLoading(false);
       })
       .catch((err: unknown) => {
-        if (!isSubscribed) return;
+        if (!isSubscribed || controller.signal.aborted) return;
         setIsLoading(false);
         setError(
           err instanceof Error
@@ -653,6 +657,7 @@ export function usePageImageBlobUrl(
 
     return () => {
       isSubscribed = false;
+      controller.abort();
       setBlobUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return null;
@@ -699,6 +704,8 @@ export function useRenderedPdfBlobUrl(
     }
 
     let isSubscribed = true;
+    const controller = new AbortController();
+    setBlobUrl(null);
     setIsLoading(true);
     setError(null);
 
@@ -709,6 +716,7 @@ export function useRenderedPdfBlobUrl(
       sourceId,
       revisionId,
       runId,
+      { signal: controller.signal },
     )
       .then((res) => {
         if (!isSubscribed) return;
@@ -717,7 +725,7 @@ export function useRenderedPdfBlobUrl(
         setIsLoading(false);
       })
       .catch((err: unknown) => {
-        if (!isSubscribed) return;
+        if (!isSubscribed || controller.signal.aborted) return;
         setIsLoading(false);
         setError(
           err instanceof Error
@@ -728,6 +736,7 @@ export function useRenderedPdfBlobUrl(
 
     return () => {
       isSubscribed = false;
+      controller.abort();
       setBlobUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return null;
@@ -744,6 +753,95 @@ export function useRenderedPdfBlobUrl(
   ]);
 
   return { blobUrl, isLoading, error, refetch };
+}
+
+export function useRevisionContentBlob(
+  workspaceId: string,
+  collectionId: string,
+  sourceId: string,
+  revisionId: string | null | undefined,
+  enabled = true,
+) {
+  const [blob, setBlob] = useState<Blob | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [contentType, setContentType] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+
+  const refetch = useCallback(() => {
+    setRetryKey((k) => k + 1);
+  }, []);
+
+  useEffect(() => {
+    void retryKey;
+    if (!enabled || !workspaceId || !collectionId || !sourceId || !revisionId) {
+      setBlob(null);
+      setBlobUrl(null);
+      setContentType(null);
+      setFileName(null);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
+    let isSubscribed = true;
+    const controller = new AbortController();
+    setBlob(null);
+    setBlobUrl(null);
+    setContentType(null);
+    setFileName(null);
+    setIsLoading(true);
+    setError(null);
+
+    downloadRevisionContent(
+      v1Client,
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      { signal: controller.signal },
+    )
+      .then((res) => {
+        if (!isSubscribed) return;
+        const url = URL.createObjectURL(res.blob);
+        setBlob(res.blob);
+        setBlobUrl(url);
+        setContentType(res.contentType ?? null);
+        setFileName(res.fileName ?? null);
+        setIsLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (!isSubscribed || controller.signal.aborted) return;
+        setIsLoading(false);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Không tải được tệp gốc của phiên bản này.",
+        );
+      });
+
+    return () => {
+      isSubscribed = false;
+      controller.abort();
+      setBlob(null);
+      setBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, [workspaceId, collectionId, sourceId, revisionId, enabled, retryKey]);
+
+  return {
+    blob,
+    blobUrl,
+    contentType,
+    fileName,
+    isLoading,
+    error,
+    refetch,
+  };
 }
 
 export function usePageRawText(
@@ -768,6 +866,8 @@ export function usePageRawText(
     }
 
     let isSubscribed = true;
+    const controller = new AbortController();
+    setRawText(null);
     setIsLoading(true);
     setError(null);
 
@@ -779,6 +879,7 @@ export function usePageRawText(
       revisionId,
       runId,
       pageNumber,
+      { signal: controller.signal },
     )
       .then(async (res) => {
         if (!isSubscribed) return;
@@ -787,7 +888,7 @@ export function usePageRawText(
         setIsLoading(false);
       })
       .catch((err: unknown) => {
-        if (!isSubscribed) return;
+        if (!isSubscribed || controller.signal.aborted) return;
         setIsLoading(false);
         setError(
           err instanceof Error
@@ -798,6 +899,7 @@ export function usePageRawText(
 
     return () => {
       isSubscribed = false;
+      controller.abort();
     };
   }, [
     enabled,

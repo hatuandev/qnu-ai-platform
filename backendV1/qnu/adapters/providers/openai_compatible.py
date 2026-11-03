@@ -79,7 +79,21 @@ def _decode(response: httpx.Response, request: ChatRequest) -> ChatResult:
     except (ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
         raise _error("chat_response_invalid", "Phản hồi chat không đúng cấu trúc.") from exc
     if finish == "length":
-        raise _error("chat_output_truncated", "Đầu ra chat bị cắt; chưa có bản nháp đầy đủ.", 422)
+        counts = [
+            f"{label} {count}"
+            for field, label in (
+                ("prompt_tokens", "đầu vào"),
+                ("completion_tokens", "đầu ra"),
+                ("total_tokens", "tổng"),
+            )
+            if (count := _tokens(usage, field)) is not None
+        ]
+        observed = f" Token server ghi nhận: {', '.join(counts)}." if counts else ""
+        raise _error(
+            "chat_output_truncated",
+            f"Đầu ra chat bị cắt (ngân sách yêu cầu {request.max_output_tokens} token).{observed}",
+            422,
+        )
     if finish != "stop":
         raise _error("chat_response_incomplete", "Provider chưa kết thúc câu trả lời hợp lệ.")
     if not isinstance(content, str) or not content.strip():

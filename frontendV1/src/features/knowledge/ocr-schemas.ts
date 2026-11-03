@@ -227,7 +227,7 @@ export const detectRequestSchema = z
       .number()
       .int()
       .positive("Budget token phải là số dương")
-      .default(4096),
+      .optional(),
   })
   .refine(
     (data) => {

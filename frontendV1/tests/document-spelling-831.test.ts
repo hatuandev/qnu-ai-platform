@@ -95,7 +95,7 @@ test("all requests pin version/hash/provider with independent stable idempotency
     r.batches.map((b) => b.key),
   );
 });
-test("failed group stays failed, successful groups survive and no group is retried", async () => {
+test("a truncated group is replaced by smaller requests without resending successful groups", async () => {
   const o = options();
   o.detect.mockImplementationOnce(async (c) => ({
     ...(await success(c)),
@@ -103,9 +103,13 @@ test("failed group stays failed, successful groups survive and no group is retri
     error_code: "chat_output_truncated",
   }));
   const r = await checkWholeDocument(o);
-  expect(r.batches[0].status).toBe("failed");
-  expect(r.batches.slice(1).every((b) => b.status === "completed")).toBe(true);
-  expect(o.detect).toHaveBeenCalledTimes(r.batches.length);
+  expect(r.batches.every((b) => b.status === "completed")).toBe(true);
+  expect(o.detect).toHaveBeenCalledTimes(r.batches.length + 1);
+  const [first] = o.detect.mock.calls[0];
+  expect(r.batches.slice(0, 2).flatMap((b) => b.evidenceIds)).toEqual(
+    first.body.evidence_ids,
+  );
+  expect(first.body.max_output_tokens).toBeUndefined();
 });
 test.each(["uncertain", "running"])(
   "%s result stops unsent groups, preserving its real check",

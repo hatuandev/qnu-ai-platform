@@ -8,6 +8,11 @@ import type {
 // Bound each request by structure and text size; server ModelOps still enforces tokens.
 const GROUP_UNITS = 20;
 const GROUP_CHARACTERS = 8000;
+const SPLITTABLE_TOKEN_ERRORS = new Set([
+  "chat_output_truncated",
+  "model_input_limit_exceeded",
+  "model_context_limit_exceeded",
+]);
 
 export type SpellingBatch = {
   page: number;
@@ -22,6 +27,7 @@ export type SpellingBatch = {
     | "not_run";
   check?: DetectionResponse;
   errorCode?: string;
+  tokenDetail?: string;
 };
 export type DocumentSpellingReport = {
   version: number;
@@ -92,12 +98,14 @@ export async function checkWholeDocument(options: {
   const publish = () =>
     onUpdate({ ...report, batches: report.batches.map((b) => ({ ...b })) });
   publish();
+  const queue = [...report.batches];
   let next = 0;
   let halted = false;
   const worker = async () => {
     while (!halted && !shouldStop()) {
-      const batch = report.batches[next++];
+      const batch = queue[next];
       if (!batch) return;
+      next++;
       batch.status = "running";
       publish();
       let stop = false;
@@ -111,7 +119,6 @@ export async function checkWholeDocument(options: {
               : {}),
             evidence_ids: batch.evidenceIds,
             provider_id: options.providerId,
-            max_output_tokens: 4096,
           },
           idempotencyKey: batch.key,
         });
@@ -142,6 +149,12 @@ export async function checkWholeDocument(options: {
           error instanceof ApiProblemError
             ? error.code
             : "ocr_spelling_interrupted";
+        if (
+          error instanceof ApiProblemError &&
+          SPLITTABLE_TOKEN_ERRORS.has(error.code)
+        ) {
+          batch.tokenDetail = error.problem?.detail;
+        }
         batch.status =
           !(error instanceof ApiProblemError) ||
           error.status === 0 ||
@@ -157,8 +170,30 @@ export async function checkWholeDocument(options: {
             batch.errorCode ?? "",
           );
       }
+      const tokenFailure =
+        batch.status === "failed" &&
+        SPLITTABLE_TOKEN_ERRORS.has(batch.errorCode ?? "");
+      if (stop && !tokenFailure) halted = true;
+      if (
+        !halted &&
+        !shouldStop() &&
+        tokenFailure &&
+        batch.evidenceIds.length > 1
+      ) {
+        const middle = Math.ceil(batch.evidenceIds.length / 2);
+        const children: SpellingBatch[] = [
+          batch.evidenceIds.slice(0, middle),
+          batch.evidenceIds.slice(middle),
+        ].map((evidenceIds, index) => ({
+          page: batch.page,
+          evidenceIds,
+          key: `${batch.key}:${index + 1}`,
+          status: "pending",
+        }));
+        report.batches.splice(report.batches.indexOf(batch), 1, ...children);
+        queue.push(...children);
+      }
       publish();
-      if (stop) halted = true;
     }
   };
   // Each slot claims its next group only after settling the active request.

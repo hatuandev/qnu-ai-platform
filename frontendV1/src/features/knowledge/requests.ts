@@ -1,4 +1,4 @@
-import type { BlobResponse, V1Client } from "@/app/api/v1";
+import type { BlobResponse, V1Client, V1RequestOptions } from "@/app/api/v1";
 import { knowledgePaths } from "@/app/api/v1";
 import type {
   CollectionCreateInput,
@@ -200,6 +200,7 @@ export async function downloadRevisionContent(
   collectionId: string,
   sourceId: string,
   revisionId: string,
+  options?: V1RequestOptions,
 ): Promise<BlobResponse> {
   return client.requestBlob(
     knowledgePaths.revisionContent(
@@ -208,6 +209,7 @@ export async function downloadRevisionContent(
       sourceId,
       revisionId,
     ),
+    options,
   );
 }
 
