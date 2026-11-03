@@ -56,3 +56,12 @@ export function internalWorkspacePath(
     ? root
     : `${root}/${link.feature}${link.tail}`;
 }
+
+export function preserveWorkspaceMask<T extends Record<string, unknown>>(
+  pathname: string | undefined,
+  search: T,
+) {
+  return pathname
+    ? { to: pathname as "/", search, unmaskOnReload: true }
+    : undefined;
+}

@@ -133,6 +133,7 @@ export function OcrComparisonView({
   externalEditUnitId,
   onClearExternalEditUnit,
   spellingPanel,
+  documentReviewOpen = false,
   spellingSuggestionsCount = 0,
   mobilePane: controlledMobilePane,
   onMobilePaneChange,
@@ -166,53 +167,35 @@ export function OcrComparisonView({
   externalEditUnitId?: string | null;
   onClearExternalEditUnit?: () => void;
   spellingPanel?: ReactNode;
+  documentReviewOpen?: boolean;
   spellingSuggestionsCount?: number;
   mobilePane?: MobileReviewPane;
   onMobilePaneChange?: (pane: MobileReviewPane) => void;
   unprocessedRightPanel?: ReactNode;
 }) {
-  const hasExtractedRun = Boolean(
-    run &&
-      (run.status === "completed" ||
-        run.status === "running" ||
-        run.status === "queued" ||
-        (run.pages_total ?? 0) > 0 ||
-        pages.length > 0),
+  const canCompareOcr = pages.some(
+    (page) => page.page_number === activePageNumber && page.used_ocr === true,
   );
-
-  // Left pane mode: "ocr" (default when extracted) vs "original" (Xem tệp gốc)
-  const [leftPaneMode, setLeftPaneMode] = useState<LeftPaneViewerMode>(() =>
-    run && run.status === "completed" ? "ocr" : !run ? "original" : "ocr",
-  );
-  const [detectedPdfPages, setDetectedPdfPages] = useState<number | null>(null);
-  const userChosenModeRef = useRef<boolean>(false);
+  const viewerKey = `${sourceId}:${revisionId}:${run?.id ?? ""}`;
+  const [chosenMode, setChosenMode] = useState<{
+    key: string;
+    mode: LeftPaneViewerMode;
+  }>();
+  const leftPaneMode = canCompareOcr
+    ? chosenMode?.key === viewerKey
+      ? chosenMode.mode
+      : "ocr"
+    : "original";
+  const [pdfPageCount, setPdfPageCount] = useState<{
+    revisionId: string;
+    count: number;
+  }>();
+  const detectedPdfPages =
+    pdfPageCount?.revisionId === revisionId ? pdfPageCount.count : null;
 
   const handleSelectLeftPaneMode = (mode: LeftPaneViewerMode) => {
-    userChosenModeRef.current = true;
-    setLeftPaneMode(mode);
+    setChosenMode({ key: viewerKey, mode });
   };
-
-  // Sync default mode when revision or run availability changes (respect user choice)
-  const runId = run?.id ?? null;
-  const runStatus = run?.status ?? null;
-  const prevSourceRevisionKeyRef = useRef<string | null>(null);
-  useEffect(() => {
-    const currentKey = `${sourceId}:${revisionId}`;
-    if (prevSourceRevisionKeyRef.current !== currentKey) {
-      prevSourceRevisionKeyRef.current = currentKey;
-      userChosenModeRef.current = false;
-      setDetectedPdfPages(null);
-      if (!runId) {
-        setLeftPaneMode("original");
-      } else if (runStatus === "completed") {
-        setLeftPaneMode("ocr");
-      }
-    } else if (!userChosenModeRef.current) {
-      if (runStatus === "completed" && leftPaneMode !== "ocr") {
-        setLeftPaneMode("ocr");
-      }
-    }
-  }, [sourceId, revisionId, runId, runStatus, leftPaneMode]);
 
   // Zoom mode: "fit-width" (default 100% width), "fit-page" (trọn trang), "custom"
   const [zoomMode, setZoomMode] =
@@ -221,7 +204,7 @@ export function OcrComparisonView({
   const [leftPanePct, setLeftPanePct] = useState<number>(50);
   const [inputPage, setInputPage] = useState<string>(String(activePageNumber));
   const [internalMobilePane, setInternalMobilePane] =
-    useState<MobileReviewPane>(() => (!run ? "image" : "content"));
+    useState<MobileReviewPane>("image");
 
   const activeMobilePane = controlledMobilePane ?? internalMobilePane;
   const setMobilePane = (pane: MobileReviewPane) => {
@@ -292,6 +275,13 @@ export function OcrComparisonView({
   const [fullscreenImageOpen, setFullscreenImageOpen] =
     useState<boolean>(false);
   const [activeTabRight, setActiveTabRight] = useState<string>("content");
+  useEffect(() => {
+    if (documentReviewOpen) setActiveTabRight("document-spelling");
+  }, [documentReviewOpen]);
+  const rightTab =
+    activeTabRight === "document-spelling" && !documentReviewOpen
+      ? "content"
+      : activeTabRight;
   const [copiedType, setCopiedType] = useState<"md" | "json" | null>(null);
 
   // Inline edit state
@@ -390,10 +380,10 @@ export function OcrComparisonView({
     prevFocusedRef.current = focusedEvidenceId;
     prevLocateNonceRef.current = locateRequestNonce;
 
-    if ((focusChangedToUnit || locateTriggered) && hasExtractedRun) {
-      handleSelectLeftPaneMode("ocr");
+    if ((focusChangedToUnit || locateTriggered) && canCompareOcr) {
+      setChosenMode({ key: viewerKey, mode: "ocr" });
     }
-  }, [focusedEvidenceId, locateRequestNonce, hasExtractedRun]);
+  }, [focusedEvidenceId, locateRequestNonce, canCompareOcr, viewerKey]);
 
   // Scroll focused unit in right pane into view when focusedEvidenceId changes
   useEffect(() => {
@@ -425,7 +415,7 @@ export function OcrComparisonView({
   }, [focusedBbox, leftPaneMode, locateRequestNonce]);
 
   const handleFocusUnitFromRightPane = (evidenceId: string | null) => {
-    if (evidenceId && hasExtractedRun) {
+    if (evidenceId && canCompareOcr) {
       handleSelectLeftPaneMode("ocr");
     }
     onFocusUnit?.(evidenceId);
@@ -953,37 +943,44 @@ export function OcrComparisonView({
             <div className="p-2 border-b bg-muted/20 flex items-center justify-between gap-2 flex-wrap text-xs">
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Bộ chuyển chế độ: Đối chiếu OCR vs Xem tệp gốc */}
-                <fieldset
-                  className="inline-flex items-center rounded-lg border bg-background p-0.5"
-                  aria-label="Chế độ xem tài liệu khung trái"
-                >
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={leftPaneMode === "ocr" ? "secondary" : "ghost"}
-                    aria-pressed={leftPaneMode === "ocr"}
-                    data-testid="left-pane-mode-ocr"
-                    className="h-6 px-2.5 text-xs font-medium gap-1.5"
-                    onClick={() => handleSelectLeftPaneMode("ocr")}
+                {canCompareOcr ? (
+                  <fieldset
+                    className="inline-flex items-center rounded-lg border bg-background p-0.5"
+                    aria-label="Chế độ xem tài liệu khung trái"
                   >
-                    <ScanSearch className="size-3.5 text-primary" />
-                    <span>Đối chiếu OCR</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={
-                      leftPaneMode === "original" ? "secondary" : "ghost"
-                    }
-                    aria-pressed={leftPaneMode === "original"}
-                    data-testid="left-pane-mode-original"
-                    className="h-6 px-2.5 text-xs font-medium gap-1.5"
-                    onClick={() => handleSelectLeftPaneMode("original")}
-                  >
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={leftPaneMode === "ocr" ? "secondary" : "ghost"}
+                      aria-pressed={leftPaneMode === "ocr"}
+                      data-testid="left-pane-mode-ocr"
+                      className="h-6 px-2.5 text-xs font-medium gap-1.5"
+                      onClick={() => handleSelectLeftPaneMode("ocr")}
+                    >
+                      <ScanSearch className="size-3.5 text-primary" />
+                      <span>Đối chiếu OCR</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={
+                        leftPaneMode === "original" ? "secondary" : "ghost"
+                      }
+                      aria-pressed={leftPaneMode === "original"}
+                      data-testid="left-pane-mode-original"
+                      className="h-6 px-2.5 text-xs font-medium gap-1.5"
+                      onClick={() => handleSelectLeftPaneMode("original")}
+                    >
+                      <Eye className="size-3.5 text-primary" />
+                      <span>Xem tệp gốc</span>
+                    </Button>
+                  </fieldset>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 font-medium">
                     <Eye className="size-3.5 text-primary" />
-                    <span>Xem tệp gốc</span>
-                  </Button>
-                </fieldset>
+                    Tệp gốc
+                  </span>
+                )}
 
                 {leftPaneMode === "ocr" ? (
                   <>
@@ -1157,7 +1154,9 @@ export function OcrComparisonView({
                     revisionKey={`${sourceId}:${revisionId}`}
                     pageNumber={activePageNumber}
                     onPageChange={onPageChange}
-                    onTotalPagesDetected={(num) => setDetectedPdfPages(num)}
+                    onTotalPagesDetected={(count) =>
+                      setPdfPageCount({ revisionId, count })
+                    }
                     zoomPercent={customZoom}
                     zoomMode={zoomMode}
                   />
@@ -1391,13 +1390,21 @@ export function OcrComparisonView({
               </div>
             ) : (
               <Tabs
-                value={activeTabRight}
+                value={rightTab}
                 onValueChange={setActiveTabRight}
                 className="flex-1 flex flex-col h-full min-h-0"
               >
                 {/* Header Tabs: Văn bản trang | Markdown | Chi tiết kỹ thuật */}
                 <div className="p-2 border-b bg-muted/20 flex items-center justify-between gap-2 flex-wrap">
                   <TabsList className="h-8">
+                    {documentReviewOpen && (
+                      <TabsTrigger
+                        value="document-spelling"
+                        className="h-7 text-xs"
+                      >
+                        Rà soát chính tả
+                      </TabsTrigger>
+                    )}
                     <TabsTrigger
                       value="content"
                       className="text-xs gap-1.5 h-7"
@@ -1473,13 +1480,22 @@ export function OcrComparisonView({
                   </div>
                 </div>
 
+                {documentReviewOpen && (
+                  <TabsContent
+                    forceMount
+                    value="document-spelling"
+                    className="m-0 flex-1 overflow-auto p-3 data-[state=inactive]:hidden"
+                  >
+                    {spellingPanel}
+                  </TabsContent>
+                )}
                 {/* TAB 1: NỘI DUNG TUẦN TỰ & GỢI Ý CHÍNH TẢ */}
                 <TabsContent
                   value="content"
                   className="flex-1 overflow-auto p-3 sm:p-4 m-0 bg-background space-y-2.5"
                 >
                   {/* Khu vực Gợi ý chính tả: Hiển thị ngay bên cạnh ảnh trên Desktop, hoặc khi mở tab Gợi ý trên Mobile */}
-                  {spellingPanel ? (
+                  {spellingPanel && !documentReviewOpen ? (
                     <div
                       className={cn(
                         activeMobilePane === "spelling"
@@ -1489,7 +1505,7 @@ export function OcrComparisonView({
                     >
                       {spellingPanel}
                     </div>
-                  ) : activeMobilePane === "spelling" ? (
+                  ) : activeMobilePane === "spelling" && !documentReviewOpen ? (
                     <div className="rounded-xl border border-dashed bg-card p-6 text-center space-y-2 text-xs text-muted-foreground lg:hidden">
                       <Sparkles className="size-5 text-primary mx-auto" />
                       <p className="font-medium text-foreground text-sm">
@@ -1688,13 +1704,13 @@ export function OcrComparisonView({
                                         )
                                       }
                                       title={
-                                        hasBbox
+                                        canCompareOcr && hasBbox
                                           ? "Nhấp để đánh dấu vị trí đoạn này trên ảnh gốc"
-                                          : "Đoạn này không có tọa độ vùng ảnh (bbox)"
+                                          : "Chọn đoạn văn bản này"
                                       }
                                     >
                                       <span>{locator}</span>
-                                      {hasBbox ? (
+                                      {canCompareOcr && hasBbox ? (
                                         <ScanSearch className="size-3 text-primary/70" />
                                       ) : null}
                                     </button>

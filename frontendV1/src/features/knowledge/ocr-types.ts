@@ -62,6 +62,7 @@ export interface ProcessingRunCreatedResponse {
 export interface PageStatusResponse {
   page_number: number;
   status: PageStatus;
+  used_ocr?: boolean;
   image_sha256: string | null;
   blocks_count: number;
   has_tables: boolean;

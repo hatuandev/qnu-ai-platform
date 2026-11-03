@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.modelops.embedding.runtime import resolve_embedding_runtime
 from qnu.domains.modelops.public_api import resolve_chat_runtime, resolve_ocr_runtime
-from qnu.domains.modelops.usage.service import month_start, usage_service
 from qnu.domains.operations import service
 from qnu.domains.operations.recovery.service import HEAD
 from qnu.platform.errors import AppException
@@ -25,18 +24,6 @@ async def inspect(
     await service.authorize(db, actor, workspace_id, admin=True)
     head = await db.scalar(text("SELECT version_num FROM alembic_version_backendv1"))
     checks = {"database": {"ok": head == HEAD, "schema_head": head}}
-    quota = await usage_service.read_quota(db, actor, workspace_id, month_start())
-    remaining = (
-        max(0, quota.monthly_token_limit - quota.tokens_used - quota.tokens_reserved)
-        if quota is not None and quota.monthly_token_limit is not None
-        else None
-    )
-    checks["quota"] = {
-        "ok": quota is not None and not quota.is_blocked and (remaining is None or remaining > 0),
-        "configured": quota is not None,
-        "remaining_tokens": remaining,
-        "blocked": quota.is_blocked if quota is not None else None,
-    }
     for name, adapter in [("queue", container.job_queue), ("vector", container.vector_store)]:
         try:
             health = getattr(adapter, "health", None)

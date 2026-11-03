@@ -91,7 +91,7 @@ export const workspaceFeatures = {
     to: "/workspaces/$workspaceId/models",
   },
   quota: {
-    title: "Hạn mức",
+    title: "Mức sử dụng",
     group: "Cấu hình đơn vị",
     icon: Gauge,
     kind: "workspace",

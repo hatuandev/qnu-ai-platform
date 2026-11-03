@@ -7,13 +7,22 @@ import {
   createRouter,
   Outlet,
   RouterProvider,
+  useLocation,
+  useNavigate,
 } from "@tanstack/react-router";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import {
   WorkspaceCanonicalLink,
   WorkspaceLinkBridge,
 } from "@/features/workspaces/workspace-link-bridge";
+import { preserveWorkspaceMask } from "@/navigation/workspace-links";
 
 vi.mock("@/app/auth/v1", () => ({ useV1Auth: () => ({ sessionId: 1 }) }));
 vi.mock("@/features/workspaces/queries", () => ({
@@ -51,7 +60,28 @@ test.each([
       getParentRoute: () => root,
       path: "/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId",
       validateSearch: (search: Record<string, unknown>) => search,
-      component: () => <p>Tài liệu đã mở</p>,
+      component: () => {
+        const location = useLocation();
+        const navigate = useNavigate();
+        return (
+          <button
+            type="button"
+            onClick={() => {
+              const search = { ...location.search, page: 3 };
+              void navigate({
+                search,
+                replace: true,
+                mask: preserveWorkspaceMask(
+                  location.maskedLocation?.pathname,
+                  search,
+                ),
+              });
+            }}
+          >
+            Tài liệu đã mở
+          </button>
+        );
+      },
     });
     const short = createRoute({
       getParentRoute: () => root,
@@ -82,5 +112,13 @@ test.each([
     );
     expect(router.state.location.search).toEqual({ runId: "run", page: 2 });
     expect(history.location.search).toContain("runId=run");
+    const paths: string[] = [];
+    const unsubscribe = history.subscribe(({ location }) => {
+      paths.push(location.pathname);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Tài liệu đã mở" }));
+    await waitFor(() => expect(history.location.search).toContain("page=3"));
+    unsubscribe();
+    expect(paths).toEqual(["/ctsv/files/src"]);
   },
 );

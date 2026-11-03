@@ -7,6 +7,22 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-11-03 — Context847: Rà soát chính tả toàn tài liệu.** [Nhật ký](../nhat_ky/2026-11-03_phien_847_ra_soat_chinh_ta.md), [Snapshot](./snapshots/2026-11-03_session_847.md). Duyệt liên trang và lưu chung bản nháp.
+
+- **2026-11-03 — Context846: Seed Qwen tắt suy luận.** [Nhật ký](../nhat_ky/2026-11-03_phien_846_seed_qwen_reasoning.md), [Snapshot](./snapshots/2026-11-03_session_846.md). Đã seed và xác nhận cấu hình DB local.
+
+- **2026-11-03 — Context845: Seed 9router local.** [Nhật ký](../nhat_ky/2026-11-03_phien_845_seed_9router.md), [Snapshot](./snapshots/2026-11-03_session_845.md). Seed DB development local thành công.
+
+- **2026-11-03 — Context844: Khung PDF nhấp nháy.** [Nhật ký](../nhat_ky/2026-11-03_phien_844_pdf_nhap_nhay.md), [Snapshot](./snapshots/2026-11-03_session_844.md). Chrome local xác nhận vòng lặp tải PDF đã dừng.
+
+- **2026-11-03 — Context843: Ưu tiên xem tệp gốc.** [Nhật ký](../nhat_ky/2026-11-03_phien_843_xem_tep_goc.md), [Snapshot](./snapshots/2026-11-03_session_843.md). V1 chỉ bật đối chiếu cho trang có kết quả OCR đã lưu.
+
+- **2026-11-03 — Context842: Trang tài liệu và thống kê sử dụng V1.** [Nhật ký](../nhat_ky/2026-11-03_phien_842_ocr_va_usage.md), [Snapshot](./snapshots/2026-11-03_session_842.md). Gỡ điều kiện quota tháng khỏi thực thi và giữ URL rút gọn khi đổi tham số tài liệu.
+
+- **2026-11-03 — Context841: Seed ModelOps local.** [Nhật ký](../nhat_ky/2026-11-03_phien_841_seed_modelops_local.md), [Snapshot](./snapshots/2026-11-03_session_841.md). Seed thật NOT RUN.
+
+- **2026-11-03 — Context840: Reset app V1 local.** [Nhật ký](../nhat_ky/2026-11-03_phien_840_reset_app_v1_local.md), [Snapshot](./snapshots/2026-11-03_session_840.md). Runner 23 PASS, dry-run root/backend PASS. Reset thật NOT RUN.
+
 - **2026-11-03 — Context839: Trợ lý tự động, discovery và thích ứng mức đầu ra.** [Nhật ký](../nhat_ky/2026-11-03_phien_839_modelops_tu_dong.md), [Snapshot](./snapshots/2026-11-03_session_839.md).
 
   FE741PASS/build/TS/E2Etypecheck; BE85trọngtâm+1OCRPASS. FullBE1323PASS/2FAIL:

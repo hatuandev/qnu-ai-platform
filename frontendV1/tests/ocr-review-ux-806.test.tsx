@@ -162,12 +162,14 @@ vi.mock("@/features/knowledge/ocr-queries", () => ({
           page_number: 1,
           status: "completed",
           has_rendered_image: true,
+          used_ocr: true,
           has_tables: false,
         },
         {
           page_number: 2,
           status: "completed",
           has_rendered_image: true,
+          used_ocr: true,
           has_tables: true,
         },
       ],
@@ -794,6 +796,7 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
     const withheldRegion = await screen.findByRole("note", {
       name: "Cần đối chiếu ảnh gốc",
     });
+    expect(withheldRegion.querySelector("mark")?.textContent).toBe("cơ huyên");
     expect(
       within(withheldRegion).queryByRole("button", {
         name: /Áp dụng/i,

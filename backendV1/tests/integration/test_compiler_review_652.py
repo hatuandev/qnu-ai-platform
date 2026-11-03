@@ -280,7 +280,7 @@ def test_idempotency_body_scope_and_permissions_are_server_checked(client):
         assert len(chat.requests) == 2
 
 
-def test_review_requires_completed_current_sources_and_real_model_quota(client):
+def test_review_requires_completed_current_sources_but_no_monthly_limit(client):
     from tests.integration.compiler_support import FakeJobQueue
     from tests.integration.ocr_support import use_queue
 
@@ -295,10 +295,10 @@ def test_review_requires_completed_current_sources_and_real_model_quota(client):
         assert execute_compile(client, run_id) == "completed"
         set_quota(client, data["workspace"]["id"], 1)
         response = review(client, data)
-        assert response.status_code == 429, response.text
+        assert response.status_code == 200, response.text
         replay = review(client, data)
-        assert replay.status_code == 200 and replay.json()["status"] == "failed"
-        assert not replay.json()["usage_id"] and len(chat.requests) == 1
+        assert replay.status_code == 200 and replay.json()["id"] == response.json()["id"]
+        assert replay.json()["usage_id"] and len(chat.requests) == 2
 
 
 def test_report_storage_failure_keeps_raw_but_exposes_no_partial_report(client, monkeypatch):

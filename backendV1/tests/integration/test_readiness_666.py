@@ -66,7 +66,7 @@ def test_worker_heartbeat_is_queue_scoped_and_removed_on_shutdown(client, monkey
     client.portal.call(check)
 
 
-def test_readiness_distinguishes_missing_zero_unlimited_and_blocked_quota(
+def test_readiness_is_independent_of_monthly_usage_configuration(
     client, ready, monkeypatch
 ):
     from sqlalchemy import delete
@@ -106,13 +106,13 @@ def test_readiness_distinguishes_missing_zero_unlimited_and_blocked_quota(
 
     client.portal.call(unconfigure)
     missing = client.get(url).json()
-    assert not missing["ready"]
-    assert not missing["checks"]["quota"]["configured"]
-    for limit, blocked, expected in [(0, False, False), (None, False, True), (None, True, False)]:
+    assert missing["ready"]
+    assert "quota" not in missing["checks"]
+    for limit, blocked in [(0, False), (None, True)]:
         configured = client.put(
             base + "/quota", json={"monthly_token_limit": limit, "is_blocked": blocked}
         )
         assert configured.status_code == 200, configured.text
-        report = client.get(url).json()
-        assert report["checks"]["quota"]["configured"]
-        assert report["checks"]["quota"]["ok"] == expected and report["ready"] == expected
+        assert configured.json()["monthly_token_limit"] is None
+        assert configured.json()["is_blocked"] is False
+        assert client.get(url).json()["ready"]

@@ -210,26 +210,22 @@ def test_key_rotation_keeps_secrets_encrypted_and_audited(client):
     client.portal.call(ciphertext)
 
 
-def test_concurrent_reservations_cannot_overspend_workspace_quota(client):
+def test_concurrent_reservations_record_usage_without_monthly_limit(client):
     ws, _ = setup_policy(client, limit=100)
 
     async def reserve(request_id):
         async with AsyncSessionFactory() as db:
-            try:
-                row = await usage_service.reserve(
-                    db, MEMBER_A, ws["id"], "chat", request_id, "a" * 64, 60
-                )
-                return row.id
-            except AppException as error:
-                assert error.status_code == 429
-                return None
+            row = await usage_service.reserve(
+                db, MEMBER_A, ws["id"], "chat", request_id, "a" * 64, 60
+            )
+            return row.id
 
     async def run():
         rows = await asyncio.gather(reserve("first"), reserve("second"))
-        assert len([row for row in rows if row]) == 1
+        assert len(set(rows)) == 2
         async with AsyncSessionFactory() as db:
             row = await usage_service.settle(
-                db, next(row for row in rows if row), total_tokens=35, cost_usd=Decimal("0.001")
+                db, rows[0], total_tokens=35, cost_usd=Decimal("0.001")
             )
             await usage_service.settle(db, row.id, total_tokens=35, cost_usd=Decimal("0.001"))
 
@@ -237,9 +233,10 @@ def test_concurrent_reservations_cannot_overspend_workspace_quota(client):
     _as(ADMIN_A)
     quota = client.get(f"{API}/workspaces/{ws['id']}/quota").json()
     assert quota["tokens_used"] == 35
-    assert quota["tokens_reserved"] == 0
+    assert quota["tokens_reserved"] == 60
     usage = client.get(f"{API}/workspaces/{ws['id']}/usage").json()["items"]
-    assert len(usage) == 1 and usage[0]["total_tokens"] == 35
+    assert len(usage) == 2
+    assert sorted(row["status"] for row in usage) == ["completed", "reserved"]
 
 
 def test_unknown_usage_retains_reservation_and_retry_is_idempotent(client):
@@ -292,7 +289,7 @@ def test_concurrent_admin_departures_preserve_at_least_one_admin(client):
     assert sorted(client.portal.call(run)) == [200, 409]
 
 
-def test_unconfigured_month_does_not_implicitly_grant_unlimited_quota(client):
+def test_new_month_automatically_creates_usage_period(client):
     from datetime import date
 
     from qnu.domains.modelops.usage import service
@@ -304,11 +301,11 @@ def test_unconfigured_month_does_not_implicitly_grant_unlimited_quota(client):
         service.month_start = lambda period=None: date(2099, 1, 1)
         try:
             async with AsyncSessionFactory() as db:
-                with pytest.raises(AppException) as error:
-                    await usage_service.reserve(
-                        db, MEMBER_A, ws["id"], "chat", "next-month", "a" * 64, 10
-                    )
-                assert error.value.code == "quota_not_configured"
+                record = await usage_service.reserve(
+                    db, MEMBER_A, ws["id"], "chat", "next-month", "a" * 64, 10
+                )
+                assert record.month_period == date(2099, 1, 1)
+                assert record.status == "reserved"
         finally:
             service.month_start = original
 

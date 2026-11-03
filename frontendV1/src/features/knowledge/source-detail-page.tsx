@@ -207,7 +207,7 @@ function SourceDetailSession({
   const [externalEditUnitId, setExternalEditUnitId] = useState<string | null>(
     null,
   );
-  const [mobilePane, setMobilePane] = useState<MobileReviewPane>("content");
+  const [mobilePane, setMobilePane] = useState<MobileReviewPane>("image");
 
   // Sync URL search params when they change externally
   useEffect(() => {
@@ -1362,6 +1362,12 @@ function SourceDetailSession({
         mobilePane={mobilePane}
         onMobilePaneChange={setMobilePane}
         spellingSuggestionsCount={spellingSuggestionsCount}
+        documentReviewOpen={Boolean(
+          documentSpelling.report?.finished &&
+            doc &&
+            documentSpelling.report.sha256 === doc.canonical_sha256 &&
+            documentSpelling.report.version === doc.version,
+        )}
         unprocessedRightPanel={
           <div className="p-6 text-center space-y-4 max-w-md mx-auto">
             <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary mx-auto">
@@ -1396,7 +1402,10 @@ function SourceDetailSession({
           </div>
         }
         spellingPanel={
-          documentSpelling.report && doc ? (
+          documentSpelling.report &&
+          doc &&
+          documentSpelling.report.sha256 === doc.canonical_sha256 &&
+          documentSpelling.report.version === doc.version ? (
             <DocumentSpellingReport
               report={documentSpelling.report}
               workspaceId={workspaceId}
@@ -1408,7 +1417,19 @@ function SourceDetailSession({
               draftChanges={draftChanges}
               canManage={canManage && !baseMovedOn}
               onApply={handleApplySuggestion}
-              onLocateUnit={handleLocateUnit}
+              onLocateUnit={({ evidenceId, page, showImage }) => {
+                if (page && page !== activePage) handlePageChange(page);
+                setFocusedEvidenceId(evidenceId);
+                setLocateRequestNonce((value) => value + 1);
+                if (showImage) setMobilePane("image");
+              }}
+              onEdit={(id, text) => {
+                if (!canManage || baseMovedOn || !current()) return false;
+                draft.update((previous) => new Map(previous).set(id, text));
+                setActiveSaveKey(generateIdempotencyKey());
+                return true;
+              }}
+              onSave={() => setSaveModalOpen(true)}
               onManualEditUnit={handleManualEditUnit}
               onRevertUnitDraft={handleRevertUnitDraft}
               focusedEvidenceId={focusedEvidenceId}

@@ -40,7 +40,11 @@ export type SpellingPanelProps = {
   draftChanges: ReadonlyMap<string, string>;
   canManage: boolean;
   onApply: (suggestion: Suggestion) => boolean;
-  onLocateUnit?: (target: { evidenceId: string; page?: number }) => void;
+  onLocateUnit?: (target: {
+    evidenceId: string;
+    page?: number;
+    showImage?: boolean;
+  }) => void;
   onManualEditUnit?: (evidenceId: string, page?: number) => void;
   onRevertUnitDraft?: (evidenceId: string) => void;
   focusedEvidenceId?: string | null;
@@ -673,6 +677,10 @@ export function SpellingResultView({
                   const unit = doc.units.find(
                     (u) => u.evidence_id === item.evidence_id,
                   );
+                  const points =
+                    unit && validateSuggestionSpan(unit.text, item)
+                      ? Array.from(unit.text)
+                      : null;
                   const locator = unit
                     ? formatUnitLocator(unit, doc.units)
                     : "Trang chưa xác định";
@@ -690,7 +698,17 @@ export function SpellingResultView({
                         </span>
                       </div>
                       <p className="whitespace-pre-wrap break-words rounded bg-background/80 p-2 border border-border/50 text-foreground">
-                        {item.context_before ?? unit?.text}
+                        {points ? (
+                          <>
+                            {points.slice(0, item.start).join("")}
+                            <mark className="rounded-sm bg-warning/30 font-semibold text-foreground underline decoration-warning underline-offset-2">
+                              {points.slice(item.start, item.end).join("")}
+                            </mark>
+                            {points.slice(item.end).join("")}
+                          </>
+                        ) : (
+                          (item.context_before ?? unit?.text)
+                        )}
                       </p>
                       <p className="flex flex-wrap items-center gap-1.5">
                         <span className="text-muted-foreground">

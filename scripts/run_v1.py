@@ -21,6 +21,8 @@ COMMANDS = {
     "v1-check": "Read-only dependency/schema/frontend check before startup",
     "v1-infra-up": "Start PostgreSQL/Redis/Qdrant/MinIO/Gotenberg; prepare and verify local storage",
     "v1-infra-down": "Stop local infrastructure, preserve volumes",
+    "v1-clear": "Delete local Docker data volumes (requires --confirm-local-reset)",
+    "v1-seed-modelops": "Configure QNU model defaults in the local development database",
     "v1-infra-status": "Show local infrastructure containers",
     "v1-infra-logs": "Follow local infrastructure logs",
     "v1-install-be": "Install backend dependencies from uv.lock",
@@ -87,6 +89,10 @@ def command_plan(
         "v1-dev": [check, api, worker, fe],
         "v1-check": [check],
         "v1-infra-down": [(root, [*infra, "down"])],
+        "v1-clear": [(root, [*infra, "down", "--volumes"])],
+        "v1-seed-modelops": [
+            (runtime, [*uv, "python", str(backend / "scripts/seed_local_modelops.py")])
+        ],
         "v1-infra-status": [(root, [*infra, "ps"])],
         "v1-infra-logs": [(root, [*infra, "logs", "-f"])],
         "v1-infra-up": [
@@ -244,6 +250,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Print argv/cwd only; never read env values or run commands",
     )
+    parser.add_argument("--confirm-local-reset", action="store_true")
     args = parser.parse_args(argv)
     if args.env_dir not in {"root", "backend"}:
         parser.error("QNU_V1_ENV_DIR must be root or backend")
@@ -266,6 +273,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         return 0
+    if args.command == "v1-clear" and not args.confirm_local_reset:
+        parser.error("clear deletes local data volumes; pass --confirm-local-reset")
     if args.command in {
         "v1-dev",
         "v1-check",
@@ -277,6 +286,8 @@ def main(argv: list[str] | None = None) -> int:
         "v1-test",
         "v1-infra-up",
         "v1-infra-down",
+        "v1-clear",
+        "v1-seed-modelops",
         "v1-infra-status",
         "v1-infra-logs",
     }:
@@ -292,6 +303,25 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(f"Required command not found: {command[0]}")
         command[0] = executable
     try:
+        if args.command == "v1-clear":
+            docker = plan[0][1][0]
+            context = os.environ.get("DOCKER_CONTEXT")
+            endpoint = None if context else os.environ.get("DOCKER_HOST")
+            if not endpoint:
+                result = subprocess.run(
+                    [
+                        docker, "context", "inspect", "--format",
+                        "{{.Endpoints.docker.Host}}",
+                    ],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                endpoint = result.stdout.strip() if result.returncode == 0 else ""
+            if not endpoint.startswith(("unix:///", "npipe:////./pipe/")):
+                print("clear requires a local Docker socket or pipe.", file=sys.stderr)
+                return 1
         if args.command == "v1-dev":
             print("Checking V1 dependencies before starting services...", flush=True)
             cwd, check = plan[0]

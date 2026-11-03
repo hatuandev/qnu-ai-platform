@@ -20,6 +20,42 @@ SPEC.loader.exec_module(runner)
 
 
 class RunnerTests(unittest.TestCase):
+    def test_seed_modelops_uses_selected_app_environment(self):
+        for mode in ("root", "backend"):
+            [(cwd, argv)] = runner.command_plan("v1-seed-modelops", runner.ROOT, mode)
+            self.assertEqual(cwd, runner.ROOT if mode == "root" else runner.ROOT / "backendV1")
+            self.assertEqual(Path(argv[-1]).name, "seed_local_modelops.py")
+
+    def test_clear_requires_explicit_confirmation(self):
+        with (
+            patch.object(runner.subprocess, "run") as run,
+            contextlib.redirect_stderr(io.StringIO()),
+            self.assertRaises(SystemExit) as error,
+        ):
+            runner.main(["clear"])
+        self.assertEqual(error.exception.code, 2)
+        run.assert_not_called()
+
+    def test_clear_limits_compose_to_selected_local_stack(self):
+        [(cwd, argv)] = runner.command_plan("v1-clear", runner.ROOT, "backend")
+        self.assertEqual(cwd, runner.ROOT)
+        self.assertEqual(Path(argv[argv.index("-f") + 1]).name, "docker-compose.infra.yml")
+        self.assertEqual(Path(argv[argv.index("--env-file") + 1]).parent.name, "backendV1")
+        self.assertEqual(argv[-2:], ["down", "--volumes"])
+
+    def test_clear_rejects_remote_docker(self):
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(runner, "ROOT", Path(directory)),
+            patch.object(runner.shutil, "which", return_value="docker"),
+            patch.dict(runner.os.environ, {"DOCKER_HOST": "ssh://remote"}, clear=True),
+            patch.object(runner.subprocess, "run") as run,
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            (Path(directory) / ".env").touch()
+            self.assertEqual(runner.main(["clear", "--confirm-local-reset"]), 1)
+        run.assert_not_called()
+
     def test_infra_validation_failure_prevents_docker_and_bucket_setup(self):
         with (
             tempfile.TemporaryDirectory() as directory,

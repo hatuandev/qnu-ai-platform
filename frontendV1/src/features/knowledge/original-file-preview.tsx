@@ -220,10 +220,7 @@ export function DocxOriginalViewer({
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
         <span>
           Bản xem trực tiếp tệp Word (.docx) dùng thanh cuộn độc lập; cách ngắt
-          trang trên trình duyệt có thể khác với Microsoft Word và bản dàn trang
-          OCR. Để định vị theo số trang hoặc tọa độ đoạn văn, hãy chuyển sang{" "}
-          <strong className="font-medium text-foreground">Đối chiếu OCR</strong>
-          .
+          trang trên trình duyệt có thể khác với Microsoft Word.
         </span>
       </div>
 
@@ -458,6 +455,7 @@ export function PdfOriginalViewer({
           )}
         >
           <PdfDocument
+            suspense={false}
             key={`${revisionKey}:${blobUrl ?? ""}`}
             file={blobUrl ?? blob}
             onLoadSuccess={({ numPages: loadedPages }) => {
@@ -490,6 +488,7 @@ export function PdfOriginalViewer({
           >
             <div className="overflow-hidden rounded-sm bg-background shadow-sm ring-1 ring-border/60">
               <PdfPage
+                suspense={false}
                 pageNumber={clampedPage}
                 width={computedPageWidth}
                 renderTextLayer={true}

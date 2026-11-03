@@ -433,7 +433,7 @@ export function formatOcrError(
     case "ocr_spelling_invalid":
       return (
         detail ||
-        "Một hoặc nhiều gợi ý từ mô hình không khớp nguyên văn đoạn văn bản hoặc làm thay đổi số liệu; toàn bộ lượt kiểm tra này bị từ chối an toàn và chưa thay đổi văn bản."
+        "Nhóm này có gợi ý không khớp nguyên văn hoặc làm thay đổi số liệu. Hệ thống đã bỏ kết quả của nhóm và chưa sửa văn bản."
       );
     case "ocr_spelling_interrupted":
       return "Lượt kiểm tra chính tả bị gián đoạn hoặc quá thời gian chờ phản hồi từ mô hình.";

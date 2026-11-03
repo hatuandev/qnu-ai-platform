@@ -83,7 +83,7 @@ export function QnuSettingsHub() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* Nhóm: Đơn vị (Thành viên, Model được phép dùng, Hạn mức) */}
+          {/* Nhóm: Đơn vị (Thành viên, Model được phép dùng, Mức sử dụng) */}
           <Card className="rounded-xl border-border/70 shadow-2xs flex flex-col justify-between">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2.5">
@@ -95,7 +95,7 @@ export function QnuSettingsHub() {
                     Đơn vị & Phân quyền
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Thành viên, model được phép dùng và hạn mức
+                    Thành viên, model được phép dùng và mức sử dụng
                   </CardDescription>
                 </div>
               </div>
@@ -127,7 +127,7 @@ export function QnuSettingsHub() {
               >
                 <span className="flex items-center gap-2">
                   <Gauge className="size-3.5 text-muted-foreground" />
-                  Hạn mức sử dụng
+                  Mức sử dụng
                 </span>
                 <ArrowUpRight className="size-3.5 text-muted-foreground" />
               </Link>

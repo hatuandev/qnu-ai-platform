@@ -119,6 +119,31 @@ test("two asynchronous slots replenish independently, never exceed two, and reta
     [1, 2, 3, 4, 5].map((n) => `key:batch:${n}`),
   );
 });
+test("invalid suggestions fail only their own batch", async () => {
+  const h = harness();
+  const run = h.run();
+  h.gates.get("e-1")?.fail(
+    new ApiProblemError({
+      status: 502,
+      code: "ocr_spelling_invalid",
+      message: "invalid suggestions",
+    }),
+  );
+  for (const page of [2, 3, 4, 5]) {
+    await vi.waitFor(() => expect(h.gates.has(`e-${page}`)).toBe(true));
+    h.gates.get(`e-${page}`)?.done();
+  }
+  const result = await run;
+  expect(result.batches.map((batch) => batch.status)).toEqual([
+    "failed",
+    "completed",
+    "completed",
+    "completed",
+    "completed",
+  ]);
+  expect(h.detect).toHaveBeenCalledTimes(5);
+});
+
 test.each(["stop", "uncertain", "quota", "stale"])(
   "%s stops unsent work but drains both active requests without retry",
   async (reason) => {

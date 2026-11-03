@@ -231,12 +231,12 @@ def test_provider_error_during_query_is_not_no_match(client, indexed):
     assert response.json()["code"] == "embedding_unavailable"
 
 
-def test_quota_blocks_index_before_embedding_http(client, indexed):
+def test_retired_monthly_limit_does_not_block_indexing(client, indexed):
     from tests.integration.ocr_support import set_quota
 
     assert set_quota(client, indexed["workspace"]["id"], 0).status_code == 200
-    assert execute_index(client, indexed["index_run"]["id"]) == "failed"
-    assert not indexed["embedding"].requests
+    assert execute_index(client, indexed["index_run"]["id"]) == "completed"
+    assert indexed["embedding"].requests
 
 
 def test_publication_change_before_worker_is_not_indexed(client, indexed):

@@ -11,7 +11,7 @@ Cập nhật BE Context791: giới hạn token khi thêm model là tùy chọn; 
 3. Bấm **Thử kết nối** để gọi API danh sách model. HTTP thành công chỉ chứng minh lấy được danh sách bằng cấu hình hiện tại; chưa chứng minh inference từng model hoạt động.
 4. Bấm **Nhập từ /models → Lấy lại** để xem model và thông số server công bố. Chọn model, chọn đúng chức năng cho model mới rồi **Áp dụng**. Model đã có được đồng bộ thông số; model mới được thêm kèm capacity/dimension nếu server cung cấp. **Thêm model** thủ công vẫn dùng khi server không hỗ trợ danh sách.
 5. Mở **Cấu hình & chạy thử** trên từng model: kiểm tra thông số đã nhận, bổ sung phần thiếu như giới hạn input riêng/ngân sách OCR, chính sách phục hồi; chạy mẫu theo đúng chức năng. Server công bố chưa phải kết quả kiểm định. Thông số thiếu không bị suy đoán; xung đột capacity/dimension cần kiểm tra trước khi áp dụng.
-6. Cấp **model cụ thể** cho workspace, chọn mặc định và cấu hình quota. Nhà cung cấp không được cấp như một model thực thi. Workspace V1 tiếp tục là biên giới quyền qua `resolve_workspace_access`.
+6. Cấp **model cụ thể** cho workspace và chọn mặc định. Số liệu sử dụng tự mở kỳ theo UTC ở lượt gọi đầu tiên. Nhà cung cấp không được cấp như một model thực thi. Workspace V1 tiếp tục là biên giới quyền qua `resolve_workspace_access`.
 
 Một server QNU là một nhà cung cấp, có thể chứa Nemotron, Qwen, BGE embedding và reranker. Các model mới dùng khóa dùng chung tại nhà cung cấp; không cần nhập lại endpoint/khóa cho từng model. Mỗi model vẫn có ID, capability, capacity, quyền workspace và lịch sử sử dụng riêng.
 

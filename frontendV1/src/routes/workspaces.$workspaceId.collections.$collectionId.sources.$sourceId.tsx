@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useLocation } from "@tanstack/react-router";
 import { z } from "zod";
 import { SourceDetailPage } from "@/features/knowledge/source-detail-page";
+import { preserveWorkspaceMask } from "@/navigation/workspace-links";
 
 const sourceDetailSearchSchema = z.object({
   revisionId: z.string().optional(),
@@ -22,6 +23,9 @@ function SourceDetailRoute() {
   const { workspaceId, collectionId, sourceId } = Route.useParams();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  const maskedPath = useLocation({
+    select: (location) => location.maskedLocation?.pathname,
+  });
 
   return (
     <SourceDetailPage
@@ -33,6 +37,7 @@ function SourceDetailRoute() {
         void navigate({
           search: (prev) => ({ ...prev, ...newParams }),
           replace: true,
+          mask: preserveWorkspaceMask(maskedPath, { ...search, ...newParams }),
         });
       }}
     />

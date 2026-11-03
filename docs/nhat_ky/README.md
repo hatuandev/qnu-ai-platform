@@ -1,5 +1,13 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên847 — Rà soát chính tả toàn tài liệu](2026-11-03_phien_847_ra_soat_chinh_ta.md).
+- [Phiên846 — Seed Qwen tắt suy luận](2026-11-03_phien_846_seed_qwen_reasoning.md).
+- [Phiên845 — Seed 9router local](2026-11-03_phien_845_seed_9router.md).
+- [Phiên844 — Khung PDF nhấp nháy](2026-11-03_phien_844_pdf_nhap_nhay.md).
+- [Phiên843 — Ưu tiên xem tệp gốc](2026-11-03_phien_843_xem_tep_goc.md).
+- [Phiên842 — Trang tài liệu và thống kê sử dụng V1](2026-11-03_phien_842_ocr_va_usage.md).
+- [Phiên841 — Seed ModelOps local](2026-11-03_phien_841_seed_modelops_local.md).
+- [Phiên840 — Reset app V1 local](2026-11-03_phien_840_reset_app_v1_local.md).
 - [Phiên839 — ModelOps tự động](2026-11-03_phien_839_modelops_tu_dong.md).
 
 - [Phiên838 — Ngân sách tự động](2026-11-03_phien_838_ngan_sach_tu_dong.md).

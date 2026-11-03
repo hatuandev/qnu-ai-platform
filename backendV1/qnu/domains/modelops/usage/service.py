@@ -1,4 +1,4 @@
-"""UTC monthly quotas and idempotent usage accounting, called by trusted inference code."""
+"""UTC monthly usage accounting and idempotent inference reservations."""
 
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.modelops.access import require_model_admin
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.models import ModelOpsEvent, ModelUsageRecord, WorkspaceQuota
-from qnu.domains.modelops.schemas import QuotaUpdateRequest
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.errors import AppException, Conflict, EntityNotFound
@@ -51,7 +50,7 @@ async def locked_quota(
         )
     ).scalar_one_or_none()
     if quota is None:
-        raise Conflict("Chưa cấu hình quota cho tháng này.", code="quota_not_configured")
+        raise Conflict("Không tìm thấy bản ghi tổng hợp sử dụng.", code="usage_period_missing")
     return quota
 
 
@@ -105,27 +104,26 @@ class UsageService:
         )
         return list(rows), total
 
-    async def configure(
+    async def initialize_legacy_period(
         self,
         db: AsyncSession,
         actor: AuthActor,
         workspace_id: str,
         period: date,
-        req: QuotaUpdateRequest,
     ) -> WorkspaceQuota:
         require_model_admin(actor)
         await resolve_workspace_access(
             db, actor, workspace_id, for_update=True, allow_suspended=True
         )
         quota = await locked_quota(db, workspace_id, month_start(period), create=True)
-        quota.monthly_token_limit = req.monthly_token_limit
-        quota.is_blocked = req.is_blocked
+        quota.monthly_token_limit = None
+        quota.is_blocked = False
         await record_workspace_event(
             db,
             workspace_id=workspace_id,
             actor=actor,
             action="quota.updated",
-            detail={"month": quota.month_period.isoformat(), **req.model_dump()},
+            detail={"month": quota.month_period.isoformat(), "monthly_limits_enabled": False},
         )
         await db.commit()
         await db.refresh(quota)
@@ -162,7 +160,7 @@ class UsageService:
         ):
             raise AppException("Reservation OCR không hợp lệ.", code="usage_request_invalid")
         ref = actor_ref(actor)
-        quota = await locked_quota(db, workspace_id, month_start())
+        quota = await locked_quota(db, workspace_id, month_start(), create=True)
         old = (
             await db.execute(
                 select(ModelUsageRecord).where(
@@ -182,15 +180,6 @@ class UsageService:
                 raise Conflict("Request ID đã dùng cho yêu cầu khác.", code="idempotency_conflict")
             await db.commit()
             return old
-        if quota.is_blocked or (
-            quota.monthly_token_limit is not None
-            and quota.tokens_used + quota.tokens_reserved + token_budget > quota.monthly_token_limit
-        ):
-            raise AppException(
-                "Quota của workspace không đủ hoặc đang bị khóa.",
-                code="quota_exceeded",
-                status_code=429,
-            )
         quota.tokens_reserved += token_budget
         record = ModelUsageRecord(
             id="usage_" + uuid.uuid4().hex[:16],

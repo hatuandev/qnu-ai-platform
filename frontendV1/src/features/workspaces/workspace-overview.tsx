@@ -119,7 +119,7 @@ export function WorkspaceOverview({ workspaceId }: { workspaceId: string }) {
               params={{ workspaceId }}
               className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
             >
-              <span>Quota tháng và usage đã quan sát</span>
+              <span>Mức sử dụng</span>
               <ArrowRight className="size-3.5" />
             </Link>
           </CardContent>

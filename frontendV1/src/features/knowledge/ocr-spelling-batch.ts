@@ -170,7 +170,7 @@ export async function checkWholeDocument(options: {
         stop =
           !(error instanceof ApiProblemError) ||
           batch.status === "uncertain" ||
-          error.status >= 500 ||
+          (error.status >= 500 && error.code !== "ocr_spelling_invalid") ||
           [401, 403, 409, 429].includes(error.status) ||
           /quota_|provider_|model_|version|source|forbidden|permission/.test(
             batch.errorCode ?? "",

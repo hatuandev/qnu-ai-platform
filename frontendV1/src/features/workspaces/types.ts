@@ -119,11 +119,6 @@ export type Quota = {
   configured: boolean;
 };
 
-export type QuotaUpdateInput = {
-  monthly_token_limit: number | null;
-  is_blocked: boolean;
-};
-
 export type UsageRecord = {
   id: string;
   workspace_id: string;

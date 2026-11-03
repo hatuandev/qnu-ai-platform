@@ -272,6 +272,7 @@ def test_mixed_document_only_calls_ocr_for_image_page(client):
         assert len(provider.requests) == 1
     pages = client.get(url + "/document").json()["pages"]
     assert [p["extraction_method"] for p in pages] == ["native", "ocr"]
+    assert [p["used_ocr"] for p in client.get(url).json()["pages"]] == [False, True]
     assert pages[0]["usage_tokens"] == 0
 
 

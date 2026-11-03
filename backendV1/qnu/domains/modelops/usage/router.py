@@ -1,4 +1,4 @@
-"""Workspace quota administration and read-only observed usage."""
+"""Workspace usage reporting with a compatibility endpoint for old callers."""
 
 from datetime import date
 
@@ -24,7 +24,9 @@ async def get_quota(
     month = month_start(period)
     row = await usage_service.read_quota(db, actor, workspace_id, month)
     if row is not None:
-        return QuotaResponse.model_validate(row)
+        return QuotaResponse.model_validate(row).model_copy(
+            update={"monthly_token_limit": None, "is_blocked": False}
+        )
     return QuotaResponse(
         workspace_id=workspace_id,
         month_period=month,
@@ -36,16 +38,16 @@ async def get_quota(
     )
 
 
-@router.put("/{workspace_id}/quota", response_model=QuotaResponse)
+@router.put("/{workspace_id}/quota", response_model=QuotaResponse, deprecated=True)
 async def set_quota(
     workspace_id: str,
-    body: QuotaUpdateRequest,
+    _body: QuotaUpdateRequest,
     period: date | None = None,
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(get_actor),
 ) -> QuotaResponse:
     return QuotaResponse.model_validate(
-        await usage_service.configure(db, actor, workspace_id, month_start(period), body)
+        await usage_service.initialize_legacy_period(db, actor, workspace_id, month_start(period))
     )
 
 

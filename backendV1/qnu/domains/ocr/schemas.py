@@ -96,6 +96,7 @@ class ProcessingRunCreatedResponse(BaseModel):
 class PageStatusResponse(BaseModel):
     page_number: int
     status: str
+    used_ocr: bool = False
     image_sha256: str | None = None
     blocks_count: int = 0
     has_tables: bool = False

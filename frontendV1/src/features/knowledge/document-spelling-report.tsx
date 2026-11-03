@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { DocumentSpellingReview } from "./document-spelling-review";
 import { formatOcrError } from "./ocr-schemas";
 import type { DocumentSpellingReport as Report } from "./ocr-spelling-batch";
 import {
@@ -60,8 +61,14 @@ export function DocumentSpellingProgress({
 
 export function DocumentSpellingReport({
   report,
+  onEdit,
+  onSave,
   ...props
-}: Omit<SpellingPanelProps, "checkId" | "localCheck"> & { report: Report }) {
+}: Omit<SpellingPanelProps, "checkId" | "localCheck"> & {
+  report: Report;
+  onEdit: (id: string, text: string) => boolean;
+  onSave: () => void;
+}) {
   const completed = report.batches.filter((b) => b.status === "completed");
   const issues = report.batches.filter(
     (b) => b.status === "failed" || b.status === "uncertain",
@@ -158,19 +165,34 @@ export function DocumentSpellingReport({
           Tải báo cáo JSON
         </Button>
       </div>
+      {report.finished && suggestions > 0 && (
+        <DocumentSpellingReview
+          key={completed.map((batch) => batch.check?.id).join(":")}
+          {...props}
+          items={completed
+            .flatMap((batch) =>
+              (batch.check?.suggestions ?? []).map((suggestion, index) => ({
+                id: `${batch.key}:${index}`,
+                page: batch.page,
+                suggestion,
+              })),
+            )
+            .sort((a, b) => a.page - b.page)}
+          onEdit={onEdit}
+          onSave={onSave}
+        />
+      )}
       {completed
-        .filter(
-          (b) =>
-            b.check &&
-            (b.check.suggestions.length ||
-              b.check.withheld_suggestions?.length),
-        )
+        .filter((b) => b.check?.withheld_suggestions?.length)
         .map((b) => (
           <div key={b.key} className="space-y-2">
             <h4 className="text-xs font-medium">
               Trang {b.page} · {b.evidenceIds.length} đoạn đã kiểm tra
             </h4>
-            <SpellingResultPanel {...props} localCheck={b.check ?? null} />
+            <SpellingResultPanel
+              {...props}
+              localCheck={b.check ? { ...b.check, suggestions: [] } : null}
+            />
           </div>
         ))}
     </section>

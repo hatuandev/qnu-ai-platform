@@ -199,9 +199,7 @@ def test_auto_policy_preserves_access_quota_and_explicit_request_boundaries(clie
                 provider["id"],
             )
 
-    with pytest.raises(AppException) as quota:
-        client.portal.call(reserve)
-    assert quota.value.code == "quota_exceeded"
+    client.portal.call(reserve)
     assert client.patch(URL + f"/{provider['id']}", json={"is_active": False}).status_code == 200
     with pytest.raises(AppException) as disabled:
         prepare(client, ws, provider)

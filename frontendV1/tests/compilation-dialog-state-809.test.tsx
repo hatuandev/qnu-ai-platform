@@ -1,8 +1,15 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CompilationDialog } from "@/features/knowledge/compilation-dialog";
 
+const { create } = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock("@/features/modelops/queries", () => ({
   useCatalogQuery: () => ({ data: [] }),
 }));
@@ -20,10 +27,13 @@ vi.mock("@/features/knowledge/ocr-queries", () => ({
 vi.mock("@/features/knowledge/compilation-queries", () => ({
   useCreateCompilationMutation: () => ({
     isPending: false,
-    mutateAsync: vi.fn(),
+    mutateAsync: create,
   }),
 }));
 beforeEach(() => {
+  create
+    .mockReset()
+    .mockResolvedValue({ created: true, run: { id: "compiled" } });
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -60,6 +70,7 @@ it("keeps compiler configuration when parent renders the same pinned input again
   expect(
     (screen.getByLabelText(/Chủ đề biên soạn/) as HTMLTextAreaElement).value,
   ).toBe("User-entered topic");
+  fireEvent.click(screen.getByRole("button", { name: "Cài đặt nâng cao" }));
   fireEvent.change(
     screen.getByLabelText(/Giới hạn Output Tokens \(Tùy chọn\)/),
     { target: { value: "2048" } },
@@ -99,4 +110,51 @@ it("starts a fresh configuration when reopened or switched to another pinned ver
   expect(
     (screen.getByLabelText(/Chủ đề biên soạn/) as HTMLTextAreaElement).value,
   ).toBe("");
+});
+
+it("opens with the pinned saved version and automatic settings, without technical fields", async () => {
+  render(
+    <CompilationDialog {...props} initialRun={{ ...run, textVersion: 6 }} />,
+  );
+  expect(screen.getByText("Bản đã lưu v6 · Tệp v1")).toBeTruthy();
+  expect(screen.queryByLabelText(/Giới hạn Output Tokens/)).toBeNull();
+  expect(screen.queryByText("Tài liệu nguồn")).toBeNull();
+  expect(screen.queryByText(/Run ID:|Gen #|Khóa:/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu biên soạn" }));
+  await waitFor(() => expect(create).toHaveBeenCalledOnce());
+  expect(create.mock.calls[0][0]).toMatchObject({
+    input: {
+      topic: "Source",
+      ocr_run_ids: ["run-1"],
+      text_versions: { "run-1": 6 },
+      provider_id: null,
+      max_output_tokens: null,
+      structured_output: false,
+      auto_review: true,
+      review_provider_id: null,
+      review_max_output_tokens: null,
+    },
+  });
+});
+
+it("lets a user open source selection and advanced options only when needed", () => {
+  render(<CompilationDialog {...props} initialRun={run} />);
+  fireEvent.click(screen.getByRole("button", { name: "Thêm tài liệu" }));
+  expect(screen.getByText("Tài liệu nguồn")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Cài đặt nâng cao" }));
+  expect(
+    screen.getByLabelText(/Giới hạn Output Tokens \(Tùy chọn\)/),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Cài đặt nâng cao" }));
+  expect(screen.queryByLabelText(/Giới hạn Output Tokens/)).toBeNull();
+});
+
+it("opens the source picker for compilation started from a collection", () => {
+  render(<CompilationDialog {...props} />);
+  expect(screen.getByText("Tài liệu nguồn")).toBeTruthy();
+  expect(
+    screen
+      .getByRole("button", { name: "Bắt đầu biên soạn" })
+      .hasAttribute("disabled"),
+  ).toBe(true);
 });

@@ -100,6 +100,32 @@ Các lệnh thiết lập và kiểm tra bổ sung:
 PowerShell thay `make` bằng `.\make.ps1` cho mọi lệnh trên. Lệnh không có tiền tố
 `v1-` đã chuyển sang V1; `make dev` chạy cùng kế hoạch với `make v1-dev`. Các lệnh
 legacy `seed/reset-db/reseed/reconcile/reindex` bị từ chối, không gọi backend cũ.
+
+Để thử lại app V1 trên dữ liệu trắng, dừng `dev` bằng Ctrl+C rồi chạy:
+
+```powershell
+.\make.ps1 clear --confirm-local-reset
+.\make.ps1 infra-up
+.\make.ps1 migrate
+.\make.ps1 seed-modelops
+.\make.ps1 dev
+```
+
+Dừng nếu có lệnh báo lỗi. Mở <http://127.0.0.1:3001/> sau khi `dev` khởi động.
+`clear` xóa volume PostgreSQL, Redis, Qdrant và MinIO của Docker local. Workspace,
+ModelOps và tài liệu lưu trong các volume này cần được tạo lại. Dữ liệu trên
+dịch vụ ngoài Docker hoặc thư mục lưu trữ riêng nằm ngoài phạm vi reset. Giữ cùng
+lựa chọn `QNU_V1_ENV_DIR` cho toàn bộ các lệnh. Xem trước bằng
+`.\make.ps1 clear --dry-run`. Với GNU Make, dùng `make clear ARGS=--confirm-local-reset`.
+
+`seed-modelops` là bước tùy chọn cho DB development local. Lệnh thêm 9router Luna
+(`cx/gpt-6-luna`) và dùng `E2E_9ROUTER_API_KEY` trong `.env` gốc nếu chưa có
+khóa dùng chung đang hoạt động trên ModelOps. Seed đặt Qwen tắt suy luận cho
+chat, biên soạn, rà soát bản biên soạn và kiểm tra chính tả. Lệnh thiết lập Qwen,
+BGE Embedding, BGE Rerank và MinerU làm model mặc định hệ thống. Nếu chưa có khóa
+dùng chung đang hoạt động, lệnh yêu cầu nhập ẩn khóa QNU dùng cho gateway QNU và
+MinerU. Chạy lại sẽ tái dùng kết nối, khóa và model phù hợp. Thiết lập quyền
+model cho từng workspace sau khi đăng nhập.
 `db-ready` chỉ tương đương kiểm tra `check`, không tự tạo schema/seed. Runner chung là
 [`scripts/run_v1.py`](../../scripts/run_v1.py), cần Python có sẵn trên máy hoặc
 môi trường `.venv` V1 đã cài. Lệnh khởi động không tự migration/seed/reset DB.
@@ -363,7 +389,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8002/health/ready
 
 `/health/live` xác nhận API còn phản hồi; `/health/ready` kiểm kết nối PostgreSQL và Redis, trả 503 nếu thiếu một trong hai. Hai kết quả này chưa chứng minh migration, worker, Qdrant hay model hoạt động đầy đủ.
 
-Sau đăng nhập, mở workspace → **Vận hành** → kiểm tra sẵn sàng bằng tài khoản admin. Màn này kiểm thêm schema, queue/worker, Qdrant, cấu hình model/quota và đọc tệp nguồn. Workspace mới chưa có nguồn có thể báo `no_source_to_probe`; upload một tài liệu rồi kiểm tra lại. Readiness không tự chạy inference model và không chứng nhận chất lượng câu trả lời.
+Sau đăng nhập, mở workspace → **Vận hành** → kiểm tra sẵn sàng bằng tài khoản admin. Màn này kiểm thêm schema, queue/worker, Qdrant, cấu hình model và đọc tệp nguồn. Workspace mới chưa có nguồn có thể báo `no_source_to_probe`; upload một tài liệu rồi kiểm tra lại. Readiness không tự chạy inference model và không chứng nhận chất lượng câu trả lời.
 
 ### Mở chức năng từ sidebar
 
@@ -388,7 +414,7 @@ Bỏ qua các bước đã cấu hình đúng; không tạo lại provider/key k
 2. Vào **ModelOps → Nhà cung cấp**, tạo kết nối theo tên/loại/endpoint. Trong chi tiết: thêm API key → thử kết nối → thêm các model và capability. Một server AI là một nhà cung cấp chứa nhiều model; xem [hướng dẫn42](42_modelops_nha_cung_cap_va_model.md).
 3. Khai báo capacity/input/output theo model và server đang dùng. Embedding cần `embedding_dimension`; OCR cần accounting ảnh/trang phù hợp. Không suy capacity từ tên model hoặc điền số giả để vượt kiểm tra. Xem [capacity ModelOps](../../backendV1/docs/model-capacity.md).
 4. Tại workspace, cấp danh sách provider được phép, rồi chọn default **OCR**, **chat**, **embedding**, và **rerank** nếu dùng. Default toàn hệ thống không thay thế bước cấp quyền cho workspace.
-5. Cấu hình **quota tháng hiện tại theo UTC** cho workspace. Thiếu bản ghi quota sẽ chặn inference; unlimited chỉ có hiệu lực khi được lưu tường minh, không phải khi bỏ qua cấu hình. Sang tháng cần cấu hình kỳ mới.
+5. Mở **Mức sử dụng** để theo dõi token. Hệ thống tự tạo kỳ thống kê UTC khi có lượt gọi đầu tiên.
 
 Các vai trò model trong luồng hiện tại:
 
@@ -431,7 +457,6 @@ workspace. Xem [hướng dẫn ModelOps](39_modelops_lay_danh_sach_va_chay_thu.m
 | Tự đăng nhập không hoạt động | Dùng `npm run dev`, URL loopback và kiểm tra `.env.local`; build/preview không có cầu nối; sau logout dùng nút đăng nhập lại |
 | `ENCRYPTION_KEY_MISSING` / `DECRYPT_FAILED` | Kiểm tra API và worker dùng đúng khóa mã hóa đã bảo vệ credential trong DB; không thay khóa tùy ý |
 | OCR/Compiler/index đứng `queued` | Xem cửa sổ worker, Redis URL, queue `qnu:v1:jobs`, database và cờ dispatch/reconcile của API/worker có khớp; xem chi tiết job ở Vận hành |
-| `quota_not_configured` / `quota_exceeded` | Cấu hình quota đúng tháng UTC hoặc kiểm tra usage/reservation; không giả định tháng trước còn hiệu lực |
 | Capacity thiếu/stale, `model_input_budget_unknown` | Kiểm tra lại capacity và OCR image accounting sau khi đổi endpoint/model; không tăng token môi trường để bỏ qua kiểm tra |
 | Provider trả 401/403, ví dụ `embedding_auth_failed` | Kiểm tra credential đang active ở ModelOps và quyền trên server AI; không biến lỗi provider thành “không có dữ liệu” |
 | Upload đọc được ở API nhưng worker báo thiếu tệp | Hai tiến trình phải dùng cùng storage driver và cùng đường dẫn tuyệt đối/bucket; kiểm tra khác thư mục hiện tại |

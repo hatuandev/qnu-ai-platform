@@ -7,7 +7,6 @@ import { useReadiness } from "./queries";
 
 const NAMES: Record<string, string> = {
   database: "Cơ sở dữ liệu",
-  quota: "Ngân sách token",
   queue: "Hàng đợi xử lý",
   vector: "Kho tìm kiếm",
   worker: "Tiến trình xử lý",
@@ -68,16 +67,6 @@ export function ReadinessPanel({ workspaceId }: { workspaceId: string }) {
                   {check.model ? (
                     <p className="mt-1 break-all text-xs text-muted-foreground">
                       {check.model}
-                    </p>
-                  ) : null}
-                  {key === "quota" ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Còn lại:{" "}
-                      {check.configured === false
-                        ? "Chưa cấu hình"
-                        : check.remaining_tokens === null
-                          ? "Không giới hạn theo cấu hình"
-                          : (check.remaining_tokens ?? "Chưa xác định")}
                     </p>
                   ) : null}
                 </div>

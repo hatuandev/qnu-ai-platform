@@ -137,7 +137,7 @@ def test_unknown_multimodal_input_is_blocked_before_http(client):
         assert result.reason == "model_input_budget_unknown" and not fake.requests
 
 
-def test_quota_covers_image_input_and_output_instead_of_a_fixed_output_number(client):
+def test_legacy_quota_does_not_cap_ocr_request(client):
     with FakeNemotron() as fake:
         _provider, run, url = setup(client, fake, "full-request-quota")
         workspace_id = client.get(url).json()["workspace_id"]
@@ -145,7 +145,7 @@ def test_quota_covers_image_input_and_output_instead_of_a_fixed_output_number(cl
         # OCR_PAGE_TOKEN_BUDGET8192 would have allowed this request.
         assert set_quota(client, workspace_id, 10000).status_code == 200
         outcome = execute_now(client, run["id"])
-        assert outcome.reason == "quota_exceeded" and not fake.requests
+        assert outcome.status == "completed" and fake.requests
 
 
 def test_reconcile_recovers_old_delivery_without_replaying_a_live_worker(client):

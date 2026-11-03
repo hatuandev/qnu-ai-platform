@@ -18,7 +18,6 @@ import type {
   Page,
   PageParams,
   Quota,
-  QuotaUpdateInput,
   UsageRecord,
   Workspace,
   WorkspaceCreateInput,
@@ -171,17 +170,6 @@ export function getQuota(
   return client.get<Quota>(workspacePaths.quota(workspaceId), {
     searchParams: { period },
     signal: options?.signal,
-  });
-}
-
-export function putQuota(
-  client: V1Client,
-  workspaceId: string,
-  input: QuotaUpdateInput,
-  period?: string,
-): Promise<Quota> {
-  return client.put<Quota>(workspacePaths.quota(workspaceId), input, {
-    searchParams: { period },
   });
 }
 

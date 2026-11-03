@@ -371,12 +371,14 @@ function buildCompletedRun(): {
         page_number: 1,
         status: "completed",
         has_rendered_image: true,
+        used_ocr: true,
         has_tables: false,
       },
       {
         page_number: 2,
         status: "completed",
         has_rendered_image: true,
+        used_ocr: true,
         has_tables: true,
       },
     ],
@@ -522,44 +524,61 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
     );
   });
 
-  it("2. Opens DOCX 'Xem tệp gốc' before extraction (unprocessed) and on failed extraction without calling Gotenberg / renderedPdf", async () => {
-    const docxBlob = await createRealMultiSectionDocxBlob();
-    mocks.useRevisionContentBlobMock.mockReturnValue({
-      blob: docxBlob,
-      blobUrl: "blob:docx-rev-1",
-      contentType:
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      fileName: "quy-che-dao-tao.docx",
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-    });
+  it.each([false, true])(
+    "2. Opens DOCX directly without an OCR comparison (native completed: %s)",
+    async (completed) => {
+      if (completed) {
+        const { run, detail, doc } = buildCompletedRun();
+        detail.pages = detail.pages.map((page) => ({
+          ...page,
+          used_ocr: false,
+        }));
+        mocks.runs = [run];
+        mocks.runDetail = detail;
+        mocks.docData = doc;
+      }
+      const docxBlob = await createRealMultiSectionDocxBlob();
+      mocks.useRevisionContentBlobMock.mockReturnValue({
+        blob: docxBlob,
+        blobUrl: "blob:docx-rev-1",
+        contentType:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        fileName: "quy-che-dao-tao.docx",
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
 
-    // Unprocessed state: runs = [], runDetail = null
-    renderWithQuery(
-      <SourceDetailPage
-        workspaceId="ws-1"
-        collectionId="col-1"
-        sourceId="src-1"
-        search={{ page: 1 }}
-        onSearchChange={vi.fn()}
-      />,
-    );
+      // Unprocessed state: runs = [], runDetail = null
+      renderWithQuery(
+        <SourceDetailPage
+          workspaceId="ws-1"
+          collectionId="col-1"
+          sourceId="src-1"
+          search={{ page: 1 }}
+          onSearchChange={vi.fn()}
+        />,
+      );
 
-    // In unprocessed state, 'Xem tệp gốc' is active by default alongside 'Bắt đầu bóc tách ngay'
-    const originalModeBtn = screen.getByTestId("left-pane-mode-original");
-    expect(originalModeBtn.getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByText(/Tài liệu đã được lưu trữ an toàn/i)).toBeTruthy();
+      // In unprocessed state, 'Xem tệp gốc' is active by default alongside 'Bắt đầu bóc tách ngay'
+      expect(screen.getByText("Tệp gốc")).toBeTruthy();
+      expect(screen.queryByTestId("left-pane-mode-ocr")).toBeNull();
+      if (!completed) {
+        expect(
+          screen.getByText(/Tài liệu đã được lưu trữ an toàn/i),
+        ).toBeTruthy();
+      }
 
-    await waitFor(() => {
-      expect(
-        screen.getByTestId("docx-original-render-target").textContent,
-      ).toContain("PHẦN I: QUY ĐỊNH CHUNG ĐẠI HỌC QUY NHƠN");
-    });
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("docx-original-render-target").textContent,
+        ).toContain("PHẦN I: QUY ĐỊNH CHUNG ĐẠI HỌC QUY NHƠN");
+      });
 
-    // Must NEVER call readRenderedPdfBlob / Gotenberg when previewing Word original file
-    expect(mocks.readRenderedPdfBlob).not.toHaveBeenCalled();
-  });
+      // Must NEVER call readRenderedPdfBlob / Gotenberg when previewing Word original file
+      expect(mocks.readRenderedPdfBlob).not.toHaveBeenCalled();
+    },
+  );
 
   it("3. Defaults to 'Đối chiếu OCR' when extracted, shows 'Bản dàn trang từ DOCX', and switches back from 'Xem tệp gốc' to 'Đối chiếu OCR' when locating a unit", async () => {
     const docxBlob = await createRealMultiSectionDocxBlob();
@@ -667,6 +686,7 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
       },
     ];
     const { run, detail, doc } = buildCompletedRun();
+    detail.pages[0].used_ocr = false;
     mocks.runs = [run];
     mocks.runDetail = detail;
     mocks.docData = doc;
@@ -724,8 +744,8 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
       />,
     );
 
-    // Switch to 'Xem tệp gốc' for PDF
-    fireEvent.click(screen.getByTestId("left-pane-mode-original"));
+    // The native text PDF opens directly in the original viewer.
+    expect(screen.queryByTestId("left-pane-mode-ocr")).toBeNull();
     const pdfViewer = await screen.findByTestId("pdf-original-viewer");
     expect(
       within(pdfViewer)
@@ -738,6 +758,12 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
     expect(pdfViewer.textContent).toContain(
       "Trường Đại học Quy Nhơn - Văn bản lớp chữ PDF gốc trang 1",
     );
+    fireEvent.click(screen.getByRole("button", { name: "Trang sau" }));
+    expect(
+      screen.getByTestId("left-pane-mode-ocr").getAttribute("aria-pressed"),
+    ).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Trang trước" }));
+    expect(screen.queryByTestId("left-pane-mode-ocr")).toBeNull();
 
     // Switch revision to rev-pdf-2 -> must immediately display rev-pdf-2 and never retain stale rev-pdf-1
     rerender(
@@ -755,7 +781,7 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
         />
       </QueryClientProvider>,
     );
-    fireEvent.click(screen.getByTestId("left-pane-mode-original"));
+    expect(screen.queryByTestId("left-pane-mode-ocr")).toBeNull();
     await waitFor(() => {
       expect(
         screen.getByTestId("mock-react-pdf-document").getAttribute("data-file"),
@@ -788,7 +814,7 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
         />
       </QueryClientProvider>,
     );
-    fireEvent.click(screen.getByTestId("left-pane-mode-original"));
+    expect(screen.queryByTestId("left-pane-mode-ocr")).toBeNull();
     expect(await screen.findByText("Không tải được tệp gốc")).toBeTruthy();
     expect(
       screen.getByText(
@@ -868,11 +894,11 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
       />,
     );
 
-    // Failed extraction alert is shown, and left pane offers "Mở Xem tệp gốc"
+    // Failed extraction leaves the original directly available.
     expect(
       screen.getAllByText(/Bóc tách chưa thành công/i).length,
     ).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole("button", { name: /Mở Xem tệp gốc/i }));
+    expect(screen.queryByTestId("left-pane-mode-ocr")).toBeNull();
 
     // Scanned PDF renders via PdfOriginalViewer canvas
     const pdfViewer = await screen.findByTestId("pdf-original-viewer");

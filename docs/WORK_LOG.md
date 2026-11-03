@@ -1,5 +1,13 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context847 — Rà soát chính tả toàn tài liệu](nhat_ky/2026-11-03_phien_847_ra_soat_chinh_ta.md).
+- [Context846 — Seed Qwen tắt suy luận](nhat_ky/2026-11-03_phien_846_seed_qwen_reasoning.md).
+- [Context845 — Seed 9router local](nhat_ky/2026-11-03_phien_845_seed_9router.md).
+- [Context844 — Khung PDF nhấp nháy](nhat_ky/2026-11-03_phien_844_pdf_nhap_nhay.md).
+- [Context843 — Ưu tiên xem tệp gốc](nhat_ky/2026-11-03_phien_843_xem_tep_goc.md).
+- [Context842 — Trang tài liệu và thống kê sử dụng V1](nhat_ky/2026-11-03_phien_842_ocr_va_usage.md).
+- [Context841 — Seed ModelOps local](nhat_ky/2026-11-03_phien_841_seed_modelops_local.md).
+- [Context840 — Reset app V1 local](nhat_ky/2026-11-03_phien_840_reset_app_v1_local.md).
 - [Context839 — ModelOps tự động](nhat_ky/2026-11-03_phien_839_modelops_tu_dong.md).
 
   FE741PASS; BE85trọngtâm+1OCRPASS; full1323PASS/2FAIL (DOCX nền, assertion

@@ -93,7 +93,8 @@ def setup(client, code, *, blocked=False):
         ).status_code
         == 200
     )
-    assert set_quota(client, workspace["id"], 0, blocked=blocked).status_code == 200
+    if blocked:
+        assert set_quota(client, workspace["id"], 0, blocked=True).status_code == 200
     as_actor(EDITOR)
     collection, source, revision = prepare_source(
         client, workspace["id"], code, payload=real_pdf(["PAGE ONE", "PAGE TWO"])
@@ -146,7 +147,7 @@ def test_default_whole_document_pipeline_and_unknown_usage(client):
 
 
 @pytest.mark.parametrize("disabled,blocked", [(True, False), (False, True)])
-def test_disabled_or_blocked_never_submits_pdf(client, disabled, blocked):
+def test_disabled_provider_blocks_ocr_but_legacy_quota_does_not(client, disabled, blocked):
     _, provider, run_id = setup(client, f"mineru-blocked-{str(disabled).lower()}", blocked=blocked)
     if disabled:
         as_actor(PLATFORM)
@@ -157,8 +158,8 @@ def test_disabled_or_blocked_never_submits_pdf(client, disabled, blocked):
             == 200
         )
     engine = DocumentEngine()
-    assert execute_now(client, run_id, engine=engine).status == "failed"
-    assert engine.calls == []
+    assert execute_now(client, run_id, engine=engine).status == ("failed" if disabled else "completed")
+    assert engine.calls == ([] if disabled else ["POST", "PUT", "GET", "GET"])
 
 
 def test_zero_reservation_cannot_bypass_token_based_models(client):

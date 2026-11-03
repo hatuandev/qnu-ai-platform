@@ -196,6 +196,7 @@ async def get_processing_run(
             PageStatusResponse(
                 page_number=row.page_number,
                 status=row.status,
+                used_ocr=row.status == "completed" and row.raw_key is not None,
                 image_sha256=row.image_sha256,
                 blocks_count=row.blocks_count,
                 has_tables=row.has_tables,

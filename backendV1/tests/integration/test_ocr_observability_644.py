@@ -147,15 +147,12 @@ def test_failed_layout_has_failed_parse_but_successful_raw_storage(client, monke
         assert any(e["stage"] == "assemble" and e["status"] == "failed" for e in finished)
 
 
-def test_quota_failure_is_visible_before_any_provider_request(client, monkeypatch):
+def test_usage_reservation_is_observable_without_monthly_limit(client, monkeypatch):
     events = RecordedEvents()
     monkeypatch.setattr(execution, "logger", events)
     with FakeNemotron() as fake:
         run, _url, _revision, _provider = prepare(client, fake, "trace-quota", quota=0)
-        assert execute_now(client, run["id"]).status == "failed"
-        assert not fake.requests
+        assert execute_now(client, run["id"]).status == "completed"
+        assert fake.requests
         stages = [e for e in events.events if e["event"] == "ocr_stage_finished"]
-        assert any(
-            e["stage"] == "reserve_usage" and e["error_code"] == "quota_exceeded" for e in stages
-        )
-        assert not any(e["stage"] == "ocr_page" for e in stages)
+        assert any(e["stage"] == "reserve_usage" and e["status"] == "completed" for e in stages)

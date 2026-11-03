@@ -24,7 +24,6 @@ import {
   listWorkspaces,
   loadMembersForRole,
   putAllowlist,
-  putQuota,
   putWorkspaceDefaults,
   revokeMember,
   updateMember,
@@ -36,7 +35,6 @@ import type {
   MemberCreateInput,
   MemberUpdateInput,
   PageParams,
-  QuotaUpdateInput,
   WorkspaceCreateInput,
   WorkspaceDefaultsInput,
   WorkspaceUpdateInput,
@@ -444,29 +442,6 @@ export function usePutWorkspaceDefaults(workspaceId: string) {
         queryKey: ["v1", sessionId, "modelops"],
       });
       void queryClient.invalidateQueries({ queryKey: ["v1", "modelops"] });
-    },
-  });
-}
-
-export function usePutQuota(workspaceId: string) {
-  const queryClient = useQueryClient();
-  const { sessionId } = useV1Auth();
-  return useMutation({
-    mutationFn: (input: QuotaUpdateInput) =>
-      putQuota(v1Client, workspaceId, input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: workspaceKeys.quota(workspaceId, sessionId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: workspaceKeys.quota(workspaceId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ["v1", sessionId, "workspaces", "events", workspaceId],
-      });
-      void queryClient.invalidateQueries({
-        queryKey: [...ROOT, "events", workspaceId],
-      });
     },
   });
 }

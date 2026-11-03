@@ -448,7 +448,7 @@ def test_provider_without_ocr_capability_is_rejected(client: TestClient) -> None
         assert outcome.reason == "provider_capability_mismatch"
 
 
-def test_quota_blocks_processing_before_any_call(client: TestClient) -> None:
+def test_legacy_zero_quota_does_not_block_processing(client: TestClient) -> None:
     with FakeNemotron() as fake:
         workspace, collection, source, revision = _workspace_with_document(client, "ocr-quota")
         setup_ocr_provider(client, workspace["id"], fake.base_url)
@@ -458,9 +458,8 @@ def test_quota_blocks_processing_before_any_call(client: TestClient) -> None:
             client, workspace["id"], collection["id"], source["id"], revision["id"]
         ).json()["run"]
         outcome = execute_now(client, run["id"])
-        assert outcome.status == "failed"
-        assert outcome.reason == "quota_exceeded"
-        assert fake.requests == []
+        assert outcome.status == "completed"
+        assert fake.requests
 
 
 def test_timeout_is_uncertain_and_never_retried(client: TestClient) -> None:

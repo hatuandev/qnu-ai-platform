@@ -1,9 +1,11 @@
 import {
   BookOpen,
   Check,
+  ChevronDown,
   Cpu,
   Info,
   Loader2,
+  MoreHorizontal,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -11,10 +13,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ApiProblemError } from "@/app/api/v1";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +29,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -84,6 +96,8 @@ export function CompilationDialog({
   const [providerId, setProviderId] = useState<string>("default");
   const [maxOutputTokens, setMaxOutputTokens] = useState<string>("");
   const [structuredOutput, setStructuredOutput] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(!initialRun);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Auto-review settings
   const [autoReview, setAutoReview] = useState(true);
@@ -178,6 +192,8 @@ export function CompilationDialog({
       setIdempotencyKey(generateIdempotencyKey());
       setPickerSourceId("");
       setPickerRevisionId("");
+      setPickerOpen(!initialRun);
+      setAdvancedOpen(false);
     }
   }, [isOpen, initialRun, initialScope]);
 
@@ -188,7 +204,7 @@ export function CompilationDialog({
 
   const handleAddRun = (run: { id: string; generation: number }) => {
     if (selectedRuns.some((r) => r.runId === run.id)) {
-      toast.error("Lượt OCR này đã được chọn.");
+      toast.error("Kết quả bóc tách này đã được chọn.");
       return;
     }
     if (selectedRuns.length >= 20) {
@@ -213,13 +229,20 @@ export function CompilationDialog({
       },
     ]);
     setIdempotencyKey(generateIdempotencyKey());
-    toast.success(`Đã thêm OCR Gen #${run.generation}`);
+    toast.success("Đã thêm tài liệu.");
   };
 
   const handleRemoveRun = (runId: string) => {
     setSelectedRuns((prev) => prev.filter((r) => r.runId !== runId));
     setIdempotencyKey(generateIdempotencyKey());
   };
+
+  const effectiveTopic =
+    topic.trim() ||
+    selectedRuns
+      .map((item) => item.sourceTitle)
+      .join("; ")
+      .slice(0, 2000);
 
   const handleTextVersionChange = (runId: string, version: number) => {
     setSelectedRuns((prev) =>
@@ -230,10 +253,6 @@ export function CompilationDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!topic.trim()) {
-      toast.error("Vui lòng nhập chủ đề biên soạn.");
-      return;
-    }
     if (selectedRuns.length === 0) {
       toast.error("Vui lòng chọn ít nhất 1 lượt xử lý OCR.");
       return;
@@ -252,7 +271,7 @@ export function CompilationDialog({
     }
 
     const payload: CompilationRequestInput = {
-      topic: topic.trim(),
+      topic: effectiveTopic,
       ocr_run_ids,
       text_versions,
       provider_id: providerId === "default" ? null : providerId,
@@ -291,7 +310,7 @@ export function CompilationDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-3xl max-h-[min(860px,calc(100vh-2rem))] flex flex-col p-0 gap-0">
+      <DialogContent className="sm:max-w-2xl max-h-[min(860px,calc(100dvh-2rem))] flex flex-col p-0 gap-0">
         <DialogHeader className="p-4 sm:p-5 border-b bg-muted/20">
           <div className="flex items-center gap-2.5">
             <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
@@ -299,11 +318,10 @@ export function CompilationDialog({
             </div>
             <div>
               <DialogTitle className="text-base font-semibold">
-                Tạo lượt biên soạn tri thức (Compiler)
+                Biên soạn tài liệu
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Tổng hợp nội dung từ các lượt xử lý OCR trong kho tri thức thành
-                bản nháp chuẩn mực có dẫn chứng.
+                Tạo bản nháp có dẫn chứng từ văn bản đã lưu.
               </DialogDescription>
             </div>
           </div>
@@ -318,7 +336,7 @@ export function CompilationDialog({
                   htmlFor="compiler-topic"
                   className="text-xs font-semibold"
                 >
-                  Chủ đề biên soạn <span className="text-destructive">*</span>
+                  Chủ đề biên soạn (tùy chọn)
                 </Label>
                 <span className="text-[11px] text-muted-foreground font-mono">
                   {topic.length} / 2000 ký tự
@@ -326,17 +344,16 @@ export function CompilationDialog({
               </div>
               <Textarea
                 id="compiler-topic"
-                rows={3}
+                rows={2}
                 className="text-xs resize-none"
-                placeholder="Ví dụ: Tổng hợp quy định tuyển sinh đại học chính quy, tiêu chuẩn xét tuyển và học phí năm 2026..."
+                placeholder="Để trống để biên soạn toàn bộ tài liệu đã chọn"
                 value={topic}
                 onChange={(e) => handleTopicChange(e.target.value)}
                 maxLength={2000}
-                required
               />
               <p className="text-[11px] text-muted-foreground">
-                Chủ đề xác định phạm vi trích xuất và tổng hợp. Mô hình chỉ sử
-                dụng các bằng chứng được cung cấp.
+                Để trống sẽ dùng tên tài liệu làm chủ đề. Có thể nhập nội dung
+                cụ thể để giới hạn phạm vi biên soạn.
               </p>
             </div>
 
@@ -345,27 +362,23 @@ export function CompilationDialog({
               <div className="flex items-center justify-between">
                 <div>
                   <Label className="text-xs font-semibold">
-                    Nguồn OCR & Phiên bản văn bản đã chọn ({selectedRuns.length}{" "}
-                    / 20)
+                    Nguồn biên soạn
                   </Label>
                   <p className="text-[11px] text-muted-foreground">
-                    Chỉ sử dụng các lượt OCR đã hoàn tất (`completed`). Mỗi
-                    nguồn có thể chọn dùng OCR gốc (v0) hoặc phiên bản rà soát
-                    hậu OCR (v1, v2...).
+                    Sử dụng đúng bản văn bản đã lưu bên dưới.
                   </p>
                 </div>
               </div>
 
               {selectedRuns.length === 0 ? (
                 <Card className="rounded-lg border-dashed p-4 text-center text-muted-foreground">
-                  <p className="text-xs">Chưa có lượt OCR nào được chọn.</p>
+                  <p className="text-xs">Chưa chọn tài liệu.</p>
                   <p className="text-[11px] text-muted-foreground/70">
-                    Chọn tài liệu và lượt OCR ở khung bên dưới để thêm vào danh
-                    sách biên soạn.
+                    Mở Thêm tài liệu để chọn nguồn biên soạn.
                   </p>
                 </Card>
               ) : (
-                <div className="space-y-2 border rounded-lg p-2.5 bg-muted/10">
+                <div className="divide-y divide-border/60">
                   {selectedRuns.map((item) => (
                     <SelectedRunRow
                       key={item.runId}
@@ -382,255 +395,183 @@ export function CompilationDialog({
               )}
 
               {/* Source & OCR Run Picker */}
-              <div className="border rounded-lg p-3 bg-card space-y-3">
-                <div className="flex items-center gap-1.5 font-medium text-foreground text-xs">
-                  <Plus className="size-3.5 text-primary" />
-                  <span>Thêm nguồn OCR từ kho tài liệu</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">
-                      Tài liệu nguồn
-                    </Label>
-                    <Select
-                      value={pickerSourceId}
-                      onValueChange={(val) => {
-                        setPickerSourceId(val);
-                        setPickerRevisionId("");
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Chọn tài liệu nguồn..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(sourcesQuery.data?.items ?? []).map((s) => (
-                          <SelectItem
-                            key={s.id}
-                            value={s.id}
-                            className="text-xs"
-                          >
-                            {s.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">
-                      Phiên bản tệp (Revision)
-                    </Label>
-                    <Select
-                      value={pickerRevisionId}
-                      onValueChange={(val) => setPickerRevisionId(val)}
-                      disabled={!pickerSourceId || revisionsQuery.isLoading}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Chọn revision..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(revisionsQuery.data ?? []).map((r) => (
-                          <SelectItem
-                            key={r.id}
-                            value={r.id}
-                            className="text-xs"
-                          >
-                            v{r.revision_no} · {r.file_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {pickerRevisionId && (
-                  <div className="pt-2 border-t space-y-1.5">
-                    <Label className="text-[11px] text-muted-foreground">
-                      Các lượt OCR đã hoàn thành của phiên bản này:
-                    </Label>
-                    {availableRunsQuery.isLoading ? (
-                      <Skeleton className="h-8 w-full" />
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {(availableRunsQuery.data?.items ?? [])
-                          .filter((r) => r.status === "completed")
-                          .map((r) => {
-                            const isAdded = selectedRuns.some(
-                              (s) => s.runId === r.id,
-                            );
-                            return (
-                              <Button
-                                key={r.id}
-                                type="button"
-                                size="sm"
-                                variant={isAdded ? "secondary" : "outline"}
-                                className="h-7 text-xs gap-1.5"
-                                disabled={isAdded}
-                                onClick={() =>
-                                  handleAddRun({
-                                    id: r.id,
-                                    generation: r.generation,
-                                  })
-                                }
-                              >
-                                {isAdded ? (
-                                  <Check className="size-3 text-primary" />
-                                ) : (
-                                  <Plus className="size-3" />
-                                )}
-                                <span>
-                                  Gen #{r.generation} (
-                                  {r.provider_id || "Mặc định"})
-                                </span>
-                              </Button>
-                            );
-                          })}
-                        {(availableRunsQuery.data?.items ?? []).filter(
-                          (r) => r.status === "completed",
-                        ).length === 0 && (
-                          <p className="text-[11px] text-muted-foreground italic">
-                            Chưa có lượt OCR completed nào cho phiên bản này.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Model & Output Settings */}
-            <div className="space-y-3 pt-2 border-t">
-              <Label className="text-xs font-semibold">
-                Cấu hình mô hình biên soạn
-              </Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="compiler-provider"
-                    className="text-[11px] text-muted-foreground"
+              <Collapsible
+                open={pickerOpen || selectedRuns.length === 0}
+                onOpenChange={setPickerOpen}
+              >
+                <CollapsibleTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5"
                   >
-                    Model biên soạn (Capability Chat)
-                  </Label>
-                  <Select
-                    value={providerId}
-                    onValueChange={(val) => {
-                      setProviderId(val);
-                      setIdempotencyKey(generateIdempotencyKey());
-                    }}
-                  >
-                    <SelectTrigger
-                      id="compiler-provider"
-                      className="h-8 text-xs"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="default" className="text-xs">
-                        Theo mặc định workspace (Khuyên dùng)
-                      </SelectItem>
-                      {chatProviders.map((p) => (
-                        <SelectItem key={p.id} value={p.id} className="text-xs">
-                          {p.name} ({p.model_name})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] text-muted-foreground">
-                    Để trống sẽ dùng model Chat mặc định của workspace.
-                  </p>
-                  <ConsumerModelBudgetNotice
-                    model={chatProviders.find((p) => p.id === providerId)}
-                    defaultModel={chatProviders.find((p) =>
-                      p.default_capabilities?.includes("chat"),
-                    )}
-                    isDefaultSelection={!providerId}
-                    capability="chat"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="compiler-max-tokens"
-                    className="text-[11px] text-muted-foreground"
-                  >
-                    Giới hạn Output Tokens (Tùy chọn)
-                  </Label>
-                  <Input
-                    id="compiler-max-tokens"
-                    type="number"
-                    min={1}
-                    className="h-8 text-xs font-mono"
-                    placeholder="Mặc định theo mô hình"
-                    value={maxOutputTokens}
-                    onChange={(e) => {
-                      setMaxOutputTokens(e.target.value);
-                      setIdempotencyKey(generateIdempotencyKey());
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2 pt-1">
-                <Checkbox
-                  id="compiler-structured"
-                  checked={structuredOutput}
-                  onCheckedChange={(checked) => {
-                    setStructuredOutput(Boolean(checked));
-                    setIdempotencyKey(generateIdempotencyKey());
-                  }}
-                />
-                <Label
-                  htmlFor="compiler-structured"
-                  className="text-xs font-normal text-muted-foreground cursor-pointer"
-                >
-                  Bật Structured Output nâng cao (JSON Schema strict)
-                </Label>
-              </div>
-            </div>
-
-            {/* Auto-Review Section */}
-            <div className="space-y-3 pt-3 border-t">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-xs font-semibold">
-                    Đánh giá & Rà soát tự động (Auto-Review)
-                  </Label>
-                  <p className="text-[11px] text-muted-foreground">
-                    Tự động gửi yêu cầu đánh giá độc lập hai chiều ngay khi
-                    Compiler hoàn tất.
-                  </p>
-                </div>
-                <Switch
-                  checked={autoReview}
-                  onCheckedChange={(checked) => {
-                    setAutoReview(checked);
-                    setIdempotencyKey(generateIdempotencyKey());
-                  }}
-                />
-              </div>
-
-              {autoReview ? (
-                <div className="rounded-lg border p-3 bg-muted/10 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Plus className="size-3.5" />
+                    Thêm tài liệu
+                    <ChevronDown className="size-3.5" />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3 pt-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div className="space-y-1">
                       <Label className="text-[11px] text-muted-foreground">
-                        Reviewer Provider (Tùy chọn)
+                        Tài liệu nguồn
                       </Label>
                       <Select
-                        value={reviewProviderId}
+                        value={pickerSourceId}
                         onValueChange={(val) => {
-                          setReviewProviderId(val);
-                          setIdempotencyKey(generateIdempotencyKey());
+                          setPickerSourceId(val);
+                          setPickerRevisionId("");
                         }}
                       >
                         <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Chọn tài liệu nguồn..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(sourcesQuery.data?.items ?? []).map((s) => (
+                            <SelectItem
+                              key={s.id}
+                              value={s.id}
+                              className="text-xs"
+                            >
+                              {s.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-muted-foreground">
+                        Phiên bản tệp
+                      </Label>
+                      <Select
+                        value={pickerRevisionId}
+                        onValueChange={(val) => setPickerRevisionId(val)}
+                        disabled={!pickerSourceId || revisionsQuery.isLoading}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Chọn phiên bản tệp..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(revisionsQuery.data ?? []).map((r) => (
+                            <SelectItem
+                              key={r.id}
+                              value={r.id}
+                              className="text-xs"
+                            >
+                              v{r.revision_no} · {r.file_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {pickerRevisionId && (
+                    <div className="pt-2 border-t space-y-1.5">
+                      <Label className="text-[11px] text-muted-foreground">
+                        Kết quả bóc tách đã hoàn tất
+                      </Label>
+                      {availableRunsQuery.isLoading ? (
+                        <Skeleton className="h-8 w-full" />
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {(availableRunsQuery.data?.items ?? [])
+                            .filter((r) => r.status === "completed")
+                            .map((r) => {
+                              const isAdded = selectedRuns.some(
+                                (s) => s.runId === r.id,
+                              );
+                              return (
+                                <Button
+                                  key={r.id}
+                                  type="button"
+                                  size="sm"
+                                  variant={isAdded ? "secondary" : "outline"}
+                                  className="h-7 text-xs gap-1.5"
+                                  disabled={isAdded}
+                                  onClick={() =>
+                                    handleAddRun({
+                                      id: r.id,
+                                      generation: r.generation,
+                                    })
+                                  }
+                                >
+                                  {isAdded ? (
+                                    <Check className="size-3 text-primary" />
+                                  ) : (
+                                    <Plus className="size-3" />
+                                  )}
+                                  <span>Lần bóc tách {r.generation}</span>
+                                </Button>
+                              );
+                            })}
+                          {(availableRunsQuery.data?.items ?? []).filter(
+                            (r) => r.status === "completed",
+                          ).length === 0 && (
+                            <p className="text-[11px] text-muted-foreground italic">
+                              Phiên bản tệp này chưa bóc tách xong.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              {providerId === "default"
+                ? "Dùng model mặc định của đơn vị."
+                : `Model đã chọn: ${chatProviders.find((p) => p.id === providerId)?.model_name ?? "Đang tải…"}.`}{" "}
+              {autoReview
+                ? "Rà soát tự động đang bật."
+                : "Rà soát tự động đang tắt."}
+            </p>
+            <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1.5"
+                >
+                  Cài đặt nâng cao
+                  <ChevronDown className="size-3.5" />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-3">
+                {/* Model & Output Settings */}
+                <div className="space-y-3 pt-2 border-t">
+                  <Label className="text-xs font-semibold">
+                    Cấu hình mô hình biên soạn
+                  </Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="compiler-provider"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        Model biên soạn (Capability Chat)
+                      </Label>
+                      <Select
+                        value={providerId}
+                        onValueChange={(val) => {
+                          setProviderId(val);
+                          setIdempotencyKey(generateIdempotencyKey());
+                        }}
+                      >
+                        <SelectTrigger
+                          id="compiler-provider"
+                          className="h-8 text-xs"
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="default" className="text-xs">
-                            Dùng provider Compiler ghim (Khuyên dùng)
+                            Theo mặc định workspace (Khuyên dùng)
                           </SelectItem>
                           {chatProviders.map((p) => (
                             <SelectItem
@@ -643,65 +584,173 @@ export function CompilationDialog({
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-[10px] text-muted-foreground">
-                        Với auto-review, để trống sẽ dùng đúng provider được
-                        ghim của Compiler.
+                      <p className="text-[11px] text-muted-foreground">
+                        Để trống sẽ dùng model Chat mặc định của workspace.
                       </p>
                       <ConsumerModelBudgetNotice
-                        model={chatProviders.find(
-                          (p) => p.id === reviewProviderId,
+                        model={chatProviders.find((p) => p.id === providerId)}
+                        defaultModel={chatProviders.find((p) =>
+                          p.default_capabilities?.includes("chat"),
                         )}
-                        defaultModel={
-                          chatProviders.find((p) => p.id === providerId) ??
-                          chatProviders.find((p) =>
-                            p.default_capabilities?.includes("chat"),
-                          )
-                        }
-                        isDefaultSelection={!reviewProviderId}
+                        isDefaultSelection={providerId === "default"}
                         capability="chat"
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-[11px] text-muted-foreground">
-                        Giới hạn Output Tokens Review
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="compiler-max-tokens"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        Giới hạn Output Tokens (Tùy chọn)
                       </Label>
                       <Input
+                        id="compiler-max-tokens"
                         type="number"
                         min={1}
                         className="h-8 text-xs font-mono"
-                        value={reviewMaxTokens}
+                        placeholder="Mặc định theo mô hình"
+                        value={maxOutputTokens}
                         onChange={(e) => {
-                          setReviewMaxTokens(e.target.value);
+                          setMaxOutputTokens(e.target.value);
                           setIdempotencyKey(generateIdempotencyKey());
                         }}
                       />
-                      <p className="text-[10px] text-muted-foreground">
-                        Để trống để tự chọn theo giới hạn model và dung lượng
-                        đầu vào.
-                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 pt-1">
                     <Checkbox
-                      id="compiler-review-structured"
-                      checked={reviewStructuredOutput}
+                      id="compiler-structured"
+                      checked={structuredOutput}
                       onCheckedChange={(checked) => {
-                        setReviewStructuredOutput(Boolean(checked));
+                        setStructuredOutput(Boolean(checked));
                         setIdempotencyKey(generateIdempotencyKey());
                       }}
                     />
                     <Label
-                      htmlFor="compiler-review-structured"
+                      htmlFor="compiler-structured"
                       className="text-xs font-normal text-muted-foreground cursor-pointer"
                     >
-                      Bật Review Structured Output (Keyed contract)
+                      Bật Structured Output nâng cao (JSON Schema strict)
                     </Label>
                   </div>
                 </div>
-              ) : null}
-            </div>
+
+                {/* Auto-Review Section */}
+                <div className="space-y-3 pt-3 border-t">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-xs font-semibold">
+                        Đánh giá & Rà soát tự động (Auto-Review)
+                      </Label>
+                      <p className="text-[11px] text-muted-foreground">
+                        Tự động gửi yêu cầu đánh giá độc lập hai chiều ngay khi
+                        Compiler hoàn tất.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={autoReview}
+                      onCheckedChange={(checked) => {
+                        setAutoReview(checked);
+                        setIdempotencyKey(generateIdempotencyKey());
+                      }}
+                    />
+                  </div>
+
+                  {autoReview ? (
+                    <div className="rounded-lg border p-3 bg-muted/10 space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-[11px] text-muted-foreground">
+                            Reviewer Provider (Tùy chọn)
+                          </Label>
+                          <Select
+                            value={reviewProviderId}
+                            onValueChange={(val) => {
+                              setReviewProviderId(val);
+                              setIdempotencyKey(generateIdempotencyKey());
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="default" className="text-xs">
+                                Dùng provider Compiler ghim (Khuyên dùng)
+                              </SelectItem>
+                              {chatProviders.map((p) => (
+                                <SelectItem
+                                  key={p.id}
+                                  value={p.id}
+                                  className="text-xs"
+                                >
+                                  {p.name} ({p.model_name})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-[10px] text-muted-foreground">
+                            Với auto-review, để trống sẽ dùng đúng provider được
+                            ghim của Compiler.
+                          </p>
+                          <ConsumerModelBudgetNotice
+                            model={chatProviders.find(
+                              (p) => p.id === reviewProviderId,
+                            )}
+                            defaultModel={
+                              chatProviders.find((p) => p.id === providerId) ??
+                              chatProviders.find((p) =>
+                                p.default_capabilities?.includes("chat"),
+                              )
+                            }
+                            isDefaultSelection={reviewProviderId === "default"}
+                            capability="chat"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[11px] text-muted-foreground">
+                            Giới hạn Output Tokens Review
+                          </Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            className="h-8 text-xs font-mono"
+                            value={reviewMaxTokens}
+                            onChange={(e) => {
+                              setReviewMaxTokens(e.target.value);
+                              setIdempotencyKey(generateIdempotencyKey());
+                            }}
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Để trống để tự chọn theo giới hạn model và dung
+                            lượng đầu vào.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="compiler-review-structured"
+                          checked={reviewStructuredOutput}
+                          onCheckedChange={(checked) => {
+                            setReviewStructuredOutput(Boolean(checked));
+                            setIdempotencyKey(generateIdempotencyKey());
+                          }}
+                        />
+                        <Label
+                          htmlFor="compiler-review-structured"
+                          className="text-xs font-normal text-muted-foreground cursor-pointer"
+                        >
+                          Bật Review Structured Output (Keyed contract)
+                        </Label>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Warning Note */}
             <Alert className="rounded-lg border-info/30 bg-info/5 text-xs py-2.5">
@@ -715,10 +764,6 @@ export function CompilationDialog({
           </div>
 
           <DialogFooter className="p-3 sm:p-4 border-t bg-card flex items-center justify-between gap-2">
-            <span className="text-[11px] text-muted-foreground font-mono truncate max-w-[200px]">
-              Khóa: {idempotencyKey.slice(0, 16)}...
-            </span>
-
             <div className="flex items-center gap-2">
               <Button
                 type="button"
@@ -736,7 +781,7 @@ export function CompilationDialog({
                 className="h-8 text-xs gap-1.5"
                 disabled={
                   createMutation.isPending ||
-                  !topic.trim() ||
+                  !effectiveTopic ||
                   selectedRuns.length === 0
                 }
               >
@@ -785,64 +830,75 @@ function SelectedRunRow({
   );
 
   const reviewDoc = textReviewQuery.data;
-  const maxVersion = reviewDoc?.version ?? 0;
+  const maxVersion = Math.max(reviewDoc?.version ?? 0, item.textVersion);
+  const [versionPickerOpen, setVersionPickerOpen] = useState(false);
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-md bg-card border text-xs">
-      <div className="space-y-0.5 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="font-medium text-foreground truncate max-w-[200px]">
-            {item.sourceTitle}
-          </span>
-          <Badge variant="outline" className="font-mono text-[10px] py-0">
-            Rev v{item.revisionNo}
-          </Badge>
-          <Badge variant="secondary" className="font-mono text-[10px] py-0">
-            Gen #{item.generation}
-          </Badge>
-        </div>
-        <div className="text-[11px] text-muted-foreground font-mono truncate">
-          Run ID: {item.runId}
-        </div>
+    <div className="flex items-start justify-between gap-3 py-3 text-sm">
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <p className="font-medium text-foreground break-words">
+          {item.sourceTitle}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {item.textVersion > 0
+            ? `Bản đã lưu v${item.textVersion}`
+            : "Bản bóc tách gốc v0"}{" "}
+          · Tệp v{item.revisionNo}
+        </p>
+        {versionPickerOpen && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor={`text-version-${item.runId}`} className="text-xs">
+              Phiên bản văn bản
+            </Label>
+            <Select
+              value={String(item.textVersion)}
+              onValueChange={(val) => onTextVersionChange(Number(val))}
+            >
+              <SelectTrigger
+                id={`text-version-${item.runId}`}
+                className="h-8 text-xs w-[190px]"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0" className="text-xs">
+                  Bản bóc tách gốc v0
+                </SelectItem>
+                {maxVersion > 0 &&
+                  Array.from({ length: maxVersion }, (_, i) => i + 1).map(
+                    (v) => (
+                      <SelectItem key={v} value={String(v)} className="text-xs">
+                        Bản đã lưu v{v}
+                      </SelectItem>
+                    ),
+                  )}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
-
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-            Văn bản:
-          </span>
-          <Select
-            value={String(item.textVersion)}
-            onValueChange={(val) => onTextVersionChange(Number(val))}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="size-7 shrink-0 p-0"
+            aria-label={`Thao tác nguồn ${item.sourceTitle}`}
           >
-            <SelectTrigger className="h-7 text-xs w-[130px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0" className="text-xs">
-                v0 (OCR gốc)
-              </SelectItem>
-              {maxVersion > 0 &&
-                Array.from({ length: maxVersion }, (_, i) => i + 1).map((v) => (
-                  <SelectItem key={v} value={String(v)} className="text-xs">
-                    v{v} (Bản rà soát #{v})
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-          onClick={onRemove}
-          title="Xóa khỏi danh sách biên soạn"
-        >
-          <Trash2 className="size-3.5" />
-        </Button>
-      </div>
+            <MoreHorizontal className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => setVersionPickerOpen(true)}>
+            Đổi phiên bản
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onSelect={onRemove}>
+            <Trash2 className="size-3.5" />
+            Bỏ tài liệu
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useLocation } from "@tanstack/react-router";
 import { z } from "zod";
 import { OcrReviewPage } from "@/features/knowledge/ocr-review-page";
+import { preserveWorkspaceMask } from "@/navigation/workspace-links";
 
 const ocrReviewSearchSchema = z.object({
   revisionId: z.string().optional(),
@@ -21,6 +22,9 @@ function OcrReviewRoute() {
   const { workspaceId, collectionId, sourceId } = Route.useParams();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  const maskedPath = useLocation({
+    select: (location) => location.maskedLocation?.pathname,
+  });
 
   return (
     <OcrReviewPage
@@ -32,9 +36,9 @@ function OcrReviewRoute() {
         void navigate({
           search: (prev) => ({ ...prev, ...newParams }),
           replace: true,
+          mask: preserveWorkspaceMask(maskedPath, { ...search, ...newParams }),
         });
       }}
     />
   );
 }
-
