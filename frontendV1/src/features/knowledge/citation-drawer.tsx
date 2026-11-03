@@ -40,6 +40,7 @@ export function CitationDrawer({
 
   const [ocrRunId, ...rest] = citationId.split(":");
   const evidenceRef = rest.join(":");
+  const pageNumber = detail.page_number ?? detail.page;
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -103,11 +104,11 @@ export function CitationDrawer({
               </div>
 
               <div className="space-y-1.5 pt-1 border-t text-[11px]">
-                {detail.page_number !== undefined && (
+                {pageNumber !== undefined && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Trang:</span>
                     <Badge variant="outline" className="font-mono text-xs">
-                      Trang {detail.page_number}
+                      Trang {pageNumber}
                     </Badge>
                   </div>
                 )}
@@ -198,7 +199,7 @@ export function CitationDrawer({
                   sourceId: detail.source_id,
                   revisionId: detail.revision_id,
                   runId: ocrRunId,
-                  page: detail.page_number,
+                  page: pageNumber,
                 })
               }
             >

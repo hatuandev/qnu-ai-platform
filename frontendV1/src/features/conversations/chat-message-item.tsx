@@ -48,7 +48,7 @@ export function ChatMessageItem({
   const isUnavailable =
     turn.source_status === "unavailable" || turn.result === null;
 
-  const result = turn.result;
+  const result = turn.result?.status === "direct_reply" ? null : turn.result;
   const trace = result?.trace;
   const verification = trace?.verification;
   const scope = turn.metadata_filter;
@@ -336,7 +336,7 @@ export function ChatMessageItem({
               </div>
             ) : (
               <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-                {result?.answer || "(Không có nội dung phản hồi)"}
+                {turn.result?.answer || "(Không có nội dung phản hồi)"}
               </div>
             ))}
         </div>

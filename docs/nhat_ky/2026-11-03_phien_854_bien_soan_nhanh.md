@@ -1,0 +1,8 @@
+# Phiên 854 — Biên soạn nhanh từ nguồn
+
+- Tùy chọn `source_first` ghim cùng snapshot, kiểm lại quyền và nguồn trong worker, dựng Markdown và JSON bằng code. Dùng toàn bộ nguồn đã chọn, theo thứ tự trang/khối. Chủ đề là tiêu đề. Giữ bảng, ô và dấu hiệu cần đối chiếu. Không gọi model, không ghi nhận usage giả và không tự tạo Review AI. Chat được phép trong ModelOps vẫn cần để liên kết reviewer theo schema V1. Chế độ AI theo chủ đề giữ các cơ chế Structured Output và chia phần hiện hữu.
+- Hộp thoại và trang chi tiết cho biết chế độ nhanh không sinh văn bản bằng AI. Bản sửa của lượt nhanh cũng không tạo review tự động. Giữ quy trình xác nhận và phát hành hiện có.
+- Đo trực tiếp qua service tạo lượt và worker, không tính chờ Redis hoặc trình duyệt. Lượt nhanh `cmp_7f230dffdda7` dùng cùng hash đầu vào với Gen #2 `cmp_f6150ad0d485`. Tổng 2,34 giây, worker 1,31 giây và 0 lượt gọi AI. Gen #2 có 209,03 giây xử lý worker và 136.422 token. Review riêng `rvw_e7d02d6ac5f1` mất 710 giây và 223.338 token.
+- So khớp nguyên văn 408 khối văn bản và toàn bộ 8 bảng, 200 ô. Dẫn chứng có 641 mục. 32 khối được đánh dấu cần đối chiếu. Khớp nguyên văn 9/9 đoạn nguồn của nhận xét có thể bỏ sót từ báo cáo cũ. Đây là đối chiếu với bản đã lưu, không phải kiểm tra độ đúng OCR từ ảnh gốc.
+- Ruff có phạm vi đạt. Harness DB cô lập chạy 3 bộ Compiler, 11 ca đạt. Chế độ nhanh không dùng Qwen hoặc Luna. Chưa đo lại chế độ AI bằng model thật và chưa bật mặc định.
+- Sau khi giữ hành vi tạo review cho bản sửa của luồng AI cũ, chạy lại hai ca tích hợp nhanh và quy trình Compiler E2E, cả hai đạt. Vitest 35 ca, Biome 5 tệp và build frontend đạt. Bộ backend đầy đủ qua `tmp/full-backend-854.py` đã khởi chạy trên DB và Redis cô lập, chưa có kết quả tổng tại thời điểm bàn giao.

@@ -265,6 +265,16 @@ test("a viewer can read the review but has no transition to editing", async () =
   ).toBeNull();
 });
 
+test("a kept inactive review tab does not leave its request dialog over another tab", async () => {
+  const view = render(<CompilationReviewTab {...props} canReview />);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Yêu cầu Review thủ công" }),
+  );
+  expect(await screen.findByRole("dialog")).toBeTruthy();
+  view.rerender(<CompilationReviewTab {...props} canReview isActive={false} />);
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
 test("human compiler edits require preview then explicit save of the new version", async () => {
   ports.accept.mockResolvedValue({ run: { id: "child" }, created: true });
   const onChild = vi.fn();

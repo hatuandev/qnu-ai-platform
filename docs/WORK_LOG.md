@@ -1,5 +1,14 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context856 — Gom bằng chứng theo khoản](nhat_ky/2026-11-03_phien_856_gom_bang_chung_rag.md).
+- [Context855 — Phân luồng hội thoại V1](nhat_ky/2026-11-03_phien_855_phan_luong_hoi_thoai.md).
+- [Context854 — Biên soạn nhanh từ nguồn](nhat_ky/2026-11-03_phien_854_bien_soan_nhanh.md).
+- [Context853 — Xuất Markdown cho nhóm Compiler không có tiêu đề](nhat_ky/2026-11-03_phien_853_compiler_tieu_de_tuy_chon.md).
+- [Context852 — Rà soát nền và dừng lượt](nhat_ky/2026-11-03_phien_852_ra_soat_nen_va_dung_luot.md).
+- [Context851 — Phần trăm tiến độ rà soát](nhat_ky/2026-11-03_phien_851_phan_tram_ra_soat.md).
+- [Context850 — Hoàn tất trạng thái và tiến độ review](nhat_ky/2026-11-03_phien_850_hoan_tat_tab_ra_soat.md).
+- [Context849 — Tối ưu chuyển tab biên soạn](nhat_ky/2026-11-03_phien_849_toi_uu_tab_bien_soan.md).
+- [Context848 — Làm gọn hộp thoại biên soạn](nhat_ky/2026-11-03_phien_848_gon_hop_thoai_bien_soan.md).
 - [Context847 — Rà soát chính tả toàn tài liệu](nhat_ky/2026-11-03_phien_847_ra_soat_chinh_ta.md).
 - [Context846 — Seed Qwen tắt suy luận](nhat_ky/2026-11-03_phien_846_seed_qwen_reasoning.md).
 - [Context845 — Seed 9router local](nhat_ky/2026-11-03_phien_845_seed_9router.md).

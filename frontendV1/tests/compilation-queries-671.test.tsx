@@ -6,6 +6,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import {
   compilationKeys,
   useAutoReviewQuery,
+  useCompilationReviewProgressQuery,
   useCreateCompilationMutation,
   useCreateReviewMutation,
 } from "../src/features/knowledge/compilation-queries";
@@ -14,6 +15,7 @@ const ports = vi.hoisted(() => ({
   create: vi.fn(),
   review: vi.fn(),
   auto: vi.fn(),
+  progress: vi.fn(),
 }));
 vi.mock("@/app/auth/v1", () => ({ useV1Auth: () => ({ sessionId: 1 }) }));
 vi.mock(
@@ -25,6 +27,7 @@ vi.mock(
     createCompilationRun: ports.create,
     createCompilationReview: ports.review,
     getAutoReviewStatus: ports.auto,
+    getCompilationReviewProgress: ports.progress,
   }),
 );
 function setup() {
@@ -42,6 +45,29 @@ function setup() {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+});
+
+test("review group polling stops at an uncertain result and keeps completed work", async () => {
+  const { client, wrapper } = setup();
+  ports.progress
+    .mockResolvedValueOnce({ review_id: "r", status: "running", completed: 1 })
+    .mockResolvedValue({ review_id: "r", status: "uncertain", completed: 1 });
+  const hook = renderHook(
+    () => useCompilationReviewProgressQuery("w", "c", "run", "r"),
+    { wrapper },
+  );
+  await waitFor(() => expect(hook.result.current.data?.status).toBe("running"));
+  await act(() => hook.result.current.refetch());
+  await waitFor(() =>
+    expect(hook.result.current.data?.status).toBe("uncertain"),
+  );
+  vi.useFakeTimers();
+  const calls = ports.progress.mock.calls.length;
+  await act(() => vi.advanceTimersByTimeAsync(15000));
+  expect(ports.progress.mock.calls.length).toBe(calls);
+  expect(hook.result.current.data?.completed).toBe(1);
+  hook.unmount();
+  client.clear();
 });
 
 test("F5: creating a compilation invalidates all page sizes in the same scope only", async () => {

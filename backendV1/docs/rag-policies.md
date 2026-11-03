@@ -121,10 +121,16 @@ giữ version/publication, áp cùng metadata_filter và loại trùng. Không d
 ordinal toàn generation để nối sang tài liệu khác, không đưa OCR chưa duyệt vào.
 Bảng tiếp tục giữ header, nhóm rowspan, ô và chú thích theo chunker đã có.
 
+Độc lập với cửa sổ lân cận, câu dẫn khoản có đánh số và dãy điểm liên tiếp được
+gom khi có ít nhất một đoạn đã truy xuất làm mốc. Các block phải liền nhau
+trên cùng trang nguồn và cùng bản xuất bản, kể cả khi nằm ở hai phần biên soạn.
+Các đoạn và phụ thuộc bảng phải cùng khớp một phạm vi metadata.
+
 context_max_bytes giới hạn JSON evidence thực gửi model (text/kind/structure),
 không tính DTO locator/citation chỉ trả cho API. Evidence chính vượt budget thì
-báo answer_context_budget_exceeded; context bổ sung hết budget được bỏ qua có
-trace, không cắt ô/bảng giữa chừng. Tổng evidence tối đa 20. ModelOps vẫn kiểm
+báo answer_context_budget_exceeded; đoạn lân cận tùy chọn được bỏ từ cuối theo
+kích thước gói JSON cuối, có trace. Giữ nguyên các điểm đã gom và phụ thuộc bảng.
+ModelOps vẫn kiểm
 capacity toàn request và output budget; byte budget không phải số token đã đo.
 Generation cũ thiếu parent vẫn đọc được, không đoán quan hệ để mở rộng.
 

@@ -10,6 +10,7 @@ import {
   getAutoReviewStatus,
   getCompilationDraft,
   getCompilationReview,
+  getCompilationReviewProgress,
   getCompilationReviewReport,
   getCompilationRun,
   getEditContext,
@@ -24,6 +25,7 @@ import type {
   DraftDocumentResponse,
   EditContextResponse,
   EditPreviewRequest,
+  ReviewProgressResponse,
   ReviewReportResponse,
   ReviewRequestInput,
 } from "./compilation-types";
@@ -448,6 +450,42 @@ export function useCompilationReviewQuery(
   });
 }
 
+export function useCompilationReviewProgressQuery(
+  workspaceId: string,
+  collectionId: string,
+  runId: string,
+  reviewId: string,
+) {
+  const { sessionId } = useV1Auth();
+  return useQuery<ReviewProgressResponse>({
+    queryKey: [
+      ...compilationKeys.review(
+        workspaceId,
+        collectionId,
+        runId,
+        reviewId,
+        sessionId,
+      ),
+      "progress",
+    ],
+    queryFn: ({ signal }) =>
+      getCompilationReviewProgress(
+        v1Client,
+        workspaceId,
+        collectionId,
+        runId,
+        reviewId,
+        { signal },
+      ),
+    enabled: Boolean(workspaceId && collectionId && runId && reviewId),
+    refetchInterval: (query) => {
+      if (query.state.status === "error") return false;
+      const status = query.state.data?.status;
+      return status === "queued" || status === "running" ? 3000 : false;
+    },
+  });
+}
+
 export function useCompilationReviewReportQuery(
   workspaceId: string,
   collectionId: string,
@@ -571,6 +609,7 @@ export function useCreateReviewMutation(
         runId,
         args.input,
         args.idempotencyKey,
+        { background: true },
       ),
     retry: 0,
     onSuccess: (review) => {

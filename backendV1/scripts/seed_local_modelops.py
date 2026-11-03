@@ -8,15 +8,19 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from qnu.domains.identity.actor import AuthActor
 from qnu.domains.identity.dev_gate import dev_admin_actor
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.connections import service
 from qnu.domains.modelops.connections.schemas import ConnectionCreate, ConnectionModelCreate
 from qnu.domains.modelops.diagnostics.router import get_diagnostic_client
 from qnu.domains.modelops.keys.service import key_service
+from qnu.domains.modelops.models import Provider
 from qnu.domains.modelops.providers.service import provider_service
 from qnu.domains.modelops.reasoning import EXTRA_CONFIG_KEY, REASONING_TASKS, ReasoningPolicy
+from qnu.domains.modelops.resilience.service import effective_policy, save_policy
 from qnu.domains.modelops.schemas import DefaultsUpdateRequest, KeyCreateRequest
 from qnu.platform.config import get_settings
 from qnu.platform.database import AsyncSessionFactory, engine
@@ -48,6 +52,19 @@ PROFILE = (
     ("QNU MinerU GPU", QNU_GATEWAY + "/mineru", "mineru", {"ocr": "mineru"}),
     ("9router Luna", ROUTER_URL, "openai_compatible", {"chat": "cx/gpt-6-luna"}),
 )
+
+
+async def configure_qwen_runtime(db: AsyncSession, actor: AuthActor, model: Provider) -> None:
+    """Apply the local Qwen contract without replacing other ModelOps policies."""
+    if model.base_url.rstrip("/") != QNU_GATEWAY + "/v1" or model.model_name != QWEN_MODEL:
+        return
+    if (model.extra_config or {}).get(EXTRA_CONFIG_KEY) != QWEN_REASONING.model_dump(mode="json"):
+        model = await provider_service.set_reasoning(db, model.id, QWEN_REASONING, actor)
+    policy = effective_policy(model)
+    if not policy.wait_for_completion:
+        await save_policy(
+            db, actor, model.id, policy.model_copy(update={"wait_for_completion": True})
+        )
 
 
 async def seed():
@@ -114,13 +131,7 @@ async def seed():
                         ConnectionModelCreate(model_name=model_name, capabilities=[capability]),
                         client=client,
                     )
-                if (
-                    url == QNU_GATEWAY + "/v1"
-                    and model_name == QWEN_MODEL
-                    and (model.extra_config or {}).get(EXTRA_CONFIG_KEY)
-                    != QWEN_REASONING.model_dump(mode="json")
-                ):
-                    await provider_service.set_reasoning(db, model.id, QWEN_REASONING, actor)
+                await configure_qwen_runtime(db, actor, model)
                 if url != ROUTER_URL:
                     defaults[f"{capability}_provider_id"] = model.id
         current = await catalog_service.get_defaults(db)

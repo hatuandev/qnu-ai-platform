@@ -16,6 +16,7 @@ import type {
   EditContextResponse,
   EditPreviewRequest,
   EditPreviewResponse,
+  ReviewProgressResponse,
   ReviewReportResponse,
   ReviewRequestInput,
 } from "./compilation-types";
@@ -157,7 +158,7 @@ export async function createCompilationReview(
   runId: string,
   input: ReviewRequestInput,
   idempotencyKey: string,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; background?: boolean },
 ): Promise<CompilationReviewResponse> {
   if (!validateReviewIdempotencyKey(idempotencyKey)) {
     throw new Error(
@@ -165,10 +166,30 @@ export async function createCompilationReview(
     );
   }
   const path = compilationPaths.reviews(workspaceId, collectionId, runId);
-  return client.post<CompilationReviewResponse>(path, input, {
-    idempotencyKey,
-    signal: options?.signal,
-  });
+  return client.post<CompilationReviewResponse>(
+    options?.background ? `${path}?background=true` : path,
+    input,
+    {
+      idempotencyKey,
+      signal: options?.signal,
+    },
+  );
+}
+
+export function cancelCompilationReview(
+  client: V1Client,
+  workspaceId: string,
+  collectionId: string,
+  runId: string,
+  reviewId: string,
+) {
+  const path = compilationPaths.review(
+    workspaceId,
+    collectionId,
+    runId,
+    reviewId,
+  );
+  return client.post<CompilationReviewResponse>(`${path}/cancel`, {});
 }
 
 export async function listCompilationReviews(
@@ -202,6 +223,25 @@ export async function getCompilationReview(
     reviewId,
   );
   return client.get<CompilationReviewResponse>(path, {
+    signal: options?.signal,
+  });
+}
+
+export async function getCompilationReviewProgress(
+  client: V1Client,
+  workspaceId: string,
+  collectionId: string,
+  runId: string,
+  reviewId: string,
+  options?: { signal?: AbortSignal },
+): Promise<ReviewProgressResponse> {
+  const path = compilationPaths.review(
+    workspaceId,
+    collectionId,
+    runId,
+    reviewId,
+  );
+  return client.get<ReviewProgressResponse>(`${path}/progress`, {
     signal: options?.signal,
   });
 }

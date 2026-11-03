@@ -761,6 +761,13 @@ function OcrTextReviewSession({
           draftChanges={draftChanges}
           canManage={canManage && !baseMovedOn}
           onApply={handleApplySuggestion}
+          onEdit={(id, text) => {
+            if (!canManage || baseMovedOn || !current()) return false;
+            draft.update((previous) => new Map(previous).set(id, text));
+            setActiveSaveKey(generateIdempotencyKey());
+            return true;
+          }}
+          onSave={() => setSaveModalOpen(true)}
           onLocateUnit={onLocateUnit}
           onManualEditUnit={(id) => {
             const unit = units.find((u) => u.evidence_id === id);

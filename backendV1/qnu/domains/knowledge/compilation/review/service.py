@@ -43,10 +43,13 @@ from qnu.domains.ocr.ids import new_id
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.errors import AppException, Conflict, EntityNotFound
+from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.chat_model import ChatMessage, ChatRequest
+from qnu.ports.job_queue import JobQueue
 
 REVIEW_ROLES = ("admin", "editor", "reviewer")
+logger = get_logger(__name__)
 SEGMENTED_CODES = {
     "model_context_limit_exceeded",
     "model_input_limit_exceeded",
@@ -236,6 +239,8 @@ async def prepare(
     run_id: str,
     req: ReviewRequest,
     key: str,
+    *,
+    enqueue: bool = False,
 ) -> PreparedReview:
     await authorize(db, actor, workspace_id, collection_id, write=True)
     run = await get_run(db, actor, workspace_id, collection_id, run_id)
@@ -264,6 +269,8 @@ async def prepare(
     if previous is not None:
         if previous.request_hash != request_hash:
             raise Conflict("Idempotency-Key đã dùng cho review khác.", code="idempotency_conflict")
+        if enqueue or previous.trace.get("background_review"):
+            return PreparedReview(run, previous, None, None)
         await expire(db, previous)
         # Never resume a request that may still be in flight; a concurrent replay
         # could send the same part twice. Only a stopped review can continue, and a
@@ -382,6 +389,7 @@ async def prepare(
         budget.max_output_tokens, reasoning_shares_budget=reasoning_shares
     )
     trace = {
+        "background_review": enqueue,
         "literal_check_version": 1,
         "review_concurrency": 2,
         "context_resolution_version": 2,
@@ -438,7 +446,7 @@ async def prepare(
         created_by=actor_ref(actor),
         idempotency_key=key,
         request_hash=request_hash,
-        status="running",
+        status="queued" if enqueue else "running",
         provider_id=runtime.provider_id,
         input_sha256=material.bundle.input_sha256,
         draft_sha256=material.bundle.draft_sha256,
@@ -475,6 +483,55 @@ async def prepare(
         messages=messages,
         segmented=bool(plans),
     )
+
+
+async def cancel_review(
+    db: AsyncSession,
+    actor: AuthActor,
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    review_id: str,
+) -> CompilationReview:
+    await authorize(db, actor, workspace_id, collection_id, write=True)
+    row = await get_review(db, actor, workspace_id, collection_id, run_id, review_id)
+    await db.refresh(row, with_for_update=True)
+    if row.status in {"queued", "running"}:
+        row.status, row.finished_at = "cancelled", utcnow()
+        await record_workspace_event(
+            db,
+            workspace_id=workspace_id,
+            actor=actor,
+            action="compilation.review_cancelled",
+            detail={"review_id": row.id},
+        )
+    await db.commit()
+    return row
+
+
+async def dispatch_review(queue: JobQueue | None, review_id: str) -> bool:
+    if queue is None:
+        return False
+    try:
+        async with asyncio.timeout(3):
+            return await queue.enqueue(
+                "manual_compiler_review_job",
+                review_id,
+                job_id=f"qnu:v1:manual-review:{review_id}:{int(utcnow().timestamp()) // 300}",
+            )
+    except Exception:
+        logger.warning("manual_review_dispatch_pending", review_id=review_id)
+        return False
+
+
+def _segment_progress_status(review: CompilationReview, segment: CompilationReviewSegment) -> str:
+    if review.status != "cancelled":
+        return segment.status
+    if segment.status == "running" and segment.request_started_at is not None:
+        return "uncertain"
+    if segment.status in {"pending", "running", "received"}:
+        return "cancelled"
+    return segment.status
 
 
 async def _store_segments(
@@ -596,7 +653,8 @@ async def progress(
     parent_ids = refinement.parent_ids_for(segments)
     counts: dict[str, int] = {}
     for segment in leaves:
-        counts[segment.status] = counts.get(segment.status, 0) + 1
+        status = _segment_progress_status(row, segment)
+        counts[status] = counts.get(status, 0) + 1
     segmented = bool(row.trace.get("segmentation")) or bool(segments)
     if segmented:
         completed = counts.get("completed", 0)
@@ -610,7 +668,7 @@ async def progress(
         usage_tokens = refinement.total_usage(segments) if any_called else row.usage_tokens
     else:
         completed = int(row.status == "completed")
-        pending = 0
+        pending = int(row.status == "queued")
         running = int(row.status == "running")
         failed = int(row.status == "failed")
         uncertain = int(row.status == "uncertain")
@@ -639,7 +697,7 @@ async def progress(
                 parent_segment_id=segment.parent_segment_id,
                 depth=refinement.segment_depth(segment),
                 is_leaf=segment.id not in parent_ids,
-                status=segment.status,
+                status=_segment_progress_status(row, segment),
                 attempt_count=segment.attempt_count,
                 usage_tokens=segment.usage_tokens,
                 error_code=segment.error_code,

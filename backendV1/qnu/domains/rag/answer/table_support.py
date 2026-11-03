@@ -21,6 +21,11 @@ def supports(primary, rows, relationships, metadata_filter, scopes=None):
         link = relationships.get((source.input_id, table))
         if not link:
             continue
+        shared_scopes = [
+            scope
+            for scope in (scopes or [metadata_filter])
+            if matches_metadata(source.structure, scope)
+        ]
         siblings = [r for r in rows if r.input_id == source.input_id]
         previous = link["previous"] if 0 in hit.structure.get("row_indices", []) else None
         refs = [(link["header"], True)] + ([(previous, False)] if previous else [])
@@ -37,9 +42,10 @@ def supports(primary, rows, relationships, metadata_filter, scopes=None):
                     break
             else:
                 row = max(options, key=lambda r: max(r.structure["row_indices"]))
-            if not any(
-                matches_metadata(row.structure, scope) for scope in (scopes or [metadata_filter])
-            ):
+            shared_scopes = [
+                scope for scope in shared_scopes if matches_metadata(row.structure, scope)
+            ]
+            if not shared_scopes:
                 break
             needed.append(row)
         else:

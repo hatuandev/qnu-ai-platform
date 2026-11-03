@@ -37,6 +37,7 @@ export type CompilationRunResponse = {
   usage_tokens: number | null;
   parent_run_id: string | null;
   origin: CompilationOrigin;
+  source_first?: boolean;
 };
 
 export type CompilationCreatedResponse = {
@@ -51,6 +52,7 @@ export type CompilationRequestInput = {
   provider_id?: string | null;
   max_output_tokens?: number | null;
   structured_output?: boolean;
+  source_first?: boolean;
   text_versions?: Record<string, number>;
   auto_review?: boolean;
   review_provider_id?: string | null;
@@ -100,6 +102,7 @@ export type CitationDetail = {
   canonical_sha256: string;
   manifest_sha256: string;
   page_number?: number;
+  page?: number;
   path?: string;
   artifact?: string;
   text_version?: {
@@ -162,6 +165,7 @@ export type AutoReviewStatus =
   | "completed"
   | "failed"
   | "uncertain"
+  | "cancelled"
   | "none";
 
 export type AutoReviewResponse = {
@@ -180,7 +184,8 @@ export type ReviewStatus =
   | "running"
   | "completed"
   | "failed"
-  | "uncertain";
+  | "uncertain"
+  | "cancelled";
 
 export type CompilationReviewResponse = {
   id: string;
@@ -206,6 +211,27 @@ export type ReviewRequestInput = {
   provider_id?: string | null;
   max_output_tokens?: number | null;
   structured_output?: boolean;
+};
+
+export type ReviewProgressResponse = {
+  review_id: string;
+  status: string;
+  segmented: boolean;
+  total: number;
+  completed: number;
+  pending: number;
+  running: number;
+  failed: number;
+  uncertain: number;
+  cancelled: number;
+  segments: {
+    id: string | null;
+    index: number;
+    depth: number;
+    is_leaf: boolean;
+    status: string;
+    error_code: string | null;
+  }[];
 };
 
 export type UnitExcerpt = {

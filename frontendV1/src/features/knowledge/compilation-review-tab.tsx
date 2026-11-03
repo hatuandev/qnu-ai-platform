@@ -44,10 +44,12 @@ import {
   useCompilationReviewsQuery,
   useCreateReviewMutation,
 } from "./compilation-queries";
+import { ReviewProgressPanel } from "./compilation-review-progress";
 import {
   formatAutoReviewStatus,
   formatCompilationError,
   formatDraftAssessmentStatus,
+  formatReviewStatus,
   formatReviewVerdict,
   formatSourceAssessmentStatus,
   generateIdempotencyKey,
@@ -67,6 +69,7 @@ export function CompilationReviewTab({
   collectionId,
   runId,
   canReview,
+  isActive = true,
   page = 1,
   pageSize = 20,
   reviewId,
@@ -77,6 +80,7 @@ export function CompilationReviewTab({
   collectionId: string;
   runId: string;
   canReview: boolean;
+  isActive?: boolean;
   page?: number;
   pageSize?: number;
   reviewId?: string;
@@ -151,7 +155,17 @@ export function CompilationReviewTab({
                 </span>
 
                 {/* Auto Review Indicator */}
-                {autoReviewData?.notScheduled ? (
+                {activeReviewQuery.data &&
+                activeReviewId !== autoReviewData?.review_id ? (
+                  <Badge
+                    variant={
+                      formatReviewStatus(activeReviewQuery.data.status).variant
+                    }
+                  >
+                    Lượt đã chọn:{" "}
+                    {formatReviewStatus(activeReviewQuery.data.status).label}
+                  </Badge>
+                ) : autoReviewData?.notScheduled ? (
                   <Badge
                     variant="outline"
                     className="text-[11px] text-muted-foreground"
@@ -165,14 +179,15 @@ export function CompilationReviewTab({
                     }
                     className="text-[11px]"
                   >
-                    Auto-Review:{" "}
+                    Rà soát tự động:{" "}
                     {formatAutoReviewStatus(autoReviewData.status).label}
                   </Badge>
                 ) : null}
 
-                {isAutoReviewPending && (
-                  <Loader2 className="size-3.5 animate-spin text-primary" />
-                )}
+                {isAutoReviewPending &&
+                  activeReviewId === autoReviewData?.review_id && (
+                    <Loader2 className="size-3.5 animate-spin text-primary" />
+                  )}
               </div>
 
               <p className="text-xs text-muted-foreground">
@@ -213,12 +228,8 @@ export function CompilationReviewTab({
                 </SelectTrigger>
                 <SelectContent>
                   {reviews.map((r) => (
-                    <SelectItem
-                      key={r.id}
-                      value={r.id}
-                      className="text-xs font-mono"
-                    >
-                      {r.id.slice(0, 12)}... · {r.verdict || r.status} (
+                    <SelectItem key={r.id} value={r.id} className="text-xs">
+                      {formatReviewStatus(r.status).label} (
                       {formatDateTimeValue(r.created_at)})
                     </SelectItem>
                   ))}
@@ -322,26 +333,40 @@ export function CompilationReviewTab({
             </Button>
           </CardContent>
         </Card>
+      ) : activeReviewQuery.isError ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Không tải được trạng thái lượt rà soát đã chọn.
+          </AlertDescription>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void activeReviewQuery.refetch()}
+          >
+            Tải lại trạng thái
+          </Button>
+        </Alert>
       ) : activeReviewQuery.isLoading || reportQuery.isLoading ? (
         <Card className="rounded-xl shadow-2xs p-5 space-y-4">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-28 w-full" />
           <Skeleton className="h-48 w-full" />
         </Card>
-      ) : activeReviewQuery.data?.status === "running" ||
-        activeReviewQuery.data?.status === "queued" ? (
-        <Card className="rounded-xl shadow-2xs p-6 text-center space-y-3">
-          <Loader2 className="size-6 animate-spin text-primary mx-auto" />
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-foreground">
-              Mô hình đang rà soát độc lập...
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Quá trình kiểm tra hai chiều bao quát toàn bộ source units và
-              draft units.
-            </p>
-          </div>
-        </Card>
+      ) : activeReviewQuery.data &&
+        activeReviewQuery.data.status !== "completed" ? (
+        <ReviewProgressPanel
+          key={activeReviewId}
+          workspaceId={workspaceId}
+          collectionId={collectionId}
+          runId={runId}
+          review={activeReviewQuery.data}
+          canStop={canReview}
+          onStopped={() => {
+            void activeReviewQuery.refetch();
+            void reviewsQuery.refetch();
+            void autoReviewQuery.refetch();
+          }}
+        />
       ) : reportQuery.isError ||
         !reportQuery.data ||
         !activeReviewQuery.data ? (
@@ -388,9 +413,12 @@ export function CompilationReviewTab({
         workspaceId={workspaceId}
         collectionId={collectionId}
         runId={runId}
-        isOpen={createDialogOpen}
+        isOpen={isActive && createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
-        onSuccess={(reviewId) => setSelectedReviewId(reviewId)}
+        onSuccess={(reviewId) => {
+          setSelectedReviewId(reviewId);
+          onSearchChange?.({ reviewId, reviewPage: 1 });
+        }}
       />
     </div>
   );
@@ -840,7 +868,8 @@ function CreateReviewDialog({
         input,
         idempotencyKey,
       });
-      toast.success("Đã khởi động lượt review độc lập.");
+      setIdempotencyKey(generateIdempotencyKey());
+      toast.success("Đã tiếp nhận yêu cầu rà soát.");
       onClose();
       onSuccess?.(review.id);
     } catch (err: unknown) {
@@ -863,8 +892,9 @@ function CreateReviewDialog({
             </DialogTitle>
           </div>
           <DialogDescription className="text-xs text-muted-foreground">
-            Mô hình AI độc lập sẽ đối chiếu hai chiều giữa bằng chứng nguồn và
-            bản nháp.
+            Tạo lượt rà soát mới để đối chiếu hai chiều giữa nguồn và bản nháp.
+            Lịch sử lượt cũ được giữ lại; hệ thống không gửi lại nhóm chưa xác
+            định.
           </DialogDescription>
         </DialogHeader>
 
@@ -939,8 +969,7 @@ function CreateReviewDialog({
           <Alert className="rounded-lg border-info/30 bg-info/5 text-xs py-2">
             <Info className="size-3 text-info shrink-0" />
             <AlertDescription className="text-muted-foreground text-[11px]">
-              Thao tác này sẽ phát sinh lượt gọi AI và tiêu tốn token quota của
-              workspace.
+              Thao tác này tạo lượt gọi AI mới và ghi nhận token sử dụng.
             </AlertDescription>
           </Alert>
 

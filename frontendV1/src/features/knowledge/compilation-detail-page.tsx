@@ -14,11 +14,11 @@ import {
   Layers,
   Loader2,
   Sparkles,
-  Tag,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { v1Client } from "@/app/api/v1";
+import { useV1Auth } from "@/app/auth/v1";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { formatDateTimeValue } from "@/lib/date-utils";
 import { CitationDrawer } from "./citation-drawer";
+import { CompilationDraftSections } from "./compilation-draft-sections";
 import { CompilationEditorTab } from "./compilation-editor-tab";
 import {
   useCompilationDraftQuery,
@@ -39,6 +40,7 @@ import {
 } from "./compilation-requests";
 import { CompilationReviewTab } from "./compilation-review-tab";
 import {
+  formatCompilationError,
   formatCompilationOrigin,
   formatCompilationStatus,
 } from "./compilation-schemas";
@@ -52,16 +54,7 @@ import { useCollectionQuery } from "./queries";
 import { RegisterDocumentDialog } from "./register-document-dialog";
 import { SourceTablesView } from "./source-tables-view";
 
-export function CompilationDetailPage({
-  workspaceId,
-  collectionId,
-  runId,
-  initialTab = "draft",
-  reviewPage = 1,
-  reviewPageSize = 20,
-  reviewId,
-  onReviewSearch,
-}: {
+type CompilationDetailProps = {
   workspaceId: string;
   collectionId: string;
   runId: string;
@@ -75,13 +68,41 @@ export function CompilationDetailPage({
     reviewId?: string;
     tab?: "draft" | "review" | "edit";
   }) => void;
-}) {
+};
+
+export function CompilationDetailPage(props: CompilationDetailProps) {
+  const { sessionId } = useV1Auth();
+  return (
+    <CompilationDetailSession
+      key={`${sessionId}:${props.workspaceId}:${props.collectionId}:${props.runId}`}
+      {...props}
+    />
+  );
+}
+
+function CompilationDetailSession({
+  workspaceId,
+  collectionId,
+  runId,
+  initialTab = "draft",
+  reviewPage = 1,
+  reviewPageSize = 20,
+  reviewId,
+  onReviewSearch,
+}: CompilationDetailProps) {
   const navigate = useNavigate();
   const [currentTab, setCurrentTab] = useState<"draft" | "review" | "edit">(
     initialTab,
   );
 
-  useEffect(() => setCurrentTab(initialTab), [initialTab]);
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([initialTab]));
+  const activateTab = useCallback((tab: "draft" | "review" | "edit") => {
+    setCurrentTab(tab);
+    setVisitedTabs((previous) =>
+      previous.has(tab) ? previous : new Set([...previous, tab]),
+    );
+  }, []);
+  useEffect(() => activateTab(initialTab), [activateTab, initialTab]);
 
   // Citation Drawer state
   const [selectedCitationId, setSelectedCitationId] = useState<string | null>(
@@ -108,7 +129,7 @@ export function CompilationDetailPage({
     workspaceId,
     collectionId,
     runId,
-    { enabled: Boolean(isCompleted) },
+    { enabled: Boolean(isCompleted && visitedTabs.has("draft")) },
   );
 
   const draft = draftQuery.data;
@@ -119,10 +140,10 @@ export function CompilationDetailPage({
       ? (draft.citations[selectedCitationId] ?? null)
       : null;
 
-  const handleOpenCitation = (citationId: string) => {
+  const handleOpenCitation = useCallback((citationId: string) => {
     setSelectedCitationId(citationId);
     setIsCitationDrawerOpen(true);
-  };
+  }, []);
 
   const handleDownloadMarkdown = async () => {
     try {
@@ -313,7 +334,7 @@ export function CompilationDetailPage({
             </div>
 
             {/* Quick Actions */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:shrink-0">
               {isCompleted && (
                 <>
                   {canRegister && (
@@ -390,24 +411,30 @@ export function CompilationDetailPage({
               ) : (
                 <span className="inline-flex items-center gap-1 font-semibold text-primary">
                   <Sparkles className="size-3" />
-                  AI Compiler
+                  {run.source_first
+                    ? "Biên soạn nhanh từ nguồn"
+                    : "AI Compiler"}
                 </span>
               )}
             </div>
 
-            <div>
-              Mô hình:{" "}
-              <span className="font-mono text-foreground">
-                {run.provider_id || "Mặc định workspace"}
-              </span>
-            </div>
+            {!run.source_first && (
+              <div>
+                Mô hình:{" "}
+                <span className="font-mono text-foreground">
+                  {run.provider_id || "Mặc định workspace"}
+                </span>
+              </div>
+            )}
 
             <div>
               Tokens:{" "}
               <span className="font-mono text-foreground font-semibold">
-                {run.usage_tokens !== null
-                  ? run.usage_tokens.toLocaleString()
-                  : "Chưa xác định"}
+                {run.source_first
+                  ? "0 (không gọi mô hình)"
+                  : run.usage_tokens !== null
+                    ? run.usage_tokens.toLocaleString()
+                    : "Chưa xác định"}
               </span>
             </div>
 
@@ -437,11 +464,34 @@ export function CompilationDetailPage({
           <AlertTitle className="text-xs font-semibold text-foreground">
             {run.status === "queued"
               ? "Lượt biên soạn đang chờ xếp lịch xử lý..."
-              : "Mô hình AI đang tổng hợp và trích xuất bản biên soạn..."}
+              : run.source_first
+                ? "Đang kiểm tra nguồn và dựng bản nháp..."
+                : "Mô hình AI đang tổng hợp và trích xuất bản biên soạn..."}
           </AlertTitle>
           <AlertDescription className="text-muted-foreground text-[11px] mt-1">
             Giao diện sẽ tự động cập nhật ngay khi quá trình hoàn tất. Bạn có
             thể giữ trang này hoặc chuyển tab khác.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {(run.status === "failed" || run.status === "uncertain") && (
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" />
+          <AlertTitle>Lượt biên soạn chưa hoàn tất</AlertTitle>
+          <AlertDescription>
+            {formatCompilationError(
+              run.error_code ?? undefined,
+              run.status === "uncertain"
+                ? "Chưa xác định được kết quả xử lý của một hoặc nhiều nhóm."
+                : "Đã xảy ra lỗi trong quá trình xử lý biên soạn.",
+            )}
+            {run.error_code && (
+              <details className="mt-2">
+                <summary>Chi tiết kỹ thuật</summary>
+                <code>{run.error_code}</code>
+              </details>
+            )}
           </AlertDescription>
         </Alert>
       )}
@@ -451,7 +501,7 @@ export function CompilationDetailPage({
         value={currentTab}
         onValueChange={(val) => {
           const tab = val as "draft" | "review" | "edit";
-          setCurrentTab(tab);
+          activateTab(tab);
           onReviewSearch?.({ tab });
         }}
       >
@@ -475,7 +525,12 @@ export function CompilationDetailPage({
         </TabsList>
 
         {/* Tab 1: Draft Content & Evidence */}
-        <TabsContent value="draft" className="space-y-6 pt-4">
+        <TabsContent
+          value="draft"
+          forceMount={visitedTabs.has("draft") ? true : undefined}
+          hidden={currentTab !== "draft"}
+          className="space-y-6 pt-4 data-[state=inactive]:hidden"
+        >
           {!isCompleted ? (
             <Card className="rounded-xl p-10 text-center text-xs text-muted-foreground">
               <p>
@@ -514,44 +569,10 @@ export function CompilationDetailPage({
                 </CardHeader>
 
                 <CardContent className="p-4 sm:p-6 space-y-6 text-sm">
-                  {draft.sections.map((sec, sIdx) => (
-                    <div
-                      // biome-ignore lint/suspicious/noArrayIndexKey: ordered document structure
-                      key={sIdx}
-                      className="space-y-3"
-                    >
-                      <h2 className="text-sm sm:text-base font-bold text-foreground border-b pb-1.5">
-                        {sec.heading}
-                      </h2>
-                      <div className="space-y-3">
-                        {sec.paragraphs.map((p, pIdx) => (
-                          <div
-                            // biome-ignore lint/suspicious/noArrayIndexKey: ordered document structure
-                            key={pIdx}
-                            className="text-xs sm:text-sm text-foreground/90 leading-relaxed font-sans"
-                          >
-                            <span>{p.text}</span>
-                            {p.citations && p.citations.length > 0 && (
-                              <span className="inline-flex flex-wrap gap-1 ml-1.5 align-baseline">
-                                {p.citations.map((cId) => (
-                                  <button
-                                    key={cId}
-                                    type="button"
-                                    onClick={() => handleOpenCitation(cId)}
-                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
-                                    title="Xem bằng chứng nguồn đối chiếu"
-                                  >
-                                    <Tag className="size-2.5" />
-                                    <span>[{cId}]</span>
-                                  </button>
-                                ))}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                  <CompilationDraftSections
+                    sections={draft.sections}
+                    onSelectCitation={handleOpenCitation}
+                  />
                 </CardContent>
               </Card>
 
@@ -602,6 +623,7 @@ export function CompilationDetailPage({
                 <SourceTablesView
                   tables={draft.source_tables ?? []}
                   onSelectCitation={handleOpenCitation}
+                  deferContent
                 />
               </div>
 
@@ -651,7 +673,7 @@ export function CompilationDetailPage({
               )}
 
               {/* LLM Raw Response On-Demand */}
-              {run.origin !== "user_edit" && (
+              {!run.source_first && run.origin !== "user_edit" && (
                 <div className="pt-2 text-right">
                   <Button
                     size="sm"
@@ -669,17 +691,23 @@ export function CompilationDetailPage({
         </TabsContent>
 
         {/* Tab 2: Review Content */}
-        <TabsContent value="review" className="pt-4">
+        <TabsContent
+          value="review"
+          forceMount={visitedTabs.has("review") ? true : undefined}
+          hidden={currentTab !== "review"}
+          className="pt-4 data-[state=inactive]:hidden"
+        >
           <CompilationReviewTab
             key={`${workspaceId}:${collectionId}:${runId}`}
             workspaceId={workspaceId}
             collectionId={collectionId}
             runId={runId}
             canReview={canReview}
+            isActive={currentTab === "review"}
             onEdit={
               canEdit && isCompleted
                 ? () => {
-                    setCurrentTab("edit");
+                    activateTab("edit");
                     onReviewSearch?.({ tab: "edit" });
                   }
                 : undefined
@@ -697,12 +725,18 @@ export function CompilationDetailPage({
 
         {/* Tab 3: Structured Editor Content */}
         {canEdit && (
-          <TabsContent value="edit" className="pt-4">
+          <TabsContent
+            value="edit"
+            forceMount={visitedTabs.has("edit") ? true : undefined}
+            hidden={currentTab !== "edit"}
+            className="pt-4 data-[state=inactive]:hidden"
+          >
             <CompilationEditorTab
               workspaceId={workspaceId}
               collectionId={collectionId}
               runId={runId}
               canEdit={canEdit}
+              isActive={currentTab === "edit"}
               onNavigateToChild={(childId) => {
                 void navigate({
                   to: "/workspaces/$workspaceId/collections/$collectionId/compilations/$runId",

@@ -22,6 +22,14 @@ không thay quyền/schema/runtime của `backend/`.
   Không tạo hai message row cho cùng cặp. API phân trang theo turn_no.
 - Chưa chia sẻ/public/embed, nhiều collection, tools, streaming hoặc bộ nhớ dài hạn.
 
+Sau khi kiểm tra quyền và giữ chỗ lượt hỏi, hội thoại phân luồng các mẫu chắc chắn
+gồm lời chào, cảm ơn, giới thiệu trợ lý và yêu cầu tiết lộ thông tin nội bộ.
+Kết quả `direct_reply` được lưu trong lịch sử và trả lại khi phát lại cùng khóa.
+Nhánh này dùng tên trợ lý trong snapshot, bỏ qua model và chỉ mục, đồng thời
+không đưa các lượt đó vào lịch sử viết lại câu hỏi. Câu có thêm nội dung nghiệp
+vụ đi qua RAG và các cổng bằng chứng như trước. Các mẫu từ chối là lớp hẹp cho
+yêu cầu rõ ràng, không phải cơ chế xác nhận an toàn cho nội dung còn lại.
+
 ## API
 
 Prefix `/platform/v1alpha1/workspaces/{workspace_id}`.

@@ -92,6 +92,7 @@ export function CompilationDialog({
   onSuccess?: (runId: string) => void;
 }) {
   const [topic, setTopic] = useState("");
+  const [sourceFirst, setSourceFirst] = useState(false);
   const [selectedRuns, setSelectedRuns] = useState<SelectedOcrRunItem[]>([]);
   const [providerId, setProviderId] = useState<string>("default");
   const [maxOutputTokens, setMaxOutputTokens] = useState<string>("");
@@ -182,6 +183,7 @@ export function CompilationDialog({
         setSelectedRuns([]);
       }
       setTopic("");
+      setSourceFirst(false);
       setProviderId("default");
       setMaxOutputTokens("");
       setStructuredOutput(false);
@@ -274,16 +276,20 @@ export function CompilationDialog({
       topic: effectiveTopic,
       ocr_run_ids,
       text_versions,
-      provider_id: providerId === "default" ? null : providerId,
-      max_output_tokens: maxOutputTokens ? Number(maxOutputTokens) : null,
-      structured_output: structuredOutput,
-      auto_review: autoReview,
-      review_provider_id:
-        reviewProviderId === "default" ? null : reviewProviderId,
-      review_max_output_tokens: reviewMaxTokens
-        ? Number(reviewMaxTokens)
-        : null,
-      review_structured_output: reviewStructuredOutput,
+      ...(sourceFirst
+        ? { source_first: true, auto_review: false }
+        : {
+            provider_id: providerId === "default" ? null : providerId,
+            max_output_tokens: maxOutputTokens ? Number(maxOutputTokens) : null,
+            structured_output: structuredOutput,
+            auto_review: autoReview,
+            review_provider_id:
+              reviewProviderId === "default" ? null : reviewProviderId,
+            review_max_output_tokens: reviewMaxTokens
+              ? Number(reviewMaxTokens)
+              : null,
+            review_structured_output: reviewStructuredOutput,
+          }),
     };
 
     try {
@@ -522,7 +528,24 @@ export function CompilationDialog({
               </Collapsible>
             </div>
 
-            <p className="text-xs text-muted-foreground">
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="compiler-source-first"
+                checked={sourceFirst}
+                onCheckedChange={(checked) => {
+                  setSourceFirst(checked === true);
+                  setIdempotencyKey(generateIdempotencyKey());
+                }}
+              />
+              <div>
+                <Label htmlFor="compiler-source-first">Biên soạn nhanh</Label>
+                <p className="text-xs text-muted-foreground">
+                  Giữ nguyên văn bản và bảng của toàn bộ nguồn đã chọn. Chủ đề
+                  dùng làm tiêu đề. Có thể yêu cầu AI rà soát sau.
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground" hidden={sourceFirst}>
               {providerId === "default"
                 ? "Dùng model mặc định của đơn vị."
                 : `Model đã chọn: ${chatProviders.find((p) => p.id === providerId)?.model_name ?? "Đang tải…"}.`}{" "}
@@ -530,7 +553,11 @@ export function CompilationDialog({
                 ? "Rà soát tự động đang bật."
                 : "Rà soát tự động đang tắt."}
             </p>
-            <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+            <Collapsible
+              hidden={sourceFirst}
+              open={!sourceFirst && advancedOpen}
+              onOpenChange={setAdvancedOpen}
+            >
               <CollapsibleTrigger asChild>
                 <Button
                   type="button"
@@ -756,9 +783,11 @@ export function CompilationDialog({
             <Alert className="rounded-lg border-info/30 bg-info/5 text-xs py-2.5">
               <Info className="size-3.5 text-info shrink-0" />
               <AlertDescription className="text-muted-foreground text-[11px] leading-relaxed">
-                Biên soạn tài liệu sẽ tiêu tốn tokens theo định mức của mô hình
-                đã chọn. Bản hoàn tất là bản nháp chưa được duyệt và chưa tự
-                động đưa vào phục vụ Trò chuyện.
+                {sourceFirst
+                  ? "Chế độ nhanh dựng bản nháp từ nguồn đã lưu và không gọi mô hình. "
+                  : "Biên soạn AI sử dụng token theo định mức của mô hình đã chọn. "}
+                Bản hoàn tất là bản nháp chưa được duyệt và chưa tự động đưa vào
+                phục vụ Trò chuyện.
               </AlertDescription>
             </Alert>
           </div>

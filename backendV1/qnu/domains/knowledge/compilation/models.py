@@ -25,6 +25,10 @@ def utcnow() -> datetime:
 
 
 class CompilationRun(Base):
+    @property
+    def source_first(self) -> bool:
+        return self.config.get("source_first") is True
+
     __tablename__ = "kb_compilation_runs"
     __table_args__ = (
         ForeignKeyConstraint(

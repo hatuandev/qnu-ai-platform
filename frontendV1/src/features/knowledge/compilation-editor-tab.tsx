@@ -1,13 +1,12 @@
 import { useBlocker, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
-  Check,
   CheckCircle2,
   FileEdit,
   GitBranch,
   Loader2,
+  MoreHorizontal,
   Plus,
-  Tag,
   Trash2,
   X,
 } from "lucide-react";
@@ -27,6 +26,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -39,6 +44,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateTimeValue } from "@/lib/date-utils";
+import { CompilationCitationPicker } from "./compilation-citation-picker";
 import {
   useAcceptEditMutation,
   useCompilationReviewsQuery,
@@ -78,6 +84,7 @@ type EditorProps = {
   collectionId: string;
   runId: string;
   canEdit: boolean;
+  isActive?: boolean;
   onNavigateToChild?: (childRunId: string) => void;
 };
 
@@ -96,6 +103,7 @@ function CompilationEditorSession({
   collectionId,
   runId,
   canEdit,
+  isActive = true,
   onNavigateToChild,
 }: EditorProps) {
   const navigate = useNavigate();
@@ -137,6 +145,10 @@ function CompilationEditorSession({
   const [unknowns, setUnknowns] = useState<string[]>([]);
   const [reason, setReason] = useState("");
   const [reviewId, setReviewId] = useState<string>("none");
+  const [citationTarget, setCitationTarget] = useState<{
+    sectionId: string;
+    paragraphId: string;
+  } | null>(null);
 
   // Active preview & idempotency
   const [activePreview, setActivePreview] =
@@ -172,7 +184,10 @@ function CompilationEditorSession({
         reviewId !== "none"),
   );
   const blocker = useBlocker({
-    shouldBlockFn: () => hasUnsavedChanges && !savedRef.current,
+    shouldBlockFn: ({ current, next }) =>
+      current.pathname !== next.pathname &&
+      hasUnsavedChanges &&
+      !savedRef.current,
     disabled: !hasUnsavedChanges,
     enableBeforeUnload: () => hasUnsavedChanges && !savedRef.current,
     withResolver: true,
@@ -345,6 +360,15 @@ function CompilationEditorSession({
     if (!editContextQuery.data?.citations) return [];
     return Object.keys(editContextQuery.data.citations);
   }, [editContextQuery.data?.citations]);
+  const citationSectionIndex = sections.findIndex(
+    (section) => section.editorId === citationTarget?.sectionId,
+  );
+  const citationParagraphIndex =
+    sections[citationSectionIndex]?.paragraphs.findIndex(
+      (paragraph) => paragraph.editorId === citationTarget?.paragraphId,
+    ) ?? -1;
+  const citationParagraph =
+    sections[citationSectionIndex]?.paragraphs[citationParagraphIndex];
 
   // Completed reviews of this bundle for linking
   const completedReviews = useMemo(() => {
@@ -493,6 +517,20 @@ function CompilationEditorSession({
 
   return (
     <div className="space-y-6">
+      {isActive && citationParagraph && (
+        <CompilationCitationPicker
+          citations={editContextQuery.data.citations}
+          selected={citationParagraph.citations}
+          onToggle={(id) =>
+            handleToggleCitation(
+              citationSectionIndex,
+              citationParagraphIndex,
+              id,
+            )
+          }
+          onClose={() => setCitationTarget(null)}
+        />
+      )}
       <ConfirmDialog
         open={blocker.status === "blocked"}
         onOpenChange={(open) => {
@@ -631,17 +669,40 @@ function CompilationEditorSession({
                       <span className="text-[11px] font-semibold text-muted-foreground">
                         Đoạn #{pIdx + 1}
                       </span>
-                      {section.paragraphs.length > 1 && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleRemoveParagraph(sIdx, pIdx)}
-                        >
-                          <X className="size-3" />
-                        </Button>
-                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="size-7 p-0"
+                            aria-label={`Thao tác đoạn ${sIdx + 1}.${pIdx + 1}`}
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              setCitationTarget({
+                                sectionId: section.editorId,
+                                paragraphId: p.editorId,
+                              })
+                            }
+                          >
+                            Chọn dẫn chứng
+                          </DropdownMenuItem>
+                          {section.paragraphs.length > 1 && (
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onSelect={() => handleRemoveParagraph(sIdx, pIdx)}
+                            >
+                              <X className="size-3" />
+                              Xóa đoạn văn
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
 
                     <Textarea
@@ -654,38 +715,9 @@ function CompilationEditorSession({
                       placeholder="Nội dung đoạn văn..."
                     />
 
-                    {/* Citations multiselect from server index */}
-                    <div className="space-y-1">
-                      <span className="text-[11px] text-muted-foreground font-semibold block">
-                        Citations đính kèm (chọn từ bằng chứng nguồn):
-                      </span>
-                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 border rounded bg-muted/10">
-                        {availableCitationIds.map((cId) => {
-                          const isSelected = p.citations.includes(cId);
-                          return (
-                            <button
-                              key={cId}
-                              type="button"
-                              onClick={() =>
-                                handleToggleCitation(sIdx, pIdx, cId)
-                              }
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono border transition-colors flex items-center gap-1 ${
-                                isSelected
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "bg-background text-muted-foreground hover:bg-muted border-border"
-                              }`}
-                            >
-                              {isSelected ? (
-                                <Check className="size-2.5" />
-                              ) : (
-                                <Tag className="size-2.5 opacity-60" />
-                              )}
-                              <span>{cId}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Đã gắn {p.citations.length} dẫn chứng.
+                    </p>
                   </div>
                 ))}
 
@@ -811,7 +843,10 @@ function CompilationEditorSession({
 
       {/* Preview Diff Modal */}
       {activePreview && (
-        <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
+        <Dialog
+          open={isActive && previewModalOpen}
+          onOpenChange={setPreviewModalOpen}
+        >
           <DialogContent className="sm:max-w-3xl max-h-[min(820px,calc(100vh-2rem))] flex flex-col p-0 gap-0">
             <DialogHeader className="p-4 border-b bg-muted/20">
               <div className="flex items-center gap-2">

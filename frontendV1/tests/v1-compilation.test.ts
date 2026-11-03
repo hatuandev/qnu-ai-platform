@@ -18,6 +18,7 @@ import {
   createCompilationReview,
   createCompilationRun,
   getAutoReviewStatus,
+  getCompilationReviewProgress,
   listCompilationRuns,
 } from "../src/features/knowledge/compilation-requests.ts";
 import {
@@ -102,6 +103,28 @@ function mockServer(handler: MockHandler) {
 // ---------------------------------------------------------------------------
 // 1. Zod Validation Schemas
 // ---------------------------------------------------------------------------
+
+test("review progress is a scoped, abortable GET with no model mutation", async () => {
+  const { client, requests } = mockServer(() => ({
+    body: { review_id: "review", total: 11 },
+  }));
+  const controller = new AbortController();
+  const result = await getCompilationReviewProgress(
+    client,
+    "w",
+    "c",
+    "run",
+    "review",
+    { signal: controller.signal },
+  );
+  assert.equal(result.total, 11);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0]?.method, "GET");
+  assert.equal(
+    requests[0]?.url,
+    "https://mock.platform/platform/v1alpha1/workspaces/w/collections/c/compilation-runs/run/reviews/review/progress",
+  );
+});
 
 test("compilationRequestSchema accepts valid payload", () => {
   const valid = {
@@ -238,11 +261,13 @@ test("manualReviewRequestSchema leaves output budgeting to ModelOps by default",
   const parsed = manualReviewRequestSchema.parse({});
   assert.equal(parsed.max_output_tokens, undefined);
   assert.equal(
-    manualReviewRequestSchema.parse({ max_output_tokens: null }).max_output_tokens,
+    manualReviewRequestSchema.parse({ max_output_tokens: null })
+      .max_output_tokens,
     null,
   );
   assert.equal(
-    manualReviewRequestSchema.parse({ max_output_tokens: 8192 }).max_output_tokens,
+    manualReviewRequestSchema.parse({ max_output_tokens: 8192 })
+      .max_output_tokens,
     8192,
   );
   assert.equal(parsed.provider_id, undefined);

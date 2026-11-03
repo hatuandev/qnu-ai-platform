@@ -60,6 +60,7 @@ export const compilationRequestSchema = z
       .nullable()
       .optional(),
     structured_output: z.boolean().default(false),
+    source_first: z.boolean().optional(),
     auto_review: z.boolean().default(true),
     review_provider_id: z.string().nullable().optional(),
     review_max_output_tokens: z
@@ -159,6 +160,8 @@ export function formatAutoReviewStatus(status: AutoReviewStatus | "none"): {
   variant: "default" | "secondary" | "destructive" | "outline";
 } {
   switch (status) {
+    case "cancelled":
+      return { label: "Đã dừng rà soát", variant: "outline" };
     case "queued":
       return { label: "Đang chờ review tự động", variant: "secondary" };
     case "running":
@@ -179,6 +182,8 @@ export function formatReviewStatus(status: ReviewStatus): {
   variant: "default" | "secondary" | "destructive" | "outline";
 } {
   switch (status) {
+    case "cancelled":
+      return { label: "Đã dừng rà soát", variant: "outline" };
     case "queued":
       return { label: "Đang chờ reviewer", variant: "secondary" };
     case "running":
@@ -317,6 +322,14 @@ export function formatCompilationError(
       return "Một trong các lượt OCR đã chọn không tồn tại hoặc không thuộc kho này.";
     case "compilation_draft_invalid":
       return "Mô hình trả bản nháp không đúng cấu trúc yêu cầu.";
+    case "compilation_draft_empty":
+      return "Không có nội dung đủ căn cứ để tạo bản nháp từ nguồn đã chọn.";
+    case "compilation_source_limits_exceeded":
+      return "Nguồn vượt dung lượng cấu trúc của một bản nháp. Hãy chọn ít nguồn hơn cho lượt này.";
+    case "compilation_failed":
+      return "Hệ thống gặp lỗi khi xử lý kết quả biên soạn.";
+    case "chat_output_truncated":
+      return "Phản hồi của mô hình bị cắt trước khi nhóm biên soạn hoàn tất.";
     case "compilation_citation_invalid":
       return "Bản nháp có citation không thuộc tập bằng chứng nguồn đã cấp.";
     case "compilation_edit_stale":

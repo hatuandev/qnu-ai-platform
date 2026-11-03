@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -53,6 +54,13 @@ class TurnRequest(BaseModel):
         return value.strip() if isinstance(value, str) else value
 
 
+class DirectReply(BaseModel):
+    id: str
+    status: Literal["direct_reply"] = "direct_reply"
+    route: Literal["greeting", "courtesy", "identity", "protected_request"]
+    answer: str
+
+
 class TurnResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -64,7 +72,7 @@ class TurnResponse(BaseModel):
     history_turn_ids: list[str]
     status: str
     error_code: str | None
-    result: AnswerResponse | None
+    result: AnswerResponse | DirectReply | None
     rewrite_trace: dict | None
     source_status: str = "current"
     created_at: datetime

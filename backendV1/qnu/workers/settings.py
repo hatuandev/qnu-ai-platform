@@ -12,6 +12,7 @@ from qnu.workers.tasks.compilation import (
     compile_run,
     compiler_review_job,
     compiler_review_reconcile,
+    manual_compiler_review_job,
 )
 from qnu.workers.tasks.indexing import index_reconcile, index_run
 from qnu.workers.tasks.ocr import ocr_process_run, ocr_reconcile_queued, shutdown, startup
@@ -33,6 +34,7 @@ class WorkerSettings:
         func(compile_run, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         compilation_reconcile,
         func(compiler_review_job, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
+        func(manual_compiler_review_job, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         compiler_review_reconcile,
         func(index_run, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         index_reconcile,

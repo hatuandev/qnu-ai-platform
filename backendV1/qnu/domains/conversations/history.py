@@ -10,6 +10,7 @@ from qnu.domains.conversations.service import expire
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.index.schemas import SearchHit, SearchResponse
 from qnu.domains.knowledge.index.validation import validate_results
+from qnu.domains.rag.answer.schemas import AnswerResponse
 from qnu.platform.errors import AppException, EntityNotFound
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.vector_store import VectorStore
@@ -24,7 +25,7 @@ async def readable(
     document_ids: list[str] | None,
 ) -> TurnResponse:
     value = TurnResponse.model_validate(turn)
-    if value.result and value.result.sources:
+    if isinstance(value.result, AnswerResponse) and value.result.sources:
         result = value.result
         retrieved = SearchResponse(
             index_run_id=result.index_run_id,

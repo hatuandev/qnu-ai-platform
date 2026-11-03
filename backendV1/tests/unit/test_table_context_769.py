@@ -133,3 +133,12 @@ def test_support_selection_stays_in_bound_input_and_respects_metadata():
         {("input-a", "run:t2"): link},
         MetadataFilter(data_year=2040),
     ) == ({}, [])
+    for entry, year in [(primary, 2031), (header, 2031), (tail, 2032)]:
+        entry.structure["retrieval_metadata"] = [{"values": {"data_year": year}}]
+    assert supports(
+        [primary],
+        [primary, header, tail],
+        {("input-a", "run:t2"): link},
+        MetadataFilter(),
+        [MetadataFilter(data_year=2031), MetadataFilter(data_year=2032)],
+    ) == ({}, [])

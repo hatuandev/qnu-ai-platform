@@ -48,6 +48,7 @@ from qnu.domains.modelops.inference.service import (
     prepare_chat_limits,
     prepare_chat_request,
 )
+from qnu.domains.modelops.public_api import assert_provider_allowed
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
@@ -154,7 +155,7 @@ async def request_run(
         **req.model_dump(
             exclude={
                 key
-                for key in ("structured_output", "review_structured_output")
+                for key in ("structured_output", "review_structured_output", "source_first")
                 if not getattr(req, key)
             }
         ),
@@ -204,6 +205,38 @@ async def request_run(
         "documents": documents,
     }
     payload = json_bytes(snapshot)
+    generation = 1 + int(
+        await db.scalar(
+            select(func.max(CompilationRun.generation)).where(
+                CompilationRun.collection_id == collection_id,
+            )
+        )
+        or 0
+    )
+    if req.source_first:
+        provider = await assert_provider_allowed(db, actor, workspace_id, "chat", req.provider_id)
+        run = CompilationRun(
+            id=new_id("cmp"),
+            workspace_id=workspace_id,
+            collection_id=collection_id,
+            generation=generation,
+            topic=req.topic,
+            status="queued",
+            requested_by=ref,
+            idempotency_key=idempotency_key,
+            request_hash=request_hash,
+            input_sha256=hashlib.sha256(payload).hexdigest(),
+            provider_id=provider.id,
+            config={
+                "source_first": True,
+                "workflow_version": "qnu.compiler.source-first/v1",
+                "auto_review": False,
+                "review": {"provider_id": provider.id},
+            },
+        )
+        db.add(run)
+        await db.flush()
+        return await _persist_inputs(db, blob, actor, run, documents, payload, queue)
     schema = output_schema(documents) if req.structured_output else None
     requested_output = req.max_output_tokens
     provider_id = req.provider_id
@@ -302,14 +335,6 @@ async def request_run(
             capacity=capacity,
             structured=req.structured_output,
         )
-    generation = 1 + int(
-        await db.scalar(
-            select(func.max(CompilationRun.generation)).where(
-                CompilationRun.collection_id == collection_id,
-            )
-        )
-        or 0
-    )
     reasoning_directive = runtime.reasoning_directive("compiler")
     config = {
         "refinement": {
@@ -435,13 +460,25 @@ async def request_run(
                 )
             )
         await db.flush()
+    return await _persist_inputs(db, blob, actor, run, documents, payload, queue)
+
+
+async def _persist_inputs(
+    db: AsyncSession,
+    blob: BlobStore,
+    actor: AuthActor,
+    run: CompilationRun,
+    documents: list[dict],
+    payload: bytes,
+    queue: JobQueue | None,
+) -> CompilationOutcome:
     for document in documents:
         db.add(
             CompilationInput(
                 id=new_id("cin"),
                 run_id=run.id,
-                workspace_id=workspace_id,
-                collection_id=collection_id,
+                workspace_id=run.workspace_id,
+                collection_id=run.collection_id,
                 ocr_run_id=document["ocr_run_id"],
                 canonical_sha256=document["canonical_sha256"],
                 manifest_sha256=document["manifest_sha256"],
@@ -452,14 +489,14 @@ async def request_run(
     await store(db, blob, run, "input_snapshot", payload)
     await record_workspace_event(
         db,
-        workspace_id=workspace_id,
+        workspace_id=run.workspace_id,
         actor=actor,
         action="compilation.requested",
         detail={
             "run_id": run.id,
-            "collection_id": collection_id,
+            "collection_id": run.collection_id,
             "input_sha256": run.input_sha256,
-            "provider_id": runtime.provider_id,
+            "provider_id": run.provider_id,
         },
     )
     await db.commit()

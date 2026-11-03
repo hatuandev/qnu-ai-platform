@@ -1,5 +1,14 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên856 — Gom bằng chứng theo khoản](2026-11-03_phien_856_gom_bang_chung_rag.md).
+- [Phiên855 — Phân luồng hội thoại V1](2026-11-03_phien_855_phan_luong_hoi_thoai.md).
+- [Phiên854 — Biên soạn nhanh từ nguồn](2026-11-03_phien_854_bien_soan_nhanh.md).
+- [Phiên853 — Xuất Markdown cho nhóm Compiler không có tiêu đề](2026-11-03_phien_853_compiler_tieu_de_tuy_chon.md).
+- [Phiên852 — Rà soát nền và dừng lượt](2026-11-03_phien_852_ra_soat_nen_va_dung_luot.md).
+- [Phiên851 — Phần trăm tiến độ rà soát](2026-11-03_phien_851_phan_tram_ra_soat.md).
+- [Phiên850 — Hoàn tất trạng thái và tiến độ review](2026-11-03_phien_850_hoan_tat_tab_ra_soat.md).
+- [Phiên849 — Tối ưu chuyển tab biên soạn](2026-11-03_phien_849_toi_uu_tab_bien_soan.md).
+- [Phiên848 — Làm gọn hộp thoại biên soạn](2026-11-03_phien_848_gon_hop_thoai_bien_soan.md).
 - [Phiên847 — Rà soát chính tả toàn tài liệu](2026-11-03_phien_847_ra_soat_chinh_ta.md).
 - [Phiên846 — Seed Qwen tắt suy luận](2026-11-03_phien_846_seed_qwen_reasoning.md).
 - [Phiên845 — Seed 9router local](2026-11-03_phien_845_seed_9router.md).

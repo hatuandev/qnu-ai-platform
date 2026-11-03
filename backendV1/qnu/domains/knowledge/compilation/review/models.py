@@ -35,7 +35,7 @@ class CompilationReview(Base):
             "workspace_id", "created_by", "idempotency_key", name="uq_compilation_review_request"
         ),
         CheckConstraint(
-            "status IN ('running','completed','failed','uncertain','cancelled')",
+            "status IN ('queued','running','completed','failed','uncertain','cancelled')",
             name="ck_compilation_review_status",
         ),
         CheckConstraint(
@@ -131,9 +131,7 @@ class CompilationReviewSegment(Base):
         index=True,
     )
     segment_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="pending", index=True
-    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", index=True)
     scope: Mapped[dict] = mapped_column(JSONB, nullable=False)
     input_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     prompt_version: Mapped[str] = mapped_column(String(120), nullable=False)

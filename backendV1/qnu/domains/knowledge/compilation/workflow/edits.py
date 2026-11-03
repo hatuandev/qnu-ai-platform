@@ -224,7 +224,7 @@ async def accept(db, blob, actor, workspace_id, collection_id, run_id, req, key,
         attempt_count=0,
         config={
             **run.config,
-            "auto_review": True,
+            "auto_review": not run.source_first,
             "review": run.config.get(
                 "review", {"provider_id": run.provider_id}
             ),

@@ -57,6 +57,7 @@ async def resolve_question(
                         ConversationTurn.conversation_id == conversation.id,
                         ConversationTurn.turn_no < turn.turn_no,
                         ConversationTurn.status == "completed",
+                        ConversationTurn.result["status"].as_string() != "direct_reply",
                     )
                     .order_by(ConversationTurn.turn_no.desc())
                     .limit(count)

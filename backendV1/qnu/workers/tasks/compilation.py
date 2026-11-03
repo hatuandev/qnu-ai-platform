@@ -8,6 +8,9 @@ from sqlalchemy import select, update
 
 from qnu.domains.knowledge.compilation.execution import execute_run
 from qnu.domains.knowledge.compilation.models import CompilationRun, utcnow
+from qnu.domains.knowledge.compilation.review.execution import run_queued
+from qnu.domains.knowledge.compilation.review.models import CompilationReview
+from qnu.domains.knowledge.compilation.review.service import dispatch_review
 from qnu.domains.knowledge.compilation.workflow import automatic
 from qnu.domains.knowledge.compilation.workflow.models import AutoReviewJob
 from qnu.platform.config import get_settings
@@ -38,6 +41,12 @@ async def compiler_review_job(ctx: dict, run_id: str) -> str:
         return await automatic.execute_job(
             db, container.blob_store, container.chat_model, run_id, ctx.get("worker_id", "arq")
         )
+
+
+async def manual_compiler_review_job(ctx: dict, review_id: str) -> str:
+    container = ctx["container"]
+    async with AsyncSessionFactory() as db:
+        return await run_queued(db, container.blob_store, container.chat_model, review_id)
 
 
 async def compiler_review_reconcile(ctx: dict) -> int:
@@ -81,6 +90,16 @@ async def compiler_review_reconcile(ctx: dict) -> int:
                 row.dispatched_at = now
                 count += 1
         await db.commit()
+        manual_ids = list(
+            await db.scalars(
+                select(CompilationReview.id)
+                .where(CompilationReview.status == "queued")
+                .order_by(CompilationReview.created_at)
+                .limit(50)
+            )
+        )
+        for review_id in manual_ids:
+            count += int(await dispatch_review(container.job_queue, review_id))
         return count
 
 

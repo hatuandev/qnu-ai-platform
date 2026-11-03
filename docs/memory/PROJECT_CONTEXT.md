@@ -7,6 +7,24 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-11-03 — Context856: RAG gom bằng chứng theo khoản.** Dãy điểm có dẫn chứng liền nhau trong cùng trang được gom qua ranh giới phần, với kiểm tra phạm vi và ngân sách. [Nhật ký](../nhat_ky/2026-11-03_phien_856_gom_bang_chung_rag.md), [Snapshot](./snapshots/2026-11-03_session_856.md).
+
+- **2026-11-03 — Context855: Phân luồng hội thoại V1.** Lời chào, cảm ơn, giới thiệu trợ lý và yêu cầu nhạy cảm rõ ràng được xử lý trước RAG, có lưu lịch sử. [Nhật ký](../nhat_ky/2026-11-03_phien_855_phan_luong_hoi_thoai.md), [Snapshot](./snapshots/2026-11-03_session_855.md).
+
+- **2026-11-03 — Context854: Biên soạn nhanh từ nguồn.** Studio có tùy chọn dựng bản nháp từ bản văn bản đã ghim. Worker lưu Markdown/JSON và dẫn chứng, không gọi model. Quy chế 363 được đo trực tiếp qua backend 2,34 giây, giữ nguyên 408 khối chữ và 8 bảng. [Nhật ký](../nhat_ky/2026-11-03_phien_854_bien_soan_nhanh.md), [Snapshot](./snapshots/2026-11-03_session_854.md).
+
+- **2026-11-03 — Context853: Compiler xử lý tiêu đề nhóm tùy chọn.** Đã tái hiện và kiểm chứng lại trên phản hồi đã lưu. Markdown của nhóm bỏ heading cấp tài liệu nếu tiêu đề trống. Studio hiển thị lỗi khi lượt kết thúc thất bại hoặc chưa xác định. [Nhật ký](../nhat_ky/2026-11-03_phien_853_compiler_tieu_de_tuy_chon.md), [Snapshot](./snapshots/2026-11-03_session_853.md).
+
+- **2026-11-03 — Context852: Rà soát nền và dừng lượt.** Studio tạo lượt review thủ công qua hàng đợi V1, theo dõi theo ID và dừng được lượt đang chờ hoặc đang chạy. Schema head `0013_queued_review`. [Nhật ký](../nhat_ky/2026-11-03_phien_852_ra_soat_nen_va_dung_luot.md), [Snapshot](./snapshots/2026-11-03_session_852.md).
+
+- **2026-11-03 — Context851: Phần trăm tiến độ rà soát.** Hiển thị theo số nhóm hoàn tất thực tế. Biome và 6/6 ca trọng tâm đạt. [Nhật ký](../nhat_ky/2026-11-03_phien_851_phan_tram_ra_soat.md), [Snapshot](./snapshots/2026-11-03_session_851.md).
+
+- **2026-11-03 — Context850: Tiến độ và cấu hình review.** [Nhật ký](../nhat_ky/2026-11-03_phien_850_hoan_tat_tab_ra_soat.md), [Snapshot](./snapshots/2026-11-03_session_850.md). Qwen local/seed bật wait_for_completion, giữ reasoning off. Review GET progress thật và lỗi terminal rõ; không gửi lại uncertain. FE764/764/buildTS/Biome, BE12/Ruff đạt. FullBE1322PASS/4FAIL/3SKIP; sáu ca thiếu Redis kiểm riêng6PASS, còn DOCX header test710, full vẫn FAIL. DBtest/Redisprefix dọn0. Không model thật/restart/publish/index/push.
+
+- **2026-11-03 — Context849: Tối ưu tab compiler.** [Nhật ký](../nhat_ky/2026-11-03_phien_849_toi_uu_tab_bien_soan.md), [Snapshot](./snapshots/2026-11-03_session_849.md). Giữ tab/nháp theo scope, section/bảng theo nhu cầu, một bộ chọn citation phân trang. FE756/756 PASS/build/TS/Biome; Chrome giữ nháp, không tăng GET qua đổi tab, 0 lỗi/ghi dữ liệu. Quay draft bình thường 10,464s→0,247s; sau resize 1,259s. Không BE/model/DB/restart/publish/push.
+
+- **2026-11-03 — Context848: Hộp thoại biên soạn gọn hơn.** [Nhật ký](../nhat_ky/2026-11-03_phien_848_gon_hop_thoai_bien_soan.md), [Snapshot](./snapshots/2026-11-03_session_848.md). Ghim nguồn/bản lưu, chủ đề UI tùy chọn, nâng cao thu gọn. Build/Biome/Chrome desktop/mobile đạt; full đầu 746 PASS/1 timeout, full 2 worker 747/747 PASS. Chưa submit compiler thật.
+
 - **2026-11-03 — Context847: Rà soát chính tả toàn tài liệu.** [Nhật ký](../nhat_ky/2026-11-03_phien_847_ra_soat_chinh_ta.md), [Snapshot](./snapshots/2026-11-03_session_847.md). Duyệt liên trang và lưu chung bản nháp.
 
 - **2026-11-03 — Context846: Seed Qwen tắt suy luận.** [Nhật ký](../nhat_ky/2026-11-03_phien_846_seed_qwen_reasoning.md), [Snapshot](./snapshots/2026-11-03_session_846.md). Đã seed và xác nhận cấu hình DB local.

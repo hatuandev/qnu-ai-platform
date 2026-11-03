@@ -45,6 +45,39 @@ from qnu.ports.vector_store import VectorStore
 logger = get_logger(__name__)
 
 
+def _pack_messages(req, sources, context, **options):
+    """Trim optional neighbors against the actual evidence envelope."""
+    optional = {
+        item["chunk_id"] for item in context.get("added", []) if item.get("kind") != "clause"
+    }
+    skipped = []
+    while True:
+        cells = catalog(sources, context.get("table_links"))
+        messages = messages_for(
+            req.question,
+            sources,
+            table_context=context.get("table_links"),
+            table_cells=cells,
+            **options,
+        )
+        envelope = json.loads(messages[-1].content)
+        evidence = {
+            key: envelope[key]
+            for key in ("evidence", "table_cells", "table_context", "narrative_context")
+            if key in envelope
+        }
+        size = len(json.dumps(evidence, ensure_ascii=False, separators=(",", ":")).encode())
+        if size <= req.context_max_bytes:
+            return messages, cells, evidence, size, skipped
+        if not sources or sources[-1].chunk_id not in optional:
+            raise AppException(
+                "Bằng chứng bắt buộc vượt ngân sách context.",
+                code="answer_context_budget_exceeded",
+                status_code=422,
+            )
+        skipped.append(sources.pop().chunk_id)
+
+
 async def answer(
     db: AsyncSession,
     blob: BlobStore,
@@ -108,12 +141,10 @@ async def answer(
         return response
     sources = sources_for(retrieval)
     await attach_source_text(db, blob, workspace_id, collection_id, sources)
-    cells = catalog(sources, trace.context.get("table_links"))
-    messages = messages_for(
-        req.question,
+    messages, cells, envelope, evidence_bytes, skipped = _pack_messages(
+        req,
         sources,
-        table_context=trace.context.get("table_links"),
-        table_cells=cells,
+        trace.context,
         resolved_question=retrieval_query,
         persona=persona,
         metadata_filter=(
@@ -127,29 +158,15 @@ async def answer(
             else req.metadata_filter.model_dump(mode="json", exclude_none=True)
         ),
     )
-    # Count the actual evidence envelope, including the derived cell catalog and
-    # dependency links. Question/style/history are bounded separately by ModelOps.
-    envelope = json.loads(messages[-1].content)
-    evidence_bytes = len(
-        json.dumps(
-            {
-                key: envelope[key]
-                for key in ("evidence", "table_cells", "table_context", "narrative_context")
-                if key in envelope
-            },
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    )
+    if skipped:
+        retrieval = retrieval.model_copy(update={"hits": retrieval.hits[: len(sources)]})
+        trace.context["added"] = [
+            item for item in trace.context["added"] if item["chunk_id"] not in skipped
+        ]
+        trace.context["skipped_envelope_budget"] = skipped
     trace.context["bytes_used"] = evidence_bytes
     trace.context["narrative_groups"] = len(envelope.get("narrative_context", []))
     trace.context["narrative_context_sha256"] = digest(envelope.get("narrative_context", []))
-    if evidence_bytes > req.context_max_bytes:
-        raise AppException(
-            "Bằng chứng và danh mục ô vượt ngân sách context.",
-            code="answer_context_budget_exceeded",
-            status_code=422,
-        )
     trace.grounding = {
         "version": CELLS_VERSION,
         "available_cells": sum(len(t["cells"]) for t in cells["tables"]),

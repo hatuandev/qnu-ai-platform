@@ -8,6 +8,7 @@ from qnu.domains.conversations.access import checkpoint
 from qnu.domains.conversations.history import readable
 from qnu.domains.conversations.models import ConversationTurn
 from qnu.domains.conversations.rewriting import resolve_question
+from qnu.domains.conversations.routing import direct_reply
 from qnu.domains.conversations.schemas import TurnRequest, TurnResponse
 from qnu.domains.conversations.service import reserve_turn
 from qnu.domains.identity.actor import AuthActor
@@ -56,36 +57,40 @@ async def send(
             raise Conflict("Nguồn của kết quả cũ đã thay đổi.", code="answer_evidence_changed")
         return value
     try:
-        query, provider_id = await resolve_question(db, actor, conversation, turn, chat)
         config = conversation.assistant_snapshot
-        policy = RagPolicy.model_validate(config.get("rag_policy", {})).model_dump(mode="json")
-        policy["metadata_filter"] = turn.metadata_filter or {}
 
         async def check():
             await checkpoint(db, actor, turn)
 
-        result = await answer(
-            db,
-            blob,
-            embedding,
-            vectors,
-            chat,
-            actor,
-            workspace_id,
-            conversation.collection_id,
-            AnswerRequest(
-                question=turn.question,
-                top_k=config["top_k"],
-                document_ids=conversation.document_ids,
-                provider_id=provider_id,
-                max_output_tokens=config["max_output_tokens"],
-                **policy,
-            ),
-            retrieval_query=query,
-            persona=config["persona"],
-            checkpoint=check,
-            reranker=reranker,
-        )
+        reply = direct_reply(turn.question, config["name"], turn.id)
+        if reply is None:
+            query, provider_id = await resolve_question(db, actor, conversation, turn, chat)
+            policy = RagPolicy.model_validate(config.get("rag_policy", {})).model_dump(mode="json")
+            policy["metadata_filter"] = turn.metadata_filter or {}
+            result = await answer(
+                db,
+                blob,
+                embedding,
+                vectors,
+                chat,
+                actor,
+                workspace_id,
+                conversation.collection_id,
+                AnswerRequest(
+                    question=turn.question,
+                    top_k=config["top_k"],
+                    document_ids=conversation.document_ids,
+                    provider_id=provider_id,
+                    max_output_tokens=config["max_output_tokens"],
+                    **policy,
+                ),
+                retrieval_query=query,
+                persona=config["persona"],
+                checkpoint=check,
+                reranker=reranker,
+            )
+        else:
+            result = reply
         await check()
         turn.result = result.model_dump(mode="json")
         turn.status, turn.finished_at = "completed", utcnow()
@@ -99,6 +104,7 @@ async def send(
                 "turn_id": turn.id,
                 "answer_id": result.id,
                 "status": result.status,
+                **({"route": reply.route} if reply else {}),
             },
         )
         await db.commit()

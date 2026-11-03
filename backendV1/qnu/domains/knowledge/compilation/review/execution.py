@@ -3,12 +3,15 @@
 import asyncio
 import json
 from collections import Counter
+from contextlib import suppress
 from dataclasses import replace
+from datetime import timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.identity.background import background_actor
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.models import CompilationRun, utcnow
 from qnu.domains.knowledge.compilation.review import artifacts, parts, refinement, service
@@ -22,6 +25,8 @@ from qnu.domains.knowledge.compilation.review.report import (
     decode_keyed,
     diagnose_contract,
     markdown_for,
+    messages_for,
+    output_schema,
     report_from_assessments,
     segment_markdown_for,
     validate_content,
@@ -65,12 +70,123 @@ async def execute(
     key: str,
 ) -> ReviewResponse:
     prepared = await service.prepare(db, blob, actor, workspace_id, collection_id, run_id, req, key)
-    run, row, material, runtime = prepared.run, prepared.review, prepared.material, prepared.runtime
+    run, row, material = prepared.run, prepared.review, prepared.material
     if material is None:
         if row.status == "completed":
             await service.target_matches(db, blob, row, run)
         return ReviewResponse.model_validate(row)
-    assert runtime is not None
+    return await execute_prepared(db, blob, chat, actor, workspace_id, prepared, req)
+
+
+async def run_queued(db: AsyncSession, blob: BlobStore, chat: ChatModel, review_id: str) -> str:
+    row = await db.get(CompilationReview, review_id)
+    if row is None or row.status != "queued":
+        return "not_claimed"
+    actor = background_actor(row.created_by)
+    try:
+        await service.authorize(db, actor, row.workspace_id, row.collection_id, write=True)
+        await db.refresh(row, with_for_update=True)
+        if row.status != "queued":
+            return "not_claimed"
+        run = await service.get_run(
+            db, actor, row.workspace_id, row.collection_id, row.compilation_run_id
+        )
+        material = await service.target_matches(db, blob, row, run)
+        req = ReviewRequest(
+            provider_id=row.provider_id,
+            max_output_tokens=row.trace["max_output_tokens"],
+            structured_output=row.trace["structured_output"],
+        )
+        segmented = bool(row.trace.get("segmentation"))
+        request, messages = None, None
+        if segmented:
+            runtime = await resolve_chat_runtime(db, row.workspace_id, row.provider_id)
+        else:
+            messages = messages_for(material.payload, structured=req.structured_output)
+            schema = (
+                output_schema(material.payload, require_references=2)
+                if req.structured_output
+                else None
+            )
+            runtime, request, budget = await prepare_chat_request(
+                db,
+                actor,
+                row.workspace_id,
+                messages,
+                provider_id=row.provider_id,
+                task="compiler_review",
+                max_output_tokens=req.max_output_tokens,
+                output_schema=schema,
+                reasoning_task="compiler_review",
+            )
+            request = replace(request, automatic_output_budget=row.trace["automatic_output_budget"])
+            if budget.total_reserved_tokens != row.trace["total_reserved_tokens"]:
+                raise Conflict(
+                    "Ngân sách review đã thay đổi.", code="compilation_review_provider_changed"
+                )
+        if runtime.configuration_hash != row.trace["configuration_hash"]:
+            raise Conflict("Model review đã thay đổi.", code="compilation_review_provider_changed")
+        now = utcnow()
+        count = (row.trace.get("segmentation") or {}).get("segment_count", 1)
+        row.trace = {**row.trace, "execution_started_at": now.isoformat()}
+        row.status = "running"
+        row.expires_at = now + timedelta(seconds=max(900, runtime.timeout_seconds + 60) * count)
+        await db.commit()
+        prepared = service.PreparedReview(run, row, material, runtime, request, messages, segmented)
+        result = await execute_prepared(db, blob, chat, actor, row.workspace_id, prepared, req)
+        return result.status
+    except Exception as exc:
+        await db.rollback()
+        row = await db.get(
+            CompilationReview, review_id, populate_existing=True, with_for_update=True
+        )
+        if row is None:
+            return "missing"
+        if row.status in {"queued", "running"}:
+            row.status, row.finished_at = "failed", utcnow()
+            row.error_code = (
+                exc.code if isinstance(exc, AppException) else "compilation_review_internal_error"
+            )
+            await db.commit()
+            logger.warning(
+                "manual_review_job_failed", review_id=review_id, error_code=row.error_code
+            )
+        return row.status
+
+
+async def _complete_until_stopped(chat, messages, request, review_id: str):
+    """Cancel the local provider wait after a durable stop, even across processes."""
+    task = asyncio.create_task(chat.complete(messages, request))
+    try:
+        while not (await asyncio.wait({task}, timeout=2))[0]:
+            async with AsyncSessionFactory() as monitor:
+                status = await monitor.scalar(
+                    select(CompilationReview.status).where(CompilationReview.id == review_id)
+                )
+            if status == "cancelled":
+                raise Conflict(
+                    "Đã dừng chờ mô hình; kết quả phía nhà cung cấp chưa xác định.",
+                    code="compilation_review_cancelled_uncertain",
+                )
+        return task.result()
+    finally:
+        if not task.done():
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+
+async def execute_prepared(
+    db: AsyncSession,
+    blob: BlobStore,
+    chat: ChatModel,
+    actor: AuthActor,
+    workspace_id: str,
+    prepared: service.PreparedReview,
+    req: ReviewRequest,
+) -> ReviewResponse:
+    run, row, material, runtime = prepared.run, prepared.review, prepared.material, prepared.runtime
+    assert runtime is not None and material is not None
     row_id = row.id
     if prepared.segmented:
         return await _execute_segments(
@@ -102,7 +218,9 @@ async def execute(
             await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
             raise
         try:
-            result = await chat.complete(messages, bind_usage(request, usage.id))
+            result = await _complete_until_stopped(
+                chat, messages, bind_usage(request, usage.id), row_id
+            )
         except ChatResponseError as exc:
             row.usage_tokens = exc.usage_tokens
             await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
@@ -143,7 +261,9 @@ async def execute(
         return ReviewResponse.model_validate(row)
     except (Exception, asyncio.CancelledError) as exc:
         await db.rollback()
-        failed = await db.get(CompilationReview, row_id, populate_existing=True)
+        failed = await db.get(
+            CompilationReview, row_id, populate_existing=True, with_for_update=True
+        )
         if failed is not None and failed.status == "running":
             code = exc.code if isinstance(exc, AppException) else "compilation_review_interrupted"
             failed.error_code = code
@@ -529,8 +649,7 @@ async def _verify_manifest(
         manifest.get("review_id") != row.id
         or manifest.get("bundle_sha256") != row.bundle_sha256
         or len(scopes) != len(roots)
-        or [scope.get("index") for scope in scopes]
-        != [segment.segment_index for segment in roots]
+        or [scope.get("index") for scope in scopes] != [segment.segment_index for segment in roots]
         or [
             (
                 scope.get("source_ids"),
@@ -741,13 +860,22 @@ async def _run_segment(
             budget.total_reserved_tokens,
             runtime.provider_id,
         )
+        # Reserving usage commits the transaction and releases the review lock.
+        await db.refresh(row, with_for_update=True)
         segment.usage_id = usage.id
+        if row.status == "cancelled":
+            refinement.settle_attempt(segment, "released")
+            await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
+            await db.commit()
+            return
         segment.status, segment.worker_id = "running", row.created_by
         segment.attempt_count += 1
         segment.request_started_at = utcnow()
         await db.commit()
         try:
-            result = await chat.complete(messages, bind_usage(request, usage.id))
+            result = await _complete_until_stopped(
+                chat, messages, bind_usage(request, usage.id), row.id
+            )
         except ChatResponseError as exc:
             # A response arrived: its usage is whatever the provider reported, else unknown.
             refinement.settle_attempt(

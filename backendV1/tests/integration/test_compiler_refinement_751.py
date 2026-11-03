@@ -51,6 +51,34 @@ class ReasoningOnlyRefineChat(RefineChat):
         return status, body
 
 
+def test_segment_without_title_still_exports_markdown_and_merges(client):
+    class UntitledChat(FakeChat):
+        def _respond(self, index):
+            status, body = super()._respond(index)
+            response = json.loads(body)
+            message = response["choices"][0]["message"]
+            content = json.loads(message["content"])
+            content["title"] = None
+            message["content"] = json.dumps(content)
+            return status, json.dumps(response).encode()
+
+    data = processed_input(client, code="refine-untitled")
+    with UntitledChat() as chat:
+        chat_provider(client, data, chat.base_url)
+        created = request_compile(client, data, auto_review=False)
+        assert created.status_code == 201, created.text
+        run_id = created.json()["run"]["id"]
+        assert execute_compile(client, run_id) == "completed"
+        assert len(chat.requests) == 1
+        base = data["url"] + "/" + run_id
+        node = base + "/segments/1/artifacts/"
+        assert client.get(node + "draft_json").json()["title"] is None
+        markdown = client.get(node + "markdown")
+        assert markdown.status_code == 200
+        assert "## " in markdown.text
+        assert client.get(base + "/draft").json()["title"]
+
+
 @pytest.mark.parametrize("chat_type", [RefineChat, ReasoningOnlyRefineChat])
 def test_truncated_parent_builds_child_pairs_and_aggregates_usage(client, chat_type):
     data = processed_input(client, code="refine751")

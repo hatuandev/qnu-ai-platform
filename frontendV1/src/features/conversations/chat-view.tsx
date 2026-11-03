@@ -340,7 +340,11 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
 
   const handleOpenCitation = (statement: Statement, turn: TurnResponse) => {
     setActiveStatement(statement);
-    setActiveSources(turn.result?.sources ?? []);
+    setActiveSources(
+      turn.result?.status === "direct_reply"
+        ? []
+        : (turn.result?.sources ?? []),
+    );
     setActiveTurnNo(turn.turn_no);
     setCitationOpen(true);
   };

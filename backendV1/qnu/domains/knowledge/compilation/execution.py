@@ -53,6 +53,7 @@ from qnu.domains.knowledge.compilation.models import (
 )
 from qnu.domains.knowledge.compilation.scheduler import effective_concurrency, run_bounded
 from qnu.domains.knowledge.compilation.service import authorize_collection
+from qnu.domains.knowledge.compilation.source_first import build_source_draft
 from qnu.domains.modelops.inference.service import prepare_chat_request
 from qnu.domains.modelops.models import ModelUsageRecord
 from qnu.domains.modelops.reasoning import ReasoningDirective
@@ -141,6 +142,10 @@ async def _compile(db: AsyncSession, blob: BlobStore, run: CompilationRun, model
     actor = background_actor(run.requested_by)
     await authorize_collection(db, actor, run.workspace_id, run.collection_id, write=True)
     documents = await _inputs(db, blob, run)
+    if run.source_first:
+        draft = await asyncio.to_thread(build_source_draft, run.topic, documents, run.id)
+        await _store_final_draft(db, blob, run, draft)
+        return await finish(db, run, "completed")
     if run.config.get("workflow_version") == "qnu.compiler.workflow/v2":
         return await _compile_segmented(db, blob, run, documents, model)
     existing_raw = await artifact(db, run.id, "raw_response")
@@ -159,11 +164,17 @@ async def _compile(db: AsyncSession, blob: BlobStore, run: CompilationRun, model
     else:
         content = await _call(db, blob, run, actor, documents, model)
     draft = build_draft(content, run.topic, documents, run.id)
+    await _store_final_draft(db, blob, run, draft)
+    return await finish(db, run, "completed")
+
+
+async def _store_final_draft(
+    db: AsyncSession, blob: BlobStore, run: CompilationRun, draft: dict
+) -> None:
     await assert_claim(db, run)
     await store(db, blob, run, "draft_json", json_bytes(draft))
     await store(db, blob, run, "markdown", markdown_for(draft).encode("utf-8"))
     await commit_owned(db, run)
-    return await finish(db, run, "completed")
 
 
 def _stored_reasoning(segment: CompilationSegment) -> tuple[bool, ReasoningDirective | None]:
@@ -772,8 +783,14 @@ async def _run_part(
             await db.rollback()
             await _fail_part(run_id, worker_id, segment_id, exc.code)
             raise
-        except Exception:
+        except Exception as exc:
             await db.rollback()
+            logger.error(
+                "compilation_part_processing_failed",
+                run_id=run_id,
+                segment_id=segment_id,
+                error_type=type(exc).__name__,
+            )
             raise
         return segment.status
 

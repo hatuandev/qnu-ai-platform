@@ -62,7 +62,22 @@ const props = {
   isOpen: true,
   onClose: vi.fn(),
 };
-it("keeps compiler configuration when parent renders the same pinned input again", () => {
+
+it("submits the pinned version in fast mode without AI generation settings", async () => {
+  render(<CompilationDialog {...props} initialRun={run} />);
+  fireEvent.click(screen.getByRole("checkbox", { name: "Biên soạn nhanh" }));
+  expect(screen.queryByRole("button", { name: "Cài đặt nâng cao" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu biên soạn" }));
+  await waitFor(() => expect(create).toHaveBeenCalledOnce());
+  expect(create.mock.calls[0][0].input).toEqual({
+    topic: "Source",
+    ocr_run_ids: ["run-1"],
+    text_versions: { "run-1": 1 },
+    source_first: true,
+    auto_review: false,
+  });
+});
+it("keeps compiler configuration when parent renders the same pinned input again", async () => {
   const view = render(<CompilationDialog {...props} initialRun={{ ...run }} />);
   fireEvent.change(screen.getByLabelText(/Chủ đề biên soạn/), {
     target: { value: "User-entered topic" },
@@ -88,6 +103,17 @@ it("keeps compiler configuration when parent renders the same pinned input again
     ).value,
   ).toBe("2048");
   expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(screen.getByRole("button", { name: "Cài đặt nâng cao" }));
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu biên soạn" }));
+  await waitFor(() => expect(create).toHaveBeenCalledOnce());
+  expect(create.mock.calls[0][0]).toMatchObject({
+    input: {
+      topic: "User-entered topic",
+      text_versions: { "run-1": 1 },
+      max_output_tokens: 2048,
+      auto_review: false,
+    },
+  });
 });
 it("starts a fresh configuration when reopened or switched to another pinned version", () => {
   const view = render(<CompilationDialog {...props} initialRun={run} />);

@@ -144,6 +144,24 @@ def test_saved_answer_replay_and_followup_use_new_evidence(client, chat_session)
     assert listing.headers["cache-control"] == "private, no-store"
 
 
+def test_greeting_replays_without_model_and_stays_out_of_retrieval_history(client, chat_session):
+    data = chat_session
+    before = len(data["answer_chat"].requests)
+    first = send(client, data, "Dạ, xin chào trợ lý ạ!")
+    assert first.status_code == 200, first.text
+    reply = first.json()
+    assert reply["result"]["status"] == "direct_reply"
+    assert reply["result"]["route"] == "greeting"
+    assert data["assistant"]["name"] in reply["result"]["answer"]
+    assert send(client, data, "Dạ, xin chào trợ lý ạ!").json() == reply
+    assert len(data["answer_chat"].requests) == before
+    question = send(client, data, "Xin chào, chỉ tiêu trúng tuyển năm 2024?", seq=1, key="turn-two")
+    assert question.status_code == 200, question.text
+    assert question.json()["result"]["sources"]
+    assert question.json()["history_turn_ids"] == []
+    assert len(data["answer_chat"].requests) == before + 1
+
+
 def test_key_conflict_and_sequence_conflict_never_call_model(client, chat_session):
     assert send(client, chat_session).status_code == 200
     count = len(chat_session["answer_chat"].requests)

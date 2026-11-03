@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from qnu.api.dependencies import get_actor, get_blob_store, get_db
+from qnu.api.dependencies import get_actor, get_blob_store, get_db, get_job_queue
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.review import service
 from qnu.domains.knowledge.compilation.review.execution import execute
@@ -17,6 +17,7 @@ from qnu.domains.knowledge.compilation.review.schemas import (
 )
 from qnu.platform.errors import Conflict
 from qnu.ports.blob_store import BlobStore
+from qnu.ports.job_queue import JobQueue
 
 
 def no_store(response: Response) -> None:
@@ -48,9 +49,28 @@ async def create(
     actor: Actor,
     blob: Blob,
     idempotency_key: Key,
+    queue: Annotated[JobQueue | None, Depends(get_job_queue)],
+    background: bool = False,
 ) -> ReviewResponse:
     if idempotency_key.startswith("auto:"):
         raise Conflict("Khóa review tự động được dành riêng.", code="idempotency_conflict")
+    if background:
+        prepared = await service.prepare(
+            db,
+            blob,
+            actor,
+            workspace_id,
+            collection_id,
+            run_id,
+            body,
+            idempotency_key,
+            enqueue=True,
+        )
+        review = ReviewResponse.model_validate(prepared.review)
+        await db.commit()
+        if review.status == "queued":
+            await service.dispatch_review(queue, review.id)
+        return review
     return await execute(
         db,
         blob,
@@ -62,6 +82,19 @@ async def create(
         body,
         idempotency_key,
     )
+
+
+@router.post("/{review_id}/cancel", response_model=ReviewResponse)
+async def cancel(
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    review_id: str,
+    db: DB,
+    actor: Actor,
+) -> ReviewResponse:
+    row = await service.cancel_review(db, actor, workspace_id, collection_id, run_id, review_id)
+    return ReviewResponse.model_validate(row)
 
 
 @router.get("", response_model=list[ReviewResponse])
@@ -93,9 +126,7 @@ async def progress(
     db: DB,
     actor: Actor,
 ) -> ReviewProgress:
-    return await service.progress(
-        db, actor, workspace_id, collection_id, run_id, review_id
-    )
+    return await service.progress(db, actor, workspace_id, collection_id, run_id, review_id)
 
 
 @router.get("/{review_id}/segments/{segment_index}/raw")

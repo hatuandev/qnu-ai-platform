@@ -162,7 +162,7 @@ def test_answer_projection_preserves_published_table_and_prompt_contract(client,
     response = ask(client, ready)
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["trace"]["prompt_version"] == "qnu.rag.answer/v14"
+    assert body["trace"]["prompt_version"] == "qnu.rag.answer/v15"
     assert body["trace"]["grounding"]["selected_cells"]
     sent = json.loads(ready["answer_chat"].requests[0]["body"]["messages"][-1]["content"])
     schema = ready["answer_chat"].requests[0]["body"]["response_format"]["json_schema"]["schema"]

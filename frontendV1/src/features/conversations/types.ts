@@ -112,6 +112,13 @@ export type AnswerResponse = {
 
 export type SourceStatus = "current" | "unavailable";
 
+type DirectReply = {
+  id: string;
+  status: "direct_reply";
+  route: "greeting" | "courtesy" | "identity" | "protected_request";
+  answer: string;
+};
+
 export type TurnResponse = {
   id: string;
   conversation_id: string;
@@ -123,7 +130,7 @@ export type TurnResponse = {
   history_turn_ids: string[];
   status: TurnStatus;
   error_code: string | null;
-  result: AnswerResponse | null;
+  result: AnswerResponse | DirectReply | null;
   rewrite_trace: Record<string, unknown> | null;
   source_status: SourceStatus;
   created_at: string;

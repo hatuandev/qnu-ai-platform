@@ -10,15 +10,22 @@ giữ bảng/header/footnote/năm/đơn vị. Mỗi nhận xét đi với nguyê
 
 Từ [quy trình29](29_noi_hau_ocr_review_va_sua_compiler_backendv1.md), Compiler mới
 mặc định tạo intent review trong cùng transaction hoàn tất và giao worker v1.
-API POST review thủ công vẫn dùng riêng. Model reviewer chọn qua ModelOps, có thể
+Studio tạo lượt thủ công qua POST nền, mở tab tiến độ theo ID đã lưu và cho phép
+dừng lượt đang chờ hoặc đang chạy. Phần hoàn tất được giữ lại. Nhóm đã gửi model
+mà chưa rõ kết quả được đánh dấu chưa xác định. Model reviewer chọn qua ModelOps, có thể
 khác model biên soạn. Một key/body chỉ tạo một lượt; failed/uncertain không auto retry.
 
 Nguồn hoặc quyền/model thay đổi giữa HTTP khiến review bị chặn. Schema/ID/coverage
 không hợp lệ giữ raw và báo lỗi; provider lỗi không giả thành không phát hiện vấn đề.
 Kết quả chỉ có needs_attention hoặc no_issues_detected, không tự approved/publish.
 
-Chỉ backendV1, giao diện làm sau. Review dùng đúng nguồn Compiler đã dùng; bản
+Review dùng đúng nguồn Compiler đã dùng; bản
 sửa hậu OCR được ghim bằng text version khi tạo Compiler; không trộn bản mới vào lượt cũ.
+
+**Biên soạn nhanh** dùng toàn bộ nguồn đã chọn và lấy chủ đề làm tiêu đề.
+Backend dựng bản nháp nguyên văn có dẫn chứng, giữ bảng và các cảnh báo nguồn.
+Lượt này không tự tạo Review AI. Người dùng có thể yêu cầu Review thủ công
+và tiếp tục qua quy trình xác nhận, duyệt và phát hành hiện hành.
 
 [API và cách tích hợp](../../backendV1/docs/compiler-review.md) ·
 [Báo cáo652](../bao_cao/context652/REVIEW.md).

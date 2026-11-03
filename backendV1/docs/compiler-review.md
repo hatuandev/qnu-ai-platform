@@ -93,8 +93,11 @@ Tiền tố `/platform/v1alpha1/workspaces/{workspace_id}/collections/{collectio
 | Method | Phần sau tiền tố | Nội dung |
 |---|---|---|
 | POST | rỗng | Tạo một lượt review; bắt buộc Idempotency-Key |
+| POST | `?background=true` | Lưu lượt review và trả ID để theo dõi qua worker |
+| POST | `/{review_id}/cancel` | Dừng lượt chờ hoặc đang chạy, yêu cầu quyền review |
 | GET | rỗng | Danh sách mới nhất trước; limit1..100, offset>=0 |
 | GET | `/{review_id}` | Trạng thái, verdict, hashes, usage và trace an toàn |
+| GET | `/{review_id}/progress` | Số nhóm hoàn tất, đang chạy, chưa chạy và kết quả chưa xác định |
 | GET | `/{review_id}/report` | JSON có nguyên văn nguồn/bản nháp, findings và coverage |
 | GET | `/{review_id}/markdown` | Báo cáo đọc như văn bản |
 | GET | `/{review_id}/raw` | Nguyên bytes model, kể cả response không hợp lệ |
@@ -110,7 +113,8 @@ Admin/editor/reviewer được tạo. Thành viên đọc theo READ_ROLES của 
 đây là ngoại lệ quyền của backendV1, không đổi phạm vi backend cũ. Body không nhận
 URL, key, actor, source hay draft do client tự đưa vào.
 
-POST trả metadata hoàn tất khi thành công. Cùng actor/workspace/key/body trả cùng
+POST đồng bộ trả metadata khi xử lý xong. POST nền trả metadata sau khi lưu lượt.
+Cùng actor/workspace/key/body trả cùng
 lượt, không gửi lại model dù trạng thái failed/uncertain/running; key trùng khác
 body/scope trả409. Key mới tạo lượt mới và có thể tính usage lần nữa.
 
@@ -139,9 +143,13 @@ input snapshot có hash trong cùng khóa workspace. Nhờ vậy hai request cù
 không gọi model hoặc reserve hai lần. ModelOps giải quyết grant, active, credential
 được bảo vệ, capacity và quota; không .env key, retry hoặc fallback ngầm.
 
-`running → completed | failed | uncertain`. Không thêm queue/worker. POST hiện
-giữ kết nối trong khi model chạy; nếu client mất phản hồi, đọc lại trạng thái hoặc
-replay cùng key. Lượt hết hạn (ít nhất900giây hoặc timeout model+60) được đánh dấu
+`queued → running → completed | failed | uncertain`. Studio gửi POST nền và đọc
+tiến độ theo ID. Worker hiện có giao lại lượt còn `queued` khi Redis gián đoạn và
+chỉ nhận lượt một lần. Người có quyền có thể chuyển lượt đang chờ hoặc đang chạy
+sang `cancelled`. Worker ngừng gửi nhóm mới và hủy việc chờ model tại QNU.
+Nhóm đã hoàn tất được giữ lại. Yêu cầu đã gửi upstream có thể vẫn chạy tại đó,
+nên giữ trạng thái chưa xác định khi chưa biết kết quả hoặc usage. Khi mất phản
+hồi tạo lượt, đọc lại danh sách hoặc dùng cùng key. Lượt hết hạn được đánh dấu
 uncertain khi đọc. Kết quả muộn sau expiry/fence không được commit thành completed.
 Review nhiều phần có thể tiếp tục phần chưa xong hoặc đọc lại raw đã nhận khi
 claim trước đã dừng và còn ngân sách. Phần completed không gọi lại; phần uncertain

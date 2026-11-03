@@ -69,6 +69,10 @@ def build_draft(content: str, topic: str, documents: list[dict], run_id: str) ->
         raise AppException(
             "LLM trả bản nháp sai schema.", code="compilation_draft_invalid", status_code=502
         ) from exc
+    return validated_draft(draft, topic, documents, run_id)
+
+
+def validated_draft(draft: DraftContent, topic: str, documents: list[dict], run_id: str) -> dict:
     draft = retain_limitations(draft, documents)
     index = citation_index(documents)
     for section in draft.sections:
@@ -101,7 +105,9 @@ def build_draft(content: str, topic: str, documents: list[dict], run_id: str) ->
 
 
 def markdown_for(draft: dict) -> str:
-    lines = [f"# {escape(draft['title'])}", "", "> Bản nháp chưa duyệt.", ""]
+    title = draft["title"]
+    lines = [f"# {escape(title)}", ""] if title and title.strip() else []
+    lines += ["> Bản nháp chưa duyệt.", ""]
     for section in draft["sections"]:
         lines += [f"## {escape(section['heading'])}", ""]
         for paragraph in section["paragraphs"]:
