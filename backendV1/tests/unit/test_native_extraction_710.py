@@ -6,7 +6,7 @@ import zipfile
 import pymupdf
 import pytest
 
-from qnu.domains.ocr.artifacts.render import render_document
+from qnu.domains.ocr.artifacts.render import render_document, render_saved_pdf
 from qnu.domains.ocr.config import processing_config
 from qnu.domains.ocr.layout import parse_page
 from qnu.domains.ocr.native import extract_native, merge_layout
@@ -40,6 +40,33 @@ def test_pdf_text_is_native_and_needs_no_provider():
     assert page.layout.text == "Source text 2023: 0 -"
     assert not page.needs_ocr
     assert page.layout.blocks[0].origin == "native"
+
+
+def test_docx_with_header_uses_the_fixed_layout_evidence():
+    from docx import Document
+
+    from qnu.domains.ocr.native_docx import _docling_tables
+
+    source = Document()
+    source.sections[0].header.paragraphs[0].text = "Section header"
+    source.sections[0].footer.paragraphs[0].text = "Section footer"
+    source.add_paragraph("Body text")
+    table = source.add_table(rows=2, cols=2)
+    table.cell(0, 0).merge(table.cell(0, 1)).text = "Merged cell"
+    table.cell(1, 0).text = "Left"
+    table.cell(1, 1).text = "Right"
+    payload = io.BytesIO()
+    source.save(payload)
+    fixed = pdf("Section header / Body text / Section footer")
+    config = processing_config(get_settings(), ".docx")
+    rendered = render_saved_pdf(fixed, config, {"converter": "gotenberg-libreoffice"}, ())
+
+    result = extract_native(payload.getvalue(), rendered)
+
+    assert result.pages[0].layout.text == "Section header / Body text / Section footer"
+    [parsed_table] = _docling_tables(payload.getvalue())
+    assert parsed_table.rows[0][0].text == "Merged cell"
+    assert parsed_table.rows[0][0].col_span == 2
 
 
 def test_blank_pdf_is_not_sent_to_ocr():

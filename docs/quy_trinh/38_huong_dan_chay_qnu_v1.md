@@ -223,6 +223,10 @@ DOCX mới dùng Gotenberg LibreOffice theo `DOCX_CONVERTER=gotenberg-libreoffic
 endpoint, `DOCX_RENDERER_REVISION` và phiên bản PyMuPDF; lỗi Gotenberg báo lỗi,
 không tự đổi converter. PDF trực tiếp vẫn dùng PyMuPDF.
 
+Ở nhánh Gotenberg, Docling đọc cấu trúc bảng từ DOCX gốc. Chỉ ghép cấu trúc
+vào bảng PDF khi nội dung và số cột khớp duy nhất. Đầu trang, chân trang,
+ảnh trang và tọa độ nội dung lấy từ PDF đã dàn trang.
+
 Khi đổi image/font/tùy chọn chuyển đổi, đổi `DOCX_RENDERER_REVISION` để phân biệt
 generation mới. Đây là revision triển khai do quản trị đặt, không phải phiên bản
 Gotenberg được đo tự động. Giá trị mặc định là `qnu-docx/v2`. Khi phục hồi DOCX,

@@ -7,6 +7,18 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-11-03 — Context834: Docling trong nhánh Gotenberg của DOCX V1.** [Nhật ký](../nhat_ky/2026-11-03_phien_834_docling_docx.md), [Snapshot](./snapshots/2026-11-03_session_834.md).
+
+- **2026-11-03 — Context833: Chia nhóm cho kiểm tra chính tả theo trang và đoạn.** Mọi phạm vi dùng chung tối đa hai nhóm đồng thời. POST kiểm tra chờ backend theo thời hạn ModelOps. [Nhật ký833](../nhat_ky/2026-11-03_phien_833_chinh_ta_pham_vi_va_thoi_han.md), [Snapshot833](./snapshots/2026-11-03_session_833.md).
+
+- **2026-11-03 — Context832: Chính tả bất đồng bộ2nhóm.** Pool2 mỗi lượt, bù việc độc lập; stop/fatal/scope chặn nhóm mới, drain đủ active, không retry. UI đủ trangđangchạy. FE729/85PASS/buildTS/Biome6/browsermock đạt. Live2nhóm nhỏ2completed/16,280s/peakHTTP2, không apply/save. Chưa full32trang/speedup/routerGPU; không restart/modelconfig/quota/push. [Nhật ký832](../nhat_ky/2026-11-03_phien_832_chinh_ta_bat_dong_bo_hai_nhom.md), [Snapshot832](./snapshots/2026-11-03_session_832.md).
+
+- **2026-11-02 — Context831: Kiểm tra chính tả toàn tài liệu.** Mainbutton alltext, nhóm theo trang/20unit/8kchar, ghim version/hash/idempotency; tiến độ thật/error/notrun/JSON, giữ gợi ý và apply/save thủ công, không retry. FE723/83PASS/buildTS/Biome11; browserdesktopmobile32trang474unit/0errors, chỉ mởdialog khônginference. Chưa liveAI32trang/BEfull. Giữ trang mở, không backgroundresume/restart/push. [Nhật ký831](../nhat_ky/2026-11-02_phien_831_kiem_tra_chinh_ta_toan_tai_lieu.md), [Snapshot831](./snapshots/2026-11-02_session_831.md).
+
+- **2026-11-02 — Context830: Dọn Nemotron, MinerU UI/E2E.** API xóa Nemotron không FK/grants/defaults; QNU còn3model, MinerU OCR giữ. UI task/protocol đúng, không chat/capacityLLM/autoport8081; E2E thêm OCR riêng. FE705PASS/build/TS/Biome16, runner18/Ruff, browser desktop/mobile0errors. Giữ lịch sử/raw/key, không BEchange/inference/restart/push. [Nhật ký830](../nhat_ky/2026-11-02_phien_830_don_nemotron_ui_mineru.md), [Snapshot830](./snapshots/2026-11-02_session_830.md).
+
+- **2026-11-02 — Context829: Quota test Tuyển sinh không giới hạn.** Local SHL tháng11/2026 từ chưa cấu hình → null/unblocked qua API200, đọc lại configured=true; giữ usage/reserved, audit hiện hành. Chỉ tháng hiện tại, chưa tự gia hạn; không code/profile/model/restart/OCR/retry/push. [Nhật ký829](../nhat_ky/2026-11-02_phien_829_quota_test_khong_gioi_han.md), [Snapshot829](./snapshots/2026-11-02_session_829.md).
+
 - **2026-11-02 — Context828: Test MinerU VRAM 0.17.** Cùng 61 trang, một create/upload mỗi file, không retry: 363 129,11s và 2699 11,61s; CER mẫu giữ 0,116%/0,262%, 34 bảng không đổi. Ngoài mẫu trang30 thêm CSĐT→CSDT xác nhận ảnh; không kết luận hoàn toàn tương đương/VRAM gây lỗi. Health4.1.3 không telemetry, cache/tải chưa kiểm soát. Không app/ModelOps/review/compiler/index/publish/restart/push. [Nhật ký828](../nhat_ky/2026-11-02_phien_828_test_mineru_vram_017.md), [Snapshot828](./snapshots/2026-11-02_session_828.md).
 
 - **2026-11-02 — Context827: Gỡ backend/frontend legacy, V1 đạt kiểm chứng.** Clean6e010471trướctask;hai thư mục vắng, archive ngoài checkout giữđủ1.799tracked+ignored/hash2config. Backend1.306/1.306PASS/1.239,09s/exactJUnit/4DBdọn0;FE701/80suites/buildTS/runner52/DockerBEFE/preflight5đạt. LiveAPIready/OpenAPIv1/UI200/0pageerrors/workerqueueisolatedđạt,đãdừngtestports,dọnRedisown7key0còn. Docs/skills/gate trỏV1,khôngappcode/DBứngdụng/LLM/publish/reindex/pushdeploy. [Nhật ký827](../nhat_ky/2026-11-02_phien_827_go_legacy_va_kiem_chung_v1.md), [Snapshot827](./snapshots/2026-11-02_session_827.md).

@@ -91,7 +91,7 @@ export type V1RequestOptions = {
   searchParams?: Record<string, QueryValue>;
   signal?: AbortSignal;
   idempotencyKey?: string;
-  timeoutMs?: number;
+  timeoutMs?: number | null;
   responseType?: "json" | "blob";
 };
 
@@ -270,10 +270,14 @@ export function createV1Client(options: V1ClientOptions = {}): V1Client {
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(
-      () => controller.abort(),
-      requestOptions.timeoutMs ?? timeoutMs,
-    );
+    const deadline =
+      requestOptions.timeoutMs === undefined
+        ? timeoutMs
+        : requestOptions.timeoutMs;
+    const timer =
+      deadline === null
+        ? undefined
+        : setTimeout(() => controller.abort(), deadline);
     const abort = () => controller.abort();
     signal?.addEventListener("abort", abort);
 

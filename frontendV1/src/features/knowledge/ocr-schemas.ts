@@ -412,7 +412,7 @@ export function formatOcrError(
     case "docx_layout_unsupported":
       return detail || "Không thể dựng layout cố định cho tệp DOCX này.";
     case "model_not_configured":
-      return "Workspace chưa cấu hình model OCR hợp lệ trong ModelOps.";
+      return "Đơn vị chưa cấu hình model mặc định cho chức năng đang thực hiện trong ModelOps.";
     case "provider_not_found":
     case "provider_inactive":
       return "Nhà cung cấp AI được yêu cầu không tồn tại hoặc đã bị tắt.";

@@ -7,6 +7,7 @@ import type { Api } from "./session";
 
 export type ProviderSetupProfile = {
   base_url: string;
+  api_type?: string;
   models: Partial<Record<Capability, string>>;
   observed_model_aliases?: Record<string, string[]>;
   model_runtime?: Partial<

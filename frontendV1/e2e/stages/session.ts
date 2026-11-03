@@ -47,6 +47,7 @@ export interface Checkpoint {
   };
   chatSelection?: "qnu" | "router";
   routerProviderSetup?: Checkpoint["providerSetup"];
+  ocrProviderSetup?: Checkpoint["providerSetup"];
   workspace?: string;
   collection?: string;
   folder?: string;

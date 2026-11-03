@@ -117,7 +117,7 @@ Tạo phiên khác sau khi dọn phiên trước:
 .\test-v1-e2e.ps1 serve
 ```
 
-Mở URL frontend E2E do `serve` in ra. Cấu hình provider/key/capacity/dimension/OCR budget cho bốn model QNU trong ModelOps của phiên thử, rồi chạy provider-setup và đủ nhóm model-* trước. Bước provider-setup đã tự kiểm tạo provider/key/model, nhận key bằng nhập ẩn trong terminal; chỉ capacity/dimension/ngân sách ảnh cần khai báo theo server thật. Navigation live sẽ kiểm lịch sử còn current, gắn đúng model đã test làm default workspace và cấp quota thử hữu hạn nếu chưa có theo profile. Không sửa quota đã có, không lấy LLM key từ `.env` hay sao chép credential DB dev. Làm theo [hướng dẫn tổng hợp](./V1_TEST_TOAN_LUONG_MODEL_QNU.md) để có đầy đủ thứ tự lệnh.
+Mở URL frontend E2E do `serve` in ra. Chạy provider-setup rồi đủ nhóm model-* trước. Profile hiện dùng ba model chat/embedding/rerank ở QNU, OCR qua kết nối MinerU riêng. MinerU không dùng ngân sách token ảnh/prompt LLM. Navigation live kiểm diagnostic còn current, gắn đúng model đã test vào workspace thử và cấp quota thử theo profile nếu chưa có. Key active trong ModelOps được ưu tiên; runner chỉ được đọc hai biến E2E ở `.env` theo ngoại lệ hiện hành để nạp key khi thiếu, không override runtime DB. Không sửa quota đã có hoặc sao chép credential DB dev. Làm theo [hướng dẫn tổng hợp](./V1_TEST_TOAN_LUONG_MODEL_QNU.md) để có đầy đủ thứ tự lệnh.
 
 Model thật có thể trả review finding hoặc nội dung khác fixture; giữ lỗi để điều tra, không đổi assertion thành skip. Live mode không chạy mock AI và có thể phát sinh usage. Chỉ dùng endpoint và dữ liệu mà bạn cho phép. Phạm vi chặng live giống workflow; không thay thế benchmark độc lập.
 

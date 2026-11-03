@@ -55,7 +55,6 @@ import {
   formatOcrError,
   formatUnitLocator,
   generateIdempotencyKey,
-  MAX_SPELL_CHECK_UNITS,
   validateSuggestionSpan,
 } from "@/features/knowledge/ocr-schemas";
 import type {
@@ -66,7 +65,13 @@ import type {
   TextUnit,
 } from "@/features/knowledge/ocr-types";
 import { useActionScope } from "@/features/lifecycle/action-scope";
+import {
+  DocumentSpellingProgress,
+  DocumentSpellingReport,
+} from "./document-spelling-report";
+import { selectableSpellingUnits } from "./ocr-spelling-batch";
 import { SpellingResultPanel } from "./spelling-result-panel";
+import { useDocumentSpelling } from "./use-document-spelling";
 
 type OcrTextReviewProps = {
   workspaceId: string;
@@ -129,6 +134,7 @@ function OcrTextReviewSession({
 
   // AI Spell Check Modal State
   const [spellCheckModalOpen, setSpellCheckModalOpen] = useState(false);
+  const [wholeDocumentCheck, setWholeDocumentCheck] = useState(true);
   const [selectedUnitsForCheck, setSelectedUnitsForCheck] = useState<
     Set<string>
   >(() => new Set());
@@ -174,6 +180,11 @@ function OcrTextReviewSession({
   );
 
   const doc = reviewQuery.data;
+  const documentSpelling = useDocumentSpelling(
+    `${workspaceId}/${revisionId}/${run.id}/${doc?.version}/${doc?.canonical_sha256}/${selectedVersion}`,
+    current,
+    detectMutation.mutateAsync,
+  );
   const units = useMemo(() => doc?.units ?? [], [doc]);
 
   const draft = useOcrDraft(
@@ -308,69 +319,37 @@ function OcrTextReviewSession({
   // Trigger AI Spell Check
   const handleRunSpellCheck = async () => {
     if (!canManage || !doc) return;
-    const ids = Array.from(selectedUnitsForCheck);
-    if (ids.length === 0 || ids.length > MAX_SPELL_CHECK_UNITS) {
-      toast.error(
-        `Vui lòng chọn từ 1 đến ${MAX_SPELL_CHECK_UNITS} đoạn văn bản để kiểm tra.`,
-      );
-      return;
+    const units = wholeDocumentCheck
+      ? doc.units
+      : doc.units.filter((unit) => selectedUnitsForCheck.has(unit.evidence_id));
+    if (units.length === 0) return;
+    const result = await documentSpelling.start(
+      { ...doc, units },
+      activeSpellKey,
+      spellCheckProviderId === "default" ? null : spellCheckProviderId,
+      selectedVersion,
+    );
+    if (!current() || !result) return;
+    setSpellCheckModalOpen(false);
+    setActiveSpellKey(generateIdempotencyKey());
+    const onlyBatch =
+      result.batches.length === 1 ? result.batches[0] : undefined;
+    const check = onlyBatch?.check;
+    if (!wholeDocumentCheck && onlyBatch?.status === "completed" && check) {
+      setLocalCheck(check);
+      onCheckChange?.(check.id);
     }
-
-    try {
-      const res = await detectMutation.mutateAsync({
-        body: {
-          ...(selectedVersion !== null
-            ? { source_version: selectedVersion }
-            : {}),
-          expected_version: doc.version,
-          expected_sha256: doc.canonical_sha256,
-          evidence_ids: ids,
-          provider_id:
-            spellCheckProviderId === "default" ? null : spellCheckProviderId,
-          max_output_tokens: 4096,
-        },
-        idempotencyKey: activeSpellKey,
-      });
-
-      if (!current()) return;
-      setLocalCheck(res);
-      onCheckChange?.(res.id);
-      setSpellCheckModalOpen(false);
-      setActiveSpellKey(generateIdempotencyKey());
-
-      if (res.status === "failed") {
-        toast.error(
-          `Lượt kiểm tra chính tả thất bại: ${formatOcrError(res.error_code)}`,
-        );
-        return;
-      }
-      if (res.status !== "completed") {
-        toast.warning(
-          "Lần kiểm tra chưa hoàn tất (quá thời gian chờ hoặc đang xử lý). Hệ thống không tự gọi lại mô hình.",
-        );
-        return;
-      }
-
-      if (res.withheld_suggestions?.length) {
-        toast.info(
-          `Có ${res.withheld_suggestions.length} chỗ cần đối chiếu ảnh; ${res.suggestions.length} gợi ý sửa chữ để xem xét.`,
-        );
-      } else if (res.suggestions.length === 0) {
-        toast.info(
-          `Hoàn tất kiểm tra ${res.checked_evidence_ids.length} đoạn: Không có đề xuất sửa nào.`,
-        );
-      } else {
-        toast.success(
-          `Tìm thấy ${res.suggestions.length} đề xuất sửa chính tả.`,
-        );
-      }
-    } catch (error: unknown) {
-      if (!current()) return;
-      if (error instanceof ApiProblemError) {
-        toast.error(formatOcrError(error.code, error.message));
-      } else {
-        toast.error("Không thể hoàn tất kiểm tra chính tả bằng AI.");
-      }
+    const incomplete = result.batches.filter(
+      (batch) => batch.status !== "completed",
+    ).length;
+    if (incomplete) {
+      toast.warning(
+        `Còn ${incomplete} nhóm lỗi hoặc chưa chạy. Xem báo cáo chi tiết.`,
+      );
+    } else {
+      toast.success(
+        "Đã kiểm tra xong phạm vi đã chọn. Xem báo cáo để đối chiếu gợi ý.",
+      );
     }
   };
 
@@ -570,19 +549,14 @@ function OcrTextReviewSession({
                 size="sm"
                 variant="outline"
                 className="h-8 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
+                disabled={documentSpelling.running || detectMutation.isPending}
                 onClick={() => {
-                  if (selectedUnitsForCheck.size === 0) {
-                    const defaultPageUnits = units.filter(
-                      (u) =>
-                        u.page === firstPage &&
-                        u.kind !== "image" &&
-                        u.kind !== "figure" &&
-                        u.text.trim().length > 0,
-                    );
-                    setSelectedUnitsForCheck(
-                      new Set(defaultPageUnits.map((u) => u.evidence_id)),
-                    );
-                  }
+                  setWholeDocumentCheck(true);
+                  setSelectedUnitsForCheck(
+                    new Set(
+                      selectableSpellingUnits(doc).map((u) => u.evidence_id),
+                    ),
+                  );
                   setActiveSpellKey(generateIdempotencyKey());
                   setSpellCheckModalOpen(true);
                 }}
@@ -775,7 +749,26 @@ function OcrTextReviewSession({
         </Alert>
       ) : null}
 
-      {doc && (checkId || localCheck) ? (
+      {doc && documentSpelling.report ? (
+        <DocumentSpellingReport
+          report={documentSpelling.report}
+          workspaceId={workspaceId}
+          collectionId={collectionId}
+          sourceId={sourceId}
+          revisionId={revisionId}
+          runId={run.id}
+          doc={doc}
+          draftChanges={draftChanges}
+          canManage={canManage && !baseMovedOn}
+          onApply={handleApplySuggestion}
+          onLocateUnit={onLocateUnit}
+          onManualEditUnit={(id) => {
+            const unit = units.find((u) => u.evidence_id === id);
+            if (unit) handleStartEdit(unit);
+          }}
+          onRevertUnitDraft={handleRevertUnitDraft}
+        />
+      ) : doc && (checkId || localCheck) ? (
         <SpellingResultPanel
           workspaceId={workspaceId}
           collectionId={collectionId}
@@ -978,7 +971,18 @@ function OcrTextReviewSession({
           setActiveSpellKey(generateIdempotencyKey());
         }}
         pendingDraftCount={pendingChanges.length}
-        isSubmitting={detectMutation.isPending}
+        isSubmitting={detectMutation.isPending || documentSpelling.running}
+        wholeDocument={wholeDocumentCheck}
+        onChangeWholeDocument={setWholeDocumentCheck}
+        progress={
+          documentSpelling.running && documentSpelling.report ? (
+            <DocumentSpellingProgress
+              report={documentSpelling.report}
+              stopping={documentSpelling.stopping}
+              onStop={documentSpelling.stop}
+            />
+          ) : undefined
+        }
         onSubmit={() => void handleRunSpellCheck()}
       />
     </div>

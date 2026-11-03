@@ -25,7 +25,6 @@ import { OcrSpellCheckDialog } from "@/features/knowledge/ocr-review-dialogs";
 import {
   extractNormalizedBbox,
   formatUnitLocator,
-  MAX_SPELL_CHECK_UNITS,
 } from "@/features/knowledge/ocr-schemas";
 import type {
   DetectionResponse,
@@ -477,7 +476,7 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
     );
   });
 
-  it("2. OcrSpellCheckDialog enforces 1..100 unit limit without silent slicing, explains unsaved draft scope, and selects ModelOps catalog model", () => {
+  it("2. OcrSpellCheckDialog allows large selections for batching, explains unsaved draft scope, and selects ModelOps catalog model", () => {
     // Generate 105 units to verify we never silently slice to 50 or 100
     const manyUnits = Array.from({ length: 105 }, (_, idx) => ({
       evidence_id: `ev-${idx + 1}`,
@@ -527,24 +526,16 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
       screen.getByText(/AI chỉ kiểm tra phiên bản đã lưu trên máy chủ/i),
     ).toBeTruthy();
 
-    // All 105 units are selected -> must show limit error (never silently slice) and disable submit
-    expect(
-      screen.getByText(
-        new RegExp(
-          `Bạn đang chọn 105 đoạn, vượt quá giới hạn tối đa ${MAX_SPELL_CHECK_UNITS} đoạn`,
-          "i",
-        ),
-      ),
-    ).toBeTruthy();
-
     const submitBtn = screen.getByRole("button", {
       name: /Bắt đầu kiểm tra \(105 đoạn\)/i,
     }) as HTMLButtonElement;
-    expect(submitBtn.disabled).toBe(true);
+    expect(submitBtn.disabled).toBe(false);
   });
 
   it("3. SourceDetailPage integrates spell-check dialog, sends exact scope & model with Idempotency-Key, and updates checkId", async () => {
-    const check = buildCompletedCheck();
+    const check = buildCompletedCheck({
+      checked_evidence_ids: ["ev-p1-1", "ev-p1-2"],
+    });
     mocks.checkDetails[check.id] = check;
     mocks.detectMutateAsync.mockResolvedValue(check);
 
@@ -570,6 +561,9 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
 
     // Submit spell check for Page 1 (2 non-empty units on page 1)
     fireEvent.click(
+      within(dialog).getByRole("button", { name: /Chọn trang 1 \(2\)/i }),
+    );
+    fireEvent.click(
       within(dialog).getByRole("button", {
         name: /Bắt đầu kiểm tra \(2 đoạn\)/i,
       }),
@@ -584,6 +578,163 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
     expect(onSearchChange).toHaveBeenCalledWith(
       expect.objectContaining({ checkId: "chk-101" }),
     );
+  });
+
+  it("main spelling button checks all pages with distinct keys, without saving or retrying", async () => {
+    mocks.detectMutateAsync.mockImplementation(
+      async ({ body, idempotencyKey }) =>
+        buildCompletedCheck({
+          id: idempotencyKey,
+          version: body.expected_version,
+          canonical_sha256: body.expected_sha256,
+          checked_evidence_ids: body.evidence_ids,
+          suggestions: [],
+          withheld_suggestions: [],
+        }),
+    );
+    renderWithQuery(
+      <SourceDetailPage
+        workspaceId="ws-1"
+        collectionId="col-1"
+        sourceId="src-1"
+        search={{ page: 1 }}
+        onSearchChange={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Kiểm tra chính tả/i }));
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByText(/Phạm vi kiểm tra: Toàn bộ tài liệu/i),
+    ).toBeTruthy();
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: /Bắt đầu kiểm tra \(3 đoạn\)/i,
+      }),
+    );
+    const report = await screen.findByRole("region", {
+      name: "Báo cáo kiểm tra chính tả",
+    });
+    await waitFor(() =>
+      expect(within(report).getByText(/2\/2 nhóm hoàn tất/)).toBeTruthy(),
+    );
+    const calls = mocks.detectMutateAsync.mock.calls.map(
+      ([request]) => request,
+    );
+    expect(calls).toHaveLength(2);
+    expect(calls.flatMap((c) => c.body.evidence_ids)).toEqual([
+      "ev-p1-1",
+      "ev-p1-2",
+      "ev-p2-cell",
+    ]);
+    expect(new Set(calls.map((c) => c.idempotencyKey)).size).toBe(2);
+    expect(
+      calls.every(
+        (c) =>
+          c.body.expected_version === 0 &&
+          c.body.expected_sha256 === "a".repeat(64),
+      ),
+    ).toBe(true);
+    expect(mocks.saveMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("batches a selected page of 32 units and excludes the other page", async () => {
+    const base = buildDefaultDoc();
+    const pageUnits = Array.from({ length: 32 }, (_, index) => ({
+      ...base.units[0],
+      page: 1,
+      evidence_id: `selected-${index}`,
+    }));
+    mocks.docData = {
+      ...base,
+      units: [...pageUnits, { ...base.units[0], page: 2 }],
+    };
+    mocks.detectMutateAsync.mockImplementation(
+      async ({ body, idempotencyKey }) =>
+        buildCompletedCheck({
+          id: idempotencyKey,
+          checked_evidence_ids: body.evidence_ids,
+          suggestions: [],
+          withheld_suggestions: [],
+        }),
+    );
+    renderWithQuery(
+      <SourceDetailPage
+        workspaceId="ws-1"
+        collectionId="col-1"
+        sourceId="src-1"
+        search={{ page: 1 }}
+        onSearchChange={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Kiểm tra chính tả/i }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: /Chọn trang 1 \(32\)/i }),
+    );
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: /Bắt đầu kiểm tra \(32 đoạn\)/i,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText(/2\/2 nhóm hoàn tất/)).toBeTruthy(),
+    );
+    const calls = mocks.detectMutateAsync.mock.calls.map(
+      ([call]) => call.body.evidence_ids,
+    );
+    expect(calls.map((ids) => ids.length)).toEqual([20, 12]);
+    expect(calls.flat()).toEqual(pageUnits.map((unit) => unit.evidence_id));
+  });
+
+  it("reports a failed page while retaining successful pages, with no automatic retry", async () => {
+    mocks.detectMutateAsync
+      .mockImplementationOnce(async ({ body }) =>
+        buildCompletedCheck({
+          checked_evidence_ids: body.evidence_ids,
+          suggestions: [],
+          withheld_suggestions: [],
+        }),
+      )
+      .mockRejectedValueOnce(
+        new ApiProblemError({
+          status: 422,
+          code: "chat_output_truncated",
+          message: "truncated",
+        }),
+      );
+    renderWithQuery(
+      <SourceDetailPage
+        workspaceId="ws-1"
+        collectionId="col-1"
+        sourceId="src-1"
+        search={{ page: 1 }}
+        onSearchChange={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Kiểm tra chính tả/i }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: /Bắt đầu kiểm tra \(3 đoạn\)/i,
+      }),
+    );
+    const report = await screen.findByRole("region", {
+      name: "Báo cáo kiểm tra chính tả",
+    });
+    await waitFor(() =>
+      expect(within(report).getByText(/1\/2 nhóm hoàn tất/)).toBeTruthy(),
+    );
+    expect(
+      within(report).getByText(
+        /Chưa kiểm tra xong phạm vi đã chọn: 1 nhóm lỗi/,
+      ),
+    ).toBeTruthy();
+    expect(within(report).getByText(/Trang 2 · 1 đoạn:/)).toBeTruthy();
+    expect(
+      within(report).getByRole("button", { name: "Tải báo cáo JSON" }),
+    ).toBeTruthy();
+    expect(mocks.detectMutateAsync).toHaveBeenCalledTimes(2);
+    expect(mocks.saveMutateAsync).not.toHaveBeenCalled();
   });
 
   it("4. Clicking 'Đối chiếu trên trang' jumps to the suggestion page, highlights real bbox, and shows honest notice when bbox is absent", async () => {
@@ -985,6 +1136,9 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
     // Start an in-flight spell check on src-1
     fireEvent.click(screen.getByRole("button", { name: /Kiểm tra chính tả/i }));
     const spellDialog = await screen.findByRole("dialog");
+    fireEvent.click(
+      within(spellDialog).getByRole("button", { name: /Chọn trang 1 \(2\)/i }),
+    );
     fireEvent.click(
       within(spellDialog).getByRole("button", {
         name: /Bắt đầu kiểm tra \(2 đoạn\)/i,

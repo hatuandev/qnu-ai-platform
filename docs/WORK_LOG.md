@@ -1,5 +1,17 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- **Context834 — Docling trong luồng DOCX V1.** [Nhật ký](nhat_ky/2026-11-03_phien_834_docling_docx.md), [Snapshot](memory/snapshots/2026-11-03_session_834.md).
+
+- **Context833 — Chính tả theo trang và đoạn.** Phạm vi đã chọn dùng chung bộ chia nhóm và chờ kết quả backend. [Nhật ký833](nhat_ky/2026-11-03_phien_833_chinh_ta_pham_vi_va_thoi_han.md), [Snapshot833](memory/snapshots/2026-11-03_session_833.md).
+
+- **Context832 — Chính tả async2:** hai nhóm đồng thời mỗi lượt, bù việc độc lập, drain khi dừng/lỗi, không retry; UI đủ trangactive. FE729/85PASS/buildTS/Biome6, browsermockdesktopmobile đạt. Live2nhóm nhỏ2completed/16,280s/peakHTTP2; chưa full32trang/speedup. [Nhật ký832](nhat_ky/2026-11-03_phien_832_chinh_ta_bat_dong_bo_hai_nhom.md), [Snapshot832](memory/snapshots/2026-11-03_session_832.md).
+
+- **Context831 — Kiểm tra chính tả toàn tài liệu:** mainbutton alltext, chia nhóm theo trang, giữ version/hash/idempotency, báo lỗi/notrun và giữ kết quả; không retry/auto-save. FE723/83PASS, buildTS/Biome11, browser desktop/mobile474unit/0errors; chưa liveAI32trang. [Nhật ký831](nhat_ky/2026-11-02_phien_831_kiem_tra_chinh_ta_toan_tai_lieu.md), [Snapshot831](memory/snapshots/2026-11-02_session_831.md).
+
+- **Context830 — Dọn Nemotron và UI MinerU:** xóa model cũ qua API/giữ3model khác/defaults/grants; UI protocol OCR/task, bỏ autoport8081; E2E profile OCR riêng. FE705PASS/build/typecheck/Biome16, runner18/Ruff/browserdesktopmobile đạt. Không inference/restart/push. [Nhật ký830](nhat_ky/2026-11-02_phien_830_don_nemotron_ui_mineru.md), [Snapshot830](memory/snapshots/2026-11-02_session_830.md).
+
+- **Context829 — Quota test không giới hạn:** API quota SHL/Tuyển sinh tháng11 null/unblocked, configured=true; counters giữ nguyên, không inference/restart/codechange. Chưa tự gia hạn. [Nhật ký829](nhat_ky/2026-11-02_phien_829_quota_test_khong_gioi_han.md), [Snapshot829](memory/snapshots/2026-11-02_session_829.md).
+
 - **Context828 — MinerU VRAM 0.17:** 61 trang OCR thật, 129,11s/11,61s; CER mẫu 0,116%/0,262% và 34 bảng giữ nguyên. Trang30 có thêm một lỗi ngoài mẫu; không khẳng định tương đương tuyệt đối/nhân quả VRAM. Không retry/appchange. [Nhật ký828](nhat_ky/2026-11-02_phien_828_test_mineru_vram_017.md), [Snapshot828](memory/snapshots/2026-11-02_session_828.md).
 
 - **Context827 — Gỡ legacy và test V1:** backend/frontendvắng,archivegiữ1.799tracked+ignored;BE1306PASS/FE701PASS/build/Docker/runner52/liveUIAPIworkerđạt,4DBtestdọn0. Chưa commit/push/LLMtest. [Nhật ký827](nhat_ky/2026-11-02_phien_827_go_legacy_va_kiem_chung_v1.md), [Snapshot827](memory/snapshots/2026-11-02_session_827.md).

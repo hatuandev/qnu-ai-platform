@@ -7,12 +7,31 @@ import {
   type ProviderSetupProfile,
 } from "../e2e/stages/provider-capacity";
 
-const profile = JSON.parse(
+const qnuProfile = JSON.parse(
   readFileSync(
     new URL("../../scripts/e2e_profiles/qnu-server.json", import.meta.url),
     "utf8",
   ),
 ) as ProviderSetupProfile;
+// Exercise optional image-token accounting with a synthetic vision provider.
+// The live QNU profile uses tokenless MinerU and must not inherit this fixture.
+const profile: ProviderSetupProfile = {
+  ...qnuProfile,
+  models: { ...qnuProfile.models, ocr: "synthetic-vision-ocr" },
+  model_runtime: {
+    ...qnuProfile.model_runtime,
+    ocr: {
+      timeout_seconds: 180,
+      ocr_page_input: {
+        max_image_width: 1664,
+        max_image_height: 2048,
+        input_tokens_upper_bound: 4096,
+        prompt_sha256:
+          "893d80dc972bc64399fd997a7fa78cebdf3bd1dc92f0de4ac25dc0d1f9e7b92d",
+      },
+    },
+  },
+};
 function requiredModel(models: Provider[], capability: string) {
   const model = models.find((row) => row.capabilities.includes(capability));
   if (!model?.token_limits)
@@ -185,7 +204,7 @@ test("a profile without runtime overrides only imports the server limits", async
   expect(api.json).not.toHaveBeenCalled();
 });
 
-test("the QNU profile OCR declaration is pinned to the actual backend prompt", () => {
+test("the synthetic image OCR declaration is pinned to its backend prompt", () => {
   const code = readFileSync(
     new URL("../../backendV1/qnu/domains/ocr/config.py", import.meta.url),
     "utf8",

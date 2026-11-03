@@ -13,6 +13,25 @@ from v1_e2e_session import read, save
 
 
 class ProviderSetupTests(unittest.TestCase):
+    def test_mineru_bootstrap_uses_task_protocol_and_qnu_key_source(self):
+        self.assertEqual(setup.KEY_ENV_NAMES["ocrProviderSetup"], "E2E_QNU_API_KEY")
+        seen = []
+        def handle(incoming):
+            if incoming.url.path.endswith("/connections"):
+                if incoming.method == "GET":
+                    return httpx.Response(200,json=[])
+                body=json.loads(incoming.content);seen.append(body)
+                return httpx.Response(201,json={"id":"ocr-conn","is_active":True,"api_type":body["api_type"]})
+            return httpx.Response(200,json=[{"id":"ocr-key","status":"active"}])
+        with httpx.Client(base_url="http://example.test/",transport=httpx.MockTransport(handle)) as client:
+            state={"runId":"test-ocr"}
+            setup.prepare_connection(client,self.directory,state,
+                {"base_url":"https://upstream.test/mineru","api_type":"mineru","timeout_seconds":300},
+                "ocrProviderSetup","OCR","qnu")
+        self.assertEqual(seen[0]["api_type"],"mineru")
+        self.assertEqual(seen[0]["timeout_seconds"],300)
+        self.assertEqual(state["ocrProviderSetup"]["keyId"],"ocr-key")
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

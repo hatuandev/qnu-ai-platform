@@ -95,7 +95,7 @@ test("QNU nhà cung cấp: tạo, khóa, kết nối, model và sidebar", async 
     rows.filter((row) =>
       Object.values(profile.models).includes(row.model_name),
     ),
-  ).toHaveLength(4);
+  ).toHaveLength(Object.keys(profile.models).length);
   await configureTestModelCapacity(api, id, profile, checked.check_id);
   console.log(
     "Đã lưu capacity từ server và thông số vận hành của profile E2E; tiếp tục kiểm từng model.",
@@ -183,6 +183,34 @@ test("QNU nhà cung cấp: tạo, khóa, kết nối, model và sidebar", async 
   for (const model of Object.values(profile.models))
     await expect(page.getByText(model, { exact: true }).first()).toBeVisible();
   state.providerSetup.modelsRegistered = true;
+  if (profile.additional_ocr_provider) {
+    const ocr = profile.additional_ocr_provider;
+    const setup = state.ocrProviderSetup;
+    if (!setup)
+      throw new Error("BLOCKED: thiếu kết nối MinerU từ provider-setup.");
+    const ocrBase = `/modelops/connections/${setup.connectionId}`;
+    const registeredConnection = await api.get<{
+      api_type: string;
+      base_url: string;
+    }>(ocrBase);
+    expect(registeredConnection.api_type).toBe("mineru");
+    expect(registeredConnection.base_url).toBe(ocr.base_url);
+    let models = await api.get<
+      { model_name: string; provider_type: string; capabilities: string[] }[]
+    >(`${ocrBase}/models`);
+    if (!models.some((m) => m.model_name === ocr.models.ocr)) {
+      await api.post(`${ocrBase}/models`, {
+        model_name: ocr.models.ocr,
+        capabilities: ["ocr"],
+      });
+      models = await api.get(`${ocrBase}/models`);
+    }
+    const model = models.filter((m) => m.model_name === ocr.models.ocr);
+    expect(model).toHaveLength(1);
+    expect(model[0].provider_type).toBe("mineru");
+    expect(model[0].capabilities).toEqual(["ocr"]);
+    setup.modelsRegistered = true;
+  }
   await verifyRouterProvider(api, state, profile);
   console.info(
     `Mặc định chat/biên soạn: ${state.chatSelection === "router" ? profile.additional_chat_provider?.models.chat : profile.models.chat}`,

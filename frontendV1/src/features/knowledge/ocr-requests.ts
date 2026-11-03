@@ -417,6 +417,7 @@ export async function createDetectCheck(
     ),
     body,
     {
+      timeoutMs: null,
       ...options,
       headers: {
         "Idempotency-Key": idempotencyKey,

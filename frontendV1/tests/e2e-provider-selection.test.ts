@@ -15,15 +15,21 @@ const profile = JSON.parse(
 ) as LiveProfile;
 
 test("9router is registered separately and only replaces the selected chat target", () => {
-  expect(configuredProfiles(profile)).toHaveLength(2);
+  expect(configuredProfiles(profile)).toHaveLength(3);
   const chat = profileForCapability(profile, "router", "chat");
   expect(chat.base_url).toBe("https://qnu-9router.duckdns.org/v1");
   expect(chat.models.chat).toBe("cx/gpt-6-luna");
-  for (const capability of ["embedding", "rerank", "ocr"] as const) {
+  for (const capability of ["embedding", "rerank"] as const) {
     const target = profileForCapability(profile, "router", capability);
     expect(target.base_url).toBe(profile.base_url);
     expect(target.models[capability]).toBe(profile.models[capability]);
   }
+  expect(profileForCapability(profile, "router", "ocr")).toBe(
+    profile.additional_ocr_provider,
+  );
+  expect(profileForCapability(profile, "qnu", "ocr")).toBe(
+    profile.additional_ocr_provider,
+  );
   expect(profileForCapability(profile, "qnu", "chat").models.chat).toBe(
     profile.models.chat,
   );

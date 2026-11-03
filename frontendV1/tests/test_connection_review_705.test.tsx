@@ -10,6 +10,8 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { ConnectionDetail } from "@/features/modelops/connections/connection-detail";
 
 const state = vi.hoisted(() => ({
+  apiType: "openai_compatible",
+  add: vi.fn(),
   test: vi.fn(),
   checks: [] as Array<{
     key_id: string;
@@ -65,12 +67,13 @@ vi.mock("@/features/modelops/connections/api", async (original) => ({
       family: "custom",
       is_active: true,
       base_url: "https://example.test/v1",
+      api_type: state.apiType,
     },
   }),
   useConnectionModels: () => ({ data: [] }),
   useConnectionKeys: () => ({ data: state.keys }),
   useDeleteConnection: () => ({ mutateAsync: vi.fn() }),
-  useAddConnectionModel: () => ({ mutateAsync: vi.fn() }),
+  useAddConnectionModel: () => ({ mutateAsync: state.add }),
   useDeleteConnectionModel: () => ({ mutateAsync: vi.fn() }),
   useDeleteConnectionKey: () => ({ mutateAsync: vi.fn() }),
   useTestConnection: () => ({ mutateAsync: state.test }),
@@ -84,8 +87,30 @@ vi.stubGlobal(
   })),
 );
 beforeEach(() => {
+  state.apiType = "openai_compatible";
   state.checks = [];
   state.test.mockResolvedValue({ ok: true, detail: "Synthetic success" });
+});
+
+test("MinerU registers OCR without LLM discovery or chat endpoint", async () => {
+  state.apiType = "mineru";
+  state.add.mockResolvedValue({ id: "ocr-child" });
+  render(<ConnectionDetail connectionId="conn-review" />);
+  expect(screen.getByText("Dịch vụ OCR PDF")).toBeDefined();
+  expect(screen.getByText("https://example.test/v1/tasks")).toBeDefined();
+  expect(screen.queryByRole("button", { name: "Nhập từ /models" })).toBeNull();
+  expect(screen.queryByText(/chat\/completions/)).toBeNull();
+  fireEvent.change(
+    screen.getByPlaceholderText("Tên dịch vụ OCR, ví dụ: mineru"),
+    { target: { value: "mineru" } },
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Thêm model" }));
+  await waitFor(() =>
+    expect(state.add).toHaveBeenCalledWith({
+      model_name: "mineru",
+      capabilities: ["ocr"],
+    }),
+  );
 });
 
 test("batch continues after a key fails and preserves each result", async () => {

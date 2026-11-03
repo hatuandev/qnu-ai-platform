@@ -72,11 +72,11 @@ Trong phiên mới, cùng lệnh `provider-setup` sẽ lần lượt:
 
 Key đang active được tái dùng, không hỏi lại. Lựa chọn lưu trong checkpoint chỉ gồm mã lựa chọn/ID; key chỉ lưu qua ModelOps. Nếu chọn 9router, script lấy capacity từ discovery hiện tại. Thiếu context/output thì hỏi số token thực tế theo cấu hình upstream của bạn; Enter trống sẽ dừng để cấu hình trong ModelOps, không đoán theo tên model hay lấy giới hạn Qwen.
 
-Hai provider/model đều được đăng ký và discovery. `model-chat` chỉ probe model chat đã chọn; `navigation` kiểm diagnostic còn current rồi đặt model đó làm chat mặc định của workspace thử. **Compiler, review và hỏi đáp** dùng model đã chọn. **Embedding, rerank và OCR** vẫn lần lượt dùng BGE-M3, BGE reranker và Nemotron ở QNU; không chuyển sang 9router.
+QNU và 9router được đăng ký và discovery. `model-chat` chỉ probe model chat đã chọn; `navigation` kiểm diagnostic còn current rồi đặt model đó làm chat mặc định của workspace thử. **Compiler, review và hỏi đáp** dùng model đã chọn. **Embedding, rerank** dùng BGE-M3 và BGE reranker ở QNU. **OCR dùng kết nối MinerU riêng** tại `/mineru`, không chuyển theo lựa chọn chat.
 
 Muốn đổi lựa chọn, chạy lại provider-setup **trước upload**, rồi chạy lại model-discovery, model-chat và các chặng còn lại theo thứ tự. Phiên đã có nguồn (kể cả PDF admissions) bị chặn vì test provider có bật/tắt connection: dùng phiên mới cho lựa chọn khác. Không tự dọn phiên đang có draft/report cần giữ. Kết quả chạy thật với 9router chỉ có sau khi bạn nhập key và chạy; các test offline không chứng minh endpoint/model qua 9router thật hoạt động.
 
-Sau đó bài Playwright kiểm tra kết nối thật bằng key đã lưu, catalog bốn model, tự đăng ký bốn model nếu thiếu, chặn inference khi provider bị tắt và bật lại trong finally. Nó còn mở sidebar **Nhà cung cấp**, kiểm danh sách/chi tiết và thực sự submit form tạo một provider UI tạm không credential, xác nhận lưu rồi xóa provider tạm đó qua API. QNU provider và bốn model được giữ cho pipeline. Đây là test kết hợp API và UI, chưa tự nhập raw key vào form frontend.
+Sau đó Playwright kiểm tra kết nối QNU bằng key đã lưu, discovery ba model chat/embedding/rerank, đăng ký nếu thiếu và kiểm tra chặn khi kết nối tắt. MinerU được đăng ký riêng theo giao thức tác vụ PDF; không yêu cầu MinerU xuất hiện trong `/models` của QNU. Chặng `model-ocr` gửi PDF mẫu và kiểm tra kết quả qua diagnostic. Không giả HTTP 200 khi adapter không báo HTTP tổng hợp. Bài provider-setup vẫn kiểm form UI bằng kết nối tạm rồi xóa đúng đối tượng đó.
 
 Nếu đã có một QNU provider cùng endpoint, bài test dùng lại; cấu hình trùng sẽ BLOCKED. Không chạy provider-setup sau khi đã upload, vì bài test có bật/tắt provider; muốn kiểm lại toàn bộ quản lý nhà cung cấp ở thời điểm đó thì tạo phiên mới. provider-setup lưu capacity/dimension server công bố bằng snapshot discovery; timeout và OCR/input override bổ sung từ profile E2E có căn cứ, không tự bịa capacity. Trên FE phiên thử, mục **Nhà cung cấp** ở sidebar mở thẳng `/providers`; mục Cấu hình giữ thiết lập khác.
 
@@ -87,7 +87,7 @@ Các model được đăng ký:
 | Chat | Chọn `qwen3.8-27b-q4` (QNU) hoặc `cx/gpt-6-luna` (9router) | Compiler, Compiler Review, trả lời và gateway chat. |
 | Embedding | `bge-m3` | Tạo chỉ mục và vector truy vấn. |
 | Rerank | `bge-reranker-v2-m3` | Xếp hạng lại ứng viên sau hybrid search trong hỏi đáp. |
-| OCR | `nemotron-parse` | OCR trang scan hoặc trang không đủ text native. PDF/DOCX có chữ vẫn dùng native-first theo backend. |
+| OCR | `mineru` | Dịch vụ OCR PDF riêng, tạo tác vụ/upload/poll/tải kết quả. Không dùng token LLM. |
 
 Sau provider-setup PASS, capacity/dimension đã được tự đồng bộ từ `/v1/models`; có thể chạy ngay nhóm model, không cần dừng để nhập thông số thủ công. Script dùng snapshot đã lưu và endpoint/model trong profile, đồng bộ model đã có hoặc đăng ký model mới kèm metadata. QNU giữ guard unknown/conflict; server công bố không phải inference verified.
 
@@ -98,25 +98,15 @@ Nếu muốn xem hoặc tự đồng bộ qua giao diện: mở đúng FE phiên
 | Qwen | Context131072, output16384 | Timeout 300 giây; input riêng để trống; Compiler/Review 8192 giữ. |
 | BGE embedding | Context8192, dimension1024 | Timeout 60 giây; input riêng có thể để trống vì có context. |
 | BGE rerank | Context8192 | Timeout 60 giây; input riêng 1024 nếu giữ chính sách thử cũ. |
-| Nemotron | Context16384, output8192 | Timeout 180 giây và ngân sách ảnh OCR bên dưới. |
+| MinerU | Không áp dụng context/output token LLM | Timeout request 300 giây; tác vụ theo checkpoint và tiến độ, không phải chờ cố định. |
 
 Các con số phản ánh server người vận hành vừa bổ sung; nếu lấy lại thấy khác thì đối chiếu cấu hình phục vụ. Không tự nâng/ép số để test xanh. Trường server không công bố giữ unknown hoặc giá trị hợp lệ đã lưu. Sync giữ input override và ngân sách OCR, chặn xung đột; dimension embedding đổi khác cấu hình hiện hành cũng bị chặn để kiểm tra index trước.
 
-Timeout/input riêng/OCR trong bảng được provider-setup bổ sung từ profile QNU khi cần; không ghi đè input/OCR đã có. Mở **nút bút chì cạnh model** nếu muốn kiểm tra hoặc thay đổi. Form chỉ gửi trường thay đổi. Nemotron dùng lại ngân sách đã có căn cứ khi server/processor/prompt không đổi: ảnh tối đa1664×2048, input upper bound4096, hash prompt theo lệnh dưới. Nếu đổi điều kiện này phải xác minh lại, không suy token ảnh từ Base64.
+Timeout/input riêng trong bảng được provider-setup bổ sung từ profile khi cần. Mở menu **⋯ → Cấu hình** của model để thay đổi; form chỉ gửi trường thay đổi. MinerU không khai báo ngân sách ảnh/prompt token của Nemotron. Key MinerU dùng biến E2E QNU hiện có để nạp qua ModelOps khi chưa có key active; nếu gateway dùng key khác, nhập ẩn khi được hỏi hoặc cấu hình qua ModelOps.
 
 Các lệnh cURL thử inference không phải cấu hình capacity. `max_tokens` trong request là mức client yêu cầu, không chứng minh giới hạn server; `--max-time` là thời gian chờ. Địa chỉ `127.0.0.1:8000` trong lệnh chạy trên máy AI chỉ tới máy AI đó; QNU trên máy Windows vẫn dùng endpoint đã cấu hình trong ModelOps. Không suy capacity từ model ID, một ảnh mẫu hay vector đã trả về.
 
-Để lấy riêng hash của prompt OCR trong mã hiện tại, từ root repo chạy (không gọi model):
-
-```powershell
-Push-Location backendV1
-.\.venv\Scripts\python.exe -c "import hashlib; from qnu.domains.ocr.config import OCR_PROMPT; print(hashlib.sha256(OCR_PROMPT.encode('utf-8')).hexdigest())"
-Pop-Location
-```
-
-Profile đã có hash và ngân sách OCR; lệnh này chỉ để đối chiếu. Hash chỉ nhận diện prompt, không đo ngân sách ảnh. Nếu chưa biết các giới hạn còn lại, lấy cấu hình khởi chạy model (`vllm serve`, Docker Compose hoặc cấu hình gateway), bỏ credential trước khi chia sẻ. Giữ trạng thái BLOCKED cho đến khi có đủ căn cứ.
-
-Capacity không được lấy từ thông số AI giả lập: khai báo giới hạn input/output/context có căn cứ của server. Compiler/Review hiện có thể yêu cầu tới 8192 output token, nên cấu hình phải phù hợp với request thật; không nâng giả giới hạn chỉ để test xanh. Cấu hình OCR cần ngân sách ảnh/prompt (`ocr_page_input`) đúng prompt hiện hành, kích thước ảnh được phép và căn cứ token ảnh do server vận hành cung cấp. Nếu thiếu, navigation sẽ BLOCKED trước upload. OCR probe trên ảnh nhỏ đạt không chứng minh trang A4 của pipeline đủ ngân sách.
+Capacity của chat/embedding/rerank vẫn phải theo server và ModelOps, không lấy thông số giả lập hay nâng giả để test xanh. MinerU kiểm protocol OCR và kết quả PDF, không kiểm `ocr_page_input` hay context/output token. Probe PDF nhỏ đạt chỉ chứng minh hợp đồng kết nối, không thay thế kiểm chất lượng toàn tài liệu.
 
 Nếu server không công bố dimension của BGE, chạy `model-embedding` trước để xem `observed_dimension`, sau đó cập nhật dimension trong ModelOps và chạy lại `model-embedding`. Mọi thay đổi endpoint/model/key/capacity/dimension làm kiểm định cũ hết hiệu lực: chạy lại các model liên quan trước navigation. Runner không tự đoán capacity/dimension. provider-setup tự áp dụng metadata server và phần khai báo tường minh của profile trước probe; giao diện vẫn có thể dùng để kiểm tra/chỉnh sửa.
 

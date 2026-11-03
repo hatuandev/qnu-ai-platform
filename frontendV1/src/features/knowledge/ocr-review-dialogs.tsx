@@ -10,7 +10,7 @@ import {
   Save,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,10 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  formatUnitLocator,
-  MAX_SPELL_CHECK_UNITS,
-} from "@/features/knowledge/ocr-schemas";
+import { formatUnitLocator } from "@/features/knowledge/ocr-schemas";
 import type {
   ReviewDocument,
   TextChange,
@@ -226,6 +223,9 @@ export function OcrSpellCheckDialog({
   pendingDraftCount,
   isSubmitting,
   onSubmit,
+  wholeDocument = false,
+  onChangeWholeDocument,
+  progress,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -239,6 +239,9 @@ export function OcrSpellCheckDialog({
   pendingDraftCount: number;
   isSubmitting: boolean;
   onSubmit: () => void;
+  wholeDocument?: boolean;
+  onChangeWholeDocument?: (value: boolean) => void;
+  progress?: ReactNode;
 }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -290,7 +293,6 @@ export function OcrSpellCheckDialog({
   );
 
   const selectedCount = selectedUnitIds.size;
-  const exceedsLimit = selectedCount > MAX_SPELL_CHECK_UNITS;
 
   // Determine whether selection matches current page
   const isCurrentPageSelection = useMemo(() => {
@@ -304,6 +306,7 @@ export function OcrSpellCheckDialog({
   }, [currentPageUnits, selectedCount, selectedUnitIds]);
 
   const handleToggleUnit = (evidenceId: string) => {
+    onChangeWholeDocument?.(false);
     const next = new Set(selectedUnitIds);
     if (next.has(evidenceId)) {
       next.delete(evidenceId);
@@ -314,7 +317,12 @@ export function OcrSpellCheckDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!isSubmitting) onOpenChange(next);
+      }}
+    >
       <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold flex items-center gap-2">
@@ -351,19 +359,35 @@ export function OcrSpellCheckDialog({
               <div className="space-y-0.5">
                 <span className="font-semibold text-foreground block">
                   Phạm vi kiểm tra:{" "}
-                  {isCurrentPageSelection
-                    ? `Trang hiện tại (Trang ${activePage})`
-                    : "Các đoạn/ô được chọn"}
+                  {wholeDocument
+                    ? "Toàn bộ tài liệu"
+                    : isCurrentPageSelection
+                      ? `Trang hiện tại (Trang ${activePage})`
+                      : "Các đoạn/ô được chọn"}
                 </span>
                 <span className="text-muted-foreground text-[11px]">
                   Đã chọn{" "}
                   <strong className="text-foreground">{selectedCount}</strong>{" "}
-                  đoạn/ô có chữ (Giới hạn: 1 – {MAX_SPELL_CHECK_UNITS}{" "}
-                  đoạn/lượt)
+                  đoạn/ô có chữ · Tự chia nhóm theo trang và độ dài.
                 </span>
               </div>
 
               <div className="flex items-center gap-1.5 flex-wrap">
+                {onChangeWholeDocument && (
+                  <Button
+                    size="sm"
+                    variant={wholeDocument ? "secondary" : "outline"}
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      onChangeWholeDocument(true);
+                      onChangeSelectedUnitIds(
+                        new Set(selectableUnits.map((u) => u.evidence_id)),
+                      );
+                    }}
+                  >
+                    Toàn bộ tài liệu
+                  </Button>
+                )}
                 {currentPageUnits.length > 0 ? (
                   <Button
                     type="button"
@@ -371,11 +395,12 @@ export function OcrSpellCheckDialog({
                     variant={isCurrentPageSelection ? "secondary" : "outline"}
                     className="h-7 px-2 text-xs"
                     disabled={isSubmitting}
-                    onClick={() =>
+                    onClick={() => {
+                      onChangeWholeDocument?.(false);
                       onChangeSelectedUnitIds(
                         new Set(currentPageUnits.map((u) => u.evidence_id)),
-                      )
-                    }
+                      );
+                    }}
                   >
                     Chọn trang {activePage} ({currentPageUnits.length})
                   </Button>
@@ -387,29 +412,16 @@ export function OcrSpellCheckDialog({
                     variant="ghost"
                     className="h-7 px-2 text-xs"
                     disabled={isSubmitting}
-                    onClick={() => onChangeSelectedUnitIds(new Set())}
+                    onClick={() => {
+                      onChangeWholeDocument?.(false);
+                      onChangeSelectedUnitIds(new Set());
+                    }}
                   >
                     Bỏ chọn tất cả
                   </Button>
                 ) : null}
               </div>
             </div>
-
-            {/* Limit exceeded alert — never silently slice */}
-            {exceedsLimit ? (
-              <Alert variant="destructive" className="py-2">
-                <AlertCircle className="size-4" />
-                <AlertTitle className="text-xs font-semibold">
-                  Vượt giới hạn số đoạn cho một lượt kiểm tra
-                </AlertTitle>
-                <AlertDescription className="text-xs mt-0.5">
-                  Bạn đang chọn {selectedCount} đoạn, vượt quá giới hạn tối đa{" "}
-                  {MAX_SPELL_CHECK_UNITS} đoạn của hệ thống. Hệ thống không tự
-                  động cắt bỏ đoạn vượt giới hạn — vui lòng bỏ chọn bớt để thu
-                  hẹp phạm vi (còn tối đa {MAX_SPELL_CHECK_UNITS} đoạn).
-                </AlertDescription>
-              </Alert>
-            ) : null}
 
             {/* Checklist of units on current page (and any other selected units) */}
             {selectableUnits.length === 0 ? (
@@ -555,6 +567,7 @@ export function OcrSpellCheckDialog({
           </div>
 
           {/* 3. In-flight Status & Elapsed Time */}
+          {progress}
           {isSubmitting ? (
             <Alert className="border-primary/40 bg-primary/5 py-2.5">
               <Loader2 className="size-4 animate-spin text-primary" />
@@ -600,10 +613,7 @@ export function OcrSpellCheckDialog({
             size="sm"
             onClick={onSubmit}
             disabled={
-              isSubmitting ||
-              selectedCount === 0 ||
-              exceedsLimit ||
-              catalogQuery.isError
+              isSubmitting || selectedCount === 0 || catalogQuery.isError
             }
             className="gap-1.5"
           >

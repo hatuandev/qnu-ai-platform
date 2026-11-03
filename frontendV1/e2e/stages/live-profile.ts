@@ -3,8 +3,13 @@ import type { ProviderSetupProfile } from "./provider-capacity";
 export type Capability = "chat" | "embedding" | "rerank" | "ocr";
 export type LiveProfile = ProviderSetupProfile & {
   name: string;
-  models: Record<Capability, string>;
+  models: Partial<Record<Capability, string>>;
   test_monthly_token_limit: number;
+  additional_ocr_provider?: ProviderSetupProfile & {
+    name: string;
+    api_type: "mineru";
+    models: { ocr: string };
+  };
   additional_chat_provider?: ProviderSetupProfile & {
     name: string;
     models: { chat: string };
@@ -16,6 +21,8 @@ export function profileForCapability(
   selection: "qnu" | "router" | undefined,
   capability: Capability,
 ): ProviderSetupProfile & { base_url: string } {
+  if (capability === "ocr" && profile.additional_ocr_provider)
+    return profile.additional_ocr_provider;
   if (profile.additional_chat_provider && !selection)
     throw new Error("BLOCKED: chạy provider-setup để chọn model mặc định.");
   if (selection === "router" && capability === "chat") {
@@ -33,6 +40,9 @@ export function configuredProfiles(
     profile,
     ...(profile.additional_chat_provider
       ? [profile.additional_chat_provider]
+      : []),
+    ...(profile.additional_ocr_provider
+      ? [profile.additional_ocr_provider]
       : []),
   ];
 }

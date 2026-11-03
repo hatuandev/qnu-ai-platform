@@ -94,7 +94,6 @@ import {
   formatOcrError,
   generateIdempotencyKey,
   isDocx,
-  MAX_SPELL_CHECK_UNITS,
   validateSuggestionSpan,
 } from "@/features/knowledge/ocr-schemas";
 import type {
@@ -123,6 +122,12 @@ import { useActionScope } from "@/features/lifecycle/action-scope";
 import { canLifecycleAction } from "@/features/lifecycle/permissions";
 import type { LifecycleOperation } from "@/features/lifecycle/types";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
+import {
+  DocumentSpellingProgress,
+  DocumentSpellingReport,
+} from "./document-spelling-report";
+import { selectableSpellingUnits } from "./ocr-spelling-batch";
+import { useDocumentSpelling } from "./use-document-spelling";
 
 export interface SourceDetailSearchParams {
   revisionId?: string;
@@ -223,6 +228,7 @@ function SourceDetailSession({
   const [reRunConfirmOpen, setReRunConfirmOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [spellCheckConfigOpen, setSpellCheckConfigOpen] = useState(false);
+  const [wholeDocumentCheck, setWholeDocumentCheck] = useState(true);
   const [compilationDialogOpen, setCompilationDialogOpen] = useState(false);
   const [lifecycleOp, setLifecycleOp] = useState<LifecycleOperation | null>(
     null,
@@ -380,6 +386,11 @@ function SourceDetailSession({
     activeRevisionId,
     selectedRunId ?? "",
   );
+  const documentSpelling = useDocumentSpelling(
+    `${workspaceId}/${activeRevisionId}/${selectedRunId}/${doc?.version}/${doc?.canonical_sha256}/${selectedVersion}`,
+    current,
+    detectMutation.mutateAsync,
+  );
 
   // Handle Page Change
   const handlePageChange = (newPage: number) => {
@@ -495,20 +506,15 @@ function SourceDetailSession({
 
   // Open Spell Check configuration dialog (never dispatches or slices silently)
   const handleOpenSpellCheckConfig = (initialUnitIds?: string[]) => {
-    if (!canManage || !doc) return;
+    if (!canManage || !doc || documentSpelling.running) return;
     if (initialUnitIds && initialUnitIds.length > 0) {
+      setWholeDocumentCheck(false);
       setSelectedUnitsForCheck(new Set(initialUnitIds));
-    } else if (selectedUnitsForCheck.size === 0) {
-      const pageSelectable = doc.units
-        .filter(
-          (u) =>
-            u.page === activePage &&
-            u.kind !== "image" &&
-            u.kind !== "figure" &&
-            u.text.trim().length > 0,
-        )
-        .map((u) => u.evidence_id);
-      setSelectedUnitsForCheck(new Set(pageSelectable));
+    } else {
+      setWholeDocumentCheck(true);
+      setSelectedUnitsForCheck(
+        new Set(selectableSpellingUnits(doc).map((u) => u.evidence_id)),
+      );
     }
     setActiveSpellKey(generateIdempotencyKey());
     setSpellCheckConfigOpen(true);
@@ -517,75 +523,43 @@ function SourceDetailSession({
   // Execute Spell Check after user confirms scope & model in dialog
   const handleRunSpellCheck = async () => {
     if (!canManage || !doc || !selectedRunId) return;
-    const unitIds = Array.from(selectedUnitsForCheck);
-    if (unitIds.length === 0 || unitIds.length > MAX_SPELL_CHECK_UNITS) {
-      toast.error(
-        `Vui lòng chọn từ 1 đến tối đa ${MAX_SPELL_CHECK_UNITS} đoạn văn bản để kiểm tra.`,
-      );
-      return;
-    }
-
-    try {
-      const checkRes = await detectMutation.mutateAsync({
-        body: {
-          ...(selectedVersion !== null
-            ? { source_version: selectedVersion }
-            : {}),
-          expected_version: doc.version,
-          expected_sha256: doc.canonical_sha256,
-          evidence_ids: unitIds,
-          provider_id:
-            spellCheckProviderId === "default" ? null : spellCheckProviderId,
-          max_output_tokens: 4096,
-        },
-        idempotencyKey: activeSpellKey,
-      });
-
-      if (!current()) return;
-      setLocalCheck(checkRes);
+    const units = wholeDocumentCheck
+      ? doc.units
+      : doc.units.filter((unit) => selectedUnitsForCheck.has(unit.evidence_id));
+    if (units.length === 0) return;
+    setMobilePane("spelling");
+    const result = await documentSpelling.start(
+      { ...doc, units },
+      activeSpellKey,
+      spellCheckProviderId === "default" ? null : spellCheckProviderId,
+      selectedVersion,
+    );
+    if (!current() || !result) return;
+    setSpellCheckConfigOpen(false);
+    setActiveSpellKey(generateIdempotencyKey());
+    const onlyBatch =
+      result.batches.length === 1 ? result.batches[0] : undefined;
+    const check = onlyBatch?.check;
+    if (!wholeDocumentCheck && onlyBatch?.status === "completed" && check) {
+      setLocalCheck(check);
       onSearchChange?.({
         revisionId: activeRevisionId,
         runId: selectedRunId,
-        checkId: checkRes.id,
+        checkId: check.id,
         page: activePage,
       });
-      setSpellCheckConfigOpen(false);
-      setMobilePane("spelling");
-      setActiveSpellKey(generateIdempotencyKey());
-
-      if (checkRes.status === "failed") {
-        toast.error(
-          `Lượt kiểm tra chính tả thất bại: ${formatOcrError(checkRes.error_code)}`,
-        );
-        return;
-      }
-      if (checkRes.status !== "completed") {
-        toast.warning(
-          "Lượt kiểm tra chưa xác định kết quả (quá thời gian chờ hoặc đang xử lý). Hệ thống không tự động gửi lại.",
-        );
-        return;
-      }
-
-      if (checkRes.withheld_suggestions?.length) {
-        toast.info(
-          `Có ${checkRes.withheld_suggestions.length} mục cần đối chiếu ảnh gốc và ${checkRes.suggestions.length} gợi ý sửa chữ để xem xét.`,
-        );
-      } else if (checkRes.suggestions.length === 0) {
-        toast.info(
-          `Hoàn tất kiểm tra ${checkRes.checked_evidence_ids.length} đoạn: Không có đề xuất sửa nào.`,
-        );
-      } else {
-        toast.success(
-          `Tìm thấy ${checkRes.suggestions.length} đề xuất sửa chính tả.`,
-        );
-      }
-    } catch (err) {
-      if (!current()) return;
-      if (err instanceof ApiProblemError) {
-        toast.error(formatOcrError(err.code, err.message));
-      } else {
-        toast.error("Không thể thực hiện kiểm tra chính tả.");
-      }
+    }
+    const incomplete = result.batches.filter(
+      (batch) => batch.status !== "completed",
+    ).length;
+    if (incomplete) {
+      toast.warning(
+        `Còn ${incomplete} nhóm lỗi hoặc chưa chạy. Xem báo cáo chi tiết.`,
+      );
+    } else {
+      toast.success(
+        "Đã kiểm tra xong phạm vi đã chọn. Xem báo cáo để đối chiếu gợi ý.",
+      );
     }
   };
 
@@ -753,10 +727,19 @@ function SourceDetailSession({
     activeRevision?.file_name ?? source?.file_name,
   );
   const activeCheckId = search?.checkId;
-  const hasActiveSpellingResult = Boolean(doc && (activeCheckId || localCheck));
-  const spellingSuggestionsCount =
-    (localCheck?.suggestions.length ?? 0) +
-    (localCheck?.withheld_suggestions?.length ?? 0);
+  const hasActiveSpellingResult = Boolean(
+    doc && (activeCheckId || localCheck || documentSpelling.report),
+  );
+  const spellingSuggestionsCount = documentSpelling.report
+    ? documentSpelling.report.batches.reduce(
+        (n, b) =>
+          n +
+          (b.check?.suggestions.length ?? 0) +
+          (b.check?.withheld_suggestions?.length ?? 0),
+        0,
+      )
+    : (localCheck?.suggestions.length ?? 0) +
+      (localCheck?.withheld_suggestions?.length ?? 0);
 
   const lifecycleDialog = lifecycleOp ? (
     <LifecycleActionDialog
@@ -904,7 +887,7 @@ function SourceDetailSession({
               size="sm"
               variant="outline"
               className="h-9 text-xs gap-1.5"
-              disabled={detectMutation.isPending}
+              disabled={detectMutation.isPending || documentSpelling.running}
               onClick={() => handleOpenSpellCheckConfig()}
             >
               {detectMutation.isPending ? (
@@ -1379,7 +1362,24 @@ function SourceDetailSession({
           onMobilePaneChange={setMobilePane}
           spellingSuggestionsCount={spellingSuggestionsCount}
           spellingPanel={
-            hasActiveSpellingResult && doc ? (
+            documentSpelling.report && doc ? (
+              <DocumentSpellingReport
+                report={documentSpelling.report}
+                workspaceId={workspaceId}
+                collectionId={collectionId}
+                sourceId={sourceId}
+                revisionId={activeRevisionId}
+                runId={selectedRunId ?? ""}
+                doc={doc}
+                draftChanges={draftChanges}
+                canManage={canManage && !baseMovedOn}
+                onApply={handleApplySuggestion}
+                onLocateUnit={handleLocateUnit}
+                onManualEditUnit={handleManualEditUnit}
+                onRevertUnitDraft={handleRevertUnitDraft}
+                focusedEvidenceId={focusedEvidenceId}
+              />
+            ) : hasActiveSpellingResult && doc ? (
               <SpellingResultPanel
                 workspaceId={workspaceId}
                 collectionId={collectionId}
@@ -1502,7 +1502,18 @@ function SourceDetailSession({
             setActiveSpellKey(generateIdempotencyKey());
           }}
           pendingDraftCount={pendingChanges.length}
-          isSubmitting={detectMutation.isPending}
+          isSubmitting={detectMutation.isPending || documentSpelling.running}
+          wholeDocument={wholeDocumentCheck}
+          onChangeWholeDocument={setWholeDocumentCheck}
+          progress={
+            documentSpelling.running && documentSpelling.report ? (
+              <DocumentSpellingProgress
+                report={documentSpelling.report}
+                stopping={documentSpelling.stopping}
+                onStop={documentSpelling.stop}
+              />
+            ) : undefined
+          }
           onSubmit={() => void handleRunSpellCheck()}
         />
       ) : null}

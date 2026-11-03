@@ -134,7 +134,15 @@ export function ModelTestModal({
   if (!model) return null;
 
   const currentCapConfig =
-    CAPABILITY_CONFIG[selectedCapability] ?? CAPABILITY_CONFIG.chat;
+    model.provider_type === "mineru" && selectedCapability === "ocr"
+      ? {
+          ...CAPABILITY_CONFIG.ocr,
+          title: "Kiểm thử dịch vụ OCR PDF",
+          description: "Gửi PDF mẫu qua MinerU và kiểm tra kết quả bóc tách.",
+          testDesc:
+            "Tạo một tác vụ PDF mẫu, tải tệp lên, chờ hoàn tất và kiểm tra kết quả. Không dùng /chat/completions hay token LLM.",
+        }
+      : (CAPABILITY_CONFIG[selectedCapability] ?? CAPABILITY_CONFIG.chat);
   const CapIcon = currentCapConfig.icon;
 
   const handleRunTest = async () => {

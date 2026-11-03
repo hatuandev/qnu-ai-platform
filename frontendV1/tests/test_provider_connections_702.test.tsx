@@ -152,3 +152,24 @@ test("provider fetch failure is shown instead of an empty provider list", () => 
   expect(screen.getByText("Synthetic backend error")).toBeDefined();
   expect(screen.queryByText("Chưa có nhà cung cấp")).toBeNull();
 });
+
+test("MinerU is OCR and an active key does not imply a successful check", () => {
+  state.query.data = [
+    {
+      id: "ocr-connection",
+      name: "OCR service",
+      api_type: "mineru",
+      family: "custom",
+      base_url: "https://example.test/mineru",
+      model_count: 1,
+      active_keys_count: 1,
+      last_probe_status: "untested",
+    },
+  ];
+  render(<ConnectionList onOpenProvider={vi.fn()} />);
+  expect(screen.getByText("Dịch vụ OCR PDF")).toBeDefined();
+  expect(screen.getByText("Chưa kiểm tra")).toBeDefined();
+  expect(screen.getByText("1 khóa đang bật")).toBeDefined();
+  expect(screen.queryByText("Trò chuyện")).toBeNull();
+  expect(screen.queryByText(/Đã kết nối/)).toBeNull();
+});

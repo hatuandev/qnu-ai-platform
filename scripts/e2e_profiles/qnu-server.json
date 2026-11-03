@@ -2,6 +2,14 @@
   "name": "QNU AI Server",
   "base_url": "http://100.105.13.53:8000/v1",
   "test_monthly_token_limit": 20000000,
+  "additional_ocr_provider": {
+    "name": "QNU MinerU GPU",
+    "base_url": "http://100.105.13.53:8000/mineru",
+    "api_type": "mineru",
+    "timeout_seconds": 300,
+    "models": { "ocr": "mineru" },
+    "model_runtime": { "ocr": { "timeout_seconds": 300 } }
+  },
   "additional_chat_provider": {
     "name": "9router Luna",
     "base_url": "https://qnu-9router.duckdns.org/v1",
@@ -16,25 +24,11 @@
   "models": {
     "chat": "qwen3.8-27b-q4",
     "embedding": "bge-m3",
-    "rerank": "bge-reranker-v2-m3",
-    "ocr": "nemotron-parse"
+    "rerank": "bge-reranker-v2-m3"
   },
   "model_runtime": {
     "chat": { "timeout_seconds": 300, "wait_for_completion": true },
     "embedding": { "timeout_seconds": 60 },
-    "rerank": { "timeout_seconds": 60 },
-    "ocr": {
-      "timeout_seconds": 180,
-      "ocr_page_input": {
-        "max_image_width": 1664,
-        "max_image_height": 2048,
-        "input_tokens_upper_bound": 4096,
-        "prompt_sha256": "893d80dc972bc64399fd997a7fa78cebdf3bd1dc92f0de4ac25dc0d1f9e7b92d"
-      }
-    }
-  },
-  "runtime_basis": {
-    "scope": "Only this QNU E2E profile; not model capacity defaults",
-    "ocr_accounting": "docs/nhat_ky/2026-10-30_phien_728_luu_capacity_va_test_model_live.md: measured 3336 prompt tokens at 1664x2048, conservative bound 4096 for the pinned prompt and same processor"
+    "rerank": { "timeout_seconds": 60 }
   }
 }

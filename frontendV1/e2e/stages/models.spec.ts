@@ -90,6 +90,7 @@ async function requireDiagnostic(
   providerId: string,
   result: Diagnostic,
   expectedKind: string,
+  mineru = false,
 ) {
   // HTTP 200 from the admin API alone can still contain a failed upstream check.
   if (result.outcome !== "ok") {
@@ -99,7 +100,8 @@ async function requireDiagnostic(
   }
   expect(result.kind).toBe(expectedKind);
   expect(result.code).toBe("diagnostic_ok");
-  expect(result.http_status).toBe(200);
+  if (mineru) expect(result.http_status).toBeNull();
+  else expect(result.http_status).toBe(200);
   expect(result.latency_ms).not.toBeNull();
   expect(result.latency_ms).toBeGreaterThanOrEqual(0);
   const history = await api.get<{ checks: Diagnostic[] }>(
@@ -122,12 +124,16 @@ test(`Model thật đã chọn: ${stage}`, async ({ page }) => {
   const target = profileForCapability(
     profile,
     state.chatSelection,
-    stage === "model-chat" ? "chat" : "ocr",
+    stage === "model-discovery" ? "embedding" : (stage.slice(6) as Capability),
   );
   const connection = await connectionFor(api, target);
   const capabilities: Capability[] = ["chat", "embedding", "rerank", "ocr"];
   for (const capability of capabilities) {
-    if (!profile.models[capability]?.trim())
+    if (
+      !profileForCapability(profile, state.chatSelection, capability).models[
+        capability
+      ]?.trim()
+    )
       throw new Error(`BLOCKED: profile thiếu model ${capability}.`);
   }
   let result: Diagnostic;
@@ -142,6 +148,7 @@ test(`Model thật đã chọn: ${stage}`, async ({ page }) => {
     for (const model of Object.values(profile.models))
       expect(result.models).toContain(model);
     for (const additional of configuredProfiles(profile).slice(1)) {
+      if (additional.api_type === "mineru") continue;
       const extra = await connectionFor(api, additional);
       const discovered = await api.post<Diagnostic>(
         `/modelops/providers/${extra.id}/discover`,
@@ -174,7 +181,13 @@ test(`Model thật đã chọn: ${stage}`, async ({ page }) => {
       `/modelops/providers/${providerId}/probe`,
       { capability },
     );
-    await requireDiagnostic(api, providerId, result, capability);
+    await requireDiagnostic(
+      api,
+      providerId,
+      result,
+      capability,
+      target.api_type === "mineru",
+    );
     expect(result.requested_model).toBe(target.models[capability]);
     expect(
       acceptsModelObservation(

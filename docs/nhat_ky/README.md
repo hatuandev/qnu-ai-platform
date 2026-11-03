@@ -1,5 +1,17 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên834 — Docling trong luồng DOCX V1](2026-11-03_phien_834_docling_docx.md).
+
+- [Phiên833 — Chính tả theo trang và đoạn](2026-11-03_phien_833_chinh_ta_pham_vi_va_thoi_han.md). Chia nhóm cho mọi phạm vi và chờ kết quả backend.
+
+- [Phiên832 — Chính tả async2](2026-11-03_phien_832_chinh_ta_bat_dong_bo_hai_nhom.md): pool2/drain/khôngretry; FE729/build/browser đạt, live2nhóm nhỏ16,280s, chưa full32trang.
+
+- [Phiên831 — Chính tả toàn tài liệu](2026-11-02_phien_831_kiem_tra_chinh_ta_toan_tai_lieu.md): tự chia nhóm, báo lỗi từng trang, không retry; FE723/build/browser đạt, chưa liveAI32trang.
+
+- [Phiên830 — Dọn Nemotron, MinerU UI/E2E](2026-11-02_phien_830_don_nemotron_ui_mineru.md): API xóa model cũ, giữ lịch sử; protocol/task đúng, profile OCR riêng; FE705/runner18/build/browser đạt.
+
+- [Phiên829 — Quota test không giới hạn](2026-11-02_phien_829_quota_test_khong_gioi_han.md): Tuyển sinh/SHL tháng11 null/unblocked, API xác nhận, giữ usage; chưa tự gia hạn.
+
 - [Phiên828 — Test MinerU VRAM 0.17](2026-11-02_phien_828_test_mineru_vram_017.md): 61 trang, CER mẫu/bảng giữ nguyên; trang30 thêm một lỗi chữ ngoài mẫu, không retry/đổi app.
 
 - [Phiên827 — Gỡ legacy, kiểm V1](2026-11-02_phien_827_go_legacy_va_kiem_chung_v1.md): archivengoàirepo/1.799trackedgiữ,BE1306/FE701PASS/buildDocker/liveđạt;khôngpush/LLMtest.

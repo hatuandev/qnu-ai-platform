@@ -28,7 +28,7 @@ import type {
   Suggestion,
 } from "./ocr-types";
 
-type Props = {
+export type SpellingPanelProps = {
   workspaceId: string;
   collectionId: string;
   sourceId: string;
@@ -45,6 +45,7 @@ type Props = {
   onRevertUnitDraft?: (evidenceId: string) => void;
   focusedEvidenceId?: string | null;
 };
+type Props = SpellingPanelProps;
 
 export function SpellingResultPanel(props: Props) {
   if (props.checkId)

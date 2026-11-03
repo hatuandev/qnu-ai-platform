@@ -16,6 +16,7 @@ KEY_ENV_FILE = ROOT / ".env"
 KEY_ENV_NAMES = {
     "providerSetup": "E2E_QNU_API_KEY",
     "routerProviderSetup": "E2E_9ROUTER_API_KEY",
+    "ocrProviderSetup": "E2E_QNU_API_KEY",
 }
 
 
@@ -88,7 +89,8 @@ def prepare_connection(client, directory, state, profile, field, label, family):
                 "name": f"{label} E2E {state['runId']}",
                 "family": family,
                 "base_url": endpoint,
-                "timeout_seconds": 60,
+                "timeout_seconds": profile.get("timeout_seconds", 60),
+                **({"api_type": profile["api_type"]} if profile.get("api_type") else {}),
             },
         )
     )
@@ -96,6 +98,8 @@ def prepare_connection(client, directory, state, profile, field, label, family):
         raise RuntimeError(
             f"Nhà cung cấp {label} hiện đang tắt; bật lại trước khi test."
         )
+    if profile.get("api_type") and connection.get("api_type") != profile["api_type"]:
+        raise RuntimeError(f"Giao thức {label} không khớp profile; sửa trong ModelOps trước.")
     setup = state.setdefault(field, {})
     setup.update(
         connectionId=connection["id"],
@@ -256,6 +260,11 @@ def prepare_provider(directory, env, profile_file):
             prepare_connection(
                 client, directory, state, profile, "providerSetup", "server QNU", "qnu"
             )
+            ocr = profile.get("additional_ocr_provider")
+            if ocr:
+                prepare_connection(
+                    client, directory, state, ocr, "ocrProviderSetup", "MinerU OCR", "qnu"
+                )
             router = profile.get("additional_chat_provider")
             if router:
                 prepare_connection(

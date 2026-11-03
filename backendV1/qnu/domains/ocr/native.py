@@ -193,7 +193,7 @@ def extract_native(payload: bytes, rendered: RenderedDocument) -> NativePlan:
     if rendered.extension == ".docx":
         from qnu.domains.ocr.native_docx import restore_source_tables
 
-        pages = restore_source_tables(payload, pages)
+        pages = restore_source_tables(payload, pages, converter=rendered.renderer.get("converter"))
     return NativePlan(pages, "render_pdf" if rendered.extension == ".docx" else "source_revision")
 
 

@@ -12,6 +12,7 @@ interface RuntimeProvider {
   base_url: string;
   capabilities: string[];
   is_active: boolean;
+  provider_type: string;
   capacity_status: string;
   token_limits: {
     max_input_tokens?: number | null;
@@ -32,7 +33,7 @@ interface Observation {
   model: string;
   provider_id: string;
   diagnostic_id: string;
-  upstream_http: number;
+  upstream_http: number | null;
   code: string;
   observed_dimension: number | null;
 }
@@ -102,7 +103,9 @@ export async function liveDefaults(api: Api, state: Checkpoint) {
       observation.stage !== stage ||
       observation.model !== provider.model_name ||
       observation.code !== "diagnostic_ok" ||
-      observation.upstream_http !== 200
+      (provider.provider_type === "mineru"
+        ? observation.upstream_http !== null
+        : observation.upstream_http !== 200)
     )
       throw new Error(`BLOCKED: observation ${capability} không hợp lệ.`);
     const history = await api.get<{
@@ -119,6 +122,12 @@ export async function liveDefaults(api: Api, state: Checkpoint) {
       throw new Error(
         `BLOCKED: kiểm định ${capability} đã cũ; cấu hình capacity/dimension xong cần chạy lại model-${capability}.`,
       );
+    if (provider.provider_type === "mineru") {
+      if (capability !== "ocr" || target.api_type !== "mineru")
+        throw new Error("BLOCKED: MinerU phải dùng đúng giao thức OCR PDF.");
+      defaults[capability] = provider.id;
+      continue;
+    }
     if (provider.capacity_status !== "configured" || !provider.token_limits)
       throw new Error(
         `BLOCKED: khai báo capacity thực tế cho ${provider.model_name}, rồi test lại model.`,

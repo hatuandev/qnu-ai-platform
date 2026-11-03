@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { v1Client } from "@/app/api/v1";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { ErrorState } from "@/components/admin/error-state";
 import {
@@ -53,7 +52,6 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { updateProvider } from "@/features/modelops/requests";
 import {
   CapacityBadge,
   ProviderOperationalBudgetsSummary,
@@ -63,7 +61,6 @@ import { CapacityPanel } from "../provider-detail";
 import { ProviderFormDialog } from "../provider-form-dialog";
 import type { Capability, Provider, ProviderKey } from "../types";
 import {
-  FAMILIES,
   useAddConnectionModel,
   useConnection,
   useConnectionKeys,
@@ -77,6 +74,7 @@ import { ConnectionForm } from "./connection-form";
 import { ConnectionKeyModal } from "./connection-key-modal";
 import { ImportModelsDialog } from "./import-models-dialog";
 import { ModelTestModal } from "./model-test-modal";
+import { connectionEndpoint, connectionProtocol } from "./presentation";
 
 export function ConnectionDetail({ connectionId }: { connectionId: string }) {
   return (
@@ -121,11 +119,7 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
       setNewModelCapability("embedding");
     } else if (lower.includes("rerank")) {
       setNewModelCapability("rerank");
-    } else if (
-      lower.includes("ocr") ||
-      lower.includes("parse") ||
-      lower.includes("nemotron")
-    ) {
+    } else if (lower.includes("ocr") || lower.includes("parse")) {
       setNewModelCapability("ocr");
     } else {
       setNewModelCapability("chat");
@@ -179,38 +173,12 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
     if (!newModelId.trim()) return;
     const trimmed = newModelId.trim();
     try {
-      const created = await addModelMutation.mutateAsync({
+      await addModelMutation.mutateAsync({
         model_name: trimmed,
         capabilities: [
           connection.api_type === "mineru" ? "ocr" : newModelCapability,
         ],
       });
-
-      // Nếu là connection QNU AI trên máy 100.105.13.53: tự động gán port tương ứng cho embedding/ocr
-      if (
-        connection.api_type !== "mineru" &&
-        connection.base_url.includes("100.105.13.53") &&
-        created?.id
-      ) {
-        let targetPort = "8000";
-        if (newModelCapability === "embedding" || trimmed.includes("bge-m3")) {
-          targetPort = "8001";
-        } else if (
-          newModelCapability === "ocr" ||
-          trimmed.includes("nemotron")
-        ) {
-          targetPort = "8081";
-        }
-        if (targetPort !== "8000") {
-          try {
-            await updateProvider(v1Client, created.id, {
-              base_url: `http://100.105.13.53:${targetPort}/v1`,
-            });
-          } catch {
-            // Port mapping update optional
-          }
-        }
-      }
 
       toast.success(`Đã thêm model ${trimmed}.`);
       setNewModelId("");
@@ -335,8 +303,8 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
             {connection.name}
           </h1>
           <p className="text-xs text-muted-foreground">
-            {keys.length} kết nối ·{" "}
-            {FAMILIES[connection.family] ?? "OpenAI Compatible"}
+            {keys.length} khóa API ·{" "}
+            <span>{connectionProtocol(connection)}</span>
           </p>
         </div>
       </div>
@@ -349,8 +317,7 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
               Chi tiết kết nối
             </h2>
             <p className="text-xs text-muted-foreground font-mono break-all">
-              Hoàn thành trò chuyện (Chat) · {connection.base_url}
-              /chat/completions
+              {connectionEndpoint(connection)}
             </p>
             {connection.prefix && (
               <p className="text-[11px] text-muted-foreground font-mono">
@@ -566,12 +533,15 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
         <CardHeader className="p-5 pb-3 border-b space-y-1">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold">
-              Mô hình sẵn có (LLM Models)
+              {connection.api_type === "mineru"
+                ? "Dịch vụ OCR"
+                : "Mô hình sẵn có"}
             </CardTitle>
           </div>
           <p className="text-xs text-muted-foreground">
-            Thêm mô hình tương thích OpenAI bằng tay hoặc nhập tự động từ
-            endpoint /models.
+            {connection.api_type === "mineru"
+              ? "Xử lý PDF qua tác vụ: tải tệp lên, theo dõi tiến độ và nhận Markdown, JSON cùng ảnh. Không sử dụng ngân sách token LLM."
+              : "Thêm mô hình bằng tay hoặc nhập từ danh sách do máy chủ công bố."}
           </p>
         </CardHeader>
 
@@ -582,7 +552,11 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
               <Input
                 value={newModelId}
                 onChange={(e) => handleModelNameChange(e.target.value)}
-                placeholder="Mã mô hình (Model ID, ví dụ: gpt-4o, bge-m3, nemotron-parse...)"
+                placeholder={
+                  connection.api_type === "mineru"
+                    ? "Tên dịch vụ OCR, ví dụ: mineru"
+                    : "Mã mô hình, ví dụ: qwen, bge-m3"
+                }
                 className="font-mono text-xs h-9"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -631,15 +605,17 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
               <span>Thêm model</span>
             </Button>
 
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-9 gap-1.5 text-xs shrink-0 text-foreground"
-              onClick={() => setImportModelsOpen(true)}
-            >
-              <Download className="size-3.5" />
-              <span>Nhập từ /models</span>
-            </Button>
+            {connection.api_type !== "mineru" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 gap-1.5 text-xs shrink-0 text-foreground"
+                onClick={() => setImportModelsOpen(true)}
+              >
+                <Download className="size-3.5" />
+                <span>Nhập từ /models</span>
+              </Button>
+            )}
           </div>
 
           {/* Model List Items */}
@@ -650,8 +626,9 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
               <Bot className="size-6 mx-auto text-muted-foreground/40" />
               <p className="text-xs">Chưa có model nào được thêm.</p>
               <p className="text-[11px]">
-                Nhập Mã mô hình ở trên rồi bấm 'Thêm model' hoặc bấm 'Nhập từ
-                /models'.
+                {connection.api_type === "mineru"
+                  ? "Nhập tên dịch vụ ở trên để đăng ký OCR."
+                  : "Nhập mã mô hình ở trên hoặc nhập từ /models."}
               </p>
             </div>
           ) : (
@@ -729,7 +706,9 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                             {m.model_name}
                           </p>
                           {visual.badge}
-                          <CapacityBadge status={m.capacity_status} />
+                          {m.provider_type !== "mineru" && (
+                            <CapacityBadge status={m.capacity_status} />
+                          )}
                         </div>
                         <ProviderOperationalBudgetsSummary
                           provider={m}
@@ -742,17 +721,6 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0 ml-2">
-                      {/* Edit Model (kept directly accessible for quick edit & test compatibility) */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="size-7 p-0 text-muted-foreground hover:text-foreground"
-                        onClick={() => setModelToEdit(m)}
-                        title="Cấu hình model và giới hạn xử lý"
-                      >
-                        <Pencil className="size-3.5" />
-                      </Button>
-
                       {/* Grouped secondary actions in 1 DropdownMenu per ui-standards.md */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -766,6 +734,10 @@ function ConnectionDetailContent({ connectionId }: { connectionId: string }) {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="text-xs">
+                          <DropdownMenuItem onClick={() => setModelToEdit(m)}>
+                            <Pencil className="size-3.5 mr-2" />
+                            <span>Cấu hình</span>
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setModelToInspect(m)}
                           >

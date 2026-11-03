@@ -103,7 +103,15 @@ function openModel(capabilities: string[] = ["chat"]) {
   };
   state.save.mockResolvedValue({ ...state.model });
   render(<ConnectionDetail connectionId="conn_test" />);
-  fireEvent.click(screen.getByTitle("Cấu hình model và giới hạn xử lý"));
+  fireEvent.keyDown(
+    screen.getByRole("button", {
+      name: `Tác vụ khác cho model ${state.model.model_name}`,
+    }),
+    { key: "Enter", code: "Enter" },
+  );
+  fireEvent.click(
+    screen.getByRole("menuitem", { name: "Cấu hình", exact: true }),
+  );
 }
 function fill(label: string, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });

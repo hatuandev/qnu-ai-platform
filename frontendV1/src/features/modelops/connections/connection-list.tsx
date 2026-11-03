@@ -27,6 +27,7 @@ import {
   useConnections,
 } from "./api";
 import { ConnectionForm } from "./connection-form";
+import { connectionProtocol } from "./presentation";
 
 export function ConnectionList({
   onOpenProvider,
@@ -62,7 +63,7 @@ export function ConnectionList({
             </h1>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Quản lý kết nối API tới các máy chủ mô hình AI (OpenAI Compatible).
+            Quản lý kết nối tới máy chủ mô hình AI và dịch vụ OCR tài liệu.
           </p>
         </div>
 
@@ -159,14 +160,13 @@ export function ConnectionList({
                           {/* Connection Status Badge */}
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {hasKeys ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                {row.active_keys_count} Đã kết nối
+                              <span className="text-[11px] text-muted-foreground">
+                                {row.active_keys_count} khóa đang bật
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                                 <span className="size-1.5 rounded-full bg-muted-foreground/40" />
-                                Chưa có kết nối
+                                Chưa có khóa
                               </span>
                             )}
 
@@ -175,8 +175,9 @@ export function ConnectionList({
                               variant="secondary"
                               className="text-[10px] py-0 px-1.5 font-normal"
                             >
-                              Trò chuyện
+                              {connectionProtocol(row)}
                             </Badge>
+                            <ConnectionStatus status={row.last_probe_status} />
 
                             {row.prefix && (
                               <Badge
@@ -251,19 +252,20 @@ export function ConnectionList({
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[10px]">
-                            {FAMILIES[row.family] ?? "OpenAI"}
+                            {connectionProtocol(row)}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           {row.active_keys_count > 0 ? (
-                            <span className="text-emerald-600 dark:text-emerald-400 font-medium text-xs">
-                              ● {row.active_keys_count} Đã kết nối
+                            <span className="text-muted-foreground text-xs">
+                              {row.active_keys_count} khóa đang bật
                             </span>
                           ) : (
                             <span className="text-muted-foreground text-xs">
-                              Chưa có kết nối
+                              Chưa có khóa
                             </span>
                           )}
+                          <ConnectionStatus status={row.last_probe_status} />
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {row.model_count} model
