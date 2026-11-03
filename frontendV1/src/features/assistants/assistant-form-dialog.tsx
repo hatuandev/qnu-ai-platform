@@ -131,7 +131,7 @@ export function AssistantFormDialog({
       chat_provider_id: assistant?.chat_provider_id ?? null,
       top_k: assistant?.top_k ?? 5,
       history_turns: assistant?.history_turns ?? 3,
-      max_output_tokens: assistant?.max_output_tokens ?? 2048,
+      max_output_tokens: assistant?.max_output_tokens ?? null,
       is_active: assistant?.is_active ?? true,
       rag_policy: toRagPolicyForm(assistant?.rag_policy),
       expected_revision: assistant?.revision ?? 1,
@@ -153,7 +153,7 @@ export function AssistantFormDialog({
             chat_provider_id: value.chat_provider_id ?? null,
             top_k: Number(value.top_k),
             history_turns: Number(value.history_turns),
-            max_output_tokens: Number(value.max_output_tokens),
+            max_output_tokens: value.max_output_tokens,
             is_active: Boolean(value.is_active),
             rag_policy: toRagPolicy(value.rag_policy),
             expected_revision: assistant.revision,
@@ -172,7 +172,7 @@ export function AssistantFormDialog({
             chat_provider_id: value.chat_provider_id ?? null,
             top_k: Number(value.top_k),
             history_turns: Number(value.history_turns),
-            max_output_tokens: Number(value.max_output_tokens),
+            max_output_tokens: value.max_output_tokens,
             is_active: Boolean(value.is_active),
             rag_policy: toRagPolicy(value.rag_policy),
           };
@@ -220,7 +220,7 @@ export function AssistantFormDialog({
         chat_provider_id: assistant?.chat_provider_id ?? null,
         top_k: assistant?.top_k ?? 5,
         history_turns: assistant?.history_turns ?? 3,
-        max_output_tokens: assistant?.max_output_tokens ?? 2048,
+        max_output_tokens: assistant?.max_output_tokens ?? null,
         is_active: assistant?.is_active ?? true,
         rag_policy: toRagPolicyForm(assistant?.rag_policy),
         expected_revision: assistant?.revision ?? 1,
@@ -733,19 +733,19 @@ export function AssistantFormDialog({
                     return (
                       <Field>
                         <FieldLabel htmlFor={tokensInputId}>
-                          Max Output Tokens{" "}
-                          <span className="text-destructive">*</span>
+                          Token đầu ra
                         </FieldLabel>
                         <Input
                           id={tokensInputId}
                           type="number"
                           min={1}
                           step={128}
-                          value={field.state.value}
+                          value={field.state.value ?? ""}
+                          placeholder="Tự động"
                           onChange={(e) =>
                             field.handleChange(
                               e.target.value === ""
-                                ? 2048
+                                ? null
                                 : Number(e.target.value),
                             )
                           }
@@ -753,7 +753,7 @@ export function AssistantFormDialog({
                           aria-invalid={Boolean(error)}
                         />
                         <FieldDescription>
-                          Giới hạn token xuất (mặc định 2048).
+                          Để trống để ModelOps tự tính ngân sách.
                         </FieldDescription>
                         {error ? <FieldError>{error}</FieldError> : null}
                       </Field>
@@ -1241,14 +1241,13 @@ export function AssistantFormDialog({
                                     <Input
                                       id={verificationTokensId}
                                       type="number"
-                                      min={128}
-                                      max={16000}
-                                      step={128}
-                                      value={field.state.value}
+                                      min={1}
+                                      placeholder="Tự động"
+                                      value={field.state.value ?? ""}
                                       onChange={(e) =>
                                         field.handleChange(
                                           e.target.value === ""
-                                            ? 2048
+                                            ? null
                                             : Number(e.target.value),
                                         )
                                       }
@@ -1257,9 +1256,8 @@ export function AssistantFormDialog({
                                       className="text-xs"
                                     />
                                     <FieldDescription className="text-[11px]">
-                                      Ngân sách riêng của lượt judge
-                                      (128–16000), tách khỏi ngân sách sinh câu
-                                      trả lời.
+                                      Để trống để ModelOps tự tính ngân sách
+                                      kiểm chứng, độc lập với ngân sách trả lời.
                                     </FieldDescription>
                                     {error ? (
                                       <FieldError>{error}</FieldError>

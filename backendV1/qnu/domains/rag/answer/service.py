@@ -33,7 +33,6 @@ from qnu.domains.rag.answer.schemas import AnswerRequest, AnswerResponse, Answer
 from qnu.domains.rag.answer.source_text import attach_source_text
 from qnu.domains.rag.answer.verification import verify
 from qnu.domains.workspaces.public_api import record_workspace_event
-from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException, Conflict
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
@@ -169,7 +168,7 @@ async def answer(
         provider_id=req.provider_id,
         task="answer",
         reasoning_task="answer",
-        max_output_tokens=req.max_output_tokens or get_settings().RAG_MAX_OUTPUT_TOKENS,
+        max_output_tokens=req.max_output_tokens,
         output_schema=answer_schema,
     )
     inference_hash = runtime.inference_configuration_hash("answer")
@@ -234,6 +233,7 @@ async def answer(
     trace.contract = {
         "schema_sha256": digest(answer_schema),
         "finish_reason": result.finish_reason,
+        "output_budget": result.budget_trace,
         **response_observation(result),
     }
     try:

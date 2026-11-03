@@ -33,17 +33,17 @@ def test_model_without_limits_imports_current_metadata_without_requiring_check_i
     assert model["capacity_basis"] == "server_reported"
     assert model["token_limits"]["context_window_tokens"] == 131072
     assert model["operational_budgets"]["chat"]["status"] == "declared"
-    assert len(requests) == 1  # Only explicit discovery; adding model sends no HTTP.
+    assert len(requests) == 1  # Current metadata is reused.
 
 
-def test_custom_model_is_saved_provisionally_without_discovery_or_secret_leaks(client, connected):
+def test_custom_model_is_saved_provisionally_after_optional_discovery(client, connected):
     cid, _, requests = connected
     model = add(client, cid, "new-model", ["chat", "rerank"])
     assert model["capacity_status"] == "unknown" and model["token_limits"] is None
     assert model["operational_budgets"]["chat"]["status"] == "provisional"
     assert model["operational_budgets"]["rerank"]["token_limits"]["max_input_tokens"] == 2048
     assert "test-only-capacity-secret" not in str(model)
-    assert not requests
+    assert len(requests) == 1 and requests[0].method == "GET"
 
 
 def test_manual_values_are_not_overwritten_by_cached_discovery(client, connected):
@@ -71,8 +71,10 @@ def test_rotated_key_invalidates_cached_metadata_before_automatic_import(client,
         == 201
     )
     model = add(client, cid, "qwen3.8-27b-q4", ["chat"])
-    assert model["token_limits"] is None and model["capacity_status"] == "unknown"
-    assert len(requests) == 1
+    assert model["capacity_basis"] == "server_reported"
+    assert model["token_limits"]["context_window_tokens"] == 131072
+    assert len(requests) == 2
+    assert requests[-1].headers["authorization"] == "Bearer other-test-secret-791"
 
 
 def test_latest_failed_discovery_is_not_replaced_by_an_older_success(client, connected):

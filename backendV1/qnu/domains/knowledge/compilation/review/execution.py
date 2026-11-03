@@ -3,6 +3,7 @@
 import asyncio
 import json
 from collections import Counter
+from dataclasses import replace
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -701,6 +702,8 @@ async def _run_segment(
             output_schema=schema,
             reasoning=reasoning,
         )
+        if row.trace.get("automatic_output_budget"):
+            request = replace(request, automatic_output_budget=True)
         if current_runtime.configuration_hash != row.trace["configuration_hash"]:
             raise Conflict("Model review đã thay đổi.", code="compilation_review_provider_changed")
         if current_runtime.provider_id != segment.config["provider_id"]:

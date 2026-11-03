@@ -234,7 +234,7 @@ giữ bố cục nếu cần xử lý. Không còn render body-only rồi âm th
 | `OCR_RENDER_DPI` | 144 | độ phân giải rasterize |
 | `OCR_MAX_PAGES` | 300 | trần số trang |
 | `OCR_MAX_PAGE_BYTES` | 8388608 | trần kích thước một ảnh trang |
-| `OCR_MAX_OUTPUT_TOKENS` | 8192 | `max_tokens` gửi provider |
+| `OCR_MAX_OUTPUT_TOKENS` | null | Override OCR ảnh legacy; trống dùng ModelOps. MinerU không dùng token LLM |
 | `OCR_PAGE_TOKEN_BUDGET` | 8192 | tương thích cấu hình cũ; runtime643 không dùng làm reserve |
 | `OCR_RUN_MAX_ATTEMPTS` | 2 | số lần thử tối đa của một run |
 | `OCR_LEASE_SECONDS` | 900 | hạn lease của worker |

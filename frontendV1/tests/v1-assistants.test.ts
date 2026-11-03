@@ -547,7 +547,7 @@ test("Assistant Schemas: Validation rules for create, update and search", () => 
   assert.equal(parsed.chat_provider_id, null);
   assert.equal(parsed.top_k, 5);
   assert.equal(parsed.history_turns, 3);
-  assert.equal(parsed.max_output_tokens, 2048);
+  assert.equal(parsed.max_output_tokens, null);
   assert.equal(parsed.is_active, true);
 
   // Update schema requires expected_revision >= 1

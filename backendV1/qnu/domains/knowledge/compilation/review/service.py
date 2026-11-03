@@ -402,6 +402,7 @@ async def prepare(
         "source_unit_count": len(material.payload["source_units"]),
         "draft_unit_count": len(material.payload["draft_units"]),
         "max_output_tokens": budget.max_output_tokens,
+        "automatic_output_budget": req.max_output_tokens is None,
         "usable_output_tokens": out_budget.usable_output_tokens,
         "reasoning_reserve_tokens": out_budget.reasoning_reserve_tokens,
         "framing_reserve_tokens": out_budget.framing_reserve_tokens,

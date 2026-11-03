@@ -68,7 +68,7 @@ export const assistantCreateSchema = z.object({
   chat_provider_id: chatProviderIdSchema.default(null),
   top_k: topKSchema.default(5),
   history_turns: historyTurnsSchema.default(3),
-  max_output_tokens: maxOutputTokensSchema.default(2048),
+  max_output_tokens: maxOutputTokensSchema.nullable().default(null),
   is_active: isActiveSchema.default(true),
 });
 
@@ -101,7 +101,8 @@ export const assistantFormSchema = z.object({
   max_output_tokens: z
     .number()
     .int("Giới hạn token xuất phải là số nguyên.")
-    .gt(0, "Giới hạn token xuất phải lớn hơn 0."),
+    .gt(0, "Giới hạn token xuất phải lớn hơn 0.")
+    .nullable(),
   is_active: isActiveSchema,
   rag_policy: ragPolicyFormSchema,
   expected_revision: z

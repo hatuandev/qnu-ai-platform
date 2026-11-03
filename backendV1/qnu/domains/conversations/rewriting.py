@@ -97,7 +97,7 @@ async def resolve_question(
         messages,
         provider_id=config["chat_provider_id"],
         task="followup",
-        max_output_tokens=get_settings().CONVERSATION_REWRITE_MAX_OUTPUT_TOKENS,
+        max_output_tokens=None,
     )
     usage = await usage_service.reserve(
         db,
@@ -149,6 +149,7 @@ async def resolve_question(
     turn.rewrite_trace = {
         **turn.rewrite_trace,
         "total_tokens": result.total_tokens,
+        "output_budget": result.budget_trace,
         "needs_clarification": value.needs_clarification,
     }
     if value.needs_clarification:

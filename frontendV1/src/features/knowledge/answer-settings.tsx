@@ -118,9 +118,17 @@ export function AnswerSettings({ value, catalog, disabled, onChange }: Props) {
       label={label}
       min={min}
       max={max}
-      value={value[name]}
+      value={value[name] ?? Number.NaN}
       disabled={disabled}
-      onChange={(n) => onChange({ ...value, [name]: n })}
+      onChange={(n) =>
+        onChange({
+          ...value,
+          [name]:
+            name === "verification_max_output_tokens" && Number.isNaN(n)
+              ? null
+              : n,
+        })
+      }
     />
   );
   return (
@@ -170,7 +178,11 @@ export function AnswerSettings({ value, catalog, disabled, onChange }: Props) {
                 </SelectContent>
               </Select>
             </div>
-            {numeric("max_output_tokens", "Token tối đa cho câu trả lời", 1)}
+            {numeric(
+              "max_output_tokens",
+              "Token đầu ra (để trống để tự động)",
+              1,
+            )}
             {value.retrieval_mode !== "dense" ? (
               <>
                 {numeric("candidate_k", "Số ứng viên", 1, 100)}
@@ -238,9 +250,8 @@ export function AnswerSettings({ value, catalog, disabled, onChange }: Props) {
                 />
                 {numeric(
                   "verification_max_output_tokens",
-                  "Token tối đa cho kiểm chứng",
-                  128,
-                  16000,
+                  "Token kiểm chứng (trống: tự động)",
+                  1,
                 )}
               </>
             ) : null}

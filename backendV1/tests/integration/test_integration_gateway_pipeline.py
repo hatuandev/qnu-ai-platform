@@ -3,6 +3,7 @@
 import json
 import os
 
+import pytest
 from redis.asyncio import from_url
 
 from qnu.api.dependencies import get_actor
@@ -14,7 +15,8 @@ from tests.integration.test_answers_api_648 import ready  # noqa: F401
 from tests.integration.test_index_api_647 import indexed  # noqa: F401
 
 
-def test_external_key_calls_real_rag_and_preserves_assistant_config(client, ready):  # noqa: F811
+@pytest.mark.parametrize("output_budget", [128, None])
+def test_external_key_calls_real_rag_and_preserves_assistant_config(client, ready, output_budget):  # noqa: F811
     ws = ready["workspace"]["id"]
     as_actor(PLATFORM)
     assistant = client.post(
@@ -24,7 +26,7 @@ def test_external_key_calls_real_rag_and_preserves_assistant_config(client, read
             "persona": "Synthetic gateway persona",
             "collection_id": ready["collection"]["id"],
             "chat_provider_id": ready["chat_provider"]["id"],
-            "max_output_tokens": 128,
+            "max_output_tokens": output_budget,
             "rag_policy": {"retrieval_mode": "hybrid", "context_window": 1},
         },
     )
@@ -66,7 +68,10 @@ def test_external_key_calls_real_rag_and_preserves_assistant_config(client, read
         assert body["qnu_extensions"]["sources"]
         assert body["qnu_extensions"]["statements"][0]["evidence_ids"][0].startswith("E")
         sent = ready["answer_chat"].requests[0]["body"]
-        assert sent["max_tokens"] == 128
+        if output_budget is None:
+            assert sent["max_tokens"] > 128
+        else:
+            assert sent["max_tokens"] == output_budget
         # Persona is deliberately data in assistant_style, never promoted to system policy.
         assert (
             json.loads(sent["messages"][-1]["content"])["assistant_style"]

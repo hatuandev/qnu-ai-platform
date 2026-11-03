@@ -14,7 +14,7 @@ export type Assistant = {
   chat_provider_id: string | null;
   top_k: number;
   history_turns: number;
-  max_output_tokens: number;
+  max_output_tokens: number | null;
   is_active: boolean;
   /**
    * Retrieval/verification policy snapshot source. Older responses may omit it;
@@ -36,7 +36,7 @@ export type AssistantCreateInput = {
   chat_provider_id?: string | null;
   top_k?: number;
   history_turns?: number;
-  max_output_tokens?: number;
+  max_output_tokens?: number | null;
   is_active?: boolean;
   rag_policy?: RagPolicy;
 };
@@ -57,7 +57,7 @@ export type AssistantUpdateInput = {
   chat_provider_id: string | null;
   top_k: number;
   history_turns: number;
-  max_output_tokens: number;
+  max_output_tokens: number | null;
   is_active: boolean;
   rag_policy: RagPolicy;
   expected_revision: number;

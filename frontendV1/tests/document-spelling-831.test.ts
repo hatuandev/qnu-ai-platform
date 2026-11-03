@@ -110,6 +110,27 @@ test("a truncated group is replaced by smaller requests without resending succes
     first.body.evidence_ids,
   );
   expect(first.body.max_output_tokens).toBeUndefined();
+  expect(r.splitAttempts).toMatchObject([
+    { key: first.idempotencyKey, errorCode: "chat_output_truncated" },
+  ]);
+});
+test("a token rejection splits down to one unit and preserves the final error", async () => {
+  const o = options();
+  o.detect.mockRejectedValue(
+    new ApiProblemError({
+      status: 422,
+      code: "model_input_limit_exceeded",
+      message: "diagnostic",
+    }),
+  );
+  const r = await checkWholeDocument(o);
+  expect(r.batches).toHaveLength(o.doc.units.length);
+  expect(
+    r.batches.every((b) => b.status === "failed" && b.evidenceIds.length === 1),
+  ).toBe(true);
+  expect(o.detect).toHaveBeenCalledTimes(
+    r.batches.length + (r.splitAttempts?.length ?? 0),
+  );
 });
 test.each(["uncertain", "running"])(
   "%s result stops unsent groups, preserving its real check",

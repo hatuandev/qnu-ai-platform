@@ -53,10 +53,10 @@ tokenizer tự động. Thiếu accounting, prompt đổi hoặc ảnh vượt p
 lỗi trước HTTP. Cần nhập giá trị phù hợp endpoint/model thực tế qua API quản trị;
 không suy accounting cho mọi trang từ usage của một phản hồi mẫu.
 
-`OCR_MAX_OUTPUT_TOKENS` vẫn là ngân sách tác vụ mặc định8192 đã ghim trong run,
-không phải context/model capacity. Trần validation32768 đã được gỡ; có thể đặt
-ngân sách tác vụ lớn hơn khi model cho phép. Runtime OCR đối chiếu ngân sách đó
-với profile và accounting trước gửi, không coi biến môi trường là capacity.
+`OCR_MAX_OUTPUT_TOKENS` là override tùy chọn cho OCR ảnh legacy; mặc định null dùng
+ModelOps tự chọn theo model và context còn lại. Run cũ giữ số đã ghim. Runtime
+đối chiếu với profile và accounting trước gửi, không coi biến môi trường là
+capacity. MinerU xử lý theo tài liệu và không dùng ngân sách token LLM.
 Quota reserve bằng tổng input bound + output, không dùng OCR_PAGE_TOKEN_BUDGET cố định.
 
 Tự động discovery metadata provider và đếm token ảnh phụ thuộc protocol/runtime,

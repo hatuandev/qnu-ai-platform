@@ -212,10 +212,46 @@ async def delete_connection(db: AsyncSession, actor: AuthActor, connection_id: s
     await db.commit()
 
 
+async def _shared_key_id(db: AsyncSession, connection_id: str) -> str | None:
+    return await db.scalar(
+        select(ProviderKey.id)
+        .where(
+            ProviderKey.provider_id == connection_id,
+            ProviderKey.status == "active",
+            ProviderKey.model_ids.is_(None),
+        )
+        .order_by(ProviderKey.priority, ProviderKey.created_at, ProviderKey.id)
+        .limit(1)
+    )
+
+
 async def add_model(
-    db: AsyncSession, actor: AuthActor, connection_id: str, req: ConnectionModelCreate
+    db: AsyncSession,
+    actor: AuthActor,
+    connection_id: str,
+    req: ConnectionModelCreate,
+    *,
+    client: ProviderDiagnosticClient | None = None,
 ) -> Provider:
     require_model_admin(actor)
+    if (
+        client is not None
+        and req.discovery_check_id is None
+        and req.token_limits is None
+        and req.embedding_dimension is None
+    ):
+        from qnu.domains.modelops.connections.capacity import cached_metadata
+
+        parent = await get_connection(db, connection_id)
+        if (
+            parent.is_active
+            and parent.provider_type != "mineru"
+            and (key_id := await _shared_key_id(db, connection_id)) is not None
+            and not await cached_metadata(db, actor, parent, req.model_name)
+        ):
+            await test_connection(
+                db, actor, connection_id, ConnectionTestRequest(key_id=key_id), client
+            )
     parent = await get_connection(db, connection_id, lock=True)
     if not parent.is_active:
         raise Conflict("Nhà cung cấp đang tắt.", code="provider_inactive")
@@ -226,15 +262,7 @@ async def add_model(
     )
     if existing:
         raise Conflict("Model đã được thêm vào nhà cung cấp.", code="model_already_registered")
-    if not await db.scalar(
-        select(ProviderKey.id)
-        .where(
-            ProviderKey.provider_id == parent.id,
-            ProviderKey.status == "active",
-            ProviderKey.model_ids.is_(None),
-        )
-        .limit(1)
-    ):
+    if await _shared_key_id(db, parent.id) is None:
         raise Conflict(
             "Thêm API key dùng chung tại nhà cung cấp trước khi thêm model; khóa cũ giữ phạm vi model ban đầu.",
             code="connection_key_required",

@@ -18,7 +18,7 @@ export type RagPolicyFormValues = {
   context_max_bytes: number;
   verification_mode: RagPolicy["verification_mode"];
   verification_provider_id: string | null;
-  verification_max_output_tokens: number;
+  verification_max_output_tokens: number | null;
   filter_data_year: number | null;
   filter_issued_year: number | null;
   filter_effective_on: string;
@@ -72,8 +72,8 @@ export const ragPolicyFormSchema = z
     verification_max_output_tokens: z
       .number()
       .int("Ngân sách token kiểm chứng phải là số nguyên.")
-      .min(128, "Ngân sách token kiểm chứng tối thiểu 128.")
-      .max(16000, "Ngân sách token kiểm chứng tối đa 16000."),
+      .positive("Ngân sách token kiểm chứng phải lớn hơn 0.")
+      .nullable(),
     filter_data_year: yearSchema,
     filter_issued_year: yearSchema,
     filter_effective_on: isoDateSchema,
@@ -157,7 +157,7 @@ export function toRagPolicyForm(
     verification_mode: source.verification_mode ?? "off",
     verification_provider_id: source.verification_provider_id ?? null,
     verification_max_output_tokens:
-      source.verification_max_output_tokens ?? 2048,
+      source.verification_max_output_tokens ?? null,
     filter_data_year: filter.data_year ?? null,
     filter_issued_year: filter.issued_year ?? null,
     filter_effective_on: filter.effective_on ?? "",

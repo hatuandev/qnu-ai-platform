@@ -134,6 +134,8 @@ async def prepare_chat_request(
             endpoint=runtime.base_url,
             model=runtime.model_name,
             max_output_tokens=budget.max_output_tokens,
+            automatic_output_budget=max_output_tokens is None,
+            budget_identity=current,
             timeout_seconds=runtime.timeout_seconds,
             wait_for_completion=runtime.wait_for_completion,
             api_key=runtime.api_key,

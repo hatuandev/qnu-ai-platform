@@ -25,7 +25,7 @@ Request mới dùng projection `compact/v3` trong scope từng phần: giữ ID,
 
 `reference_contract_version=2` ghim schema gồm các nhánh object hoàn chỉnh: covered/supported/contradicted phải có nguồn đối chiếu; mỗi nhánh vẫn cần explanation/suggested_action. Không có nguồn cho phép thì không thể chọn supported/contradicted. Thử synthetic với Qwen thật đạt trong 4.1s; đây là kiểm chứng giao thức, không phải nghiệm thu tài liệu thật.
 
-Compiler mặc định lấy `min(COMPILER_MAX_OUTPUT_TOKENS, ceiling ModelOps)` khi người gọi không chỉ định output. Model khai báo 4096 được dùng 4096, Qwen hiện tại vẫn 8192. Nếu người gọi chỉ định 8192 trên model trần 4096 thì trả 422 đúng hợp đồng, không âm thầm thay yêu cầu. Lỗi chung HTTP422 không phải căn cứ chia tiếp.
+Compiler dùng ngân sách ModelOps theo model và context còn lại khi người gọi không chỉ định output; không áp COMPILER_MAX_OUTPUT_TOKENS. Ví dụ model công bố 4096 thì dùng tối đa 4096; model công bố 32768 được phép dùng mức đó nếu context đủ. Nếu người gọi chỉ định 8192 trên model trần 4096 thì trả 422 đúng hợp đồng, không âm thầm thay yêu cầu. Lỗi chung HTTP422 không phải căn cứ chia tiếp. Xem [hợp đồng tự động](V1_MODELOPS_NGAN_SACH_TU_DONG.md).
 
 Planner không trộn phần bảng literal với phần văn xuôi. `--recover` chỉ tạo lại review đã completed theo chính sách cũ nếu chưa xuất bản; giữ review cũ trong lịch sử và dùng key mới. Không thay review running/uncertain bằng nhánh này.
 

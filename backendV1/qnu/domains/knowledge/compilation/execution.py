@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from dataclasses import replace
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -229,6 +230,8 @@ async def _call(
         task="compiler",
         reasoning=reasoning,
     )
+    if run.config.get("automatic_output_budget"):
+        request = replace(request, automatic_output_budget=True)
     if recorded:
         live = runtime.reasoning_directive("compiler")
         if (live.public_dict() if live else None) != run.config["reasoning_directive"]:
@@ -548,6 +551,8 @@ async def _run_leaf(
             output_schema=schema,
             reasoning=reasoning,
         )
+        if run.config.get("automatic_output_budget"):
+            request = replace(request, automatic_output_budget=True)
         if (
             runtime.configuration_hash != run.config["provider"]["configuration_hash"]
             or runtime.provider_id != segment.config["provider_id"]

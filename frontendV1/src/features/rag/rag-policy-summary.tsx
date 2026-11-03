@@ -79,7 +79,9 @@ export function RagPolicySummary({ policy }: { policy?: RagPolicy | null }) {
           <span className="text-muted-foreground">Judge / ngân sách</span>
           <span className="font-mono text-foreground truncate max-w-[60%]">
             {value.verification_provider_id ?? "model chat mặc định"} ·{" "}
-            {value.verification_max_output_tokens} token
+            {value.verification_max_output_tokens === null
+              ? "Tự động"
+              : `${value.verification_max_output_tokens} token`}
           </span>
         </div>
       ) : null}

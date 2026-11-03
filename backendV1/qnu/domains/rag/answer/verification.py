@@ -213,6 +213,7 @@ async def verify(
         "prompt_tokens": result.prompt_tokens,
         "completion_tokens": result.completion_tokens,
         "total_tokens": result.total_tokens,
+        "output_budget": result.budget_trace,
         "ms": round((time.monotonic() - started) * 1000, 3),
         **report.model_dump(),
     }

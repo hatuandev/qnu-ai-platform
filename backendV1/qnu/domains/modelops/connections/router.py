@@ -100,9 +100,10 @@ async def register(
     req: ConnectionModelCreate,
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(admin),
+    client: ProviderDiagnosticClient = Depends(get_diagnostic_client),
 ):
     return ProviderResponse(
-        **provider_payload(await service.add_model(db, actor, connection_id, req))
+        **provider_payload(await service.add_model(db, actor, connection_id, req, client=client))
     )
 
 

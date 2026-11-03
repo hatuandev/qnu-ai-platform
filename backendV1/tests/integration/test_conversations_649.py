@@ -32,6 +32,7 @@ def create_assistant(client, data):
 
 def test_assistant_binding_and_owned_conversation_are_persistent(client, ready):  # noqa: F811
     assistant = create_assistant(client, ready)
+    assert assistant["max_output_tokens"] is None
     base = f"{API}/workspaces/{ready['workspace']['id']}/conversations"
     response = client.post(base, json={"assistant_id": assistant["id"], "title": "Chỉ tiêu"})
     assert response.status_code == 201, response.text
@@ -43,6 +44,29 @@ def test_assistant_binding_and_owned_conversation_are_persistent(client, ready):
     )
     as_actor(MEMBER)
     assert client.get(base + "/" + conversation["id"]).status_code == 404
+
+
+def test_assistant_explicit_budget_is_preserved_until_cleared(client, ready):  # noqa: F811
+    as_actor(PLATFORM)
+    body = {
+        "name": "Budget fixture",
+        "collection_id": ready["collection"]["id"],
+        "chat_provider_id": ready["chat_provider"]["id"],
+        "max_output_tokens": 777,
+    }
+    created = client.post(assistant_url(ready), json=body)
+    assert created.status_code == 201, created.text
+    assistant = created.json()
+    path = assistant_url(ready) + "/" + assistant["id"]
+    body.pop("max_output_tokens")
+    updated = client.put(path, json={**body, "expected_revision": assistant["revision"]})
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["max_output_tokens"] == 777
+    automatic = client.put(path, json={
+        **body, "max_output_tokens": None, "expected_revision": updated.json()["revision"],
+    })
+    assert automatic.status_code == 200, automatic.text
+    assert automatic.json()["max_output_tokens"] is None
 
 
 @pytest.fixture
@@ -99,6 +123,7 @@ def test_saved_answer_replay_and_followup_use_new_evidence(client, chat_session)
     assert first.status_code == 200, first.text
     assert first.json()["status"] == "completed" and first.json()["result"]["sources"]
     assert first.json()["history_turn_ids"] == []
+    assert data["answer_chat"].requests[0]["body"]["max_tokens"] > 0
     before = len(data["answer_chat"].requests)
     assert send(client, data).json()["id"] == first.json()["id"]
     assert len(data["answer_chat"].requests) == before
@@ -106,6 +131,8 @@ def test_saved_answer_replay_and_followup_use_new_evidence(client, chat_session)
     assert second.status_code == 200, second.text
     assert second.json()["history_turn_ids"] == [first.json()["id"]]
     assert second.json()["rewrite_trace"]["total_tokens"] == 80
+    assert data["answer_chat"].requests[-2]["body"]["max_tokens"] == 8192
+    assert second.json()["rewrite_trace"]["output_budget"]["mode"] == "automatic"
     assert len(data["answer_chat"].requests) == before + 2
     incoming = json.loads(data["answer_chat"].requests[-2]["body"]["messages"][-1]["content"])
     assert incoming["previous_user_questions"] == [first.json()["question"]]

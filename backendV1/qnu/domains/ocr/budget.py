@@ -18,7 +18,7 @@ async def page_request_budget(
     width: int,
     height: int,
     prompt: str,
-    output_tokens: int,
+    output_tokens: int | None,
 ):
     current = await resolve_ocr_runtime(db, workspace_id, expected.provider_id)
     if current.configuration_hash != expected.configuration_hash:

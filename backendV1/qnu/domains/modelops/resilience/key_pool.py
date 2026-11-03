@@ -158,6 +158,7 @@ async def finish(
     attempt: int = 1,
     total_tokens: int | None = None,
     usage_id: str | None = None,
+    budget_trace: dict | None = None,
 ) -> None:
     owner = await credential_owner(db, lease.provider_id, lock=True)
     if lease.token:
@@ -197,6 +198,7 @@ async def finish(
                 "key_id": lease.key_id,
                 "code": code,
                 "upstream_status": failure.upstream_status if failure else None,
+                "output_budget": budget_trace or {},
             },
         )
     )

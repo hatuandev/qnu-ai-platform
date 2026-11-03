@@ -21,7 +21,8 @@ export type AnswerSettings = RagPolicy & {
   provider_id: string | null;
   max_output_tokens: number;
 };
-export type AnswerRequest = AnswerSettings & {
+export type AnswerRequest = Omit<AnswerSettings, "max_output_tokens"> & {
+  max_output_tokens: number | null;
   question: string;
   document_ids: string[] | null;
 };
@@ -29,13 +30,13 @@ export const DEFAULT_ANSWER_SETTINGS: AnswerSettings = {
   ...DEFAULT_RAG_POLICY,
   top_k: 5,
   provider_id: null,
-  max_output_tokens: 2048,
+  max_output_tokens: Number.NaN,
 };
 const requestSchema = z.object({
   question: z.string().trim().min(1, "Nhập câu hỏi.").max(8000),
   top_k: z.number().int().min(1).max(20),
   provider_id: z.string().min(1).max(64).nullable(),
-  max_output_tokens: z.number().int().positive(),
+  max_output_tokens: z.number().int().positive().nullable(),
   document_ids: z
     .array(z.string().min(1).max(64))
     .max(100)
@@ -53,6 +54,9 @@ export function buildAnswerRequest(
   const basic = requestSchema.safeParse({
     question,
     ...settings,
+    max_output_tokens: Number.isNaN(settings.max_output_tokens)
+      ? null
+      : settings.max_output_tokens,
     document_ids: documents,
   });
   if (!basic.success)

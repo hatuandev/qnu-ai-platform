@@ -6,11 +6,42 @@ Context791, ngày 01/11/2026. Áp dụng `backendV1/`; FE có [prompt triển kh
 
 Giữ luồng nhà cung cấp → khóa bảo vệ trong ModelOps → model/chức năng → cấp quyền workspace và quota. Khi thêm model, `token_limits` là tùy chọn. Không cần điền context/input/output để lưu model.
 
-Khi tạo model con mà không gửi thông số tay hoặc `discovery_check_id`, backend tìm snapshot discovery mới nhất của đúng nhà cung cấp. Chỉ sử dụng kết quả thành công có fingerprint hiện hành (endpoint/model/giao thức/key/config) và đúng model ID. Snapshot thất bại/stale/model không có không được thay bằng kết quả cũ; model vẫn được lưu với thông số chưa biết và ngân sách vận hành dự phòng. Không phát sinh HTTP tự động trong POST thêm model.
+Khi tạo model con mà không gửi thông số tay hoặc `discovery_check_id`, backend tìm snapshot discovery mới nhất của đúng nhà cung cấp. Nếu chưa có metadata phù hợp, API thử lấy danh sách model bằng khóa dùng chung đang hoạt động. Chỉ sử dụng kết quả thành công có fingerprint hiện hành (endpoint/model/giao thức/key/config) và đúng model ID. Snapshot thất bại/stale/model không có không được thay bằng kết quả cũ; model vẫn được lưu với thông số chưa biết và ngân sách vận hành dự phòng.
 
 Metadata mới chỉ áp dụng khi tạo model hoặc sync có chủ đích; không tự cập nhật model đang phục vụ theo catalog, không xóa khai báo tay, không đổi preferred model. `discovery_check_id` được gửi tường minh vẫn phải hợp lệ; không hạ thành fallback khi ID đó sai. Giữ kiểm tra embedding dimension và phạm vi credential.
 
 ## Hai lớp thông tin
+
+Từ Context839, trợ lý mới có `max_output_tokens=null` cho chế độ tự động.
+Để trống trường Token đầu ra trên giao diện để chọn chế độ này. Hội thoại và API
+tích hợp truyền lựa chọn đã lưu qua ModelOps. Giá trị đã lưu trước migration0012
+giữ nguyên. PUT không có trường token giữ giá trị cũ, còn null chọn tự động.
+Compiler, review, hỏi đáp trực tiếp và kiểm chứng câu trả lời cũng dùng tự động khi
+request để trống. Viết lại câu hỏi nối tiếp không còn tự gán 1.024 token. Ô token
+kiểm chứng để trống gửi null; các mức cũ được lưu trong policy vẫn giữ nguyên.
+
+Các biến môi trường COMPILER_MAX_OUTPUT_TOKENS, RAG_MAX_OUTPUT_TOKENS và
+CONVERSATION_REWRITE_MAX_OUTPUT_TOKENS giữ để đọc cấu hình triển khai cũ, không còn
+đặt trần cho request tự động mới. OCR ảnh cũ có OCR_MAX_OUTPUT_TOKENS tùy chọn;
+không đặt biến này thì dùng ngân sách ModelOps. Run cũ giữ số đã ghim. MinerU
+không dùng token LLM. Request chẩn đoán kết nối vẫn nhỏ có chủ đích, không phải
+giới hạn cho công việc thực tế. Số mặc định trong planner review chỉ phục vụ
+đọc kế hoạch cũ/helper; đường chạy mới truyền ngân sách đã phân giải.
+
+Lỗi HTTP 400/422 chỉ cho phép điều chỉnh một lần nếu provider từ chối rõ ngân
+sách đầu ra và trả mức thấp hơn hợp lệ, chưa có usage sinh được ghi nhận.
+Managed chat lưu quan sát tối đa 10 phút trong tiến trình theo provider,
+endpoint, model và dấu cấu hình. Giá trị quan sát không thay declaration.
+Request do người dùng chỉ định mức và policy giao retry cho gateway giữ hợp
+đồng riêng. Các trường token thực gửi và ngân sách đã đặt chỗ xuất hiện trong
+trace và audit. Quota vẫn bao phủ request trước khi gọi.
+
+Chỉ đọc trường lỗi có mã mức đầu ra cụ thể hoặc thông báo so sánh
+`max_tokens: requested > allowed` có đủ số và ý nghĩa rõ ràng. Các lỗi khác
+giữ nguyên mã lỗi. `finish_reason=length` báo phần đầu ra đã sinh bị cắt,
+được luồng tài liệu chia nhỏ khi có thể. Việc tăng ngân sách một câu trả lời
+đã sinh tốn thêm token cần một lượt đặt chỗ riêng, nên adapter không tự
+thử lại lỗi này. Phản hồi không có usage vẫn giữ trạng thái usage chưa biết.
 
 `token_limits`, `capacity_status` và `capacity_basis` vẫn mô tả khai báo đã lưu. Nếu chưa biết, `token_limits=null`, `capacity_status=unknown`. Chạy probe thành công không đổi thành capacity đã xác minh.
 
@@ -46,7 +77,7 @@ Phép tính đầu vào giữ cận UTF-8/framing hiện có, bao gồm schema c
 - Configuration hash ghi cả policy khi provisional. Hai lần resolve lúc chuẩn bị request phải khớp; tác vụ đã ghim không được đổi budget giữa chừng. Hash cho runtime đã khai báo đầy đủ giữ cơ chế cũ.
 - Giữ `resolve_workspace_access`, capability/grant, trạng thái nhà cung cấp/model, credential mã hóa, egress, quota và usage reservation/settlement. Không thêm `.env` runtime key hoặc tự tăng quota.
 - Trace runtime provisional chứa policy/nguồn hiệu lực, không chứa credential; quota vẫn được đặt chỗ trước gửi và chỉ quyết toán bằng usage quan sát. Timeout/unknown không được tính 0 hoặc gọi lại tự động.
-- HTTP400/422 từ server không mặc định là lỗi token. Lỗi từ chối upstream, output truncated, schema sai, 429 và timeout vẫn có luồng hiện có. Phiên này không thêm vòng lặp retry/regex học capacity hoặc đổi provider. Compiler refinement hiện có tiếp tục giữ giới hạn và lịch sử.
+- HTTP400/422 từ server không mặc định là lỗi token. Từ Context839, chỉ lỗi giới hạn output rõ ràng mới được điều chỉnh một lần theo hợp đồng ở trên. Output truncated, schema sai, 429 và timeout giữ luồng lỗi riêng; không đổi provider. Compiler refinement tiếp tục giữ giới hạn và lịch sử.
 - Không có thay đổi OCR/tokenizer native mới, registry model bên ngoài hoặc adapter mới cho giao thức chưa hỗ trợ. Embedding chưa biết dimension và OCR chưa biết cách tính ảnh vẫn cần kiểm tra riêng.
 
 ## Bài học từ llm_wiki và điểm điều chỉnh

@@ -68,6 +68,34 @@ def add(client, cid, name, caps, **extra):
     return r.json()
 
 
+def test_add_model_fetches_metadata_without_capacity_fields(client, setup):
+    cid, _, requests = setup
+    model = add(client, cid, "qwen3.8-27b-q4", ["chat"])
+    assert len(requests) == 1
+    assert model["capacity_basis"] == "server_reported"
+    assert model["token_limits"]["max_output_tokens"] == 16384
+    assert model["token_limits"]["context_window_tokens"] == 131072
+
+
+def test_unlisted_model_keeps_unknown_capacity_after_successful_discovery(client, setup):
+    cid, _, requests = setup
+    model = add(client, cid, "private-model", ["chat"])
+    assert len(requests) == 1
+    assert model["token_limits"] is None
+    assert model["operational_budgets"]["chat"]["status"] == "provisional"
+
+
+@pytest.mark.parametrize("status", [404, 503])
+def test_optional_discovery_failure_still_allows_manual_model_id(client, setup, status):
+    cid, _, _ = setup
+    app.dependency_overrides[get_diagnostic_client] = lambda: HttpProviderDiagnosticClient(
+        transport=httpx.MockTransport(lambda _: httpx.Response(status))
+    )
+    model = add(client, cid, "unlisted-chat", ["chat"])
+    assert model["token_limits"] is None
+    assert model["operational_budgets"]["chat"]["status"] == "provisional"
+
+
 def sync(client, cid, check, names):
     return client.post(
         API + f"/connections/{cid}/sync-capacity", json={"check_id": check, "model_names": names}

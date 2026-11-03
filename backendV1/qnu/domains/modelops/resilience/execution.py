@@ -5,6 +5,8 @@ the actual target, and ambiguous failures are returned without spending twice.
 """
 
 import asyncio
+import json
+import re
 import time
 import uuid
 from dataclasses import replace
@@ -15,7 +17,49 @@ from qnu.domains.modelops.resilience.key_pool import acquire, finish
 from qnu.domains.modelops.resilience.key_pool import renew as renew_key
 from qnu.platform.database import AsyncSessionFactory
 from qnu.platform.errors import AppException
+from qnu.platform.logging import get_logger
+from qnu.ports.chat_model import ChatResponseError
 from qnu.ports.provider_execution import ProviderFailure
+
+logger = get_logger(__name__)
+
+
+def _reported_output_limit(error: ChatResponseError, requested: int) -> int | None:
+    failure = error.provider_failure
+    if (
+        error.code != "chat_provider_rejected"
+        or failure is None
+        or failure.upstream_status not in (400, 422)
+        or error.usage_tokens not in (None, 0)
+    ):
+        return None
+    try:
+        payload = json.loads(error.raw_body)
+        detail = payload["error"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    if not isinstance(detail, dict):
+        return None
+    usage = payload.get("usage")
+    if isinstance(usage, dict) and any(
+        usage.get(field) not in (None, 0) for field in ("completion_tokens", "total_tokens")
+    ):
+        return None
+    limit = (
+        detail.get("max_output_tokens")
+        if detail.get("code") == "max_output_tokens_exceeded"
+        else None
+    )
+    message = detail.get("message")
+    if limit is None and isinstance(message, str):
+        match = re.search(
+            r"\bmax_tokens:\s*(\d{1,9})\s*>\s*(\d{1,9}),\s*which is the maximum allowed number of output tokens",
+            message,
+            re.IGNORECASE,
+        )
+        if match and int(match[1]) == requested:
+            limit = int(match[2])
+    return limit if type(limit) is int and 0 < limit < requested else None
 
 
 class CredentialExecutor:
@@ -27,13 +71,16 @@ class CredentialExecutor:
             async with chat_slot(request):
                 try:
                     async with asyncio.timeout(
-                        None if getattr(request, "wait_for_completion", False) else request.timeout_seconds
+                        None
+                        if getattr(request, "wait_for_completion", False)
+                        else request.timeout_seconds
                     ):
                         return await self._call(capability, request, invoke)
                 except TimeoutError as exc:
                     raise AppException(
                         "Hết thời gian gọi model; không tự gửi lại.",
-                        code="chat_provider_uncertain", status_code=504,
+                        code="chat_provider_uncertain",
+                        status_code=504,
                     ) from exc
         return await self._call(capability, request, invoke)
 
@@ -76,9 +123,18 @@ class CredentialExecutor:
                     if lease.key_id:
                         excluded.add(lease.key_id)
                     failure, success, code = None, False, "cancelled"
+                    budget_trace = {}
                     attempt_started, tokens = time.monotonic(), None
                     try:
-                        live_request = replace(request, api_key=lease.secret, timeout_seconds=remaining)
+                        live_request = replace(
+                            request, api_key=lease.secret, timeout_seconds=remaining
+                        )
+                        if (
+                            capability == "chat"
+                            and lease.policy.retry_owner != "qnu"
+                            and getattr(live_request, "automatic_output_budget", False)
+                        ):
+                            live_request = replace(live_request, automatic_output_budget=False)
                         if wait and lease.token:
 
                             async def renew(lease=lease, remaining=remaining):
@@ -90,6 +146,7 @@ class CredentialExecutor:
                         else:
                             result = await invoke(live_request)
                         success, code = True, "ok"
+                        budget_trace = getattr(result, "budget_trace", {})
                         tokens = getattr(
                             result, "total_tokens", getattr(result, "usage_tokens", None)
                         )
@@ -125,6 +182,7 @@ class CredentialExecutor:
                             tokens=tokens,
                             attempt=attempt,
                             attempt_started=attempt_started,
+                            budget_trace=budget_trace,
                         ):
                             async with sessions() as db:
                                 await finish(
@@ -139,6 +197,7 @@ class CredentialExecutor:
                                     attempt=attempt + 1,
                                     total_tokens=tokens,
                                     usage_id=request.execution.usage_id,
+                                    budget_trace=budget_trace,
                                 )
 
                         await asyncio.shield(release())
@@ -153,11 +212,45 @@ class CredentialExecutor:
 class ManagedChatModel:
     def __init__(self, adapter, executor=None):
         self.adapter, self.executor = adapter, executor or CredentialExecutor()
+        self._output_limits: dict[tuple[str, str, str, str | None], tuple[float, int]] = {}
 
     async def complete(self, messages, request):
-        return await self.executor.call(
-            "chat", request, lambda req: self.adapter.complete(messages, req)
-        )
+        recovered = False
+
+        async def invoke(req):
+            nonlocal recovered
+            if not getattr(req, "automatic_output_budget", False) or req.execution is None:
+                return await self.adapter.complete(messages, req)
+            key = (req.execution.provider_id, req.endpoint, req.model, req.budget_identity)
+            cached = self._output_limits.get(key)
+            if cached and cached[0] > time.monotonic():
+                req = replace(req, max_output_tokens=min(req.max_output_tokens, cached[1]))
+            try:
+                result = await self.adapter.complete(messages, req)
+            except ChatResponseError as exc:
+                limit = _reported_output_limit(exc, req.max_output_tokens)
+                if limit is None or recovered:
+                    raise
+                recovered = True
+                if len(self._output_limits) >= 256:
+                    self._output_limits.pop(next(iter(self._output_limits)))
+                self._output_limits[key] = (time.monotonic() + 600, limit)
+                logger.info("chat_output_limit_observed", provider_id=key[0], limit=limit)
+                req = replace(req, max_output_tokens=limit)
+                result = await self.adapter.complete(messages, req)
+            return replace(
+                result,
+                budget_trace={
+                    "mode": "automatic",
+                    "reserved_output_tokens": request.max_output_tokens,
+                    "sent_output_tokens": req.max_output_tokens,
+                    "observed_output_limit": req.max_output_tokens
+                    if req.max_output_tokens < request.max_output_tokens
+                    else None,
+                },
+            )
+
+        return await self.executor.call("chat", request, invoke)
 
 
 class ManagedOcrEngine:

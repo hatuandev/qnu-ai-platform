@@ -1,5 +1,15 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context839 — ModelOps tự động](nhat_ky/2026-11-03_phien_839_modelops_tu_dong.md).
+
+  FE741PASS; BE85trọngtâm+1OCRPASS; full1323PASS/2FAIL (DOCX nền, assertion
+  output cũ đã fix/kiểm riêng). Full vẫn FAIL; DB test dọn đủ, chưa migration
+  DB ứng dụng/restart/model thật/push.
+
+- [Context838 — Ngân sách tự động](nhat_ky/2026-11-03_phien_838_ngan_sach_tu_dong.md).
+
+- [Context837 — Rà soát phục hồi lỗi token](nhat_ky/2026-11-03_phien_837_ra_soat_token.md).
+
 - [Context836 — Ngân sách kiểm tra chính tả](nhat_ky/2026-11-03_phien_836_ngan_sach_chinh_ta.md).
 
 - **Context835 — Xem tệp gốc và đối chiếu OCR V1:** thêm chế độ `Xem tệp gốc` (`docx-preview` cho `.docx`, `react-pdf` kèm worker cục bộ cho `.pdf`) cùng khung trái với `Đối chiếu OCR`, mở được trước khi bóc tách hoặc khi bóc tách lỗi mà không gọi Gotenberg; tự chuyển về `Đối chiếu OCR` khi bấm định vị đoạn có `bbox`. 10/10 suites OCR (59/59 PASS), Biome 9 files/TS/build PASS. [Nhật ký835](nhat_ky/2026-11-03_phien_835_xem_tep_goc_va_doi_chieu_ocr.md), [Snapshot835](memory/snapshots/2026-11-03_session_835.md).

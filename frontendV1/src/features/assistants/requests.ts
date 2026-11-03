@@ -64,7 +64,7 @@ export function createAssistant(
       chat_provider_id: input.chat_provider_id ?? null,
       top_k: input.top_k ?? 5,
       history_turns: input.history_turns ?? 3,
-      max_output_tokens: input.max_output_tokens ?? 2048,
+      max_output_tokens: input.max_output_tokens ?? null,
       is_active: input.is_active ?? true,
       // Backend default when omitted; sending it explicitly keeps the payload
       // self-describing without upgrading an existing assistant.

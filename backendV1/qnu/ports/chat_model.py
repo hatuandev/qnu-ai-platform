@@ -41,6 +41,8 @@ class ChatRequest:
     reasoning: ReasoningParameter | None = field(default=None, repr=False)
     # Server-owned ModelOps policy; connection/write limits remain finite.
     wait_for_completion: bool = False
+    automatic_output_budget: bool = False
+    budget_identity: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +55,7 @@ class ChatResult:
     finish_reason: str | None = None
     total_tokens: int | None = None
     raw_body: bytes = field(default=b"", repr=False)
+    budget_trace: dict = field(default_factory=dict, repr=False)
 
 
 class ChatResponseError(AppException):

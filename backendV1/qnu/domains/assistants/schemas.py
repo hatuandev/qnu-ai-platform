@@ -14,7 +14,7 @@ class AssistantConfig(BaseModel):
     chat_provider_id: str | None = Field(None, min_length=1, max_length=64)
     top_k: int = Field(5, strict=True, ge=1, le=20)
     history_turns: int = Field(3, strict=True, ge=0, le=10)
-    max_output_tokens: int = Field(2048, strict=True, gt=0)
+    max_output_tokens: int | None = Field(None, strict=True, gt=0)
     is_active: bool = True
     rag_policy: RagPolicy = Field(default_factory=RagPolicy)
 

@@ -69,6 +69,8 @@ async def save_assistant(
     await load_collection(db, workspace_id, req.collection_id)
     if assistant_id:
         existing = await get_assistant(db, actor, workspace_id, assistant_id, write=True)
+        if "max_output_tokens" not in req.model_fields_set:
+            req = req.model_copy(update={"max_output_tokens": existing.max_output_tokens})
         if "rag_policy" not in req.model_fields_set:
             # Older FE clients cannot accidentally reset a policy they do not expose.
             try:

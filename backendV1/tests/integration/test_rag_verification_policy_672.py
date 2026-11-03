@@ -87,6 +87,8 @@ def test_verification_mode_controls_release_without_silently_rewriting(
     assert body["trace"]["verification"]["status"] == outcome
     assert body["trace"]["verification"]["total_tokens"] == 71
     assert len(ready["answer_chat"].requests) == 2
+    assert ready["answer_chat"].requests[-1]["body"]["max_tokens"] == 8192
+    assert body["trace"]["verification"]["output_budget"]["mode"] == "automatic"
     if status == "answered":
         assert "150" in body["answer"]
     else:

@@ -205,11 +205,11 @@ async def request_run(
     }
     payload = json_bytes(snapshot)
     schema = output_schema(documents) if req.structured_output else None
-    requested_output = req.max_output_tokens or get_settings().COMPILER_MAX_OUTPUT_TOKENS
+    requested_output = req.max_output_tokens
     provider_id = req.provider_id
     planned_runtime = None
     if req.max_output_tokens is None:
-        planned_runtime, ceiling = await prepare_chat_limits(
+        planned_runtime, _ = await prepare_chat_limits(
             db,
             actor,
             workspace_id,
@@ -217,7 +217,6 @@ async def request_run(
             task="compiler",
             max_output_tokens=None,
         )
-        requested_output = min(requested_output, ceiling.max_output_tokens)
         provider_id = planned_runtime.provider_id
     plans: list[split.SegmentPlan] = []
     try:
@@ -331,6 +330,7 @@ async def request_run(
             "reasoning": runtime.reasoning_trace("compiler"),
         },
         "max_output_tokens": budget.max_output_tokens,
+        "automatic_output_budget": req.max_output_tokens is None,
         "reasoning_directive": (
             reasoning_directive.public_dict() if reasoning_directive is not None else None
         ),

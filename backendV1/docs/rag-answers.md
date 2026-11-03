@@ -148,9 +148,10 @@ Response là `private, no-store`; không có semantic cache.
    footnote, không dùng kiến thức ngoài, không suy TopK là danh sách đầy đủ hoặc
    để model tự tính số liệu chính thức. Thiếu/mâu thuẫn căn cứ thì abstain.
 4. `prepare_chat_request` kiểm provider/capacity, text budget bảo thủ và max output.
-   Quota reserve qua ledger hiện có trước HTTP; không fallback/retry tự động.
-   `RAG_MAX_OUTPUT_TOKENS=2048` chỉ là budget mặc định của tác vụ; giới hạn thật vẫn
-   do ModelOps quyết định. Người gọi có thể chọn budget nhỏ hơn.
+   Quota reserve qua ledger hiện có trước HTTP. Khi không chỉ định output,
+   ModelOps tự chọn theo model và context còn lại; không áp RAG_MAX_OUTPUT_TOKENS.
+   Đầu ra tự động chỉ điều chỉnh một lần khi provider từ chối rõ mức tối đa;
+   timeout/quota/length không kích hoạt gửi lại mù. Xem [hợp đồng ngân sách](../../docs/quy_trinh/V1_MODELOPS_NGAN_SACH_TU_DONG.md).
 5. Sau reservation kiểm lại snapshot/provider, thả transaction lock trong lúc gọi
    chat. Trước khi trả kết quả kiểm lại quyền, active index, receipt, revision/hash,
    chunk/manifest và model. Thu hồi/thay đổi trong lúc inference loại câu trả lời,

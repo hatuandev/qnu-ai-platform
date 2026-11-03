@@ -1,6 +1,20 @@
 import { AlertCircle, FileText, Info, Loader2, RefreshCw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Component, type ReactNode, useEffect, useRef, useState } from "react";
+import { Document as PdfDocument, Page as PdfPage, pdfjs } from "react-pdf";
+import "react-pdf/dist/Page/TextLayer.css";
+import "react-pdf/dist/Page/AnnotationLayer.css";
 import { Button } from "@/components/ui/button";
+
+if (typeof window !== "undefined") {
+  try {
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+      "/pdf.worker.min.mjs",
+      window.location.origin,
+    ).toString();
+  } catch {
+    pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+  }
+}
 
 export type OriginalPreviewZoomMode = "fit-width" | "fit-page" | "custom";
 
@@ -294,25 +308,39 @@ export function DocxOriginalViewer({
   );
 }
 
-let pdfWorkerConfigured = false;
+interface PdfErrorBoundaryProps {
+  children: ReactNode;
+  fallback: (error: Error) => ReactNode;
+}
 
-function configurePdfWorker(pdfjs: {
-  GlobalWorkerOptions: { workerSrc: string };
-}) {
-  if (pdfWorkerConfigured) return;
-  pdfWorkerConfigured = true;
-  if (typeof window !== "undefined") {
-    try {
-      pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-        "/pdf.worker.min.mjs",
-        window.location.origin,
-      ).toString();
-      return;
-    } catch {
-      // fallback
-    }
+interface PdfErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class PdfViewerErrorBoundary extends Component<
+  PdfErrorBoundaryProps,
+  PdfErrorBoundaryState
+> {
+  constructor(props: PdfErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
   }
-  pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+
+  static getDerivedStateFromError(error: Error): PdfErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  override componentDidCatch(error: Error) {
+    console.warn("Lỗi dựng PDF gốc qua react-pdf:", error);
+  }
+
+  override render() {
+    if (this.state.hasError && this.state.error) {
+      return this.props.fallback(this.state.error);
+    }
+    return this.props.children;
+  }
 }
 
 export interface PdfOriginalViewerProps {
@@ -341,47 +369,18 @@ export function PdfOriginalViewer({
     width: number;
     height: number;
   }>({ width: 680, height: 820 });
-  const [pdfModule, setPdfModule] = useState<{
-    Document: typeof import("react-pdf")["Document"];
-    Page: typeof import("react-pdf")["Page"];
-  } | null>(null);
-  const [moduleError, setModuleError] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number | null>(null);
   const [docError, setDocError] = useState<string | null>(null);
 
-  // Lazy-load react-pdf and bundle worker only when PDF viewer is opened
+  // Reset state when switching revision or blobUrl (skipping initial mount)
+  const prevDocKeyRef = useRef<string>(`${revisionKey}:${blobUrl ?? ""}`);
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        await Promise.all([
-          import("react-pdf/dist/Page/TextLayer.css"),
-          import("react-pdf/dist/Page/AnnotationLayer.css"),
-        ]);
-        const mod = await import("react-pdf");
-        if (cancelled) return;
-        configurePdfWorker(mod.pdfjs);
-        setPdfModule({ Document: mod.Document, Page: mod.Page });
-      } catch (err: unknown) {
-        if (cancelled) return;
-        setModuleError(
-          err instanceof Error
-            ? err.message
-            : "Không thể nạp bộ đọc PDF (react-pdf).",
-        );
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Reset state when switching revision or blobUrl
-  useEffect(() => {
-    void revisionKey;
-    void blobUrl;
-    setNumPages(null);
-    setDocError(null);
+    const currentKey = `${revisionKey}:${blobUrl ?? ""}`;
+    if (prevDocKeyRef.current !== currentKey) {
+      prevDocKeyRef.current = currentKey;
+      setNumPages(null);
+      setDocError(null);
+    }
   }, [revisionKey, blobUrl]);
 
   // Observe viewport dimensions for fit-width / fit-page
@@ -426,34 +425,6 @@ export function PdfOriginalViewer({
         ? Math.round(baseFitWidth * (zoomPercent / 100))
         : baseFitWidth;
 
-  if (moduleError) {
-    return (
-      <div
-        role="alert"
-        className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center"
-      >
-        <AlertCircle className="h-8 w-8 text-destructive" />
-        <p className="text-sm font-medium text-foreground">
-          Không thể khởi tạo trình xem PDF gốc
-        </p>
-        <p className="text-xs text-muted-foreground">{moduleError}</p>
-      </div>
-    );
-  }
-
-  if (!pdfModule) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2.5 p-6 text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        <span className="text-xs font-medium">
-          Đang khởi tạo trình đọc PDF...
-        </span>
-      </div>
-    );
-  }
-
-  const { Document: PdfDocument, Page: PdfPage } = pdfModule;
-
   return (
     <div
       ref={viewportRef}
@@ -472,57 +443,72 @@ export function PdfOriginalViewer({
           <p className="text-xs text-muted-foreground">{docError}</p>
         </div>
       ) : (
-        <PdfDocument
-          key={`${revisionKey}:${blobUrl ?? ""}`}
-          file={blobUrl ?? blob}
-          onLoadSuccess={({ numPages: loadedPages }) => {
-            setNumPages(loadedPages);
-            setDocError(null);
-            onTotalPagesDetected?.(loadedPages);
-          }}
-          onLoadError={(err) => {
-            setDocError(
-              err instanceof Error
-                ? err.message
-                : "Tệp PDF gốc bị hỏng hoặc không đúng định dạng.",
-            );
-          }}
-          loading={
-            <div className="flex flex-col items-center justify-center gap-2.5 py-16 text-muted-foreground">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <span className="text-xs font-medium">
-                Đang tải tệp PDF gốc...
-              </span>
+        <PdfViewerErrorBoundary
+          fallback={(err) => (
+            <div
+              role="alert"
+              className="my-auto flex max-w-md flex-col items-center justify-center gap-2.5 rounded-lg border border-destructive/30 bg-background p-6 text-center shadow-xs"
+            >
+              <AlertCircle className="h-8 w-8 text-destructive" />
+              <p className="text-sm font-medium text-foreground">
+                Không thể hiển thị trang PDF gốc
+              </p>
+              <p className="text-xs text-muted-foreground">{err.message}</p>
             </div>
-          }
-          noData={
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
-              <FileText className="h-8 w-8 text-muted-foreground/50" />
-              <span className="text-xs">Chưa có dữ liệu tệp PDF gốc.</span>
-            </div>
-          }
-          className="mx-auto flex justify-center"
+          )}
         >
-          <div className="overflow-hidden rounded-sm bg-background shadow-sm ring-1 ring-border/60">
-            <PdfPage
-              pageNumber={clampedPage}
-              width={computedPageWidth}
-              renderTextLayer={true}
-              renderAnnotationLayer={false}
-              loading={
-                <div
-                  style={{ width: computedPageWidth, minHeight: 420 }}
-                  className="flex flex-col items-center justify-center gap-2 bg-background text-muted-foreground"
-                >
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                  <span className="text-xs">
-                    Đang hiển thị trang {clampedPage}...
-                  </span>
-                </div>
-              }
-            />
-          </div>
-        </PdfDocument>
+          <PdfDocument
+            key={`${revisionKey}:${blobUrl ?? ""}`}
+            file={blobUrl ?? blob}
+            onLoadSuccess={({ numPages: loadedPages }) => {
+              setNumPages(loadedPages);
+              setDocError(null);
+              onTotalPagesDetected?.(loadedPages);
+            }}
+            onLoadError={(err) => {
+              setDocError(
+                err instanceof Error
+                  ? err.message
+                  : "Tệp PDF gốc bị hỏng hoặc không đúng định dạng.",
+              );
+            }}
+            loading={
+              <div className="flex flex-col items-center justify-center gap-2.5 py-16 text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="text-xs font-medium">
+                  Đang tải tệp PDF gốc...
+                </span>
+              </div>
+            }
+            noData={
+              <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
+                <FileText className="h-8 w-8 text-muted-foreground/50" />
+                <span className="text-xs">Chưa có dữ liệu tệp PDF gốc.</span>
+              </div>
+            }
+            className="mx-auto flex justify-center"
+          >
+            <div className="overflow-hidden rounded-sm bg-background shadow-sm ring-1 ring-border/60">
+              <PdfPage
+                pageNumber={clampedPage}
+                width={computedPageWidth}
+                renderTextLayer={true}
+                renderAnnotationLayer={false}
+                loading={
+                  <div
+                    style={{ width: computedPageWidth, minHeight: 420 }}
+                    className="flex flex-col items-center justify-center gap-2 bg-background text-muted-foreground"
+                  >
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <span className="text-xs">
+                      Đang hiển thị trang {clampedPage}...
+                    </span>
+                  </div>
+                }
+              />
+            </div>
+          </PdfDocument>
+        </PdfViewerErrorBoundary>
       )}
     </div>
   );

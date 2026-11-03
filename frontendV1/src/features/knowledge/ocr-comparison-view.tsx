@@ -185,20 +185,34 @@ export function OcrComparisonView({
     run && run.status === "completed" ? "ocr" : !run ? "original" : "ocr",
   );
   const [detectedPdfPages, setDetectedPdfPages] = useState<number | null>(null);
+  const userChosenModeRef = useRef<boolean>(false);
 
-  // Sync default mode when revision or run availability changes
+  const handleSelectLeftPaneMode = (mode: LeftPaneViewerMode) => {
+    userChosenModeRef.current = true;
+    setLeftPaneMode(mode);
+  };
+
+  // Sync default mode when revision or run availability changes (respect user choice)
   const runId = run?.id ?? null;
   const runStatus = run?.status ?? null;
+  const prevSourceRevisionKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    void sourceId;
-    void revisionId;
-    setDetectedPdfPages(null);
-    if (!runId) {
-      setLeftPaneMode("original");
-    } else if (runStatus === "completed") {
-      setLeftPaneMode("ocr");
+    const currentKey = `${sourceId}:${revisionId}`;
+    if (prevSourceRevisionKeyRef.current !== currentKey) {
+      prevSourceRevisionKeyRef.current = currentKey;
+      userChosenModeRef.current = false;
+      setDetectedPdfPages(null);
+      if (!runId) {
+        setLeftPaneMode("original");
+      } else if (runStatus === "completed") {
+        setLeftPaneMode("ocr");
+      }
+    } else if (!userChosenModeRef.current) {
+      if (runStatus === "completed" && leftPaneMode !== "ocr") {
+        setLeftPaneMode("ocr");
+      }
     }
-  }, [sourceId, revisionId, runId, runStatus]);
+  }, [sourceId, revisionId, runId, runStatus, leftPaneMode]);
 
   // Zoom mode: "fit-width" (default 100% width), "fit-page" (trọn trang), "custom"
   const [zoomMode, setZoomMode] =
@@ -377,7 +391,7 @@ export function OcrComparisonView({
     prevLocateNonceRef.current = locateRequestNonce;
 
     if ((focusChangedToUnit || locateTriggered) && hasExtractedRun) {
-      setLeftPaneMode("ocr");
+      handleSelectLeftPaneMode("ocr");
     }
   }, [focusedEvidenceId, locateRequestNonce, hasExtractedRun]);
 
@@ -412,7 +426,7 @@ export function OcrComparisonView({
 
   const handleFocusUnitFromRightPane = (evidenceId: string | null) => {
     if (evidenceId && hasExtractedRun) {
-      setLeftPaneMode("ocr");
+      handleSelectLeftPaneMode("ocr");
     }
     onFocusUnit?.(evidenceId);
   };
@@ -950,7 +964,7 @@ export function OcrComparisonView({
                     aria-pressed={leftPaneMode === "ocr"}
                     data-testid="left-pane-mode-ocr"
                     className="h-6 px-2.5 text-xs font-medium gap-1.5"
-                    onClick={() => setLeftPaneMode("ocr")}
+                    onClick={() => handleSelectLeftPaneMode("ocr")}
                   >
                     <ScanSearch className="size-3.5 text-primary" />
                     <span>Đối chiếu OCR</span>
@@ -964,7 +978,7 @@ export function OcrComparisonView({
                     aria-pressed={leftPaneMode === "original"}
                     data-testid="left-pane-mode-original"
                     className="h-6 px-2.5 text-xs font-medium gap-1.5"
-                    onClick={() => setLeftPaneMode("original")}
+                    onClick={() => handleSelectLeftPaneMode("original")}
                   >
                     <Eye className="size-3.5 text-primary" />
                     <span>Xem tệp gốc</span>
@@ -1171,7 +1185,7 @@ export function OcrComparisonView({
                       size="sm"
                       variant="outline"
                       className="h-7 text-xs mt-1 gap-1.5"
-                      onClick={() => setLeftPaneMode("original")}
+                      onClick={() => handleSelectLeftPaneMode("original")}
                     >
                       <Eye className="size-3.5 text-primary" />
                       <span>Mở Xem tệp gốc</span>
@@ -1217,7 +1231,7 @@ export function OcrComparisonView({
                           size="sm"
                           variant="secondary"
                           className="h-7 text-xs gap-1"
-                          onClick={() => setLeftPaneMode("original")}
+                          onClick={() => handleSelectLeftPaneMode("original")}
                         >
                           <Eye className="size-3" />
                           <span>Xem tệp gốc</span>
@@ -1298,7 +1312,7 @@ export function OcrComparisonView({
                       size="sm"
                       variant="outline"
                       className="h-7 text-xs gap-1.5 mt-1"
-                      onClick={() => setLeftPaneMode("original")}
+                      onClick={() => handleSelectLeftPaneMode("original")}
                     >
                       <Eye className="size-3.5 text-primary" />
                       <span>Mở Xem tệp gốc</span>

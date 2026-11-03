@@ -33,6 +33,7 @@ export type DocumentSpellingReport = {
   version: number;
   sha256: string;
   batches: SpellingBatch[];
+  splitAttempts?: SpellingBatch[];
   finished: boolean;
 };
 export type DetectCall = (request: {
@@ -93,10 +94,15 @@ export async function checkWholeDocument(options: {
     version: doc.version,
     sha256: doc.canonical_sha256,
     batches: planSpellingBatches(doc, options.key),
+    splitAttempts: [],
     finished: false,
   };
   const publish = () =>
-    onUpdate({ ...report, batches: report.batches.map((b) => ({ ...b })) });
+    onUpdate({
+      ...report,
+      batches: report.batches.map((b) => ({ ...b })),
+      splitAttempts: [...(report.splitAttempts ?? [])],
+    });
   publish();
   const queue = [...report.batches];
   let next = 0;
@@ -190,6 +196,7 @@ export async function checkWholeDocument(options: {
           key: `${batch.key}:${index + 1}`,
           status: "pending",
         }));
+        report.splitAttempts?.push(batch);
         report.batches.splice(report.batches.indexOf(batch), 1, ...children);
         queue.push(...children);
       }

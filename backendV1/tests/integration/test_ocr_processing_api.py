@@ -194,7 +194,11 @@ def test_pdf_flow_produces_pinned_evidence(client: TestClient) -> None:
         assert fake.requests[0]["authorization"] == "Bearer nemotron-test-secret"
         assert fake.requests[0]["path"].endswith("/v1/chat/completions")
         assert fake.requests[0]["body"]["model"] == "nemotron-parse"
-        assert fake.requests[0]["body"]["max_tokens"] == 8192
+        assert canonical["limits"]["max_output_tokens"] is None
+        assert all(
+            request["body"]["max_tokens"] == provider["token_limits"]["max_output_tokens"]
+            for request in fake.requests
+        )
 
 
 def test_docx_table_keeps_spans_values_and_footnote(client: TestClient) -> None:

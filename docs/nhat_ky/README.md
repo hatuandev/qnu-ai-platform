@@ -1,5 +1,11 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên839 — ModelOps tự động](2026-11-03_phien_839_modelops_tu_dong.md).
+
+- [Phiên838 — Ngân sách tự động](2026-11-03_phien_838_ngan_sach_tu_dong.md).
+
+- [Phiên837 — Rà soát phục hồi lỗi token](2026-11-03_phien_837_ra_soat_token.md).
+
 - [Phiên836 — Ngân sách kiểm tra chính tả](2026-11-03_phien_836_ngan_sach_chinh_ta.md).
 
 - [Phiên835 — Xem tệp gốc và đối chiếu OCR V1](2026-11-03_phien_835_xem_tep_goc_va_doi_chieu_ocr.md): `docx-preview` & `react-pdf` trong khung trái cùng `Đối chiếu OCR`, mở được khi chưa bóc tách/lỗi, tự chuyển về OCR khi định vị `bbox`; 10 suites OCR (59/59 PASS), Biome/TS/build đạt.

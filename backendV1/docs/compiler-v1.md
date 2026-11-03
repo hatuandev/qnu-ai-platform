@@ -68,10 +68,10 @@ Body tạo job:
 ```
 
 `provider_id` bỏ trống thì chọn default chat của workspace. `max_output_tokens`
-bỏ trống thì dùng `COMPILER_MAX_OUTPUT_TOKENS` (mặc định workflow 8192); capacity
-thực lấy từ model đã chọn, không có trần model chung 8K. Đầu vào hiện gửi toàn bộ
-nguồn đã chọn trong **một request**, không crop hoặc tự chia/mất cấu trúc. Vượt
-ngân sách trả lỗi; bản này chưa có biên soạn nhiều vòng cho tài liệu quá dài.
+bỏ trống thì ModelOps tự chọn theo model và context còn lại, không áp trần
+COMPILER_MAX_OUTPUT_TOKENS. Planner chia theo cấu trúc khi tài liệu cần nhiều
+request, giữ nguồn và kết quả từng phần. Lỗi token xác định được chỉ chia lại
+phần lỗi. Xem [luồng tài liệu lớn](../../docs/quy_trinh/V1_COMPILER_TAI_LIEU_LON.md).
 
 POST mới trả 201 với `{run, created, dispatched}`. Cùng actor/workspace/key và
 nội dung trả 200 cùng run; key trùng nhưng nội dung khác trả 409. Key mới là yêu

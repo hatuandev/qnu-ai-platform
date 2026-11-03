@@ -46,7 +46,7 @@ class ProcessingConfig:
     dpi: int
     max_pages: int
     max_page_bytes: int
-    max_output_tokens: int
+    max_output_tokens: int | None
     prompt_version: str
     processor_version: str
     table_layout_version: str
@@ -116,7 +116,11 @@ def config_from_run(payload: dict) -> ProcessingConfig:
             dpi=int(renderer["dpi"]),
             max_pages=int(renderer["max_pages"]),
             max_page_bytes=int(limits["max_page_bytes"]),
-            max_output_tokens=int(limits["max_output_tokens"]),
+            max_output_tokens=(
+                int(limits["max_output_tokens"])
+                if limits["max_output_tokens"] is not None
+                else None
+            ),
             prompt_version=str(limits["prompt_version"]),
             processor_version=str(limits["processor_version"]),
             table_layout_version=str(limits["table_layout_version"]),

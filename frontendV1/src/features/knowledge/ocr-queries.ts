@@ -532,6 +532,7 @@ export function useDetectCheckMutation(
     Error,
     { body: DetectRequestInput; idempotencyKey: string }
   >({
+    retry: false,
     mutationFn: ({ body, idempotencyKey }) =>
       createDetectCheck(
         v1Client,

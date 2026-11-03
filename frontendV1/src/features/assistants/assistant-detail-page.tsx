@@ -550,7 +550,7 @@ export function AssistantDetailPage({
                   </div>
                 </div>
                 <Badge variant="secondary" className="font-mono text-xs">
-                  {assistant.max_output_tokens}
+                  {assistant.max_output_tokens ?? "Tự động"}
                 </Badge>
               </div>
 

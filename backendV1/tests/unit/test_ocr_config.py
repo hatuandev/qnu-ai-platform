@@ -27,9 +27,14 @@ BASE = ProcessingConfig(
 
 
 def test_fingerprint_is_stable_for_the_same_config() -> None:
-    current = processing_config(Settings(_env_file=None))
-    assert current == replace(BASE, table_layout_version="nemotron-tabular/v2")
-    assert current.fingerprint == processing_config(Settings(_env_file=None)).fingerprint
+    current = processing_config(Settings(_env_file=None, OCR_MAX_OUTPUT_TOKENS=None))
+    assert current == replace(
+        BASE, max_output_tokens=None, table_layout_version="nemotron-tabular/v2"
+    )
+    assert (
+        current.fingerprint
+        == processing_config(Settings(_env_file=None, OCR_MAX_OUTPUT_TOKENS=None)).fingerprint
+    )
     assert current.fingerprint != BASE.fingerprint
 
 
@@ -50,9 +55,11 @@ def test_fingerprint_changes_with_any_byte_shaping_setting(change: dict) -> None
     assert changed.fingerprint != BASE.fingerprint
 
 
-def test_payload_round_trips_through_a_stored_run() -> None:
-    payload = config_payload(BASE)
-    assert config_from_run(payload) == BASE
+@pytest.mark.parametrize("budget", [None, 8192])
+def test_payload_round_trips_through_a_stored_run(budget) -> None:
+    config = replace(BASE, max_output_tokens=budget)
+    payload = config_payload(config)
+    assert config_from_run(payload) == config
     assert payload["provider"] is None
 
 

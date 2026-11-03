@@ -46,7 +46,7 @@ class Assistant(Base):
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
     top_k: Mapped[int] = mapped_column(nullable=False, default=5)
     history_turns: Mapped[int] = mapped_column(nullable=False, default=3)
-    max_output_tokens: Mapped[int] = mapped_column(nullable=False, default=2048)
+    max_output_tokens: Mapped[int | None] = mapped_column(nullable=True)
     rag_policy: Mapped[dict] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
     )

@@ -70,7 +70,7 @@ export type RagPolicy = {
   context_max_bytes: number;
   verification_mode: VerificationMode;
   verification_provider_id: string | null;
-  verification_max_output_tokens: number;
+  verification_max_output_tokens: number | null;
 };
 
 /** Backend defaults: dense + no context expansion + verification off. */
@@ -84,7 +84,7 @@ export const DEFAULT_RAG_POLICY: RagPolicy = {
   context_max_bytes: 16000,
   verification_mode: "off",
   verification_provider_id: null,
-  verification_max_output_tokens: 2048,
+  verification_max_output_tokens: null,
 };
 
 export const RETRIEVAL_MODE_LABEL: Record<RetrievalMode, string> = {

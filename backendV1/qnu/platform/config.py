@@ -64,13 +64,13 @@ class Settings(BaseSettings):
     OCR_RENDER_DPI: int = Field(default=144, ge=72, le=300)
     OCR_MAX_PAGES: int = Field(default=300, ge=1, le=2000)
     OCR_MAX_PAGE_BYTES: int = Field(default=8 * 1024 * 1024, ge=65536)
-    # Workflow default, not a declaration of the selected model's output capacity.
-    OCR_MAX_OUTPUT_TOKENS: int = Field(default=8192, ge=1)
+    # Optional operator override for legacy image OCR; MinerU does not use LLM tokens.
+    OCR_MAX_OUTPUT_TOKENS: int | None = Field(default=None, ge=1)
     OCR_PAGE_TOKEN_BUDGET: int = Field(default=8192, ge=1, le=10**9)
     OCR_RUN_MAX_ATTEMPTS: int = Field(default=2, ge=1, le=5)
     OCR_LEASE_SECONDS: int = Field(default=900, ge=60)
     OCR_DISPATCH_ENABLED: bool = True
-    # Workflow request defaults; actual limits come from the selected ModelOps model.
+    # Retained for deployment compatibility; new compiler requests use ModelOps automatic budgets.
     COMPILER_MAX_OUTPUT_TOKENS: int = Field(default=8192, ge=1)
     COMPILER_LEASE_SECONDS: int = Field(default=900, ge=60)
     # Independent parts may overlap, but the provider is shared with every other
@@ -87,9 +87,11 @@ class Settings(BaseSettings):
     INDEX_MAX_CHUNKS: int = Field(default=20000, ge=1)
     INDEX_LEASE_SECONDS: int = Field(default=900, ge=60)
     INDEX_MAX_ATTEMPTS: int = Field(default=3, ge=1, le=10)
+    # Legacy environment option, no longer applied to automatic answers.
     RAG_MAX_OUTPUT_TOKENS: int = Field(default=2048, ge=1)
     CONVERSATION_TURN_LEASE_SECONDS: int = Field(default=900, ge=60)
     CONVERSATION_HISTORY_MAX_BYTES: int = Field(default=16000, ge=1024)
+    # Legacy environment option, no longer applied to automatic follow-up rewriting.
     CONVERSATION_REWRITE_MAX_OUTPUT_TOKENS: int = Field(default=1024, ge=1)
     # Ownership rule (docs/runtime-ownership.md): only one backend reconciles its own queue.
     OWN_RECONCILE: bool = True

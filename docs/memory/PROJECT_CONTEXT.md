@@ -7,6 +7,17 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-11-03 — Context839: Trợ lý tự động, discovery và thích ứng mức đầu ra.** [Nhật ký](../nhat_ky/2026-11-03_phien_839_modelops_tu_dong.md), [Snapshot](./snapshots/2026-11-03_session_839.md).
+
+  FE741PASS/build/TS/E2Etypecheck; BE85trọngtâm+1OCRPASS. FullBE1323PASS/2FAIL:
+  table-header DOCX nền và assertion output8192 cũ (đã sửa/kiểm riêng PASS).
+  Full vẫn FAIL; DB test đã dọn. Chưa migration DB ứng dụng do kết nối mặc định
+  lỗi xác thực; chưa gọi model thật/restart/push.
+
+- **2026-11-03 — Context838: Ngân sách tự động cho Compiler và hỏi đáp trực tiếp.** [Nhật ký](../nhat_ky/2026-11-03_phien_838_ngan_sach_tu_dong.md), [Snapshot](./snapshots/2026-11-03_session_838.md).
+
+- **2026-11-03 — Context837: Quy tắc token trong AGENTS.md và lịch sử chia nhóm OCR.** [Nhật ký](../nhat_ky/2026-11-03_phien_837_ra_soat_token.md), [Snapshot](./snapshots/2026-11-03_session_837.md).
+
 - **2026-11-03 — Context836: Ngân sách chính tả theo ModelOps, chia nhóm lỗi token.** [Nhật ký](../nhat_ky/2026-11-03_phien_836_ngan_sach_chinh_ta.md), [Snapshot](./snapshots/2026-11-03_session_836.md).
 
 - **2026-11-03 — Context835: Chế độ Xem tệp gốc (`docx-preview` & `react-pdf`) và làm mới bố cục đối chiếu 2 khung V1.** Tích hợp `Xem tệp gốc` chung khung trái với `Đối chiếu OCR` trên `SourceDetailPage` / `OcrComparisonView`; `.docx` render trực tiếp bằng `docx-preview` (tắt `renderAltChunks`, cô lập CSS `.qnu-docx-preview-scope`, chặn URL ngoài, cuộn độc lập kèm chú thích giới hạn ngắt trang, không gọi Gotenberg), `.pdf` mở bằng `react-pdf` kèm `pdf.worker.min.mjs` đóng gói cục bộ và lớp chữ chọn được. Mở được cả khi chưa bóc tách hoặc bóc tách lỗi; bấm định vị đoạn tự chuyển về `Đối chiếu OCR` và cuộn tới `bbox`. Kiểm chứng: 10/10 suites OCR (59/59 PASS), Biome 9 files/TS/build PASS. [Nhật ký835](../nhat_ky/2026-11-03_phien_835_xem_tep_goc_va_doi_chieu_ocr.md), [Snapshot835](./snapshots/2026-11-03_session_835.md).

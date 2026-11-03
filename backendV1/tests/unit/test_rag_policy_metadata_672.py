@@ -31,6 +31,8 @@ def annotation(target="paragraph:0:0", year=2024):
 
 def test_old_policy_is_compatible_and_new_policy_is_explicit():
     old = RagPolicy.model_validate({})
+    assert old.verification_max_output_tokens is None
+    assert RagPolicy(verification_max_output_tokens=32768).verification_max_output_tokens == 32768
     assert (
         old.retrieval_mode == "dense" and old.context_window == 0 and old.verification_mode == "off"
     )

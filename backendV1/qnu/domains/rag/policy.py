@@ -19,7 +19,7 @@ class RagPolicy(BaseModel):
     context_max_bytes: int = Field(16000, strict=True, ge=256, le=128000)
     verification_mode: Literal["off", "observe", "enforce"] = "off"
     verification_provider_id: str | None = Field(None, min_length=1, max_length=64)
-    verification_max_output_tokens: int = Field(2048, strict=True, ge=128, le=16000)
+    verification_max_output_tokens: int | None = Field(None, strict=True, gt=0)
 
     @model_validator(mode="after")
     def compatible(self):

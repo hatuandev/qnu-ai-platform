@@ -47,6 +47,9 @@ export default defineConfig(({ command, mode, isPreview }) => {
     resolve: {
       alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
     },
+    optimizeDeps: {
+      exclude: ["pdfjs-dist"],
+    },
     server: {
       host: "127.0.0.1",
       port: Number(env.FRONTEND_PORT || 3001),

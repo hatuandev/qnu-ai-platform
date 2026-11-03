@@ -83,6 +83,12 @@ export function DocumentSpellingReport({
             version: report.version,
             sha256: report.sha256,
             finished: report.finished,
+            split_attempts: report.splitAttempts?.map((b) => ({
+              page: b.page,
+              units: b.evidenceIds.length,
+              error_code: b.errorCode,
+              token_detail: b.tokenDetail,
+            })),
             batches: report.batches.map((b) => ({
               page: b.page,
               units: b.evidenceIds.length,
@@ -119,6 +125,11 @@ export function DocumentSpellingReport({
           {completed.length}/{report.batches.length} nhóm hoàn tất ·{" "}
           {suggestions} gợi ý sửa · {withheld} mục cần đối chiếu ảnh.
         </p>
+        {!!report.splitAttempts?.length && (
+          <p>
+            Đã chia nhỏ {report.splitAttempts.length} nhóm gặp giới hạn token.
+          </p>
+        )}
         {(issues.length > 0 || skipped.length > 0) && (
           <p className="text-warning">
             Chưa kiểm tra xong phạm vi đã chọn: {issues.length} nhóm lỗi/chưa

@@ -250,11 +250,23 @@ test("requesting an index generation carries a real idempotency key", async () =
 });
 
 test("the default RAG form round-trips to the backend-compatible default policy", () => {
+  expect(DEFAULT_RAG_POLICY_FORM.verification_max_output_tokens).toBeNull();
   const parsed = ragPolicyFormSchema.safeParse(DEFAULT_RAG_POLICY_FORM);
   expect(parsed.success).toBe(true);
   if (!parsed.success) return;
 
   expect(toRagPolicy(parsed.data)).toEqual(DEFAULT_RAG_POLICY);
+});
+
+test("verification output is automatic when blank and preserves a large explicit budget", () => {
+  for (const budget of [null, 32768]) {
+    const policy = {
+      ...DEFAULT_RAG_POLICY,
+      verification_max_output_tokens: budget,
+    };
+    const form = ragPolicyFormSchema.parse(toRagPolicyForm(policy));
+    expect(toRagPolicy(form).verification_max_output_tokens).toBe(budget);
+  }
 });
 
 test("a stored policy is never silently upgraded to hybrid or to the judge", () => {
