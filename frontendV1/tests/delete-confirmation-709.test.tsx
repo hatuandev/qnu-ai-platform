@@ -25,7 +25,13 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 let row: LifecycleAction;
-let mode: "ok" | "preview-error" | "network-once" | "stale" | "denied";
+let mode:
+  | "ok"
+  | "pending"
+  | "preview-error"
+  | "network-once"
+  | "stale"
+  | "denied";
 let previewCount: number;
 let accepted: { body: unknown; key: string | null }[];
 const clients: QueryClient[] = [];
@@ -114,15 +120,17 @@ beforeEach(() => {
           );
         row = {
           ...row,
-          status: "completed",
+          status: mode === "pending" ? "pending" : "completed",
           accepted_at: new Date().toISOString(),
           result:
             row.kind === "source"
-              ? {
-                  permanent: true,
-                  originals_retained: false,
-                  restore_available: false,
-                }
+              ? mode === "pending"
+                ? { permanent: true }
+                : {
+                    permanent: true,
+                    originals_retained: false,
+                    restore_available: false,
+                  }
               : null,
         };
       }
@@ -222,6 +230,37 @@ test("lost response retries the same deletion intent", async () => {
   fireEvent.click(retry);
   await waitFor(() => expect(accepted).toHaveLength(2));
   expect(accepted[1]).toEqual(accepted[0]);
+});
+
+test("accepted source deletion shows progress until the receipt completes", async () => {
+  mode = "pending";
+  const close = mount();
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Xóa vĩnh viễn" }));
+  await screen.findByText(/Đã nhận yêu cầu xóa/);
+  expect(screen.getByRole("button", { name: "Đang xóa…" })).toHaveProperty(
+    "disabled",
+    true,
+  );
+  expect(
+    screen.queryByRole("button", { name: "Thử lại cùng thao tác" }),
+  ).toBeNull();
+  expect(close).not.toHaveBeenCalled();
+
+  row = {
+    ...row,
+    status: "completed",
+    result: {
+      permanent: true,
+      originals_retained: false,
+      restore_available: false,
+    },
+  };
+  await act(async () => {
+    await clients.at(-1)?.invalidateQueries();
+  });
+  await waitFor(() => expect(close).toHaveBeenCalledOnce());
+  expect(accepted).toHaveLength(1);
 });
 
 test("a stale preview requires another explicit delete confirmation", async () => {

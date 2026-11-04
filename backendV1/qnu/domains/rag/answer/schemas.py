@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from qnu.domains.knowledge.index.schemas import SearchHit, SearchRequest
+from qnu.domains.rag.answer.coverage import CoverageReport, Requirement
 from qnu.domains.rag.policy import RagPolicy
 
 
@@ -68,6 +69,7 @@ class ModelAnswer(BaseModel):
     status: Literal["answered", "insufficient_evidence"]
     statements: list[Statement] = Field(max_length=20)
     lookups: list[CellSelection] = Field(default_factory=list, max_length=20)
+    assessment: list[Requirement] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def consistent_status(self) -> "ModelAnswer":
@@ -100,6 +102,7 @@ class AnswerTrace(BaseModel):
     grounding: dict = Field(default_factory=dict)
     contract: dict = Field(default_factory=dict)
     verification: dict = Field(default_factory=lambda: {"mode": "off", "status": "not_run"})
+    coverage: dict = Field(default_factory=dict)
 
 
 class AnswerResponse(BaseModel):
@@ -121,3 +124,4 @@ class AnswerResponse(BaseModel):
     index_run_id: str
     generation: int
     trace: AnswerTrace
+    coverage: CoverageReport | None = None

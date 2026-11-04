@@ -125,6 +125,11 @@ async def test_expansion_adds_all_cited_points_with_window_disabled(monkeypatch)
         context, "_eligible", AsyncMock(return_value=([SimpleNamespace(id="published")], None))
     )
     monkeypatch.setattr(context, "manifest", AsyncMock(return_value={}))
+    monkeypatch.setattr(
+        context,
+        "pinned_bundles",
+        AsyncMock(return_value={"version": SimpleNamespace(documents=[])}),
+    )
     validate_hits = AsyncMock(return_value=[hit(rows[i]) for i in (0, 2, 3)])
     monkeypatch.setattr(context, "_hits", validate_hits)
     expanded, trace = await context.expand_context(

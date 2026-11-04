@@ -33,6 +33,7 @@ def create_assistant(client, data):
 def test_assistant_binding_and_owned_conversation_are_persistent(client, ready):  # noqa: F811
     assistant = create_assistant(client, ready)
     assert assistant["max_output_tokens"] is None
+    assert assistant["rag_policy"]["context_window"] == 1
     base = f"{API}/workspaces/{ready['workspace']['id']}/conversations"
     response = client.post(base, json={"assistant_id": assistant["id"], "title": "Chỉ tiêu"})
     assert response.status_code == 201, response.text
@@ -53,18 +54,26 @@ def test_assistant_explicit_budget_is_preserved_until_cleared(client, ready):  #
         "collection_id": ready["collection"]["id"],
         "chat_provider_id": ready["chat_provider"]["id"],
         "max_output_tokens": 777,
+        "rag_policy": {"context_window": 0},
     }
     created = client.post(assistant_url(ready), json=body)
     assert created.status_code == 201, created.text
     assistant = created.json()
     path = assistant_url(ready) + "/" + assistant["id"]
     body.pop("max_output_tokens")
+    body.pop("rag_policy")
     updated = client.put(path, json={**body, "expected_revision": assistant["revision"]})
     assert updated.status_code == 200, updated.text
     assert updated.json()["max_output_tokens"] == 777
-    automatic = client.put(path, json={
-        **body, "max_output_tokens": None, "expected_revision": updated.json()["revision"],
-    })
+    assert updated.json()["rag_policy"]["context_window"] == 0
+    automatic = client.put(
+        path,
+        json={
+            **body,
+            "max_output_tokens": None,
+            "expected_revision": updated.json()["revision"],
+        },
+    )
     assert automatic.status_code == 200, automatic.text
     assert automatic.json()["max_output_tokens"] is None
 
@@ -82,10 +91,20 @@ def chat_session(client, ready):  # noqa: F811
     def respond(index):
         incoming = json.loads(fake.requests[index]["body"]["messages"][-1]["content"])
         if "previous_user_questions" in incoming:
+            if fake.mode == "http_error":
+                return 503, b'{"error":"unavailable"}'
+            route = getattr(fake, "intent_route", "knowledge")
+            previous = incoming["previous_user_questions"]
             value = {
-                "standalone_question": incoming["previous_user_questions"][-1]
-                + " "
-                + incoming["current_question"],
+                "route": route,
+                "answer": getattr(fake, "direct_answer", "Phản hồi từ model thử nghiệm.")
+                if route != "knowledge"
+                else None,
+                "standalone_question": getattr(
+                    fake,
+                    "standalone_override",
+                    (previous[-1] + " " if previous else "") + incoming["current_question"],
+                ),
                 "needs_clarification": fake.mode == "clarify",
             }
             if fake.mode == "rewrite_bad":
@@ -93,7 +112,10 @@ def chat_session(client, ready):  # noqa: F811
             return 200, json.dumps(
                 {
                     "choices": [
-                        {"message": {"content": json.dumps(value)}, "finish_reason": "stop"}
+                        {
+                            "message": {"content": json.dumps(value)},
+                            "finish_reason": "length" if fake.mode == "route_truncated" else "stop",
+                        }
                     ],
                     "usage": {"total_tokens": 80},
                 }
@@ -144,22 +166,110 @@ def test_saved_answer_replay_and_followup_use_new_evidence(client, chat_session)
     assert listing.headers["cache-control"] == "private, no-store"
 
 
-def test_greeting_replays_without_model_and_stays_out_of_retrieval_history(client, chat_session):
+def test_first_knowledge_turn_preserves_original_query_when_model_rewrites_it(client, chat_session):
+    chat_session["answer_chat"].standalone_override = "Chỉ tiêu là gì?"
+    question = "Cho tôi biết chỉ tiêu năm 2024"
+    response = send(client, chat_session, question)
+    assert response.status_code == 200, response.text
+    assert response.json()["resolved_question"] == question
+
+
+@pytest.mark.parametrize("route", ["greeting", "courtesy", "identity", "protected_request"])
+def test_social_reply_comes_from_model_once_and_stays_out_of_retrieval_history(
+    client, chat_session, route
+):
     data = chat_session
+    fake = data["answer_chat"]
+    fake.intent_route = route
+    fake.direct_answer = "Đây là lời đáp riêng do model sinh, không lấy từ câu mẫu."
     before = len(data["answer_chat"].requests)
+    embeddings_before = len(data["embedding"].requests)
     first = send(client, data, "Dạ, xin chào trợ lý ạ!")
     assert first.status_code == 200, first.text
     reply = first.json()
     assert reply["result"]["status"] == "direct_reply"
-    assert reply["result"]["route"] == "greeting"
-    assert data["assistant"]["name"] in reply["result"]["answer"]
+    assert reply["result"]["route"] == route
+    assert reply["result"]["answer"] == fake.direct_answer
+    trace = reply["rewrite_trace"]
+    assert trace["route"] == route and trace["total_tokens"] == 80
+    assert trace["provider_id"] == data["chat_provider"]["id"]
+    body = fake.requests[-1]["body"]
+    assert data["assistant"]["persona"] in body["messages"][0]["content"]
+    assert data["assistant"]["name"] in body["messages"][0]["content"]
+    assert body["response_format"]["type"] == "json_schema"
     assert send(client, data, "Dạ, xin chào trợ lý ạ!").json() == reply
-    assert len(data["answer_chat"].requests) == before
+    assert len(fake.requests) == before + 1
+    assert len(data["embedding"].requests) == embeddings_before
+    fake.intent_route = "knowledge"
     question = send(client, data, "Xin chào, chỉ tiêu trúng tuyển năm 2024?", seq=1, key="turn-two")
     assert question.status_code == 200, question.text
     assert question.json()["result"]["sources"]
     assert question.json()["history_turn_ids"] == []
-    assert len(data["answer_chat"].requests) == before + 1
+    assert len(fake.requests) == before + 3
+
+
+@pytest.mark.parametrize(
+    "mode,code",
+    [
+        ("http_error", "chat_provider_unavailable"),
+        ("rewrite_bad", "conversation_route_invalid"),
+        ("route_truncated", "chat_output_truncated"),
+    ],
+)
+def test_social_model_failure_is_reported_without_canned_reply_or_retry(
+    client, chat_session, mode, code
+):
+    fake = chat_session["answer_chat"]
+    fake.intent_route, fake.mode = "greeting", mode
+    response = send(client, chat_session, "Xin chào")
+    assert response.status_code >= 400, response.text
+    assert response.json()["code"] == code
+    assert len(fake.requests) == 1
+    turns = client.get(chat_session["conversation_url"] + "/turns").json()
+    assert turns[0]["status"] == "failed" and turns[0]["result"] is None
+    assert send(client, chat_session, "Xin chào").json()["code"] == "conversation_turn_failed"
+    assert len(fake.requests) == 1
+
+
+def test_social_call_uses_declared_reasoning_policy_and_records_paid_usage(client, chat_session):
+    from sqlalchemy import select
+
+    from qnu.domains.modelops.models import ModelUsageRecord
+    from qnu.platform.database import AsyncSessionFactory
+
+    data = chat_session
+    as_actor(PLATFORM)
+    configured = client.put(
+        f"{API}/modelops/providers/{data['chat_provider']['id']}/reasoning",
+        json={
+            "policy": {
+                "mode": "chat_template_kwarg",
+                "parameter": "enable_thinking",
+                "off_value": False,
+                "tasks": {"off": ["answer"]},
+                "verified": True,
+            }
+        },
+    )
+    assert configured.status_code == 200, configured.text
+    as_actor(EDITOR)
+    data["answer_chat"].intent_route = "greeting"
+    response = send(client, data, "Xin chào")
+    assert response.status_code == 200, response.text
+    turn = response.json()
+    assert turn["rewrite_trace"]["reasoning"]["value"] is False
+    assert data["answer_chat"].requests[0]["body"]["chat_template_kwargs"] == {
+        "enable_thinking": False,
+    }
+
+    async def ledger():
+        async with AsyncSessionFactory() as db:
+            row = await db.scalar(
+                select(ModelUsageRecord).where(ModelUsageRecord.request_id == "route:" + turn["id"])
+            )
+            return row.total_tokens, row.status
+
+    assert client.portal.call(ledger) == (80, "completed")
 
 
 def test_key_conflict_and_sequence_conflict_never_call_model(client, chat_session):
@@ -212,7 +322,7 @@ def test_old_source_content_is_hidden_after_withdrawal(client, chat_session):
     "mode,code",
     [
         ("clarify", "conversation_clarification_required"),
-        ("rewrite_bad", "conversation_rewrite_invalid"),
+        ("rewrite_bad", "conversation_route_invalid"),
     ],
 )
 def test_unclear_or_bad_rewrite_never_reaches_answer(client, chat_session, mode, code):
@@ -325,20 +435,24 @@ def test_expired_turn_becomes_uncertain_without_resend(client, chat_session):
         ("assistant", "conversation_assistant_changed"),
         ("archive", "conversation_archived"),
         ("membership", "workspace_not_found"),
+        ("provider", "chat_provider_changed"),
     ],
 )
+@pytest.mark.parametrize("intent", ["knowledge", "greeting"])
 def test_changes_during_generation_discard_persisted_answer(
-    client, chat_session, monkeypatch, change, code
+    client, chat_session, monkeypatch, change, code, intent
 ):
     from sqlalchemy import update
 
     from qnu.domains.assistants.models import Assistant
     from qnu.domains.conversations.models import Conversation
+    from qnu.domains.modelops.models import Provider
     from qnu.domains.workspaces.models import WorkspaceMember
     from qnu.main import app
     from qnu.platform.database import AsyncSessionFactory
 
     original = app.state.container.chat_model
+    chat_session["answer_chat"].intent_route = intent
 
     class ChangeDuringChat:
         async def complete(self, messages, request):
@@ -355,6 +469,12 @@ def test_changes_during_generation_discard_persisted_answer(
                         update(Conversation)
                         .where(Conversation.id == chat_session["conversation"]["id"])
                         .values(status="archived")
+                    )
+                elif change == "provider":
+                    await db.execute(
+                        update(Provider)
+                        .where(Provider.id == chat_session["chat_provider"]["id"])
+                        .values(model_name="changed-model")
                     )
                 else:
                     await db.execute(

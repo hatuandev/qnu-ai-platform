@@ -1,5 +1,17 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên868 — Cửa sổ ngữ cảnh của trợ lý mới](2026-11-04_phien_868_cua_so_ngu_canh_tro_ly_moi.md).
+- [Phiên867 — Truy xuất danh sách theo tiêu đề nguồn](2026-11-04_phien_867_truy_xuat_danh_sach_theo_muc.md).
+- [Phiên866 — Bỏ bản sao chữ của bảng khi lập chỉ mục](2026-11-04_phien_866_bo_ban_sao_bang_khoi_chi_muc.md).
+- [Phiên865 — Hiển thị tiến độ xóa nguồn](2026-11-04_phien_865_trang_thai_dang_xoa.md).
+- [Phiên864 — Xóa nguồn đã biên soạn](2026-11-04_phien_864_xoa_nguon_da_bien_soan.md).
+- [Phiên863 — Nhóm đọc Compiler và chỉ mục](2026-11-04_phien_863_nhom_doc_compiler_va_chi_muc.md).
+- [Phiên862 — Đối chiếu biên soạn nhanh](2026-11-04_phien_862_doi_chieu_bien_soan_nhanh.md).
+- [Phiên861 — Phạm vi đọc và độ bao quát RAG](2026-11-04_phien_861_pham_vi_va_do_phu_rag.md).
+- [Phiên860 — Hội thoại qua LLM](2026-11-04_phien_860_hoi_thoai_qua_llm.md).
+- [Phiên859 — Hiện tin nhắn ngay khi gửi](2026-11-03_phien_859_hien_tin_nhan_ngay.md).
+- [Phiên858 — Xác nhận xóa hội thoại](2026-11-03_phien_858_xac_nhan_xoa_hoi_thoai.md).
+- [Phiên857 — Menu hội thoại và kịch bản kiểm thử](2026-11-03_phien_857_menu_hoi_thoai.md).
 - [Phiên856 — Gom bằng chứng theo khoản](2026-11-03_phien_856_gom_bang_chung_rag.md).
 - [Phiên855 — Phân luồng hội thoại V1](2026-11-03_phien_855_phan_luong_hoi_thoai.md).
 - [Phiên854 — Biên soạn nhanh từ nguồn](2026-11-03_phien_854_bien_soan_nhanh.md).

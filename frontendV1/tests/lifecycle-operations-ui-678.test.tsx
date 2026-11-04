@@ -21,6 +21,7 @@ import {
   LifecycleReceipt,
   LifecycleReceiptView,
 } from "@/features/lifecycle/action-receipt";
+import { LifecycleActions } from "@/features/lifecycle/lifecycle-actions";
 import { ResourcesPage } from "@/features/lifecycle/resources-page";
 import type { LifecycleAction } from "@/features/lifecycle/types";
 import { OperationsPage } from "@/features/operations/operations-page";
@@ -314,6 +315,61 @@ async function preview() {
   fireEvent.click(screen.getByRole("button", { name: "Xem trước tác động" }));
   await screen.findByText("Bản gốc và bằng chứng OCR");
 }
+test.each(["active", "archived"])(
+  "conversation menu offers confirmed deletion for an %s conversation",
+  async (status) => {
+    action = {
+      ...action,
+      kind: "conversation",
+      resource_id: "chat",
+      action: "delete",
+    };
+    const onDeleted = vi.fn();
+    mount(
+      <LifecycleActions
+        workspaceId="w"
+        kind="conversation"
+        resourceId="chat"
+        label="Hội thoại kiểm thử"
+        ownedConversation
+        status={status}
+        compact
+        onRename={vi.fn()}
+        onDeleted={onDeleted}
+      />,
+    );
+    const trigger = screen.getByRole("button", {
+      name: "Thao tác vòng đời: Hội thoại kiểm thử",
+    });
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    expect(screen.getByRole("menuitem", { name: "Đổi tên" })).toBeTruthy();
+    expect(
+      screen.getByRole("menuitem", {
+        name: status === "active" ? "Lưu trữ" : "Khôi phục",
+      }),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Đưa vào thùng rác" }),
+    );
+    const confirm = await screen.findByRole("button", { name: "Xóa" });
+    await waitFor(() => expect(confirm.hasAttribute("disabled")).toBe(false));
+    expect(screen.queryByLabelText("Lý do")).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(postCalls).toHaveLength(1);
+    expect(onDeleted).not.toHaveBeenCalled();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
+    expect(postCalls[0].body).toMatchObject({
+      kind: "conversation",
+      resource_id: "chat",
+      action: "delete",
+      reason: "Yêu cầu đưa vào thùng rác từ giao diện.",
+    });
+    expect(
+      postCalls.filter((call) => call.path.endsWith("/lifecycle/actions")),
+    ).toHaveLength(1);
+  },
+);
 test("human acknowledgement is required after impact preview; confirmation uses exact server hash", async () => {
   mount(dialog());
   await preview();

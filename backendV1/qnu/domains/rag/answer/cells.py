@@ -238,7 +238,7 @@ def materialize(answer: ModelAnswer, sources: list[EvidenceSource], cells: dict)
         raise AppException(
             "Quá nhiều ý trong câu trả lời.", code="answer_response_invalid", status_code=502
         )
-    return ModelAnswer(status=answer.status, statements=statements)
+    return ModelAnswer(status=answer.status, statements=statements, assessment=answer.assessment)
 
 
 def prompt_catalog(cells: dict) -> dict:

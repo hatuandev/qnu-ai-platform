@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.api.dependencies import get_actor, get_db
 from qnu.domains.assistants import service
-from qnu.domains.assistants.schemas import AssistantConfig, AssistantResponse, AssistantUpdate
+from qnu.domains.assistants.schemas import AssistantCreate, AssistantResponse, AssistantUpdate
 from qnu.domains.identity.actor import AuthActor
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/assistants", tags=["Assistants"])
@@ -14,7 +14,7 @@ Actor = Annotated[AuthActor, Depends(get_actor)]
 
 
 @router.post("", response_model=AssistantResponse, status_code=201)
-async def create(workspace_id: str, body: AssistantConfig, db: DB, actor: Actor):
+async def create(workspace_id: str, body: AssistantCreate, db: DB, actor: Actor):
     return await service.save_assistant(db, actor, workspace_id, body)
 
 

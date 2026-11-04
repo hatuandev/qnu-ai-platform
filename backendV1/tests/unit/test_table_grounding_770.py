@@ -233,7 +233,7 @@ def test_ingestion_quality_and_dependencies_are_derived_not_source_rewrites():
     content, documents = fixture()
     original = copy.deepcopy((content, documents))
     chunks = build_chunks(content, documents, 1800)
-    assert CHUNKER_VERSION == "qnu.published-chunks/v3"
+    assert CHUNKER_VERSION == "qnu.published-chunks/v4"
     assert all(
         c.structure["reading_quality"]["status"] == "structured"
         for c in chunks

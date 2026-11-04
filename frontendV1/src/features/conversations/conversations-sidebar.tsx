@@ -1,45 +1,36 @@
 import { useNavigate } from "@tanstack/react-router";
 import {
-  Archive,
   ChevronLeft,
   ChevronRight,
   MessageSquare,
   MessageSquarePlus,
-  MoreVertical,
-  Pencil,
-  RotateCcw,
   Search,
 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
-import { ApiProblemError } from "@/app/api/v1";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LifecycleActions } from "@/features/lifecycle/lifecycle-actions";
 import { formatDateTimeValue } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import { ConversationCreateDialog } from "./conversation-create-dialog";
 import { ConversationRenameDialog } from "./conversation-rename-dialog";
-import { useConversationsQuery, useUpdateConversation } from "./queries";
-import { formatConversationError } from "./schemas";
+import { useConversationsQuery } from "./queries";
 import type { Conversation, ConversationStatus } from "./types";
 
 export function ConversationsSidebar({
   workspaceId,
   selectedConversationId,
   onSelectConversation,
+  onDeleteSelectedConversation,
+  hasActiveConversation = false,
 }: {
   workspaceId: string;
   selectedConversationId?: string;
   onSelectConversation?: (conversationId: string) => void;
+  onDeleteSelectedConversation?: () => void;
+  hasActiveConversation?: boolean;
 }) {
   const navigate = useNavigate();
   const [offset, setOffset] = useState(0);
@@ -62,11 +53,6 @@ export function ConversationsSidebar({
   const [createOpen, setCreateOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<Conversation | null>(null);
 
-  const updateMutation = useUpdateConversation(
-    workspaceId,
-    renameTarget?.id ?? "",
-  );
-
   // Client-side filtering of loaded conversations
   const filteredConversations = rawConversations.filter((c) => {
     if (statusFilter !== "all" && c.status !== statusFilter) return false;
@@ -87,33 +73,8 @@ export function ConversationsSidebar({
     }
   };
 
-  const handleToggleArchive = async (
-    e: React.MouseEvent,
-    conv: Conversation,
-  ) => {
-    e.stopPropagation();
-    const nextStatus = conv.status === "active" ? "archived" : "active";
-    try {
-      await updateMutation.mutateAsync({
-        title: conv.title,
-        status: nextStatus,
-      });
-      toast.success(
-        nextStatus === "archived"
-          ? "Đã lưu trữ cuộc trò chuyện"
-          : "Đã mở lại cuộc trò chuyện",
-      );
-    } catch (err) {
-      if (err instanceof ApiProblemError) {
-        toast.error(formatConversationError(err.code, err.message));
-      } else {
-        toast.error("Không thể thay đổi trạng thái hội thoại.");
-      }
-    }
-  };
-
   return (
-    <aside className="flex flex-col h-full bg-card border-r shrink-0 w-full sm:w-80 md:w-96 select-none">
+    <aside className="flex flex-col h-full bg-card shrink-0 w-full select-none">
       {/* Header & Create Button */}
       <div className="p-3.5 border-b space-y-3">
         <div className="flex items-center justify-between gap-2">
@@ -125,8 +86,9 @@ export function ConversationsSidebar({
           </div>
           <Button
             size="sm"
+            variant={hasActiveConversation ? "default" : "outline"}
             onClick={() => setCreateOpen(true)}
-            className="h-8 gap-1.5 text-xs"
+            className="h-8 gap-1.5 text-xs font-medium"
           >
             <MessageSquarePlus className="size-3.5" />
             <span>Mới</span>
@@ -258,46 +220,19 @@ export function ConversationsSidebar({
                   </div>
                 </button>
 
-                {/* Item action dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => e.stopPropagation()}
-                      className="size-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                    >
-                      <MoreVertical className="size-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="text-xs">
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setRenameTarget(conv);
-                      }}
-                    >
-                      <Pencil className="size-3.5 mr-2" />
-                      Đổi tên
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={(e) => handleToggleArchive(e, conv)}
-                    >
-                      {conv.status === "active" ? (
-                        <>
-                          <Archive className="size-3.5 mr-2" />
-                          Lưu trữ
-                        </>
-                      ) : (
-                        <>
-                          <RotateCcw className="size-3.5 mr-2" />
-                          Mở lại
-                        </>
-                      )}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <LifecycleActions
+                  workspaceId={workspaceId}
+                  kind="conversation"
+                  resourceId={conv.id}
+                  label={conv.title}
+                  status={conv.status}
+                  ownedConversation
+                  compact
+                  onRename={() => setRenameTarget(conv)}
+                  onDeleted={
+                    isSelected ? onDeleteSelectedConversation : undefined
+                  }
+                />
               </div>
             );
           })

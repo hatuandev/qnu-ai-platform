@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 from dataclasses import dataclass
 
 from sqlalchemy import func, select, update
@@ -42,6 +43,7 @@ from qnu.domains.knowledge.compilation.schemas import (
     CompilationSegmentProgress,
 )
 from qnu.domains.knowledge.policies.access import READ_ROLES, WRITE_ROLES, load_collection
+from qnu.domains.knowledge.source_sections import reading_groups
 from qnu.domains.lifecycle.guards import require_compilation_sources
 from qnu.domains.modelops.inference.service import (
     available_input_tokens,
@@ -556,6 +558,18 @@ async def read_result(
         if len(roots) == 1:
             return await read_segment(db, blob, roots[0], kind)
     return await read(db, blob, run, kind)
+
+
+async def read_draft_view(
+    db: AsyncSession, blob: BlobStore, run: CompilationRun
+) -> tuple[str, dict]:
+    _, payload = await read_result(db, blob, run, "draft_json")
+    snapshot, raw_input = await read(db, blob, run, "input_snapshot")
+    if snapshot.sha256 != run.input_sha256:
+        raise Conflict("Snapshot Compiler khác nguồn đã ghim.", code="compilation_source_mismatch")
+    content = json.loads(payload)
+    content["reading_groups"] = reading_groups(content, json.loads(raw_input)["documents"])
+    return hashlib.sha256(json_bytes(content)).hexdigest(), content
 
 
 async def progress(

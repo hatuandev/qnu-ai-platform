@@ -7,8 +7,6 @@ import {
   ChevronUp,
   Loader2,
   Lock,
-  MoreVertical,
-  Pencil,
   SendHorizontal,
   SlidersHorizontal,
   X,
@@ -25,13 +23,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAssistantQuery } from "@/features/assistants/queries";
@@ -98,6 +89,43 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
 
   // Update conversation mutation (rename / archive / unarchive)
   const sendTurnMutation = useSendTurn(workspaceId, conversationId);
+  const sendingRef = useRef(false);
+  const pendingSubmission = sendTurnMutation.isPending
+    ? sendTurnMutation.variables
+    : undefined;
+  const pendingInput = pendingSubmission?.input;
+  const submittedTurn = sendTurnMutation.data;
+  const awaitingHistory =
+    submittedTurn && !turns.some((turn) => turn.id === submittedTurn.id)
+      ? submittedTurn
+      : null;
+  const pendingTurn: TurnResponse | null =
+    pendingSubmission &&
+    pendingInput &&
+    !turns.some((turn) => turn.turn_no === pendingInput.expected_turn_no + 1)
+      ? {
+          id: pendingSubmission.idempotencyKey,
+          conversation_id: conversationId,
+          turn_no: pendingInput.expected_turn_no + 1,
+          question: pendingInput.question,
+          resolved_question: null,
+          metadata_filter: pendingInput.metadata_filter ?? undefined,
+          history_turn_ids: [],
+          status: "running",
+          error_code: null,
+          result: null,
+          rewrite_trace: null,
+          source_status: "current",
+          created_at: new Date(sendTurnMutation.submittedAt).toISOString(),
+          finished_at: null,
+        }
+      : null;
+  const visibleTurns = [
+    ...turns,
+    ...(awaitingHistory ? [awaitingHistory] : []),
+  ];
+  const visibleTurnCount = visibleTurns.length + Number(Boolean(pendingTurn));
+  const lastVisibleTurnId = pendingTurn?.id ?? visibleTurns.at(-1)?.id;
 
   // UI state
   const [renameOpen, setRenameOpen] = useState(false);
@@ -158,20 +186,21 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
   };
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTo({
-        top: scrollContainerRef.current.scrollHeight,
-        behavior,
-      });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    if (behavior === "auto") {
+      container.scrollTop = container.scrollHeight;
+    } else {
+      container.scrollTo({ top: container.scrollHeight, behavior });
     }
   }, []);
 
   // Scroll to bottom on initial load
   useEffect(() => {
-    if (turns.length > 0 && isNearBottomRef.current) {
+    if (lastVisibleTurnId && isNearBottomRef.current) {
       scrollToBottom("auto");
     }
-  }, [turns.length, scrollToBottom]);
+  }, [lastVisibleTurnId, scrollToBottom]);
 
   // Clean polling on unmount
   useEffect(() => {
@@ -185,7 +214,9 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
 
   // Poll running turn if any
   useEffect(() => {
-    const runningTurn = turns.find((t) => t.status === "running");
+    const runningTurn =
+      (awaitingHistory?.status === "running" ? awaitingHistory : null) ??
+      turns.find((t) => t.status === "running");
     if (runningTurn && runningTurn.id !== pollingTurnId) {
       setPollingTurnId(runningTurn.id);
 
@@ -233,6 +264,7 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
     sessionId,
     queryClient,
     pollingTurnId,
+    awaitingHistory,
   ]);
 
   // Handle send turn
@@ -242,7 +274,7 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
     expected_turn_no: number;
     metadata_filter: MetadataFilter | null;
   }) => {
-    if (!conversation) return;
+    if (!conversation || sendingRef.current) return;
     if (!overrideAttempt && hasFilterErrors) {
       setScopeOpen(true);
       toast.error("Hãy sửa năm trong phạm vi metadata trước khi gửi câu hỏi.");
@@ -296,9 +328,10 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
       setQuestion(""); // clear input box
     }
 
+    sendingRef.current = true;
     try {
       isNearBottomRef.current = true;
-      const newTurn = await sendTurnMutation.mutateAsync({
+      await sendTurnMutation.mutateAsync({
         input: {
           question: questionText,
           expected_turn_no: expectedTurnNo,
@@ -306,12 +339,6 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
         },
         idempotencyKey,
       });
-
-      // Check if immediate running turn
-      if (newTurn.status === "running") {
-        setPollingTurnId(newTurn.id);
-      }
-      scrollToBottom();
     } catch (err) {
       if (err instanceof ApiProblemError) {
         toast.error(formatConversationError(err.code, err.message));
@@ -335,6 +362,8 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
           "Không nhận được phản hồi từ máy chủ. Bạn có thể bấm Thử lại lượt hỏi này.",
         );
       }
+    } finally {
+      sendingRef.current = false;
     }
   };
 
@@ -458,6 +487,9 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
             label={conversation.title}
             status={conversation.status}
             ownedConversation
+            compact
+            onRename={() => setRenameOpen(true)}
+            onDeleted={onBack}
           />
           {turns
             .filter((turn) => turn.status === "running")
@@ -472,20 +504,6 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
                 ownedConversation
               />
             ))}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8">
-                <MoreVertical className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="text-xs">
-              <DropdownMenuItem onClick={() => setRenameOpen(true)}>
-                <Pencil className="size-3.5 mr-2" />
-                Đổi tên cuộc trò chuyện
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
 
@@ -496,14 +514,6 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
             <Lock className="size-3.5" />
             <span>Hội thoại đã lưu trữ (chế độ chỉ đọc).</span>
           </div>
-          <LifecycleActions
-            workspaceId={workspaceId}
-            kind="conversation"
-            resourceId={conversationId}
-            label={conversation.title}
-            status="archived"
-            ownedConversation
-          />
         </div>
       )}
 
@@ -553,7 +563,7 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
           </Alert>
         ) : turnsQuery.isPending ? (
           <Skeleton className="h-24 w-full" />
-        ) : turns.length === 0 ? (
+        ) : visibleTurnCount === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center p-6 space-y-3">
             <div className="size-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
               <Bot className="size-6" />
@@ -569,7 +579,7 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
             </div>
           </div>
         ) : (
-          turns.map((turn) => (
+          visibleTurns.map((turn) => (
             <ChatMessageItem
               key={turn.id}
               turn={turn}
@@ -577,6 +587,13 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
               onRetry={handleRetryLast}
             />
           ))
+        )}
+        {pendingTurn && (
+          <ChatMessageItem
+            turn={pendingTurn}
+            isSubmitting
+            onOpenCitation={handleOpenCitation}
+          />
         )}
       </div>
 

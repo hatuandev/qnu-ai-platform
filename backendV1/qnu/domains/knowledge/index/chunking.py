@@ -5,14 +5,17 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
+from qnu.domains.knowledge.compilation.schemas import DRAFT_PARAGRAPH_TEXT_LIMIT
 from qnu.domains.knowledge.index.table_dependencies import dependencies
 from qnu.domains.knowledge.index.table_layout import quality
 from qnu.domains.knowledge.metadata import chunk_metadata
+from qnu.domains.knowledge.source_sections import shared_section, source_sections
 from qnu.platform.errors import AppException
 
-CHUNKER_VERSION = "qnu.published-chunks/v3"
+CHUNKER_VERSION = "qnu.published-chunks/v5"
+READABLE_CHUNKER_VERSIONS = {"qnu.published-chunks/v3", "qnu.published-chunks/v4", CHUNKER_VERSION}
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,18 +145,56 @@ def _table_chunks(
     return chunks
 
 
+def _table_text_copies(tables: list[dict]) -> dict[str, set[str]]:
+    """Recognize literal copies of parsed rows, including split draft paragraphs."""
+    copies = {}
+    for entry in tables:
+        table = entry["table"]
+        if table["status"] != "parsed" or not table["rows"]:
+            continue
+        text = "\n".join(" | ".join(cell["text"] for cell in row) for row in table["rows"])
+        copies[entry["citation"]] = {
+            text[offset : offset + DRAFT_PARAGRAPH_TEXT_LIMIT]
+            for offset in range(0, len(text), DRAFT_PARAGRAPH_TEXT_LIMIT)
+        }
+    return copies
+
+
 def build_chunks(
     content: dict, documents: list[dict], maximum: int, annotations: list[dict] | None = None
 ) -> list[Chunk]:
     index = content["citations"]
     annotations = annotations or []
     relations = {ref: link for doc in documents for ref, link in dependencies(doc).items()}
+    source_outline = source_sections(documents)
+    source_copy = content.get("validation", {}).get("source_copy") == "retained"
+    table_copies = _table_text_copies(content["source_tables"])
     chunks = []
     for section_no, section in enumerate(content["sections"]):
-        prefix = content["title"] + "\n" + section["heading"] + "\n"
         for paragraph_no, paragraph in enumerate(section["paragraphs"]):
-            refs = {r: index[r] for r in paragraph["citations"]}
+            citations = paragraph["citations"]
+            refs = {r: index[r] for r in citations}
             target = f"paragraph:{section_no}:{paragraph_no}"
+            metadata = chunk_metadata(annotations, {target})
+            if (
+                len(citations) == 1
+                and paragraph["text"] in table_copies.get(citations[0], ())
+                and not any(item["target"] == target for item in metadata)
+            ):
+                continue
+            source = shared_section(citations, source_outline)
+            fallback = (
+                ""
+                if source_copy and section["heading"].startswith("Nguồn ")
+                else section["heading"]
+            )
+            heading = (source.heading if source else "") or fallback
+            prefix = f"{content['title']}\n{heading}\n"
+            if heading != fallback and any(
+                len((prefix + word).encode("utf-8")) > maximum
+                for word in re.findall(r"\S+\s*", paragraph["text"])
+            ):
+                prefix = f"{content['title']}\n{fallback}\n"
             chunks += [
                 Chunk(
                     "paragraph",
@@ -165,15 +206,21 @@ def build_chunks(
                             "position": paragraph_no,
                             "part": part,
                             "title": content["title"],
-                            "heading": section["heading"],
+                            "heading": heading,
+                            **(
+                                {"source_heading_citation": source.citation}
+                                if source and source.heading
+                                else {}
+                            ),
                         },
-                        "retrieval_metadata": chunk_metadata(annotations, {target}),
+                        "retrieval_metadata": metadata,
                     },
                 )
                 for part, t in enumerate(_split_text(prefix, paragraph["text"], maximum))
             ]
     for table in content["source_tables"]:
         fragments = _table_chunks(content["title"], table, documents, index, maximum)
+        source = source_outline.get(table["citation"])
         for part, fragment in enumerate(fragments):
             parent = "table:" + table["citation"]
             structure = fragment.structure
@@ -189,11 +236,18 @@ def build_chunks(
                 "part": 0,
                 "title": content["title"],
             }
+            if source and source.heading:
+                structure["context"].update(
+                    heading=source.heading, source_heading_citation=source.citation
+                )
+                prefix = source.heading + "\n"
+                if len((prefix + fragment.text).encode("utf-8")) <= maximum:
+                    fragment = replace(fragment, text=prefix + fragment.text)
             structure["retrieval_metadata"] = chunk_metadata(annotations, targets)
             structure["reading_quality"] = quality(structure)
             if table["citation"] in relations:
                 structure["source_dependencies"] = relations[table["citation"]]
-        chunks += fragments
+            chunks.append(fragment)
     if not chunks:
         raise AppException(
             "Bản xuất bản không có chunk.", code="index_chunks_empty", status_code=422

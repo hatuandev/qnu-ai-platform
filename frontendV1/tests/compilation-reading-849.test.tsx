@@ -38,6 +38,36 @@ test("sections render on expansion and pass the original citation identifier", (
   expect(select).toHaveBeenCalledExactlyOnceWith("original-2");
 });
 
+test("the source outline presents stored paragraphs without changing their citations", () => {
+  const select = vi.fn();
+  render(
+    <CompilationDraftSections
+      sections={[
+        {
+          heading: "Nguồn 1 · Phần 1",
+          paragraphs: [
+            { text: "Nội dung trang 1", citations: ["original-1"] },
+            { text: "Giá trị gốc", citations: ["original-2"] },
+          ],
+        },
+      ]}
+      readingGroups={[
+        { heading: "Trang 1", paragraphs: [[0, 0]] },
+        { heading: "Phụ lục", paragraphs: [[0, 1]] },
+      ]}
+      onSelectCitation={select}
+    />,
+  );
+  expect(screen.queryByText("Nguồn 1 · Phần 1")).toBeNull();
+  expect(screen.queryByText("Giá trị gốc")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Phụ lục" }));
+  expect(screen.getByText("Giá trị gốc")).toBeTruthy();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Xem dẫn chứng 1 của đoạn 2.1" }),
+  );
+  expect(select).toHaveBeenCalledExactlyOnceWith("original-2");
+});
+
 const tables = [
   {
     citation: "original-table",

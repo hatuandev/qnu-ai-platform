@@ -571,6 +571,7 @@ function CompilationDetailSession({
                 <CardContent className="p-4 sm:p-6 space-y-6 text-sm">
                   <CompilationDraftSections
                     sections={draft.sections}
+                    readingGroups={draft.reading_groups}
                     onSelectCitation={handleOpenCitation}
                   />
                 </CardContent>

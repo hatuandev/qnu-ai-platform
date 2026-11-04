@@ -69,4 +69,4 @@ def test_arbitrary_json_in_table_text_is_not_removed():
 
 
 def test_new_answer_contract_has_a_distinct_prompt_version():
-    assert PROMPT_VERSION == "qnu.rag.answer/v15"
+    assert PROMPT_VERSION == "qnu.rag.answer/v18"

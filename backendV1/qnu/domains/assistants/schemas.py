@@ -32,6 +32,14 @@ class AssistantConfig(BaseModel):
         return value.strip()
 
 
+class NewAssistantRagPolicy(RagPolicy):
+    context_window: int = Field(1, strict=True, ge=0, le=5)
+
+
+class AssistantCreate(AssistantConfig):
+    rag_policy: NewAssistantRagPolicy = Field(default_factory=NewAssistantRagPolicy)
+
+
 class AssistantUpdate(AssistantConfig):
     expected_revision: int = Field(strict=True, ge=1)
 

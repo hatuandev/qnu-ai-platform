@@ -3,7 +3,7 @@
 from pydantic import ValidationError
 
 from qnu.domains.knowledge.compilation.drafting import validated_draft
-from qnu.domains.knowledge.compilation.schemas import DraftContent
+from qnu.domains.knowledge.compilation.schemas import DRAFT_PARAGRAPH_TEXT_LIMIT, DraftContent
 from qnu.platform.errors import AppException
 
 
@@ -26,8 +26,11 @@ def build_source_draft(topic: str, documents: list[dict], run_id: str) -> dict:
                     text = f"Bảng nguồn tại trang {page['page_number']} (xem phần Bảng nguồn)."
                 if text.strip():
                     paragraphs.extend(
-                        {"text": text[offset : offset + 20000], "citations": [ref]}
-                        for offset in range(0, len(text), 20000)
+                        {
+                            "text": text[offset : offset + DRAFT_PARAGRAPH_TEXT_LIMIT],
+                            "citations": [ref],
+                        }
+                        for offset in range(0, len(text), DRAFT_PARAGRAPH_TEXT_LIMIT)
                     )
                     if block.get("requires_review"):
                         checks.append(

@@ -78,10 +78,11 @@ và `revision_unchanged`; thông báo không lộ ID nguồn nội bộ.
   tác vụ liên quan và chặn sử dụng nguồn; chưa tuyên bố xóa xong. Tác vụ đang chạy
   có khoảng chờ tối đa job hiện tại (1800 giây) trước khi dọn; reconciler hiện có
   gửi lại việc còn chờ mỗi 5 phút. Dùng cùng biên nhận/idempotency key để tiếp tục.
-  Raw/artifact hoàn tất muộn chỉ được nhận thêm nếu thuộc đúng run đã xác nhận;
-  không mở rộng sang nguồn, phiên bản hay tác vụ mới.
+  Chỉ nhận thêm tệp hoàn tất muộn thuộc đúng lượt hoặc nhóm xử lý đã xác nhận.
+  Nguồn, phiên bản và tác vụ mới cần một phạm vi xóa riêng.
 - Worker dọn toàn bộ revision của nguồn, raw OCR đã đăng ký, MD/JSON hậu OCR,
-  run/artifact Compiler/review phụ thuộc, kết quả hội thoại đã lưu có nguồn đó,
+  lượt Compiler/Review phụ thuộc, các bản nháp toàn phần hoặc một phần và tệp
+  kết quả của từng nhóm xử lý, kết quả hội thoại đã lưu có nguồn đó,
   chunk và đúng point vector liên quan. Bản nháp gộp nhiều nguồn cũng bị xóa nếu
   phụ thuộc nguồn này; giữ tệp nguồn khác và phiên bản không phụ thuộc.
 - Kho dữ liệu dạng S3/MinIO xóa cả version và delete marker của **đúng object key**.

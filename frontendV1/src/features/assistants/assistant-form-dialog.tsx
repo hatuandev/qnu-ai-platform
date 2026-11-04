@@ -63,6 +63,7 @@ import { ConsumerModelBudgetNotice } from "@/features/modelops/capacity-badge";
 import { useCatalogQuery } from "@/features/modelops/queries";
 import { toRagPolicy, toRagPolicyForm } from "@/features/rag/schemas";
 import {
+  NEW_ASSISTANT_RAG_POLICY,
   RETRIEVAL_MODE_LABEL,
   type RetrievalMode,
   VERIFICATION_MODE_LABEL,
@@ -133,7 +134,9 @@ export function AssistantFormDialog({
       history_turns: assistant?.history_turns ?? 3,
       max_output_tokens: assistant?.max_output_tokens ?? null,
       is_active: assistant?.is_active ?? true,
-      rag_policy: toRagPolicyForm(assistant?.rag_policy),
+      rag_policy: toRagPolicyForm(
+        assistant ? assistant.rag_policy : NEW_ASSISTANT_RAG_POLICY,
+      ),
       expected_revision: assistant?.revision ?? 1,
     },
     validators: {
@@ -222,7 +225,9 @@ export function AssistantFormDialog({
         history_turns: assistant?.history_turns ?? 3,
         max_output_tokens: assistant?.max_output_tokens ?? null,
         is_active: assistant?.is_active ?? true,
-        rag_policy: toRagPolicyForm(assistant?.rag_policy),
+        rag_policy: toRagPolicyForm(
+          assistant ? assistant.rag_policy : NEW_ASSISTANT_RAG_POLICY,
+        ),
         expected_revision: assistant?.revision ?? 1,
       });
     }
@@ -784,10 +789,9 @@ export function AssistantFormDialog({
 
                   <CollapsibleContent className="pt-4 space-y-4">
                     <p className="text-[11px] leading-relaxed text-muted-foreground">
-                      Mặc định giữ tương thích backend: dense, không mở rộng ngữ
-                      cảnh, không kiểm chứng. Thay đổi ở đây làm tăng revision
-                      và chỉ áp dụng cho hội thoại mới; hội thoại đang chạy giữ
-                      nguyên snapshot cũ.
+                      Trợ lý mới mặc định dùng Dense, lấy thêm tối đa 1 đoạn
+                      liền kề mỗi phía và tắt kiểm chứng. Thay đổi cấu hình chỉ
+                      áp dụng cho hội thoại mới.
                     </p>
 
                     <form.Field name="rag_policy.scope_resolution">
@@ -1064,8 +1068,8 @@ export function AssistantFormDialog({
                                 className="text-xs"
                               />
                               <FieldDescription className="text-[11px]">
-                                Số chunk kề cùng tài liệu lấy thêm sau rerank
-                                (0–5). 0 giữ hành vi cũ.
+                                Số đoạn liền kề mỗi phía (0–5). Chọn 0 để tắt
+                                lấy thêm đoạn liền kề.
                               </FieldDescription>
                               {error ? <FieldError>{error}</FieldError> : null}
                             </Field>

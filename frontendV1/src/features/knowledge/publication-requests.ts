@@ -136,6 +136,7 @@ export async function getCompiledVersionDraft(
     versionId,
   );
   return client.get<DraftDocumentResponse>(path, {
+    searchParams: { group_by_source: true },
     signal: options?.signal,
   });
 }

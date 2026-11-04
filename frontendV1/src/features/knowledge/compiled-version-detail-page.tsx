@@ -14,7 +14,6 @@ import {
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
-  Tag,
 } from "lucide-react";
 import { useState } from "react";
 import { ApiProblemError } from "@/app/api/v1";
@@ -44,6 +43,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { formatDateTimeValue } from "@/lib/date-utils";
 import { CitationDrawer } from "./citation-drawer";
+import { CompilationDraftSections } from "./compilation-draft-sections";
 import type { CitationDetail } from "./compilation-types";
 import { DecisionConfirmDialog } from "./decision-confirm-dialog";
 import { useIndexRunsQuery, useRequestIndexMutation } from "./index-queries";
@@ -597,44 +597,11 @@ export function CompiledVersionDetailPage({
                 </CardHeader>
 
                 <CardContent className="p-4 sm:p-6 space-y-6 text-sm">
-                  {draft.sections.map((sec, sIdx) => (
-                    <div
-                      // biome-ignore lint/suspicious/noArrayIndexKey: ordered document structure
-                      key={sIdx}
-                      className="space-y-3"
-                    >
-                      <h2 className="text-sm sm:text-base font-bold text-foreground border-b pb-1.5">
-                        {sec.heading}
-                      </h2>
-                      <div className="space-y-3">
-                        {sec.paragraphs.map((p, pIdx) => (
-                          <div
-                            // biome-ignore lint/suspicious/noArrayIndexKey: ordered document structure
-                            key={pIdx}
-                            className="text-xs sm:text-sm text-foreground/90 leading-relaxed font-sans"
-                          >
-                            <span>{p.text}</span>
-                            {p.citations && p.citations.length > 0 && (
-                              <span className="inline-flex flex-wrap gap-1 ml-1.5 align-baseline">
-                                {p.citations.map((cId) => (
-                                  <button
-                                    key={cId}
-                                    type="button"
-                                    onClick={() => handleOpenCitation(cId)}
-                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20 cursor-pointer"
-                                    title="Xem chi tiết bằng chứng nguồn"
-                                  >
-                                    <Tag className="size-2.5" />
-                                    <span>[{cId}]</span>
-                                  </button>
-                                ))}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                  <CompilationDraftSections
+                    sections={draft.sections}
+                    readingGroups={draft.reading_groups}
+                    onSelectCitation={handleOpenCitation}
+                  />
                 </CardContent>
               </Card>
 
@@ -673,7 +640,11 @@ export function CompiledVersionDetailPage({
 
         {/* Tab 2: Literal Tables */}
         <TabsContent value="tables" className="space-y-4 m-0">
-          <SourceTablesView tables={draft?.source_tables ?? []} />
+          <SourceTablesView
+            tables={draft?.source_tables ?? []}
+            onSelectCitation={handleOpenCitation}
+            deferContent
+          />
         </TabsContent>
       </Tabs>
 

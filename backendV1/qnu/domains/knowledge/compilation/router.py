@@ -83,6 +83,7 @@ async def compilation_draft(
     run_id: str,
     response: Response,
     partial: bool = Query(False),
+    group_by_source: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(get_actor),
     blob: BlobStore = Depends(get_blob_store),
@@ -94,6 +95,10 @@ async def compilation_draft(
         response.headers.update({"ETag": f'"{sha256}"', "Cache-Control": "private, no-store"})
         return json.loads(payload)
     run = await service.get_run(db, actor, workspace_id, collection_id, run_id)
+    if group_by_source:
+        sha, content = await service.read_draft_view(db, blob, run)
+        response.headers.update({"ETag": f'"{sha}"', "Cache-Control": "private, no-store"})
+        return content
     artifact, payload = await service.read_result(db, blob, run, "draft_json")
     response.headers.update({"ETag": f'"{artifact.sha256}"', "Cache-Control": "private, no-store"})
     return json.loads(payload)

@@ -76,6 +76,7 @@ export async function getCompilationDraft(
 ): Promise<DraftDocumentResponse> {
   const path = compilationPaths.draft(workspaceId, collectionId, runId);
   return client.get<DraftDocumentResponse>(path, {
+    searchParams: { group_by_source: true },
     signal: options?.signal,
   });
 }

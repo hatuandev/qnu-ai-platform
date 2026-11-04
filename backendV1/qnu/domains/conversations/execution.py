@@ -7,8 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.domains.conversations.access import checkpoint
 from qnu.domains.conversations.history import readable
 from qnu.domains.conversations.models import ConversationTurn
-from qnu.domains.conversations.rewriting import resolve_question
-from qnu.domains.conversations.routing import direct_reply
+from qnu.domains.conversations.rewriting import resolve_turn
 from qnu.domains.conversations.schemas import TurnRequest, TurnResponse
 from qnu.domains.conversations.service import reserve_turn
 from qnu.domains.identity.actor import AuthActor
@@ -62,9 +61,8 @@ async def send(
         async def check():
             await checkpoint(db, actor, turn)
 
-        reply = direct_reply(turn.question, config["name"], turn.id)
+        reply, provider_id = await resolve_turn(db, actor, conversation, turn, chat)
         if reply is None:
-            query, provider_id = await resolve_question(db, actor, conversation, turn, chat)
             policy = RagPolicy.model_validate(config.get("rag_policy", {})).model_dump(mode="json")
             policy["metadata_filter"] = turn.metadata_filter or {}
             result = await answer(
@@ -84,7 +82,7 @@ async def send(
                     max_output_tokens=config["max_output_tokens"],
                     **policy,
                 ),
-                retrieval_query=query,
+                retrieval_query=turn.resolved_question,
                 persona=config["persona"],
                 checkpoint=check,
                 reranker=reranker,

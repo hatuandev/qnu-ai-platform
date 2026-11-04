@@ -2,6 +2,7 @@ import {
   Archive,
   MoreHorizontal,
   Pause,
+  Pencil,
   Play,
   RotateCcw,
   Trash2,
@@ -15,6 +16,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LifecycleActionDialog } from "./action-dialog";
@@ -36,6 +38,9 @@ type Props = {
   status?: string;
   isActive?: boolean;
   jobKind?: CancellableJobKind;
+  compact?: boolean;
+  onRename?: () => void;
+  onDeleted?: () => void;
 };
 export function LifecycleActions(props: Props) {
   const { sessionId } = useSyncExternalStore(
@@ -67,6 +72,9 @@ function ActionMenu(props: Props) {
     status,
     isActive,
     jobKind,
+    compact,
+    onRename,
+    onDeleted,
   } = props;
   const choices: LifecycleOperation[] =
     status === "archived" || status === "deleted"
@@ -85,7 +93,7 @@ function ActionMenu(props: Props) {
       turn: jobKind === "turn",
     }),
   );
-  if (!allowed.length) return null;
+  if (!allowed.length && !onRename) return null;
   const icons = {
     archive: Archive,
     delete: Trash2,
@@ -101,16 +109,25 @@ function ActionMenu(props: Props) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
-            size="sm"
-            variant="outline"
+            size={compact ? "icon" : "sm"}
+            variant={compact ? "ghost" : "outline"}
             aria-label={`Thao tác vòng đời: ${label}`}
-            className="gap-1.5"
+            className={compact ? "size-7 shrink-0" : "gap-1.5"}
           >
             <MoreHorizontal className="size-3.5" />
-            Quản lý
+            {!compact && "Quản lý"}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {onRename && (
+            <>
+              <DropdownMenuItem onSelect={onRename}>
+                <Pencil className="size-4" />
+                Đổi tên
+              </DropdownMenuItem>
+              {allowed.length > 0 && <DropdownMenuSeparator />}
+            </>
+          )}
           {allowed.map((action) => {
             const Icon = icons[action];
             return (
@@ -137,6 +154,10 @@ function ActionMenu(props: Props) {
             ...(jobKind ? { job_kind: jobKind } : {}),
           }}
           onClose={() => setSelected(null)}
+          onCompleted={(action) => {
+            setSelected(null);
+            if (action.action === "delete") onDeleted?.();
+          }}
         />
       ) : null}
     </>

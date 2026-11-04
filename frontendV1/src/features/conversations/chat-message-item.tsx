@@ -14,6 +14,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AnswerCoverageNotice } from "@/features/rag/answer-coverage";
 import {
   describeAnswerReason,
   describeMetadataFilter,
@@ -33,10 +34,12 @@ export function ChatMessageItem({
   turn,
   onOpenCitation,
   onRetry,
+  isSubmitting = false,
 }: {
   turn: TurnResponse;
   onOpenCitation: (statement: Statement, turn: TurnResponse) => void;
   onRetry?: (turn: TurnResponse) => void;
+  isSubmitting?: boolean;
 }) {
   const isRunning = turn.status === "running";
   const isFailed = turn.status === "failed";
@@ -62,10 +65,9 @@ export function ChatMessageItem({
 
   const openEvidenceById = (evidenceId: string) => {
     if (!result) return;
-    const statement =
-      result.statements.find((item) =>
-        item.evidence_ids.includes(evidenceId),
-      ) ?? result.statements[0];
+    const statement = result.statements.find((item) =>
+      item.evidence_ids.includes(evidenceId),
+    );
     const source = result.sources.find(
       (item) => item.evidence_id === evidenceId,
     );
@@ -134,10 +136,15 @@ export function ChatMessageItem({
 
           {/* Running State: Honest spinner, NO fake typing */}
           {isRunning && (
-            <div className="flex items-center gap-2.5 p-4 rounded-xl border bg-muted/20 text-xs text-muted-foreground animate-pulse">
+            <div
+              role="status"
+              className="flex items-center gap-2.5 p-4 rounded-xl border bg-muted/20 text-xs text-muted-foreground animate-pulse"
+            >
               <Loader2 className="size-4 animate-spin text-primary" />
               <span>
-                Trợ lý đang tìm kiếm tài liệu và tổng hợp câu trả lời...
+                {isSubmitting
+                  ? "Đang chờ trợ lý phản hồi…"
+                  : "Trợ lý đang tìm kiếm tài liệu và tổng hợp câu trả lời..."}
               </span>
             </div>
           )}
@@ -232,6 +239,15 @@ export function ChatMessageItem({
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     {describeAnswerReason(result.reason)}
                   </p>
+                  <AnswerCoverageNotice
+                    coverage={result.coverage}
+                    onOpenSources={(ids) =>
+                      onOpenCitation(
+                        { text: "Phần nguồn cần đối chiếu", evidence_ids: ids },
+                        turn,
+                      )
+                    }
+                  />
                 </div>
 
                 <VerificationPanel
@@ -296,6 +312,16 @@ export function ChatMessageItem({
                       </div>
                     ))}
                   </div>
+
+                  <AnswerCoverageNotice
+                    coverage={result.coverage}
+                    onOpenSources={(ids) =>
+                      onOpenCitation(
+                        { text: "Phần nguồn cần đối chiếu", evidence_ids: ids },
+                        turn,
+                      )
+                    }
+                  />
 
                   {/* Summary / Trace footer */}
                   {trace && (

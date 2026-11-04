@@ -146,9 +146,17 @@ async def version_draft(
     db: DB,
     actor: Actor,
     blob: Blob,
+    group_by_source: bool = False,
 ) -> dict:
     sha, content = await reading.read_version_draft(
-        db, blob, actor, workspace_id, collection_id, document_id, version_id
+        db,
+        blob,
+        actor,
+        workspace_id,
+        collection_id,
+        document_id,
+        version_id,
+        group_by_source=group_by_source,
     )
     response.headers.update({"ETag": f'"{sha}"', "Cache-Control": "private, no-store"})
     return content

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.publication.access import active_version, authorize, document, version
-from qnu.domains.knowledge.publication.evidence import assert_pinned, load_bundle
+from qnu.domains.knowledge.publication.evidence import assert_pinned, digest, load_bundle
 from qnu.domains.knowledge.publication.models import PublicationDecision
 from qnu.domains.knowledge.publication.schemas import (
     DecisionResponse,
@@ -15,6 +15,7 @@ from qnu.domains.knowledge.publication.schemas import (
     PublishedResponse,
     VersionResponse,
 )
+from qnu.domains.knowledge.source_sections import reading_groups
 from qnu.platform.errors import Conflict, EntityNotFound
 from qnu.ports.blob_store import BlobStore
 
@@ -79,10 +80,18 @@ async def read_version_draft(
     collection_id: str,
     document_id: str,
     version_id: str,
+    *,
+    group_by_source: bool = False,
 ) -> tuple[str, dict]:
     await authorize(db, actor, workspace_id, collection_id)
     doc = await document(db, workspace_id, collection_id, document_id)
     target = await version(db, doc, version_id)
     bundle = await load_bundle(db, blob, workspace_id, collection_id, target.compilation_run_id)
     assert_pinned(target, bundle)
+    if group_by_source:
+        content = {
+            **bundle.content,
+            "reading_groups": reading_groups(bundle.content, bundle.documents),
+        }
+        return digest(content), content
     return target.draft_sha256, bundle.content

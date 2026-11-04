@@ -19,6 +19,8 @@ from qnu.domains.modelops.usage.service import usage_service
 from qnu.domains.rag.answer.cells import PROJECTION_VERSION, catalog, materialize
 from qnu.domains.rag.answer.cells import VERSION as CELLS_VERSION
 from qnu.domains.rag.answer.context import expand_context
+from qnu.domains.rag.answer.coverage import VERSION as COVERAGE_VERSION
+from qnu.domains.rag.answer.coverage import assess, plan_for, referenced_ids
 from qnu.domains.rag.answer.drafting import (
     PROMPT_VERSION,
     messages_for,
@@ -58,12 +60,19 @@ def _pack_messages(req, sources, context, **options):
             sources,
             table_context=context.get("table_links"),
             table_cells=cells,
+            answer_plan=plan_for(sources, context),
             **options,
         )
         envelope = json.loads(messages[-1].content)
         evidence = {
             key: envelope[key]
-            for key in ("evidence", "table_cells", "table_context", "narrative_context")
+            for key in (
+                "evidence",
+                "table_cells",
+                "table_context",
+                "narrative_context",
+                "answer_plan",
+            )
             if key in envelope
         }
         size = len(json.dumps(evidence, ensure_ascii=False, separators=(",", ":")).encode())
@@ -131,8 +140,9 @@ async def answer(
         trace=trace,
     )
     context_started = time.monotonic()
+    bundles = {}
     retrieval, trace.context = await expand_context(
-        db, blob, actor, workspace_id, collection_id, retrieval, req
+        db, blob, actor, workspace_id, collection_id, retrieval, req, bundles=bundles
     )
     trace.stage_ms["context"] = round((time.monotonic() - context_started) * 1000, 3)
     if not retrieval.hits:
@@ -140,7 +150,7 @@ async def answer(
         trace.verification["skip_reason"] = "no_evidence"
         return response
     sources = sources_for(retrieval)
-    await attach_source_text(db, blob, workspace_id, collection_id, sources)
+    await attach_source_text(db, blob, workspace_id, collection_id, sources, bundles=bundles)
     messages, cells, envelope, evidence_bytes, skipped = _pack_messages(
         req,
         sources,
@@ -256,6 +266,7 @@ async def answer(
     try:
         proposed = parse_answer(result.content, sources)
         draft = materialize(proposed, sources, cells)
+        coverage = assess(draft, sources, trace.context)
     except AppException as exc:
         await record_workspace_event(
             db,
@@ -282,6 +293,7 @@ async def answer(
         await db.commit()
         raise
     trace.grounding["selected_cells"] = [item.cell_id for item in proposed.lookups]
+    trace.coverage = {"version": COVERAGE_VERSION, **coverage.model_dump()}
     trace.grounding["narrative_supports"] = continuation_supports(sources)
     trace.grounding["projection"] = {
         "version": PROJECTION_VERSION,
@@ -323,9 +335,10 @@ async def answer(
         trace.stage_ms["verification"] = trace.verification["ms"]
         await safety_check()
     response.status, response.statements = draft.status, draft.statements
+    response.coverage = coverage
+    visible = referenced_ids(draft, coverage)
+    response.sources = [s for s in sources if s.evidence_id in visible]
     if draft.status == "answered":
-        used = {e for s in draft.statements for e in s.evidence_ids}
-        response.sources = [s for s in sources if s.evidence_id in used]
         response.answer = "\n\n".join(
             s.text + " " + " ".join(f"[{e}]" for e in s.evidence_ids) for s in draft.statements
         )
@@ -337,6 +350,8 @@ async def answer(
                 else "answer_verification_uncertain"
             )
             response.answer, response.statements = None, []
+            response.coverage = coverage.model_copy(update={"status": "insufficient"})
+            trace.coverage["status"] = "insufficient"
     else:
         response.reason = "model_abstained"
         trace.verification["skip_reason"] = "model_abstained"

@@ -188,6 +188,59 @@ def test_cancelled_call_can_retain_raw_within_approved_run_but_not_add_versions(
     assert caught.value.code == "purge_dependency_changed"
 
 
+@pytest.mark.parametrize(
+    ("artifact_table", "parent_table"),
+    [
+        ("kb_compilation_segment_artifacts", "kb_compilation_segments"),
+        ("kb_compilation_review_segment_artifacts", "kb_compilation_review_segments"),
+    ],
+)
+def test_cancelled_segment_artifacts_stay_within_approved_parts(artifact_table, parent_table):
+    parent = {parent_table: {("part",): {"id": "part"}}}
+    plan = graph_plan(parent)
+    raw = {
+        "id": "raw",
+        "segment_id": "part",
+        "blob_key": "v1/workspaces/w/segments/raw",
+        "sha256": "hash",
+    }
+    graph = {**parent, artifact_table: {("raw",): raw}}
+    settled = purge._settled_plan(plan, graph)
+    assert settled["objects"][raw["blob_key"]] == "hash"
+    with pytest.raises(Conflict) as caught:
+        purge._settled_plan(
+            plan, {**parent, artifact_table: {("raw",): {**raw, "segment_id": "other"}}}
+        )
+    assert caught.value.code == "purge_scope_invalid"
+    with pytest.raises(Conflict) as caught:
+        purge._settled_plan(plan, {parent_table: {("new-part",): {"id": "new-part"}}})
+    assert caught.value.code == "purge_dependency_changed"
+
+
+def test_partial_output_pairs_are_purged_with_their_approved_compiler_run():
+    parent = {"kb_compilation_runs": {("run",): {"id": "run"}}}
+    plan = graph_plan(parent)
+    output = {
+        "id": "out",
+        "run_id": "run",
+        "draft_blob_key": "v1/workspaces/w/outputs/out/draft.json",
+        "draft_sha256": "draft-hash",
+        "markdown_blob_key": "v1/workspaces/w/outputs/out/markdown.md",
+        "markdown_sha256": "markdown-hash",
+    }
+    graph = {**parent, "kb_compilation_outputs": {("out",): output}}
+    settled = purge._settled_plan(plan, graph)
+    assert settled["objects"] == {
+        output["draft_blob_key"]: "draft-hash",
+        output["markdown_blob_key"]: "markdown-hash",
+    }
+    with pytest.raises(Conflict) as caught:
+        purge._settled_plan(
+            plan, {**parent, "kb_compilation_outputs": {("out",): {**output, "run_id": "other"}}}
+        )
+    assert caught.value.code == "purge_scope_invalid"
+
+
 @pytest.mark.asyncio
 async def test_s3_purge_removes_versions_and_markers_only_for_exact_key():
     from qnu.adapters.storage.s3 import S3BlobStore

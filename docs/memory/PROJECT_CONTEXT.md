@@ -7,6 +7,28 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-11-04 — Context868 — Cửa sổ ngữ cảnh của trợ lý mới.** Form và API tạo trợ lý dùng `context_window=1` khi không chọn giá trị. Giá trị tường minh và chính sách của hội thoại đã lưu được bảo toàn. [Nhật ký](../nhat_ky/2026-11-04_phien_868_cua_so_ngu_canh_tro_ly_moi.md), [Snapshot](./snapshots/2026-11-04_session_868.md).
+
+- **2026-11-04 — Context867 — Truy xuất danh sách theo tiêu đề nguồn.** Lượt đầu giữ câu gốc, RAG mở rộng danh sách gạch đầu dòng theo mục có dẫn chứng và giữ dòng nối liên trang. PASS 49 unit và 6 ca tích hợp. Phát lại bước gom dẫn chứng trên chỉ mục thật có đủ các mục. [Nhật ký](../nhat_ky/2026-11-04_phien_867_truy_xuat_danh_sach_theo_muc.md), [Snapshot](./snapshots/2026-11-04_session_867.md).
+
+- **2026-11-04 — Context866 — Bỏ bản sao chữ của bảng khi lập chỉ mục.** Chỉ mục v5 giữ bảng có cấu trúc và loại đoạn sao nguyên văn theo đúng dẫn chứng. Đối chiếu cùng bản nháp thật giảm 174 xuống 161 đoạn văn, giữ đủ 56 đoạn bảng. [Nhật ký](../nhat_ky/2026-11-04_phien_866_bo_ban_sao_bang_khoi_chi_muc.md), [Snapshot](./snapshots/2026-11-04_session_866.md).
+
+- **2026-11-04 — Context865 — Hiển thị tiến độ xóa nguồn.** Hộp thoại hiện Đang xóa… trong lúc chờ biên nhận và tự đóng khi hoàn tất. PASS 39 ca frontend. [Nhật ký](../nhat_ky/2026-11-04_phien_865_trang_thai_dang_xoa.md), [Snapshot](./snapshots/2026-11-04_session_865.md).
+
+- **2026-11-04 — Context864 — Xóa nguồn đã biên soạn.** Sửa đồ thị xóa bỏ sót bản nháp và nhóm Compiler/Review. Nguồn được báo qua kiểm tra đồ thị chỉ đọc, kiểm thử xóa chạy trên DB riêng. [Nhật ký](../nhat_ky/2026-11-04_phien_864_xoa_nguon_da_bien_soan.md), [Snapshot](./snapshots/2026-11-04_session_864.md).
+
+- **2026-11-04 — Context863 — Nhóm đọc Compiler và chỉ mục.** Hai chế độ dùng chung nhóm đọc từ nguồn đã ghim. Chỉ mục v4 gắn tiêu đề nguồn. BGE-M3 thật tìm đúng ô trong top 3 cho ba ca trên cả hai bản. [Nhật ký](../nhat_ky/2026-11-04_phien_863_nhom_doc_compiler_va_chi_muc.md), [Snapshot](./snapshots/2026-11-04_session_863.md).
+
+- **2026-11-04 — Context862 — Đối chiếu biên soạn nhanh.** Kiểm tra app V1 local đạt. Lượt nhanh cùng bản nguồn hoàn tất trong 0,85 giây, giữ 171 khối chữ và 13 bảng. [Nhật ký](../nhat_ky/2026-11-04_phien_862_doi_chieu_bien_soan_nhanh.md), [Snapshot](./snapshots/2026-11-04_session_862.md).
+
+- **2026-11-04 — Context861: Phạm vi đọc và độ bao quát RAG.** Nhận diện điều/mục/danh sách theo nguồn đã ghim; báo `coverage` và phần chưa trả lời, UI mở nguồn cần đối chiếu. Promptv17, không tự retry/đổi policy/reindex. Qwen thật còn một câu rộng trả thiếu, đã báo partial; không tuyên bố hoàn chỉnh mọi câu. [Nhật ký](../nhat_ky/2026-11-04_phien_861_pham_vi_va_do_phu_rag.md), [Snapshot](./snapshots/2026-11-04_session_861.md).
+- **2026-11-04 — Context860: Hội thoại qua LLM.** Mọi lượt mới gọi model để phân loại/làm rõ câu hỏi hoặc tự viết lời đáp giao tiếp. Bỏ regex/câu mẫu, áp dụng chính sách answer của ModelOps. Qwen thật cohort cuối 6/6 đúng route, suy luận tắt. Full backend chưa hoàn tất. [Nhật ký](../nhat_ky/2026-11-04_phien_860_hoi_thoai_qua_llm.md), [Snapshot](./snapshots/2026-11-04_session_860.md).
+- **2026-11-03 — Context859: Hiện tin nhắn ngay khi gửi.** Khung chat hiển thị tin tạm trong lúc chờ và đồng bộ với lượt thật khi API phản hồi. [Nhật ký](../nhat_ky/2026-11-03_phien_859_hien_tin_nhan_ngay.md), [Snapshot](./snapshots/2026-11-03_session_859.md).
+
+- **2026-11-03 — Context858: Xác nhận xóa hội thoại.** UI dùng lý do audit mặc định và chỉ yêu cầu người dùng xác nhận xóa. [Nhật ký](../nhat_ky/2026-11-03_phien_858_xac_nhan_xoa_hoi_thoai.md), [Snapshot](./snapshots/2026-11-03_session_858.md).
+
+- **2026-11-03 — Context857: Menu hội thoại.** Sidebar và khung chat dùng chung thao tác vòng đời với đúng ID hội thoại và luồng xác nhận hiện có. [Nhật ký](../nhat_ky/2026-11-03_phien_857_menu_hoi_thoai.md), [Snapshot](./snapshots/2026-11-03_session_857.md).
+
 - **2026-11-03 — Context856: RAG gom bằng chứng theo khoản.** Dãy điểm có dẫn chứng liền nhau trong cùng trang được gom qua ranh giới phần, với kiểm tra phạm vi và ngân sách. [Nhật ký](../nhat_ky/2026-11-03_phien_856_gom_bang_chung_rag.md), [Snapshot](./snapshots/2026-11-03_session_856.md).
 
 - **2026-11-03 — Context855: Phân luồng hội thoại V1.** Lời chào, cảm ơn, giới thiệu trợ lý và yêu cầu nhạy cảm rõ ràng được xử lý trước RAG, có lưu lịch sử. [Nhật ký](../nhat_ky/2026-11-03_phien_855_phan_luong_hoi_thoai.md), [Snapshot](./snapshots/2026-11-03_session_855.md).

@@ -23,27 +23,37 @@ def passages(source, documents):
     return result
 
 
-async def attach_source_text(db, blob, workspace_id, collection_id, sources):
+async def pinned_bundles(db, blob, workspace_id, collection_id, sources, bundles=None):
+    """Request-local cache only; every bundle still uses the published snapshot checks."""
+    bundles = bundles if bundles is not None else {}
+    for source in sources:
+        if source.version_id in bundles:
+            continue
+        version = await db.get(CompiledVersion, source.version_id)
+        if version is None or version.document_id != source.document_id:
+            raise Conflict("Nguồn đã thay đổi.", code="answer_evidence_changed")
+        bundle = await load_bundle(
+            db,
+            blob,
+            workspace_id,
+            collection_id,
+            version.compilation_run_id,
+            require_current=True,
+            serving=True,
+        )
+        assert_pinned(version, bundle)
+        bundles[source.version_id] = bundle
+    return bundles
+
+
+async def attach_source_text(db, blob, workspace_id, collection_id, sources, *, bundles=None):
     # Caller has authorized and validated the retrieved snapshot. No arbitrary
     # page neighbors: only block IDs already cited by the published chunk.
-    bundles = {}
+    bundles = await pinned_bundles(
+        db, blob, workspace_id, collection_id, [s for s in sources if s.kind != "table"], bundles
+    )
     for source in sources:
         if source.kind == "table":
             continue
-        if source.version_id not in bundles:
-            version = await db.get(CompiledVersion, source.version_id)
-            if version is None or version.document_id != source.document_id:
-                raise Conflict("Nguồn đã thay đổi.", code="answer_evidence_changed")
-            bundle = await load_bundle(
-                db,
-                blob,
-                workspace_id,
-                collection_id,
-                version.compilation_run_id,
-                require_current=True,
-                serving=True,
-            )
-            assert_pinned(version, bundle)
-            bundles[source.version_id] = bundle
         source.source_passages = passages(source, bundles[source.version_id].documents)
     return sources

@@ -27,5 +27,10 @@ Backend dựng bản nháp nguyên văn có dẫn chứng, giữ bảng và các
 Lượt này không tự tạo Review AI. Người dùng có thể yêu cầu Review thủ công
 và tiếp tục qua quy trình xác nhận, duyệt và phát hành hiện hành.
 
+Màn hình đọc của cả hai chế độ dùng cùng nhóm mở/đóng. Nhóm lấy tiêu đề từ
+nguồn đã ghim hoặc dùng số trang khi thiếu tiêu đề rõ ràng. Đoạn tổng hợp
+dẫn từ nhiều mục giữ tiêu đề biên soạn. Nhóm đọc là dữ liệu hiển thị riêng,
+còn bản lưu, tệp tải xuống, dẫn chứng và vị trí chỉnh sửa lấy từ bản nháp gốc.
+
 [API và cách tích hợp](../../backendV1/docs/compiler-review.md) ·
 [Báo cáo652](../bao_cao/context652/REVIEW.md).

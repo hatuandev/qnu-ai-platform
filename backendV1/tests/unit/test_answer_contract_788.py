@@ -72,7 +72,7 @@ def test_schema_is_closed_and_required_fields_match_validator():
 
     schema = output_schema()
     assert schema["additionalProperties"] is False
-    assert set(schema["required"]) == {"status", "statements", "lookups"}
+    assert set(schema["required"]) == {"status", "statements", "lookups", "assessment"}
     assert schema["$defs"]["Statement"]["additionalProperties"] is False
     assert "default" not in schema["properties"]["lookups"]
 

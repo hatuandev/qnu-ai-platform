@@ -25,9 +25,13 @@ vi.mock("@/features/conversations/conversation-rename-dialog", () => ({
   ConversationRenameDialog: () => null,
 }));
 vi.mock("@/features/conversations/chat-message-item", () => ({
-  ChatMessageItem: ({ turn }: { turn: { turn_no: number } }) => (
-    <p>Lượt {turn.turn_no}</p>
-  ),
+  ChatMessageItem: ({
+    turn,
+    isSubmitting,
+  }: {
+    turn: { turn_no: number; question?: string };
+    isSubmitting?: boolean;
+  }) => (isSubmitting ? <p>{turn.question}</p> : <p>Lượt {turn.turn_no}</p>),
 }));
 vi.mock("@/features/conversations/requests", () => ({
   getConversation: async () => ({
@@ -51,14 +55,20 @@ test("F3: show latest turns, load earlier pages and retain a new turn beyond 50"
       status: "completed",
     })).slice(params.offset, params.offset + params.limit),
   );
-  ports.send.mockImplementation(async () => {
-    ports.count += 1;
-    return {
-      id: `turn-${ports.count}`,
-      turn_no: ports.count,
-      status: "completed",
-    };
-  });
+  let finishSend = () => {};
+  ports.send.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finishSend = () => {
+          ports.count += 1;
+          resolve({
+            id: `turn-${ports.count}`,
+            turn_no: ports.count,
+            status: "completed",
+          });
+        };
+      }),
+  );
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -77,7 +87,13 @@ test("F3: show latest turns, load earlier pages and retain a new turn beyond 50"
     target: { value: "Next question" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Gửi câu hỏi" }));
+  expect(await screen.findByText("Next question")).toBeTruthy();
+  expect(screen.queryByText("Lượt 61")).toBeNull();
+  expect(ports.send).toHaveBeenCalledTimes(1);
+  finishSend();
   await waitFor(() => expect(screen.getByText("Lượt 61")).toBeTruthy());
+  expect(screen.queryByText("Next question")).toBeNull();
+  expect(screen.getAllByText("Lượt 61")).toHaveLength(1);
   expect(screen.getAllByText("Lượt 60")).toHaveLength(1);
   expect(ports.send).toHaveBeenCalledTimes(1);
   client.clear();

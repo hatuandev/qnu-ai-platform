@@ -70,6 +70,11 @@ export type DraftSection = {
   paragraphs: DraftParagraph[];
 };
 
+export type DraftReadingGroup = {
+  heading: string;
+  paragraphs: [section: number, paragraph: number][];
+};
+
 export type DraftContent = {
   title: string;
   sections: DraftSection[];
@@ -148,6 +153,7 @@ export type DraftDocumentResponse = {
   sections: DraftSection[];
   unknowns: string[];
   citations: Record<string, CitationDetail>;
+  reading_groups?: DraftReadingGroup[];
   source_tables: LiteralTableEntry[];
   sources: SourceSummary[];
   origin?: string;

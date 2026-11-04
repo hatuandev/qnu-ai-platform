@@ -3,6 +3,7 @@
  * from `backendV1/qnu/domains/conversations/schemas.py` and `backendV1/qnu/domains/rag/answer/schemas.py`.
  */
 
+import type { AnswerCoverage } from "@/features/rag/answer-coverage";
 import type {
   ContextTrace,
   MetadataFilter,
@@ -108,6 +109,7 @@ export type AnswerResponse = {
   index_run_id: string;
   generation: number;
   trace: AnswerTrace;
+  coverage?: AnswerCoverage | null;
 };
 
 export type SourceStatus = "current" | "unavailable";

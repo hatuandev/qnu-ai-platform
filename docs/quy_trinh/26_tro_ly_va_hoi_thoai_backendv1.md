@@ -9,9 +9,13 @@ Không thay schema/quyền/backend cũ. Workspace là biên giới quyền riên
    scope. Owner lấy từ xác thực; không nhận history/owner/system prompt từ client.
 3. Gửi turn với key và expected_turn_no. BE lưu request/sequence/lease trước HTTP;
    một lượt running, replay không gọi model lại, khác body/sequence báo conflict.
-4. Có history thì dùng cửa sổ câu hỏi người dùng đã hoàn tất để làm rõ chủ thể;
-   không dùng assistant text làm dữ kiện. Lưu câu hỏi gốc, resolved query và trace.
-5. Search/retrieval/answer dùng pipeline648, citation và kiểm nguồn hiện hành.
+4. Mọi lượt mới gọi model qua ModelOps để phân loại và làm rõ chủ thể trong một
+   request. Lời chào/cảm ơn/giới thiệu được model tự viết theo tên và persona,
+   lưu `direct_reply`. Câu dữ kiện trả `knowledge` và chưa có câu trả lời.
+   History chỉ gồm câu hỏi nghiệp vụ đã hoàn tất, không dùng assistant text làm
+   dữ kiện. Lưu câu hỏi gốc, resolved query, route và usage trong `rewrite_trace`.
+   Khi history rỗng, dùng nguyên câu hỏi gốc để truy xuất. Model vẫn phân loại lượt.
+5. Với knowledge, search/retrieval/answer dùng pipeline648, citation và kiểm nguồn hiện hành.
    Kiểm lại owner/quyền/assistant revision/active/lease trước và sau gọi model.
 6. Lưu cặp question/result/citation hoặc status/error. Lỗi provider vẫn báo lỗi
    thật. GET history kiểm nguồn, ẩn result/source cũ không hợp lệ, giữ history row.

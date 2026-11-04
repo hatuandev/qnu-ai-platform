@@ -14,6 +14,14 @@ from qnu.domains.knowledge.metadata import matches_metadata
 from qnu.domains.rag.answer.clause_context import clause_groups
 from qnu.domains.rag.answer.projection import evidence_item
 from qnu.domains.rag.answer.schemas import AnswerRequest
+from qnu.domains.rag.answer.source_text import pinned_bundles
+from qnu.domains.rag.answer.structure_context import (
+    VERSION,
+    enumeration_requested,
+    needs_structure,
+    select_groups,
+    unresolved_references,
+)
 from qnu.domains.rag.answer.table_support import attach_table_support
 from qnu.platform.errors import AppException, Conflict
 from qnu.ports.blob_store import BlobStore
@@ -33,6 +41,8 @@ async def expand_context(
     collection_id: str,
     result: SearchResponse,
     req: AnswerRequest,
+    *,
+    bundles: dict | None = None,
 ) -> tuple[SearchResponse, dict]:
     trace = {
         "window": req.context_window,
@@ -102,7 +112,53 @@ async def expand_context(
     scopes = result_scopes(result, req.metadata_filter)
     additions = []
     truncated = 0
-    for group in clause_groups(rows, set(anchors)):
+    structural = []
+    if needs_structure(req.question):
+        bundles = await pinned_bundles(db, blob, workspace_id, collection_id, result.hits, bundles)
+        structural = select_groups(rows, result.hits, bundles, req.question)
+        trace["structure"] = {
+            "version": VERSION,
+            "groups": structural,
+            "enumeration_requested": enumeration_requested(req.question),
+            "unresolved_references": unresolved_references(req.question, structural),
+        }
+    for group in structural:
+        eligible = [
+            by_id[key]
+            for key in group["required_ids"]
+            if any(matches_metadata(by_id[key].structure, scope) for scope in scopes)
+        ]
+        group["scope_excluded_ids"] = [
+            key for key in group["required_ids"] if key not in {row.id for row in eligible}
+        ]
+        primary = anchors[group["primary_chunk_id"]]
+        candidates = await _hits(
+            db,
+            run,
+            allowed,
+            [
+                _neighbor_hit(row, run, primary.version_id)
+                for row in eligible
+                if row.id not in known
+            ],
+            sealed,
+        )
+        for candidate in candidates:
+            size = evidence_size(candidate)
+            if consumed + size > req.context_max_bytes or len(known) >= 20:
+                truncated += 1
+                continue
+            additions.append(candidate)
+            known.add(candidate.chunk_id)
+            consumed += size
+            trace["added"].append(
+                {
+                    "chunk_id": candidate.chunk_id,
+                    "primary_chunk_id": primary.chunk_id,
+                    "kind": "structure",
+                }
+            )
+    for group in [] if structural else clause_groups(rows, set(anchors)):
         if not any(
             all(matches_metadata(row.structure, scope) for row in group) for scope in scopes
         ):

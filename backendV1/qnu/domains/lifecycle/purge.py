@@ -234,7 +234,13 @@ def _settled_plan(plan, graph):
         "ocr_run_pages": ("run_id", "ocr_processing_runs"),
         "ocr_run_artifacts": ("run_id", "ocr_processing_runs"),
         "kb_compilation_artifacts": ("run_id", "kb_compilation_runs"),
+        "kb_compilation_outputs": ("run_id", "kb_compilation_runs"),
+        "kb_compilation_segment_artifacts": ("segment_id", "kb_compilation_segments"),
         "kb_compilation_review_artifacts": ("review_id", "kb_compilation_reviews"),
+        "kb_compilation_review_segment_artifacts": (
+            "segment_id",
+            "kb_compilation_review_segments",
+        ),
     }
     # In-flight calls may retain raw evidence after cancellation, within the
     # exact approved runs. New sources, versions or jobs never widen this intent.
@@ -331,7 +337,10 @@ async def _assert_exclusive_blobs(db, plan):
         "ocr_run_pages": ("image_key", "raw_key"),
         "ocr_run_artifacts": ("blob_key",),
         "kb_compilation_artifacts": ("blob_key",),
+        "kb_compilation_outputs": ("draft_blob_key", "markdown_blob_key"),
+        "kb_compilation_segment_artifacts": ("blob_key",),
         "kb_compilation_review_artifacts": ("blob_key",),
+        "kb_compilation_review_segment_artifacts": ("blob_key",),
         "ocr_text_versions": ("document_key", "markdown_key"),
     }.items():
         target = table(name)

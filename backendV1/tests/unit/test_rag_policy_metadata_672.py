@@ -5,7 +5,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from qnu.domains.assistants.schemas import AssistantConfig
+from qnu.domains.assistants.schemas import AssistantConfig, AssistantCreate
 from qnu.domains.knowledge.index.chunking import build_chunks
 from qnu.domains.knowledge.metadata import (
     MetadataFilter,
@@ -36,12 +36,13 @@ def test_old_policy_is_compatible_and_new_policy_is_explicit():
     assert (
         old.retrieval_mode == "dense" and old.context_window == 0 and old.verification_mode == "off"
     )
-    config = AssistantConfig(
+    config = AssistantCreate(
         name="Test",
         collection_id="collection",
         rag_policy={"retrieval_mode": "hybrid", "candidate_k": 10},
     )
     assert config.rag_policy.candidate_k == 10
+    assert config.rag_policy.context_window == 1
 
 
 @pytest.mark.parametrize(

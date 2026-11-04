@@ -13,6 +13,23 @@ from tests.integration.test_index_api_647 import indexed  # noqa: F401
 class FakeAnswerChat(FakeNemotron):
     def _respond(self, index):
         incoming = json.loads(self.requests[index]["body"]["messages"][-1]["content"])
+        if "current_question" in incoming:
+            history = incoming["previous_user_questions"]
+            value = {
+                "route": "knowledge",
+                "answer": None,
+                "standalone_question": (history[-1] + " " if history else "")
+                + incoming["current_question"],
+                "needs_clarification": False,
+            }
+            return 200, json.dumps(
+                {
+                    "choices": [
+                        {"message": {"content": json.dumps(value)}, "finish_reason": "stop"}
+                    ],
+                    "usage": {"total_tokens": 80},
+                }
+            ).encode()
         source = next(
             (e for e in incoming["evidence"] if e["kind"] == "table"), incoming["evidence"][0]
         )
@@ -153,7 +170,7 @@ def test_answer_returns_only_server_bound_sources(client, ready):
     assert sent["response_format"]["type"] == "json_schema"
     contract = sent["response_format"]["json_schema"]
     assert contract["strict"] is True
-    assert set(contract["schema"]["required"]) == {"status", "statements", "lookups"}
+    assert set(contract["schema"]["required"]) == {"status", "statements", "lookups", "assessment"}
     assert sent["model"] == "test-chat"
     assert "revision_id" not in sent["messages"][-1]["content"]
 
@@ -162,7 +179,7 @@ def test_answer_projection_preserves_published_table_and_prompt_contract(client,
     response = ask(client, ready)
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["trace"]["prompt_version"] == "qnu.rag.answer/v15"
+    assert body["trace"]["prompt_version"] == "qnu.rag.answer/v18"
     assert body["trace"]["grounding"]["selected_cells"]
     sent = json.loads(ready["answer_chat"].requests[0]["body"]["messages"][-1]["content"])
     schema = ready["answer_chat"].requests[0]["body"]["response_format"]["json_schema"]["schema"]

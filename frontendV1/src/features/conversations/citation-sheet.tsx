@@ -57,8 +57,8 @@ export function CitationSheet({
                 Dẫn nguồn bằng chứng {turnNo ? `(Lượt #${turnNo})` : ""}
               </SheetTitle>
               <SheetDescription className="text-xs text-muted-foreground mt-0.5">
-                Các trích đoạn tài liệu đã được xác thực dùng để chứng minh câu
-                trả lời
+                Các trích đoạn từ tài liệu dùng để đối chiếu nội dung và phần
+                còn cần làm rõ.
               </SheetDescription>
             </div>
           </div>
@@ -70,7 +70,7 @@ export function CitationSheet({
             <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
                 <Sparkles className="size-3.5" />
-                <span>Ý kiến được chứng minh</span>
+                <span>Nội dung đang đối chiếu</span>
               </div>
               <p className="text-sm font-medium text-foreground leading-relaxed">
                 "{statement.text}"

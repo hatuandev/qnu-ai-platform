@@ -22,13 +22,15 @@ không thay quyền/schema/runtime của `backend/`.
   Không tạo hai message row cho cùng cặp. API phân trang theo turn_no.
 - Chưa chia sẻ/public/embed, nhiều collection, tools, streaming hoặc bộ nhớ dài hạn.
 
-Sau khi kiểm tra quyền và giữ chỗ lượt hỏi, hội thoại phân luồng các mẫu chắc chắn
-gồm lời chào, cảm ơn, giới thiệu trợ lý và yêu cầu tiết lộ thông tin nội bộ.
-Kết quả `direct_reply` được lưu trong lịch sử và trả lại khi phát lại cùng khóa.
-Nhánh này dùng tên trợ lý trong snapshot, bỏ qua model và chỉ mục, đồng thời
-không đưa các lượt đó vào lịch sử viết lại câu hỏi. Câu có thêm nội dung nghiệp
-vụ đi qua RAG và các cổng bằng chứng như trước. Các mẫu từ chối là lớp hẹp cho
-yêu cầu rõ ràng, không phải cơ chế xác nhận an toàn cho nội dung còn lại.
+Sau khi kiểm tra quyền và giữ chỗ lượt hỏi, mọi lượt mới gọi model Chat qua
+ModelOps để nhận diện ý định và làm rõ câu hỏi nối tiếp trong cùng một request.
+Model tự viết lời chào, cảm ơn, giới thiệu hoặc từ chối tiết lộ thông tin nội bộ
+theo tên/persona đã ghim. Không dùng regex hay câu trả lời mẫu cho nhánh này.
+Kết quả `direct_reply` được lưu trong lịch sử, replay cùng khóa không gọi lại.
+Lượt giao tiếp không truy vấn chỉ mục và không đưa vào history làm rõ nghiệp vụ.
+Câu có nội dung cần dữ kiện, kể cả có lời chào, được phân sang `knowledge` rồi
+đi qua RAG và kiểm dẫn chứng. Router không có bằng chứng nên không được trả lời
+dữ kiện. Phân loại vẫn có thể sai do model và cần kiểm chứng bằng các ca thực tế.
 
 ## API
 
@@ -87,11 +89,12 @@ chủ động thử lượt mới cần key mới/sequence mới, và có thể 
 2. Chọn tối đa history_turns **câu hỏi người dùng** của các lượt completed trước,
    đúng conversation. Không dùng assistant text hoặc citation cũ làm dữ kiện.
    Không lấy failed/uncertain turn hoặc lịch sử client tự gửi.
-3. Không có history thì dùng câu hỏi gốc. Có history thì gọi chat ModelOps một lần
-   để làm rõ chủ thể thành standalone_question; nhu cầu mới tường minh ưu tiên câu
-   trước. Model báo needs_clarification thì trả409 rõ và lưu trạng thái failed.
-   Giữ original/resolved/history IDs/usage để truy vết; không tự giả vờ đã hiểu.
-4. Gọi lại pipeline answer648 bằng câu hỏi gốc và retrieval query đã làm rõ;
+3. Gọi model điều phối một lần, kể cả lượt đầu. Chỉ gửi tên, persona và cửa sổ
+   câu hỏi người dùng, không gửi credential hoặc cấu hình quyền. JSON schema
+   `qnu.conversation.route/v2` phân biệt knowledge và giao tiếp. Câu dữ kiện có
+   `answer=null`, dùng standalone_question để tìm nguồn. Model báo cần làm rõ
+   thì trả409. Các nhánh giao tiếp có answer do model sinh và kết thúc tại đây.
+4. Với knowledge, gọi pipeline answer648 bằng câu hỏi gốc và query đã làm rõ;
    persona chỉ thêm style. Search/evidence/citation/source checks vẫn dùng mã cũ.
    History không chứng minh dữ kiện và không thay document/collection scope.
 5. Checkpoint trước generation và trước hoàn tất: owner/membership, conversation
@@ -100,10 +103,13 @@ chủ động thử lượt mới cần key mới/sequence mới, và có thể 
 6. Persist result cùng audit, trả turn. Lỗi provider/validation vẫn là RFC7807;
    row failed giữ mã lỗi để đọc lại, không tạo câu trả lời thay thế.
 
-Ledger riêng cho rewrite và generation; embedding vẫn được accounting như search.
-Tối đa một rewrite + một answer call và một query embedding mỗi lượt mới (không
-tính thao tác kiểm chứng offline). Không retry hoặc fallback ngầm. Không có worker
-hay cron mới; đây là xử lý đồng bộ có record bền vững.
+Ledger riêng cho routing và generation, embedding vẫn được accounting như search.
+Giao tiếp cần một chat call, knowledge tối đa một routing + một answer call
+(chưa tính các bước kiểm chứng cấu hình riêng). `rewrite_trace` lưu version,
+route, model/provider, reasoning, usage và ngân sách đã áp dụng. Routing dùng
+chính sách tác vụ `answer`, gồm lựa chọn model và reasoning của ModelOps.
+Ngân sách theo caller hoặc ModelOps tự động, lỗi provider/JSON vẫn báo lỗi thật.
+Không tự tạo câu trả lời mẫu khi model lỗi. Không có worker hay cron mới.
 
 ## Lịch sử, phục hồi và giới hạn
 
@@ -132,7 +138,7 @@ không đổi key để retry mù. Nếu process chết, chưa có background re
 lease chỉ fence kết quả, không là cơ chế tự nối tiếp tác vụ.
 
 Mặc định lease900s, history tối đa3cặp câu hỏi đã hoàn tất (config0–10), budget
-history16000UTF-8byte, rewrite output1024token. History quá budget trả422, không
+history16000UTF-8byte. Routing/output theo cấu hình trợ lý và ModelOps. History quá budget trả422, không
 cắt âm thầm. Model capacity/quota vẫn lấy DB ModelOps; đây không phải trần model
 hardcode. Chuỗi hội thoại dài lưu đầy đủ trong DB nhưng chỉ cửa sổ history được gửi.
 

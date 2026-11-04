@@ -6,7 +6,7 @@ import type {
   AssistantListParams,
   AssistantUpdateInput,
 } from "@/features/assistants/types";
-import { DEFAULT_RAG_POLICY } from "@/features/rag/types";
+import { NEW_ASSISTANT_RAG_POLICY } from "@/features/rag/types";
 
 /**
  * Lists assistants in a workspace.
@@ -66,9 +66,7 @@ export function createAssistant(
       history_turns: input.history_turns ?? 3,
       max_output_tokens: input.max_output_tokens ?? null,
       is_active: input.is_active ?? true,
-      // Backend default when omitted; sending it explicitly keeps the payload
-      // self-describing without upgrading an existing assistant.
-      rag_policy: input.rag_policy ?? DEFAULT_RAG_POLICY,
+      rag_policy: input.rag_policy ?? NEW_ASSISTANT_RAG_POLICY,
     },
     { signal: options?.signal },
   );

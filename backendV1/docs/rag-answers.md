@@ -1,5 +1,38 @@
 # Hỏi đáp có trích dẫn — Backend v1
 
+## Cập nhật861 — Phạm vi nguồn và độ bao quát câu trả lời
+
+Prompt hiện hành `qnu.rag.answer/v17`. Sau retrieval theo policy đã ghim,
+backend nhận diện điều/mục hoặc danh sách có câu dẫn trong bản nguồn canonical
+đã xuất bản. Đọc theo thứ tự nguồn qua trang/phần Compiler, thay vì coi một điểm
+trúng TopK là toàn bộ quy định. Chỉ thêm chunk thuộc input/version/publication
+được phép, khớp metadata và manifest. Không tự tăng budget, đổi model hay reindex.
+
+`answer_plan` mô tả nhóm nguồn, các unit đã cấp và phần chưa cấp; toàn bộ kế hoạch
+được tính trong ngân sách byte cùng evidence. Khi budget/chunk count không đủ,
+giữ dấu vết unit chưa cấp; không nhận là danh sách đầy đủ. Mỗi request dùng lại
+bundle đã kiểm tra trong bộ nhớ cục bộ, không tạo cache bỏ qua quyền/thu hồi.
+
+Hợp đồng model thêm `assessment` gồm yêu cầu, trạng thái `covered/missing/conflicting`
+và evidence IDs. Backend kiểm ID, đối chiếu citation thực dùng và đếm unit cấu trúc
+đã được dẫn. Response thêm `coverage` (`complete/partial/insufficient/not_assessed`),
+không thay các status cũ `answered/insufficient_evidence`. Quy định chung có căn cứ
+có thể trả lời cùng phần chi tiết còn thiếu. Nếu thiếu căn cứ quyết định kết luận,
+không được tự bịa kết luận ấy. Lỗi provider vẫn là lỗi, không thành thiếu dữ liệu.
+
+`complete` chỉ mô tả đánh giá yêu cầu của model và độ phủ citation trong phạm vi
+nguồn đã chọn; **không phải chứng minh đúng ngữ nghĩa hoặc đủ toàn kho**. TopK không
+chứng minh một dữ kiện không có trong cả PDF. Câu liệt kê chưa nhận diện được nhóm
+nguồn giới hạn có `scope_status=unresolved`, giữ kết quả partial. Verifier độc lập
+vẫn chạy đúng policy `off/observe/enforce`; không tự bật hoặc gọi model sửa lại.
+
+Các nguồn được dùng trong assessment và các unit còn thiếu citation cũng nằm
+trong response.sources, kể cả khi abstain, để lịch sử kiểm lại trạng thái nguồn.
+UI hội thoại báo phần còn thiếu và mở đúng tập nguồn cần đối chiếu. Không tự chèn
+đoạn nguồn vào đáp án của model hoặc báo đã xác minh khi chỉ kiểm tra ID.
+
+Kiểm chứng và giới hạn model thật: [nhật ký861](../../docs/nhat_ky/2026-11-04_phien_861_pham_vi_va_do_phu_rag.md).
+
 Context648 nối [dense search](dense-indexing.md) với runtime chat ModelOps.
 Luồng một câu hỏi: **search có quyền → evidence → prompt → model → kiểm citation
 và nguồn hiện hành → câu trả lời cùng nguồn**. Chưa lưu hội thoại hoặc có bộ nhớ.

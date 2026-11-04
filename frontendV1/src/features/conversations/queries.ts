@@ -261,13 +261,18 @@ export function useSendTurn(workspaceId: string, conversationId: string) {
     }) =>
       sendTurn(v1Client, workspaceId, conversationId, input, idempotencyKey),
     onSuccess: (newTurn: TurnResponse) => {
-      // Invalidate the turns list and the conversation metadata (to refresh last_turn_no)
+      const detail = conversationsQueryKeys.detail(
+        sessionId,
+        workspaceId,
+        conversationId,
+      );
+      queryClient.setQueryData<Conversation>(detail, (current) =>
+        current && newTurn.turn_no > current.last_turn_no
+          ? { ...current, last_turn_no: newTurn.turn_no }
+          : current,
+      );
       void queryClient.invalidateQueries({
-        queryKey: conversationsQueryKeys.detail(
-          sessionId,
-          workspaceId,
-          conversationId,
-        ),
+        queryKey: detail,
       });
       return newTurn;
     },

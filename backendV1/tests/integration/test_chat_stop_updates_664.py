@@ -111,7 +111,7 @@ def test_stop_and_resume_discards_late_answer_and_allows_new_turn(
                 (
                     await db.scalars(
                         select(ModelUsageRecord).where(
-                            ModelUsageRecord.request_id.startswith("ans_")
+                            ModelUsageRecord.request_id.startswith("route:")
                         )
                     )
                 ).all()

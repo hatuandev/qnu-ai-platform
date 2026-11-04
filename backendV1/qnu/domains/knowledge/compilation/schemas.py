@@ -7,6 +7,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+DRAFT_PARAGRAPH_TEXT_LIMIT = 20000
+
 
 class CompilationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -45,7 +47,7 @@ class CompilationRequest(BaseModel):
 
 class DraftParagraph(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    text: str = Field(min_length=1, max_length=20000)
+    text: str = Field(min_length=1, max_length=DRAFT_PARAGRAPH_TEXT_LIMIT)
     citations: list[str] = Field(min_length=1, max_length=100)
 
 

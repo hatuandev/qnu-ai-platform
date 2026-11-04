@@ -15,6 +15,12 @@ Qdrant/Redis/storage là cấu hình hạ tầng server, không lấy URL từ m
 1. Editor/admin yêu cầu indexing bằng Idempotency-Key. Server chụp publication,
    chia đoạn và nhóm bảng giữ citation/ô/header/span/footnote từ snapshot gốc;
    lưu run/input/chunk và audit trước dispatch.
+   Chỉ mục mới lấy tiêu đề nguồn có căn cứ cho đoạn và bảng của cả hai chế độ
+   biên soạn. Nếu một đoạn tổng hợp nhiều mục, giữ tiêu đề biên soạn của đoạn.
+   Với bảng sát ngân sách, giữ tiêu đề trong metadata để bảo toàn nhóm hàng.
+   Chỉ mục v5 bỏ bản sao chữ trùng nguyên văn với các hàng của bảng đã bóc tách
+   khi đoạn chỉ dẫn đúng bảng đó. Đoạn có metadata riêng, dẫn chứng khác hoặc
+   nội dung bổ sung vẫn được lập chỉ mục theo đoạn.
 2. Worker ARQ kiểm quyền/nguồn/model, reserve quota, gọi embedding theo batch.
    Raw response có hash, vector staging và usage receipt được giữ bền vững.
 3. Ghi vào Qdrant generation riêng, xác nhận hoàn thành, kiểm lại snapshot,

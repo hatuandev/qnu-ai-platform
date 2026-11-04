@@ -7,21 +7,31 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import type { DraftSection } from "./compilation-types";
+import type { DraftReadingGroup, DraftSection } from "./compilation-types";
 
 export const CompilationDraftSections = memo(function CompilationDraftSections({
   sections,
+  readingGroups,
   onSelectCitation,
 }: {
   sections: DraftSection[];
+  readingGroups?: DraftReadingGroup[];
   onSelectCitation: (id: string) => void;
 }) {
+  const groups =
+    readingGroups?.map((group) => ({
+      heading: group.heading,
+      paragraphs: group.paragraphs.flatMap(([section, paragraph]) => {
+        const entry = sections[section]?.paragraphs[paragraph];
+        return entry ? [entry] : [];
+      }),
+    })) ?? sections;
   return (
     <Accordion type="multiple" defaultValue={["section-0"]}>
-      {sections.map((section, index) => (
+      {groups.map((section, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: immutable ordered sections of a pinned run
         <AccordionItem key={`section-${index}`} value={`section-${index}`}>
-          <AccordionTrigger className="text-sm sm:text-base">
+          <AccordionTrigger className="text-left text-sm sm:text-base">
             {section.heading}
           </AccordionTrigger>
           <AccordionContent className="text-foreground [&>div]:pr-0">

@@ -19,8 +19,13 @@ TABLES = frozenset(
         "kb_compilation_runs",
         "kb_compilation_inputs",
         "kb_compilation_artifacts",
+        "kb_compilation_outputs",
+        "kb_compilation_segments",
+        "kb_compilation_segment_artifacts",
         "kb_compilation_reviews",
         "kb_compilation_review_artifacts",
+        "kb_compilation_review_segments",
+        "kb_compilation_review_segment_artifacts",
         "kb_compilation_review_jobs",
         "kb_compilation_edit_previews",
         "kb_compiled_versions",
@@ -33,6 +38,10 @@ TABLES = frozenset(
     }
 )
 MAX_ROWS = 10000
+SEGMENT_OWNERS = {
+    "kb_compilation_segments": "run_id",
+    "kb_compilation_review_segments": "review_id",
+}
 
 
 def table(name):
@@ -150,6 +159,14 @@ async def graph_for_source(db, workspace_id, source_id):
                         .where(selected(alias, keys))
                     )
                 changed |= await _add(db, graph, name, statement, workspace_id)
+    for name, owner_field in SEGMENT_OWNERS.items():
+        segments = graph.get(name, {})
+        for row in segments.values():
+            if row["parent_segment_id"] is None:
+                continue
+            parent = segments.get((row["parent_segment_id"],))
+            if parent is None or parent[owner_field] != row[owner_field]:
+                raise Conflict("Nhóm xử lý ngoài phạm vi xóa.", code="purge_scope_invalid")
     versions = list(graph.get("kb_compiled_versions", {}).values())
     if any(row["status"] == "published" for row in versions):
         raise Conflict(
@@ -240,9 +257,14 @@ def graph_plan(graph):
             if name in {
                 "ocr_run_artifacts",
                 "kb_compilation_artifacts",
+                "kb_compilation_segment_artifacts",
                 "kb_compilation_review_artifacts",
+                "kb_compilation_review_segment_artifacts",
             }:
                 add_object(row["blob_key"], row["sha256"])
+            if name == "kb_compilation_outputs":
+                add_object(row["draft_blob_key"], row["draft_sha256"])
+                add_object(row["markdown_blob_key"], row["markdown_sha256"])
             if name == "ocr_text_versions":
                 add_object(row["document_key"], row["canonical_sha256"])
                 add_object(row["markdown_key"], row["markdown_sha256"])
@@ -262,8 +284,13 @@ async def delete_rows(db, plan, workspace_id):
         keys = plan["rows"].get(target.name, [])
         if not keys:
             continue
-        if target.name == "kb_compilation_runs":
-            # Immutable edit ancestry is a self-FK; delete leaves before their parents.
+        parent_field = {
+            "kb_compilation_runs": "parent_run_id",
+            "kb_compilation_segments": "parent_segment_id",
+            "kb_compilation_review_segments": "parent_segment_id",
+        }.get(target.name)
+        if parent_field:
+            # Delete edit and refinement leaves before their self-referenced parents.
             while await db.scalar(select(target.c.id).where(selected(target, keys)).limit(1)):
                 child = target.alias("purge_child")
                 result = await db.execute(
@@ -271,7 +298,7 @@ async def delete_rows(db, plan, workspace_id):
                         selected(target, keys),
                         ~select(child.c.id)
                         .where(
-                            child.c.parent_run_id == target.c.id,
+                            child.c[parent_field] == target.c.id,
                         )
                         .exists(),
                     )

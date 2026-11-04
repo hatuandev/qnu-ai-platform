@@ -223,7 +223,7 @@ def test_turn_scope_is_pinned_and_inherited_without_promoting_history_answers_to
     )
     assert response.status_code == 200, response.text
     assert response.json()["metadata_filter"]["data_year"] == 2024
-    # No annotated content in the old fixture: no model generation is allowed.
+    # The routing call runs, but no source-grounded answer may use unannotated content.
     assert response.json()["result"]["status"] == "insufficient_evidence"
     replay = client.post(
         turns,

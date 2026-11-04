@@ -40,12 +40,13 @@ và có credential bảo vệ trong ModelOps. Có thể chọn `verification_pro
 riêng với capability chat; khi không chọn dùng chat provider của yêu cầu/default
 ModelOps. Không sao chép key vào cấu hình trợ lý hoặc biến môi trường LLM.
 
-Mặc định tương thích: dense, context_window=0, verification_mode=off. Cần bật
-tường minh chức năng mới. candidate_k >= top_k ở hybrid/rerank; không chọn
-rerank provider trong mode khác. Các số ví dụ/default là ngân sách, chưa phải tối ưu.
+Trợ lý mới mặc định dùng `dense`, `context_window=1` và `verification_mode=off`.
+API hỏi đáp trực tiếp và snapshot cũ thiếu policy dùng mặc định tương thích
+`context_window=0`. Ở chế độ hybrid/rerank, `candidate_k` phải lớn hơn hoặc bằng
+`top_k`. Chỉ cấu hình provider rerank ở chế độ `hybrid_rerank`.
 Policy được lưu trong snapshot hội thoại. Thay cấu hình làm tăng revision và cần
 hội thoại mới theo hợp đồng hiện có. Client cũ PUT không có rag_policy giữ policy
-đang lưu; hội thoại/snapshot cũ thiếu policy dùng mặc định tương thích.
+đang lưu.
 
 `POST .../collections/{collection_id}/answers` nhận các trường policy ở cấp ngoài
 cùng (không bọc rag_policy), bên cạnh question/top_k/provider_id. API search giữ

@@ -2,7 +2,9 @@
 
 import pytest
 
+from qnu.domains.knowledge.compilation.schemas import DRAFT_PARAGRAPH_TEXT_LIMIT
 from qnu.domains.knowledge.index.chunking import build_chunks
+from qnu.domains.knowledge.source_sections import reading_groups
 from qnu.platform.errors import AppException
 
 
@@ -103,3 +105,90 @@ def test_long_paragraph_keeps_heading_and_all_words_with_original_citations():
         assert list(chunk.citations) == ["ocr-example:ev-text"]
         recovered += chunk.text.split("\n", 2)[2].split()
     assert recovered == words
+
+
+@pytest.mark.parametrize("status", ["parsed", "unsupported"])
+def test_index_omits_only_exact_table_copy_with_no_paragraph_metadata(status):
+    content, documents = fixture()
+    entry = content["source_tables"][0]
+    table = entry["table"]
+    table["status"] = status
+    flat_text = "\n".join(" | ".join(cell["text"] for cell in row) for row in table["rows"])
+    documents[0]["pages"][0]["blocks"][0]["text"] = flat_text
+    table_ref = entry["citation"]
+    summary = "Chỉ tiêu trong bảng áp dụng cho nhiều năm."
+    paragraphs = content["sections"][0]["paragraphs"]
+    paragraphs.extend(
+        [
+            {"text": flat_text, "citations": [table_ref]},
+            {"text": summary, "citations": [table_ref]},
+            {"text": flat_text, "citations": [table_ref, "ocr-example:ev-note"]},
+            {"text": flat_text, "citations": [table_ref]},
+        ]
+    )
+    annotations = [{"target": "paragraph:0:4", "values": {"data_year": 2024}, "evidence": []}]
+
+    chunks = build_chunks(content, documents, 3000, annotations)
+
+    prose = {c.structure["context"]["position"]: c for c in chunks if c.kind == "paragraph"}
+    assert set(prose) == ({0, 2, 3, 4} if status == "parsed" else {0, 1, 2, 3, 4})
+    assert summary in prose[2].text
+    assert prose[4].structure["retrieval_metadata"] == annotations
+    assert any(c.kind == "table" and table_ref in c.citations for c in chunks)
+    assert paragraphs[1]["text"] == flat_text
+
+
+def test_index_omits_every_literal_part_of_a_long_parsed_table():
+    content, documents = fixture(35)
+    entry = content["source_tables"][0]
+    for row in entry["table"]["rows"][1:]:
+        row[0]["text"] += " dài" * 155
+    flat_text = "\n".join(
+        " | ".join(cell["text"] for cell in row) for row in entry["table"]["rows"]
+    )
+    assert len(flat_text) > DRAFT_PARAGRAPH_TEXT_LIMIT
+    documents[0]["pages"][0]["blocks"][0]["text"] = flat_text
+    content["sections"][0]["paragraphs"] = [
+        {
+            "text": flat_text[start : start + DRAFT_PARAGRAPH_TEXT_LIMIT],
+            "citations": [entry["citation"]],
+        }
+        for start in range(0, len(flat_text), DRAFT_PARAGRAPH_TEXT_LIMIT)
+    ]
+
+    chunks = build_chunks(content, documents, 3000)
+
+    assert {chunk.kind for chunk in chunks} == {"table"}
+    assert {row for chunk in chunks for row in chunk.structure["row_indices"]} == set(range(35))
+
+
+def test_both_compiler_modes_share_source_headings_without_changing_draft_or_citations():
+    content, documents = fixture()
+    blocks = documents[0]["pages"][0]["blocks"]
+    blocks.insert(0, {"evidence_id": "ev-intro", "text": "Giới thiệu."})
+    blocks.insert(1, {"evidence_id": "ev-title", "text": "2. Quy đổi điểm:"})
+    blocks.insert(2, {"evidence_id": "ev-text", "text": "Nội dung nguồn."})
+    blocks.insert(3, {"evidence_id": "ev-item", "text": "c. Điều kiện để xác định"})
+    content["citations"]["ocr-example:ev-intro"] = {"page": 1}
+    blocks[4]["table"] = content["source_tables"][0]["table"]
+    section = content["sections"][0]
+    section["paragraphs"].append({"text": "Một ô nguồn.", "citations": ["ocr-example:ev-cell-1-1"]})
+    section["paragraphs"].append({"text": "Giới thiệu.", "citations": ["ocr-example:ev-intro"]})
+    expected = [
+        {"heading": "2. Quy đổi điểm:", "paragraphs": [(0, 0), (0, 1)]},
+        {"heading": "Trang 1", "paragraphs": [(0, 2)]},
+    ]
+    for heading in ("Bản tóm tắt", "Nguồn 1 · Phần 1"):
+        section["heading"] = heading
+        assert reading_groups(content, documents) == expected
+        chunks = build_chunks(content, documents, 3000)
+        for chunk in chunks[:2] + chunks[3:]:
+            assert "2. Quy đổi điểm:" in chunk.text
+            assert chunk.structure["context"]["source_heading_citation"] == "ocr-example:ev-title"
+        assert list(chunks[1].citations) == ["ocr-example:ev-cell-1-1"]
+        assert section["heading"] == heading
+        tight = build_chunks(content, documents, 1800)[-1]
+        assert tight.structure["context"]["heading"] == "2. Quy đổi điểm:"
+        assert tight.structure["rows"] == chunks[-1].structure["rows"]
+    section["paragraphs"][0]["citations"].append("ocr-example:ev-intro")
+    assert reading_groups(content, documents)[0]["heading"] == section["heading"]

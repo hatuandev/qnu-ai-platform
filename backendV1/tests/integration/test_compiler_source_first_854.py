@@ -19,7 +19,19 @@ def test_fast_compilation_keeps_source_and_creates_no_model_requests(client):
         assert not chat.requests
 
         base = data["url"] + "/" + run["id"]
-        draft = client.get(base + "/draft").json()
+        plain = client.get(base + "/draft")
+        draft = plain.json()
+        view = client.get(base + "/draft", params={"group_by_source": "true"})
+        assert view.status_code == 200
+        assert view.headers["etag"] != plain.headers["etag"]
+        grouped = view.json()
+        groups = grouped.pop("reading_groups")
+        assert grouped == draft
+        assert [position for group in groups for position in group["paragraphs"]] == [
+            [s, p]
+            for s, section in enumerate(draft["sections"])
+            for p in range(len(section["paragraphs"]))
+        ]
         assert draft["validation"]["source_copy"] == "retained"
         assert draft["validation"]["semantic_faithfulness"] == "not_evaluated"
         paragraphs = [p for section in draft["sections"] for p in section["paragraphs"]]

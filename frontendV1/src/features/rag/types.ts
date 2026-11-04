@@ -87,6 +87,11 @@ export const DEFAULT_RAG_POLICY: RagPolicy = {
   verification_max_output_tokens: null,
 };
 
+export const NEW_ASSISTANT_RAG_POLICY: RagPolicy = {
+  ...DEFAULT_RAG_POLICY,
+  context_window: 1,
+};
+
 export const RETRIEVAL_MODE_LABEL: Record<RetrievalMode, string> = {
   dense: "Dense (ngữ nghĩa)",
   hybrid: "Hybrid (dense + từ khóa)",

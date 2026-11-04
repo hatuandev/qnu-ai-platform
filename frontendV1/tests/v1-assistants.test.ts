@@ -194,6 +194,10 @@ test("Assistant API: createAssistant posts full config with trimmed name and non
   assert.equal(body.history_turns, 3);
   assert.equal(body.max_output_tokens, 2048);
   assert.equal(body.is_active, true);
+  assert.equal(
+    (body.rag_policy as { context_window: number }).context_window,
+    1,
+  );
   assert.equal(created.id, "ast-new");
 });
 

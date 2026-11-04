@@ -67,7 +67,7 @@ function LifecycleActionForm({
 }: LifecycleActionDialogProps) {
   const confirmationOnly =
     target.action === "delete" &&
-    ["collection", "source", "document"].includes(target.kind);
+    ["collection", "source", "document", "conversation"].includes(target.kind);
   const permanent = target.kind === "source" && target.action === "delete";
   const automaticPreviewRequested = useRef(false);
   const { sessionId } = useV1Auth();
@@ -85,6 +85,8 @@ function LifecycleActionForm({
   );
   const detail = useLifecycleAction(workspaceId, preview?.id);
   const live = detail.data ?? preview;
+  const purgeInProgress =
+    permanent && live?.status === "pending" && !live.error_code;
   const navigated = useRef(false);
   useEffect(() => {
     if (
@@ -159,6 +161,7 @@ function LifecycleActionForm({
     if (
       !current() ||
       !preview ||
+      purgeInProgress ||
       (!confirmationOnly && !confirmed) ||
       submitting.current ||
       (live?.status !== "preview" && live?.status !== "pending")
@@ -393,17 +396,24 @@ function LifecycleActionForm({
             <Button
               variant={target.action === "delete" ? "destructive" : "default"}
               onClick={() => void accept()}
-              disabled={busy || !preview || (!confirmationOnly && !confirmed)}
+              disabled={
+                busy ||
+                purgeInProgress ||
+                !preview ||
+                (!confirmationOnly && !confirmed)
+              }
             >
               {busy
                 ? "Đang xác nhận…"
-                : acceptStarted
-                  ? "Thử lại cùng thao tác"
-                  : confirmationOnly
-                    ? permanent
-                      ? "Xóa vĩnh viễn"
-                      : "Xóa"
-                    : "Xác nhận thao tác"}
+                : purgeInProgress
+                  ? "Đang xóa…"
+                  : acceptStarted
+                    ? "Thử lại cùng thao tác"
+                    : confirmationOnly
+                      ? permanent
+                        ? "Xóa vĩnh viễn"
+                        : "Xóa"
+                      : "Xác nhận thao tác"}
             </Button>
           ) : null}
         </ResponsiveDialogFooter>
