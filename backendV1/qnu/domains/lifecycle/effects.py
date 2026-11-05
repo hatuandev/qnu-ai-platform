@@ -80,6 +80,14 @@ async def apply(db: AsyncSession, action: LifecycleAction, row: Base) -> dict:
         row.is_active = False
     if action.kind == "conversation":
         row.status = "active" if status == "active" else "archived"
+    if action.kind in {"source", "document", "collection"}:
+        from qnu.domains.identity.background import background_actor
+        from qnu.domains.knowledge.index.sync import mark_pending
+
+        collection_id = row.id if action.kind == "collection" else row.collection_id
+        await mark_pending(
+            db, background_actor(action.actor_ref), action.workspace_id, collection_id
+        )
     return {
         "resource_status": status,
         "originals_retained": True,

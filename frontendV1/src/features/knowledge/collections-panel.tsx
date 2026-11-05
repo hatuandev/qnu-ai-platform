@@ -1,7 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Archive,
-  ChevronRight,
   Database,
   Eye,
   FileText,
@@ -29,7 +28,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -39,6 +37,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ViewModeToggle } from "@/components/ui/view-mode-toggle";
+import {
+  CollectionCard,
+  CollectionCardSkeleton,
+} from "@/features/knowledge/collection-card";
 import { CollectionFormDialog } from "@/features/knowledge/collection-form-dialog";
 import { canManageKnowledge } from "@/features/knowledge/permissions";
 import { useCollectionsQuery } from "@/features/knowledge/queries";
@@ -226,9 +228,9 @@ export function CollectionsPanel({
       {/* 4. Query State Handling: Skeleton / ErrorState / EmptyState */}
       {collectionsQuery.isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Skeleton className="h-36 rounded-xl" />
-          <Skeleton className="h-36 rounded-xl" />
-          <Skeleton className="h-36 rounded-xl" />
+          <CollectionCardSkeleton />
+          <CollectionCardSkeleton />
+          <CollectionCardSkeleton />
         </div>
       ) : collectionsQuery.isError ? (
         <ErrorState
@@ -265,57 +267,21 @@ export function CollectionsPanel({
         /* 5. Grid View Cards */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((item) => (
-            <Card
+            <CollectionCard
               key={item.id}
-              className="group relative rounded-xl border-border/70 transition-all hover:border-primary/40 hover:shadow-xs flex flex-col justify-between"
-            >
-              <CardContent className="p-4 flex flex-col justify-between h-full">
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-2.5">
-                    <Link
-                      to="/workspaces/$workspaceId/knowledge/$knowledgeId"
-                      params={{ workspaceId, knowledgeId: item.id }}
-                      search={{ page: 1, pageSize: 20 }}
-                      className="flex items-center gap-2.5 min-w-0 flex-1 hover:text-primary transition-colors"
-                    >
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <FolderOpen className="size-4" />
-                      </span>
-                      <span className="font-semibold text-sm truncate text-foreground group-hover:text-primary">
-                        {item.name}
-                      </span>
-                    </Link>
-
-                    {renderCollectionMenu(item)}
-                  </div>
-
-                  <p className="text-xs text-muted-foreground line-clamp-2 min-h-8 mb-3">
-                    {item.description || "Chưa có mô tả chi tiết."}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-border/50 text-[11px] text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <FileText className="size-3.5 text-primary/70" />
-                    <span>
-                      <strong className="text-foreground">
-                        {item.source_count}
-                      </strong>{" "}
-                      tài liệu
-                    </span>
-                  </div>
-                  <Link
-                    to="/workspaces/$workspaceId/knowledge/$knowledgeId"
-                    params={{ workspaceId, knowledgeId: item.id }}
-                    search={{ page: 1, pageSize: 20 }}
-                    className="flex items-center gap-1 text-primary font-medium hover:underline"
-                  >
-                    <span>Mở kho</span>
-                    <ChevronRight className="size-3" />
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
+              collection={item}
+              workspaceId={workspaceId}
+              canManage={canManage}
+              canArchive={canArchive}
+              canDelete={canDelete}
+              onEdit={setEditingCollection}
+              onArchive={(col) =>
+                setLifecycleTarget({ collection: col, action: "archive" })
+              }
+              onDelete={(col) =>
+                setLifecycleTarget({ collection: col, action: "delete" })
+              }
+            />
           ))}
         </div>
       ) : (

@@ -4,6 +4,7 @@ import { useV1Auth } from "@/app/auth/v1";
 import {
   getDocumentIndexReadiness,
   getIndexRun,
+  getMetadataFacets,
   listIndexRuns,
   requestIndex,
   searchCollection,
@@ -180,5 +181,23 @@ export function useSearchMutation(workspaceId: string, collectionId: string) {
   return useMutation<SearchResponse, Error, SearchRequestInput>({
     mutationFn: (input) =>
       searchCollection(v1Client, workspaceId, collectionId, input),
+  });
+}
+
+export function useMetadataFacetsQuery(
+  workspaceId: string,
+  collectionId: string,
+) {
+  const { sessionId } = useV1Auth();
+  return useQuery({
+    queryKey: [
+      ...indexingKeys.all(sessionId),
+      workspaceId,
+      collectionId,
+      "facets",
+    ],
+    queryFn: ({ signal }) =>
+      getMetadataFacets(v1Client, workspaceId, collectionId, { signal }),
+    enabled: Boolean(workspaceId && collectionId),
   });
 }

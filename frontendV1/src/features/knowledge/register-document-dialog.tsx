@@ -35,6 +35,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { MetadataValues } from "@/features/rag/types";
+import type { CompilerMetadataProposal } from "./compilation-types";
+import { MetadataProposalItem, proposalValue } from "./metadata-proposal-item";
 import {
   useCompiledDocumentsQuery,
   useCreateCompiledDocumentMutation,
@@ -59,6 +62,8 @@ export function RegisterDocumentDialog({
   collectionId,
   compilationRunId,
   defaultTitle = "",
+  proposals = [],
+  draftState = "ready",
   isOpen,
   onClose,
   onSuccess,
@@ -67,6 +72,8 @@ export function RegisterDocumentDialog({
   collectionId: string;
   compilationRunId: string;
   defaultTitle?: string;
+  proposals?: CompilerMetadataProposal[];
+  draftState?: "ready" | "loading" | "error";
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (documentId: string, versionId: string) => void;
@@ -82,6 +89,10 @@ export function RegisterDocumentDialog({
 
   // Optional retrieval metadata declared for the version being registered.
   const [metadataOpen, setMetadataOpen] = useState(false);
+  const [selectedProposalIds, setSelectedProposalIds] = useState<string[]>([]);
+  const [proposalEdits, setProposalEdits] = useState<
+    Record<string, { value: string; quote: string }>
+  >({});
   const [annotationDrafts, setAnnotationDrafts] = useState<AnnotationDraft[]>(
     [],
   );
@@ -120,6 +131,8 @@ export function RegisterDocumentDialog({
       setMode("new");
       setSelectedDocumentId("");
       setAnnotationDrafts([]);
+      setSelectedProposalIds([]);
+      setProposalEdits({});
       setMetadataOpen(false);
     }
   }, [isOpen, defaultTitle]);
@@ -140,6 +153,7 @@ export function RegisterDocumentDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (draftState !== "ready") return;
     setErrorBanner(null);
 
     if (hasAnnotationIssues) {
@@ -151,6 +165,44 @@ export function RegisterDocumentDialog({
     }
 
     const retrievalMetadata = draftsToAnnotations(annotationDrafts);
+    const edits: Record<string, { values: MetadataValues; quote: string }> = {};
+    for (const proposal of proposals) {
+      const edit = proposalEdits[proposal.id];
+      if (!edit || !selectedProposalIds.includes(proposal.id)) continue;
+      const { field, original, custom } = proposalValue(
+        proposal.annotation.values,
+      );
+      const raw = edit.value.trim();
+      const value =
+        typeof original === "number"
+          ? Number(raw)
+          : typeof original === "boolean"
+            ? raw === "true"
+            : raw;
+      if (
+        !raw ||
+        !edit.quote.trim() ||
+        (typeof value === "number" && !Number.isFinite(value)) ||
+        (typeof original === "boolean" && raw !== "true" && raw !== "false")
+      ) {
+        setErrorBanner(
+          "Điền giá trị metadata hợp lệ và đoạn trích nguyên văn.",
+        );
+        return;
+      }
+      const values = custom
+        ? { attributes: { [field]: value } }
+        : { [field]: value };
+      edits[proposal.id] = { values, quote: edit.quote.trim() };
+    }
+    const proposalInput = selectedProposalIds.length
+      ? {
+          metadata_proposal_ids: selectedProposalIds,
+          ...(Object.keys(edits).length
+            ? { metadata_proposal_edits: edits }
+            : {}),
+        }
+      : {};
 
     if (mode === "new") {
       const parsed = createDocumentSchema.safeParse({
@@ -173,6 +225,7 @@ export function RegisterDocumentDialog({
             title: title.trim(),
             compilation_run_id: compilationRunId,
             retrieval_metadata: retrievalMetadata,
+            ...proposalInput,
           },
           idempotencyKey,
         });
@@ -213,6 +266,7 @@ export function RegisterDocumentDialog({
           input: {
             compilation_run_id: compilationRunId,
             retrieval_metadata: retrievalMetadata,
+            ...proposalInput,
           },
           idempotencyKey,
         });
@@ -428,6 +482,47 @@ export function RegisterDocumentDialog({
             </div>
           )}
 
+          {proposals.length > 0 && (
+            <fieldset className="min-w-0 space-y-2 border-t pt-3">
+              <legend className="text-sm font-medium">
+                Xác nhận metadata theo nguồn
+              </legend>
+              <p className="text-xs text-muted-foreground">
+                Đã chọn {selectedProposalIds.length}/{proposals.length} đề xuất.
+                Chọn giá trị đã đối chiếu để lưu vào phiên bản này.
+              </p>
+              <ul className="max-h-64 divide-y overflow-y-auto pr-2">
+                {proposals.map((proposal) => (
+                  <MetadataProposalItem
+                    key={proposal.id}
+                    proposal={proposal}
+                    selected={selectedProposalIds.includes(proposal.id)}
+                    edit={proposalEdits[proposal.id]}
+                    disabled={isPending}
+                    onSelected={(selected) =>
+                      setSelectedProposalIds((current) =>
+                        selected
+                          ? [...current, proposal.id]
+                          : current.filter((id) => id !== proposal.id),
+                      )
+                    }
+                    onEdit={(edit) =>
+                      setProposalEdits((current) =>
+                        edit
+                          ? { ...current, [proposal.id]: edit }
+                          : Object.fromEntries(
+                              Object.entries(current).filter(
+                                ([id]) => id !== proposal.id,
+                              ),
+                            ),
+                      )
+                    }
+                  />
+                ))}
+              </ul>
+            </fieldset>
+          )}
+
           <Collapsible open={metadataOpen} onOpenChange={setMetadataOpen}>
             <CollapsibleTrigger asChild>
               <Button
@@ -439,7 +534,7 @@ export function RegisterDocumentDialog({
               >
                 <span className="flex items-center gap-1.5">
                   <Tags className="size-3.5 text-primary" />
-                  Metadata truy xuất
+                  Bổ sung metadata từ nguồn
                   {annotationDrafts.length > 0 ? (
                     <span className="text-[11px] text-muted-foreground">
                       ({annotationDrafts.length} mục)
@@ -458,7 +553,7 @@ export function RegisterDocumentDialog({
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="mt-2 rounded-lg border bg-muted/10 p-3">
+              <div className="mt-2 px-1 py-2">
                 <RetrievalMetadataEditor
                   drafts={annotationDrafts}
                   onChange={setAnnotationDrafts}
@@ -468,15 +563,13 @@ export function RegisterDocumentDialog({
             </CollapsibleContent>
           </Collapsible>
 
-          <div className="text-[11px] text-muted-foreground/80 flex items-center justify-between border-t pt-2">
-            <span>
-              Compiler Run:{" "}
-              <span className="font-mono">{compilationRunId}</span>
-            </span>
-            <span className="font-mono">
-              Key: {idempotencyKey.slice(0, 16)}...
-            </span>
-          </div>
+          {draftState !== "ready" && (
+            <p role="status" className="text-xs text-muted-foreground">
+              {draftState === "error"
+                ? "Chưa tải được bản biên soạn và đề xuất. Hãy đóng hộp thoại rồi mở lại."
+                : "Đang tải bản biên soạn và đề xuất metadata…"}
+            </p>
+          )}
 
           <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t">
             <Button
@@ -494,6 +587,7 @@ export function RegisterDocumentDialog({
               size="sm"
               disabled={
                 isPending ||
+                draftState !== "ready" ||
                 hasAnnotationIssues ||
                 (mode === "new" && (!title.trim() || !documentKey.trim())) ||
                 (mode === "existing" &&

@@ -151,13 +151,21 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
 
   // Changing a key the assistant policy pinned is rejected by the backend with
   // `conversation_scope_conflict`. Surface it here instead of failing the turn.
-  const scopeConflicts = Object.keys(explicitFilter).filter((key) => {
-    const pinned = fixedFilter[key as keyof MetadataFilter];
-    if (pinned === undefined || pinned === null) return false;
-    return (
-      String(pinned) !== String(explicitFilter[key as keyof MetadataFilter])
-    );
-  });
+  const scopeConflicts = [
+    ...Object.keys(explicitFilter).filter((key) => {
+      if (key === "attributes") return false;
+      const field = key as keyof MetadataFilter;
+      const pinned = fixedFilter[field];
+      return pinned != null && pinned !== explicitFilter[field];
+    }),
+    ...Object.entries(explicitFilter.attributes ?? {})
+      .filter(
+        ([key, value]) =>
+          Object.hasOwn(fixedFilter.attributes ?? {}, key) &&
+          fixedFilter.attributes?.[key] !== value,
+      )
+      .map(([key]) => key),
+  ];
 
   // Attempt tracking for idempotency & retry
   const [lastAttempt, setLastAttempt] = useState<{
@@ -664,6 +672,8 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
                 </p>
 
                 <MetadataFilterFields
+                  workspaceId={workspaceId}
+                  collectionId={assistant?.collection_id}
                   value={filterDraft}
                   onChange={setFilterDraft}
                   disabled={

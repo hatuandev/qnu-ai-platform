@@ -111,7 +111,11 @@ def validate_document(canonical: dict[str, Any], *, expected_pages: int) -> Repo
             )
         elif status == "completed" and not any(block.get("text") for block in blocks):
             errors.append(
-                Issue("page_without_content", "Trang ở trạng thái có nội dung nhưng không có khối nào.", number)
+                Issue(
+                    "page_without_content",
+                    "Trang ở trạng thái có nội dung nhưng không có khối nào.",
+                    number,
+                )
             )
         elif status == "blank" and any(block.get("text") for block in blocks):
             warnings.append(
@@ -127,9 +131,21 @@ def validate_document(canonical: dict[str, Any], *, expected_pages: int) -> Repo
             else:
                 seen_evidence.add(block_id)
             if block_id and block_id not in evidence_index:
-                errors.append(Issue("evidence_unmapped", f"Không có mapping cho {block_id}", number))
-            if not _valid_bbox(block.get("bbox") or {}):
-                errors.append(Issue("block_bbox_invalid", f"bbox không hợp lệ ở {block_id}", number))
+                errors.append(
+                    Issue("evidence_unmapped", f"Không có mapping cho {block_id}", number)
+                )
+            locator = block.get("source_locator") or {}
+            direct_word = (
+                canonical.get("processing", {}).get("renderer", {}).get("pagination") == "document"
+                and locator.get("format") == "docx"
+                and bool(locator.get("docling_ref"))
+            )
+            if not _valid_bbox(block.get("bbox") or {}) and not (
+                direct_word and not block.get("bbox")
+            ):
+                errors.append(
+                    Issue("block_bbox_invalid", f"bbox không hợp lệ ở {block_id}", number)
+                )
 
             table = block.get("table")
             if table is None:
@@ -137,7 +153,11 @@ def validate_document(canonical: dict[str, Any], *, expected_pages: int) -> Repo
             if table.get("status") == "parsed":
                 if not table.get("rows") or not _table_reconstructable(table):
                     errors.append(
-                        Issue("table_grid_inconsistent", f"Bảng không tái dựng được ở {block_id}", number)
+                        Issue(
+                            "table_grid_inconsistent",
+                            f"Bảng không tái dựng được ở {block_id}",
+                            number,
+                        )
                     )
                 for row in table.get("rows") or []:
                     for cell in row:
@@ -146,11 +166,17 @@ def validate_document(canonical: dict[str, Any], *, expected_pages: int) -> Repo
                             errors.append(Issue("evidence_missing", "Ô thiếu evidence_id.", number))
                             continue
                         if cell_id in seen_evidence:
-                            errors.append(Issue("evidence_duplicate", f"evidence_id trùng: {cell_id}", number))
+                            errors.append(
+                                Issue("evidence_duplicate", f"evidence_id trùng: {cell_id}", number)
+                            )
                         else:
                             seen_evidence.add(cell_id)
                         if cell_id not in evidence_index:
-                            errors.append(Issue("evidence_unmapped", f"Không có mapping cho {cell_id}", number))
+                            errors.append(
+                                Issue(
+                                    "evidence_unmapped", f"Không có mapping cho {cell_id}", number
+                                )
+                            )
             else:
                 warnings.append(
                     Issue(

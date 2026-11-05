@@ -1,7 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronRight } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Building2, FolderOpen, Library, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
+import { PageBreadcrumbs } from "@/components/admin/page-breadcrumbs";
 import { CompilationDialog } from "@/features/knowledge/compilation-dialog";
 import { CompilationRunsList } from "@/features/knowledge/compilation-runs-list";
 import { canCreateOrEditCompilation } from "@/features/knowledge/permissions";
@@ -57,35 +58,36 @@ function CompilationsListRoute() {
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
-        <Link
-          to="/workspaces/$workspaceId"
-          params={{ workspaceId }}
-          className="hover:text-foreground transition-colors"
-        >
-          Workspace
-        </Link>
-        <ChevronRight className="size-3 text-muted-foreground/60" />
-        <Link
-          to="/workspaces/$workspaceId/collections"
-          params={{ workspaceId }}
-          search={{ page: 1, pageSize: 20 }}
-          className="hover:text-foreground transition-colors"
-        >
-          Kho tri thức
-        </Link>
-        <ChevronRight className="size-3 text-muted-foreground/60" />
-        <Link
-          to="/workspaces/$workspaceId/collections/$collectionId"
-          params={{ workspaceId, collectionId }}
-          search={{ page: 1, pageSize: 20, tab: "compilations" }}
-          className="hover:text-foreground transition-colors truncate max-w-[150px]"
-        >
-          {collection?.name ?? "Bộ sưu tập"}
-        </Link>
-        <ChevronRight className="size-3 text-muted-foreground/60" />
-        <span className="font-medium text-foreground">Biên soạn tri thức</span>
-      </div>
+      <PageBreadcrumbs
+        items={[
+          {
+            label: "Workspace",
+            to: "/workspaces/$workspaceId",
+            params: { workspaceId },
+            icon: Building2,
+          },
+          {
+            label: "Kho tri thức",
+            to: "/workspaces/$workspaceId/collections",
+            params: { workspaceId },
+            search: { page: 1, pageSize: 20 },
+            icon: Library,
+          },
+          {
+            label: collection?.name ?? "Bộ sưu tập",
+            to: "/workspaces/$workspaceId/collections/$collectionId",
+            params: { workspaceId, collectionId },
+            search: { page: 1, pageSize: 20, tab: "compilations" },
+            icon: FolderOpen,
+            maxChars: 24,
+          },
+          {
+            label: "Biên soạn tri thức",
+            icon: Sparkles,
+            current: true,
+          },
+        ]}
+      />
 
       <CompilationRunsList
         page={search.page ?? 1}

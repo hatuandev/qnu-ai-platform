@@ -71,6 +71,7 @@ class Table:
     rows: tuple[tuple[Cell, ...], ...] = ()
     column_count: int = 0
     reason: str | None = None
+    source_mapping: dict | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,11 +80,13 @@ class Block:
     label: str
     kind: str
     text: str
-    bbox: tuple[float, float, float, float]
+    bbox: tuple[float, float, float, float] | None
     requires_review: bool
     table: Table | None = None
     origin: str = "ocr"
     image: dict | None = None
+    source_image_asset_no: int | None = None
+    source_locator: dict | None = None
 
 
 @dataclass(frozen=True, slots=True)

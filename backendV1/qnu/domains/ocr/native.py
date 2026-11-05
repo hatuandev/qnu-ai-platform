@@ -15,10 +15,10 @@ import pymupdf
 from qnu.domains.ocr.artifacts.render import RenderedDocument, _render_lock
 from qnu.domains.ocr.layout import Block, Cell, PageLayout, Table
 from qnu.domains.ocr.native_order import reading_order
-from qnu.domains.ocr.native_tables import table_regions
+from qnu.domains.ocr.native_tables import read_table, table_regions
 from qnu.platform.errors import AppException
 
-NATIVE_VERSION = "qnu-native/v1"
+NATIVE_VERSION = "qnu-native/v3"
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,7 @@ class NativePage:
     images: tuple[EmbeddedImage, ...]
     needs_ocr: bool
     native_text: bool
+    inspector_markdown: str | None = None
 
 
 @dataclass(frozen=True)
@@ -67,15 +68,20 @@ def _ordered(blocks, warnings=()):
     )
 
 
-def _page(page, number, blank):
+def _page(page, number, blank, *, geometry=None, read_region=None):
     bounds = page.rect
-    raw = page.get_text("dict", sort=True)
+    raw, detected = geometry if geometry is not None else (page.get_text("dict", sort=True), ())
     blocks, images, warnings = [], [], []
-    tables = table_regions(page)
+    tables = (
+        [(pymupdf.Rect(t.bbox), read_table(t, page, read_region)) for t in detected]
+        if geometry is not None
+        else table_regions(page)
+    )
     for rect, table in tables:
         text = "\n".join(" | ".join(c.text for c in row) for row in table.rows)
         if table.status != "parsed":
-            text = page.get_text("text", clip=rect)
+            original = page.get_text("text", clip=rect)
+            text = original if read_region is None else read_region(rect, original)
         blocks.append(
             Block(
                 0,
@@ -143,7 +149,8 @@ def _page(page, number, blank):
             ]
             if not spans:
                 continue
-            text = "".join(s["text"] for s in spans)
+            original = "".join(s["text"] for s in spans)
+            text = original if read_region is None else read_region(line["bbox"], original)
             if text.strip():
                 blocks.append(
                     Block(
@@ -210,7 +217,15 @@ def page_payload(page: NativePage, source_artifact: str) -> dict:
         "needs_ocr": page.needs_ocr,
         "native_text": page.native_text,
         "warnings": list(page.layout.warnings),
-        "blocks": [asdict(b) for b in page.layout.blocks],
+        **(
+            {"inspector_markdown": page.inspector_markdown}
+            if page.inspector_markdown is not None
+            else {}
+        ),
+        "blocks": [
+            {key: value for key, value in asdict(b).items() if key != "source_locator" or value}
+            for b in page.layout.blocks
+        ],
     }
 
 
@@ -222,13 +237,15 @@ def page_from_payload(payload: dict) -> NativePage:
     blocks = []
     for item in payload["blocks"]:
         record = dict(item)
-        record["bbox"] = tuple(record["bbox"])
+        if record["bbox"] is not None:
+            record["bbox"] = tuple(record["bbox"])
         if table := record.get("table"):
             record["table"] = Table(
                 table["status"],
                 tuple(tuple(Cell(**c) for c in row) for row in table["rows"]),
                 table["column_count"],
                 table["reason"],
+                table.get("source_mapping"),
             )
         blocks.append(Block(**record))
     return NativePage(
@@ -237,20 +254,29 @@ def page_from_payload(payload: dict) -> NativePage:
         (),
         payload["needs_ocr"],
         payload["native_text"],
+        payload.get("inspector_markdown"),
     )
 
 
 def merge_layout(native: NativePage, ocr: PageLayout | None) -> PageLayout:
     images = [b for b in native.layout.blocks if b.image]
+    warnings = tuple(dict.fromkeys((*native.layout.warnings, *(ocr.warnings if ocr else ()))))
     if not native.native_text:
-        return _ordered(images + list(ocr.blocks if ocr else ()), native.layout.warnings)
+        return _ordered(images + list(ocr.blocks if ocr else ()), warnings)
     extra = []
-    for block in ocr.blocks if ocr else ():
+    for block in sorted(ocr.blocks if ocr else (), key=lambda b: b.source_image_asset_no is None):
         rect = pymupdf.Rect(block.bbox)
         # Most of a supplementary OCR block must lie inside an embedded picture.
-        if any(
+        inside = any(
             (rect & pymupdf.Rect(image.bbox)).get_area() >= rect.get_area() * 0.5
             for image in images
-        ):
+        )
+        duplicate = any(
+            block.text.strip()
+            and " ".join(block.text.split()) == " ".join(old.text.split())
+            and (rect & pymupdf.Rect(old.bbox)).get_area() >= rect.get_area() * 0.5
+            for old in (*native.layout.blocks, *extra)
+        )
+        if inside and not duplicate:
             extra.append(block)
-    return _ordered(list(native.layout.blocks) + extra, native.layout.warnings)
+    return _ordered(list(native.layout.blocks) + extra, warnings)

@@ -22,6 +22,7 @@ dependencies = [
     "python-multipart>=0.0.18",
     "pymupdf>=1.24,<2",
     "docling-slim[format-docx]==2.145.0",
+    "pdf-inspector==1.25.2",
 ]
 
 [project.optional-dependencies]

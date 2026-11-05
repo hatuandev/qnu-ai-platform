@@ -62,7 +62,7 @@ Tài liệu này là **quy tắc bắt buộc (Hard Rule)** cho mọi AI Model (
 
 1. **Khung xem bản gốc (Left Pane — Original Preview)**:
    - Mặc định ở chế độ **Vừa chiều ngang (`Fit-to-Width` — `w-full max-w-full h-auto`)** để văn bản đọc rõ ngay khi mở trang, kèm nút chuyển nhanh sang `Trọn trang` (`Fit-to-Page`) và phóng to/thu nhỏ.
-   - Tài liệu Word (`.docx`) được chuyển đổi chuẩn xác sang PDF/ảnh trang qua Gotenberg ở tầng Backend để hiển thị trực tiếp như PDF.
+   - Hiển thị tệp Word (`.docx`) gốc bằng `docx-preview`. Khi lượt bóc tách có `pagination=document`, đối chiếu theo nội dung Word. PDF giữ điều hướng theo trang.
 2. **Mặt giấy hiệu đính liền mạch (Right Pane — Document Sheet Canvas)**:
    - ❌ **Nghiêm cấm**: Đóng khung từng dòng/đoạn văn ngắn thành hàng chục hộp `<Card>` rời rạc với badge `text` và nút `Sửa` cố định làm nát mạch văn bản.
    - ✅ **Chuẩn mực**: Trình bày toàn bộ các đoạn văn và bảng biểu của trang trên một **mặt giấy liền mạch (`bg-card border rounded-xl p-6 shadow-2xs`)** giữ đúng nhịp điệu văn bản hành chính/học thuật.

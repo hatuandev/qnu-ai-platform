@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.knowledge.compilation.supplement import confirm
 from qnu.domains.knowledge.publication.access import authorize, document
 from qnu.domains.knowledge.publication.evidence import digest, load_bundle, registered_bundle_hash
 from qnu.domains.knowledge.publication.models import (
@@ -50,6 +51,24 @@ async def _replay(
     return Registration(doc, row, False)
 
 
+def _request_payload(req: RegisterVersionRequest) -> dict:
+    payload = req.model_dump(mode="json")
+    for field in ("metadata_proposal_ids", "metadata_proposal_edits", "retrieval_metadata"):
+        if not payload[field]:
+            del payload[field]
+    for item in payload.get("retrieval_metadata", []):
+        if item["values"].get("attributes") is None:
+            item["values"].pop("attributes", None)
+    if req.metadata_proposal_edits:
+        payload["metadata_proposal_edits"] = {
+            key: value.model_dump(mode="json", exclude_none=True)
+            for key, value in req.metadata_proposal_edits.items()
+        }
+    if req.metadata_proposal_ids:
+        payload["metadata_proposal_ids"] = sorted(req.metadata_proposal_ids)
+    return payload
+
+
 async def create_document(
     db: AsyncSession,
     blob: BlobStore,
@@ -64,9 +83,7 @@ async def create_document(
         {
             "operation": "create_document",
             "collection_id": collection_id,
-            **req.model_dump(
-                mode="json", exclude={"retrieval_metadata"} if not req.retrieval_metadata else set()
-            ),
+            **_request_payload(req),
         }
     )
     old = await _replay(db, workspace_id, actor, key, request_hash)
@@ -115,9 +132,7 @@ async def register_version(
             "operation": "register_version",
             "document_id": document_id,
             "collection_id": collection_id,
-            **req.model_dump(
-                mode="json", exclude={"retrieval_metadata"} if not req.retrieval_metadata else set()
-            ),
+            **_request_payload(req),
         }
     )
     old = await _replay(db, workspace_id, actor, key, request_hash)
@@ -137,7 +152,12 @@ async def _register(
 ) -> Registration:
     run_id = req.compilation_run_id
     bundle = await load_bundle(db, blob, doc.workspace_id, doc.collection_id, run_id)
-    annotations = [a.model_dump(mode="json", exclude_none=True) for a in req.retrieval_metadata]
+    annotations = confirm(
+        bundle.content,
+        req.metadata_proposal_ids,
+        [a.model_dump(mode="json", exclude_none=True) for a in req.retrieval_metadata],
+        _request_payload(req).get("metadata_proposal_edits", {}),
+    )
     bundle_hash = registered_bundle_hash(bundle, annotations)
     if await db.scalar(
         select(CompiledVersion.id).where(CompiledVersion.compilation_run_id == run_id)
@@ -160,7 +180,26 @@ async def _register(
         markdown_sha256=bundle.markdown_sha256,
         bundle_sha256=bundle_hash,
         retrieval_metadata=annotations,
-        provenance=bundle.provenance,
+        provenance={
+            **bundle.provenance,
+            **(
+                {
+                    "metadata_confirmation": {
+                        "status": "confirmed",
+                        "proposal_ids": sorted(req.metadata_proposal_ids),
+                        **(
+                            {"edited_proposal_ids": sorted(req.metadata_proposal_edits)}
+                            if req.metadata_proposal_edits
+                            else {}
+                        ),
+                        "confirmed_by": actor_ref(actor),
+                        "input_sha256": bundle.input_sha256,
+                    }
+                }
+                if req.metadata_proposal_ids
+                else {}
+            ),
+        },
         created_by=actor_ref(actor),
         idempotency_key=key,
         request_hash=request_hash,

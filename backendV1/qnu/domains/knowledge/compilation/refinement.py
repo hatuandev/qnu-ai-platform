@@ -171,7 +171,9 @@ async def create_children(
             json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()
         ).hexdigest()
         schema = (
-            split.segment_schema(citations) if segment.config.get("structured_output") else None
+            split.segment_schema(citations, plan.projection)
+            if segment.config.get("structured_output")
+            else None
         )
         schema_hash = hashlib.sha256(json_bytes(schema)).hexdigest() if schema else None
         scope.update(input_sha256=input_hash, schema_sha256=schema_hash)

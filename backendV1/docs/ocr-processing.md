@@ -4,11 +4,25 @@ Context710 bổ sung upload tự bóc tách, native-first và ZIP MD/JSON/ảnh.
 toàn trang thủ công bên dưới vẫn giữ tương thích. Xem [quy trình43](../../docs/quy_trinh/43_boc_tach_tu_dong_backend_v1.md)
 cho mode auto, migration0007, quyền và giới hạn; native không tạo raw provider giả.
 
+Native v2 (phiên870) bổ sung giữ thứ tự ký tự trong cell và OCR ảnh nhúng qua
+MinerU theo vùng có tọa độ nguồn. Xem mục “Chữ bên trong ảnh nhúng với MinerU”
+ở quy trình43. Dữ liệu cũ giữ nguyên; muốn áp dụng cần lượt bóc tách mới.
+
+PDF tự động mới dùng PDF Inspector đọc lớp chữ và phân loại từng trang. PyMuPDF
+đo vùng dẫn chứng, dựng lưới bảng và kết xuất ảnh xem trước. Nếu chữ trong một
+vùng khác với lớp chữ tại vị trí đo được, giữ chữ nguồn của vùng đó và ghi số
+vùng phục hồi trong cảnh báo trang. MinerU nhận riêng các trang cần OCR hoặc
+ảnh raster nhúng và trả kết quả về tọa độ gốc.
+
+DOCX mới dùng Docling đọc trực tiếp gói Word. Văn bản, bảng, giá trị trường đã lưu
+và vị trí nguồn lấy từ DOCX. MinerU xử lý ảnh raster nhúng. Các artifact từ
+luồng DOCX chuyển PDF trước đây vẫn đọc được.
+
 Luồng biến một revision đã lưu thành bằng chứng OCR có thể kiểm chứng:
 
 ```
 upload PDF/DOCX → revision gốc bất biến → yêu cầu xử lý (cùng transaction)
-→ dispatch sau commit → worker claim → render trang → OCR từng trang qua ModelOps
+→ dispatch sau commit → worker claim → Docling cho DOCX hoặc PDF Inspector cho PDF tự động
 → raw response + canonical JSON + Markdown + manifest → đọc qua API
 ```
 
@@ -61,20 +75,17 @@ Ràng buộc đáng chú ý:
 `pages_done`/`pages_failed` là số đếm thật từ canonical, không phải phần trăm ước lượng.
 Run chỉ `completed` khi không còn trang lỗi/không xác định.
 
-## 3. Render
+## 3. Bóc tách và vị trí nguồn
 
 | Định dạng | Cách làm | Artifact |
 |---|---|---|
 | `.pdf` | rasterize từng trang bằng PyMuPDF (`pdf-direct`) | `page_image` |
-| `.docx` | `word/document.xml` → HTML → `pymupdf.Story` → PDF fixed-layout → rasterize (`docx-story`) | `render_pdf` + `page_image` |
+| `.docx` | Docling đọc gói Word trực tiếp, MinerU bổ sung chữ trong ảnh nhúng | `native_page` và `embedded_image` khi có ảnh |
 
-DOCX không có layout cố định, nên bản PDF trung gian **được lưu lại** vì đó chính là thứ
-OCR đã nhìn. Renderer ghi lại `converter`, `dpi`, phiên bản PyMuPDF và hash của cả hai
-loại artifact.
-
-Cấu trúc gốc của DOCX (bảng, span, footnote) được chiếu sang HTML để giữ vị trí và bảng;
-nó **không** được dùng để ghi đè kết quả OCR. Nếu OCR trả về bảng không tái dựng được,
-bảng giữ `status="unsupported"` + raw text và bị đánh dấu cần review.
+DOCX có `pagination=document` và một đơn vị logic dùng chung contract với PDF.
+`source_locator` ghi tham chiếu Docling và đường dẫn OOXML khi có. Bbox OCR trong
+DOCX quy chiếu theo ảnh nhúng. Giao diện mở tệp Word gốc để đối chiếu. Bảng vượt
+phạm vi cấu trúc hỗ trợ giữ văn bản và đánh dấu cần rà soát.
 
 ## 4. Artifact
 
@@ -86,7 +97,7 @@ v1/workspaces/{workspace_id}/ocr/{run_id}/{kind}/p{page:04d}-{sha256}.{ext}
 
 | `kind` | Nội dung |
 |---|---|
-| `render_pdf` | PDF fixed-layout của DOCX (không có với PDF đầu vào) |
+| `render_pdf` | PDF fixed-layout của các lượt DOCX cũ |
 | `page_image` | PNG từng trang, đúng bytes đã gửi provider |
 | `raw_response` | nguyên văn JSON provider trả về cho trang đó |
 | `canonical_json` | tài liệu chuẩn `qnu.ocr.document/v1` |
@@ -223,9 +234,8 @@ truncated, malformed và layout lỗi. Raw lỗi không được phục vụ nh�
 Run ghim hash endpoint/model/capacity/prompt; thay target không được trộn vào cùng
 generation. Kết quả hoàn tất chỉ reuse khi identity hiện tại vẫn tương thích.
 
-DOCX có header/footer tham chiếu theo section hiện trả docx_layout_unsupported,
-giữ nguyên file gốc. Converter Story hiện tại chưa bảo toàn chúng; dùng PDF đã
-giữ bố cục nếu cần xử lý. Không còn render body-only rồi âm thầm coi là đủ nội dung.
+Header, footer và footnote Word được đọc theo cấu trúc Docling. Các bản ghi cũ
+giữ nguyên bằng chứng và trạng thái lỗi đã lưu.
 
 ## 9. Cấu hình
 
@@ -274,7 +284,7 @@ input bound có căn cứ + output đã kiểm; unknown bị chặn trước HTT
 | `ocr_output_truncated` | 422 | đầu ra bị cắt, chưa đủ bằng chứng |
 | `ocr_input_empty` | 422 | ảnh trang rỗng |
 | `pdf_invalid`, `pdf_encrypted`, `pdf_no_pages`, `document_too_many_pages` | 422 | PDF không render được |
-| `docx_invalid` | 422 | gói DOCX hỏng |
+| `docx_source_invalid`, `docx_source_incomplete`, `docx_empty` | 422 | Docling không đọc được đầy đủ cấu trúc hoặc không có nội dung |
 | `page_image_too_large` | 422 | ảnh trang vượt trần |
 | `revision_content_mismatch` | 409 | bytes không còn khớp hash đã ghim |
 | `render_mismatch` | 409 | số trang/ảnh khác lần chạy trước |
@@ -301,11 +311,7 @@ cd backendV1
 
 - Chưa có Compiler, chunk, embedding, index, publication, RAG, frontend.
 - Chưa hỗ trợ `.xlsx`, `.txt`, `.md` cho OCR — API trả 415 rõ ràng, tệp vẫn được lưu.
-- DOCX mới ghim `DOCX_CONVERTER` (mặc định Gotenberg LibreOffice), endpoint từ Settings,
-  revision triển khai `DOCX_RENDERER_REVISION` và phiên bản PyMuPDF. Gotenberg lỗi
-  không tự fallback sang Story. Chọn Story tường minh nếu cần layout gần đúng.
-- Retry DOCX dùng lại PDF đã lưu và kiểm checksum; không chuyển đổi lại tệp gốc.
-  Khi đổi image/font/options, cập nhật revision triển khai để tránh reuse job cũ.
-  Metadata phiên bản Gotenberg thực không được suy từ phiên bản PyMuPDF.
+- Lượt DOCX mới ghim phiên bản luồng Docling. Lượt cũ chưa hoàn tất cần tạo lại
+  từ revision Word gốc. Đồ họa Word chưa đọc được có cảnh báo để đối chiếu.
 - Bảng không tái dựng được giữ raw + cảnh báo, không được tự "đoán" lại.
 - Chưa có backfill tự động cho revision cũ: phải gọi API.

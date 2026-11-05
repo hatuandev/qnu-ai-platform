@@ -184,3 +184,22 @@ it("opens the source picker for compilation started from a collection", () => {
       .hasAttribute("disabled"),
   ).toBe(true);
 });
+it("sends the hybrid mode with the saved source version and an automatic budget", async () => {
+  render(<CompilationDialog {...props} initialRun={run} />);
+  fireEvent.click(screen.getByRole("checkbox", { name: "Biên soạn nhanh" }));
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: "AI bổ sung cấu trúc và metadata" }),
+  );
+  expect(screen.getByRole("button", { name: "Cài đặt nâng cao" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu biên soạn" }));
+  await waitFor(() => expect(create).toHaveBeenCalledOnce());
+  const input = create.mock.calls[0][0].input;
+  expect(input).toMatchObject({
+    ai_supplement: true,
+    text_versions: { "run-1": 1 },
+    provider_id: null,
+    max_output_tokens: null,
+    auto_review: false,
+  });
+  expect(input).not.toHaveProperty("source_first");
+});

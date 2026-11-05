@@ -4,14 +4,16 @@ import {
   ArrowLeft,
   BookOpen,
   BookPlus,
-  ChevronRight,
+  Building2,
   Download,
   FileCheck2,
   FileCode,
   FileEdit,
+  FolderOpen,
   GitBranch,
   HelpCircle,
   Layers,
+  Library,
   Loader2,
   Sparkles,
 } from "lucide-react";
@@ -19,6 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { v1Client } from "@/app/api/v1";
 import { useV1Auth } from "@/app/auth/v1";
+import { PageBreadcrumbs } from "@/components/admin/page-breadcrumbs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -129,7 +132,11 @@ function CompilationDetailSession({
     workspaceId,
     collectionId,
     runId,
-    { enabled: Boolean(isCompleted && visitedTabs.has("draft")) },
+    {
+      enabled: Boolean(
+        isCompleted && (visitedTabs.has("draft") || isRegisterDialogOpen),
+      ),
+    },
   );
 
   const draft = draftQuery.data;
@@ -267,37 +274,36 @@ function CompilationDetailSession({
   return (
     <div className="space-y-6">
       {/* Breadcrumbs */}
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
-        <Link
-          to="/workspaces/$workspaceId"
-          params={{ workspaceId }}
-          className="hover:text-foreground transition-colors"
-        >
-          Workspace
-        </Link>
-        <ChevronRight className="size-3 text-muted-foreground/60" />
-        <Link
-          to="/workspaces/$workspaceId/collections"
-          params={{ workspaceId }}
-          search={{ page: 1, pageSize: 20 }}
-          className="hover:text-foreground transition-colors"
-        >
-          Kho tri thức
-        </Link>
-        <ChevronRight className="size-3 text-muted-foreground/60" />
-        <Link
-          to="/workspaces/$workspaceId/collections/$collectionId"
-          params={{ workspaceId, collectionId }}
-          search={{ page: 1, pageSize: 20, tab: "compilations" }}
-          className="hover:text-foreground transition-colors truncate max-w-[150px]"
-        >
-          {collection?.name ?? "Bộ sưu tập"}
-        </Link>
-        <ChevronRight className="size-3 text-muted-foreground/60" />
-        <span className="font-medium text-foreground">
-          Biên soạn Gen #{run.generation}
-        </span>
-      </div>
+      <PageBreadcrumbs
+        items={[
+          {
+            label: "Workspace",
+            to: "/workspaces/$workspaceId",
+            params: { workspaceId },
+            icon: Building2,
+          },
+          {
+            label: "Kho tri thức",
+            to: "/workspaces/$workspaceId/collections",
+            params: { workspaceId },
+            search: { page: 1, pageSize: 20 },
+            icon: Library,
+          },
+          {
+            label: collection?.name ?? "Bộ sưu tập",
+            to: "/workspaces/$workspaceId/collections/$collectionId",
+            params: { workspaceId, collectionId },
+            search: { page: 1, pageSize: 20, tab: "compilations" },
+            icon: FolderOpen,
+            maxChars: 24,
+          },
+          {
+            label: `Biên soạn Gen #${run.generation}`,
+            icon: Sparkles,
+            current: true,
+          },
+        ]}
+      />
 
       {/* Header Summary Card */}
       <Card className="rounded-xl shadow-2xs">
@@ -413,7 +419,9 @@ function CompilationDetailSession({
                   <Sparkles className="size-3" />
                   {run.source_first
                     ? "Biên soạn nhanh từ nguồn"
-                    : "AI Compiler"}
+                    : run.ai_supplement
+                      ? "Biên soạn nhanh + AI bổ sung"
+                      : "AI Compiler"}
                 </span>
               )}
             </div>
@@ -552,6 +560,35 @@ function CompilationDetailSession({
             </Card>
           ) : (
             <div className="space-y-6">
+              {draft.supplement &&
+                (draft.supplement.sections.length > 0 ||
+                  draft.supplement.metadata.length > 0) && (
+                  <section className="space-y-2 text-sm">
+                    <h2 className="font-semibold">Đề xuất bổ sung</h2>
+                    <p className="text-muted-foreground">
+                      {draft.supplement.metadata.length} đề xuất metadata có dẫn
+                      chứng. Có thể đối chiếu và xác nhận khi đăng ký tài liệu.
+                    </p>
+                    {draft.supplement.sections.map((part) => (
+                      <details key={part.segment} className="border-b py-2">
+                        <summary className="cursor-pointer">
+                          Gợi ý AI · Nhóm {part.segment}
+                        </summary>
+                        <div className="space-y-2 py-2">
+                          <CompilationDraftSections
+                            sections={part.sections}
+                            onSelectCitation={handleOpenCitation}
+                          />
+                          {part.unknowns.length > 0 && (
+                            <p className="text-muted-foreground">
+                              Cần đối chiếu · {part.unknowns.join(" · ")}
+                            </p>
+                          )}
+                        </div>
+                      </details>
+                    ))}
+                  </section>
+                )}
               {/* Draft Document View */}
               <Card className="rounded-xl shadow-2xs">
                 <CardHeader className="p-4 sm:p-5 border-b bg-muted/10">
@@ -768,6 +805,8 @@ function CompilationDetailSession({
         collectionId={collectionId}
         compilationRunId={run.id}
         defaultTitle={draft?.title || run.topic}
+        proposals={draft?.supplement?.metadata}
+        draftState={draft ? "ready" : draftQuery.isError ? "error" : "loading"}
         isOpen={isRegisterDialogOpen}
         onClose={() => setIsRegisterDialogOpen(false)}
         onSuccess={(docId, verId) => {

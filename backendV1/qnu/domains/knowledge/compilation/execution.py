@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.identity.background import background_actor
 from qnu.domains.knowledge.compilation import outputs as compilation_outputs
-from qnu.domains.knowledge.compilation import refinement
+from qnu.domains.knowledge.compilation import refinement, supplement
 from qnu.domains.knowledge.compilation import segments as split
 from qnu.domains.knowledge.compilation.artifacts import (
     artifact,
@@ -144,6 +144,9 @@ async def _compile(db: AsyncSession, blob: BlobStore, run: CompilationRun, model
     documents = await _inputs(db, blob, run)
     if run.source_first:
         draft = await asyncio.to_thread(build_source_draft, run.topic, documents, run.id)
+        draft = await asyncio.to_thread(
+            supplement.attach, draft, documents, [], run.input_sha256, {}
+        )
         await _store_final_draft(db, blob, run, draft)
         return await finish(db, run, "completed")
     if run.config.get("workflow_version") == "qnu.compiler.workflow/v2":
@@ -468,6 +471,8 @@ async def _run_segment(
         "sections": split._merge_sections(drafts),
         "unknowns": list(dict.fromkeys(item for d in drafts for item in d["unknowns"])),
     }
+    if run.config.get("ai_supplement"):
+        draft["metadata"] = [item for child in drafts for item in child.get("metadata", [])]
     own = segment.config["refined_usage_tokens"]
     segment.usage_tokens = (
         own + sum(child.usage_tokens for child in parts)
@@ -515,7 +520,7 @@ async def _run_leaf(
         payload, segment.segment_index, total, projection=plan.projection
     )
     structured = bool(segment.config.get("structured_output"))
-    schema = split.segment_schema(citations) if structured else None
+    schema = split.segment_schema(citations, plan.projection) if structured else None
     if (
         hashlib.sha256(messages[-1].content.encode("utf-8")).hexdigest() != segment.input_sha256
         or segment.prompt_version != split.prompt_version_for(plan.projection)
@@ -629,7 +634,12 @@ async def _run_leaf(
         await commit_owned(db, run)
         await _settle_part_usage(usage.id, result.total_tokens, failed=False)
         content = result.content
-    draft = split.parse_segment_draft(content, set(citations))
+    draft = split.parse_segment_draft(content, set(citations), plan.projection)
+    if plan.projection == split.PROJECTION_SUPPLEMENT:
+        from qnu.domains.knowledge.compilation.projection import project_documents
+
+        owned = project_documents(documents, plan.owned, [])
+        draft["metadata"] = supplement.owned_metadata(draft, owned)
     if run.config.get("refinement"):
         await refinement.save_pair(
             db, blob, run, segment, refinement.node_content(segment, draft, documents)
@@ -714,23 +724,56 @@ async def _store_generation(
     )
 
 
+def _source_with_supplement(
+    run: CompilationRun,
+    documents: list[dict],
+    parts: list[tuple[int, dict]],
+    coverage: dict,
+    partial: bool,
+) -> dict:
+    draft = build_source_draft(run.topic, documents, run.id)
+    draft["segmentation"] = coverage
+    draft["partial"] = partial
+    return supplement.attach(draft, documents, parts, run.input_sha256, run.config)
+
+
+async def _merged_draft(
+    run: CompilationRun,
+    documents: list[dict],
+    parts: list[tuple[int, dict]],
+    coverage: dict,
+    *,
+    partial: bool,
+) -> dict:
+    if run.config.get("ai_supplement"):
+        return await asyncio.to_thread(
+            _source_with_supplement, run, documents, parts, coverage, partial
+        )
+    draft = split.merge_parts_in_order(
+        parts,
+        run.topic,
+        documents,
+        run.id,
+        partial=partial,
+        segmentation=coverage,
+    )
+    if not partial:
+        await asyncio.to_thread(supplement.attach, draft, documents, [], run.input_sha256, {})
+    return draft
+
+
 async def _write_partial(
     db: AsyncSession, blob: BlobStore, run: CompilationRun, documents: list[dict]
 ) -> None:
     """Single writer for partial generations; called only by the orchestrator."""
     segments = await _segments(db, run.id)
-    if not any(segment.status == "completed" for segment in segments):
+    if not run.config.get("ai_supplement") and not any(
+        segment.status == "completed" for segment in segments
+    ):
         return
     parts = await _completed_parts(db, blob, segments)
     coverage = _coverage(segments)
-    merged = split.merge_parts_in_order(
-        parts,
-        run.topic,
-        documents,
-        run.id,
-        partial=True,
-        segmentation=coverage,
-    )
+    merged = await _merged_draft(run, documents, parts, coverage, partial=True)
     await compilation_outputs.store_output(
         db,
         blob,
@@ -849,6 +892,8 @@ async def _compile_segmented(
     if not segments:
         return await finish(db, run, "failed", "compilation_segment_manifest_mismatch")
     await _verify_manifest(db, blob, run, segments)
+    if run.config.get("ai_supplement") and await compilation_outputs.latest(db, run.id) is None:
+        await _write_partial(db, blob, run, documents)
     for segment in segments:
         if segment.status == "completed":
             continue
@@ -920,14 +965,7 @@ async def _compile_segmented(
     if coverage["state"] != "completed":
         return await finish(db, run, "failed", "compilation_segments_incomplete")
     parts = await _completed_parts(db, blob, segments)
-    draft = split.merge_parts_in_order(
-        parts,
-        run.topic,
-        documents,
-        run.id,
-        partial=False,
-        segmentation=coverage,
-    )
+    draft = await _merged_draft(run, documents, parts, coverage, partial=False)
     await assert_claim(db, run)
     draft["compilation_nodes"] = [
         {

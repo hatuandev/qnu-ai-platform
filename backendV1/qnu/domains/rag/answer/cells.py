@@ -32,6 +32,7 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
     """No cross-publication joins or header inference from neighboring text."""
     by_chunk = {s.chunk_id: s for s in sources}
     relationships = {link["chunk_id"]: link for link in links or []}
+    support_headers = {key: link for link in links or [] for key in link.get("support_ids", [])}
     tables, issues = [], []
     for source in sources:
         structure = source.structure or {}
@@ -44,13 +45,15 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
         headers = header_rows(structure)
         header_source, header_positions = source, positions
         link = relationships.get(source.chunk_id)
-        if not headers and link:
+        header_link = link or support_headers.get(source.chunk_id)
+        if not headers and header_link:
             candidates = [
                 by_chunk[key]
-                for key in link.get("support_ids", [])
+                for key in header_link.get("support_ids", [])
                 if key in by_chunk
                 and _same_input(source, by_chunk[key])
-                and (by_chunk[key].structure or {}).get("source_table_citation") == link["header"]
+                and (by_chunk[key].structure or {}).get("source_table_citation")
+                == header_link["header"]
                 and 0 in by_chunk[key].structure.get("row_indices", [])
             ]
             if candidates:
@@ -59,7 +62,7 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
                 # Legacy native dependency proof verifies a single unmarked header row.
                 headers = header_rows(header_source.structure) or (
                     [0]
-                    if link.get("basis")
+                    if header_link.get("basis")
                     in {"native_numbered_table_boundary/v1", "native_typed_columns/v1"}
                     else []
                 )

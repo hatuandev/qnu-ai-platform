@@ -52,12 +52,12 @@ _render_lock = asyncio.Lock()
 @dataclass(frozen=True, slots=True)
 class PageImage:
     page_number: int
-    png: bytes
-    width: int
-    height: int
-    sha256: str
+    png: bytes | None
+    width: int | None
+    height: int | None
+    sha256: str | None
     blank: bool
-    ink_ratio: float
+    ink_ratio: float | None
 
 
 @dataclass(frozen=True, slots=True)

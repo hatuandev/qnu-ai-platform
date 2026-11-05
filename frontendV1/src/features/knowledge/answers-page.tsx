@@ -212,6 +212,8 @@ export function AnswerForm({ workspaceId, collectionId }: Props) {
             <form.Subscribe selector={(s) => s.values.metadata}>
               {(metadata) => (
                 <MetadataFilterFields
+                  workspaceId={workspaceId}
+                  collectionId={collectionId}
                   value={metadata}
                   disabled={busy}
                   onChange={(v) => form.setFieldValue("metadata", v)}

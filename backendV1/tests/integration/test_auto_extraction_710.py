@@ -94,7 +94,13 @@ def test_default_upload_is_durable_and_native_without_model_or_quota(client):
         assert "Source 2023" in archive.read("document.md").decode()
 
 
-def test_docx_table_has_real_structure_and_original_is_unchanged(client):
+def test_docx_table_has_real_structure_and_original_is_unchanged(client, monkeypatch):
+    from qnu.domains.ocr import automatic
+
+    async def forbidden_render(*args, **kwargs):
+        pytest.fail("Word source must never enter the PDF renderer")
+
+    monkeypatch.setattr(automatic, "_render_for_run", forbidden_render)
     data = docx_with_table()
     _, _, body, run, url, _ = setup(client, data, "source.docx")
     assert execute_now(client, run["id"]).status == "completed"
@@ -111,6 +117,15 @@ def test_docx_table_has_real_structure_and_original_is_unchanged(client):
     content_url = url.split("/processing-runs/")[0] + "/content"
     assert client.get(content_url).content == data
     assert body["source"]["status"] == "stored"
+    assert run["pagination"] == "document"
+    assert doc["processing"]["provider"] is None
+    assert all(
+        not b["bbox"] and b["source_locator"]["format"] == "docx" for b in doc["pages"][0]["blocks"]
+    )
+    kinds = {a["kind"] for a in client.get(url + "/manifest").json()["artifacts"]}
+    assert kinds.isdisjoint({"render_pdf", "page_image", "raw_response"})
+    pdf = client.get(url + "/pdf")
+    assert pdf.status_code == 409 and pdf.json()["code"] == "run_not_ready"
 
 
 def test_mixed_page_preserves_native_text_image_and_raw_ocr(client):

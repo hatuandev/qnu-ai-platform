@@ -1,4 +1,4 @@
-import type { RetrievalAnnotation } from "../rag/types";
+import type { MetadataValues, RetrievalAnnotation } from "../rag/types";
 import type { ReviewFinding } from "./compilation-types";
 
 /**
@@ -93,11 +93,21 @@ export interface CreateDocumentRequest {
   title: string;
   compilation_run_id: string;
   retrieval_metadata?: RetrievalAnnotation[];
+  metadata_proposal_ids?: string[];
+  metadata_proposal_edits?: Record<
+    string,
+    { values: MetadataValues; quote: string }
+  >;
 }
 
 export interface RegisterVersionRequest {
   compilation_run_id: string;
   retrieval_metadata?: RetrievalAnnotation[];
+  metadata_proposal_ids?: string[];
+  metadata_proposal_edits?: Record<
+    string,
+    { values: MetadataValues; quote: string }
+  >;
 }
 
 export interface DecisionPreviewRequest {

@@ -89,6 +89,40 @@ class IndexRun(Base):
     batch_receipts: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     manifest_key: Mapped[str | None] = mapped_column(String(512))
     manifest_sha256: Mapped[str | None] = mapped_column(String(64))
+    vectors_retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class IndexSync(Base):
+    """Transactional publication outbox, coalesced by collection."""
+
+    __tablename__ = "kb_index_sync"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["collection_id", "workspace_id"],
+            ["kb_collections.id", "kb_collections.workspace_id"],
+            ondelete="CASCADE",
+        ),
+        CheckConstraint("revision >= 1 AND run_revision >= 0", name="ck_index_sync_revision"),
+        CheckConstraint(
+            "status IN ('pending','building','ready','failed','uncertain')",
+            name="ck_index_sync_status",
+        ),
+    )
+    collection_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    revision: Mapped[int] = mapped_column(nullable=False, default=1)
+    run_revision: Mapped[int] = mapped_column(nullable=False, default=0)
+    requested_by: Mapped[str] = mapped_column(String(200), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    run_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("kb_index_runs.id", ondelete="SET NULL")
+    )
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    retry_receipts: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
 class IndexInput(Base):

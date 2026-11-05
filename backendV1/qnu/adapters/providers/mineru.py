@@ -73,6 +73,9 @@ class MineruOcrEngine:
         checksum = hashlib.sha256(pdf).hexdigest()
         if state and state.get("input_sha256") != checksum:
             raise error("mineru_checkpoint_mismatch")
+        if state and state.get("ocr_mode", "auto") != request.ocr_mode:
+            raise error("mineru_checkpoint_mismatch")
+        state["ocr_mode"] = request.ocr_mode
         timeout = httpx.Timeout(request.timeout_seconds, connect=min(10, request.timeout_seconds))
         try:
             async with httpx.AsyncClient(
@@ -112,7 +115,7 @@ class MineruOcrEngine:
                         {"file_name": "document.pdf", "bytes": len(pdf), "sha256sum": checksum}
                     ],
                     "tier": "standard",
-                    "ocr_mode": "auto",
+                    "ocr_mode": state["ocr_mode"],
                     "output_formats": ["default"],
                 },
             )
@@ -147,8 +150,10 @@ class MineruOcrEngine:
                 raise error("mineru_response_invalid")
             files = data.get("files")
             if (
-                not isinstance(files, list) or len(files) != 1
-                or not isinstance(files[0], dict) or files[0].get("file_id") != file
+                not isinstance(files, list)
+                or len(files) != 1
+                or not isinstance(files[0], dict)
+                or files[0].get("file_id") != file
             ):
                 raise error("mineru_response_invalid")
             if data.get("status") == "completed":

@@ -61,6 +61,7 @@ import type {
 import { useCollectionsQuery } from "@/features/knowledge/queries";
 import { ConsumerModelBudgetNotice } from "@/features/modelops/capacity-badge";
 import { useCatalogQuery } from "@/features/modelops/queries";
+import { MetadataFacetFields } from "@/features/rag/metadata-facet-fields";
 import { toRagPolicy, toRagPolicyForm } from "@/features/rag/schemas";
 import {
   NEW_ASSISTANT_RAG_POLICY,
@@ -1286,6 +1287,24 @@ export function AssistantFormDialog({
                         unknown không khớp bộ lọc đã đặt.
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <form.Subscribe
+                          selector={(state) => state.values.collection_id}
+                        >
+                          {(collectionId) =>
+                            collectionId && (
+                              <form.Field name="rag_policy.filter_attributes">
+                                {(field) => (
+                                  <MetadataFacetFields
+                                    workspaceId={workspaceId}
+                                    collectionId={collectionId}
+                                    attributes={field.state.value}
+                                    onChange={field.handleChange}
+                                  />
+                                )}
+                              </form.Field>
+                            )
+                          }
+                        </form.Subscribe>
                         <form.Field name="rag_policy.filter_data_year">
                           {(field) => (
                             <Field>

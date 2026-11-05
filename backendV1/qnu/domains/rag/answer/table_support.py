@@ -12,53 +12,81 @@ from qnu.platform.errors import Conflict
 from qnu.ports.vector_store import VectorHit
 
 
-def supports(primary, rows, relationships, metadata_filter, scopes=None):
-    selected, links = {}, []
-    by_id = {r.id: r for r in rows}
-    for hit in primary:
-        table = (hit.structure or {}).get("source_table_citation")
-        source = by_id[hit.chunk_id]
-        link = relationships.get((source.input_id, table))
-        if not link:
-            continue
-        shared_scopes = [
-            scope
-            for scope in (scopes or [metadata_filter])
-            if matches_metadata(source.structure, scope)
-        ]
-        siblings = [r for r in rows if r.input_id == source.input_id]
-        previous = link["previous"] if 0 in hit.structure.get("row_indices", []) else None
-        refs = [(link["header"], True)] + ([(previous, False)] if previous else [])
-        needed = []
-        for ref, is_header in refs:
-            options = [
-                r for r in siblings if (r.structure or {}).get("source_table_citation") == ref
-            ]
-            if not options:
-                break
-            if is_header:
-                row = min(options, key=lambda r: min(r.structure["row_indices"]))
-                if 0 not in row.structure["row_indices"]:
-                    break
-            else:
-                row = max(options, key=lambda r: max(r.structure["row_indices"]))
-            shared_scopes = [
-                scope for scope in shared_scopes if matches_metadata(row.structure, scope)
-            ]
-            if not shared_scopes:
-                break
-            needed.append(row)
+def _support_link(source, tables, relationships, scopes):
+    table = (source.structure or {}).get("source_table_citation")
+    link = relationships.get((source.input_id, table))
+    if not link:
+        return None
+    shared = [scope for scope in scopes if matches_metadata(source.structure, scope)]
+    previous = link["previous"] if 0 in source.structure.get("row_indices", []) else None
+    refs = [(link["header"], True)] + ([(previous, False)] if previous else [])
+    needed = []
+    for ref, is_header in refs:
+        options = tables.get((source.input_id, ref), [])
+        if not options:
+            return None
+        if is_header:
+            row = min(options, key=lambda r: min(r.structure["row_indices"]))
+            if 0 not in row.structure["row_indices"]:
+                return None
         else:
-            selected.update({r.id: r for r in needed})
-            links.append(
-                {
-                    "chunk_id": hit.chunk_id,
-                    **link,
-                    "previous": previous,
-                    "support_ids": [r.id for r in needed],
-                }
-            )
-    return selected, links
+            row = max(options, key=lambda r: max(r.structure["row_indices"]))
+        shared = [scope for scope in shared if matches_metadata(row.structure, scope)]
+        if not shared:
+            return None
+        needed.append(row)
+    return needed, {
+        "chunk_id": source.id,
+        **link,
+        "previous": previous,
+        "support_ids": [r.id for r in needed],
+    }
+
+
+def supports(primary, rows, relationships, metadata_filter, scopes=None):
+    selected, links, tables = {}, {}, {}
+    by_id = {r.id: r for r in rows}
+    for row in rows:
+        if table := (row.structure or {}).get("source_table_citation"):
+            tables.setdefault((row.input_id, table), []).append(row)
+    continuations = {
+        (binding, link["previous"]): ref
+        for (binding, ref), link in relationships.items()
+        if link["previous"]
+    }
+    scopes = scopes or [metadata_filter]
+    for hit in primary:
+        source = by_id[hit.chunk_id]
+        matched = _support_link(source, tables, relationships, scopes)
+        if not matched:
+            continue
+        needed, link = matched
+        selected.update({row.id: row for row in needed})
+        links[source.id] = link
+
+        structure = source.structure
+        next_table = continuations.get((source.input_id, structure["source_table_citation"]))
+        if (
+            not next_table
+            or structure.get("original_row_count", 0) - 1 not in structure["row_indices"]
+        ):
+            continue
+        head = next(
+            (
+                row
+                for row in tables.get((source.input_id, next_table), [])
+                if 0 in row.structure["row_indices"]
+            ),
+            None,
+        )
+        if head is None or head.id in links:
+            continue
+        matched = _support_link(head, tables, relationships, scopes)
+        if matched:
+            needed, link = matched
+            selected.update({row.id: row for row in (*needed, head)})
+            links[head.id] = link
+    return selected, list(links.values())
 
 
 async def attach_table_support(db, blob, actor, workspace_id, collection_id, result, req):
@@ -90,7 +118,13 @@ async def attach_table_support(db, blob, actor, workspace_id, collection_id, res
     # remains unchanged; every item still consumes the shared byte/token budget.
     room, selected, resolved, unresolved = 4, {}, [], []
     for link in links:
-        extra = [key for key in link["support_ids"] if key not in known and key not in selected]
+        extra = list(
+            dict.fromkeys(
+                key
+                for key in (link["chunk_id"], *link["support_ids"])
+                if key not in known and key not in selected
+            )
+        )
         if len(selected) + len(extra) > room:
             unresolved.extend(extra)
             continue

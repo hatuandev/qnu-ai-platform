@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
-from qnu.domains.knowledge.metadata import RetrievalAnnotation
+from qnu.domains.knowledge.metadata import MetadataValues, RetrievalAnnotation
 
 Action = Literal["approve", "publish", "withdraw"]
 
@@ -38,10 +38,23 @@ class ReviewSkipAcknowledgement(BaseModel):
     retrieval_metadata_sha256: str | None = Field(None, pattern=r"^[0-9a-f]{64}$")
 
 
+class MetadataProposalEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    values: MetadataValues
+    quote: str = Field(min_length=1, max_length=2000)
+
+
 class RegisterVersionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     compilation_run_id: str = Field(min_length=1, max_length=64)
     retrieval_metadata: list[RetrievalAnnotation] = Field(default_factory=list, max_length=10000)
+    metadata_proposal_ids: list[Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]] = Field(
+        default_factory=list, max_length=10000
+    )
+
+    metadata_proposal_edits: dict[
+        Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")], MetadataProposalEdit
+    ] = Field(default_factory=dict, max_length=10000)
 
 
 class CreateDocumentRequest(RegisterVersionRequest):

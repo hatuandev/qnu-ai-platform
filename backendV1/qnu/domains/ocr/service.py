@@ -21,6 +21,8 @@ from qnu.domains.knowledge.public_api import RevisionScope
 from qnu.domains.modelops.public_api import resolve_ocr_runtime
 from qnu.domains.modelops.resilience.routing import choose_target
 from qnu.domains.ocr.config import (
+    DOCX_VERSION,
+    PDF_INSPECTOR_VERSION,
     SUPPORTED_PROCESSING_EXTENSIONS,
     config_payload,
     processing_config,
@@ -76,7 +78,8 @@ class ProcessingService:
                 code="processing_unsupported_format",
             )
 
-        config = processing_config(get_settings(), scope.extension)
+        direct_word = scope.extension == ".docx"
+        config = processing_config(get_settings(), ".pdf" if direct_word else scope.extension)
         if render_dpi is not None:
             if not 72 <= render_dpi <= 300:
                 raise AppException(
@@ -89,7 +92,7 @@ class ProcessingService:
         if provider_id:
             payload["provider_requested"] = provider_id
         fingerprint = config.fingerprint
-        if strategy == "auto":
+        if strategy == "auto" or direct_word:
             from qnu.domains.ocr.native import NATIVE_VERSION
 
             payload["extraction"] = {
@@ -97,6 +100,10 @@ class ProcessingService:
                 "version": NATIVE_VERSION,
                 "pymupdf": pymupdf.version[0],
             }
+            if direct_word:
+                payload["extraction"].update(docx=DOCX_VERSION)
+            else:
+                payload["extraction"].update(pdf_inspector=PDF_INSPECTOR_VERSION)
             fingerprint = hashlib.sha256(
                 (fingerprint + json.dumps(payload["extraction"], sort_keys=True)).encode()
             ).hexdigest()

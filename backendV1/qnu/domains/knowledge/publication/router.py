@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from qnu.api.dependencies import get_actor, get_blob_store, get_db
+from qnu.api.dependencies import get_actor, get_blob_store, get_db, get_job_queue
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.publication import access, decisions, reading, review_gate, service
 from qnu.domains.knowledge.publication.evidence import digest
@@ -30,6 +30,7 @@ from qnu.domains.knowledge.publication.schemas import (
     VersionResponse,
 )
 from qnu.ports.blob_store import BlobStore
+from qnu.ports.job_queue import JobQueue
 
 router = APIRouter(
     prefix="/workspaces/{workspace_id}/collections/{collection_id}/compiled-documents",
@@ -209,10 +210,16 @@ async def decide(
     db: DB,
     actor: Actor,
     blob: Blob,
+    queue: JobQueue | None = Depends(get_job_queue),
 ) -> PublicationDecision:
-    return await decisions.commit_decision(
+    result = await decisions.commit_decision(
         db, blob, actor, workspace_id, collection_id, document_id, version_id, body, idempotency_key
     )
+    if result.action in {"publish", "withdraw"}:
+        from qnu.domains.knowledge.index.sync import wake
+
+        await wake(queue, collection_id)
+    return result
 
 
 @router.get("/{document_id}/history", response_model=list[DecisionResponse])

@@ -17,6 +17,12 @@ Workspace là biên giới quyền **chỉ trong v1** theo ngoại lệ AGENTS.m
 không tự xuất bản hoặc đi vào retrieval. Nội dung OCR và LLM đều là dữ liệu không
 tin cậy; model không quyết định quyền hoặc trạng thái duyệt.
 
+## Biên soạn nhanh và AI bổ sung
+
+- **Biên soạn nhanh** giữ nguyên văn bản, bảng và dẫn chứng từ phiên bản bóc tách đã chọn.
+- Bật **AI bổ sung cấu trúc và metadata** để dùng thêm ModelOps. Worker lưu bản nền và xử lý gợi ý theo nhóm. Phản hồi bị cắt do giới hạn đầu ra xác định được sẽ chia ở phần lỗi theo cấu trúc nguồn. Bản JSON lưu gợi ý cùng dẫn chứng, tách khỏi bản nền.
+- Khi **Đăng ký thành tài liệu biên soạn**, mục **Xác nhận metadata theo nguồn** cho xem trích đoạn, trang và giá trị. Chỉ các mục được chọn và qua xác minh mới trở thành metadata của phiên bản. Gợi ý cấu trúc là nội dung để đối chiếu khi chỉnh sửa. Đăng ký, duyệt và phát hành vẫn là các thao tác riêng.
+
 Xem [hợp đồng API và vận hành Compiler](../../backendV1/docs/compiler-v1.md)
 và [báo cáo Context645](../bao_cao/context645/REVIEW.md). Các quy trình Compiler
 legacy ở mục 18 vẫn là luồng riêng; đợt này không chạy lại hoặc sửa Compiler đó.

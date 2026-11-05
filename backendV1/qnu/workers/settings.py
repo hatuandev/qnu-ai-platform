@@ -14,7 +14,7 @@ from qnu.workers.tasks.compilation import (
     compiler_review_reconcile,
     manual_compiler_review_job,
 )
-from qnu.workers.tasks.indexing import index_reconcile, index_run
+from qnu.workers.tasks.indexing import index_maintenance, index_reconcile, index_run, index_sync
 from qnu.workers.tasks.ocr import ocr_process_run, ocr_reconcile_queued, shutdown, startup
 from qnu.workers.tasks.operations import (
     evidence_backup_delete,
@@ -38,6 +38,8 @@ class WorkerSettings:
         compiler_review_reconcile,
         func(index_run, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         index_reconcile,
+        index_sync,
+        index_maintenance,
         evidence_backup_job,
         evidence_backup_delete,
         operations_reconcile,
@@ -51,6 +53,7 @@ class WorkerSettings:
             cron(compilation_reconcile, minute=set(range(0, 60, 5))),
             cron(compiler_review_reconcile, minute=set(range(0, 60, 5))),
             cron(index_reconcile, minute=set(range(0, 60, 5))),
+            cron(index_maintenance, minute=set(range(60)), run_at_startup=True),
             cron(operations_reconcile, minute=set(range(0, 60, 5))),
         ]
         if settings.OWN_RECONCILE

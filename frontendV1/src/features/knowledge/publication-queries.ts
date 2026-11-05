@@ -640,6 +640,9 @@ export function useCommitDecisionMutation(
     retry: 0,
     onSuccess: () => {
       void queryClient.invalidateQueries({
+        queryKey: ["search-availability", sessionId, workspaceId, collectionId],
+      });
+      void queryClient.invalidateQueries({
         queryKey: conversationsQueryKeys.root(sessionId, workspaceId),
       });
       void queryClient.invalidateQueries({

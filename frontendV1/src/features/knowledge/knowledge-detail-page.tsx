@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
-  FileSearch,
   FileSpreadsheet,
   FileText,
   FileUp,
@@ -488,17 +487,6 @@ export function KnowledgeDetailPage({
           <DropdownMenuContent align="end" className="w-56 text-xs">
             <DropdownMenuItem asChild>
               <Link
-                to="/workspaces/$workspaceId/collections/$collectionId/search"
-                params={{ workspaceId, collectionId: knowledgeId }}
-                search={{ page: 1, pageSize: 20 }}
-                className="flex items-center gap-2"
-              >
-                <FileSearch className="size-3.5 text-muted-foreground" />
-                <span>Tìm kiếm thử & Chỉ mục</span>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link
                 to="/workspaces/$workspaceId/collections/$collectionId/answers"
                 params={{ workspaceId, collectionId: knowledgeId }}
                 className="flex items-center gap-2"
@@ -507,6 +495,18 @@ export function KnowledgeDetailPage({
                 <span>Hỏi đáp trên kho</span>
               </Link>
             </DropdownMenuItem>
+            {canManage && (
+              <DropdownMenuItem asChild>
+                <Link
+                  to="/workspaces/$workspaceId/collections/$collectionId/search"
+                  params={{ workspaceId, collectionId: knowledgeId }}
+                  search={{ page: 1, pageSize: 20 }}
+                >
+                  <SlidersHorizontal className="size-3.5 text-muted-foreground" />
+                  <span>Quản trị chỉ mục</span>
+                </Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem asChild>
               <Link
                 to="/workspaces/$workspaceId/collections/$collectionId/evaluations"

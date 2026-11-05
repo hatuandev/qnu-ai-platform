@@ -318,6 +318,10 @@ async def _apply(
         },
     )
     db.add(row)
+    if preview.action in {"publish", "withdraw"}:
+        from qnu.domains.knowledge.index.sync import mark_pending
+
+        await mark_pending(db, actor, doc.workspace_id, doc.collection_id)
     await record_workspace_event(
         db,
         workspace_id=doc.workspace_id,

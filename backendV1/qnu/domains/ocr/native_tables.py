@@ -1,11 +1,24 @@
 """Project measured PDF cell rectangles into rows/spans without inferring headers/years."""
 
+from collections import Counter
+
 import pymupdf
 
 from qnu.domains.ocr.layout import Cell, Table, _table_grid
 
 
-def read_table(table) -> Table:
+def _cell_text(page: pymupdf.Page, rect, extracted: str) -> str:
+    measured = page.get_text("text", clip=rect, sort=True).strip()
+    # Table extraction can reorder low glyphs (e.g. underscores) onto another
+    # line. Use the cell's measured text only if every non-space glyph survives.
+    if Counter(c for c in measured if not c.isspace()) == Counter(
+        c for c in extracted if not c.isspace()
+    ):
+        return measured
+    return extracted
+
+
+def read_table(table, page: pymupdf.Page, read_region=None) -> Table:
     rectangles = sorted({tuple(c) for row in table.rows for c in row.cells if c})
     xs = sorted({round(c[i], 2) for c in rectangles for i in (0, 2)})
     ys = sorted({round(c[i], 2) for c in rectangles for i in (1, 3)})
@@ -14,7 +27,10 @@ def read_table(table) -> Table:
     for r, row in enumerate(table.rows):
         for c, rect in enumerate(row.cells):
             if rect:
-                text_by_rect[tuple(round(v, 2) for v in rect)] = values[r][c] or ""
+                original = _cell_text(page, rect, values[r][c] or "")
+                text_by_rect[tuple(round(v, 2) for v in rect)] = (
+                    original if read_region is None else read_region(rect, original)
+                )
     rows = []
     covered = set()
     for r, top in enumerate(ys[:-1]):
@@ -39,6 +55,6 @@ def read_table(table) -> Table:
 
 def table_regions(page: pymupdf.Page):
     return [
-        (pymupdf.Rect(t.bbox), read_table(t))
+        (pymupdf.Rect(t.bbox), read_table(t, page))
         for t in page.find_tables(strategy="lines_strict").tables
     ]

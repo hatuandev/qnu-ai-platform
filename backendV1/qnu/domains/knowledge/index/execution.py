@@ -237,10 +237,11 @@ async def _activate(db, blob, run, actor, vectors: VectorStore) -> str:
             IndexRun.id != run.id,
             IndexRun.is_active.is_(True),
         )
-        .values(is_active=False)
+        .values(is_active=False, deactivated_at=utcnow())
     )
     run.manifest_key, run.manifest_sha256 = key, sha
     run.status, run.is_active, run.finished_at = "completed", True, utcnow()
+    run.deactivated_at = None
     run.lease_expires_at = None
     run.error_code = None
     await record_workspace_event(

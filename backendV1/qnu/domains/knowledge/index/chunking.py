@@ -5,13 +5,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from qnu.domains.knowledge.compilation.schemas import DRAFT_PARAGRAPH_TEXT_LIMIT
 from qnu.domains.knowledge.index.table_dependencies import dependencies
 from qnu.domains.knowledge.index.table_layout import quality
 from qnu.domains.knowledge.metadata import chunk_metadata
-from qnu.domains.knowledge.source_sections import shared_section, source_sections
+from qnu.domains.knowledge.source_sections import SourceSection, shared_section, source_sections
 from qnu.platform.errors import AppException
 
 CHUNKER_VERSION = "qnu.published-chunks/v5"
@@ -38,14 +39,24 @@ def _too_large(code: str = "index_chunk_too_large") -> AppException:
     )
 
 
-def _split_text(prefix: str, text: str, maximum: int) -> list[str]:
-    if len((prefix + text).encode("utf-8")) <= maximum:
+def _text_size(text: str) -> int:
+    return len(text.encode("utf-8"))
+
+
+def _chunk_size(chunk: Chunk) -> int:
+    return _text_size(chunk.text)
+
+
+def _split_text(
+    prefix: str, text: str, maximum: int, size: Callable[[str], int] = _text_size
+) -> list[str]:
+    if size(prefix + text) <= maximum:
         return [prefix + text]
     pieces, current = [], ""
     for word in re.findall(r"\S+\s*", text):
-        if len((prefix + word).encode("utf-8")) > maximum:
+        if size(prefix + word) > maximum:
             raise _too_large()
-        if current and len((prefix + current + word).encode("utf-8")) > maximum:
+        if current and size(prefix + current + word) > maximum:
             pieces.append(prefix + current.rstrip())
             current = ""
         current += word
@@ -92,7 +103,13 @@ def _row_groups(rows: list[list[dict]], header_indices: list[int]) -> list[list[
 
 
 def _table_chunks(
-    title: str, entry: dict, documents: list[dict], index: dict, maximum: int
+    title: str,
+    entry: dict,
+    documents: list[dict],
+    index: dict,
+    maximum: int,
+    prepare: Callable[[Chunk, int], Chunk],
+    size: Callable[[Chunk], int],
 ) -> list[Chunk]:
     table = entry["table"]
     notes, raw_text = _table_context(entry, documents)
@@ -100,12 +117,13 @@ def _table_chunks(
     note_refs = [n["citation"] for n in notes]
     if table["status"] != "parsed" or not table["rows"]:
         text = prefix + raw_text
-        if len(text.encode("utf-8")) > maximum:
-            raise _too_large("index_table_group_too_large")
         refs = [entry["citation"], *note_refs]
-        return [
-            Chunk("table", text, {r: index[r] for r in refs}, {"table_status": table["status"]})
-        ]
+        chunk = prepare(
+            Chunk("table", text, {r: index[r] for r in refs}, {"table_status": table["status"]}), 0
+        )
+        if size(chunk) > maximum:
+            raise _too_large("index_table_group_too_large")
+        return [chunk]
     rows = table["rows"]
     headers = []
     for i, row in enumerate(rows):
@@ -129,13 +147,13 @@ def _table_chunks(
         refs = [entry["citation"], *note_refs] + [
             run_id + ":" + cell["evidence_id"] for i in selected for cell in rows[i]
         ]
-        return Chunk("table", text, {r: index[r] for r in refs}, structure)
+        return prepare(Chunk("table", text, {r: index[r] for r in refs}, structure), len(chunks))
 
     chunks, pending = [], []
     for group in groups:
         candidate = fragment(pending + group)
-        if len(candidate.text.encode("utf-8")) > maximum:
-            if not pending or len(fragment(group).text.encode("utf-8")) > maximum:
+        if size(candidate) > maximum:
+            if not pending or size(fragment(group)) > maximum:
                 raise _too_large("index_table_group_too_large")
             chunks.append(fragment(pending))
             pending = []
@@ -161,7 +179,12 @@ def _table_text_copies(tables: list[dict]) -> dict[str, set[str]]:
 
 
 def build_chunks(
-    content: dict, documents: list[dict], maximum: int, annotations: list[dict] | None = None
+    content: dict,
+    documents: list[dict],
+    maximum: int,
+    annotations: list[dict] | None = None,
+    *,
+    size: Callable[[Chunk], int] = _chunk_size,
 ) -> list[Chunk]:
     index = content["citations"]
     annotations = annotations or []
@@ -175,23 +198,45 @@ def build_chunks(
             citations = paragraph["citations"]
             refs = {r: index[r] for r in citations}
             target = f"paragraph:{section_no}:{paragraph_no}"
-            metadata = chunk_metadata(annotations, {target})
+            source = shared_section(citations, source_outline)
+            targets = {target}
+            if source and source.citation:
+                targets.add(f"section:{source.citation}")
+            metadata = chunk_metadata(annotations, targets)
             if (
                 len(citations) == 1
                 and paragraph["text"] in table_copies.get(citations[0], ())
                 and not any(item["target"] == target for item in metadata)
             ):
                 continue
-            source = shared_section(citations, source_outline)
             fallback = (
                 ""
                 if source_copy and section["heading"].startswith("Nguồn ")
                 else section["heading"]
             )
             heading = (source.heading if source else "") or fallback
+            structure = {
+                "context": {
+                    "parent": f"section:{section_no}",
+                    "position": paragraph_no,
+                    "part": 0,
+                    "title": content["title"],
+                    "heading": heading,
+                    **(
+                        {"source_heading_citation": source.citation}
+                        if source and source.heading
+                        else {}
+                    ),
+                },
+                "retrieval_metadata": metadata,
+            }
+
+            def text_size(text: str, *, refs: dict = refs, structure: dict = structure) -> int:
+                return size(Chunk("paragraph", text, refs, structure))
+
             prefix = f"{content['title']}\n{heading}\n"
             if heading != fallback and any(
-                len((prefix + word).encode("utf-8")) > maximum
+                text_size(prefix + word) > maximum
                 for word in re.findall(r"\S+\s*", paragraph["text"])
             ):
                 prefix = f"{content['title']}\n{fallback}\n"
@@ -200,28 +245,20 @@ def build_chunks(
                     "paragraph",
                     t,
                     refs,
-                    {
-                        "context": {
-                            "parent": f"section:{section_no}",
-                            "position": paragraph_no,
-                            "part": part,
-                            "title": content["title"],
-                            "heading": heading,
-                            **(
-                                {"source_heading_citation": source.citation}
-                                if source and source.heading
-                                else {}
-                            ),
-                        },
-                        "retrieval_metadata": metadata,
-                    },
+                    {**structure, "context": {**structure["context"], "part": part}},
                 )
-                for part, t in enumerate(_split_text(prefix, paragraph["text"], maximum))
+                for part, t in enumerate(_split_text(prefix, paragraph["text"], maximum, text_size))
             ]
     for table in content["source_tables"]:
-        fragments = _table_chunks(content["title"], table, documents, index, maximum)
         source = source_outline.get(table["citation"])
-        for part, fragment in enumerate(fragments):
+
+        def prepare(
+            fragment: Chunk,
+            part: int,
+            *,
+            table: dict = table,
+            source: SourceSection | None = source,
+        ) -> Chunk:
             parent = "table:" + table["citation"]
             structure = fragment.structure
             targets = {f"{parent}:row:{r}" for r in structure.get("row_indices", [])}
@@ -236,18 +273,22 @@ def build_chunks(
                 "part": 0,
                 "title": content["title"],
             }
+            if source and source.citation:
+                targets.add(f"section:{source.citation}")
+            structure["retrieval_metadata"] = chunk_metadata(annotations, targets)
             if source and source.heading:
                 structure["context"].update(
                     heading=source.heading, source_heading_citation=source.citation
                 )
                 prefix = source.heading + "\n"
-                if len((prefix + fragment.text).encode("utf-8")) <= maximum:
+                if size(replace(fragment, text=prefix + fragment.text)) <= maximum:
                     fragment = replace(fragment, text=prefix + fragment.text)
-            structure["retrieval_metadata"] = chunk_metadata(annotations, targets)
             structure["reading_quality"] = quality(structure)
             if table["citation"] in relations:
                 structure["source_dependencies"] = relations[table["citation"]]
-            chunks.append(fragment)
+            return fragment
+
+        chunks += _table_chunks(content["title"], table, documents, index, maximum, prepare, size)
     if not chunks:
         raise AppException(
             "Bản xuất bản không có chunk.", code="index_chunks_empty", status_code=422

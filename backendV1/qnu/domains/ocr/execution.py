@@ -460,6 +460,13 @@ async def _execute_claimed(
         observation.byte_count = len(payload_bytes)
         observation.sha256 = scope.sha256
 
+    if scope.extension == ".docx":
+        raise AppException(
+            "Luồng DOCX đã đổi sang đọc trực tiếp. Hãy tạo lượt bóc tách mới.",
+            code="native_version_changed",
+            status_code=409,
+        )
+
     with observe_stage(run, "render", logger=logger) as observation:
         rendered = await _render_for_run(
             db, blob_store, run, payload_bytes, scope.extension, config
@@ -534,7 +541,8 @@ async def _persist_render(
         # Commit the conversion before page processing so a retry reuses identical bytes.
         await commit_owned(db, run)
     for page in rendered.pages:
-        await _store_artifact(db, blob_store, run, "page_image", page.page_number, page.png)
+        if page.png is not None:
+            await _store_artifact(db, blob_store, run, "page_image", page.page_number, page.png)
     await commit_owned(db, run)
 
 
@@ -578,7 +586,8 @@ async def _sync_pages(
         row.image_sha256 = page.sha256
         row.width = page.width
         row.height = page.height
-        row.image_key = artifact_key(run, "page_image", page.page_number, page.sha256)
+        if page.sha256 is not None:
+            row.image_key = artifact_key(run, "page_image", page.page_number, page.sha256)
     run.pages_total = len(rendered.pages)
     _refresh_page_counters(run, existing)
     await commit_owned(db, run)
@@ -799,7 +808,12 @@ async def _assemble_result(
                 db, blob_store, run, "native_page", page.page_number
             )
             native = page_from_payload(json.loads(native_bytes))
-            layout = merge_layout(native, layout)
+            if rendered.renderer.get("pagination") == "document":
+                from qnu.domains.ocr.direct_docx import merge_docx_layout
+
+                layout = merge_docx_layout(native, layout)
+            else:
+                layout = merge_layout(native, layout)
             if row.status == "completed":
                 row.text = layout.text
                 row.blocks_count = len(layout.blocks)

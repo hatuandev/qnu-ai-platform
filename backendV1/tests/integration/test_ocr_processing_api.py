@@ -11,7 +11,6 @@ import json
 
 from fastapi.testclient import TestClient
 
-from qnu.platform.config import get_settings
 from tests.integration.knowledge_support import (
     API,
     EDITOR,
@@ -25,7 +24,6 @@ from tests.integration.knowledge_support import (
     workspace_with_editor,
 )
 from tests.integration.ocr_support import (
-    TABLE_RESPONSE,
     FakeJobQueue,
     FakeNemotron,
     docx_with_table,
@@ -69,16 +67,16 @@ def _workspace_with_document(
 def test_processing_requires_authentication(client: TestClient) -> None:
     workspace, collection, source, revision = _workspace_with_document(client, "ocr-auth")
     as_actor(None)
-    response = client.post(runs_url(workspace["id"], collection["id"], source["id"], revision["id"]))
+    response = client.post(
+        runs_url(workspace["id"], collection["id"], source["id"], revision["id"])
+    )
     assert response.status_code == 401
 
 
 def test_reviewer_cannot_request_processing(client: TestClient) -> None:
     workspace, collection, source, revision = _workspace_with_document(client, "ocr-role")
     as_actor(REVIEWER)
-    response = request_run(
-        client, workspace["id"], collection["id"], source["id"], revision["id"]
-    )
+    response = request_run(client, workspace["id"], collection["id"], source["id"], revision["id"])
     assert response.status_code == 403
     assert response.json()["code"] == "workspace_forbidden"
 
@@ -93,9 +91,7 @@ def test_unsupported_format_is_reported_explicitly(client: TestClient) -> None:
         filename="ghi-chu.txt",
     )
     as_actor(EDITOR)
-    response = request_run(
-        client, workspace["id"], collection["id"], source["id"], revision["id"]
-    )
+    response = request_run(client, workspace["id"], collection["id"], source["id"], revision["id"])
     assert response.status_code == 415
     assert response.json()["code"] == "processing_unsupported_format"
 
@@ -134,7 +130,9 @@ def test_pdf_flow_produces_pinned_evidence(client: TestClient) -> None:
         outcome = execute_now(client, run["id"])
         assert outcome.status == "completed", outcome
 
-        detail = client.get(f"{runs_url(workspace['id'], collection['id'], source['id'], revision['id'])}/{run['id']}")
+        detail = client.get(
+            f"{runs_url(workspace['id'], collection['id'], source['id'], revision['id'])}/{run['id']}"
+        )
         assert detail.status_code == 200
         detail_body = detail.json()
         assert detail_body["status"] == "completed"
@@ -202,9 +200,7 @@ def test_pdf_flow_produces_pinned_evidence(client: TestClient) -> None:
 
 
 def test_docx_table_keeps_spans_values_and_footnote(client: TestClient) -> None:
-    expected_converter = get_settings().DOCX_CONVERTER
     with FakeNemotron() as fake:
-        fake.responses = [TABLE_RESPONSE]
         workspace = workspace_with_editor(client, "ocr-docx")
         as_actor(EDITOR)
         collection, source, revision = prepare_source(
@@ -221,22 +217,24 @@ def test_docx_table_keeps_spans_values_and_footnote(client: TestClient) -> None:
         run_id = created.json()["run"]["id"]
         outcome = execute_now(client, run_id)
         assert outcome.status == "completed", outcome
+        assert fake.requests == []
 
         document = client.get(
             f"{runs_url(workspace['id'], collection['id'], source['id'], revision['id'])}/{run_id}/document"
         )
         canonical = json.loads(document.content)
-        table_block = next(
-            block for block in canonical["pages"][0]["blocks"] if block.get("table")
-        )
+        table_block = next(block for block in canonical["pages"][0]["blocks"] if block.get("table"))
         table = table_block["table"]
         assert table["status"] == "parsed"
         assert table["column_count"] == 4
         headers = table["rows"][0]
-        assert [cell["header"] for cell in headers] == [True, True, True, True]
-        values = table["rows"][1]
+        assert [cell["header"] for cell in headers] == [True, True, True]
+        assert headers[-1]["col_span"] == 2
+        assert [cell["text"] for cell in table["rows"][1]][-2:] == ["2023", "2024"]
+        assert all(cell["header"] for cell in table["rows"][1])
+        values = table["rows"][2]
         assert [cell["text"] for cell in values] == ["1", "Chỉ tiêu tuyển sinh", "0", "-"]
-        assert table["rows"][2][2]["text"] == ""
+        assert table["rows"][3][2]["text"] == ""
         footnote = next(
             block for block in canonical["pages"][0]["blocks"] if block["type"] == "footnote"
         )
@@ -245,7 +243,7 @@ def test_docx_table_keeps_spans_values_and_footnote(client: TestClient) -> None:
         manifest = client.get(
             f"{runs_url(workspace['id'], collection['id'], source['id'], revision['id'])}/{run_id}/manifest"
         ).json()
-        assert manifest["processing"]["renderer"]["converter"] == expected_converter
+        assert manifest["processing"]["renderer"]["name"] == "docling"
         assert manifest["validation"]["ok"] is True
 
 

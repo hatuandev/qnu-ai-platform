@@ -49,6 +49,7 @@ v1_owned:
   - kb_publication_decisions
   # Batch 2026-10-26 — isolated dense generations and publication-bound chunks
   - kb_index_runs
+  - kb_index_sync
   - kb_index_inputs
   - kb_index_chunks
   # Batch 2026-10-26 — assistants and owned persistent conversations

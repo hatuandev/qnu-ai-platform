@@ -29,6 +29,10 @@ class CompilationRun(Base):
     def source_first(self) -> bool:
         return self.config.get("source_first") is True
 
+    @property
+    def ai_supplement(self) -> bool:
+        return self.config.get("ai_supplement") is True
+
     __tablename__ = "kb_compilation_runs"
     __table_args__ = (
         ForeignKeyConstraint(

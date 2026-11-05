@@ -4,6 +4,7 @@ import type {
   IndexCreated,
   IndexReadiness,
   IndexRun,
+  MetadataFacets,
   SearchRequestInput,
   SearchResponse,
 } from "./index-types";
@@ -104,6 +105,18 @@ export async function searchCollection(
   return client.post<SearchResponse>(
     indexingPaths.search(workspaceId, collectionId),
     body,
+    { signal: options?.signal },
+  );
+}
+
+export async function getMetadataFacets(
+  client: V1Client,
+  workspaceId: string,
+  collectionId: string,
+  options?: { signal?: AbortSignal },
+): Promise<MetadataFacets> {
+  return client.get<MetadataFacets>(
+    `/workspaces/${encodeURIComponent(workspaceId)}/collections/${encodeURIComponent(collectionId)}/search-facets`,
     { signal: options?.signal },
   );
 }

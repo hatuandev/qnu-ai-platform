@@ -6,7 +6,9 @@ from sqlalchemy import select, update
 
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.index.execution import execute_run
-from qnu.domains.knowledge.index.models import IndexRun
+from qnu.domains.knowledge.index.models import IndexRun, IndexSync
+from qnu.domains.knowledge.index.retirement import retire_vectors, retirement_candidates
+from qnu.domains.knowledge.index.sync import synchronize, wake
 from qnu.platform.config import get_settings
 from qnu.platform.database import AsyncSessionFactory
 from qnu.platform.logging import get_logger
@@ -17,7 +19,7 @@ logger = get_logger(__name__)
 async def index_run(ctx: dict, run_id: str) -> str:
     container = ctx["container"]
     async with AsyncSessionFactory() as db:
-        return await execute_run(
+        status = await execute_run(
             db,
             container.blob_store,
             run_id,
@@ -25,6 +27,42 @@ async def index_run(ctx: dict, run_id: str) -> str:
             model=container.embedding_model,
             vectors=container.vector_store,
         )
+        run = await db.get(IndexRun, run_id)
+        if run:
+            await wake(container.job_queue, run.collection_id)
+    return status
+
+
+async def index_sync(ctx: dict, collection_id: str) -> str:
+    async with AsyncSessionFactory() as db:
+        return await synchronize(db, ctx["container"], collection_id)
+
+
+async def index_maintenance(ctx: dict) -> int:
+    """Re-deliver outbox intents and reclaim only old inactive vector namespaces."""
+    container = ctx["container"]
+    async with AsyncSessionFactory() as db:
+        pending = list(
+            (
+                await db.scalars(
+                    select(IndexSync.collection_id)
+                    .where(IndexSync.status.in_(("pending", "building")))
+                    .order_by(IndexSync.updated_at)
+                    .limit(50)
+                )
+            ).all()
+        )
+        candidates = await retirement_candidates(db, container.vector_store)
+    for collection_id in pending:
+        await wake(container.job_queue, collection_id)
+    for run_id in candidates:
+        async with AsyncSessionFactory() as db:
+            try:
+                await retire_vectors(db, container.vector_store, run_id)
+            except Exception:
+                await db.rollback()
+                logger.warning("index_retirement_pending", run_id=run_id)
+    return len(pending)
 
 
 async def index_reconcile(ctx: dict) -> int:

@@ -29,10 +29,10 @@ class PageDocument:
 
     page_number: int
     status: str
-    image_sha256: str
-    image_width: int
-    image_height: int
-    ink_ratio: float
+    image_sha256: str | None
+    image_width: int | None
+    image_height: int | None
+    ink_ratio: float | None
     layout: PageLayout | None = None
     error_code: str | None = None
     usage_tokens: int | None = None
@@ -61,7 +61,7 @@ def _table_payload(table: Table, page: int, block_order: int) -> dict[str, Any]:
                 }
             )
         rows.append(cells)
-    return {
+    payload = {
         "evidence_id": evidence_id(page, block_order),
         "status": table.status,
         "reason": table.reason,
@@ -69,6 +69,9 @@ def _table_payload(table: Table, page: int, block_order: int) -> dict[str, Any]:
         "row_count": len(table.rows),
         "rows": rows,
     }
+    if table.source_mapping is not None:
+        payload["source_mapping"] = table.source_mapping
+    return payload
 
 
 def build_canonical(
@@ -97,26 +100,33 @@ def build_canonical(
                     "type": block.kind,
                     "label": block.label,
                     "text": block.text,
-                    "bbox": {
-                        "x0": block.bbox[0],
-                        "y0": block.bbox[1],
-                        "x1": block.bbox[2],
-                        "y1": block.bbox[3],
-                        "units": BBOX_UNITS,
-                    },
+                    "bbox": {},
                     "requires_review": block.requires_review,
                 }
+                if block.bbox is not None:
+                    payload["bbox"] = dict(
+                        zip(("x0", "y0", "x1", "y1"), block.bbox, strict=True),
+                        units="normalized_image_0_1"
+                        if block.source_locator and block.source_image_asset_no
+                        else BBOX_UNITS,
+                    )
+                if block.source_locator:
+                    payload["source_locator"] = block.source_locator
                 artifact = "native_page" if block.origin == "native" else "raw_response"
                 if block.origin == "native":
                     payload["origin"] = "native"
                 if block.image:
                     payload["image"] = block.image
+                if block.source_image_asset_no is not None:
+                    payload["source_image_asset_no"] = block.source_image_asset_no
                 evidence[block_id] = {
                     "kind": "block",
                     "page": document.page_number,
                     "path": f"pages[{page_index}].blocks[{len(blocks)}]",
                     "artifact": artifact,
                 }
+                if block.source_locator:
+                    evidence[block_id]["source_locator"] = block.source_locator
                 if block.table is not None:
                     table = _table_payload(block.table, document.page_number, block.order)
                     payload["table"] = table
@@ -125,6 +135,12 @@ def build_canonical(
                         "page": document.page_number,
                         "path": f"pages[{page_index}].blocks[{len(blocks)}].table",
                         "artifact": artifact,
+                    }
+                    if block.source_locator:
+                        evidence[block_id]["source_locator"] = block.source_locator
+                    omitted = {
+                        (y, i)
+                        for y, i, _ in (table.get("source_mapping") or {}).get("omitted_slots", ())
                     }
                     for row_index, row in enumerate(table["rows"]):
                         for column_index, cell in enumerate(row):
@@ -137,6 +153,13 @@ def build_canonical(
                                 ),
                                 "artifact": artifact,
                             }
+                            if block.source_locator:
+                                evidence[cell["evidence_id"]]["source_locator"] = {
+                                    **block.source_locator,
+                                    "row": row_index,
+                                    "cell": column_index,
+                                    "omitted": (row_index, column_index) in omitted,
+                                }
                 blocks.append(payload)
 
         page_payloads.append(
@@ -171,7 +194,12 @@ def build_canonical(
             "provider_usage_per_page_when_absent",
         ]
         + (
-            ["native_pdf_header_roles", "image_semantics_unverified"]
+            [
+                "word_pagination"
+                if (processing.get("renderer") or {}).get("pagination") == "document"
+                else "native_pdf_header_roles",
+                "image_semantics_unverified",
+            ]
             if processing.get("extraction")
             else []
         ),
@@ -204,8 +232,10 @@ def render_markdown(canonical: dict[str, Any]) -> str:
         f"<!-- run_id: {identity['run_id']} generation: {identity['generation']} -->",
         "",
     ]
+    renderer = canonical.get("processing", {}).get("renderer", {})
+    unit = "document" if renderer.get("pagination") == "document" else "page"
     for page in canonical["pages"]:
-        lines.append(f"<!-- page {page['page_number']} -->")
+        lines.append(f"<!-- {unit} {page['page_number']} -->")
         if page["status"] in {"failed", "uncertain"}:
             lines.append(f"<!-- page_status: {page['status']} error: {page['error']} -->")
             lines.append("")

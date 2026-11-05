@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.index.models import IndexChunk, IndexInput, IndexRun
-from qnu.domains.knowledge.index.query_scope import plan
+from qnu.domains.knowledge.index.query_scope import catalog_attributes, plan, verified_structures
 from qnu.domains.knowledge.index.schemas import SearchHit, SearchRequest, SearchResponse
 from qnu.domains.knowledge.index.scope import metadata_chunk_ids
 from qnu.domains.knowledge.index.snapshots import publication_identity, published_versions
@@ -192,6 +192,29 @@ async def _hits(
             )
         )
     return result
+
+
+async def metadata_facets(db, blob, actor, workspace_id, collection_id, document_ids):
+    await resolve_workspace_access(db, actor, workspace_id, for_update=True)
+    await authorize(db, actor, workspace_id, collection_id)
+    run = await db.scalar(
+        select(IndexRun).where(
+            IndexRun.workspace_id == workspace_id,
+            IndexRun.collection_id == collection_id,
+            IndexRun.is_active.is_(True),
+            IndexRun.status == "completed",
+        )
+    )
+    if run is None:
+        return {"ready": False, "attributes": {}, "truncated": False}
+    sealed = await manifest(db, blob, run)
+    allowed, _ = await _eligible(db, blob, actor, run, document_ids or None)
+    catalog = catalog_attributes(await verified_structures(db, run, allowed, sealed))
+    return {
+        "ready": True,
+        "attributes": {key: values[:50] for key, values in list(catalog.items())[:50]},
+        "truncated": len(catalog) > 50 or any(len(values) > 50 for values in catalog.values()),
+    }
 
 
 async def search(

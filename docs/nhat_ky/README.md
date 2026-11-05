@@ -1,5 +1,20 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên880 — Metadata động và tương thích](2026-11-05_phien_880_metadata_dong_va_tuong_thich.md).
+
+- [Phiên879 — Metadata và biên soạn kết hợp](2026-11-05_phien_879_metadata_va_bien_soan_ket_hop.md).
+
+- [Phiên878 — Tự cập nhật chỉ mục sau phát hành](2026-11-05_phien_878_tu_dong_chi_muc_sau_phat_hanh.md).
+
+- [Phiên877 — Dẫn chứng bảng PDF nối trang](2026-11-04_phien_877_noi_bang_pdf.md).
+- [Phiên876 — PDF Inspector](2026-11-04_phien_876_pdf_inspector.md).
+- [Phiên875 — Docling đọc DOCX trực tiếp](2026-11-04_phien_875_docling_docx_truc_tiep.md).
+- [Phiên874 — Đối chiếu ba Compiler](2026-11-04_phien_874_doi_chieu_ba_ban_bien_soan.md).
+- [Phiên873 — Đối chiếu Compiler mới](2026-11-04_phien_873_doi_chieu_bien_soan_moi.md).
+- [Phiên872 — Bảng nối trang và cảnh báo ảnh](2026-11-04_phien_872_bang_noi_trang_va_canh_bao_anh.md).
+- [Phiên871 — Đối chiếu bản DOCX mới](2026-11-04_phien_871_doi_chieu_ban_docx_moi.md).
+- [Phiên870 — Bảng DOCX và chữ trong ảnh nhúng](2026-11-04_phien_870_bang_docx_va_chu_trong_anh.md).
+- [Phiên869 — Kích thước đoạn theo model embedding](2026-11-04_phien_869_kich_thuoc_doan_theo_embedding.md).
 - [Phiên868 — Cửa sổ ngữ cảnh của trợ lý mới](2026-11-04_phien_868_cua_so_ngu_canh_tro_ly_moi.md).
 - [Phiên867 — Truy xuất danh sách theo tiêu đề nguồn](2026-11-04_phien_867_truy_xuat_danh_sach_theo_muc.md).
 - [Phiên866 — Bỏ bản sao chữ của bảng khi lập chỉ mục](2026-11-04_phien_866_bo_ban_sao_bang_khoi_chi_muc.md).

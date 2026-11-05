@@ -24,8 +24,11 @@ export type VerificationStatus =
   | "unsupported"
   | "uncertain";
 
+export type MetadataScalar = string | number | boolean;
+
 /** `MetadataValues` — annotations attached to a paragraph, row/cell or document. */
 export type MetadataValues = {
+  attributes?: Record<string, MetadataScalar> | null;
   data_year?: number | null;
   issued_year?: number | null;
   /** ISO `yyyy-mm-dd`. */
@@ -38,6 +41,7 @@ export type MetadataValues = {
 
 /** `MetadataFilter` — explicit scope sent with a search or a turn. */
 export type MetadataFilter = {
+  attributes?: Record<string, MetadataScalar> | null;
   data_year?: number | null;
   issued_year?: number | null;
   /** ISO `yyyy-mm-dd`; requires both effective bounds on the annotation. */
@@ -89,6 +93,7 @@ export const DEFAULT_RAG_POLICY: RagPolicy = {
 
 export const NEW_ASSISTANT_RAG_POLICY: RagPolicy = {
   ...DEFAULT_RAG_POLICY,
+  scope_resolution: "catalog",
   context_window: 1,
 };
 
@@ -204,6 +209,8 @@ export function compactMetadataFilter(filter: MetadataFilter): MetadataFilter {
   if (filter.effective_on) next.effective_on = filter.effective_on;
   if (filter.program) next.program = filter.program;
   if (filter.intake) next.intake = filter.intake;
+  if (filter.attributes && Object.keys(filter.attributes).length)
+    next.attributes = filter.attributes;
   return next;
 }
 
@@ -223,6 +230,8 @@ export function describeMetadataFilter(
   if (value.effective_on) parts.push(`Hiệu lực ngày ${value.effective_on}`);
   if (value.program) parts.push(`Ngành ${value.program}`);
   if (value.intake) parts.push(`Đợt ${value.intake}`);
+  for (const [key, entry] of Object.entries(value.attributes ?? {}))
+    parts.push(`${key} · ${entry}`);
   return parts.length > 0 ? parts.join(" · ") : "Không giới hạn metadata";
 }
 
@@ -238,6 +247,9 @@ export function describeMetadataValues(
   if (values?.effective_until) parts.push(`đến ${values.effective_until}`);
   if (values?.program) parts.push(`Ngành ${values.program}`);
   if (values?.intake) parts.push(`Đợt ${values.intake}`);
+  for (const [label, value] of Object.entries(values?.attributes ?? {})) {
+    parts.push(`${label} ${value}`);
+  }
   return parts.length > 0 ? parts.join(" · ") : "Chưa khai báo giá trị";
 }
 
@@ -247,6 +259,7 @@ export function describeMetadataValues(
  */
 export function describeAnnotationTarget(target: string): string {
   if (target === "document") return "Toàn tài liệu";
+  if (target.startsWith("section:")) return "Mục theo tiêu đề nguồn";
   const paragraph = /^paragraph:(\d+):(\d+)$/.exec(target);
   if (paragraph) {
     return `Đoạn ${Number(paragraph[2]) + 1} của mục ${Number(paragraph[1]) + 1}`;

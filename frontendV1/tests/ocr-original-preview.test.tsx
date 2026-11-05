@@ -666,6 +666,45 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
     );
   });
 
+  it("Opens directly extracted Word in its original viewer without a page image", async () => {
+    const docxBlob = await createRealMultiSectionDocxBlob();
+    const { run, detail, doc } = buildCompletedRun();
+    const word = { ...run, pagination: "document" as const };
+    mocks.runs = [word];
+    mocks.runDetail = {
+      ...detail,
+      ...word,
+      page_count: 1,
+      pages_total: 1,
+      pages: [{ ...detail.pages[0], has_rendered_image: false }],
+    };
+    mocks.docData = { ...doc, units: [{ ...doc.units[0], bbox: {} }] };
+    mocks.useRevisionContentBlobMock.mockReturnValue({
+      blob: docxBlob,
+      blobUrl: "blob:docx-rev-1",
+      contentType: mocks.revisions[0].mime_type,
+      fileName: mocks.revisions[0].file_name,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithQuery(
+      <SourceDetailPage
+        workspaceId="ws-1"
+        collectionId="col-1"
+        sourceId="src-1"
+        search={{ page: 1 }}
+        onSearchChange={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByTestId("docx-original-viewer")).toBeTruthy();
+    expect(screen.getByText("Tài liệu Word")).toBeTruthy();
+    expect(screen.queryByTestId("left-pane-mode-ocr")).toBeNull();
+    expect(mocks.readRenderedPdfBlob).not.toHaveBeenCalled();
+  });
+
   it("4. Renders PDF original file with selectable text layer via react-pdf and supports permission error & revision switching", async () => {
     mocks.revisions = [
       {

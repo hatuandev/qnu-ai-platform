@@ -648,6 +648,8 @@ function IndexSession({
               Nhận diện phạm vi từ câu hỏi; yêu cầu làm rõ khi mơ hồ
             </FieldLabel>
             <MetadataFilterFields
+              workspaceId={workspaceId}
+              collectionId={collectionId}
               value={filterDraft}
               onChange={setFilterDraft}
               columns={3}

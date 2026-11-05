@@ -53,6 +53,7 @@ class ProcessingRunResponse(BaseModel):
     config_fingerprint: str
     dispatch_pending: bool = False
     strategy: str = "ocr"
+    pagination: Literal["page", "document"] = "page"
     results_ready: bool = False
 
     @classmethod
@@ -83,6 +84,9 @@ class ProcessingRunResponse(BaseModel):
             config_fingerprint=run.config_fingerprint,
             dispatch_pending=run.status in ACTIVE_RUN_STATUSES and run.dispatched_at is None,
             strategy=(run.config or {}).get("extraction", {}).get("strategy", "ocr"),
+            pagination="document"
+            if (run.config or {}).get("extraction", {}).get("docx")
+            else "page",
             results_ready=run.status == "completed",
         )
 

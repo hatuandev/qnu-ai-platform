@@ -11,7 +11,6 @@ import {
   Layers,
   Loader2,
   MoreHorizontal,
-  RefreshCw,
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
@@ -46,7 +45,6 @@ import { CitationDrawer } from "./citation-drawer";
 import { CompilationDraftSections } from "./compilation-draft-sections";
 import type { CitationDetail } from "./compilation-types";
 import { DecisionConfirmDialog } from "./decision-confirm-dialog";
-import { useIndexRunsQuery, useRequestIndexMutation } from "./index-queries";
 import {
   canApproveCompiledVersion,
   canPublishCompiledVersion,
@@ -67,6 +65,10 @@ import type { DecisionPreviewResponse } from "./publication-types";
 import { useCollectionQuery } from "./queries";
 import { RetrievalMetadataView } from "./retrieval-metadata-view";
 import { ReviewGateDialog } from "./review-gate-dialog";
+import {
+  SearchAvailability,
+  useSearchAvailability,
+} from "./search-availability";
 import { SourceTablesView } from "./source-tables-view";
 
 export function CompiledVersionDetailPage({
@@ -88,11 +90,6 @@ export function CompiledVersionDetailPage({
 
   // Queries
   const collectionQuery = useCollectionQuery(workspaceId, collectionId);
-  const indexRunsQuery = useIndexRunsQuery(workspaceId, collectionId);
-  const requestIndexMutation = useRequestIndexMutation(
-    workspaceId,
-    collectionId,
-  );
   const documentQuery = useCompiledDocumentQuery(
     workspaceId,
     collectionId,
@@ -158,6 +155,12 @@ export function CompiledVersionDetailPage({
     (approval?.after.review_ack as Record<string, unknown> | null)?.mode ===
     "skipped";
 
+  const availability = useSearchAvailability(
+    workspaceId,
+    collectionId,
+    documentId,
+    ver,
+  );
   if (
     documentQuery.isLoading ||
     versionQuery.isLoading ||
@@ -198,22 +201,7 @@ export function CompiledVersionDetailPage({
   }
 
   const statusInfo = formatPublicationStatus(ver.status);
-  const indexRuns = indexRunsQuery.data ?? [];
-  const activeIndexRun = indexRuns.find(
-    (r) => r.is_active && r.status === "completed",
-  );
-  const buildingIndexRun = indexRuns.find(
-    (r) =>
-      r.status === "queued" ||
-      r.status === "dispatched" ||
-      r.status === "running",
-  );
-  const isReadyForQA = Boolean(
-    ver.status === "published" &&
-      activeIndexRun &&
-      new Date(activeIndexRun.requested_at).getTime() >=
-        new Date(ver.created_at).getTime(),
-  );
+  const isReadyForQA = availability.isReady;
 
   // Permissions & Transitions
   const canPerformApprove =
@@ -361,21 +349,6 @@ export function CompiledVersionDetailPage({
                     ? "Đã phát hành"
                     : statusInfo.label}
                 </Badge>
-                {ver.status === "published" ? (
-                  isReadyForQA ? (
-                    <Badge variant="info" className="text-xs font-medium">
-                      Sẵn sàng hỏi đáp (Index Gen #{activeIndexRun?.generation})
-                    </Badge>
-                  ) : buildingIndexRun ? (
-                    <Badge variant="warning" className="text-xs font-medium">
-                      Đang cập nhật tìm kiếm…
-                    </Badge>
-                  ) : (
-                    <Badge variant="warning" className="text-xs font-medium">
-                      Chưa cập nhật chỉ mục tìm kiếm
-                    </Badge>
-                  )
-                ) : null}
                 {skippedReview && (
                   <Badge variant="warning">Chưa qua review</Badge>
                 )}
@@ -456,38 +429,12 @@ export function CompiledVersionDetailPage({
                   <span>Thu hồi (Withdraw)</span>
                 </Button>
               )}
-
-              {ver.status === "published" && !isReadyForQA && canPublish ? (
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="h-8 text-xs gap-1.5"
-                  disabled={
-                    requestIndexMutation.isPending || Boolean(buildingIndexRun)
-                  }
-                  onClick={() =>
-                    void requestIndexMutation.mutateAsync({
-                      providerId: null,
-                      idempotencyKey: crypto.randomUUID(),
-                    })
-                  }
-                >
-                  <RefreshCw
-                    className={`size-3.5 ${
-                      requestIndexMutation.isPending || buildingIndexRun
-                        ? "animate-spin"
-                        : ""
-                    }`}
-                  />
-                  <span>
-                    {buildingIndexRun
-                      ? "Đang cập nhật tìm kiếm…"
-                      : "Cập nhật tìm kiếm"}
-                  </span>
-                </Button>
-              ) : null}
             </div>
           </div>
+
+          {ver.status === "published" && (
+            <SearchAvailability state={availability} canRetry={canPublish} />
+          )}
 
           {/* Điều kiện chuyển bước rõ ràng */}
           <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
@@ -499,7 +446,7 @@ export function CompiledVersionDetailPage({
                 : ver.status === "published"
                   ? isReadyForQA
                     ? "Đã phát hành và đã có trong chỉ mục tìm kiếm hiện hành — Sẵn sàng phục vụ hỏi đáp có trích dẫn."
-                    : 'Đã phát hành nhưng chưa có chỉ mục tìm kiếm phù hợp sau thời điểm phát hành. Bấm "Cập nhật tìm kiếm" để hoàn tất đưa vào hỏi đáp.'
+                    : "Hệ thống đang tự cập nhật tài liệu cho trợ lý AI. Trạng thái bên dưới sẽ báo khi sẵn sàng."
                   : "Phiên bản này đã bị thay thế hoặc thu hồi. Có thể duyệt lại nếu cần khôi phục."}
           </div>
 

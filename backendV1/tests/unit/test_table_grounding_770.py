@@ -151,6 +151,7 @@ def test_forged_or_duplicate_selection_is_rejected():
 def test_borrowed_header_and_carried_subject_require_same_published_identity():
     head = source(
         [["Index", "Name", "Condition"], ["1", "Alpha", "-"], ["2", "Beta", "first part"]],
+        headers=0,
         key="E2",
         table="ocr:head",
     )
@@ -170,6 +171,12 @@ def test_borrowed_header_and_carried_subject_require_same_published_identity():
     answer = materialize(parse_answer(selected("E1:r0:k2"), [body, head]), [body, head], cells)
     assert answer.statements[0].text == "Beta — Condition: note >= 7"
     assert set(answer.statements[0].evidence_ids) == {"E1", "E2"}
+    assert any(
+        cell["subject"] == "Beta" and cell["value"] == "first part"
+        for table in cells["tables"]
+        if table["evidence_id"] == "E2"
+        for cell in table["cells"]
+    )
     head.version_id = "different-version"
     assert catalog([body, head], [link])["tables"][0]["evidence_id"] != "E1"
 

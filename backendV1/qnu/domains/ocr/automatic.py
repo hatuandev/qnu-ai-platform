@@ -12,7 +12,7 @@ from qnu.domains.knowledge.public_api import (
 )
 from qnu.domains.modelops.public_api import resolve_ocr_runtime
 from qnu.domains.modelops.resilience.routing import choose_target
-from qnu.domains.ocr.config import ocr_contract_hash
+from qnu.domains.ocr.config import DOCX_VERSION, PDF_INSPECTOR_VERSION, ocr_contract_hash
 from qnu.domains.ocr.execution import (
     _assemble,
     _ocr_pages,
@@ -20,9 +20,11 @@ from qnu.domains.ocr.execution import (
     _render_for_run,
     _store_artifact,
     _sync_pages,
+    logger,
 )
 from qnu.domains.ocr.lease import commit_owned
 from qnu.domains.ocr.native import NATIVE_VERSION, extract_native_async, page_payload
+from qnu.domains.ocr.telemetry import observe_stage
 from qnu.domains.workspaces.access import resolve_workspace_access
 from qnu.platform.errors import AppException
 
@@ -69,15 +71,36 @@ async def execute_auto(db, blob, run, actor, engine, config, settings):
             status_code=409,
         )
     payload = await read_revision_bytes(blob, scope)
-    rendered = await _render_for_run(db, blob, run, payload, scope.extension, config)
-    if scope.extension == ".docx":
-        rendered = replace(
-            rendered,
-            warnings=tuple(
-                dict.fromkeys((*rendered.warnings, "docx_page_numbers_refer_to_render_pdf"))
-            ),
-        )
-    plan = await extract_native_async(payload, rendered)
+    direct_word = scope.extension == ".docx"
+    inspector = pinned.get("pdf_inspector")
+    if direct_word:
+        from qnu.domains.ocr.direct_docx import extract_docx_async
+
+        if pinned.get("docx") != DOCX_VERSION:
+            raise AppException(
+                "Luồng DOCX đã đổi sang đọc trực tiếp. Hãy tạo lượt bóc tách mới.",
+                code="native_version_changed",
+                status_code=409,
+            )
+        with observe_stage(run, "read_docx", logger=logger) as observation:
+            rendered, plan = await extract_docx_async(payload)
+            observation.item_count = len(plan.pages[0].layout.blocks)
+    else:
+        rendered = await _render_for_run(db, blob, run, payload, scope.extension, config)
+        if inspector:
+            from qnu.domains.ocr.pdf_inspector import extract_pdf_async
+
+            if inspector != PDF_INSPECTOR_VERSION:
+                raise AppException(
+                    "Phiên bản PDF Inspector đã thay đổi. Hãy tạo lượt bóc tách mới.",
+                    code="native_version_changed",
+                    status_code=409,
+                )
+            with observe_stage(run, "read_pdf", logger=logger) as observation:
+                plan = await extract_pdf_async(payload, rendered)
+                observation.item_count = len(plan.pages)
+        else:
+            plan = await extract_native_async(payload, rendered)
     await resolve_workspace_access(db, actor, run.workspace_id, required_roles=WRITE_ROLES)
     await resolve_revision_scope(
         db, run.workspace_id, run.collection_id, run.source_id, run.revision_id
@@ -117,19 +140,32 @@ async def execute_auto(db, blob, run, actor, engine, config, settings):
     runtime = None
     if any(p.needs_ocr for p in plan.pages):
         runtime = await resolve_runtime(db, run)
-        await _ocr_pages(
-            db,
-            blob,
-            run,
-            actor,
-            runtime,
-            config,
-            rendered,
-            rows,
-            settings,
-            engine,
-            pdf=payload if scope.extension == ".pdf" else rendered.fixed_layout_pdf,
-        )
+        if direct_word:
+            from qnu.domains.ocr.image_ocr import ocr_embedded_images
+
+            await ocr_embedded_images(
+                db, blob, run, actor, runtime, plan.pages[0], rows[1], engine, word=True
+            )
+        elif inspector and runtime.provider_type == "mineru":
+            from qnu.domains.ocr.mineru_execution import ocr_pdf_pages
+
+            await ocr_pdf_pages(
+                db, blob, run, actor, runtime, rendered, rows, engine, payload, plan
+            )
+        else:
+            await _ocr_pages(
+                db,
+                blob,
+                run,
+                actor,
+                runtime,
+                config,
+                rendered,
+                rows,
+                settings,
+                engine,
+                pdf=payload,
+            )
     await resolve_workspace_access(db, actor, run.workspace_id, required_roles=WRITE_ROLES)
     await resolve_revision_scope(
         db, run.workspace_id, run.collection_id, run.source_id, run.revision_id

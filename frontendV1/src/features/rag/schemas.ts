@@ -24,6 +24,7 @@ export type RagPolicyFormValues = {
   filter_effective_on: string;
   filter_program: string;
   filter_intake: string;
+  filter_attributes?: MetadataFilter["attributes"];
 };
 
 const yearSchema = z
@@ -74,6 +75,12 @@ export const ragPolicyFormSchema = z
       .int("Ngân sách token kiểm chứng phải là số nguyên.")
       .positive("Ngân sách token kiểm chứng phải lớn hơn 0.")
       .nullable(),
+    filter_attributes: z
+      .record(
+        z.string().min(1).max(80),
+        z.union([z.string().min(1).max(500), z.number(), z.boolean()]),
+      )
+      .nullish(),
     filter_data_year: yearSchema,
     filter_issued_year: yearSchema,
     filter_effective_on: isoDateSchema,
@@ -104,6 +111,8 @@ export const DEFAULT_RAG_POLICY_FORM: RagPolicyFormValues =
 /** Form values → API `rag_policy`. Empty filter fields are omitted. */
 export function toRagPolicy(values: RagPolicyFormValues): RagPolicy {
   const filter: MetadataFilter = {};
+  if (values.filter_attributes && Object.keys(values.filter_attributes).length)
+    filter.attributes = values.filter_attributes;
   if (typeof values.filter_data_year === "number") {
     filter.data_year = values.filter_data_year;
   }
@@ -163,5 +172,6 @@ export function toRagPolicyForm(
     filter_effective_on: filter.effective_on ?? "",
     filter_program: filter.program ?? "",
     filter_intake: filter.intake ?? "",
+    ...(filter.attributes ? { filter_attributes: filter.attributes } : {}),
   };
 }

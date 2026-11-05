@@ -6,10 +6,12 @@ import zipfile
 import pymupdf
 import pytest
 
-from qnu.domains.ocr.artifacts.render import render_document, render_saved_pdf
+from qnu.domains.ocr.artifacts.render import render_document
 from qnu.domains.ocr.config import processing_config
+from qnu.domains.ocr.direct_docx import extract_docx
 from qnu.domains.ocr.layout import parse_page
 from qnu.domains.ocr.native import extract_native, merge_layout
+from qnu.domains.ocr.pdf_inspector import extract_pdf
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException
 
@@ -42,10 +44,8 @@ def test_pdf_text_is_native_and_needs_no_provider():
     assert page.layout.blocks[0].origin == "native"
 
 
-def test_docx_with_header_uses_the_fixed_layout_evidence():
+def test_docx_with_header_reads_source_without_fixed_layout():
     from docx import Document
-
-    from qnu.domains.ocr.native_docx import _docling_tables
 
     source = Document()
     source.sections[0].header.paragraphs[0].text = "Section header"
@@ -57,14 +57,13 @@ def test_docx_with_header_uses_the_fixed_layout_evidence():
     table.cell(1, 1).text = "Right"
     payload = io.BytesIO()
     source.save(payload)
-    fixed = pdf("Section header / Body text / Section footer")
-    config = processing_config(get_settings(), ".docx")
-    rendered = render_saved_pdf(fixed, config, {"converter": "gotenberg-libreoffice"}, ())
-
-    result = extract_native(payload.getvalue(), rendered)
-
-    assert result.pages[0].layout.text == "Section header / Body text / Section footer"
-    [parsed_table] = _docling_tables(payload.getvalue())
+    rendered, result = extract_docx(payload.getvalue())
+    assert rendered.fixed_layout_pdf is None and rendered.pages[0].png is None
+    blocks = result.pages[0].layout.blocks
+    assert {"Body text", "Section header", "Section footer"} <= {b.text for b in blocks}
+    assert {b.kind for b in blocks} >= {"text", "header", "footer", "table"}
+    assert all(b.bbox is None and b.source_locator for b in blocks)
+    [parsed_table] = [b.table for b in blocks if b.table]
     assert parsed_table.rows[0][0].text == "Merged cell"
     assert parsed_table.rows[0][0].col_span == 2
 
@@ -104,19 +103,35 @@ def test_scan_is_not_mistaken_for_native_text():
 
 
 def test_docx_reads_unicode_and_literal_numbers_without_ocr():
-    data = io.BytesIO()
-    with zipfile.ZipFile(data, "w") as archive:
-        archive.writestr(
-            "word/document.xml",
-            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Thông báo năm 2023: 0 -</w:t></w:r></w:p></w:body></w:document>',
-        )
-    result = plan(data.getvalue(), ".docx")
+    from tests.docx_fixture import _docx_package
+
+    _, result = extract_docx(
+        _docx_package("<w:p><w:r><w:t>Thông báo năm 2023: 0 -</w:t></w:r></w:p>")
+    )
     assert "Thông báo năm 2023: 0 -" in result.pages[0].layout.text
     assert not result.pages[0].needs_ocr
-    assert result.source_artifact == "render_pdf"
+    assert result.source_artifact == "source_revision"
 
 
-def test_pdf_table_keeps_cells_and_empty_zero_dash():
+def test_docx_keeps_cached_field_values_without_recalculation():
+    from tests.docx_fixture import _docx_package
+
+    payload = _docx_package(
+        "<w:tbl><w:tblGrid><w:gridCol/><w:gridCol/></w:tblGrid><w:tr>"
+        '<w:tc><w:p><w:fldSimple w:instr="=SUM(ABOVE)"><w:r><w:t>00451</w:t></w:r>'
+        "</w:fldSimple></w:p></w:tc>"
+        '<w:tc><w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+        "<w:r><w:instrText> =SUM(ABOVE) </w:instrText></w:r>"
+        '<w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>402</w:t></w:r>'
+        '<w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:tc></w:tr></w:tbl>'
+    )
+    _, result = extract_docx(payload)
+    [table] = [block.table for block in result.pages[0].layout.blocks if block.table]
+    assert [cell.text for cell in table.rows[0]] == ["00451", "402"]
+
+
+@pytest.mark.parametrize("extract", [extract_native, extract_pdf])
+def test_pdf_table_keeps_cells_and_empty_zero_dash(extract):
     doc = pymupdf.open()
     page = doc.new_page()
     for x in (40, 140, 240, 340):
@@ -133,13 +148,17 @@ def test_pdf_table_keeps_cells_and_empty_zero_dash():
         page.insert_text((x, y), text)
     data = doc.tobytes()
     doc.close()
-    result = plan(data).pages[0]
+    rendered = render_document(data, ".pdf", processing_config(get_settings()))
+    result = extract(data, rendered).pages[0]
     table = next(b.table for b in result.layout.blocks if b.table)
     assert [[c.text for c in row] for row in table.rows] == [
         ["Year", "2023", "2024"],
         ["0", "-", ""],
     ]
     assert not result.needs_ocr
+    if extract is extract_pdf:
+        assert result.inspector_markdown
+        assert not any("regions_recovered" in warning for warning in result.layout.warnings)
 
 
 def docx_image():

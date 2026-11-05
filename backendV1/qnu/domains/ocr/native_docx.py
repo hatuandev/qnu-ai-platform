@@ -1,7 +1,7 @@
 """Recover explicit DOCX table headers and spans from the source document.
 
 Only an exact, unique content match can attach source cell structure to a measured
-rendered PDF table. Split or ambiguous tables keep geometry and a review warning.
+rendered PDF table. Page fragments require a complete literal cell-continuity proof.
 """
 
 import re
@@ -11,6 +11,7 @@ from io import BytesIO
 
 from qnu.domains.ocr.artifacts.docx_html import convert_docx_to_html
 from qnu.domains.ocr.layout import Cell, Table, _table_grid
+from qnu.domains.ocr.native_docx_fragments import match_fragments
 
 
 class _Tables(HTMLParser):
@@ -72,15 +73,18 @@ def _docling_tables(payload: bytes) -> list[Table]:
     from docling.document_converter import DocumentConverter
     from docling_core.types.io import DocumentStream
 
-    document = DocumentConverter(allowed_formats=[InputFormat.DOCX]).convert(
-        DocumentStream(name="source.docx", stream=BytesIO(payload))
-    ).document
+    document = (
+        DocumentConverter(allowed_formats=[InputFormat.DOCX])
+        .convert(DocumentStream(name="source.docx", stream=BytesIO(payload)))
+        .document
+    )
     tables = []
     for item in document.tables:
         data = item.data
         rows: list[list[Cell]] = [[] for _ in range(data.num_rows)]
         for cell in sorted(
-            data.table_cells, key=lambda cell: (cell.start_row_offset_idx, cell.start_col_offset_idx)
+            data.table_cells,
+            key=lambda cell: (cell.start_row_offset_idx, cell.start_col_offset_idx),
         ):
             rows[cell.start_row_offset_idx].append(
                 Cell(cell.text, cell.row_span, cell.col_span, cell.column_header or cell.row_header)
@@ -97,11 +101,18 @@ def restore_source_tables(payload, pages, *, converter):
         parser = _Tables()
         parser.feed(convert_docx_to_html(payload).html)
         source_tables = parser.tables
+    entries = [
+        (page_index, block_index, block.table)
+        for page_index, page in enumerate(pages)
+        for block_index, block in enumerate(page.layout.blocks)
+        if block.table and block.table.status == "parsed"
+    ]
+    fragments = match_fragments(source_tables, entries)
     result = []
-    for page in pages:
+    for page_index, page in enumerate(pages):
         blocks = []
         warnings = list(page.layout.warnings)
-        for block in page.layout.blocks:
+        for block_index, block in enumerate(page.layout.blocks):
             if block.table and block.table.status == "parsed":
                 matches = [
                     t
@@ -109,8 +120,17 @@ def restore_source_tables(payload, pages, *, converter):
                     if _content(t) == _content(block.table)
                     and t.column_count == block.table.column_count
                 ]
-                if len(matches) == 1:
-                    block = replace(block, table=matches[0])
+                if (page_index, block_index) in fragments:
+                    # Keep page text, bbox, cells and spans. Attach only proven
+                    # source header roles and row/cell/continuation identities.
+                    block = replace(block, table=fragments[page_index, block_index])
+                elif len(matches) == 1:
+                    table = matches[0]
+                    block = replace(
+                        block,
+                        table=table,
+                        text="\n".join(" | ".join(c.text for c in row) for row in table.rows),
+                    )
                 else:
                     warnings.append("docx_table_source_mapping_requires_review")
                     block = replace(block, requires_review=True)

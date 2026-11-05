@@ -51,6 +51,7 @@ def document():
 
 def test_numbered_native_flow_exposes_header_and_partial_row_dependencies_without_mutation():
     doc = document()
+    doc["pages"][1]["blocks"][0]["bbox"]["y1"] = 0.884
     original = copy.deepcopy(doc)
     result = dependencies(doc)
     assert result["run:t2"]["header"] == "run:t1"
@@ -58,6 +59,38 @@ def test_numbered_native_flow_exposes_header_and_partial_row_dependencies_withou
     assert result["run:t3"]["chain"] == ["run:t1", "run:t2", "run:t3"]
     assert result["run:t3"]["previous"] is None
     assert doc == original
+
+
+def test_retrieving_last_row_also_selects_its_verified_continuation():
+    def row(key, ref, indices, total):
+        return SimpleNamespace(
+            id=key,
+            chunk_id=key,
+            input_id="input",
+            structure={
+                "source_table_citation": ref,
+                "row_indices": indices,
+                "original_row_count": total,
+            },
+        )
+
+    header = row("header", "run:t1", [0, 1], 3)
+    tail = row("tail", "run:t1", [2], 3)
+    head = row("head", "run:t2", [0, 1], 3)
+    links = {("input", ref): link for ref, link in dependencies(document()).items()}
+
+    selected, resolved = supports([tail], [header, tail, head], links, MetadataFilter())
+    assert set(selected) == {"header", "tail", "head"}
+    continuation = next(link for link in resolved if link["chunk_id"] == head.id)
+    assert continuation["previous"] == "run:t1"
+    assert set(continuation["support_ids"]) == {"header", "tail"}
+    selected, _ = supports([header], [header, tail, head], links, MetadataFilter())
+    assert "head" not in selected
+    head.structure["retrieval_metadata"] = [{"values": {"data_year": 2032}}]
+    for chunk in (header, tail):
+        chunk.structure["retrieval_metadata"] = [{"values": {"data_year": 2031}}]
+    selected, _ = supports([tail], [header, tail, head], links, MetadataFilter(data_year=2031))
+    assert "head" not in selected
 
 
 @pytest.mark.parametrize(
@@ -103,6 +136,14 @@ def test_sources_never_share_a_chain():
     second["ocr_run_id"] = "other"
     assert all(k.startswith("run:") for k in dependencies(first))
     assert all(v["header"].startswith("other:") for v in dependencies(second).values())
+
+
+def test_partial_row_with_its_own_subject_cannot_borrow_previous_subject():
+    doc = document()
+    doc["pages"][1]["blocks"][0]["table"]["rows"][0][1]["text"] = "Different subject"
+    link = dependencies(doc)["run:t2"]
+    assert link["header"] == "run:t1"
+    assert link["previous"] is None
 
 
 def test_support_selection_stays_in_bound_input_and_respects_metadata():

@@ -7,13 +7,17 @@ import {
 } from "@tanstack/react-table";
 import {
   Bell,
+  Building2,
   CheckCircle2,
   CircleAlert,
+  FolderOpen,
+  Library,
   Loader2,
   MoreHorizontal,
   PanelLeft,
   Plus,
   Search,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
@@ -147,6 +151,7 @@ import {
 import { getAnalyticsData } from "@/features/analytics/analytics-data";
 import { ActivityTrendChart, CategoryChart } from "@/features/analytics/charts";
 import { Breadcrumbs } from "@/layouts/breadcrumbs";
+import { PageBreadcrumbs } from "@/components/admin/page-breadcrumbs";
 import { formatDateTime } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/design-system")({
@@ -446,8 +451,26 @@ function ApplicationChromePatterns() {
             </DropdownMenu>
             <QuickCreateMenu />
           </div>
-          <div className="rounded-md border px-4 py-3">
+          <div className="rounded-md border px-4 py-3 space-y-3">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Topbar Breadcrumbs (Hệ thống)
+            </div>
             <Breadcrumbs />
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-2 border-t">
+              PageBreadcrumbs (Trang chi tiết & Ngữ cảnh động)
+            </div>
+            <PageBreadcrumbs
+              items={[
+                { label: "Workspace", icon: Building2 },
+                { label: "Kho tri thức", icon: Library },
+                {
+                  label: "Tuyển sinh Đại học Quy Nhơn 2026 - Quy chế mẫu mở rộng",
+                  icon: FolderOpen,
+                  maxChars: 30,
+                },
+                { label: "Biên soạn Gen #1", icon: Sparkles, current: true },
+              ]}
+            />
           </div>
         </CardContent>
       </Card>

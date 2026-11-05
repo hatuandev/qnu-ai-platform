@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
 
 from qnu.platform.errors import AppException
 from qnu.ports.provider_execution import ProviderExecution
@@ -44,6 +44,7 @@ class OcrDocumentRequest:
     auth_optional: bool = False
     execution: ProviderExecution | None = field(default=None, repr=False)
     wait_for_completion: bool = False
+    ocr_mode: Literal["auto", "ocr"] = "auto"
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,5 +1,20 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context880 — Metadata động và tương thích](nhat_ky/2026-11-05_phien_880_metadata_dong_va_tuong_thich.md).
+
+- [Context879 — Metadata và biên soạn kết hợp](nhat_ky/2026-11-05_phien_879_metadata_va_bien_soan_ket_hop.md).
+
+- [Context878 — Tự cập nhật chỉ mục sau phát hành](nhat_ky/2026-11-05_phien_878_tu_dong_chi_muc_sau_phat_hanh.md).
+
+- [Context877 — Dẫn chứng bảng PDF nối trang](nhat_ky/2026-11-04_phien_877_noi_bang_pdf.md).
+- [Context876 — PDF Inspector](nhat_ky/2026-11-04_phien_876_pdf_inspector.md).
+- [Context875 — Docling đọc DOCX trực tiếp](nhat_ky/2026-11-04_phien_875_docling_docx_truc_tiep.md).
+- [Context874 — Đối chiếu ba Compiler](nhat_ky/2026-11-04_phien_874_doi_chieu_ba_ban_bien_soan.md).
+- [Context873 — Đối chiếu Compiler mới](nhat_ky/2026-11-04_phien_873_doi_chieu_bien_soan_moi.md).
+- [Context872 — Bảng nối trang và cảnh báo ảnh](nhat_ky/2026-11-04_phien_872_bang_noi_trang_va_canh_bao_anh.md).
+- [Context871 — Đối chiếu bản DOCX mới](nhat_ky/2026-11-04_phien_871_doi_chieu_ban_docx_moi.md).
+- [Context870 — Bảng DOCX và chữ trong ảnh nhúng](nhat_ky/2026-11-04_phien_870_bang_docx_va_chu_trong_anh.md).
+- [Context869 — Kích thước đoạn theo model embedding](nhat_ky/2026-11-04_phien_869_kich_thuoc_doan_theo_embedding.md).
 - [Context868 — Cửa sổ ngữ cảnh của trợ lý mới](nhat_ky/2026-11-04_phien_868_cua_so_ngu_canh_tro_ly_moi.md).
 - [Context867 — Truy xuất danh sách theo tiêu đề nguồn](nhat_ky/2026-11-04_phien_867_truy_xuat_danh_sach_theo_muc.md).
 - [Context866 — Bỏ bản sao chữ của bảng khi lập chỉ mục](nhat_ky/2026-11-04_phien_866_bo_ban_sao_bang_khoi_chi_muc.md).

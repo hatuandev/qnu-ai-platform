@@ -16,7 +16,46 @@ from qnu.ports.ocr_engine import OcrDocumentRequest
 from qnu.ports.provider_execution import ProviderExecution
 
 
-async def ocr_document(db, blob, run, actor, runtime, rendered, rows, engine, pdf):
+def _subset_pdf(payload, selected):
+    import pymupdf
+
+    with pymupdf.open(stream=payload, filetype="pdf") as document:
+        document.select([number - 1 for number in selected])
+        return document.tobytes(no_new_id=True, garbage=4)
+
+
+async def ocr_pdf_pages(db, blob, run, actor, runtime, rendered, rows, engine, payload, plan):
+    from qnu.domains.ocr.artifacts.render import _render_lock
+    from qnu.domains.ocr.image_ocr import ocr_embedded_images
+
+    selected = tuple(p.page_number for p in plan.pages if p.needs_ocr and not p.native_text)
+    if selected:
+        transport = payload
+        if len(selected) != len(plan.pages):
+            async with _render_lock:
+                transport = await asyncio.to_thread(_subset_pdf, payload, selected)
+        await ocr_document(
+            db,
+            blob,
+            run,
+            actor,
+            runtime,
+            rendered,
+            rows,
+            engine,
+            transport,
+            selected_pages=selected,
+        )
+    for page in plan.pages:
+        if page.needs_ocr and page.native_text:
+            await ocr_embedded_images(
+                db, blob, run, actor, runtime, page, rows[page.page_number], engine
+            )
+
+
+async def ocr_document(
+    db, blob, run, actor, runtime, rendered, rows, engine, pdf, *, selected_pages=None
+):
     from qnu.domains.ocr.execution import (
         _artifact,
         _refresh_page_counters,
@@ -25,7 +64,14 @@ async def ocr_document(db, blob, run, actor, runtime, rendered, rows, engine, pd
         read_artifact_bytes,
     )
 
-    pending = [r for r in rows.values() if r.status not in {"completed", "blank"}]
+    page_map = (
+        selected_pages
+        if selected_pages is not None
+        else tuple(p.page_number for p in rendered.pages)
+    )
+    pending = [
+        rows[number] for number in page_map if rows[number].status not in {"completed", "blank"}
+    ]
     if not pending:
         return
     if not pdf:
@@ -55,6 +101,9 @@ async def ocr_document(db, blob, run, actor, runtime, rendered, rows, engine, pd
         await commit_owned(db, run)
 
     await guard()
+    source_hash = run.source_sha256
+    if selected_pages is not None:
+        source_hash = hashlib.sha256(pdf).hexdigest() + ":" + ",".join(map(str, page_map))
     usage = await usage_service.reserve(
         db,
         actor,
@@ -62,7 +111,7 @@ async def ocr_document(db, blob, run, actor, runtime, rendered, rows, engine, pd
         "ocr",
         f"ocr:{run.id}:document",
         hashlib.sha256(
-            f"{run.id}|{run.source_sha256}|{runtime.configuration_hash}|{VERSION}".encode()
+            f"{run.id}|{source_hash}|{runtime.configuration_hash}|{VERSION}".encode()
         ).hexdigest(),
         0,
         runtime.provider_id,
@@ -109,13 +158,37 @@ async def ocr_document(db, blob, run, actor, runtime, rendered, rows, engine, pd
             archive = call.archive
             await _store_artifact(db, blob, run, "provider_document", 0, archive)
             await commit_owned(db, run)
-        pages = await asyncio.to_thread(archive_pages, archive, len(rendered.pages))
+        pages = await asyncio.to_thread(archive_pages, archive, len(page_map))
         archive_hash = hashlib.sha256(archive).hexdigest()
+        source_to_transport = {number: index for index, number in enumerate(page_map, 1)}
         for page in rendered.pages:
             row = rows[page.page_number]
             if row not in pending:
                 continue
-            raw = {**pages[page.page_number], "archive_sha256": archive_hash}
+            raw = {**pages[source_to_transport[page.page_number]], "archive_sha256": archive_hash}
+            if selected_pages is not None:
+                raw.update(
+                    source_page=page.page_number,
+                    transport_page=source_to_transport[page.page_number],
+                )
+            elif run.config.get("extraction"):
+                from qnu.domains.ocr.image_ocr import supplement_images
+                from qnu.domains.ocr.native import page_from_payload
+
+                _, native_bytes = await read_artifact_bytes(
+                    db, blob, run, "native_page", page.page_number
+                )
+                raw = await supplement_images(
+                    db,
+                    blob,
+                    run,
+                    actor,
+                    runtime,
+                    page_from_payload(json.loads(native_bytes)),
+                    raw,
+                    engine,
+                    guard,
+                )
             await _save_raw(
                 db, blob, run, row, json.dumps(raw, ensure_ascii=False, sort_keys=True).encode()
             )

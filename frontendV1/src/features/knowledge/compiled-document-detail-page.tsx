@@ -35,12 +35,6 @@ import { isLifecycleAdmin } from "@/features/lifecycle/permissions";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { formatDateTimeValue } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
-import {
-  useDocumentIndexReadinessQuery,
-  useIndexRunsQuery,
-  useRequestIndexMutation,
-} from "./index-queries";
-import { matchesPublishedIndex } from "./index-readiness";
 import { ListPagination } from "./list-pagination";
 import {
   canPublishCompiledVersion,
@@ -57,6 +51,10 @@ import {
   formatPublicationStatus,
 } from "./publication-schemas";
 import { useCollectionQuery } from "./queries";
+import {
+  SearchAvailability,
+  useSearchAvailability,
+} from "./search-availability";
 
 /**
  * Explains a failed published-version read without pretending the document has
@@ -117,11 +115,6 @@ export function CompiledDocumentDetailPage({
   const canPublish = !rolePending && canPublishCompiledVersion(role);
 
   const collectionQuery = useCollectionQuery(workspaceId, collectionId);
-  const indexRunsQuery = useIndexRunsQuery(workspaceId, collectionId);
-  const requestIndexMutation = useRequestIndexMutation(
-    workspaceId,
-    collectionId,
-  );
   const documentQuery = useCompiledDocumentQuery(
     workspaceId,
     collectionId,
@@ -155,29 +148,12 @@ export function CompiledDocumentDetailPage({
   const versions = (versionsQuery.data ?? []).slice(0, pageSize);
   const history = (historyQuery.data ?? []).slice(0, pageSize);
 
-  const indexRuns = indexRunsQuery.data ?? [];
-  const activeIndexRun = indexRuns.find(
-    (r) => r.is_active && r.status === "completed",
-  );
-  const buildingIndexRun = indexRuns.find(
-    (r) =>
-      r.status === "queued" ||
-      r.status === "dispatched" ||
-      r.status === "running",
-  );
-  const readinessQuery = useDocumentIndexReadinessQuery(
+  const availability = useSearchAvailability(
     workspaceId,
     collectionId,
     documentId,
-    published?.decision.id,
-    activeIndexRun?.id,
+    published?.version,
   );
-  const readinessError = indexRunsQuery.error ?? readinessQuery.error;
-  const isCheckingReadiness =
-    indexRunsQuery.isPending || readinessQuery.isPending;
-  const isReadyForQA =
-    !readinessError &&
-    matchesPublishedIndex(readinessQuery.data, published, activeIndexRun);
 
   if (documentQuery.isLoading || collectionQuery.isLoading) {
     return (
@@ -375,23 +351,6 @@ export function CompiledDocumentDetailPage({
                 >
                   Đã phát hành · v{published.version.version_no}
                 </Badge>
-                {isReadyForQA ? (
-                  <Badge variant="info" className="text-xs font-medium">
-                    Sẵn sàng hỏi đáp (Index Gen #{activeIndexRun?.generation})
-                  </Badge>
-                ) : readinessError ? (
-                  <Badge variant="warning">Không kiểm tra được chỉ mục</Badge>
-                ) : isCheckingReadiness ? (
-                  <Badge variant="secondary">Đang kiểm tra chỉ mục…</Badge>
-                ) : buildingIndexRun ? (
-                  <Badge variant="warning" className="text-xs font-medium">
-                    Đang cập nhật chỉ mục tìm kiếm…
-                  </Badge>
-                ) : (
-                  <Badge variant="warning" className="text-xs font-medium">
-                    Chưa cập nhật chỉ mục tìm kiếm mới nhất
-                  </Badge>
-                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 Được phê duyệt và phát hành bởi{" "}
@@ -400,61 +359,10 @@ export function CompiledDocumentDetailPage({
                 </span>{" "}
                 vào {formatDateTimeValue(published.decision.created_at)}.
               </p>
-              <p className="text-xs text-muted-foreground">
-                <strong className="text-foreground">
-                  Trạng thái phục vụ AI:
-                </strong>{" "}
-                {readinessError
-                  ? "Chưa xác minh được trạng thái tìm kiếm. Hãy kiểm tra lại trước khi yêu cầu cập nhật chỉ mục."
-                  : isCheckingReadiness
-                    ? "Đang đối chiếu bản phát hành với chỉ mục hiện hành."
-                    : isReadyForQA
-                      ? "Tài liệu đã phát hành và đã được đưa vào chỉ mục tìm kiếm hiện hành — sẵn sàng phục vụ hỏi đáp có trích dẫn."
-                      : "Tài liệu đã phát hành nhưng cần cập nhật chỉ mục tìm kiếm của kho để Trợ lý AI truy xuất được nội dung mới nhất."}
-              </p>
+              <SearchAvailability state={availability} canRetry={canPublish} />
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              {readinessError ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    void indexRunsQuery.refetch();
-                    void readinessQuery.refetch();
-                  }}
-                >
-                  Kiểm tra lại chỉ mục
-                </Button>
-              ) : !isCheckingReadiness && !isReadyForQA && canPublish ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={
-                    requestIndexMutation.isPending || Boolean(buildingIndexRun)
-                  }
-                  onClick={() =>
-                    void requestIndexMutation.mutateAsync({
-                      providerId: null,
-                      idempotencyKey: crypto.randomUUID(),
-                    })
-                  }
-                  className="h-8 text-xs gap-1.5"
-                >
-                  <RefreshCw
-                    className={cn(
-                      "size-3.5",
-                      (requestIndexMutation.isPending || buildingIndexRun) &&
-                        "animate-spin",
-                    )}
-                  />
-                  <span>
-                    {buildingIndexRun
-                      ? "Đang cập nhật tìm kiếm…"
-                      : "Cập nhật tìm kiếm"}
-                  </span>
-                </Button>
-              ) : null}
               <Button
                 asChild
                 size="sm"

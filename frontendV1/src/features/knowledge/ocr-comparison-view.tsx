@@ -173,9 +173,12 @@ export function OcrComparisonView({
   onMobilePaneChange?: (pane: MobileReviewPane) => void;
   unprocessedRightPanel?: ReactNode;
 }) {
-  const canCompareOcr = pages.some(
-    (page) => page.page_number === activePageNumber && page.used_ocr === true,
-  );
+  const isWordDocument = run?.pagination === "document";
+  const canCompareOcr =
+    !isWordDocument &&
+    pages.some(
+      (page) => page.page_number === activePageNumber && page.used_ocr === true,
+    );
   const viewerKey = `${sourceId}:${revisionId}:${run?.id ?? ""}`;
   const [chosenMode, setChosenMode] = useState<{
     key: string;
@@ -537,7 +540,10 @@ export function OcrComparisonView({
   // Derived Markdown for this page
   const pageMarkdown = useMemo(() => {
     const lines: string[] = [];
-    lines.push(`<!-- Trang ${activePageNumber} -->\n`);
+    const position = isWordDocument
+      ? "Tài liệu Word"
+      : `Trang ${activePageNumber}`;
+    lines.push(`<!-- ${position} -->\n`);
 
     for (const block of sequentialBlocks) {
       if (block.type === "prose") {
@@ -568,7 +574,7 @@ export function OcrComparisonView({
     }
 
     return lines.join("\n");
-  }, [sequentialBlocks, activePageNumber]);
+  }, [sequentialBlocks, activePageNumber, isWordDocument]);
 
   // Derived JSON for this page (for diagnostic view)
   const pageJson = useMemo(() => {
@@ -690,7 +696,9 @@ export function OcrComparisonView({
       <div className="flex flex-wrap items-center justify-between gap-3 py-1 text-xs">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-semibold text-foreground text-sm">
-            Trang {activePageNumber} / {totalPages > 0 ? totalPages : "?"}
+            {isWordDocument
+              ? "Tài liệu Word"
+              : `Trang ${activePageNumber} / ${totalPages > 0 ? totalPages : "?"}`}
           </span>
           {activePageInfo ? (
             <Badge
@@ -796,7 +804,10 @@ export function OcrComparisonView({
             type="button"
             size="sm"
             variant="outline"
-            className="h-8 px-2.5 text-xs gap-1"
+            className={cn(
+              "h-8 px-2.5 text-xs gap-1",
+              isWordDocument && "hidden",
+            )}
             disabled={activePageNumber <= 1}
             onClick={() => onPageChange(activePageNumber - 1)}
             title="Trang trước (Phím tắt: [)"
@@ -805,7 +816,12 @@ export function OcrComparisonView({
             <span className="hidden sm:inline">Trang trước</span>
           </Button>
 
-          <div className="flex items-center gap-1.5 font-mono text-xs px-1">
+          <div
+            className={cn(
+              "flex items-center gap-1.5 font-mono text-xs px-1",
+              isWordDocument && "hidden",
+            )}
+          >
             <label
               htmlFor="ocr-page-number-input"
               className="text-muted-foreground font-sans"
@@ -847,7 +863,10 @@ export function OcrComparisonView({
             type="button"
             size="sm"
             variant="outline"
-            className="h-8 px-2.5 text-xs gap-1"
+            className={cn(
+              "h-8 px-2.5 text-xs gap-1",
+              isWordDocument && "hidden",
+            )}
             disabled={totalPages > 0 && activePageNumber >= totalPages}
             onClick={() => onPageChange(activePageNumber + 1)}
             title="Trang sau (Phím tắt: ])"
@@ -1410,7 +1429,11 @@ export function OcrComparisonView({
                       className="text-xs gap-1.5 h-7"
                     >
                       <FileText className="size-3 text-primary" />
-                      <span>Văn bản trang {activePageNumber}</span>
+                      <span>
+                        {isWordDocument
+                          ? "Văn bản"
+                          : `Văn bản trang ${activePageNumber}`}
+                      </span>
                     </TabsTrigger>
                     <TabsTrigger
                       value="markdown"

@@ -6,6 +6,7 @@ import {
   FieldLabel,
 } from "@/components/admin/field";
 import { Input } from "@/components/ui/input";
+import { MetadataFacetFields } from "./metadata-facet-fields";
 import type { MetadataFilter } from "./types";
 import { compactMetadataFilter } from "./types";
 
@@ -18,6 +19,7 @@ import { compactMetadataFilter } from "./types";
  * Nonempty invalid years must be corrected before conversion or submission.
  */
 export type MetadataFilterDraft = {
+  attributes?: MetadataFilter["attributes"];
   data_year: string;
   issued_year: string;
   effective_on: string;
@@ -51,6 +53,7 @@ export function draftToFilter(draft: MetadataFilterDraft): MetadataFilter {
     throw new Error("Phạm vi có năm không hợp lệ. Hãy sửa trước khi gửi.");
   }
   return compactMetadataFilter({
+    attributes: draft.attributes,
     data_year: draft.data_year.trim() ? Number(draft.data_year) : null,
     issued_year: draft.issued_year.trim() ? Number(draft.issued_year) : null,
     effective_on: draft.effective_on.trim() || null,
@@ -63,6 +66,7 @@ export function filterToDraft(
   filter: MetadataFilter | null | undefined,
 ): MetadataFilterDraft {
   return {
+    attributes: filter?.attributes,
     data_year: filter?.data_year ? String(filter.data_year) : "",
     issued_year: filter?.issued_year ? String(filter.issued_year) : "",
     effective_on: filter?.effective_on ?? "",
@@ -74,7 +78,11 @@ export function filterToDraft(
 export function isMetadataFilterDraftEmpty(
   draft: MetadataFilterDraft,
 ): boolean {
-  return Object.values(draft).every((value) => !value.trim());
+  const { attributes, ...standard } = draft;
+  return (
+    !Object.keys(attributes ?? {}).length &&
+    Object.values(standard).every((value) => !value.trim())
+  );
 }
 
 export function MetadataFilterFields({
@@ -83,12 +91,16 @@ export function MetadataFilterFields({
   disabled,
   columns = 2,
   showHint = true,
+  workspaceId,
+  collectionId,
 }: {
   value: MetadataFilterDraft;
   onChange: (next: MetadataFilterDraft) => void;
   disabled?: boolean;
   columns?: 2 | 3;
   showHint?: boolean;
+  workspaceId?: string;
+  collectionId?: string;
 }) {
   const dataYearId = useId();
   const issuedYearId = useId();
@@ -196,6 +208,15 @@ export function MetadataFilterFields({
           className="text-xs"
         />
       </Field>
+      {workspaceId && collectionId && (
+        <MetadataFacetFields
+          workspaceId={workspaceId}
+          collectionId={collectionId}
+          attributes={value.attributes}
+          onChange={(attributes) => patch({ attributes })}
+          disabled={disabled}
+        />
+      )}
     </div>
   );
 }

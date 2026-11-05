@@ -93,6 +93,8 @@ export function CompilationDialog({
 }) {
   const [topic, setTopic] = useState("");
   const [sourceFirst, setSourceFirst] = useState(false);
+  const [aiSupplement, setAiSupplement] = useState(false);
+  const quickOnly = sourceFirst && !aiSupplement;
   const [selectedRuns, setSelectedRuns] = useState<SelectedOcrRunItem[]>([]);
   const [providerId, setProviderId] = useState<string>("default");
   const [maxOutputTokens, setMaxOutputTokens] = useState<string>("");
@@ -184,6 +186,7 @@ export function CompilationDialog({
       }
       setTopic("");
       setSourceFirst(false);
+      setAiSupplement(false);
       setProviderId("default");
       setMaxOutputTokens("");
       setStructuredOutput(false);
@@ -276,9 +279,10 @@ export function CompilationDialog({
       topic: effectiveTopic,
       ocr_run_ids,
       text_versions,
-      ...(sourceFirst
+      ...(quickOnly
         ? { source_first: true, auto_review: false }
         : {
+            ...(sourceFirst ? { ai_supplement: true } : {}),
             provider_id: providerId === "default" ? null : providerId,
             max_output_tokens: maxOutputTokens ? Number(maxOutputTokens) : null,
             structured_output: structuredOutput,
@@ -545,7 +549,29 @@ export function CompilationDialog({
                 </p>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground" hidden={sourceFirst}>
+            {sourceFirst && (
+              <div className="flex items-start gap-2 pl-6">
+                <Checkbox
+                  id="compiler-ai-supplement"
+                  checked={aiSupplement}
+                  onCheckedChange={(checked) => {
+                    setAiSupplement(checked === true);
+                    setAutoReview(checked !== true);
+                    setIdempotencyKey(generateIdempotencyKey());
+                  }}
+                />
+                <div>
+                  <Label htmlFor="compiler-ai-supplement">
+                    AI bổ sung cấu trúc và metadata
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Giữ bản nền theo nguồn. Xem gợi ý của AI cùng dẫn chứng
+                    trước khi đăng ký.
+                  </p>
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground" hidden={quickOnly}>
               {providerId === "default"
                 ? "Dùng model mặc định của đơn vị."
                 : `Model đã chọn: ${chatProviders.find((p) => p.id === providerId)?.model_name ?? "Đang tải…"}.`}{" "}
@@ -554,8 +580,8 @@ export function CompilationDialog({
                 : "Rà soát tự động đang tắt."}
             </p>
             <Collapsible
-              hidden={sourceFirst}
-              open={!sourceFirst && advancedOpen}
+              hidden={quickOnly}
+              open={!quickOnly && advancedOpen}
               onOpenChange={setAdvancedOpen}
             >
               <CollapsibleTrigger asChild>
@@ -783,9 +809,9 @@ export function CompilationDialog({
             <Alert className="rounded-lg border-info/30 bg-info/5 text-xs py-2.5">
               <Info className="size-3.5 text-info shrink-0" />
               <AlertDescription className="text-muted-foreground text-[11px] leading-relaxed">
-                {sourceFirst
+                {quickOnly
                   ? "Chế độ nhanh dựng bản nháp từ nguồn đã lưu và không gọi mô hình. "
-                  : "Biên soạn AI sử dụng token theo định mức của mô hình đã chọn. "}
+                  : "Phần AI sử dụng token theo định mức của mô hình đã chọn. "}
                 Bản hoàn tất là bản nháp chưa được duyệt và chưa tự động đưa vào
                 phục vụ Trò chuyện.
               </AlertDescription>

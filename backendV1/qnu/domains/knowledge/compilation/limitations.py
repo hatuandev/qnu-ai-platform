@@ -6,6 +6,47 @@ from qnu.domains.knowledge.compilation.schemas import DraftContent
 from qnu.platform.errors import AppException
 
 
+def _linked_image_text(block: dict, page: dict) -> list[dict]:
+    asset = (block.get("image") or {}).get("asset_no")
+    if type(asset) is not int or asset <= 0:
+        return []
+    return [
+        other
+        for other in page["blocks"]
+        if other is not block
+        and other.get("source_image_asset_no") == asset
+        and (
+            other.get("text", "").strip()
+            or (
+                (table := other.get("table"))
+                and table.get("status") == "parsed"
+                and any(c.get("text", "").strip() for row in table.get("rows", []) for c in row)
+            )
+        )
+    ]
+
+
+def _image_limits(block: dict, page: dict, run_id: str) -> list[dict]:
+    linked = _linked_image_text(block, page)
+    if not linked:
+        return []
+    references = list(dict.fromkeys(f"{run_id}:{item['evidence_id']}" for item in linked))
+    # Each paragraph fits the draft citation contract without dropping linked OCR.
+    return [
+        {
+            "text": (
+                f"Ảnh nguồn được trích dẫn tại trang {page['page_number']} "
+                "đã có văn bản OCR trong các khối liên kết được dẫn chứng. "
+                "Chưa xác minh độ chính xác, độ đầy đủ của chữ và quan hệ bố cục "
+                "trong ảnh; cần đối chiếu ảnh gốc. Cảnh báo này không kết luận "
+                "ảnh chưa được OCR hoặc các khối khác cùng trang chưa được đọc."
+            ),
+            "citations": [f"{run_id}:{block['evidence_id']}", *references[offset : offset + 99]],
+        }
+        for offset in range(0, len(references), 99)
+    ]
+
+
 def limitation_paragraphs(documents: list[dict]) -> list[dict]:
     paragraphs = []
     for doc in documents:
@@ -17,6 +58,9 @@ def limitation_paragraphs(documents: list[dict]) -> list[dict]:
                     or block["text"].strip()
                     or (table and table.get("status") == "parsed" and table.get("rows"))
                 ):
+                    continue
+                if notes := _image_limits(block, page, doc["ocr_run_id"]):
+                    paragraphs.extend(notes)
                     continue
                 paragraphs.append(
                     {

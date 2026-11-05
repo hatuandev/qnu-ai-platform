@@ -34,6 +34,7 @@ TABLES = (
     "chat_conversations",
     "chat_assistants",
     "kb_index_chunks",
+    "kb_index_sync",
     "kb_index_inputs",
     "kb_index_runs",
     "kb_publication_decisions",

@@ -50,6 +50,7 @@ export interface ProcessingRunResponse {
   config_fingerprint: string;
   dispatch_pending: boolean;
   strategy?: string;
+  pagination?: "page" | "document";
   results_ready?: boolean;
 }
 

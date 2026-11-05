@@ -6,18 +6,24 @@ hand-maintained university dictionary. Years with multiple roles require clarifi
 """
 
 import itertools
+import json
 import re
 import unicodedata
 
 from sqlalchemy import select
 
 from qnu.domains.knowledge.index.models import IndexChunk
-from qnu.domains.knowledge.metadata import MetadataFilter, matches_metadata
+from qnu.domains.knowledge.metadata import (
+    MetadataFilter,
+    matches_metadata,
+    merge_scope,
+    scope_conflicts,
+)
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.platform.config import get_settings
 from qnu.platform.errors import Conflict
 
-VERSION = "qnu.catalog-scope/v1"
+VERSION = "qnu.catalog-scope/v2"
 
 
 def normalize(value: str) -> str:
@@ -84,6 +90,8 @@ def year_choices(query: str, catalog: dict) -> dict:
             )
             if re.search(r"(?:" + label + r")\s*[:=]?\s*" + str(year) + r"\b", query, re.IGNORECASE)
         ]
+        if not explicit and not roles:
+            continue
         if not explicit and len(roles) != 1:
             clarify("vai trò năm", ["năm dữ liệu", "năm ban hành"])
         for role in explicit or roles:
@@ -91,16 +99,65 @@ def year_choices(query: str, catalog: dict) -> dict:
     return choices
 
 
+def catalog_attributes(structures: list[dict]) -> dict:
+    catalog: dict[str, dict] = {}
+    for structure in structures:
+        for annotation in structure.get("retrieval_metadata", []):
+            for key, value in (annotation["values"].get("attributes") or {}).items():
+                typed_value = (type(value) if isinstance(value, (str, bool)) else int, value)
+                catalog.setdefault(key, {})[typed_value] = value
+    return {key: list(values.values()) for key, values in sorted(catalog.items())}
+
+
+def attribute_scope(query: str, catalog: dict) -> dict:
+    text = normalize(query)
+    selected = {}
+    for label, values in catalog.items():
+        label_pattern = (
+            r"(?<!\w)"
+            + re.escape(normalize(label))
+            + r"(?!\w)\s*(?:(?P<explicit>[:=])\s*|là\b\s*)?"
+        )
+        selectors = list(re.finditer(label_pattern, text))
+        if not selectors:
+            continue
+        by_label = {}
+        for value in values:
+            if isinstance(value, bool):
+                literal = json.dumps(value)
+            elif isinstance(value, float) and value.is_integer():
+                literal = str(int(value))
+            else:
+                literal = str(value)
+            by_label.setdefault(normalize(literal), []).append(value)
+        options = "|".join(re.escape(key) for key in sorted(by_label, key=len, reverse=True))
+        value_pattern = re.compile(r"(?:" + options + r")(?!\w|[.,]\d)")
+        join_pattern = re.compile(r"\s*(?:,|và\b|hoặc\b|với\b)\s*")
+        found = set()
+        for selector in selectors:
+            match = value_pattern.match(text, selector.end())
+            if match is None and selector["explicit"]:
+                clarify(label, values)
+            while match:
+                found.add(match[0])
+                join = join_pattern.match(text, match.end())
+                match = value_pattern.match(text, join.end()) if join else None
+        matches = [value for key in found for value in by_label[key]]
+        overview = re.search(r"\b(?:liệt kê|tất cả|các|những|nào|list|all|overview)\b", text)
+        if len(matches) > 1 or (not matches and not overview):
+            clarify(label, values)
+        if matches:
+            selected[label] = matches[0]
+    if len(selected) > 20:
+        raise Conflict("Câu hỏi có quá nhiều thuộc tính.", code="query_scope_too_large")
+    return selected
+
+
 def resolve(
     query: str, fixed: MetadataFilter, structures: list[dict]
 ) -> tuple[str, list[MetadataFilter], dict]:
     """Return a disjunction of conjunctive scopes, without weakening fixed filters."""
-    units = [
-        a["values"]
-        for s in structures
-        for a in s.get("retrieval_metadata", [])
-        if matches_metadata({"retrieval_metadata": [a]}, fixed)
-    ]
+    units = [a["values"] for s in structures for a in s.get("retrieval_metadata", [])]
     catalog = {
         key: sorted({u[key] for u in units if u.get(key) is not None}, key=str)
         for key in ("program", "intake", "data_year", "issued_year")
@@ -110,6 +167,14 @@ def resolve(
     # contain four digits. Require a year label, including for unknown years.
     chosen.update(year_choices(query, catalog))
     base = fixed.model_dump(mode="json", exclude_none=True)
+    attributes = attribute_scope(query, catalog_attributes(structures))
+    if attributes:
+        requested = {"attributes": attributes}
+        if scope_conflicts(base, requested):
+            raise Conflict("Câu hỏi mâu thuẫn với phạm vi đã chọn.", code="answer_scope_conflict")
+        base = merge_scope(base, requested)
+        if len(base["attributes"]) > 20:
+            raise Conflict("Câu hỏi có quá nhiều thuộc tính.", code="query_scope_too_large")
     # Disambiguate glossary within the explicit question scope, not across
     # unrelated programs/years of the authorized collection.
     preliminary = {**base, **{k: v[0] for k, v in chosen.items() if len(v) == 1}}
@@ -174,7 +239,7 @@ def resolve(
     )
 
 
-async def plan(db, run, allowed, sealed, query, fixed):
+async def verified_structures(db, run, allowed, sealed):
     rows = (
         await db.execute(
             select(IndexChunk.id, IndexChunk.structure)
@@ -192,7 +257,11 @@ async def plan(db, run, allowed, sealed, query, fixed):
     for identifier, structure in rows:
         if digest(structure) != proofs.get(identifier):
             raise Conflict("Metadata khác manifest đã ghim.", code="index_metadata_changed")
-    return resolve(query, fixed, [structure or {} for _, structure in rows])
+    return [structure or {} for _, structure in rows]
+
+
+async def plan(db, run, allowed, sealed, query, fixed):
+    return resolve(query, fixed, await verified_structures(db, run, allowed, sealed))
 
 
 def result_scopes(result, fallback):

@@ -81,12 +81,15 @@ class Settings(BaseSettings):
     MODEL_CHAT_CONCURRENCY: int = Field(default=4, ge=1, le=64)
     MODEL_CHAT_QUEUE_TIMEOUT_SECONDS: int = Field(default=300, ge=1, le=3600)
     PUBLICATION_PREVIEW_TTL_SECONDS: int = Field(default=300, ge=1, le=3600)
-    INDEX_CHUNK_MAX_BYTES: int = Field(default=3000, ge=256)
+    # Optional operator override; otherwise chunk sizing follows the embedding runtime.
+    INDEX_CHUNK_MAX_BYTES: int | None = Field(default=None, ge=256)
     INDEX_EMBED_BATCH_SIZE: int = Field(default=16, ge=1, le=128)
     INDEX_MAX_DOCUMENTS: int = Field(default=100, ge=1, le=1000)
     INDEX_MAX_CHUNKS: int = Field(default=20000, ge=1)
     INDEX_LEASE_SECONDS: int = Field(default=900, ge=60)
     INDEX_MAX_ATTEMPTS: int = Field(default=3, ge=1, le=10)
+    INDEX_RETAIN_INACTIVE: int = Field(default=1, ge=0)
+    INDEX_RETIRE_AFTER_SECONDS: int = Field(default=86400, ge=0)
     # Legacy environment option, no longer applied to automatic answers.
     RAG_MAX_OUTPUT_TOKENS: int = Field(default=2048, ge=1)
     CONVERSATION_TURN_LEASE_SECONDS: int = Field(default=900, ge=60)

@@ -37,6 +37,48 @@ Actor = Annotated[AuthActor, Depends(get_actor)]
 Blob = Annotated[BlobStore, Depends(get_blob_store)]
 
 
+@router.get("/search-facets")
+async def search_facets(
+    workspace_id: str,
+    collection_id: str,
+    response: Response,
+    db: DB,
+    actor: Actor,
+    blob: Blob,
+    document_ids: Annotated[list[str] | None, Query(max_length=100)] = None,
+) -> dict:
+    response.headers["Cache-Control"] = "private, no-store"
+    return await retrieval.metadata_facets(
+        db, blob, actor, workspace_id, collection_id, document_ids
+    )
+
+
+@router.get("/search-readiness")
+async def search_readiness(
+    workspace_id: str, collection_id: str, response: Response, db: DB, actor: Actor
+) -> dict:
+    from qnu.domains.knowledge.index.sync import readiness
+
+    response.headers["Cache-Control"] = "private, no-store"
+    return await readiness(db, actor, workspace_id, collection_id)
+
+
+@router.post("/search-readiness/retry", status_code=202)
+async def retry_search_update(
+    workspace_id: str,
+    collection_id: str,
+    db: DB,
+    actor: Actor,
+    idempotency_key: Key,
+    queue: JobQueue | None = Depends(get_job_queue),
+) -> dict:
+    from qnu.domains.knowledge.index.sync import readiness, retry, wake
+
+    await retry(db, actor, workspace_id, collection_id, idempotency_key)
+    await wake(queue, collection_id)
+    return await readiness(db, actor, workspace_id, collection_id)
+
+
 @router.post("/indexing-runs", response_model=IndexCreated, status_code=201)
 async def create_index(
     workspace_id: str,

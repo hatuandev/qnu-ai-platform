@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from qnu.domains.ocr import execution, service
+from qnu.domains.ocr import automatic, execution, service
 from tests.integration.knowledge_support import EDITOR, OUTSIDER, as_actor, workspace_with_editor
 from tests.integration.ocr_support import (
     TABLE_RESPONSE,
@@ -60,6 +60,7 @@ def prepare(client, fake, name, *, docx=False, quota=1000000):
 @pytest.mark.parametrize("docx", [False, True], ids=["pdf", "docx"])
 def test_stages_correlate_worker_and_api_without_document_content(client, monkeypatch, docx):
     events = RecordedEvents()
+    monkeypatch.setattr(automatic, "logger", events)
     monkeypatch.setattr(execution, "logger", events)
     monkeypatch.setattr(service, "logger", events)
     with FakeNemotron() as fake:
@@ -71,36 +72,35 @@ def test_stages_correlate_worker_and_api_without_document_content(client, monkey
         assert client.get(url + "/document").status_code == 200
         evidence = client.get(url + "/evidence").json()
         assert evidence["identity"]["source_sha256"] == revision["sha256"]
-        assert {a["kind"] for a in evidence["artifacts"]} >= {
-            "page_image",
-            "raw_response",
-            "canonical_json",
-            "markdown",
-            "manifest",
-        }
+        kinds = {a["kind"] for a in evidence["artifacts"]}
+        assert kinds >= {"canonical_json", "markdown", "manifest"}
         stages = [e for e in events.events if e["event"] == "ocr_stage_finished"]
-        assert {e["stage"] for e in stages} >= {
-            "dispatch",
-            "authorize",
-            "resolve_model",
-            "load_revision",
-            "render",
-            "provider_preflight",
-            "ocr_page",
-            "parse_page",
-            "store_artifact",
-            "assemble",
-            "read_artifact",
-        }, "The real worker/API do not expose stage observations"
+        names = {e["stage"] for e in stages}
+        assert names >= {"dispatch", "authorize", "store_artifact", "assemble", "read_artifact"}
+        if docx:
+            assert "read_docx" in names
+            assert kinds.isdisjoint({"render_pdf", "page_image", "raw_response"})
+            assert fake.requests == []
+        else:
+            assert kinds >= {"page_image", "raw_response"}
+            assert names >= {
+                "resolve_model",
+                "load_revision",
+                "render",
+                "provider_preflight",
+                "ocr_page",
+                "parse_page",
+            }
         for event in stages:
             assert event["run_id"] == run["id"]
             assert event["revision_id"] == revision["id"]
             assert event["source_sha256"] == revision["sha256"]
             assert event["duration_ms"] >= 0
             assert event["status"] == "completed"
-        provider_events = [e for e in stages if e["stage"] == "ocr_page"]
-        assert provider_events and provider_events[0]["provider_id"] == provider["id"]
-        assert provider_events[0]["model_name"] == provider["model_name"]
+        if not docx:
+            [provider_event] = [e for e in stages if e["stage"] == "ocr_page"]
+            assert provider_event["provider_id"] == provider["id"]
+            assert provider_event["model_name"] == provider["model_name"]
         serialized = json.dumps(stages, ensure_ascii=False)
         for private in ("nemotron-test-secret", "Chỉ tiêu tuyển sinh", "data:image", fake.base_url):
             assert private not in serialized

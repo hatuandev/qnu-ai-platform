@@ -8,6 +8,8 @@
  * - qnu.domains.knowledge.compilation.workflow.schemas
  */
 
+import type { RetrievalAnnotation } from "@/features/rag/types";
+
 export type CompilationOrigin = "compiler" | "user_edit";
 
 export type CompilationStatus =
@@ -38,6 +40,7 @@ export type CompilationRunResponse = {
   parent_run_id: string | null;
   origin: CompilationOrigin;
   source_first?: boolean;
+  ai_supplement?: boolean;
 };
 
 export type CompilationCreatedResponse = {
@@ -53,6 +56,7 @@ export type CompilationRequestInput = {
   max_output_tokens?: number | null;
   structured_output?: boolean;
   source_first?: boolean;
+  ai_supplement?: boolean;
   text_versions?: Record<string, number>;
   auto_review?: boolean;
   review_provider_id?: string | null;
@@ -143,6 +147,19 @@ export type SourceSummary = {
   };
 };
 
+export type CompilerMetadataProposal = {
+  id: string;
+  status: "proposed";
+  annotation: RetrievalAnnotation;
+  origin: "rules" | "model";
+  source: CitationDetail;
+};
+
+export type CompilerSupplement = {
+  metadata: CompilerMetadataProposal[];
+  sections: { segment: number; sections: DraftSection[]; unknowns: string[] }[];
+};
+
 export type DraftDocumentResponse = {
   schema_version: string;
   compilation_run_id: string;
@@ -154,6 +171,7 @@ export type DraftDocumentResponse = {
   unknowns: string[];
   citations: Record<string, CitationDetail>;
   reading_groups?: DraftReadingGroup[];
+  supplement?: CompilerSupplement;
   source_tables: LiteralTableEntry[];
   sources: SourceSummary[];
   origin?: string;

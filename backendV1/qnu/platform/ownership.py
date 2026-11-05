@@ -105,6 +105,7 @@ V1_TABLES = frozenset(
         "kb_publication_previews",
         "kb_publication_decisions",
         "kb_index_runs",
+        "kb_index_sync",
         "kb_index_inputs",
         "kb_index_chunks",
         "chat_assistants",

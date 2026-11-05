@@ -12,6 +12,7 @@ from qnu.domains.conversations.models import Conversation, ConversationTurn
 from qnu.domains.conversations.schemas import ConversationCreate, ConversationUpdate, TurnRequest
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import utcnow
+from qnu.domains.knowledge.metadata import merge_scope, scope_conflicts
 from qnu.domains.knowledge.publication.access import document
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.lifecycle.effects import cancel_related_jobs
@@ -185,16 +186,18 @@ async def reserve_turn(
         .order_by(ConversationTurn.turn_no.desc())
         .limit(1)
     )
-    scope = {**fixed_scope, **((previous.metadata_filter or {}) if previous else {})}
+    scope = merge_scope(fixed_scope, (previous.metadata_filter or {}) if previous else {})
     if req.metadata_filter is not None:
         requested = req.metadata_filter.model_dump(mode="json", exclude_none=True)
-        if any(
-            key in fixed_scope and fixed_scope[key] != value for key, value in requested.items()
-        ):
+        if scope_conflicts(fixed_scope, requested):
             raise Conflict(
                 "Câu hỏi mâu thuẫn phạm vi cố định của trợ lý.", code="conversation_scope_conflict"
             )
-        scope.update(requested)
+        scope = merge_scope(scope, requested)
+        if len(scope.get("attributes", {})) > 20:
+            raise Conflict(
+                "Phạm vi hội thoại có quá nhiều thuộc tính.", code="query_scope_too_large"
+            )
     turn = ConversationTurn(
         id=new_id("trn"),
         workspace_id=workspace_id,

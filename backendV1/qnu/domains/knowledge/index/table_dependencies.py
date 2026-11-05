@@ -72,7 +72,9 @@ def adjoining(left: dict, right: dict) -> bool:
     return (
         right["page"] == left["page"] + 1
         and a.get("units") == b.get("units") == "normalized_0_1"
-        and a["y1"] >= 0.90
+        # Bottom margins vary even between pages of the same numbered table.
+        # The page edge is only a gate alongside geometry and consecutive IDs.
+        and a["y1"] >= 0.88
         and b["y0"] <= 0.12
         and abs(a["x0"] - b["x0"]) <= 0.005
         and abs(a["x1"] - b["x1"]) <= 0.005
@@ -128,7 +130,13 @@ def dependencies(document: dict) -> dict[str, dict]:
             else:
                 header, chain = None, []
             if header:
-                carried = start == 0 and not table["rows"][0][0]["text"].strip()
+                first = table["rows"][0]
+                identity_width = 1 if len(first) == 2 else 2
+                carried = (
+                    start == 0
+                    and not any(c["text"].strip() for c in first[:identity_width])
+                    and any(c["text"].strip() for c in first[identity_width:])
+                )
                 result[ref] = {
                     "basis": BASIS,
                     "header": header,

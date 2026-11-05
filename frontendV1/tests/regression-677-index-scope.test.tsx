@@ -17,6 +17,11 @@ vi.mock("@/features/modelops/queries", () => ({
   useCatalogQuery: () => ({ data: [], isPending: false }),
 }));
 vi.mock("@/features/knowledge/index-queries", () => ({
+  useMetadataFacetsQuery: () => ({
+    data: { ready: true, attributes: {}, truncated: false },
+    isPending: false,
+    isError: false,
+  }),
   useIndexRunsQuery: () => ({
     data: mocks.runs,
     isPending: false,

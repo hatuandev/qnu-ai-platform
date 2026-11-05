@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -33,6 +34,7 @@ class AssistantConfig(BaseModel):
 
 
 class NewAssistantRagPolicy(RagPolicy):
+    scope_resolution: Literal["explicit", "catalog"] = "catalog"
     context_window: int = Field(1, strict=True, ge=0, le=5)
 
 

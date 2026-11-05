@@ -5,6 +5,7 @@ import json
 import math
 import stat
 import zipfile
+from dataclasses import replace
 from html.parser import HTMLParser
 from pathlib import PurePosixPath
 
@@ -253,4 +254,49 @@ def parse_mineru_page(raw: dict) -> PageLayout:
                 table=table,
             )
         )
-    return PageLayout(tuple(blocks))
+    warnings = []
+    regions = raw.get("image_ocr", [])
+    if not isinstance(regions, list) or len(regions) > 2048:
+        raise invalid()
+    assets = set()
+    for region in regions:
+        if not isinstance(region, dict) or not isinstance(region.get("result"), dict):
+            raise invalid()
+        asset, bbox = region.get("image_asset_no"), region.get("bbox")
+        number = region.get("image_region", 1)
+        if (
+            type(asset) is not int
+            or asset <= 0
+            or type(number) is not int
+            or not 1 <= number <= 65
+            or (asset, number) in assets
+            or not isinstance(bbox, list)
+            or len(bbox) != 4
+            or not all(type(v) in (int, float) and math.isfinite(v) for v in bbox)
+            or not 0 <= bbox[0] < bbox[2] <= 1
+            or not 0 <= bbox[1] < bbox[3] <= 1
+            or region.get("result", {}).get("image_ocr")
+        ):
+            raise invalid()
+        assets.add((asset, number))
+        image_layout = parse_mineru_page(region["result"])
+        text_blocks = [b for b in image_layout.blocks if b.text.strip()]
+        if not text_blocks:
+            warnings.append(f"image_text_unresolved:{asset}")
+        for block in text_blocks:
+            x0, y0, x1, y1 = block.bbox
+            blocks.append(
+                replace(
+                    block,
+                    order=len(blocks) + 1,
+                    bbox=(
+                        bbox[0] + x0 * (bbox[2] - bbox[0]),
+                        bbox[1] + y0 * (bbox[3] - bbox[1]),
+                        bbox[0] + x1 * (bbox[2] - bbox[0]),
+                        bbox[1] + y1 * (bbox[3] - bbox[1]),
+                    ),
+                    requires_review=True,
+                    source_image_asset_no=asset,
+                )
+            )
+    return PageLayout(tuple(blocks), tuple(warnings))

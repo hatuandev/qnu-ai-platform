@@ -1,11 +1,22 @@
-import { Bot, Cpu, Plus, Search, Server, Sparkles } from "lucide-react";
-import { useState } from "react";
+import {
+  Bot,
+  CheckCircle2,
+  ChevronRight,
+  Cpu,
+  Plus,
+  RotateCcw,
+  Server,
+  Sparkles,
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import { DebouncedSearchInput } from "@/components/admin/debounced-search-input";
 import { EmptyState } from "@/components/admin/empty-state";
 import { ErrorState } from "@/components/admin/error-state";
+import { KpiMetric } from "@/components/admin/kpi-metric";
+import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -43,6 +54,16 @@ export function ConnectionList({
   const [filter, setFilter] = useState("");
   const [mode, setMode] = useState<ViewMode>("grid");
 
+  const totalModels = useMemo(
+    () => connections.reduce((acc, c) => acc + (c.model_count ?? 0), 0),
+    [connections],
+  );
+
+  const activeConnections = useMemo(
+    () => connections.filter((c) => c.active_keys_count > 0).length,
+    [connections],
+  );
+
   const visible = connections.filter((row) =>
     `${row.name} ${row.base_url} ${row.prefix ?? ""} ${FAMILIES[row.family]}`
       .toLowerCase()
@@ -51,246 +72,295 @@ export function ConnectionList({
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Server className="size-4" />
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-foreground">
-              Nhà cung cấp
-            </h1>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Quản lý kết nối tới máy chủ mô hình AI và dịch vụ OCR tài liệu.
-          </p>
-        </div>
-
-        {/* Action Buttons styled like screenshot */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-2.5 size-3.5 text-muted-foreground" />
-            <Input
-              className="pl-8 text-xs h-9"
-              aria-label="Tìm nhà cung cấp"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Tìm kiếm nhà cung cấp..."
-            />
-          </div>
-
+      {/* 1. Page Header Chuẩn */}
+      <PageHeader
+        eyebrow="QNU AI · HẠ TẦNG"
+        title="Nhà cung cấp"
+        description="Quản lý kết nối tới máy chủ mô hình AI và dịch vụ OCR tài liệu."
+        actions={
           <Button
-            size="sm"
-            className="h-9 gap-1.5 text-xs shadow-xs"
+            size="default"
+            className="gap-2 shadow-xs"
             onClick={() => {
               setInitialFamily("openai");
               setFormOpen(true);
             }}
           >
-            <Plus className="size-3.5" />
+            <Plus className="size-4" />
             <span>Thêm mới</span>
           </Button>
+        }
+      />
 
+      {/* 2. Dải KPI Metrics Thống Kê Tổng Quan */}
+      <Card className="overflow-hidden border bg-card shadow-xs">
+        <CardContent className="grid p-0 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x">
+          <KpiMetric
+            icon={Server}
+            label="Tổng số nhà cung cấp"
+            value={connections.length.toLocaleString("vi-VN")}
+          />
+          <KpiMetric
+            icon={Cpu}
+            label="Tổng số mô hình (Models)"
+            value={totalModels.toLocaleString("vi-VN")}
+          />
+          <KpiMetric
+            icon={CheckCircle2}
+            label="Nhà cung cấp sẵn sàng"
+            value={activeConnections.toLocaleString("vi-VN")}
+          />
+        </CardContent>
+      </Card>
+
+      {/* 3. Toolbar: Tìm kiếm & Đổi chế độ xem */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        <div className="w-full sm:w-80">
+          <DebouncedSearchInput
+            placeholder="Tìm kiếm nhà cung cấp..."
+            value={filter}
+            onChange={setFilter}
+            className="text-xs h-9"
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-2">
+          {filter ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setFilter("")}
+            >
+              <RotateCcw className="size-3.5 mr-1" />
+              <span>Đặt lại</span>
+            </Button>
+          ) : null}
           <ViewModeToggle value={mode} onChange={setMode} />
         </div>
       </div>
 
+      {/* 4. Trạng thái Loading / Error / Empty / Nội dung */}
       {query.isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          <Skeleton className="h-32 w-full rounded-xl" />
-          <Skeleton className="h-32 w-full rounded-xl" />
-          <Skeleton className="h-32 w-full rounded-xl" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-36 w-full rounded-xl" />
+          <Skeleton className="h-36 w-full rounded-xl" />
+          <Skeleton className="h-36 w-full rounded-xl" />
         </div>
       ) : query.isError ? (
         <ErrorState error={query.error} onRetry={() => void query.refetch()} />
-      ) : (
-        <div className="space-y-6">
-          {/* Section: Danh sách nhà cung cấp */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
-                <span>Danh sách nhà cung cấp</span>
-                <Badge variant="outline" className="text-[11px] font-normal">
-                  {visible.length}
-                </Badge>
-              </h2>
-            </div>
+      ) : visible.length === 0 ? (
+        <Card className="rounded-xl shadow-2xs border-border/70">
+          <CardContent className="py-12">
+            <EmptyState
+              icon={Server}
+              title={
+                filter
+                  ? "Không tìm thấy nhà cung cấp phù hợp"
+                  : "Chưa có nhà cung cấp nào"
+              }
+              description={
+                filter
+                  ? `Không có kết nối nào khớp với từ khóa "${filter}".`
+                  : "Nhấn vào 'Thêm mới' ở trên để kết nối nhà cung cấp đầu tiên."
+              }
+              action={
+                !filter
+                  ? {
+                      label: "Thêm nhà cung cấp",
+                      onClick: () => {
+                        setInitialFamily("openai");
+                        setFormOpen(true);
+                      },
+                    }
+                  : undefined
+              }
+            />
+          </CardContent>
+        </Card>
+      ) : mode === "grid" ? (
+        /* Grid View */
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {visible.map((row) => {
+            const hasKeys = row.active_keys_count > 0;
 
-            {visible.length === 0 ? (
-              <EmptyState
-                title={
-                  filter
-                    ? "Không tìm thấy nhà cung cấp phù hợp"
-                    : "Chưa có nhà cung cấp nào"
-                }
-                description="Nhấn vào 'Thêm mới' ở trên để kết nối nhà cung cấp đầu tiên."
-              />
-            ) : mode === "grid" ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {visible.map((row) => {
-                  const hasKeys = row.active_keys_count > 0;
-
-                  return (
-                    <Card
-                      key={row.id}
-                      onClick={() => onOpenProvider(row)}
-                      className={cn(
-                        "group cursor-pointer rounded-xl border border-border/70 p-4 transition-all hover:border-primary/60 hover:shadow-sm bg-card hover:bg-muted/10 relative",
+            return (
+              <Card
+                key={row.id}
+                onClick={() => onOpenProvider(row)}
+                className={cn(
+                  "group cursor-pointer rounded-xl border border-border/70 p-4 transition-all hover:border-primary/60 hover:shadow-xs bg-card hover:bg-muted/10 relative flex flex-col justify-between",
+                )}
+              >
+                <div>
+                  <div className="flex items-start gap-3">
+                    {/* Provider Icon Avatar */}
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      {row.family === "anthropic" ? (
+                        <Sparkles className="size-5 text-amber-600 dark:text-amber-400" />
+                      ) : row.family === "qnu" ? (
+                        <Cpu className="size-5 text-teal-600 dark:text-teal-400" />
+                      ) : (
+                        <Bot className="size-5 text-primary" />
                       )}
-                    >
-                      <div className="flex items-start gap-3">
-                        {/* Provider Icon Avatar */}
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted/60 border border-border/80 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                          {row.family === "anthropic" ? (
-                            <Sparkles className="size-5 text-amber-600 dark:text-amber-400" />
-                          ) : row.family === "qnu" ? (
-                            <Cpu className="size-5 text-teal-600 dark:text-teal-400" />
-                          ) : (
-                            <Bot className="size-5 text-primary" />
-                          )}
-                        </div>
+                    </div>
 
-                        {/* Provider Info */}
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                            {row.name}
-                          </h3>
+                    {/* Provider Info */}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                        {row.name}
+                      </h3>
 
-                          {/* Connection Status Badge */}
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {hasKeys ? (
-                              <span className="text-[11px] text-muted-foreground">
-                                {row.active_keys_count} khóa đang bật
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                                <span className="size-1.5 rounded-full bg-muted-foreground/40" />
-                                Chưa có khóa
-                              </span>
-                            )}
-
-                            {/* Badge type */}
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px] py-0 px-1.5 font-normal"
-                            >
-                              {connectionProtocol(row)}
-                            </Badge>
-                            <ConnectionStatus status={row.last_probe_status} />
-
-                            {row.prefix && (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] py-0 px-1 font-mono text-muted-foreground"
-                              >
-                                {row.prefix}/
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Card Footer detail */}
-                      <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
-                        <span
-                          className="truncate max-w-[140px]"
-                          title={row.base_url}
-                        >
-                          {row.base_url.replace(/^https?:\/\//, "")}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="shrink-0">
-                            {row.model_count} model
+                      {/* Connection Status Badge */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {hasKeys ? (
+                          <span className="text-[11px] text-muted-foreground">
+                            {row.active_keys_count} khóa đang bật
                           </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 px-1.5 text-[11px] text-primary hover:text-primary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenProvider(row);
-                            }}
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <span className="size-1.5 rounded-full bg-muted-foreground/40" />
+                            Chưa có khóa
+                          </span>
+                        )}
+
+                        {/* Badge type */}
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] py-0 px-1.5 font-normal"
+                        >
+                          {connectionProtocol(row)}
+                        </Badge>
+                        <ConnectionStatus status={row.last_probe_status} />
+
+                        {row.prefix && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] py-0 px-1 font-mono text-muted-foreground"
                           >
-                            Mở nhà cung cấp
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            ) : (
-              <Card className="overflow-hidden rounded-xl border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tên nhà cung cấp</TableHead>
-                      <TableHead>Địa chỉ Base URL</TableHead>
-                      <TableHead>Tiền tố (Prefix)</TableHead>
-                      <TableHead>Giao thức</TableHead>
-                      <TableHead>Số lượng kết nối</TableHead>
-                      <TableHead>Số Model</TableHead>
-                      <TableHead className="text-right">Thao tác</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {visible.map((row) => (
-                      <TableRow
-                        key={row.id}
-                        className="cursor-pointer hover:bg-muted/40"
-                        onClick={() => onOpenProvider(row)}
-                      >
-                        <TableCell className="font-semibold text-foreground">
-                          {row.name}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground max-w-xs truncate">
-                          {row.base_url}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {row.prefix ? `${row.prefix}/` : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-[10px]">
-                            {connectionProtocol(row)}
+                            {row.prefix}/
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {row.active_keys_count > 0 ? (
-                            <span className="text-muted-foreground text-xs">
-                              {row.active_keys_count} khóa đang bật
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">
-                              Chưa có khóa
-                            </span>
-                          )}
-                          <ConnectionStatus status={row.last_probe_status} />
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {row.model_count} model
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 text-xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenProvider(row);
-                            }}
-                          >
-                            Chi tiết →
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Footer detail */}
+                <div className="mt-3.5 pt-2.5 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+                  <span
+                    className="truncate max-w-[140px] text-muted-foreground/80"
+                    title={row.base_url}
+                  >
+                    {row.base_url.replace(/^https?:\/\//, "")}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="shrink-0 text-foreground font-medium">
+                      {row.model_count} model
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-1.5 text-[11px] text-primary hover:text-primary hover:underline gap-0.5 group-hover:translate-x-0.5 transition-transform"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenProvider(row);
+                      }}
+                    >
+                      <span>Mở nhà cung cấp</span>
+                      <ChevronRight className="size-3" />
+                    </Button>
+                  </div>
+                </div>
               </Card>
-            )}
-          </div>
+            );
+          })}
         </div>
+      ) : (
+        /* Table View */
+        <Card className="overflow-hidden rounded-xl border border-border/70 shadow-2xs">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                  Tên nhà cung cấp
+                </TableHead>
+                <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                  Địa chỉ Base URL
+                </TableHead>
+                <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                  Tiền tố (Prefix)
+                </TableHead>
+                <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                  Giao thức
+                </TableHead>
+                <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                  Số lượng kết nối
+                </TableHead>
+                <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                  Số Model
+                </TableHead>
+                <TableHead className="text-right font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
+                  Thao tác
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visible.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="cursor-pointer hover:bg-muted/40"
+                  onClick={() => onOpenProvider(row)}
+                >
+                  <TableCell className="font-semibold text-foreground">
+                    {row.name}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground max-w-xs truncate">
+                    {row.base_url}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {row.prefix ? `${row.prefix}/` : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-[10px]">
+                      {connectionProtocol(row)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {row.active_keys_count > 0 ? (
+                      <span className="text-muted-foreground text-xs">
+                        {row.active_keys_count} khóa đang bật
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">
+                        Chưa có khóa
+                      </span>
+                    )}
+                    <ConnectionStatus status={row.last_probe_status} />
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {row.model_count} model
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs text-primary hover:text-primary gap-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenProvider(row);
+                      }}
+                    >
+                      <span>Chi tiết</span>
+                      <ChevronRight className="size-3" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
       )}
 
       {/* Connection Form Dialog */}

@@ -30,6 +30,7 @@ from qnu.domains.knowledge.compilation.projection import (
     project_table_block,
 )
 from qnu.domains.knowledge.compilation.schemas import SegmentDraftContent
+from qnu.domains.knowledge.compilation.supplement import SUPPLEMENT_PROMPT, SupplementPart
 from qnu.domains.knowledge.compilation.units import (
     Unit,
     _ref_key,
@@ -47,6 +48,7 @@ from qnu.ports.chat_model import ChatMessage
 PROJECTION_V2 = "qnu.compiler.projection/v2"
 PROJECTION_V3 = "qnu.compiler.projection/v3"
 PROJECTION_V4 = "qnu.compiler.projection/v4"
+PROJECTION_SUPPLEMENT = "qnu.compiler.projection/supplement-v1"
 PROMPT_VERSION = "qnu.compiler.segment.prompt/v4"
 PLANNER_VERSION = "qnu.compiler.plan/v5"
 MANIFEST_VERSION = "qnu.compiler.segment-manifest/v2"
@@ -55,6 +57,7 @@ PROMPT_VERSIONS = {
     PROJECTION_V2: segments_v2.PROMPT_VERSION,
     PROJECTION_V3: "qnu.compiler.segment.prompt/v3",
     PROJECTION_V4: PROMPT_VERSION,
+    PROJECTION_SUPPLEMENT: "qnu.compiler.supplement.prompt/v1",
 }
 
 TARGET_RATIO = 0.7
@@ -163,8 +166,7 @@ def prompt_version_for(projection: str) -> str:
 def _table_signature(rows: list[list[dict]], headers: tuple[int, ...], columns: int) -> tuple:
     if headers:
         return tuple(
-            " ".join((cell.get("text") or "").strip() for cell in rows[index])
-            for index in headers
+            " ".join((cell.get("text") or "").strip() for cell in rows[index]) for index in headers
         )
     return ("columns", columns)
 
@@ -185,7 +187,13 @@ def build_layout(document: dict, *, legacy_v3: bool = False) -> Layout:
             blocks_at[position] = block
             if block.get("type") in HEADING_TYPES and (block.get("text") or "").strip():
                 headings.append(
-                    (page_index, block_index, page["page_number"], block["evidence_id"], block["text"])
+                    (
+                        page_index,
+                        block_index,
+                        page["page_number"],
+                        block["evidence_id"],
+                        block["text"],
+                    )
                 )
             table = block.get("table")
             if table and table.get("status") == "parsed":
@@ -208,7 +216,10 @@ def build_layout(document: dict, *, legacy_v3: bool = False) -> Layout:
         while start >= 0 and len(found) < 2:
             previous = reading[start]
             block = blocks_at[previous]
-            if block.get("table") is not None or block.get("type") not in HEADING_TYPES | NOTE_TYPES:
+            if (
+                block.get("table") is not None
+                or block.get("type") not in HEADING_TYPES | NOTE_TYPES
+            ):
                 break
             found.append(
                 {
@@ -250,7 +261,11 @@ def build_layout(document: dict, *, legacy_v3: bool = False) -> Layout:
     for first, second in pairwise(ordered):
         # Header equality/page adjacency never prove source table identity.
         # Keep this heuristic solely for replay of already-pinned v3 bytes.
-        if legacy_v3 and second.page_index == first.page_index + 1 and second.signature == first.signature:
+        if (
+            legacy_v3
+            and second.page_index == first.page_index + 1
+            and second.signature == first.signature
+        ):
             links.append(
                 {
                     "from": first.evidence_id,
@@ -337,11 +352,16 @@ def _following_notes(document: dict, unit: Unit, layout: Layout) -> list[dict]:
         block = page["blocks"][block_index]
         if block.get("table") is not None or block.get("type") in HEADING_TYPES:
             break
-        refs.append({
-            "kind": "block", "ocr_run_id": unit.ocr_run_id,
-            "page": page["page_number"], "evidence_id": block["evidence_id"],
-            "role": "neighbour_note", "scope": "unresolved",
-        })
+        refs.append(
+            {
+                "kind": "block",
+                "ocr_run_id": unit.ocr_run_id,
+                "page": page["page_number"],
+                "evidence_id": block["evidence_id"],
+                "role": "neighbour_note",
+                "scope": "unresolved",
+            }
+        )
     return refs
 
 
@@ -367,7 +387,9 @@ def _adjacent_notes(document: dict, unit: Unit) -> list[dict]:
     return refs
 
 
-def _merge_context(documents: list[dict], units: list[Unit], layouts: list[Layout]) -> tuple[dict, ...]:
+def _merge_context(
+    documents: list[dict], units: list[Unit], layouts: list[Layout]
+) -> tuple[dict, ...]:
     owned = {_ref_key(ref) for ref in owned_refs(units)}
     refs: list[dict] = []
     seen: set[tuple] = set()
@@ -457,7 +479,7 @@ def build_projection(
 ) -> tuple[dict, list[str]]:
     if projection == PROJECTION_V2:
         return segments_v2.build_projection(topic, documents, owned, context, index)
-    if projection not in {PROJECTION_V3, PROJECTION_V4}:
+    if projection not in {PROJECTION_V3, PROJECTION_V4, PROJECTION_SUPPLEMENT}:
         raise AppException(
             "Phần biên soạn dùng phiên bản projection không hỗ trợ.",
             code="compilation_segment_version_unsupported",
@@ -486,6 +508,8 @@ def build_projection(
 def segment_system(index: int, total: int, *, projection: str = PROJECTION_V4) -> str:
     if projection == PROJECTION_V2:
         return segments_v2.segment_system(index, total)
+    if projection == PROJECTION_SUPPLEMENT:
+        return SUPPLEMENT_PROMPT
     prompt = SYSTEM_PROMPT + (
         f"\nĐây là phần {index}/{total} của một tài liệu dài. Chỉ trả nội dung của phần "
         "này, viết gọn và không lặp lại nội dung phần khác. Không tạo lại bảng: hệ thống "
@@ -505,9 +529,9 @@ def segment_system(index: int, total: int, *, projection: str = PROJECTION_V4) -
     )
 
 
-
-def segment_schema(citations: list[str]) -> dict:
-    schema = SegmentDraftContent.model_json_schema()
+def segment_schema(citations: list[str], projection: str = PROJECTION_V4) -> dict:
+    contract = SupplementPart if projection == PROJECTION_SUPPLEMENT else SegmentDraftContent
+    schema = contract.model_json_schema()
     schema["$defs"]["DraftParagraph"]["properties"]["citations"]["items"]["enum"] = citations
     return schema
 
@@ -564,8 +588,7 @@ class Budget:
         if unit.kind == "table_row":
             row = block["table"]["rows"][unit.row_index]
             citation = sum(
-                len(f"{unit.ocr_run_id}:{cell['evidence_id']}".encode()) + 4
-                for cell in row
+                len(f"{unit.ocr_run_id}:{cell['evidence_id']}".encode()) + 4 for cell in row
             )
             size = ROW_INTERPRETATION_BYTES + citation
         else:
@@ -596,12 +619,7 @@ class Budget:
         owned = sum(self.unit_bytes(unit) for unit in units)
         context_bytes = sum(self.ref_bytes(ref) for ref in context)
         # 128 B of JSON framing per ref plus ~34 B for its citation in the enum.
-        fixed = (
-            768
-            + self.prompt_bytes
-            + self.outline_bytes
-            + 162 * (len(units) + len(context))
-        )
+        fixed = 768 + self.prompt_bytes + self.outline_bytes + 162 * (len(units) + len(context))
         return int((fixed + owned + context_bytes) * 1.1)
 
 
@@ -628,7 +646,7 @@ def build_plan(
         topic, documents, owned, context, index, total=total_estimate, projection=projection
     )
     user = json.dumps(payload, ensure_ascii=False, sort_keys=True)
-    schema = segment_schema(citations) if structured else None
+    schema = segment_schema(citations, projection) if structured else None
     messages = [
         ChatMessage("system", segment_system(index, total_estimate, projection=projection)),
         ChatMessage("user", user),
@@ -651,7 +669,9 @@ def _scope_text(units: list[Unit], documents: list[dict]) -> str:
     pages = sorted({unit.page_number for unit in units})
     blocks = sum(1 for unit in units if unit.kind == "block")
     rows = sum(1 for unit in units if unit.kind == "table_row")
-    tables = len({(unit.ocr_run_id, unit.evidence_id) for unit in units if unit.kind == "table_row"})
+    tables = len(
+        {(unit.ocr_run_id, unit.evidence_id) for unit in units if unit.kind == "table_row"}
+    )
     parts = [f"Trang {pages[0]}" if len(pages) == 1 else f"Trang {pages[0]}–{pages[-1]}"]
     if blocks:
         parts.append(f"{blocks} khối văn bản")
@@ -710,7 +730,9 @@ def plan_segments(
             * 1.1
         )
         output_estimate = 512 + owned_bytes + unit_cost
-        if current and (estimate > target or (output_target is not None and output_estimate > output_target)):
+        if current and (
+            estimate > target or (output_target is not None and output_estimate > output_target)
+        ):
             plans.append(
                 build_plan(
                     index=len(plans) + 1,
@@ -913,9 +935,12 @@ def plan_from_scope(scope: dict) -> SegmentPlan:
     )
 
 
-def parse_segment_draft(content: str, allowed_citations: set[str]) -> dict:
+def parse_segment_draft(
+    content: str, allowed_citations: set[str], projection: str = PROJECTION_V4
+) -> dict:
+    contract = SupplementPart if projection == PROJECTION_SUPPLEMENT else SegmentDraftContent
     try:
-        value = SegmentDraftContent.model_validate_json(content)
+        value = contract.model_validate_json(content)
     except Exception as exc:  # Pydantic validation is reported as one stable contract
         raise AppException(
             "LLM trả phần bản nháp sai schema.",

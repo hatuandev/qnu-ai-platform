@@ -49,6 +49,9 @@ export type AnnotationDraft = {
   effectiveUntil: string;
   program: string;
   intake: string;
+  attributeName?: string;
+  attributeValue?: string;
+  attributeType?: "text" | "number" | "boolean";
   /** Evidence rows carry a local id so editing keeps React state stable. */
   evidence: { id: string; citation: string; quote: string }[];
 };
@@ -125,6 +128,18 @@ function draftValues(draft: AnnotationDraft): MetadataValues {
   if (draft.effectiveUntil) values.effective_until = draft.effectiveUntil;
   if (draft.program.trim()) values.program = draft.program.trim();
   if (draft.intake.trim()) values.intake = draft.intake.trim();
+  const label = draft.attributeName?.trim();
+  const raw = draft.attributeValue?.trim();
+  if (label && raw) {
+    if (draft.attributeType === "number" && Number.isFinite(Number(raw))) {
+      values.attributes = { [label]: Number(raw) };
+    } else if (draft.attributeType === "boolean") {
+      if (raw === "true" || raw === "false")
+        values.attributes = { [label]: raw === "true" };
+    } else if (draft.attributeType !== "number") {
+      values.attributes = { [label]: raw };
+    }
+  }
   return values;
 }
 
@@ -169,6 +184,12 @@ export function annotationDraftIssues(
     }
 
     const values = draftValues(draft);
+    if (
+      (draft.attributeName?.trim() || draft.attributeValue?.trim()) &&
+      !values.attributes
+    ) {
+      list.push("Cần tên và giá trị hợp lệ cho thuộc tính bổ sung.");
+    }
     if (Object.keys(values).length === 0) {
       list.push("Cần khai báo ít nhất một giá trị metadata.");
     }
@@ -322,6 +343,8 @@ function AnnotationCard({
   const effectiveUntilId = useId();
   const programId = useId();
   const intakeId = useId();
+  const attributeNameId = useId();
+  const attributeValueId = useId();
 
   const target = draftTarget(draft);
   const isDocumentTarget = draft.targetKind === "document";
@@ -345,7 +368,7 @@ function AnnotationCard({
           </p>
           <p className="text-[11px] text-muted-foreground font-mono truncate">
             {target
-              ? `${target} — ${describeAnnotationTarget(target)}`
+              ? `${describeAnnotationTarget(target)}`
               : "Chưa đủ thông tin target"}
           </p>
         </div>
@@ -465,6 +488,51 @@ function AnnotationCard({
             </div>
           </div>
         ) : null}
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        <label htmlFor={attributeNameId} className="space-y-1 text-xs">
+          Tên thuộc tính
+          <Input
+            id={attributeNameId}
+            value={draft.attributeName ?? ""}
+            disabled={disabled}
+            maxLength={80}
+            onChange={(e) => onPatch({ attributeName: e.target.value })}
+          />
+        </label>
+        <div className="space-y-1 text-xs">
+          <span>Kiểu giá trị</span>
+          <Select
+            value={draft.attributeType ?? "text"}
+            disabled={disabled}
+            onValueChange={(value) =>
+              onPatch({
+                attributeType: value as AnnotationDraft["attributeType"],
+                attributeValue: "",
+              })
+            }
+          >
+            <SelectTrigger aria-label="Kiểu giá trị">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="text">Văn bản</SelectItem>
+              <SelectItem value="number">Số</SelectItem>
+              <SelectItem value="boolean">True / False</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <label htmlFor={attributeValueId} className="space-y-1 text-xs">
+          Giá trị
+          <Input
+            id={attributeValueId}
+            value={draft.attributeValue ?? ""}
+            disabled={disabled}
+            maxLength={500}
+            onChange={(e) => onPatch({ attributeValue: e.target.value })}
+          />
+        </label>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t pt-3">

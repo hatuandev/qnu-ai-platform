@@ -157,7 +157,12 @@ async def request_run(
         **req.model_dump(
             exclude={
                 key
-                for key in ("structured_output", "review_structured_output", "source_first")
+                for key in (
+                    "structured_output",
+                    "review_structured_output",
+                    "source_first",
+                    "ai_supplement",
+                )
                 if not getattr(req, key)
             }
         ),
@@ -239,11 +244,11 @@ async def request_run(
         db.add(run)
         await db.flush()
         return await _persist_inputs(db, blob, actor, run, documents, payload, queue)
-    schema = output_schema(documents) if req.structured_output else None
+    schema = output_schema(documents) if req.structured_output and not req.ai_supplement else None
     requested_output = req.max_output_tokens
     provider_id = req.provider_id
     planned_runtime = None
-    if req.max_output_tokens is None:
+    if req.max_output_tokens is None and not req.ai_supplement:
         planned_runtime, _ = await prepare_chat_limits(
             db,
             actor,
@@ -254,31 +259,8 @@ async def request_run(
         )
         provider_id = planned_runtime.provider_id
     plans: list[split.SegmentPlan] = []
-    try:
-        runtime, _, budget = await prepare_chat_request(
-            db,
-            actor,
-            workspace_id,
-            messages_for(req.topic, documents),
-            provider_id=provider_id,
-            task="compiler",
-            reasoning_task="compiler",
-            max_output_tokens=requested_output,
-            output_schema=schema,
-        )
-        owned_size = await asyncio.to_thread(
-            split.estimate_output_size, documents, split.build_units(documents)
-        )
-        content_budget = split.output_content_bytes(budget.max_output_tokens)
-        if content_budget is not None and owned_size > content_budget:
-            raise AppException(
-                "Nguồn cần chia phần theo ngân sách đầu ra.",
-                code="compilation_output_requires_segments",
-                status_code=422,
-            )
-    except AppException as exc:
-        if exc.code not in SEGMENTED_CODES:
-            raise
+    projection = split.PROJECTION_SUPPLEMENT if req.ai_supplement else split.PROJECTION_V4
+    if req.ai_supplement:
         runtime, budget = await prepare_chat_limits(
             db,
             actor,
@@ -287,29 +269,63 @@ async def request_run(
             task="compiler",
             max_output_tokens=requested_output,
         )
-        capacity = available_input_tokens(runtime.token_limits, budget.max_output_tokens)
-        if capacity is None:
-            raise AppException(
-                "Chưa xác định được ngân sách biên soạn.",
-                code="model_capacity_required",
-                status_code=422,
-            ) from exc
-        plans = await asyncio.to_thread(
-            split.plan_segments,
-            documents,
-            req.topic,
-            capacity=capacity,
-            structured=req.structured_output,
-            output_tokens=budget.max_output_tokens,
-        )
-        plans = await asyncio.to_thread(
-            split.finalize_plans,
-            plans,
-            documents,
-            req.topic,
-            capacity=capacity,
-            structured=req.structured_output,
-        )
+    else:
+        try:
+            runtime, _, budget = await prepare_chat_request(
+                db,
+                actor,
+                workspace_id,
+                messages_for(req.topic, documents),
+                provider_id=provider_id,
+                task="compiler",
+                reasoning_task="compiler",
+                max_output_tokens=requested_output,
+                output_schema=schema,
+            )
+            owned_size = await asyncio.to_thread(
+                split.estimate_output_size, documents, split.build_units(documents)
+            )
+            content_budget = split.output_content_bytes(budget.max_output_tokens)
+            if content_budget is not None and owned_size > content_budget:
+                raise AppException(
+                    "Nguồn cần chia phần theo ngân sách đầu ra.",
+                    code="compilation_output_requires_segments",
+                    status_code=422,
+                )
+        except AppException as exc:
+            if exc.code not in SEGMENTED_CODES:
+                raise
+            runtime, budget = await prepare_chat_limits(
+                db,
+                actor,
+                workspace_id,
+                provider_id=provider_id,
+                task="compiler",
+                max_output_tokens=requested_output,
+            )
+            capacity = available_input_tokens(runtime.token_limits, budget.max_output_tokens)
+            if capacity is None:
+                raise AppException(
+                    "Chưa xác định được ngân sách biên soạn.",
+                    code="model_capacity_required",
+                    status_code=422,
+                ) from exc
+            plans = await asyncio.to_thread(
+                split.plan_segments,
+                documents,
+                req.topic,
+                capacity=capacity,
+                structured=req.structured_output,
+                output_tokens=budget.max_output_tokens,
+            )
+            plans = await asyncio.to_thread(
+                split.finalize_plans,
+                plans,
+                documents,
+                req.topic,
+                capacity=capacity,
+                structured=req.structured_output,
+            )
     if (
         planned_runtime is not None
         and runtime.configuration_hash != planned_runtime.configuration_hash
@@ -327,6 +343,7 @@ async def request_run(
             req.topic,
             capacity=capacity,
             structured=req.structured_output,
+            projection=projection,
             output_tokens=budget.max_output_tokens,
         )
         plans = await asyncio.to_thread(
@@ -336,9 +353,11 @@ async def request_run(
             req.topic,
             capacity=capacity,
             structured=req.structured_output,
+            projection=projection,
         )
     reasoning_directive = runtime.reasoning_directive("compiler")
     config = {
+        **({"ai_supplement": True} if req.ai_supplement else {}),
         "refinement": {
             "version": 1,
             "max_depth": 4,
@@ -361,8 +380,16 @@ async def request_run(
         "reasoning_directive": (
             reasoning_directive.public_dict() if reasoning_directive is not None else None
         ),
-        "prompt_version": PROMPT_VERSION,
-        "prompt_sha256": hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest(),
+        "prompt_version": split.prompt_version_for(projection)
+        if req.ai_supplement
+        else PROMPT_VERSION,
+        "prompt_sha256": hashlib.sha256(
+            (
+                split.segment_system(1, len(plans), projection=projection)
+                if req.ai_supplement
+                else SYSTEM_PROMPT
+            ).encode()
+        ).hexdigest(),
         **(
             {
                 "structured_output": True,
@@ -375,8 +402,8 @@ async def request_run(
     if plans:
         config["segmentation"] = {
             "planner_version": split.PLANNER_VERSION,
-            "prompt_version": split.PROMPT_VERSION,
-            "projection_version": split.PROJECTION_V4,
+            "prompt_version": split.prompt_version_for(projection),
+            "projection_version": projection,
             "segment_count": len(plans),
             "concurrency": get_settings().COMPILER_SEGMENT_CONCURRENCY,
             "input_capacity_tokens": available_input_tokens(
@@ -428,7 +455,7 @@ async def request_run(
             "max_output_tokens": budget.max_output_tokens,
             "structured_output": bool(req.structured_output),
             "auto_review": req.auto_review,
-            "projection_version": split.PROJECTION_V4,
+            "projection_version": projection,
             # Stored verbatim so a resume sends the same reasoning contract or fails.
             "reasoning": reasoning_public,
         }
@@ -441,7 +468,7 @@ async def request_run(
                     status="pending",
                     scope=plan.scope_dict(),
                     input_sha256=plan.input_sha256,
-                    prompt_version=split.PROMPT_VERSION,
+                    prompt_version=split.prompt_version_for(projection),
                     schema_sha256=plan.schema_sha256,
                     config=segment_config,
                     request_hash=hashlib.sha256(

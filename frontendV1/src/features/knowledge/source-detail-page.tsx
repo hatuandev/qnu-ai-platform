@@ -4,12 +4,13 @@ import {
   AlertTriangle,
   Archive,
   ArrowLeft,
-  ChevronRight,
   ClipboardList,
   Download,
   FilePlus2,
   FileText,
+  FolderOpen,
   History,
+  Library,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -35,6 +36,7 @@ import {
   v1Client,
 } from "@/app/api/v1";
 import { ErrorState } from "@/components/admin/error-state";
+import { PageBreadcrumbs } from "@/components/admin/page-breadcrumbs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -308,12 +310,12 @@ function SourceDetailSession({
     () =>
       selectedRunId
         ? {
-            workspaceId,
-            collectionId,
-            sourceId,
-            revisionId: activeRevisionId,
-            runId: selectedRunId,
-          }
+          workspaceId,
+          collectionId,
+          sourceId,
+          revisionId: activeRevisionId,
+          runId: selectedRunId,
+        }
         : null,
     [collectionId, activeRevisionId, selectedRunId, sourceId, workspaceId],
   );
@@ -733,14 +735,14 @@ function SourceDetailSession({
   );
   const spellingSuggestionsCount = documentSpelling.report
     ? documentSpelling.report.batches.reduce(
-        (n, b) =>
-          n +
-          (b.check?.suggestions.length ?? 0) +
-          (b.check?.withheld_suggestions?.length ?? 0),
-        0,
-      )
+      (n, b) =>
+        n +
+        (b.check?.suggestions.length ?? 0) +
+        (b.check?.withheld_suggestions?.length ?? 0),
+      0,
+    )
     : (localCheck?.suggestions.length ?? 0) +
-      (localCheck?.withheld_suggestions?.length ?? 0);
+    (localCheck?.withheld_suggestions?.length ?? 0);
 
   const lifecycleDialog = lifecycleOp ? (
     <LifecycleActionDialog
@@ -811,29 +813,31 @@ function SourceDetailSession({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-border/70">
         <div className="min-w-0 space-y-1">
           {/* Breadcrumbs */}
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
-            <Link
-              to="/workspaces/$workspaceId/knowledge"
-              params={{ workspaceId }}
-              search={{ page: 1, pageSize: 20 }}
-              className="hover:text-foreground transition-colors"
-            >
-              Kho tri thức
-            </Link>
-            <ChevronRight className="size-3 text-muted-foreground/60" />
-            <Link
-              to="/workspaces/$workspaceId/knowledge/$knowledgeId"
-              params={{ workspaceId, knowledgeId: collectionId }}
-              search={{ page: 1, pageSize: 20 }}
-              className="hover:text-foreground transition-colors truncate max-w-[180px]"
-            >
-              {collection?.name ?? "Bộ sưu tập"}
-            </Link>
-            <ChevronRight className="size-3 text-muted-foreground/60" />
-            <span className="font-semibold text-foreground truncate max-w-[220px]">
-              {source.title}
-            </span>
-          </div>
+          <PageBreadcrumbs
+            items={[
+              {
+                label: "Kho tri thức",
+                to: "/workspaces/$workspaceId/knowledge",
+                params: { workspaceId },
+                search: { page: 1, pageSize: 20 },
+                icon: Library,
+              },
+              {
+                label: collection?.name ?? "Bộ sưu tập",
+                to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
+                params: { workspaceId, knowledgeId: collectionId },
+                search: { page: 1, pageSize: 20 },
+                icon: FolderOpen,
+                maxChars: 24,
+              },
+              {
+                label: source.title,
+                icon: FileText,
+                current: true,
+                maxChars: 32,
+              },
+            ]}
+          />
 
           {/* Tiêu đề, phiên bản tệp & badge trạng thái */}
           <div className="flex items-center gap-2.5 flex-wrap">
@@ -1020,7 +1024,7 @@ function SourceDetailSession({
                   <DropdownMenuSeparator />
 
                   {statusInfo.status !== "unprocessed" &&
-                  statusInfo.status !== "running" ? (
+                    statusInfo.status !== "running" ? (
                     <DropdownMenuItem
                       className="gap-2"
                       onClick={() => setReRunConfirmOpen(true)}
@@ -1113,17 +1117,17 @@ function SourceDetailSession({
                 </SelectItem>
                 {doc.version > 0
                   ? Array.from({ length: doc.version }, (_, i) => i + 1).map(
-                      (v) => (
-                        <SelectItem
-                          key={`v_${v}`}
-                          value={String(v)}
-                          className="text-xs"
-                        >
-                          Phiên bản v{v}{" "}
-                          {v === doc.version ? "(Hiện hành)" : ""}
-                        </SelectItem>
-                      ),
-                    )
+                    (v) => (
+                      <SelectItem
+                        key={`v_${v}`}
+                        value={String(v)}
+                        className="text-xs"
+                      >
+                        Phiên bản v{v}{" "}
+                        {v === doc.version ? "(Hiện hành)" : ""}
+                      </SelectItem>
+                    ),
+                  )
                   : null}
               </SelectContent>
             </Select>
@@ -1248,11 +1252,11 @@ function SourceDetailSession({
 
       {/* Thanh tiến độ dùng chung khi đang bóc tách / chờ xử lý */}
       {activeProcessing &&
-      (activeProcessing.status === "queued" ||
-        activeProcessing.status === "running" ||
-        activeProcessing.dispatch_pending === true ||
-        (activeProcessing.status === "completed" &&
-          activeProcessing.results_ready === false)) ? (
+        (activeProcessing.status === "queued" ||
+          activeProcessing.status === "running" ||
+          activeProcessing.dispatch_pending === true ||
+          (activeProcessing.status === "completed" &&
+            activeProcessing.results_ready === false)) ? (
         <ProcessingProgress
           progress={{
             status: activeProcessing.status,
@@ -1364,9 +1368,9 @@ function SourceDetailSession({
         spellingSuggestionsCount={spellingSuggestionsCount}
         documentReviewOpen={Boolean(
           documentSpelling.report?.finished &&
-            doc &&
-            documentSpelling.report.sha256 === doc.canonical_sha256 &&
-            documentSpelling.report.version === doc.version,
+          doc &&
+          documentSpelling.report.sha256 === doc.canonical_sha256 &&
+          documentSpelling.report.version === doc.version,
         )}
         unprocessedRightPanel={
           <div className="p-6 text-center space-y-4 max-w-md mx-auto">
@@ -1403,9 +1407,9 @@ function SourceDetailSession({
         }
         spellingPanel={
           documentSpelling.report &&
-          doc &&
-          documentSpelling.report.sha256 === doc.canonical_sha256 &&
-          documentSpelling.report.version === doc.version ? (
+            doc &&
+            documentSpelling.report.sha256 === doc.canonical_sha256 &&
+            documentSpelling.report.version === doc.version ? (
             <DocumentSpellingReport
               report={documentSpelling.report}
               workspaceId={workspaceId}

@@ -1,5 +1,6 @@
 import type {
   MetadataFilter,
+  MetadataScalar,
   RagPolicy,
   RetrievalMode,
 } from "@/features/rag/types";
@@ -119,3 +120,9 @@ export function searchInputFromPolicy(
     metadata_filter: policy.metadata_filter,
   };
 }
+
+export type MetadataFacets = {
+  ready: boolean;
+  attributes: Record<string, MetadataScalar[]>;
+  truncated: boolean;
+};

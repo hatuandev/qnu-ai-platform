@@ -19,6 +19,8 @@ Stage = Literal[
     "authorize",
     "resolve_model",
     "load_revision",
+    "read_docx",
+    "read_pdf",
     "render",
     "provider_preflight",
     "reserve_usage",
