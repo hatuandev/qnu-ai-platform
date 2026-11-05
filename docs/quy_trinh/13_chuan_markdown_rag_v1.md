@@ -1,5 +1,7 @@
 # QNU RAG Markdown Standard v1.0
 
+> **TÀI LIỆU LỊCH SỬ — không phải hiện trạng V1.** Nội dung dưới đây mô tả hệ thống `backend/` + `frontend/` trước V1 (hai thư mục đã gỡ khỏi checkout) và chỉ dùng để truy vết. Bản đang chạy là [`backendV1/`](../../backendV1) + [`frontendV1/`](../../frontendV1); xem [bản đồ tài liệu](../README.md).
+
 > Chuẩn thống nhất: lõi Universal + quy tắc dữ liệu chọn lọc từ v1 + chỉ mục dẫn xuất.
 > Chốt cấu trúc ngày 2026-10-17. Đây là đặc tả và mẫu để chuyển đổi tài liệu,
 > **không phải tài liệu kiến thức để nạp nguyên file này vào RAG**.

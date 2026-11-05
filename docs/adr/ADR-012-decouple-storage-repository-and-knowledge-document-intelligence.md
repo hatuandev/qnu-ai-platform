@@ -1,6 +1,9 @@
 # ADR-012: Tách Rời Kho Tài Liệu Thuần Lưu Trữ & Chuyển Toàn Bộ Document Intelligence Vào Kho Tri Thức Đa Embedding
 
 - **Trạng thái**: **ACCEPTED** (Đã thông qua, Supersedes một phần ADR-011)
+- **Hiệu lực với V1**: **KHÔNG ÁP DỤNG** — V1 không có domain `repository`/`/documents`; upload
+  đi trực tiếp vào collection của Knowledge. Quyết định loại bỏ nằm ở ADR-007 và ghi nhận
+  2026-10-26 trong [module-boundaries](../../backendV1/docs/module-boundaries.md).
 - **Ngày quyết định**: 2026-10-10
 - **Kiến trúc sư phụ trách**: Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Phạm vi tác động**: Phân hệ Kho Tài Liệu (`/documents`), Phân hệ Kho Tri Thức (`/knowledge`), Document Ingestion Workers, ModelOps & Hybrid RAG Engine

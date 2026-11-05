@@ -184,7 +184,7 @@ npm run dev
 
 Mở **<http://127.0.0.1:3001/dashboard>**, đăng nhập rồi chọn workspace. Có thể mở thẳng <http://127.0.0.1:3001/workspaces> để tạo hoặc chọn đơn vị.
 
-`run.ps1 dev`, `dev1`, `dev2` và `be` ở gốc hiện vẫn chạy `backend/` và `frontend/` cũ. Dùng các lệnh V1 bên trên. File `backendV1/docker-compose.v1.yml` hiện chưa truyền đủ cấu hình và chia sẻ storage cho toàn luồng; hướng dẫn này dùng API/worker chạy trực tiếp trên máy.
+`run.ps1` ở gốc là entrypoint tương thích, gọi lại `make.ps1` nên chạy đúng các lệnh V1 bên trên; tên `dev1`/`dev2` không còn trong bộ lệnh V1, dùng `dev`. `backendV1/docker-compose.v1.yml` là entrypoint tương thích include cấu hình root, không phải một stack thứ hai; hướng dẫn này dùng API/worker chạy trực tiếp trên máy. Nếu máy cũ còn thư mục `backend/` hoặc `frontend/` untracked, đó là tàn dư đã bị gỡ khỏi Git — không chạy và không dùng làm căn cứ.
 
 ## 2. Chuẩn bị lần đầu
 

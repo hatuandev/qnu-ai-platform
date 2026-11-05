@@ -1,5 +1,7 @@
 # QUY TRÌNH 05: CỔNG CÔNG CỤ & XUẤT BẢN TÀI LIỆU (TOOL GATEWAY & DOCUMENT EXPORT FLOW)
 
+> **TÀI LIỆU LỊCH SỬ — không phải hiện trạng V1.** Nội dung dưới đây mô tả hệ thống `backend/` + `frontend/` trước V1 (hai thư mục đã gỡ khỏi checkout) và chỉ dùng để truy vết. Bản đang chạy là [`backendV1/`](../../backendV1) + [`frontendV1/`](../../frontendV1); xem [bản đồ tài liệu](../README.md).
+
 Tài liệu này đặc tả quy trình kết nối công cụ ngoại vi qua cơ chế Function Calling chuẩn OpenAPI, sinh tệp văn bản hành chính Word theo Nghị định 30/2020/NĐ-CP, tệp bảng tính Excel ma trận đề thi chuẩn Bloom, lưu trữ thành phẩm trên **MinIO Object Storage** và chuyển đổi PDF qua **Gotenberg 8**.
 
 ---

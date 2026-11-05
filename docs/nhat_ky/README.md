@@ -1,5 +1,7 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên881 — Chuẩn hóa tài liệu về V1, dán nhãn lịch sử](2026-11-05_phien_881_cap_nhat_tai_lieu_sang_v1.md).
+
 - [Phiên880 — Metadata động và tương thích](2026-11-05_phien_880_metadata_dong_va_tuong_thich.md).
 
 - [Phiên879 — Metadata và biên soạn kết hợp](2026-11-05_phien_879_metadata_va_bien_soan_ket_hop.md).

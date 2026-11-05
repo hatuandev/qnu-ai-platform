@@ -7,6 +7,8 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-11-05 — Context881 — Tài liệu V1 và nhãn lịch sử.** Thêm bản đồ tài liệu `docs/README.md` (sống vs lịch sử); viết lại kiến trúc root theo V1; đưa 19–44 lên mục hiện hành và dán nhãn lịch sử cho quy trình 01–18, `smart_approval`, ADR-011/012; sửa các câu còn nói `run.ps1` chạy bản cũ, cổng 8001 và thư mục legacy. Không sửa mã/DB/model/dịch vụ. Kiểm 0 link hỏng, 0 BOM; test **NOT RUN** vì chỉ sửa tài liệu. [Nhật ký](../nhat_ky/2026-11-05_phien_881_cap_nhat_tai_lieu_sang_v1.md), [Snapshot](./snapshots/2026-11-05_session_881.md).
+
 - **2026-11-05 — Context880 — Metadata động và tương thích.** Đề xuất có nguồn có thể chỉnh khi đăng ký; bộ lọc JSON có kiểu và catalog theo publication đã xác nhận. Trợ lý mới tự nhận diện catalog, giữ scope và hash dữ liệu cũ. 101 ca backend mở rộng và 59 ca FE cuối đạt; full backend dừng ở lỗi nền Redis751, full FE còn URL draft và timeout chính tả ngoài batch. Không đổi dữ liệu/dịch vụ ứng dụng. [Nhật ký](../nhat_ky/2026-11-05_phien_880_metadata_dong_va_tuong_thich.md), [Snapshot](./snapshots/2026-11-05_session_880.md).
 
 - **2026-11-05 — Context879 — Metadata có dẫn chứng và biên soạn kết hợp.** Tự nhận diện từ phiên bản bóc tách đã ghim. Chế độ kết hợp giữ bản nhanh, tách gợi ý AI theo nhóm. Người dùng chọn metadata khi đăng ký. Kết quả kiểm thử xem [Nhật ký](../nhat_ky/2026-11-05_phien_879_metadata_va_bien_soan_ket_hop.md), [Snapshot](./snapshots/2026-11-05_session_879.md).

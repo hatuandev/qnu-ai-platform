@@ -3,6 +3,12 @@
 > **Dành cho**: Đội ngũ phát triển (Dev Team), Kỹ sư vận hành (DevOps/SRE) và Quản trị viên hệ thống.  
 > **Mục tiêu**: Giúp toàn bộ thành viên trong team nắm bắt nhanh chóng, đầy đủ và chuẩn xác về **bối cảnh công nghệ hạ tầng** và **quy trình đưa ứng dụng lên môi trường Production** bằng giải pháp PaaS **Dokploy**.
 
+> **Phạm vi V1:** quy trình triển khai hiện hành là
+> [02_quy_trinh_trien_khai_dokploy.md](./02_quy_trinh_trien_khai_dokploy.md) — root
+> `docker-compose.yml` build từ `backendV1/` + `frontendV1/`, backend nội bộ cổng **8002**,
+> frontend Nginx cổng 80. Bảng công nghệ dưới đây mô tả hạ tầng chung; các cổng đã cập nhật
+> theo V1. Tài liệu lịch sử dùng cổng 8001 không còn áp dụng.
+
 ---
 
 ## 🧭 1. Mục Lục Tài Liệu Triển Khai
@@ -42,7 +48,7 @@ graph TD
     Client[Người dùng / Web Client / Cổng Trường] -->|HTTPS 443| Traefik[Dokploy Traefik Reverse Proxy]
     
     subgraph Dokploy_Network ["🌐 dokploy-network (Public Bridge Network)"]
-        Traefik -->|Proxy Pass :8001| Backend["qnu_backend (FastAPI API Gateway)"]
+        Traefik -->|Proxy Pass :8002| Backend["qnu_backend (backendV1 API)"]
         Traefik -.->|Tùy chọn :9001| MinioConsole["qnu_minio (Giao diện Web Console)"]
     end
 

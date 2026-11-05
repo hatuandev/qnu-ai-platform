@@ -1,4 +1,4 @@
-import { AlertCircle, FileText, Info, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, FileText, Loader2, RefreshCw } from "lucide-react";
 import { Component, type ReactNode, useEffect, useRef, useState } from "react";
 import { Document as PdfDocument, Page as PdfPage, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -212,18 +212,6 @@ export function DocxOriginalViewer({
       className="flex h-full w-full flex-col overflow-hidden bg-muted/30"
       data-testid="docx-original-viewer"
     >
-      {/* Honest limitation banner for DOCX browser rendering */}
-      <div
-        className="flex shrink-0 items-start gap-2 border-b border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
-        data-testid="docx-original-limitation-note"
-      >
-        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-        <span>
-          Bản xem trực tiếp tệp Word (.docx) dùng thanh cuộn độc lập; cách ngắt
-          trang trên trình duyệt có thể khác với Microsoft Word.
-        </span>
-      </div>
-
       {/* Independent scroll viewport */}
       <div
         ref={scrollContainerRef}

@@ -27,6 +27,7 @@ from qnu.platform.database import AsyncSessionFactory, engine
 from qnu.platform.errors import AppException
 
 QNU_GATEWAY = "http://100.105.13.53:8000"
+QNU_KEY = "E2E_QNU_API_KEY"
 ROUTER_URL = "https://qnu-9router.duckdns.org/v1"
 ROUTER_KEY = "E2E_9ROUTER_API_KEY"
 QWEN_MODEL = "qwen3.8-27b-q4"
@@ -97,9 +98,18 @@ async def seed():
                         )
                     connection_key = KeyCreateRequest(name="9router local", secret=secret)
                 elif credential is None:
+                    env_file = Path(__file__).resolve().parents[2] / ".env"
+                    env_secret = (
+                        dotenv_values(env_file, interpolate=False).get(QNU_KEY) or ""
+                    ).strip()
+                    secret = (
+                        env_secret
+                        if 8 <= len(env_secret) <= 4096
+                        else getpass.getpass("API key QNU dùng chung với MinerU: ")
+                    )
                     credential = KeyCreateRequest(
                         name="QNU local",
-                        secret=getpass.getpass("API key QNU dùng chung với MinerU: "),
+                        secret=secret,
                     )
                     connection_key = credential
                 else:

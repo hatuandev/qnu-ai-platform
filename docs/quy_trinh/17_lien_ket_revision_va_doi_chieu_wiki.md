@@ -1,5 +1,7 @@
 # Liên kết, revision và đối chiếu Trang tri thức
 
+> **TÀI LIỆU LỊCH SỬ — không phải hiện trạng V1.** Nội dung dưới đây mô tả hệ thống `backend/` + `frontend/` trước V1 (hai thư mục đã gỡ khỏi checkout) và chỉ dùng để truy vết. Bản đang chạy là [`backendV1/`](../../backendV1) + [`frontendV1/`](../../frontendV1); xem [bản đồ tài liệu](../README.md).
+
 ## Luồng phổ thông
 
 Upload DOCX/PDF → chuẩn hóa → kiểm chất lượng → sẵn sàng nạp vector → phục vụ

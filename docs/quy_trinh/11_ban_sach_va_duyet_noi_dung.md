@@ -1,5 +1,7 @@
 # Bản sạch và duyệt nội dung nguồn
 
+> **TÀI LIỆU LỊCH SỬ — không phải hiện trạng V1.** Nội dung dưới đây mô tả hệ thống `backend/` + `frontend/` trước V1 (hai thư mục đã gỡ khỏi checkout) và chỉ dùng để truy vết. Bản đang chạy là [`backendV1/`](../../backendV1) + [`frontendV1/`](../../frontendV1); xem [bản đồ tài liệu](../README.md).
+
 ## Phạm vi phiên 510
 
 Ba bước đầu của chuẩn hóa nguồn đã được triển khai trên ingestion/Studio hiện có:

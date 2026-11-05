@@ -1,5 +1,7 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context881 — Chuẩn hóa tài liệu về V1, dán nhãn lịch sử](nhat_ky/2026-11-05_phien_881_cap_nhat_tai_lieu_sang_v1.md).
+
 - [Context880 — Metadata động và tương thích](nhat_ky/2026-11-05_phien_880_metadata_dong_va_tuong_thich.md).
 
 - [Context879 — Metadata và biên soạn kết hợp](nhat_ky/2026-11-05_phien_879_metadata_va_bien_soan_ket_hop.md).

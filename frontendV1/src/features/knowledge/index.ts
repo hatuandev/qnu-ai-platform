@@ -1,5 +1,4 @@
 export { CitationDrawer } from "@/features/knowledge/citation-drawer";
-export { KnowledgeDetailPage } from "@/features/knowledge/knowledge-detail-page";
 export { CollectionFormDialog } from "@/features/knowledge/collection-form-dialog";
 export { CollectionsPanel } from "@/features/knowledge/collections-panel";
 export { CompilationDetailPage } from "@/features/knowledge/compilation-detail-page";
@@ -30,6 +29,8 @@ export { CompiledDocumentDetailPage } from "@/features/knowledge/compiled-docume
 export { CompiledDocumentsList } from "@/features/knowledge/compiled-documents-list";
 export { CompiledVersionDetailPage } from "@/features/knowledge/compiled-version-detail-page";
 export { DecisionConfirmDialog } from "@/features/knowledge/decision-confirm-dialog";
+export { DocumentSheetCanvas } from "@/features/knowledge/document-sheet-canvas";
+export { KnowledgeDetailPage } from "@/features/knowledge/knowledge-detail-page";
 export { OcrArtifactsPanel } from "@/features/knowledge/ocr-artifacts-panel";
 export { OcrComparisonView } from "@/features/knowledge/ocr-comparison-view";
 export * from "@/features/knowledge/ocr-queries";
@@ -62,6 +63,7 @@ export { ReviewGateDialog } from "@/features/knowledge/review-gate-dialog";
 export { RevisionUploadDialog } from "@/features/knowledge/revision-upload-dialog";
 export * from "@/features/knowledge/schemas";
 export { SourceDetailPage } from "@/features/knowledge/source-detail-page";
+export { SourceStudioHeader } from "@/features/knowledge/source-studio-header";
 export { SourceTablesView } from "@/features/knowledge/source-tables-view";
 export { SourceUploadDialog } from "@/features/knowledge/source-upload-dialog";
 export * from "@/features/knowledge/types";

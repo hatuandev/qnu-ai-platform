@@ -1,6 +1,10 @@
 # ADR-011: Tiếp Nhận Một Lần, Quản Lý Revision Bất Biến & Xuất Bản Tri Thức RAG An Toàn
 
 - **Trạng thái**: **ACCEPTED** (Đã thông qua)
+- **Hiệu lực với V1**: **KHÔNG ÁP DỤNG** — mô hình "Kho tài liệu tập trung" (`/documents`,
+  `repository`) đã bị loại bỏ khỏi `backendV1/` (ADR-007 + quyết định 2026-10-26); nguồn tệp
+  và revision bất biến nay thuộc trực tiếp domain Knowledge. Xem
+  [module-boundaries](../../backendV1/docs/module-boundaries.md).
 - **Ngày quyết định**: 2026-10-07
 - **Kiến trúc sư phụ trách**: Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Phạm vi tác động**: Phân hệ Kho Tài Liệu Tập Trung (`/documents`), Phân hệ Kho Tri Thức (`/knowledge`), Hybrid RAG Engine, Worker Jobs & ModelOps

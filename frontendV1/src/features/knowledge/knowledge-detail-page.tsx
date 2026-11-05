@@ -14,9 +14,12 @@ import {
   FolderPlus,
   Gauge,
   HardDrive,
+  Layers,
   MessageSquare,
+  MoreVertical,
   Pencil,
   Play,
+  RotateCcw,
   Settings2,
   SlidersHorizontal,
   Trash2,
@@ -25,6 +28,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DataTablePagination } from "@/components/admin/data-table/data-table-pagination";
 import { DebouncedSearchInput } from "@/components/admin/debounced-search-input";
+import { EmptyState } from "@/components/admin/empty-state";
 import { ErrorState } from "@/components/admin/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,7 +61,6 @@ import { ExtractDocumentDialog } from "@/features/knowledge/extract-document-dia
 import { FolderDeleteDialog } from "@/features/knowledge/folder-delete-dialog";
 import { FolderFormDialog } from "@/features/knowledge/folder-form-dialog";
 import { FolderMoveDialog } from "@/features/knowledge/folder-move-dialog";
-import { FolderTreePanel } from "@/features/knowledge/folder-tree-panel";
 import { IndexPanel } from "@/features/knowledge/index-panel";
 import {
   canCreateOrEditCompilation,
@@ -210,6 +213,11 @@ export function KnowledgeDetailPage({
     return trail;
   }, [folders, currentFolderId, allFoldersActive]);
 
+  const parentFolder = useMemo(() => {
+    if (!currentFolder || !currentFolder.parent_id) return null;
+    return folders.find((f) => f.id === currentFolder.parent_id) ?? null;
+  }, [currentFolder, folders]);
+
   // Sources Query in current folder
   const sourcesQuery = useSourcesQuery(workspaceId, knowledgeId, {
     page,
@@ -273,81 +281,119 @@ export function KnowledgeDetailPage({
   }
 
   return (
-    <div className="min-w-0 space-y-6">
-      {/* 1. Header with Breadcrumb, Name & Action Toolbar: Tải tài liệu · Bóc tách · Quản lý */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
-        <div className="min-w-0 space-y-1">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Link
-              to="/workspaces/$workspaceId/knowledge"
-              params={{ workspaceId }}
-              search={{ page: 1, pageSize: 20 }}
-              className="hover:text-foreground transition-colors flex items-center gap-1"
-            >
-              <ArrowLeft className="size-3" />
-              <span>Kho tri thức</span>
-            </Link>
-            <ChevronRight className="size-3 text-muted-foreground/50" />
-            <span className="font-medium text-foreground truncate max-w-[240px]">
-              {collection.name}
-            </span>
-          </div>
+    <div className="min-w-0 space-y-4">
+      {/* 1. Header tinh gọn tối đa: Tên kho · Giai đoạn · Thao tác chính */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-3">
+        {/* Bên trái: Breadcrumb quay lại + Tên kho + Badge đếm + Tab giai đoạn */}
+        <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+          <Link
+            to="/workspaces/$workspaceId/knowledge"
+            params={{ workspaceId }}
+            search={{ page: 1, pageSize: 20 }}
+            className="hover:text-foreground text-muted-foreground transition-colors flex items-center gap-1 text-xs font-medium"
+          >
+            <ArrowLeft className="size-3.5" />
+            <span>Kho tri thức</span>
+          </Link>
+          <ChevronRight className="size-3 text-muted-foreground/40" />
+          <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground truncate max-w-[280px]">
+            {collection.name}
+          </h1>
+          <Badge variant="secondary" className="font-normal text-[11px] h-5">
+            {collection.source_count} tài liệu · {folders.length} thư mục
+          </Badge>
 
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold tracking-tight text-foreground truncate">
-              {collection.name}
-            </h1>
-            <Badge variant="secondary" className="text-xs font-normal shrink-0">
-              {collection.source_count} tài liệu
-            </Badge>
+          {/* Tab Giai đoạn (Tài liệu / Biên soạn / Phát hành) */}
+          <div
+            role="tablist"
+            aria-label="Giai đoạn kho tri thức"
+            className="inline-flex items-center gap-0.5 rounded-lg bg-muted/60 p-0.5 ml-2"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeStage === "files" || activeStage === "ocr"}
+              onClick={() => onStageChange?.("files")}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                activeStage === "files" || activeStage === "ocr"
+                  ? "bg-background text-foreground shadow-2xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <FileText className="size-3" />
+              <span>Tài liệu</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeStage === "compiler"}
+              onClick={() => onStageChange?.("compiler")}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                activeStage === "compiler"
+                  ? "bg-background text-foreground shadow-2xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <ClipboardList className="size-3" />
+              <span>Biên soạn</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeStage === "publication"}
+              onClick={() => onStageChange?.("publication")}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                activeStage === "publication"
+                  ? "bg-background text-foreground shadow-2xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <BookMarked className="size-3" />
+              <span>Phát hành</span>
+            </button>
           </div>
-          {collection.description && (
-            <p className="text-xs text-muted-foreground line-clamp-1">
-              {collection.description}
-            </p>
-          )}
         </div>
 
-        {/* Thanh thao tác chính: Tải tài liệu · Bóc tách · Quản lý */}
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          {/* Nút 1: Tải tài liệu */}
+        {/* Bên phải: Nút hành động */}
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             size="sm"
-            className="gap-1.5 text-xs h-9 shadow-xs"
+            className="gap-1.5 shadow-xs text-xs h-8"
             disabled={!canManage || foldersQuery.isError}
             onClick={() => setUploadOpen(true)}
           >
-            <FileUp className="size-4" />
+            <FileUp className="size-3.5" />
             <span>Tải tài liệu</span>
           </Button>
 
-          {/* Nút 2: Bóc tách */}
           <Button
             size="sm"
             variant="outline"
-            className="gap-1.5 text-xs h-9"
+            className="gap-1.5 shadow-xs text-xs h-8"
             disabled={!canManage || collection.source_count === 0}
             onClick={() => setExtractDialogOpen(true)}
           >
-            <Play className="size-3.5 text-primary" />
+            <Play className="size-3 text-primary" />
             <span>Bóc tách</span>
           </Button>
 
-          {/* Nút 3: Quản lý (Gộp menu Sửa kho, Tạo thư mục, Lưu trữ, Xóa kho) */}
           {canManage && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 text-xs h-9 text-muted-foreground hover:text-foreground"
+                  className="gap-1 shadow-xs text-xs h-8 text-muted-foreground hover:text-foreground"
                 >
                   <Settings2 className="size-3.5" />
-                  <span>Quản lý</span>
+                  <span className="hidden sm:inline">Quản lý</span>
                   <ChevronDown className="size-3 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52 text-xs">
+              <DropdownMenuContent align="end" className="w-56 text-xs">
                 <DropdownMenuItem
                   className="gap-2"
                   onClick={() => setEditCollectionOpen(true)}
@@ -370,14 +416,54 @@ export function KnowledgeDetailPage({
                   <span>Tạo thư mục mới</span>
                 </DropdownMenuItem>
 
-                {canLifecycleAction(role, "collection", "archive") && (
-                  <DropdownMenuItem
-                    className="gap-2"
-                    onClick={() => setCollectionLifecycleOp("archive")}
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem asChild>
+                  <Link
+                    to="/workspaces/$workspaceId/collections/$collectionId/answers"
+                    params={{ workspaceId, collectionId: knowledgeId }}
+                    className="flex items-center gap-2"
                   >
-                    <Archive className="size-3.5 text-muted-foreground" />
-                    <span>Lưu trữ kho</span>
-                  </DropdownMenuItem>
+                    <MessageSquare className="size-3.5 text-muted-foreground" />
+                    <span>Hỏi đáp trên kho</span>
+                  </Link>
+                </DropdownMenuItem>
+
+                <DropdownMenuItem asChild>
+                  <Link
+                    to="/workspaces/$workspaceId/collections/$collectionId/search"
+                    params={{ workspaceId, collectionId: knowledgeId }}
+                    search={{ page: 1, pageSize: 20 }}
+                    className="flex items-center gap-2"
+                  >
+                    <SlidersHorizontal className="size-3.5 text-muted-foreground" />
+                    <span>Quản trị chỉ mục</span>
+                  </Link>
+                </DropdownMenuItem>
+
+                <DropdownMenuItem asChild>
+                  <Link
+                    to="/workspaces/$workspaceId/collections/$collectionId/evaluations"
+                    params={{ workspaceId, collectionId: knowledgeId }}
+                    search={{ page: 1 }}
+                    className="flex items-center gap-2"
+                  >
+                    <Gauge className="size-3.5 text-muted-foreground" />
+                    <span>Đánh giá RAG</span>
+                  </Link>
+                </DropdownMenuItem>
+
+                {canLifecycleAction(role, "collection", "archive") && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="gap-2"
+                      onClick={() => setCollectionLifecycleOp("archive")}
+                    >
+                      <Archive className="size-3.5 text-muted-foreground" />
+                      <span>Lưu trữ kho</span>
+                    </DropdownMenuItem>
+                  </>
                 )}
 
                 {canLifecycleAction(role, "collection", "delete") && (
@@ -418,278 +504,289 @@ export function KnowledgeDetailPage({
         </div>
       </div>
 
-      {/* Thanh điều hướng nội bộ Kho tri thức: Tài liệu · Biên soạn · Phát hành + Công cụ nâng cao */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-2.5">
-        <div
-          role="tablist"
-          aria-label="Điều hướng trong kho tri thức"
-          className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeStage === "files" || activeStage === "ocr"}
-            onClick={() => onStageChange?.("files")}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-              activeStage === "files" || activeStage === "ocr"
-                ? "bg-background text-foreground shadow-2xs"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <FileText className="size-3.5" />
-            <span>Tài liệu</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeStage === "compiler"}
-            onClick={() => onStageChange?.("compiler")}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-              activeStage === "compiler"
-                ? "bg-background text-foreground shadow-2xs"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <ClipboardList className="size-3.5" />
-            <span>Biên soạn</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeStage === "publication"}
-            onClick={() => onStageChange?.("publication")}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-              activeStage === "publication"
-                ? "bg-background text-foreground shadow-2xs"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <BookMarked className="size-3.5" />
-            <span>Phát hành</span>
-          </button>
-        </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <SlidersHorizontal className="size-3.5" />
-              <span>Công cụ nâng cao</span>
-              <ChevronDown className="size-3 opacity-60" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 text-xs">
-            <DropdownMenuItem asChild>
-              <Link
-                to="/workspaces/$workspaceId/collections/$collectionId/answers"
-                params={{ workspaceId, collectionId: knowledgeId }}
-                className="flex items-center gap-2"
-              >
-                <MessageSquare className="size-3.5 text-muted-foreground" />
-                <span>Hỏi đáp trên kho</span>
-              </Link>
-            </DropdownMenuItem>
-            {canManage && (
-              <DropdownMenuItem asChild>
-                <Link
-                  to="/workspaces/$workspaceId/collections/$collectionId/search"
-                  params={{ workspaceId, collectionId: knowledgeId }}
-                  search={{ page: 1, pageSize: 20 }}
-                >
-                  <SlidersHorizontal className="size-3.5 text-muted-foreground" />
-                  <span>Quản trị chỉ mục</span>
-                </Link>
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem asChild>
-              <Link
-                to="/workspaces/$workspaceId/collections/$collectionId/evaluations"
-                params={{ workspaceId, collectionId: knowledgeId }}
-                search={{ page: 1 }}
-                className="flex items-center gap-2"
-              >
-                <Gauge className="size-3.5 text-muted-foreground" />
-                <span>Đánh giá RAG</span>
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* 2. KHU VỰC QUẢN LÝ TÀI LIỆU (Cột trái: Cây thư mục | Vùng phải: Danh sách tệp) */}
+      {/* 2. KHU VỰC KHÁM PHÁ THƯ MỤC & TÀI LIỆU (Google Drive Canvas — Toàn Chiều Rộng) */}
       {(activeStage === "files" || activeStage === "ocr") && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-[540px]">
-          {/* CỘT TRÁI (3 cols): Cây thư mục */}
-          <div className="lg:col-span-3">
-            <FolderTreePanel
-              folders={folders}
-              currentFolderId={currentFolderId}
-              allFoldersActive={allFoldersActive}
-              canManage={canManage}
-              rootSourceCount={rootSourceCount}
-              totalSourceCount={collection.source_count}
-              onSelectFolder={(folderId, all) => {
-                setCurrentFolderId(folderId);
-                setAllFoldersActive(Boolean(all));
-                onPageChange(1);
-              }}
-              onCreateFolder={() => {
-                setFolderToEdit(null);
-                setFolderParentForCreate({
-                  id: null,
-                  name: "Gốc kho tri thức",
-                });
-                setFolderFormOpen(true);
-              }}
-              onCreateSubfolder={(parent) => {
-                setFolderToEdit(null);
-                setFolderParentForCreate({ id: parent.id, name: parent.name });
-                setFolderFormOpen(true);
-              }}
-              onRenameFolder={(f) => {
-                setFolderToEdit(f);
-                setFolderFormOpen(true);
-              }}
-              onMoveFolder={(f) => {
-                setItemToMove({
-                  type: "folder",
-                  id: f.id,
-                  title: f.name,
-                  currentFolderId: f.parent_id,
-                });
-                setMoveDialogOpen(true);
-              }}
-              onDeleteFolder={(f) => {
-                setFolderToDelete(f);
-                setFolderDeleteOpen(true);
-              }}
-            />
-          </div>
-
-          {/* VÙNG PHẢI (9 cols): Danh sách tài liệu */}
-          <div className="lg:col-span-9 space-y-4">
-            {/* Toolbar phẳng: Breadcrumb đường dẫn thư mục hiện tại, Tìm kiếm & Chế độ xem */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-border/60">
-              {/* Breadcrumb đường dẫn thư mục */}
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
-                <button
+        <div className="space-y-4">
+          {/* Thanh Breadcrumb vị trí & Công cụ Lọc/Xem */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-border/60">
+            {/* Đường dẫn Breadcrumb hiện tại */}
+            <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap min-w-0">
+              {currentFolderId ? (
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1 -ml-1 mr-1"
                   onClick={() => {
-                    setCurrentFolderId(null);
+                    setCurrentFolderId(parentFolder ? parentFolder.id : null);
                     setAllFoldersActive(false);
                     onPageChange(1);
                   }}
-                  className={cn(
-                    "hover:text-foreground font-medium flex items-center gap-1 transition-colors",
-                    !currentFolderId && !allFoldersActive
-                      ? "text-primary font-semibold"
-                      : "",
-                  )}
+                  title="Quay lại thư mục cấp trên"
                 >
-                  <HardDrive className="size-3.5 text-primary" />
-                  <span>Gốc kho</span>
-                </button>
+                  <ArrowLeft className="size-3.5" />
+                  <span>Lên một cấp</span>
+                </Button>
+              ) : null}
 
-                {allFoldersActive ? (
-                  <>
-                    <ChevronRight className="size-3 text-muted-foreground/40" />
-                    <span className="font-semibold text-foreground">
-                      Tất cả tài liệu
-                    </span>
-                  </>
-                ) : (
-                  folderBreadcrumbs.map((bc, idx) => {
-                    const isLast = idx === folderBreadcrumbs.length - 1;
-                    return (
-                      <div key={bc.id} className="flex items-center gap-1.5">
-                        <ChevronRight className="size-3 text-muted-foreground/40" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCurrentFolderId(bc.id);
-                            setAllFoldersActive(false);
-                            onPageChange(1);
-                          }}
-                          className={cn(
-                            "hover:text-foreground transition-colors",
-                            isLast ? "font-semibold text-foreground" : "",
-                          )}
-                        >
-                          {bc.name}
-                        </button>
-                      </div>
-                    );
-                  })
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentFolderId(null);
+                  setAllFoldersActive(false);
+                  onPageChange(1);
+                }}
+                className={cn(
+                  "hover:text-foreground font-medium flex items-center gap-1.5 transition-colors px-2 py-1 rounded-md",
+                  !currentFolderId && !allFoldersActive
+                    ? "bg-muted font-semibold text-foreground shadow-2xs"
+                    : "text-muted-foreground",
                 )}
-              </div>
+              >
+                <HardDrive className="size-3.5 text-primary" />
+                <span>Gốc kho</span>
+                <span className="text-[10px] text-muted-foreground/80 font-normal">
+                  ({rootSourceCount})
+                </span>
+              </button>
 
-              {/* Tìm kiếm & Chuyển chế độ xem */}
-              <div className="flex items-center gap-2">
-                <div className="w-full sm:w-64">
-                  <DebouncedSearchInput
-                    value={searchQuery}
-                    onChange={setSearchQuery}
-                    placeholder="Tìm tài liệu..."
-                    className="text-xs h-9"
-                  />
-                </div>
+              {allFoldersActive ? (
+                <>
+                  <ChevronRight className="size-3 text-muted-foreground/40" />
+                  <span className="font-semibold text-foreground flex items-center gap-1 px-2 py-1 rounded-md bg-muted shadow-2xs">
+                    <Layers className="size-3 text-muted-foreground" />
+                    <span>Tất cả tài liệu</span>
+                  </span>
+                </>
+              ) : (
+                folderBreadcrumbs.map((bc, idx) => {
+                  const isLast = idx === folderBreadcrumbs.length - 1;
+                  return (
+                    <div key={bc.id} className="flex items-center gap-1">
+                      <ChevronRight className="size-3 text-muted-foreground/40" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentFolderId(bc.id);
+                          setAllFoldersActive(false);
+                          onPageChange(1);
+                        }}
+                        className={cn(
+                          "hover:text-foreground transition-colors flex items-center gap-1 px-2 py-1 rounded-md",
+                          isLast
+                            ? "bg-muted font-semibold text-foreground shadow-2xs"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        <Folder className="size-3 text-amber-500" />
+                        <span>{bc.name}</span>
+                      </button>
+                    </div>
+                  );
+                })
+              )}
 
-                <ViewModeToggle value={viewMode} onChange={setViewMode} />
-              </div>
+              {/* Lối tắt xem tất cả tài liệu */}
+              <button
+                type="button"
+                onClick={() => {
+                  setAllFoldersActive(!allFoldersActive);
+                  onPageChange(1);
+                }}
+                className={cn(
+                  "ml-2 text-[11px] px-2 py-0.5 rounded-full border transition-colors flex items-center gap-1",
+                  allFoldersActive
+                    ? "border-primary bg-primary/10 text-primary font-medium"
+                    : "border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/40",
+                )}
+              >
+                <Layers className="size-3" />
+                <span>Xem toàn bộ ({collection.source_count})</span>
+              </button>
             </div>
 
-            {foldersQuery.isError && (
-              <ErrorState
-                error={foldersQuery.error}
-                onRetry={() => void foldersQuery.refetch()}
-              />
-            )}
+            {/* Nhóm công cụ bên phải: Thêm thư mục + Tìm kiếm + Chế độ xem */}
+            <div className="flex items-center justify-end gap-2 shrink-0">
+              {canManage && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-2.5 text-xs gap-1.5 shadow-2xs"
+                  onClick={() => {
+                    setFolderToEdit(null);
+                    setFolderParentForCreate({
+                      id: currentFolderId,
+                      name: currentFolder?.name ?? "Gốc kho tri thức",
+                    });
+                    setFolderFormOpen(true);
+                  }}
+                >
+                  <FolderPlus className="size-3.5 text-muted-foreground" />
+                  <span>Thư mục mới</span>
+                </Button>
+              )}
 
-            {/* Danh sách Thư mục con (nếu có) */}
-            {!allFoldersActive && directSubfolders.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <FolderOpen className="size-3.5 text-amber-500" />
-                  <span>Thư mục con ({directSubfolders.length})</span>
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5">
-                  {directSubfolders.map((f) => (
-                    <Card
-                      key={f.id}
-                      onClick={() => {
-                        setCurrentFolderId(f.id);
-                        setAllFoldersActive(false);
-                        onPageChange(1);
-                      }}
-                      className="p-3 rounded-xl border-border/80 hover:border-primary/60 hover:bg-muted/20 transition-all cursor-pointer group shadow-2xs"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Folder className="size-7 text-amber-500/90 group-hover:text-amber-600 transition-colors shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                            {f.name}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {f.source_count} tệp · {f.subfolder_count} thư mục
-                            con
-                          </p>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
+              <div className="w-full sm:w-52 lg:w-64">
+                <DebouncedSearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Tìm tài liệu..."
+                  className="text-xs h-8"
+                />
               </div>
+
+              {searchQuery ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <RotateCcw className="size-3 mr-1" />
+                  <span>Đặt lại</span>
+                </Button>
+              ) : null}
+
+              <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            </div>
+          </div>
+
+          {foldersQuery.isError && (
+            <ErrorState
+              error={foldersQuery.error}
+              onRetry={() => void foldersQuery.refetch()}
+            />
+          )}
+
+          {/* 1. KHU VỰC THƯ MỤC CON (Hiển thị dạng thẻ Google Drive Grid) */}
+          {!allFoldersActive && directSubfolders.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <FolderOpen className="size-3.5 text-amber-500" />
+                  <span>Thư mục ({directSubfolders.length})</span>
+                </h2>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                {directSubfolders.map((f) => (
+                  <Card
+                    key={f.id}
+                    onClick={() => {
+                      setCurrentFolderId(f.id);
+                      setAllFoldersActive(false);
+                      onPageChange(1);
+                    }}
+                    className="p-3 rounded-xl border border-border/70 hover:border-primary/50 hover:bg-muted/30 transition-all cursor-pointer group shadow-2xs hover:shadow-xs flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <Folder className="size-5 sm:size-6 text-amber-500 group-hover:text-amber-600 transition-colors shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                          {f.name}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {f.source_count} tệp
+                          {f.subfolder_count > 0
+                            ? ` · ${f.subfolder_count} con`
+                            : ""}
+                        </p>
+                      </div>
+                    </div>
+
+                    {canManage && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          asChild
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            aria-label="Thao tác thư mục"
+                            className="size-6 shrink-0 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-md hover:bg-muted transition-opacity text-muted-foreground hover:text-foreground"
+                          >
+                            <MoreVertical className="size-3.5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          className="w-44 text-xs"
+                        >
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFolderToEdit(null);
+                              setFolderParentForCreate({
+                                id: f.id,
+                                name: f.name,
+                              });
+                              setFolderFormOpen(true);
+                            }}
+                            className="gap-2"
+                          >
+                            <FolderPlus className="size-3.5 text-muted-foreground" />
+                            <span>Tạo thư mục con</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFolderToEdit(f);
+                              setFolderFormOpen(true);
+                            }}
+                            className="gap-2"
+                          >
+                            <Pencil className="size-3.5 text-muted-foreground" />
+                            <span>Đổi tên</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setItemToMove({
+                                type: "folder",
+                                id: f.id,
+                                title: f.name,
+                                currentFolderId: f.parent_id,
+                              });
+                              setMoveDialogOpen(true);
+                            }}
+                            className="gap-2"
+                          >
+                            <Folder className="size-3.5 text-muted-foreground" />
+                            <span>Di chuyển</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFolderToDelete(f);
+                              setFolderDeleteOpen(true);
+                            }}
+                            className="gap-2 text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="size-3.5" />
+                            <span>Xóa thư mục</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 2. KHU VỰC TÀI LIỆU */}
+          <div className="space-y-2">
+            {!allFoldersActive && directSubfolders.length > 0 && (
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 pt-2">
+                <FileText className="size-3.5 text-primary" />
+                <span>Tài liệu ({total})</span>
+              </h2>
             )}
 
-            {/* Danh sách Tệp (Sources) */}
             {sourcesQuery.isLoading ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+                <Skeleton className="h-28 w-full rounded-xl" />
                 <Skeleton className="h-28 w-full rounded-xl" />
                 <Skeleton className="h-28 w-full rounded-xl" />
                 <Skeleton className="h-28 w-full rounded-xl" />
@@ -700,36 +797,48 @@ export function KnowledgeDetailPage({
                 onRetry={() => void sourcesQuery.refetch()}
               />
             ) : sources.length === 0 ? (
-              <div className="rounded-xl border border-dashed p-10 text-center space-y-3 bg-muted/10">
-                <div className="flex size-12 items-center justify-center rounded-2xl bg-muted mx-auto text-muted-foreground">
-                  <FileText className="size-6" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-foreground">
-                    {searchQuery
+              <Card className="rounded-xl border border-dashed bg-muted/10 shadow-none">
+                <EmptyState
+                  icon={FileUp}
+                  title={
+                    searchQuery
                       ? "Không tìm thấy tài liệu phù hợp"
-                      : "Chưa có tài liệu nào trong thư mục này"}
-                  </p>
-                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    {searchQuery
-                      ? "Hãy thử tìm kiếm với từ khóa khác."
-                      : "Tải tài liệu PDF hoặc Word (.docx) vào kho để lưu trữ an toàn và bóc tách nội dung."}
-                  </p>
-                </div>
-                {canManage && !searchQuery && (
-                  <Button
-                    size="sm"
-                    className="gap-1.5 text-xs shadow-xs"
-                    onClick={() => setUploadOpen(true)}
-                  >
-                    <FileUp className="size-3.5" />
-                    <span>Tải tài liệu vào đây</span>
-                  </Button>
-                )}
-              </div>
+                      : "Chưa có tài liệu nào trong thư mục này"
+                  }
+                  description={
+                    searchQuery
+                      ? "Hãy thử tìm kiếm với từ khóa hoặc tên tệp khác."
+                      : "Tải lên tài liệu PDF hoặc Word (.docx) để lưu trữ an toàn và tiến hành bóc tách OCR."
+                  }
+                  action={
+                    canManage && !searchQuery
+                      ? {
+                          label: "Tải tài liệu vào đây",
+                          onClick: () => setUploadOpen(true),
+                        }
+                      : undefined
+                  }
+                  secondaryAction={
+                    canManage && !searchQuery
+                      ? {
+                          label: "Tạo thư mục con",
+                          onClick: () => {
+                            setFolderToEdit(null);
+                            setFolderParentForCreate({
+                              id: currentFolderId,
+                              name: currentFolder?.name ?? "Gốc kho tri thức",
+                            });
+                            setFolderFormOpen(true);
+                          },
+                        }
+                      : undefined
+                  }
+                  className="py-12 max-w-md mx-auto"
+                />
+              </Card>
             ) : viewMode === "grid" ? (
-              /* Chế độ Grid Card */
-              <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+              /* Chế độ Grid Card Full-Width */
+              <div className="grid gap-3.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
                 {sources.map((s) => {
                   const pdf = isPdf(s.content_type, s.file_name);
                   const docx = isDocx(s.content_type, s.file_name);
@@ -739,7 +848,7 @@ export function KnowledgeDetailPage({
                   return (
                     <Card
                       key={s.id}
-                      className="p-4 rounded-xl border-border/70 hover:border-primary/40 hover:shadow-xs transition-all group relative flex flex-col justify-between"
+                      className="p-4 rounded-xl border border-border/70 hover:border-primary/40 hover:shadow-xs transition-all group relative flex flex-col justify-between"
                     >
                       <div className="space-y-2.5">
                         <div className="flex items-start gap-2.5">
@@ -887,8 +996,8 @@ export function KnowledgeDetailPage({
                 })}
               </div>
             ) : (
-              /* Chế độ Bảng Table */
-              <Card className="rounded-xl shadow-2xs border-border/70 overflow-hidden">
+              /* Chế độ Bảng Table Full-Width */
+              <div className="rounded-xl border border-border/70 overflow-hidden bg-card shadow-2xs">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/40">
@@ -1021,11 +1130,13 @@ export function KnowledgeDetailPage({
                     })}
                   </TableBody>
                 </Table>
-              </Card>
+              </div>
             )}
+          </div>
 
-            {/* Phân trang */}
-            {total > 0 && (
+          {/* Phân trang */}
+          {total > 0 && (
+            <div className="pt-2">
               <DataTablePagination
                 page={page}
                 pageSize={pageSize}
@@ -1034,8 +1145,8 @@ export function KnowledgeDetailPage({
                 onPageChange={onPageChange}
                 onPageSizeChange={onPageSizeChange}
               />
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 

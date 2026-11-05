@@ -1,5 +1,7 @@
 # 15 — Phân luồng hội thoại và phiên chat
 
+> **TÀI LIỆU LỊCH SỬ — không phải hiện trạng V1.** Nội dung dưới đây mô tả hệ thống `backend/` + `frontend/` trước V1 (hai thư mục đã gỡ khỏi checkout) và chỉ dùng để truy vết. Bản đang chạy là [`backendV1/`](../../backendV1) + [`frontendV1/`](../../frontendV1); xem [bản đồ tài liệu](../README.md).
+
 Chat dùng chung backend cho Sandbox, cổng chat và widget nhúng. Sau kiểm quyền/phiên và input guard, hệ thống phân loại toàn thông điệp trước khi truy xuất nguồn.
 
 - Lời chào/cảm ơn/tạm biệt thuần túy trả lời giao tiếp từ cấu hình, không gọi model/retrieval.

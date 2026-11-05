@@ -1,42 +1,132 @@
-# Thuyết Minh Kiến Trúc Hệ Thống — QNU.AI Platform
+# Kiến trúc QNU AI Platform — V1
 
-## 1. Tầm Nhìn & Mục Tiêu
+> **Phạm vi:** tài liệu sống, mô tả hệ thống đang chạy tại HEAD.
+> Bằng chứng là mã trong [`backendV1/`](../backendV1) và [`frontendV1/`](../frontendV1);
+> khi tài liệu mâu thuẫn với mã/test, mã/test thắng.
+> Bản kiến trúc cũ (Next.js, DAG, 5 trợ lý, PaddleOCR/Gemini) đã được thay thế và không còn
+> mô tả hệ thống hiện hành. Bản đồ tài liệu: [docs/README.md](./README.md).
 
-QNU.AI Platform là nền tảng AI trung gian (AI Middleware & Workflow Platform) phục vụ toàn diện công tác Chuyển đổi số Trường Đại học Quy Nhơn, hợp nhất 05 lĩnh vực trọng điểm:
-1. **Tư vấn Tuyển sinh** (`admissions`)
-2. **Quy chế & Quy định Đào tạo** (`regulations`)
-3. **Khai thác Tài nguyên Thư viện** (`library`)
-4. **Hỗ trợ Soạn thảo Văn bản Hành chính** (`drafting`) theo chuẩn Nghị định 30/2020/NĐ-CP
-5. **Ngân hàng Câu hỏi & Đề thi** (`question_bank`) theo chuẩn đầu ra Bloom
+## 1. Mục tiêu sản phẩm
 
-## 2. Kiến Trúc Phân Tầng Theo Tính Năng (Feature-Driven)
+Nền tảng AI nội bộ phục vụ chuyển đổi số Trường Đại học Quy Nhơn, hướng tới các lĩnh vực:
+tư vấn tuyển sinh, quy chế — quy định đào tạo, khai thác tài liệu thư viện, soạn thảo văn bản
+hành chính và ngân hàng câu hỏi/đề thi.
+
+Đây là **định hướng**, không phải danh sách tính năng đã có. Phần 5 liệt kê chính xác những gì
+V1 đã triển khai và những gì còn là khung.
+
+## 2. Nguyên tắc thiết kế
+
+1. **Evidence-first:** mọi câu trả lời phải truy vết được về nguồn đã xuất bản (source →
+   revision → OCR → biên soạn → duyệt → chỉ mục → trích dẫn). Không có bằng chứng thì từ chối
+   kết luận, không thay bằng câu trả lời suy đoán.
+2. **Job xong ≠ nội dung đã duyệt:** trạng thái xử lý kỹ thuật tách khỏi quyết định xuất bản của
+   con người.
+3. **Workspace là biên giới quyền**, không phải phân vùng vật lý. Mọi truy vấn tài nguyên đi qua
+   `resolve_workspace_access`; `workspace_id` từ URL/body chỉ là đối tượng cần kiểm tra.
+4. **Fail closed:** thiếu credential, thiếu quyền, provider lỗi hoặc loại provider chưa có
+   adapter đều trả lỗi rõ ràng, không sinh dữ liệu giả và không tự fallback.
+5. **Bí mật LLM nằm trong ModelOps DB** (mã hóa), không nằm trong `.env` hay bundle frontend.
+
+## 3. Kiến trúc backend
+
+Modular monolith: một tiến trình API + một tiến trình worker, cùng một codebase.
 
 ```
-[ Frontend: QNU Studio UI (Next.js 15, React 19) ]
-                       │ (REST / WebSocket / SSE)
-                       ▼
-[ Backend API Gateway & Routers (FastAPI) ]
-  ├── /knowledge   : Quản lý bộ sưu tập tri thức, Ingest đa định dạng, Chunking
-  ├── /rag         : Hybrid Search (Dense BGE-M3 + Sparse Postgres FTS + BGE-Reranker v2)
-  ├── /assistants  : Quản lý Trợ lý AI, Seeder 5 trợ lý chuẩn, Bundle Packaging
-  ├── /workflows   : DAG Runtime Engine, Thư viện Nodes (Input, Route, Approval, Tool, Export)
-  ├── /channels    : Đa kênh phân phối (Web Widget nhúng, Messenger, Zalo) & Live Human Handoff
-  ├── /modelops    : Quản lý LLM Providers (OpenAI, Gemini, Local vLLM/Ollama), Model Profiles
-  ├── /tools       : Tool Gateway tích hợp cổng UIS đào tạo, tính học phí, kèm PII Masking
-  ├── /ocr         : Đa bộ máy OCR (PaddleOCR, RapidOCR, PyMuPDF)
-  ├── /evaluation  : Đánh giá chất lượng Ragas (Hit Rate >= 90%, Faithfulness >= 95%, TM-08)
-  └── /system      : Quản lý API Keys, Giám sát Worker & Sao lưu Snapshot 1-Click
-                        │
-        ┌───────────────┼───────────────┬───────────────┐
-        ▼               ▼               ▼               ▼
- [ PostgreSQL 16 ]  [ Qdrant DB ]   [ Redis 7 ]   [ MinIO S3 ]
- (Metadata, Facts,  (Vectors 1024D  (Semantic     (Raw Documents,
-  FTS tiếng Việt)    BGE-M3)         Cache, ARQ)   Artifacts NĐ30)
+HTTP → middleware (correlation, CORS) → dependencies (actor, db)
+     → router mỏng → service → port → adapter
 ```
 
-## 3. Các Đặc Tuyến Kỹ Thuật Nổi Bật
+| Tầng | Vai trò | Không được làm |
+|---|---|---|
+| `qnu/api/` | lắp ráp, dependency, handler lỗi, health | chứa SQL hay nghiệp vụ |
+| `qnu/platform/` | config, DB, cache, storage, crypto, log, metric | import domain |
+| `qnu/contracts/` | DTO dùng chung | logic nghiệp vụ |
+| `qnu/ports/` | protocol ra hệ ngoài | import SDK cụ thể |
+| `qnu/adapters/` | cài đặt port | được domain import |
+| `qnu/domains/` | router + service + policy + models | import `adapters` |
+| `qnu/workers/` | ARQ, queue riêng của V1 | nhặt job legacy |
 
-1. **MinIO Object Storage Pipeline**: Toàn bộ tệp tải lên (PDF tuyển sinh, Word quy chế) được lưu trữ bền vững tại MinIO Object Storage trước khi chuyển sang tầng bóc tách dữ liệu; các thành phẩm do AI sinh ra (Word NĐ 30, Excel Bloom) cũng được lưu trữ an toàn tại MinIO.
-2. **Structured Fact Layer**: Trích xuất bảng biểu thành các bản ghi sự thật (điểm chuẩn, học phí, chỉ tiêu, mã ngành) giúp truy xuất chính xác 100% không bị hallucination.
-3. **Citation Guard & Groundedness Policy**: Bắt buộc câu trả lời RAG phải có trích dẫn nguồn có kiểm định.
-4. **Worker Bất đồng bộ ARQ**: Thuần `asyncio` Python, nhẹ, nhanh, tương thích tốt từ Windows đến Linux.
+Quy tắc phụ thuộc: `api → domains → ports/contracts → platform`; adapter chỉ được khởi tạo ở
+`api/wiring.py`. Mỗi domain giao tiếp qua `public_api.py` — xem
+[module-boundaries.md](../backendV1/docs/module-boundaries.md).
+
+### Domain (16)
+
+`identity`, `workspaces`, `modelops`, `knowledge`, `ocr`, `rag`, `assistants`,
+`conversations`, `lifecycle`, `operations`, `evaluation`, `integration`, `document_types`,
+`tools`, `workflows`, `node_catalog`.
+
+`tools`, `workflows`, `node_catalog` hiện chỉ là khung (README + `__init__.py`), chưa có engine.
+
+### Dữ liệu
+
+- PostgreSQL 16, 53 bảng, chuỗi Alembic riêng `0001…0014`
+  (bảng version `alembic_version_backendv1`).
+- Redis: queue ARQ `qnu:v1:jobs` + cache namespace `qnu:v1:cache:`.
+- Qdrant: collection vector 1024 chiều theo generation.
+- MinIO/S3 hoặc local: tệp gốc và artifact content-addressed.
+
+## 4. Luồng dữ liệu
+
+1. **Workspace & quyền** — membership + role (`admin`/`editor`/`member`), platform admin
+   quản trị toàn hệ thống; audit theo đơn vị.
+2. **Kho tri thức** — collection theo workspace, upload tệp, revision bất biến, checksum,
+   idempotency theo `(workspace, actor, key)`.
+3. **Bóc tách** — native-first: PyMuPDF + PDF Inspector cho PDF có lớp chữ, Docling cho DOCX
+   (qua Gotenberg), MinerU cho PDF scan/ảnh. Sinh raw + canonical JSON + Markdown + manifest.
+4. **Rà soát hậu OCR** — sửa đoạn/ô, gợi ý chính tả qua ModelOps, lưu `text_versions` có hash.
+5. **Biên soạn (Compiler)** — job bền vững theo chủ đề, bản nháp có trích dẫn và bảng nguyên bản;
+   review ngữ nghĩa hai chiều nguồn/bản nháp.
+6. **Xuất bản** — con người xác nhận và duyệt; document/version bất biến, preview + audit,
+   thay thế/thu hồi/khôi phục.
+7. **Lập chỉ mục** — publication đã duyệt → chunk giữ nguồn/bảng → embedding qua ModelOps →
+   generation Qdrant; dense, hybrid (FTS + RRF) và rerank.
+8. **Hỏi đáp & trợ lý** — search → evidence → model chat qua ModelOps → kiểm tra trích dẫn và
+   nguồn hiện hành → câu trả lời; hội thoại lưu owner, thứ tự lượt và idempotency.
+
+## 5. Năng lực hiện có và chưa có
+
+**Đã có (có mã + test):** workspace/membership/audit; ModelOps provider/key/default/grant/
+quota/usage; kho tri thức + revision; OCR PDF/DOCX với MinerU; rà soát văn bản hậu OCR;
+Compiler + review; publication lifecycle; index/search dense/hybrid/rerank; hỏi đáp có trích dẫn;
+trợ lý + hội thoại; vòng đời ngược (dừng/hủy/thùng rác/khôi phục/xóa có điều kiện); readiness,
+backup bằng chứng, dọn dữ liệu dẫn xuất; API tích hợp cho ứng dụng ngoài (app key + gateway).
+
+**Chưa có:** DAG engine và tool gateway; kênh public (widget/Messenger/Zalo); streaming/SSE;
+chia sẻ chatbot công khai; xuất Word Nghị định 30 / Excel Bloom; Structured Fact Layer, wiki,
+glossary (các thư mục này chỉ còn `__init__.py`); benchmark/quality gate tự động cho RAG của V1.
+
+**Không còn dùng:** `provider_type` `gemini` và `paddleocr` chỉ tồn tại để tương thích dữ liệu
+cũ; registry đánh dấu “chưa có adapter” và runtime từ chối bằng mã
+`*_provider_type_unsupported`. OCR hiện hành là MinerU/native.
+
+## 6. Công nghệ
+
+| Lớp | Công nghệ |
+|---|---|
+| Backend | Python 3.12, FastAPI, SQLAlchemy async, Pydantic v2, Alembic |
+| Worker | ARQ (asyncio), lease + reconcile |
+| Dữ liệu | PostgreSQL 16, Redis 7, Qdrant |
+| Tệp | MinIO/S3 (boto3) hoặc local |
+| Xử lý tài liệu | PyMuPDF, PDF Inspector 1.25.2, Docling, Gotenberg 8, MinerU |
+| Model | OpenAI-compatible chat, embedding, rerank — cấu hình qua ModelOps |
+| Frontend | React 19, Vite 8, TanStack Router/Query/Form/Table, Radix/shadcn, Tailwind 4, Biome |
+| Xác thực | Dev gate local; SSO OpenIddict authorization code + PKCE (RS256/JWKS) |
+
+## 7. Tài liệu chi tiết
+
+Backend: [architecture](../backendV1/docs/architecture.md) ·
+[module boundaries](../backendV1/docs/module-boundaries.md) ·
+[OCR](../backendV1/docs/ocr-processing.md) ·
+[Compiler](../backendV1/docs/compiler-v1.md) ·
+[publication](../backendV1/docs/compiled-publication.md) ·
+[index](../backendV1/docs/dense-indexing.md) ·
+[RAG answers](../backendV1/docs/rag-answers.md) ·
+[ModelOps](../backendV1/docs/workspaces-modelops.md) ·
+[readiness](../backendV1/docs/readiness.md).
+
+Vận hành: [quy trình V1](./quy_trinh/README.md) ·
+[chạy local](./quy_trinh/38_huong_dan_chay_qnu_v1.md) ·
+[triển khai](./trien_khai/02_quy_trinh_trien_khai_dokploy.md) ·
+[memory](./memory/PROJECT_CONTEXT.md).

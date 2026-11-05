@@ -4,6 +4,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  FolderTree,
   HardDrive,
   Layers,
   MoreVertical,
@@ -35,6 +36,7 @@ export function FolderTreePanel({
   canManage,
   rootSourceCount,
   totalSourceCount,
+  isUnified = false,
   onSelectFolder,
   onCreateFolder,
   onCreateSubfolder,
@@ -48,6 +50,7 @@ export function FolderTreePanel({
   canManage: boolean;
   rootSourceCount: number;
   totalSourceCount: number;
+  isUnified?: boolean;
   onSelectFolder: (folderId: string | null, allFolders?: boolean) => void;
   onCreateFolder: () => void;
   onCreateSubfolder: (parent: KBFolder) => void;
@@ -144,7 +147,10 @@ export function FolderTreePanel({
 
             {canManage ? (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuTrigger
+                  asChild
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     type="button"
                     aria-label="Thao tác thư mục"
@@ -208,22 +214,32 @@ export function FolderTreePanel({
     );
   };
 
-  const isRootSelected = !allFoldersActive && (currentFolderId === null || currentFolderId === "root");
+  const isRootSelected =
+    !allFoldersActive &&
+    (currentFolderId === null || currentFolderId === "root");
 
   return (
-    <div className="flex flex-col h-full bg-card/50 rounded-lg border border-border/70 p-2.5">
+    <div
+      className={cn(
+        "flex flex-col h-full",
+        isUnified
+          ? "space-y-2"
+          : "bg-card rounded-xl border border-border/70 p-3 shadow-xs min-h-[460px]",
+      )}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between pb-2 mb-1.5 border-b border-border/50 px-1">
-        <span className="text-xs font-semibold text-foreground tracking-tight uppercase">
-          Thư mục
-        </span>
+      <div className="flex items-center justify-between pb-2 mb-1 border-b border-border/60 px-1">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          <FolderTree className="size-3.5 text-primary" />
+          <span>Thư mục</span>
+        </div>
         {canManage ? (
           <Button
             size="sm"
             variant="ghost"
             className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
             onClick={onCreateFolder}
-            title="Tạo thư mục ở gốc"
+            title="Tạo thư mục mới ở gốc"
           >
             <FolderPlus className="size-3.5" />
           </Button>
@@ -251,7 +267,12 @@ export function FolderTreePanel({
           }}
         >
           <div className="flex items-center gap-2 min-w-0">
-            <HardDrive className={cn("size-3.5 shrink-0", isRootSelected ? "text-primary" : "text-muted-foreground")} />
+            <HardDrive
+              className={cn(
+                "size-3.5 shrink-0",
+                isRootSelected ? "text-primary" : "text-muted-foreground",
+              )}
+            />
             <span className="truncate">Gốc kho tri thức</span>
           </div>
           <Badge variant="secondary" className="text-[10px] h-4 font-normal">
@@ -294,4 +315,3 @@ export function FolderTreePanel({
     </div>
   );
 }
-

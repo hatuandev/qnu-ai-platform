@@ -2,24 +2,10 @@ import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
   AlertTriangle,
-  Archive,
   ArrowLeft,
-  ClipboardList,
-  Download,
-  FilePlus2,
-  FileText,
-  FolderOpen,
-  History,
-  Library,
   Loader2,
-  MoreHorizontal,
-  Pencil,
   Play,
   RotateCcw,
-  Save,
-  Sparkles,
-  Trash2,
-  Undo2,
 } from "lucide-react";
 import {
   useCallback,
@@ -36,9 +22,7 @@ import {
   v1Client,
 } from "@/app/api/v1";
 import { ErrorState } from "@/components/admin/error-state";
-import { PageBreadcrumbs } from "@/components/admin/page-breadcrumbs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,20 +32,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompilationDialog } from "@/features/knowledge/compilation-dialog";
 import {
@@ -116,6 +86,7 @@ import { downloadRevisionContent } from "@/features/knowledge/requests";
 import { RevisionUploadDialog } from "@/features/knowledge/revision-upload-dialog";
 import { formatProcessingStatus } from "@/features/knowledge/schemas";
 import { SourceRenameDialog } from "@/features/knowledge/source-rename-dialog";
+import { SourceStudioHeader } from "@/features/knowledge/source-studio-header";
 import { SpellingResultPanel } from "@/features/knowledge/spelling-result-panel";
 import type { KBRevision } from "@/features/knowledge/types";
 import { LifecycleActionDialog } from "@/features/lifecycle/action-dialog";
@@ -310,12 +281,12 @@ function SourceDetailSession({
     () =>
       selectedRunId
         ? {
-          workspaceId,
-          collectionId,
-          sourceId,
-          revisionId: activeRevisionId,
-          runId: selectedRunId,
-        }
+            workspaceId,
+            collectionId,
+            sourceId,
+            revisionId: activeRevisionId,
+            runId: selectedRunId,
+          }
         : null,
     [collectionId, activeRevisionId, selectedRunId, sourceId, workspaceId],
   );
@@ -735,14 +706,14 @@ function SourceDetailSession({
   );
   const spellingSuggestionsCount = documentSpelling.report
     ? documentSpelling.report.batches.reduce(
-      (n, b) =>
-        n +
-        (b.check?.suggestions.length ?? 0) +
-        (b.check?.withheld_suggestions?.length ?? 0),
-      0,
-    )
+        (n, b) =>
+          n +
+          (b.check?.suggestions.length ?? 0) +
+          (b.check?.withheld_suggestions?.length ?? 0),
+        0,
+      )
     : (localCheck?.suggestions.length ?? 0) +
-    (localCheck?.withheld_suggestions?.length ?? 0);
+      (localCheck?.withheld_suggestions?.length ?? 0);
 
   const lifecycleDialog = lifecycleOp ? (
     <LifecycleActionDialog
@@ -809,363 +780,56 @@ function SourceDetailSession({
   return (
     <div className="space-y-4">
       {lifecycleDialog}
-      {/* 1. Header trên cùng: Tên tài liệu, phiên bản, trạng thái & Hàng hành động */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-border/70">
-        <div className="min-w-0 space-y-1">
-          {/* Breadcrumbs */}
-          <PageBreadcrumbs
-            items={[
-              {
-                label: "Kho tri thức",
-                to: "/workspaces/$workspaceId/knowledge",
-                params: { workspaceId },
-                search: { page: 1, pageSize: 20 },
-                icon: Library,
-              },
-              {
-                label: collection?.name ?? "Bộ sưu tập",
-                to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
-                params: { workspaceId, knowledgeId: collectionId },
-                search: { page: 1, pageSize: 20 },
-                icon: FolderOpen,
-                maxChars: 24,
-              },
-              {
-                label: source.title,
-                icon: FileText,
-                current: true,
-                maxChars: 32,
-              },
-            ]}
-          />
-
-          {/* Tiêu đề, phiên bản tệp & badge trạng thái */}
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <FileText className="size-5 text-primary shrink-0" />
-            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate max-w-[400px]">
-              {source.title}
-            </h1>
-            <Badge variant="outline" className="text-xs font-mono h-5">
-              Tệp v{activeRevisionNo}
-            </Badge>
-
-            <Badge
-              variant={statusInfo.variant}
-              className="text-xs font-normal h-5"
-            >
-              {statusInfo.status === "running" ? (
-                <Loader2 className="size-3 animate-spin mr-1 inline" />
-              ) : null}
-              {statusInfo.label}
-            </Badge>
-
-            {!canManage ? (
-              <Badge variant="outline" className="text-xs font-normal h-5">
-                Chế độ chỉ xem
-              </Badge>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Hàng hành động tinh gọn: Hành động chính theo ngữ cảnh + Menu phụ ⋯ */}
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
-          {canManage && statusInfo.status === "unprocessed" ? (
-            <Button
-              size="sm"
-              className="h-9 text-xs gap-1.5 shadow-xs"
-              disabled={requestRunMutation.isPending}
-              onClick={() => void handleStartExtraction(false)}
-            >
-              {requestRunMutation.isPending ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Play className="size-3.5" />
-              )}
-              <span>Bắt đầu bóc tách</span>
-            </Button>
-          ) : null}
-
-          {/* Kiểm tra chính tả (mở hộp thoại chọn phạm vi & mô hình) */}
-          {canManage && statusInfo.status === "completed" && doc ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-9 text-xs gap-1.5"
-              disabled={detectMutation.isPending || documentSpelling.running}
-              onClick={() => handleOpenSpellCheckConfig()}
-            >
-              {detectMutation.isPending ? (
-                <Loader2 className="size-3.5 animate-spin text-primary" />
-              ) : (
-                <Sparkles className="size-3.5 text-primary" />
-              )}
-              <span>Kiểm tra chính tả</span>
-            </Button>
-          ) : null}
-
-          {/* Lưu thay đổi (nổi bật khi có nháp hiệu đính) */}
-          {canManage && statusInfo.status === "completed" ? (
-            <Button
-              type="button"
-              size="sm"
-              variant={hasUnsavedDraft ? "default" : "outline"}
-              className="h-9 text-xs gap-1.5"
-              disabled={
-                !hasUnsavedDraft || saveMutation.isPending || baseMovedOn
-              }
-              onClick={() => setSaveModalOpen(true)}
-            >
-              <Save className="size-3.5" />
-              <span>Lưu thay đổi</span>
-              {hasUnsavedDraft ? (
-                <Badge
-                  variant="warning"
-                  className="ml-1 text-[10px] py-0 px-1 font-mono"
-                >
-                  {draftCount}
-                </Badge>
-              ) : null}
-            </Button>
-          ) : null}
-
-          {/* Dùng để biên soạn (từ đúng phiên bản đã lưu) */}
-          {canCompile && statusInfo.status === "completed" && selectedRunId ? (
-            <Button
-              type="button"
-              size="sm"
-              variant={hasUnsavedDraft ? "outline" : "default"}
-              className="h-9 text-xs gap-1.5"
-              onClick={() => {
-                if (hasUnsavedDraft) {
-                  toast.warning(
-                    `Bạn đang có ${draftCount} đoạn sửa nháp chưa lưu. Trình biên soạn chỉ sử dụng phiên bản đã lưu trên máy chủ (v${doc?.version ?? 0}). Vui lòng bấm "Lưu thay đổi" trước khi biên soạn.`,
-                  );
-                  return;
-                }
-                setCompilationDialogOpen(true);
-              }}
-            >
-              <ClipboardList className="size-3.5" />
-              <span>Dùng để biên soạn</span>
-            </Button>
-          ) : null}
-
-          {/* Menu phụ ⋯ gom Tải xuống (bản gốc/MD/JSON/ZIP), Bóc tách lại, Tải phiên bản mới và Thao tác vòng đời */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="size-9 p-0 text-muted-foreground hover:text-foreground"
-                aria-label="Thao tác tài liệu"
-              >
-                {downloadingType ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <MoreHorizontal className="size-4" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-60 text-xs">
-              <DropdownMenuItem
-                className="gap-2"
-                disabled={downloadingType !== null}
-                onClick={() => void handleDownload("raw")}
-              >
-                <Download className="size-3.5 text-muted-foreground" />
-                <span className="truncate">
-                  Tải tệp gốc ({source.file_name})
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="gap-2"
-                disabled={
-                  statusInfo.status !== "completed" || downloadingType !== null
-                }
-                onClick={() => void handleDownload("md")}
-              >
-                <Download className="size-3.5 text-muted-foreground" />
-                <span>Tải bản Markdown (.md)</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="gap-2"
-                disabled={
-                  statusInfo.status !== "completed" || downloadingType !== null
-                }
-                onClick={() => void handleDownload("json")}
-              >
-                <Download className="size-3.5 text-muted-foreground" />
-                <span>Tải bản JSON cấu trúc (.json)</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="gap-2"
-                disabled={
-                  statusInfo.status !== "completed" || downloadingType !== null
-                }
-                onClick={() => void handleDownload("zip")}
-              >
-                <Download className="size-3.5 text-muted-foreground" />
-                <span>Tải gói ZIP kèm ảnh (.zip)</span>
-              </DropdownMenuItem>
-              {isDocxFile && statusInfo.status === "completed" && (
-                <DropdownMenuItem
-                  className="gap-2"
-                  disabled={downloadingType !== null}
-                  onClick={() => void handleDownload("pdf")}
-                >
-                  <Download className="size-3.5 text-muted-foreground" />
-                  <span>Tải PDF kết xuất từ Word (.pdf)</span>
-                </DropdownMenuItem>
-              )}
-
-              {canManage ? (
-                <>
-                  <DropdownMenuSeparator />
-
-                  {statusInfo.status !== "unprocessed" &&
-                    statusInfo.status !== "running" ? (
-                    <DropdownMenuItem
-                      className="gap-2"
-                      onClick={() => setReRunConfirmOpen(true)}
-                    >
-                      <RotateCcw className="size-3.5 text-muted-foreground" />
-                      <span>Bóc tách lại</span>
-                    </DropdownMenuItem>
-                  ) : null}
-
-                  <DropdownMenuItem
-                    className="gap-2"
-                    onClick={() => setUploadRevisionOpen(true)}
-                  >
-                    <FilePlus2 className="size-3.5 text-muted-foreground" />
-                    <span>Tải phiên bản mới</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="gap-2"
-                    onClick={() => setRenameSourceOpen(true)}
-                  >
-                    <Pencil className="size-3.5 text-muted-foreground" />
-                    <span>Đổi tên tài liệu</span>
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-              {canLifecycleAction(role, "source", "archive") && (
-                <DropdownMenuItem
-                  className="gap-2"
-                  onClick={() => setLifecycleOp("archive")}
-                >
-                  <Archive className="size-3.5 text-muted-foreground" />
-                  <span>Lưu trữ tài liệu</span>
-                </DropdownMenuItem>
-              )}
-              {canLifecycleAction(role, "source", "delete") && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="gap-2 text-destructive focus:text-destructive"
-                    onClick={() => setLifecycleOp("delete")}
-                  >
-                    <Trash2 className="size-3.5" />
-                    <span>Xóa vĩnh viễn tài liệu</span>
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Thanh trạng thái Phiên bản Văn bản & Bản nháp Hiệu đính */}
-      {statusInfo.status === "completed" && doc ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-3.5 py-2.5 text-xs shadow-2xs">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="font-semibold text-foreground flex items-center gap-1.5">
-              <History className="size-3.5 text-primary" />
-              <span>Phiên bản văn bản:</span>
-            </span>
-            <Select
-              value={
-                selectedVersion === null ? "latest" : String(selectedVersion)
-              }
-              onValueChange={(val) => {
-                if (hasUnsavedDraft) {
-                  if (
-                    !window.confirm(
-                      "Bạn đang có thay đổi nháp chưa lưu. Chuyển phiên bản xem sẽ xóa các thay đổi nháp này. Tiếp tục?",
-                    )
-                  ) {
-                    return;
-                  }
-                  draft.clear();
-                }
-                setSelectedVersion(val === "latest" ? null : Number(val));
-              }}
-            >
-              <SelectTrigger
-                aria-label="Phiên bản văn bản"
-                className="h-8 text-xs w-[170px]"
-              >
-                <SelectValue placeholder="Chọn phiên bản" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="latest" className="text-xs">
-                  Mới nhất (v{doc.version})
-                </SelectItem>
-                <SelectItem value="0" className="text-xs">
-                  v0 (OCR gốc ban đầu)
-                </SelectItem>
-                {doc.version > 0
-                  ? Array.from({ length: doc.version }, (_, i) => i + 1).map(
-                    (v) => (
-                      <SelectItem
-                        key={`v_${v}`}
-                        value={String(v)}
-                        className="text-xs"
-                      >
-                        Phiên bản v{v}{" "}
-                        {v === doc.version ? "(Hiện hành)" : ""}
-                      </SelectItem>
-                    ),
-                  )
-                  : null}
-              </SelectContent>
-            </Select>
-
-            {hasUnsavedDraft ? (
-              <div className="flex items-center gap-1.5">
-                <Badge variant="warning" className="text-[11px] py-0">
-                  Bản nháp: {draftCount} đoạn chưa lưu
-                </Badge>
-                {canManage ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-destructive"
-                    onClick={handleDiscardAllDrafts}
-                  >
-                    <Undo2 className="size-3" />
-                    <span>Hủy nháp</span>
-                  </Button>
-                ) : null}
-              </div>
-            ) : (
-              <Badge variant="secondary" className="text-[11px] py-0">
-                Đã lưu (v{doc.version}) · Không có nháp chưa lưu
-              </Badge>
-            )}
-          </div>
-
-          <p className="text-[11px] text-muted-foreground">
-            Quy trình: AI gợi ý sửa → Áp dụng vào{" "}
-            <strong className="text-foreground">Bản nháp</strong> →{" "}
-            <strong className="text-foreground">Lưu thay đổi</strong> tạo phiên
-            bản mới →{" "}
-            <strong className="text-foreground">Dùng để biên soạn</strong>.
-          </p>
-        </div>
-      ) : null}
+      {/* 1. Header Studio thống nhất: Breadcrumb, tiêu đề, trạng thái, phiên bản & hành động */}
+      <SourceStudioHeader
+        source={source}
+        collectionName={collection?.name}
+        workspaceId={workspaceId}
+        collectionId={collectionId}
+        activeRevisionNo={activeRevisionNo}
+        statusInfo={statusInfo}
+        doc={doc ?? null}
+        selectedVersion={selectedVersion}
+        hasUnsavedDraft={hasUnsavedDraft}
+        draftCount={draftCount}
+        baseMovedOn={baseMovedOn}
+        canManage={canManage}
+        canCompile={canCompile}
+        selectedRunId={selectedRunId}
+        downloadingType={downloadingType}
+        isDocxFile={isDocxFile}
+        isExtractionPending={requestRunMutation.isPending}
+        isSpellCheckRunning={
+          detectMutation.isPending || documentSpelling.running
+        }
+        isSaving={saveMutation.isPending}
+        onVersionChange={(v) => {
+          if (hasUnsavedDraft) {
+            draft.clear();
+          }
+          setSelectedVersion(v);
+        }}
+        onDiscardAllDrafts={handleDiscardAllDrafts}
+        onStartExtraction={() => void handleStartExtraction(false)}
+        onOpenSpellCheck={handleOpenSpellCheckConfig}
+        onOpenSaveModal={() => setSaveModalOpen(true)}
+        onOpenCompileDialog={() => {
+          if (hasUnsavedDraft) {
+            toast.warning(
+              `Bạn đang có ${draftCount} đoạn sửa nháp chưa lưu. Trình biên soạn chỉ sử dụng phiên bản đã lưu trên máy chủ (v${doc?.version ?? 0}). Vui lòng bấm "Lưu thay đổi" trước khi biên soạn.`,
+            );
+            return;
+          }
+          setCompilationDialogOpen(true);
+        }}
+        onDownload={(fmt) => void handleDownload(fmt)}
+        onOpenReRunDialog={() => setReRunConfirmOpen(true)}
+        onOpenUploadRevision={() => setUploadRevisionOpen(true)}
+        onOpenRenameDialog={() => setRenameSourceOpen(true)}
+        onLifecycleAction={(op) => setLifecycleOp(op)}
+        canArchive={canLifecycleAction(role, "source", "archive")}
+        canDelete={canLifecycleAction(role, "source", "delete")}
+      />
 
       {/* Cảnh báo khi phiên bản trên máy chủ đã tiến lên sau khi tạo nháp */}
       {baseMovedOn && doc ? (
@@ -1252,11 +916,11 @@ function SourceDetailSession({
 
       {/* Thanh tiến độ dùng chung khi đang bóc tách / chờ xử lý */}
       {activeProcessing &&
-        (activeProcessing.status === "queued" ||
-          activeProcessing.status === "running" ||
-          activeProcessing.dispatch_pending === true ||
-          (activeProcessing.status === "completed" &&
-            activeProcessing.results_ready === false)) ? (
+      (activeProcessing.status === "queued" ||
+        activeProcessing.status === "running" ||
+        activeProcessing.dispatch_pending === true ||
+        (activeProcessing.status === "completed" &&
+          activeProcessing.results_ready === false)) ? (
         <ProcessingProgress
           progress={{
             status: activeProcessing.status,
@@ -1368,9 +1032,9 @@ function SourceDetailSession({
         spellingSuggestionsCount={spellingSuggestionsCount}
         documentReviewOpen={Boolean(
           documentSpelling.report?.finished &&
-          doc &&
-          documentSpelling.report.sha256 === doc.canonical_sha256 &&
-          documentSpelling.report.version === doc.version,
+            doc &&
+            documentSpelling.report.sha256 === doc.canonical_sha256 &&
+            documentSpelling.report.version === doc.version,
         )}
         unprocessedRightPanel={
           <div className="p-6 text-center space-y-4 max-w-md mx-auto">
@@ -1407,9 +1071,9 @@ function SourceDetailSession({
         }
         spellingPanel={
           documentSpelling.report &&
-            doc &&
-            documentSpelling.report.sha256 === doc.canonical_sha256 &&
-            documentSpelling.report.version === doc.version ? (
+          doc &&
+          documentSpelling.report.sha256 === doc.canonical_sha256 &&
+          documentSpelling.report.version === doc.version ? (
             <DocumentSpellingReport
               report={documentSpelling.report}
               workspaceId={workspaceId}
@@ -1417,7 +1081,7 @@ function SourceDetailSession({
               sourceId={sourceId}
               revisionId={activeRevisionId}
               runId={selectedRunId ?? ""}
-              doc={doc}
+              doc={doc ?? null}
               draftChanges={draftChanges}
               canManage={canManage && !baseMovedOn}
               onApply={handleApplySuggestion}
@@ -1447,7 +1111,7 @@ function SourceDetailSession({
               runId={selectedRunId ?? ""}
               checkId={activeCheckId}
               localCheck={localCheck}
-              doc={doc}
+              doc={doc ?? null}
               draftChanges={draftChanges}
               canManage={canManage && !baseMovedOn}
               onApply={handleApplySuggestion}
@@ -1501,7 +1165,7 @@ function SourceDetailSession({
         <OcrSaveConfirmDialog
           open={saveModalOpen}
           onOpenChange={setSaveModalOpen}
-          doc={doc}
+          doc={doc ?? null}
           pendingChanges={pendingChanges}
           baseMovedOn={baseMovedOn}
           isSaving={saveMutation.isPending}
@@ -1515,7 +1179,7 @@ function SourceDetailSession({
           open={spellCheckConfigOpen}
           onOpenChange={setSpellCheckConfigOpen}
           workspaceId={workspaceId}
-          doc={doc}
+          doc={doc ?? null}
           activePage={activePage}
           selectedUnitIds={selectedUnitsForCheck}
           onChangeSelectedUnitIds={(next) => {

@@ -2,6 +2,11 @@
 
 Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thuật và phân tích phương án phát triển cho từng cấu phần của dự án **QNU AI Platform**.
 
+> **Đây là tài liệu lịch sử.** Mỗi kế hoạch mô tả bối cảnh và trạng thái tại thời điểm viết; nhiều
+> mục đã được triển khai, thay thế hoặc huỷ bỏ. Không dùng trạng thái trong thư mục này để kết
+> luận hiện trạng V1 — xem [bản đồ tài liệu](../README.md), [kiến trúc V1](../architecture.md) và
+> [PROJECT_CONTEXT](../memory/PROJECT_CONTEXT.md).
+
 ---
 
 ## 📌 Danh Mục Kế Hoạch

@@ -41,17 +41,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { AuthenticatedEmbeddedImage } from "@/features/knowledge/embedded-image";
+import { DocumentSheetCanvas } from "@/features/knowledge/document-sheet-canvas";
 import {
   usePageImageBlobUrl,
   usePageRawText,
@@ -687,195 +680,138 @@ export function OcrComparisonView({
     onPageChange,
   ]);
 
-  const activeSplitPreset =
-    leftPanePct >= 58 ? "wide-left" : leftPanePct <= 42 ? "wide-right" : "even";
-
   return (
     <div ref={containerRef} className="space-y-3">
-      {/* Thanh điều hướng trang phẳng dùng chung cho cả 2 cột (Không đóng hộp chồng hộp) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 py-1 text-xs">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-foreground text-sm">
-            {isWordDocument
-              ? "Tài liệu Word"
-              : `Trang ${activePageNumber} / ${totalPages > 0 ? totalPages : "?"}`}
-          </span>
-          {activePageInfo ? (
-            <Badge
-              variant={
-                activePageInfo.status === "completed"
-                  ? "success"
-                  : activePageInfo.status === "blank"
-                    ? "secondary"
-                    : activePageInfo.status === "failed"
-                      ? "destructive"
-                      : "outline"
-              }
-              className="text-[11px] py-0 font-normal"
-            >
-              {activePageInfo.status === "blank"
-                ? "Trang trắng (không có chữ)"
-                : activePageInfo.status === "completed"
-                  ? "Đã bóc tách"
-                  : activePageInfo.status === "in_flight" ||
-                      activePageInfo.status === "pending"
-                    ? "Đang xử lý…"
-                    : activePageInfo.status}
-            </Badge>
-          ) : null}
+      {/* Thanh điều hướng trang tinh gọn khi là tài liệu PDF nhiều trang */}
+      {!isWordDocument && totalPages > 1 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 py-1 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-foreground text-xs sm:text-sm">
+              Trang {activePageNumber} / {totalPages > 0 ? totalPages : "?"}
+            </span>
+            {activePageInfo ? (
+              <Badge
+                variant={
+                  activePageInfo.status === "completed"
+                    ? "success"
+                    : activePageInfo.status === "blank"
+                      ? "secondary"
+                      : activePageInfo.status === "failed"
+                        ? "destructive"
+                        : "outline"
+                }
+                className="text-[11px] py-0 font-normal"
+              >
+                {activePageInfo.status === "blank"
+                  ? "Trang trắng (không có chữ)"
+                  : activePageInfo.status === "completed"
+                    ? "Đã bóc tách"
+                    : activePageInfo.status === "in_flight" ||
+                        activePageInfo.status === "pending"
+                      ? "Đang xử lý…"
+                      : activePageInfo.status}
+              </Badge>
+            ) : null}
 
-          {activePageInfo?.has_tables ? (
-            <Badge
-              variant="outline"
-              className="text-[11px] py-0 gap-1 font-normal"
-            >
-              <FileSpreadsheet className="size-3 text-primary" />
-              <span>Có bảng biểu</span>
-            </Badge>
-          ) : null}
+            {activePageInfo?.has_tables ? (
+              <Badge
+                variant="outline"
+                className="text-[11px] py-0 gap-1 font-normal"
+              >
+                <FileSpreadsheet className="size-3 text-primary" />
+                <span>Có bảng biểu</span>
+              </Badge>
+            ) : null}
 
-          {focusedUnitOnPage ? (
-            <Badge
-              variant="outline"
-              className="text-[11px] py-0 gap-1 border-primary/40 bg-primary/5 text-primary"
-            >
-              <ScanSearch className="size-3" />
-              <span>
-                Đang đối chiếu:{" "}
-                {formatUnitLocator(focusedUnitOnPage, reviewDoc?.units, {
-                  includePage: false,
-                })}
-              </span>
-              {!focusedBbox ? (
-                <span className="text-muted-foreground">
-                  (không có tọa độ vùng ảnh)
+            {focusedUnitOnPage ? (
+              <Badge
+                variant="outline"
+                className="text-[11px] py-0 gap-1 border-primary/40 bg-primary/5 text-primary"
+              >
+                <ScanSearch className="size-3" />
+                <span>
+                  Đang đối chiếu:{" "}
+                  {formatUnitLocator(focusedUnitOnPage, reviewDoc?.units, {
+                    includePage: false,
+                  })}
                 </span>
-              ) : null}
-            </Badge>
-          ) : null}
-        </div>
+                {!focusedBbox ? (
+                  <span className="text-muted-foreground">
+                    (không có tọa độ vùng ảnh)
+                  </span>
+                ) : null}
+              </Badge>
+            ) : null}
+          </div>
 
-        {/* Nút chuyển trang tinh gọn & tỷ lệ chia cột trên Desktop */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <fieldset
-            className="hidden lg:flex items-center gap-0.5 rounded-lg border bg-muted/20 p-0.5 mr-1"
-            aria-label="Tỷ lệ chia hai cột ảnh và văn bản"
-          >
+          {/* Nút chuyển trang tinh gọn cho PDF */}
+          <div className="flex items-center gap-1.5 flex-wrap">
             <Button
               type="button"
               size="sm"
-              variant={activeSplitPreset === "even" ? "secondary" : "ghost"}
-              aria-pressed={activeSplitPreset === "even"}
-              className="h-6 px-2 text-[11px]"
-              onClick={() => handleSetSplitRatio(50)}
-              title="Chia đều 50% tài liệu : 50% văn bản"
+              variant="outline"
+              className="h-8 px-2.5 text-xs gap-1"
+              disabled={activePageNumber <= 1}
+              onClick={() => onPageChange(activePageNumber - 1)}
+              title="Trang trước (Phím tắt: [)"
             >
-              50:50
+              <ChevronLeft className="size-3.5" />
+              <span className="hidden sm:inline">Trang trước</span>
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={
-                activeSplitPreset === "wide-left" ? "secondary" : "ghost"
-              }
-              aria-pressed={activeSplitPreset === "wide-left"}
-              className="h-6 px-2 text-[11px]"
-              onClick={() => handleSetSplitRatio(62)}
-              title="Mở rộng vùng tài liệu (62% tài liệu : 38% văn bản)"
-            >
-              Rộng ảnh
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={
-                activeSplitPreset === "wide-right" ? "secondary" : "ghost"
-              }
-              aria-pressed={activeSplitPreset === "wide-right"}
-              className="h-6 px-2 text-[11px]"
-              onClick={() => handleSetSplitRatio(38)}
-              title="Mở rộng vùng văn bản và gợi ý (38% tài liệu : 62% văn bản)"
-            >
-              Rộng chữ
-            </Button>
-          </fieldset>
 
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className={cn(
-              "h-8 px-2.5 text-xs gap-1",
-              isWordDocument && "hidden",
-            )}
-            disabled={activePageNumber <= 1}
-            onClick={() => onPageChange(activePageNumber - 1)}
-            title="Trang trước (Phím tắt: [)"
-          >
-            <ChevronLeft className="size-3.5" />
-            <span className="hidden sm:inline">Trang trước</span>
-          </Button>
-
-          <div
-            className={cn(
-              "flex items-center gap-1.5 font-mono text-xs px-1",
-              isWordDocument && "hidden",
-            )}
-          >
-            <label
-              htmlFor="ocr-page-number-input"
-              className="text-muted-foreground font-sans"
-            >
-              Trang
-            </label>
-            <Input
-              id="ocr-page-number-input"
-              type="number"
-              min={1}
-              max={totalPages || 1}
-              value={inputPage}
-              onChange={(e) => setInputPage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
+            <div className="flex items-center gap-1.5 font-mono text-xs px-1">
+              <label
+                htmlFor="ocr-page-number-input"
+                className="text-muted-foreground font-sans"
+              >
+                Trang
+              </label>
+              <Input
+                id="ocr-page-number-input"
+                type="number"
+                min={1}
+                max={totalPages || 1}
+                value={inputPage}
+                onChange={(e) => setInputPage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const p = parseInt(inputPage, 10);
+                    if (!Number.isNaN(p) && p >= 1 && p <= totalPages) {
+                      onPageChange(p);
+                    }
+                  }
+                }}
+                onBlur={() => {
                   const p = parseInt(inputPage, 10);
                   if (!Number.isNaN(p) && p >= 1 && p <= totalPages) {
                     onPageChange(p);
+                  } else {
+                    setInputPage(String(activePageNumber));
                   }
-                }
-              }}
-              onBlur={() => {
-                const p = parseInt(inputPage, 10);
-                if (!Number.isNaN(p) && p >= 1 && p <= totalPages) {
-                  onPageChange(p);
-                } else {
-                  setInputPage(String(activePageNumber));
-                }
-              }}
-              className="w-14 h-8 px-1.5 text-center font-mono text-xs"
-              aria-label="Số trang hiện tại"
-            />
-            <span className="text-muted-foreground font-sans">
-              / {totalPages > 0 ? totalPages : 1}
-            </span>
-          </div>
+                }}
+                className="w-14 h-8 px-1.5 text-center font-mono text-xs"
+                aria-label="Số trang hiện tại"
+              />
+              <span className="text-muted-foreground font-sans">
+                / {totalPages > 0 ? totalPages : 1}
+              </span>
+            </div>
 
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className={cn(
-              "h-8 px-2.5 text-xs gap-1",
-              isWordDocument && "hidden",
-            )}
-            disabled={totalPages > 0 && activePageNumber >= totalPages}
-            onClick={() => onPageChange(activePageNumber + 1)}
-            title="Trang sau (Phím tắt: ])"
-          >
-            <span className="hidden sm:inline">Trang sau</span>
-            <ChevronRight className="size-3.5" />
-          </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 px-2.5 text-xs gap-1"
+              disabled={totalPages > 0 && activePageNumber >= totalPages}
+              onClick={() => onPageChange(activePageNumber + 1)}
+              title="Trang sau (Phím tắt: ])"
+            >
+              <span className="hidden sm:inline">Trang sau</span>
+              <ChevronRight className="size-3.5" />
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Thanh chuyển vùng rõ ràng cho Mobile / Tablet (< lg) — Giữ nguyên trang, nháp và gợi ý */}
       <div
@@ -1651,346 +1587,26 @@ export function OcrComparisonView({
                       </div>
                     ) : null}
 
-                    {sequentialBlocks.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-muted-foreground space-y-1 bg-muted/15 rounded-xl">
-                        {activePageInfo?.status === "blank" ? (
-                          <p className="text-sm font-medium text-foreground">
-                            Trang này không có chữ (Trang trắng).
-                          </p>
-                        ) : activePageInfo?.status === "in_flight" ||
-                          activePageInfo?.status === "pending" ? (
-                          <div className="flex flex-col items-center gap-2 py-4">
-                            <Loader2 className="size-5 animate-spin text-primary" />
-                            <p>Trang đang trong quá trình bóc tách…</p>
-                          </div>
-                        ) : (
-                          <p>Chưa có nội dung văn bản nào cho trang này.</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="mx-auto max-w-2xl px-1 sm:px-2 py-1 space-y-1.5 font-sans">
-                        {sequentialBlocks.map((block) => {
-                          if (block.type === "prose") {
-                            const isFocused =
-                              focusedEvidenceId === block.unit.evidence_id;
-                            const isSelected = Boolean(
-                              selectedUnitIds?.has(block.unit.evidence_id),
-                            );
-                            const locator = formatUnitLocator(
-                              block.unit,
-                              reviewDoc?.units,
-                              { includePage: false },
-                            );
-                            const hasBbox = Boolean(
-                              extractNormalizedBbox(block.unit.bbox),
-                            );
-
-                            return (
-                              <div
-                                key={block.unit.evidence_id}
-                                data-evidence-id={block.unit.evidence_id}
-                                className={cn(
-                                  "group relative py-1.5 px-2.5 -mx-1 rounded-lg transition-colors border border-transparent",
-                                  isFocused
-                                    ? "ring-2 ring-primary bg-primary/5 border-primary/30"
-                                    : block.hasUnsavedDraft
-                                      ? "bg-warning/10 border-l-2 border-l-warning pl-3"
-                                      : block.wasSavedPreviously
-                                        ? "bg-muted/40 border-l-2 border-l-primary/50 pl-3"
-                                        : "hover:bg-muted/40",
-                                )}
-                              >
-                                {/* Thanh мета nhỏ của đoạn: vị trí, trạng thái nháp và nút thao tác */}
-                                <div className="flex flex-wrap items-center justify-between gap-2 mb-1 text-xs">
-                                  <div className="flex items-center gap-2">
-                                    {canManage &&
-                                    onToggleUnitSelection &&
-                                    block.currentText.trim().length > 0 ? (
-                                      <Checkbox
-                                        checked={isSelected}
-                                        onCheckedChange={() =>
-                                          onToggleUnitSelection(
-                                            block.unit.evidence_id,
-                                          )
-                                        }
-                                        aria-label={`Chọn ${locator} để kiểm tra chính tả`}
-                                      />
-                                    ) : null}
-                                    <button
-                                      type="button"
-                                      className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 cursor-pointer"
-                                      onClick={() =>
-                                        handleFocusUnitFromRightPane(
-                                          isFocused
-                                            ? null
-                                            : block.unit.evidence_id,
-                                        )
-                                      }
-                                      title={
-                                        canCompareOcr && hasBbox
-                                          ? "Nhấp để đánh dấu vị trí đoạn này trên ảnh gốc"
-                                          : "Chọn đoạn văn bản này"
-                                      }
-                                    >
-                                      <span>{locator}</span>
-                                      {canCompareOcr && hasBbox ? (
-                                        <ScanSearch className="size-3 text-primary/70" />
-                                      ) : null}
-                                    </button>
-
-                                    {block.hasUnsavedDraft ? (
-                                      <Badge
-                                        variant="warning"
-                                        className="text-[10px] py-0 px-1.5"
-                                      >
-                                        Nháp chưa lưu
-                                      </Badge>
-                                    ) : block.wasSavedPreviously ? (
-                                      <Badge
-                                        variant="secondary"
-                                        className="text-[10px] py-0 px-1.5"
-                                      >
-                                        Đã lưu hiệu đính
-                                      </Badge>
-                                    ) : null}
-                                  </div>
-
-                                  {canManage ? (
-                                    <div className="flex items-center gap-1">
-                                      {block.hasUnsavedDraft &&
-                                      onRevertUnitDraft ? (
-                                        <Button
-                                          type="button"
-                                          size="sm"
-                                          variant="ghost"
-                                          className="h-6 px-1.5 text-[11px] gap-1 text-muted-foreground hover:text-destructive"
-                                          onClick={() =>
-                                            onRevertUnitDraft(
-                                              block.unit.evidence_id,
-                                            )
-                                          }
-                                          title="Khôi phục đoạn này về bản đã lưu"
-                                        >
-                                          <RotateCcw className="size-3" />
-                                          <span>Hoàn tác nháp</span>
-                                        </Button>
-                                      ) : null}
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary hover:bg-primary/10"
-                                        onClick={() =>
-                                          handleStartEdit(
-                                            block.unit,
-                                            block.currentText,
-                                          )
-                                        }
-                                        aria-label={`Sửa ${locator}`}
-                                      >
-                                        <Edit3 className="size-3" />
-                                        <span>Sửa</span>
-                                      </Button>
-                                    </div>
-                                  ) : null}
-                                </div>
-
-                                {/* Nội dung văn bản giữ đúng cỡ chữ dễ đọc (14px) */}
-                                {block.unit.kind === "heading" ? (
-                                  <h3 className="text-sm sm:text-base font-bold text-foreground leading-snug whitespace-pre-wrap">
-                                    {block.currentText}
-                                  </h3>
-                                ) : (
-                                  <p className="text-sm text-foreground leading-relaxed font-sans whitespace-pre-wrap">
-                                    {block.currentText}
-                                  </p>
-                                )}
-
-                                {block.hasUnsavedDraft ? (
-                                  <div className="mt-2 pt-2 border-t border-warning/30 space-y-1">
-                                    <span className="text-[11px] font-medium text-muted-foreground block">
-                                      So sánh từ đã thay đổi so với bản đã lưu:
-                                    </span>
-                                    <OcrWordDiffView
-                                      before={block.unit.text}
-                                      after={block.currentText}
-                                      className="text-xs bg-background/80 rounded-md p-2 border border-border/50"
-                                    />
-                                  </div>
-                                ) : null}
-                              </div>
-                            );
-                          }
-
-                          if (block.type === "table") {
-                            return (
-                              <div
-                                key={block.blockId}
-                                className="my-2.5 rounded-lg border border-border/70 bg-card overflow-hidden shadow-2xs"
-                              >
-                                <div className="px-3 py-1.5 bg-muted/30 border-b border-border/60 flex items-center justify-between text-xs">
-                                  <div className="flex items-center gap-1.5 font-medium text-foreground">
-                                    <FileSpreadsheet className="size-3.5 text-primary" />
-                                    <span>
-                                      Bảng dữ liệu ({block.rows.length} hàng)
-                                    </span>
-                                  </div>
-                                  {canManage ? (
-                                    <span className="text-[11px] text-muted-foreground">
-                                      Nhấp vào ô bất kỳ để chỉnh sửa
-                                    </span>
-                                  ) : null}
-                                </div>
-
-                                <div className="overflow-x-auto">
-                                  <Table className="text-xs">
-                                    <TableHeader>
-                                      <TableRow>
-                                        {block.rows[0]?.cells.map(
-                                          ({
-                                            unit,
-                                            currentText,
-                                            hasUnsavedDraft,
-                                          }) => {
-                                            const isFocused =
-                                              focusedEvidenceId ===
-                                              unit.evidence_id;
-                                            return (
-                                              <TableHead
-                                                key={unit.evidence_id}
-                                                data-evidence-id={
-                                                  unit.evidence_id
-                                                }
-                                                className={cn(
-                                                  "font-semibold text-foreground text-xs bg-muted/20 py-2 px-3 transition-colors",
-                                                  canManage &&
-                                                    "cursor-pointer hover:bg-muted/40",
-                                                  hasUnsavedDraft &&
-                                                    "bg-warning/15",
-                                                  isFocused &&
-                                                    "ring-2 ring-inset ring-primary bg-primary/10",
-                                                )}
-                                                onClick={() => {
-                                                  handleFocusUnitFromRightPane(
-                                                    unit.evidence_id,
-                                                  );
-                                                  if (canManage) {
-                                                    handleStartEdit(
-                                                      unit,
-                                                      currentText,
-                                                    );
-                                                  }
-                                                }}
-                                                title={
-                                                  canManage
-                                                    ? "Nhấp để đối chiếu và chỉnh sửa ô tiêu đề bảng"
-                                                    : "Nhấp để đối chiếu vị trí ô bảng"
-                                                }
-                                              >
-                                                {currentText || "—"}
-                                              </TableHead>
-                                            );
-                                          },
-                                        )}
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {block.rows.slice(1).map((row) => (
-                                        <TableRow key={row.rowIdx}>
-                                          {row.cells.map(
-                                            ({
-                                              unit,
-                                              currentText,
-                                              hasUnsavedDraft,
-                                              wasSavedPreviously,
-                                            }) => {
-                                              const isFocused =
-                                                focusedEvidenceId ===
-                                                unit.evidence_id;
-                                              return (
-                                                <TableCell
-                                                  key={unit.evidence_id}
-                                                  data-evidence-id={
-                                                    unit.evidence_id
-                                                  }
-                                                  className={cn(
-                                                    "text-xs py-2 px-3 leading-normal transition-colors",
-                                                    canManage &&
-                                                      "cursor-pointer hover:bg-muted/40",
-                                                    hasUnsavedDraft
-                                                      ? "bg-warning/15 font-medium"
-                                                      : wasSavedPreviously
-                                                        ? "bg-muted/30"
-                                                        : "",
-                                                    isFocused &&
-                                                      "ring-2 ring-inset ring-primary bg-primary/10",
-                                                  )}
-                                                  onClick={() => {
-                                                    handleFocusUnitFromRightPane(
-                                                      unit.evidence_id,
-                                                    );
-                                                    if (canManage) {
-                                                      handleStartEdit(
-                                                        unit,
-                                                        currentText,
-                                                      );
-                                                    }
-                                                  }}
-                                                  title={
-                                                    canManage
-                                                      ? `Hàng ${(unit.row ?? 0) + 1}, Cột ${(unit.column ?? 0) + 1} — Nhấp để chỉnh sửa`
-                                                      : `Hàng ${(unit.row ?? 0) + 1}, Cột ${(unit.column ?? 0) + 1}`
-                                                  }
-                                                >
-                                                  {currentText === "" ? (
-                                                    <span className="text-muted-foreground/60 italic">
-                                                      (trống)
-                                                    </span>
-                                                  ) : (
-                                                    currentText
-                                                  )}
-                                                </TableCell>
-                                              );
-                                            },
-                                          )}
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          if (block.type === "image") {
-                            return (
-                              <div
-                                key={block.blockId}
-                                className="my-3 p-3 rounded-lg border border-border/70 bg-muted/10 flex flex-col items-center gap-2"
-                              >
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground self-start">
-                                  <ImageIcon className="size-3.5 text-primary" />
-                                  <span>Ảnh trích xuất #{block.assetNo}</span>
-                                </div>
-
-                                <div className="flex justify-center p-2 bg-background rounded border">
-                                  <AuthenticatedEmbeddedImage
-                                    workspaceId={workspaceId}
-                                    collectionId={collectionId}
-                                    sourceId={sourceId}
-                                    revisionId={revisionId}
-                                    runId={run?.id ?? ""}
-                                    assetNo={block.assetNo}
-                                  />
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          return null;
-                        })}
-                      </div>
-                    )}
+                    <DocumentSheetCanvas
+                      sequentialBlocks={sequentialBlocks}
+                      activePageNumber={activePageNumber}
+                      isWordDocument={isWordDocument}
+                      activePageInfo={activePageInfo}
+                      reviewDoc={reviewDoc}
+                      canManage={canManage}
+                      canCompareOcr={canCompareOcr}
+                      focusedEvidenceId={focusedEvidenceId}
+                      selectedUnitIds={selectedUnitIds}
+                      onToggleUnitSelection={onToggleUnitSelection}
+                      onFocusUnit={handleFocusUnitFromRightPane}
+                      onStartEdit={handleStartEdit}
+                      onRevertUnitDraft={onRevertUnitDraft}
+                      workspaceId={workspaceId}
+                      collectionId={collectionId}
+                      sourceId={sourceId}
+                      revisionId={revisionId}
+                      runId={run?.id}
+                    />
                   </div>
                 </TabsContent>
 

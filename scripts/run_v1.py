@@ -160,6 +160,18 @@ def command_plan(
     return plans[command]
 
 
+def resolve_executable(command_name: str) -> str | None:
+    """Find executable, prioritizing PATHEXT on Windows to avoid matching POSIX scripts."""
+    if os.name == "nt":
+        pathext = [ext for ext in (os.environ.get("PATHEXT") or ".COM;.EXE;.BAT;.CMD").split(";") if ext]
+        for ext in pathext:
+            target = command_name if command_name.lower().endswith(ext.lower()) else f"{command_name}{ext}"
+            found = shutil.which(target)
+            if found:
+                return found
+    return shutil.which(command_name)
+
+
 def stop_services(processes: list[subprocess.Popen]) -> None:
     for process in processes:
         if process.poll() is None:
@@ -298,7 +310,7 @@ def main(argv: list[str] | None = None) -> int:
             )
     # Resolve ALL tools before starting any service.
     for _, command in plan:
-        executable = shutil.which(command[0])
+        executable = resolve_executable(command[0])
         if not executable:
             parser.error(f"Required command not found: {command[0]}")
         command[0] = executable

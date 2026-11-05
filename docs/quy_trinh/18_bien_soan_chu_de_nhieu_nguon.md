@@ -1,5 +1,7 @@
 # Biên soạn chủ đề nhiều nguồn và quản lý dẫn xuất
 
+> **TÀI LIỆU LỊCH SỬ — không phải hiện trạng V1.** Nội dung dưới đây mô tả hệ thống `backend/` + `frontend/` trước V1 (hai thư mục đã gỡ khỏi checkout) và chỉ dùng để truy vết. Bản đang chạy là [`backendV1/`](../../backendV1) + [`frontendV1/`](../../frontendV1); xem [bản đồ tài liệu](../README.md).
+
 Đợt3–4 bổ sung API quản trị cho compiler theo chủ đề. Ingestion phổ thông và
 chatbot hiện tại giữ luồng cũ; bản compiler không tự thành fact có hiệu lực.
 Không bắt người upload tài liệu xử lý mọi proposal trước nạp vector nguồn đã đạt
