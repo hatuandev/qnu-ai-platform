@@ -1,5 +1,19 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context888 — Đánh giá RAG trong Cấu hình](nhat_ky/2026-11-06_phien_888_danh_gia_rag_trong_cau_hinh.md).
+
+- [Context887 — Gọn menu quản lý kho](nhat_ky/2026-11-06_phien_887_menu_quan_ly_kho.md).
+
+- [Context886 — Gọn thao tác bóc tách](nhat_ky/2026-11-06_phien_886_gon_thao_tac_boc_tach.md).
+
+- [Context885 — Kiểm chứng xóa vĩnh viễn](nhat_ky/2026-11-05_phien_885_kiem_chung_xoa_vinh_vien.md).
+
+- [Context884 — Hộp thoại xóa không nháy, lời xác nhận ngắn](nhat_ky/2026-11-05_phien_884_nhay_hop_thoai_xoa.md).
+
+- [Context883 — Trạng thái xóa vĩnh viễn](nhat_ky/2026-11-05_phien_883_trang_thai_xoa_vinh_vien.md).
+
+- [Context882 — Kéo/thả và thao tác văn bản](nhat_ky/2026-11-05_phien_882_keo_tha_va_thao_tac_van_ban.md).
+
 - [Context881 — Chuẩn hóa tài liệu về V1, dán nhãn lịch sử](nhat_ky/2026-11-05_phien_881_cap_nhat_tai_lieu_sang_v1.md).
 
 - [Context880 — Metadata động và tương thích](nhat_ky/2026-11-05_phien_880_metadata_dong_va_tuong_thich.md).

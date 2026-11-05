@@ -6,26 +6,20 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
-  FileSpreadsheet,
   FileText,
   FileUp,
   Folder,
   FolderOpen,
   FolderPlus,
-  Gauge,
-  HardDrive,
-  Layers,
-  MessageSquare,
   MoreVertical,
   Pencil,
-  Play,
   RotateCcw,
   Settings2,
-  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useV1Auth } from "@/app/auth/v1";
 import { DataTablePagination } from "@/components/admin/data-table/data-table-pagination";
 import { DebouncedSearchInput } from "@/components/admin/debounced-search-input";
 import { EmptyState } from "@/components/admin/empty-state";
@@ -57,11 +51,16 @@ import { CollectionFormDialog } from "@/features/knowledge/collection-form-dialo
 import { CompilationDialog } from "@/features/knowledge/compilation-dialog";
 import { CompilationRunsList } from "@/features/knowledge/compilation-runs-list";
 import { CompiledDocumentsList } from "@/features/knowledge/compiled-documents-list";
-import { ExtractDocumentDialog } from "@/features/knowledge/extract-document-dialog";
+import {
+  DocumentTypeIcon,
+  FolderItemIcon,
+  getDocumentFormatInfo,
+} from "@/features/knowledge/document-file-icon";
 import { FolderDeleteDialog } from "@/features/knowledge/folder-delete-dialog";
 import { FolderFormDialog } from "@/features/knowledge/folder-form-dialog";
 import { FolderMoveDialog } from "@/features/knowledge/folder-move-dialog";
 import { IndexPanel } from "@/features/knowledge/index-panel";
+import { KnowledgeBreadcrumbs } from "@/features/knowledge/knowledge-breadcrumbs";
 import {
   canCreateOrEditCompilation,
   canManageKnowledge,
@@ -71,15 +70,15 @@ import { ProcessingProgress } from "@/features/knowledge/processing-progress";
 import {
   useCollectionQuery,
   useFoldersQuery,
+  useMoveSource,
   useSourcesQuery,
 } from "@/features/knowledge/queries";
 import {
   formatBytes,
   formatProcessingStatus,
-  isDocx,
-  isPdf,
 } from "@/features/knowledge/schemas";
 import { SourceActions } from "@/features/knowledge/source-actions";
+import { SourceReextractDialog } from "@/features/knowledge/source-reextract-dialog";
 import { SourceRenameDialog } from "@/features/knowledge/source-rename-dialog";
 import { SourceUploadDialog } from "@/features/knowledge/source-upload-dialog";
 import type {
@@ -129,6 +128,7 @@ export function KnowledgeDetailPage({
   onSelectSourceId?: (sourceId: string | null) => void;
 }) {
   const navigate = useNavigate();
+  const { sessionId } = useV1Auth();
 
   // Queries
   const collectionQuery = useCollectionQuery(workspaceId, knowledgeId);
@@ -149,7 +149,7 @@ export function KnowledgeDetailPage({
 
   // Dialog States
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [extractDialogOpen, setExtractDialogOpen] = useState(false);
+  const [sourceToExtract, setSourceToExtract] = useState<KBSource | null>(null);
   const [compilationDialogOpen, setCompilationDialogOpen] = useState(false);
   const [editCollectionOpen, setEditCollectionOpen] = useState(false);
   const [collectionLifecycleOp, setCollectionLifecycleOp] =
@@ -176,6 +176,131 @@ export function KnowledgeDetailPage({
     title: string;
     currentFolderId?: string | null;
   } | null>(null);
+
+  // Drag & Drop State
+  const [draggingSourceId, setDraggingSourceId] = useState<string | null>(null);
+  const [dragOverTargetId, setDragOverTargetId] = useState<string | null>(null);
+  const activeDrag = useRef<{
+    sourceId: string;
+    workspaceId: string;
+    collectionId: string;
+    sessionId: typeof sessionId;
+  } | null>(null);
+  const moveSourceMutation = useMoveSource(workspaceId, knowledgeId);
+
+  const handleDragStart = (
+    e: React.DragEvent<HTMLElement>,
+    source: KBSource,
+  ) => {
+    if (!canManage || moveSourceMutation.isPending) {
+      e.preventDefault();
+      return;
+    }
+    activeDrag.current = {
+      sourceId: source.id,
+      workspaceId,
+      collectionId: knowledgeId,
+      sessionId,
+    };
+    setDraggingSourceId(source.id);
+    e.dataTransfer.setData("application/qnu-source-id", source.id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragEnd = () => {
+    activeDrag.current = null;
+    setDraggingSourceId(null);
+    setDragOverTargetId(null);
+  };
+
+  const getDraggedSource = () => {
+    const drag = activeDrag.current;
+    if (
+      !canManage ||
+      moveSourceMutation.isPending ||
+      !drag ||
+      drag.workspaceId !== workspaceId ||
+      drag.collectionId !== knowledgeId ||
+      drag.sessionId !== sessionId
+    )
+      return undefined;
+    return sources.find(
+      (source) =>
+        source.id === drag.sourceId && source.collection_id === knowledgeId,
+    );
+  };
+
+  const handleFolderDragOver = (
+    e: React.DragEvent<HTMLElement>,
+    folderId: string,
+  ) => {
+    if (
+      !getDraggedSource() ||
+      !e.dataTransfer.types.includes("application/qnu-source-id")
+    )
+      return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverTargetId !== folderId) {
+      setDragOverTargetId(folderId);
+    }
+  };
+
+  const handleFolderDragLeave = (
+    e: React.DragEvent<HTMLElement>,
+    folderId: string,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragOverTargetId === folderId) {
+      setDragOverTargetId(null);
+    }
+  };
+
+  const handleDropOnFolder = (
+    e: React.DragEvent<HTMLElement>,
+    targetFolderId: string | null,
+    targetFolderName: string,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const source = getDraggedSource();
+    const sourceId = e.dataTransfer.getData("application/qnu-source-id");
+    // Consume the local drag before starting I/O; repeated drops cannot resubmit it.
+    handleDragEnd();
+    if (
+      !source ||
+      sourceId !== source.id ||
+      source.folder_id === targetFolderId ||
+      (targetFolderId !== null &&
+        !folders.some((folder) => folder.id === targetFolderId))
+    ) {
+      return;
+    }
+
+    const sourceTitle = source.title;
+
+    moveSourceMutation.mutate(
+      { sourceId, targetFolderId },
+      {
+        onSuccess: () => {
+          toast.success(
+            targetFolderId
+              ? `Đã di chuyển "${sourceTitle}" vào thư mục "${targetFolderName}"`
+              : `Đã di chuyển "${sourceTitle}" ra Gốc kho tri thức`,
+          );
+        },
+        onError: (err) => {
+          toast.error(
+            `Không thể di chuyển tài liệu: ${
+              err instanceof Error ? err.message : "Đã xảy ra lỗi"
+            }`,
+          );
+        },
+      },
+    );
+  };
 
   const [renameSourceOpen, setRenameSourceOpen] = useState(false);
   const [sourceToRename, setSourceToRename] = useState<KBSource | null>(null);
@@ -299,9 +424,16 @@ export function KnowledgeDetailPage({
           <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground truncate max-w-[280px]">
             {collection.name}
           </h1>
-          <Badge variant="secondary" className="font-normal text-[11px] h-5">
-            {collection.source_count} tài liệu · {folders.length} thư mục
-          </Badge>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/60 text-[11px] font-medium border border-border/40">
+              <FileText className="size-3 text-primary" />
+              <span>{collection.source_count} tài liệu</span>
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/60 text-[11px] font-medium border border-border/40">
+              <Folder className="size-3 text-amber-500 fill-amber-500/20" />
+              <span>{folders.length} thư mục</span>
+            </span>
+          </div>
 
           {/* Tab Giai đoạn (Tài liệu / Biên soạn / Phát hành) */}
           <div
@@ -369,23 +501,13 @@ export function KnowledgeDetailPage({
             <span>Tải tài liệu</span>
           </Button>
 
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 shadow-xs text-xs h-8"
-            disabled={!canManage || collection.source_count === 0}
-            onClick={() => setExtractDialogOpen(true)}
-          >
-            <Play className="size-3 text-primary" />
-            <span>Bóc tách</span>
-          </Button>
-
           {canManage && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label="Quản lý kho"
                   className="gap-1 shadow-xs text-xs h-8 text-muted-foreground hover:text-foreground"
                 >
                   <Settings2 className="size-3.5" />
@@ -414,43 +536,6 @@ export function KnowledgeDetailPage({
                 >
                   <FolderPlus className="size-3.5 text-muted-foreground" />
                   <span>Tạo thư mục mới</span>
-                </DropdownMenuItem>
-
-                <DropdownMenuSeparator />
-
-                <DropdownMenuItem asChild>
-                  <Link
-                    to="/workspaces/$workspaceId/collections/$collectionId/answers"
-                    params={{ workspaceId, collectionId: knowledgeId }}
-                    className="flex items-center gap-2"
-                  >
-                    <MessageSquare className="size-3.5 text-muted-foreground" />
-                    <span>Hỏi đáp trên kho</span>
-                  </Link>
-                </DropdownMenuItem>
-
-                <DropdownMenuItem asChild>
-                  <Link
-                    to="/workspaces/$workspaceId/collections/$collectionId/search"
-                    params={{ workspaceId, collectionId: knowledgeId }}
-                    search={{ page: 1, pageSize: 20 }}
-                    className="flex items-center gap-2"
-                  >
-                    <SlidersHorizontal className="size-3.5 text-muted-foreground" />
-                    <span>Quản trị chỉ mục</span>
-                  </Link>
-                </DropdownMenuItem>
-
-                <DropdownMenuItem asChild>
-                  <Link
-                    to="/workspaces/$workspaceId/collections/$collectionId/evaluations"
-                    params={{ workspaceId, collectionId: knowledgeId }}
-                    search={{ page: 1 }}
-                    className="flex items-center gap-2"
-                  >
-                    <Gauge className="size-3.5 text-muted-foreground" />
-                    <span>Đánh giá RAG</span>
-                  </Link>
                 </DropdownMenuItem>
 
                 {canLifecycleAction(role, "collection", "archive") && (
@@ -509,104 +594,32 @@ export function KnowledgeDetailPage({
         <div className="space-y-4">
           {/* Thanh Breadcrumb vị trí & Công cụ Lọc/Xem */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-border/60">
-            {/* Đường dẫn Breadcrumb hiện tại */}
-            <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap min-w-0">
-              {currentFolderId ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1 -ml-1 mr-1"
-                  onClick={() => {
-                    setCurrentFolderId(parentFolder ? parentFolder.id : null);
-                    setAllFoldersActive(false);
-                    onPageChange(1);
-                  }}
-                  title="Quay lại thư mục cấp trên"
-                >
-                  <ArrowLeft className="size-3.5" />
-                  <span>Lên một cấp</span>
-                </Button>
-              ) : null}
-
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentFolderId(null);
-                  setAllFoldersActive(false);
-                  onPageChange(1);
-                }}
-                className={cn(
-                  "hover:text-foreground font-medium flex items-center gap-1.5 transition-colors px-2 py-1 rounded-md",
-                  !currentFolderId && !allFoldersActive
-                    ? "bg-muted font-semibold text-foreground shadow-2xs"
-                    : "text-muted-foreground",
-                )}
-              >
-                <HardDrive className="size-3.5 text-primary" />
-                <span>Gốc kho</span>
-                <span className="text-[10px] text-muted-foreground/80 font-normal">
-                  ({rootSourceCount})
-                </span>
-              </button>
-
-              {allFoldersActive ? (
-                <>
-                  <ChevronRight className="size-3 text-muted-foreground/40" />
-                  <span className="font-semibold text-foreground flex items-center gap-1 px-2 py-1 rounded-md bg-muted shadow-2xs">
-                    <Layers className="size-3 text-muted-foreground" />
-                    <span>Tất cả tài liệu</span>
-                  </span>
-                </>
-              ) : (
-                folderBreadcrumbs.map((bc, idx) => {
-                  const isLast = idx === folderBreadcrumbs.length - 1;
-                  return (
-                    <div key={bc.id} className="flex items-center gap-1">
-                      <ChevronRight className="size-3 text-muted-foreground/40" />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCurrentFolderId(bc.id);
-                          setAllFoldersActive(false);
-                          onPageChange(1);
-                        }}
-                        className={cn(
-                          "hover:text-foreground transition-colors flex items-center gap-1 px-2 py-1 rounded-md",
-                          isLast
-                            ? "bg-muted font-semibold text-foreground shadow-2xs"
-                            : "text-muted-foreground",
-                        )}
-                      >
-                        <Folder className="size-3 text-amber-500" />
-                        <span>{bc.name}</span>
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-
-              {/* Lối tắt xem tất cả tài liệu */}
-              <button
-                type="button"
-                onClick={() => {
-                  setAllFoldersActive(!allFoldersActive);
-                  onPageChange(1);
-                }}
-                className={cn(
-                  "ml-2 text-[11px] px-2 py-0.5 rounded-full border transition-colors flex items-center gap-1",
-                  allFoldersActive
-                    ? "border-primary bg-primary/10 text-primary font-medium"
-                    : "border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/40",
-                )}
-              >
-                <Layers className="size-3" />
-                <span>Xem toàn bộ ({collection.source_count})</span>
-              </button>
-            </div>
+            {/* Đường dẫn Breadcrumb phong cách Google Drive (Hỗ trợ Drop target tệp) */}
+            <KnowledgeBreadcrumbs
+              currentFolderId={currentFolderId}
+              allFoldersActive={allFoldersActive}
+              parentFolder={parentFolder}
+              folderBreadcrumbs={folderBreadcrumbs}
+              rootSourceCount={rootSourceCount}
+              totalSourceCount={collection.source_count}
+              dragOverTargetId={dragOverTargetId}
+              draggingSourceId={draggingSourceId}
+              onSelectFolder={(folderId) => {
+                setCurrentFolderId(folderId);
+                setAllFoldersActive(false);
+                onPageChange(1);
+              }}
+              onToggleAllFolders={() => {
+                setAllFoldersActive(!allFoldersActive);
+                onPageChange(1);
+              }}
+              onDragOverTarget={handleFolderDragOver}
+              onDragLeaveTarget={handleFolderDragLeave}
+              onDropTarget={handleDropOnFolder}
+            />
 
             {/* Nhóm công cụ bên phải: Thêm thư mục + Tìm kiếm + Chế độ xem */}
-            <div className="flex items-center justify-end gap-2 shrink-0">
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:flex-1">
               {canManage && (
                 <Button
                   size="sm"
@@ -669,108 +682,144 @@ export function KnowledgeDetailPage({
                 </h2>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                {directSubfolders.map((f) => (
-                  <Card
-                    key={f.id}
-                    onClick={() => {
-                      setCurrentFolderId(f.id);
-                      setAllFoldersActive(false);
-                      onPageChange(1);
-                    }}
-                    className="p-3 rounded-xl border border-border/70 hover:border-primary/50 hover:bg-muted/30 transition-all cursor-pointer group shadow-2xs hover:shadow-xs flex items-center justify-between gap-2"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <Folder className="size-5 sm:size-6 text-amber-500 group-hover:text-amber-600 transition-colors shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                          {f.name}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground truncate">
-                          {f.source_count} tệp
-                          {f.subfolder_count > 0
-                            ? ` · ${f.subfolder_count} con`
-                            : ""}
-                        </p>
+                {directSubfolders.map((f) => {
+                  const isHoveredTarget = dragOverTargetId === f.id;
+                  return (
+                    <Card
+                      key={f.id}
+                      onDragOver={(e) => handleFolderDragOver(e, f.id)}
+                      onDragLeave={(e) => handleFolderDragLeave(e, f.id)}
+                      onDrop={(e) => handleDropOnFolder(e, f.id, f.name)}
+                      onClick={() => {
+                        setCurrentFolderId(f.id);
+                        setAllFoldersActive(false);
+                        onPageChange(1);
+                      }}
+                      className={cn(
+                        "p-3 rounded-xl border transition-all cursor-pointer group shadow-2xs hover:shadow-xs flex items-center justify-between gap-2",
+                        isHoveredTarget
+                          ? "border-primary ring-2 ring-primary/40 bg-primary/10 scale-[1.03] shadow-md"
+                          : "border-border/70 hover:border-primary/50 hover:bg-muted/30",
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div
+                          className={cn(
+                            "flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors",
+                            isHoveredTarget
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-amber-100/60 dark:bg-amber-950/40 border-amber-200/60 dark:border-amber-800/40 text-amber-600 dark:text-amber-400",
+                          )}
+                        >
+                          <FolderItemIcon
+                            open={isHoveredTarget}
+                            className={cn(
+                              "size-5",
+                              isHoveredTarget
+                                ? "text-primary-foreground fill-primary-foreground/30"
+                                : "text-amber-600 dark:text-amber-400",
+                            )}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                            {f.name}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {isHoveredTarget ? (
+                              <span className="text-primary font-medium">
+                                Thả để chuyển vào
+                              </span>
+                            ) : (
+                              <>
+                                {f.source_count} tệp
+                                {f.subfolder_count > 0
+                                  ? ` · ${f.subfolder_count} con`
+                                  : ""}
+                              </>
+                            )}
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    {canManage && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          asChild
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            aria-label="Thao tác thư mục"
-                            className="size-6 shrink-0 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-md hover:bg-muted transition-opacity text-muted-foreground hover:text-foreground"
+                      {canManage && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            asChild
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <MoreVertical className="size-3.5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="end"
-                          className="w-44 text-xs"
-                        >
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFolderToEdit(null);
-                              setFolderParentForCreate({
-                                id: f.id,
-                                name: f.name,
-                              });
-                              setFolderFormOpen(true);
-                            }}
-                            className="gap-2"
+                            <button
+                              type="button"
+                              aria-label="Thao tác thư mục"
+                              className="size-6 shrink-0 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-md hover:bg-muted transition-opacity text-muted-foreground hover:text-foreground"
+                            >
+                              <MoreVertical className="size-3.5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-44 text-xs"
                           >
-                            <FolderPlus className="size-3.5 text-muted-foreground" />
-                            <span>Tạo thư mục con</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFolderToEdit(f);
-                              setFolderFormOpen(true);
-                            }}
-                            className="gap-2"
-                          >
-                            <Pencil className="size-3.5 text-muted-foreground" />
-                            <span>Đổi tên</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setItemToMove({
-                                type: "folder",
-                                id: f.id,
-                                title: f.name,
-                                currentFolderId: f.parent_id,
-                              });
-                              setMoveDialogOpen(true);
-                            }}
-                            className="gap-2"
-                          >
-                            <Folder className="size-3.5 text-muted-foreground" />
-                            <span>Di chuyển</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFolderToDelete(f);
-                              setFolderDeleteOpen(true);
-                            }}
-                            className="gap-2 text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="size-3.5" />
-                            <span>Xóa thư mục</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </Card>
-                ))}
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFolderToEdit(null);
+                                setFolderParentForCreate({
+                                  id: f.id,
+                                  name: f.name,
+                                });
+                                setFolderFormOpen(true);
+                              }}
+                              className="gap-2"
+                            >
+                              <FolderPlus className="size-3.5 text-muted-foreground" />
+                              <span>Tạo thư mục con</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFolderToEdit(f);
+                                setFolderFormOpen(true);
+                              }}
+                              className="gap-2"
+                            >
+                              <Pencil className="size-3.5 text-muted-foreground" />
+                              <span>Đổi tên</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setItemToMove({
+                                  type: "folder",
+                                  id: f.id,
+                                  title: f.name,
+                                  currentFolderId: f.parent_id,
+                                });
+                                setMoveDialogOpen(true);
+                              }}
+                              className="gap-2"
+                            >
+                              <Folder className="size-3.5 text-muted-foreground" />
+                              <span>Di chuyển</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFolderToDelete(f);
+                                setFolderDeleteOpen(true);
+                              }}
+                              className="gap-2 text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="size-3.5" />
+                              <span>Xóa thư mục</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -840,33 +889,49 @@ export function KnowledgeDetailPage({
               /* Chế độ Grid Card Full-Width */
               <div className="grid gap-3.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
                 {sources.map((s) => {
-                  const pdf = isPdf(s.content_type, s.file_name);
-                  const docx = isDocx(s.content_type, s.file_name);
-                  const formatLabel = pdf ? "PDF" : docx ? "DOCX" : "XLSX";
+                  const formatInfo = getDocumentFormatInfo(
+                    s.content_type,
+                    s.file_name,
+                  );
                   const statusInfo = formatProcessingStatus(s.processing);
+
+                  const isDragging = draggingSourceId === s.id;
 
                   return (
                     <Card
                       key={s.id}
-                      className="p-4 rounded-xl border border-border/70 hover:border-primary/40 hover:shadow-xs transition-all group relative flex flex-col justify-between"
+                      draggable={canManage}
+                      onDragStart={(e) => handleDragStart(e, s)}
+                      onDragEnd={handleDragEnd}
+                      onClick={() => {
+                        void navigate({
+                          to: "/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId",
+                          params: {
+                            workspaceId,
+                            collectionId: knowledgeId,
+                            sourceId: s.id,
+                          },
+                        });
+                      }}
+                      className={cn(
+                        "p-4 rounded-xl border border-border/70 hover:border-primary/50 hover:bg-muted/20 hover:shadow-xs transition-all group relative flex flex-col justify-between select-none cursor-pointer",
+                        isDragging &&
+                          "opacity-40 scale-95 border-dashed border-primary ring-2 ring-primary/20",
+                      )}
                     >
                       <div className="space-y-2.5">
                         <div className="flex items-start gap-2.5">
                           <div
                             className={cn(
                               "flex size-9 shrink-0 items-center justify-center rounded-lg border",
-                              pdf
-                                ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/40 dark:border-rose-800"
-                                : docx
-                                  ? "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800"
-                                  : "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800",
+                              formatInfo.containerClass,
                             )}
                           >
-                            {pdf || docx ? (
-                              <FileText className="size-4" />
-                            ) : (
-                              <FileSpreadsheet className="size-4" />
-                            )}
+                            <DocumentTypeIcon
+                              contentType={s.content_type}
+                              fileName={s.file_name}
+                              className="size-5"
+                            />
                           </div>
 
                           <div className="min-w-0 flex-1">
@@ -883,13 +948,20 @@ export function KnowledgeDetailPage({
                                 {s.title}
                               </Link>
                             </h4>
-                            <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                              <span className="font-mono">{formatLabel}</span>
-                              <span> · </span>
+                            <p className="text-[11px] text-muted-foreground truncate mt-0.5 flex items-center gap-1.5">
+                              <span
+                                className={cn(
+                                  "font-mono font-semibold px-1 py-0.2 rounded text-[10px] border",
+                                  formatInfo.badgeClass,
+                                )}
+                              >
+                                {formatInfo.label}
+                              </span>
+                              <span>·</span>
                               <span className="font-mono">
                                 v{s.current_revision_no}
                               </span>
-                              <span> · </span>
+                              <span>·</span>
                               <span>{formatBytes(s.size_bytes)}</span>
                             </p>
                           </div>
@@ -903,6 +975,7 @@ export function KnowledgeDetailPage({
                             }
                             role={role}
                             canManage={canManage}
+                            onReextract={() => setSourceToExtract(s)}
                             onOcr={() => {
                               void navigate({
                                 to: "/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId",
@@ -1024,14 +1097,35 @@ export function KnowledgeDetailPage({
                   </TableHeader>
                   <TableBody>
                     {sources.map((s) => {
-                      const pdf = isPdf(s.content_type, s.file_name);
-                      const docx = isDocx(s.content_type, s.file_name);
+                      const formatInfo = getDocumentFormatInfo(
+                        s.content_type,
+                        s.file_name,
+                      );
                       const statusInfo = formatProcessingStatus(s.processing);
+
+                      const isDragging = draggingSourceId === s.id;
 
                       return (
                         <TableRow
                           key={s.id}
-                          className="group hover:bg-muted/40"
+                          draggable={canManage}
+                          onDragStart={(e) => handleDragStart(e, s)}
+                          onDragEnd={handleDragEnd}
+                          onClick={() => {
+                            void navigate({
+                              to: "/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId",
+                              params: {
+                                workspaceId,
+                                collectionId: knowledgeId,
+                                sourceId: s.id,
+                              },
+                            });
+                          }}
+                          className={cn(
+                            "group hover:bg-muted/50 transition-colors select-none cursor-pointer",
+                            isDragging &&
+                              "opacity-40 bg-primary/5 border-dashed",
+                          )}
                         >
                           <TableCell className="font-medium text-xs text-foreground max-w-xs truncate">
                             <Link
@@ -1043,18 +1137,23 @@ export function KnowledgeDetailPage({
                               }}
                               className="flex items-center gap-2 hover:text-primary transition-colors"
                             >
-                              {pdf ? (
-                                <FileText className="size-4 text-rose-500 shrink-0" />
-                              ) : docx ? (
-                                <FileText className="size-4 text-blue-500 shrink-0" />
-                              ) : (
-                                <FileSpreadsheet className="size-4 text-emerald-500 shrink-0" />
-                              )}
+                              <DocumentTypeIcon
+                                contentType={s.content_type}
+                                fileName={s.file_name}
+                                className="size-4 shrink-0"
+                              />
                               <span className="truncate">{s.title}</span>
                             </Link>
                           </TableCell>
-                          <TableCell className="text-xs uppercase text-muted-foreground font-mono">
-                            {pdf ? "PDF" : docx ? "DOCX" : "XLSX"}
+                          <TableCell className="text-xs font-mono">
+                            <span
+                              className={cn(
+                                "font-mono font-semibold px-1.5 py-0.5 rounded text-[10px] border",
+                                formatInfo.badgeClass,
+                              )}
+                            >
+                              {formatInfo.label}
+                            </span>
                           </TableCell>
                           <TableCell className="text-xs font-mono text-muted-foreground">
                             {formatBytes(s.size_bytes)}
@@ -1100,6 +1199,7 @@ export function KnowledgeDetailPage({
                               }
                               role={role}
                               canManage={canManage}
+                              onReextract={() => setSourceToExtract(s)}
                               onOcr={() => {
                                 void navigate({
                                   to: "/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId",
@@ -1241,13 +1341,26 @@ export function KnowledgeDetailPage({
         />
       ) : null}
 
-      {/* Quick Extract Dialog */}
-      {extractDialogOpen && (
-        <ExtractDocumentDialog
-          open={extractDialogOpen}
-          onOpenChange={setExtractDialogOpen}
+      {sourceToExtract && canManage && (
+        <SourceReextractDialog
+          key={`${sessionId}:${workspaceId}:${knowledgeId}:${sourceToExtract.id}`}
           workspaceId={workspaceId}
           collectionId={knowledgeId}
+          source={sourceToExtract}
+          onClose={() => setSourceToExtract(null)}
+          onStarted={(revisionId, runId) => {
+            setSourceToExtract(null);
+            void sourcesQuery.refetch();
+            void navigate({
+              to: "/workspaces/$workspaceId/collections/$collectionId/sources/$sourceId",
+              params: {
+                workspaceId,
+                collectionId: knowledgeId,
+                sourceId: sourceToExtract.id,
+              },
+              search: { revisionId, runId },
+            });
+          }}
         />
       )}
 

@@ -6,6 +6,7 @@ import {
   FolderTree,
   MoreVertical,
   Pencil,
+  RotateCcw,
   ScanLine,
   Trash2,
 } from "lucide-react";
@@ -36,6 +37,7 @@ export function SourceActions({
   onRename,
   onMove,
   onOcr,
+  onReextract,
   onLifecycle,
 }: {
   workspaceId: string;
@@ -46,6 +48,7 @@ export function SourceActions({
   onRename: () => void;
   onMove: () => void;
   onOcr: () => void;
+  onReextract?: () => void;
   onLifecycle?: (operation: LifecycleOperation, source: KBSource) => void;
 }) {
   const navigate = useNavigate();
@@ -125,8 +128,21 @@ export function SourceActions({
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={onOcr}>
             <ScanLine />
-            OCR & hiệu đính
+            Xem kết quả bóc tách
           </DropdownMenuItem>
+          {canManage && onReextract && (
+            <DropdownMenuItem
+              disabled={
+                source.processing?.status === "queued" ||
+                source.processing?.status === "running" ||
+                source.processing?.dispatch_pending === true
+              }
+              onSelect={onReextract}
+            >
+              <RotateCcw />
+              Bóc tách lại
+            </DropdownMenuItem>
+          )}
           {canManage && (
             <>
               <DropdownMenuSeparator />

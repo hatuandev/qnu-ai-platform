@@ -241,12 +241,6 @@ export function OcrComparisonView({
     transformRef.current?.resetTransform(180);
   };
 
-  const handleToggleFit = () => {
-    setZoomMode((prev) => (prev === "fit-width" ? "fit-page" : "fit-width"));
-    setCustomZoom(100);
-    transformRef.current?.resetTransform(180);
-  };
-
   const handleZoomToBbox = () => {
     const el = bboxHighlightRef.current;
     if (el && el.offsetWidth > 0 && transformRef.current) {
@@ -890,140 +884,114 @@ export function OcrComparisonView({
         >
           <Card
             className={cn(
-              "rounded-xl shadow-2xs overflow-hidden flex-col lg:h-[calc(100vh-14rem)] min-h-[480px] lg:min-h-[580px] border-border/80 w-full",
+              "rounded-xl shadow-2xs overflow-hidden flex-col lg:h-[calc(100vh-9rem)] min-h-[520px] lg:min-h-[640px] border-border/80 w-full",
               activeMobilePane === "image" ? "flex" : "hidden lg:flex",
             )}
           >
-            {/* Thanh công cụ cố định phía trên tài liệu (Chuyển chế độ Đối chiếu OCR | Xem tệp gốc + Zoom) */}
-            <div className="p-2 border-b bg-muted/20 flex items-center justify-between gap-2 flex-wrap text-xs">
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Bộ chuyển chế độ: Đối chiếu OCR vs Xem tệp gốc */}
+            {/* Thanh công cụ cố định phía trên tài liệu */}
+            <div className="p-2 border-b bg-muted/20 flex items-center justify-between gap-2 text-xs min-h-[41px]">
+              {/* Cột trái: Bộ chuyển chế độ Đối chiếu OCR vs Xem tệp gốc nếu tài liệu hỗ trợ */}
+              <div className="flex items-center gap-2 flex-1 justify-start min-w-0">
                 {canCompareOcr ? (
-                  <fieldset
-                    className="inline-flex items-center rounded-lg border bg-background p-0.5"
-                    aria-label="Chế độ xem tài liệu khung trái"
-                  >
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={leftPaneMode === "ocr" ? "secondary" : "ghost"}
-                      aria-pressed={leftPaneMode === "ocr"}
-                      data-testid="left-pane-mode-ocr"
-                      className="h-6 px-2.5 text-xs font-medium gap-1.5"
-                      onClick={() => handleSelectLeftPaneMode("ocr")}
-                    >
-                      <ScanSearch className="size-3.5 text-primary" />
-                      <span>Đối chiếu OCR</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={
-                        leftPaneMode === "original" ? "secondary" : "ghost"
-                      }
-                      aria-pressed={leftPaneMode === "original"}
-                      data-testid="left-pane-mode-original"
-                      className="h-6 px-2.5 text-xs font-medium gap-1.5"
-                      onClick={() => handleSelectLeftPaneMode("original")}
-                    >
-                      <Eye className="size-3.5 text-primary" />
-                      <span>Xem tệp gốc</span>
-                    </Button>
-                  </fieldset>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 font-medium">
-                    <Eye className="size-3.5 text-primary" />
-                    Tệp gốc
-                  </span>
-                )}
-
-                {leftPaneMode === "ocr" ? (
                   <>
-                    <span className="text-muted-foreground hidden sm:inline">
-                      Trang {activePageNumber}
-                    </span>
-                    {isDocx ? (
+                    <fieldset
+                      className="inline-flex items-center rounded-lg border bg-background p-0.5"
+                      aria-label="Chế độ xem tài liệu khung trái"
+                    >
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={leftPaneMode === "ocr" ? "secondary" : "ghost"}
+                        aria-pressed={leftPaneMode === "ocr"}
+                        data-testid="left-pane-mode-ocr"
+                        className="h-6 px-2.5 text-xs font-medium gap-1.5"
+                        onClick={() => handleSelectLeftPaneMode("ocr")}
+                      >
+                        <ScanSearch className="size-3.5 text-primary" />
+                        <span>Đối chiếu OCR</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={
+                          leftPaneMode === "original" ? "secondary" : "ghost"
+                        }
+                        aria-pressed={leftPaneMode === "original"}
+                        data-testid="left-pane-mode-original"
+                        className="h-6 px-2.5 text-xs font-medium gap-1.5"
+                        onClick={() => handleSelectLeftPaneMode("original")}
+                      >
+                        <Eye className="size-3.5 text-primary" />
+                        <span>Xem tệp gốc</span>
+                      </Button>
+                    </fieldset>
+
+                    {leftPaneMode === "ocr" ? (
+                      <>
+                        <span className="text-muted-foreground hidden sm:inline">
+                          Trang {activePageNumber}
+                        </span>
+                        {isDocx ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] py-0 px-1.5 border-border bg-muted/40 text-muted-foreground font-normal"
+                          >
+                            Bản dàn trang từ DOCX
+                          </Badge>
+                        ) : null}
+                        {focusedBbox ? (
+                          <>
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] py-0 px-1.5 border-primary/40 text-primary"
+                            >
+                              Đang đánh dấu vùng văn bản
+                            </Badge>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-1.5 text-[11px] gap-1 text-primary hover:bg-primary/10"
+                              onClick={handleZoomToBbox}
+                              title="Phóng to trực tiếp vào vùng văn bản đang đối chiếu trên ảnh"
+                            >
+                              <ScanSearch className="size-3" />
+                              <span>Phóng vào vùng này</span>
+                            </Button>
+                          </>
+                        ) : null}
+                      </>
+                    ) : (
                       <Badge
                         variant="outline"
-                        className="text-[10px] py-0 px-1.5 border-border bg-muted/40 text-muted-foreground font-normal"
+                        className="text-[10px] py-0 px-1.5 border-primary/30 bg-primary/5 text-primary font-normal"
                       >
-                        Bản dàn trang từ DOCX
+                        {isDocx
+                          ? "Word (.docx)"
+                          : `PDF gốc · Trang ${activePageNumber}${
+                              totalPages > 0 ? ` / ${totalPages}` : ""
+                            }`}
                       </Badge>
-                    ) : null}
-                    {focusedBbox ? (
-                      <>
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] py-0 px-1.5 border-primary/40 text-primary"
-                        >
-                          Đang đánh dấu vùng văn bản
-                        </Badge>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-1.5 text-[11px] gap-1 text-primary hover:bg-primary/10"
-                          onClick={handleZoomToBbox}
-                          title="Phóng to trực tiếp vào vùng văn bản đang đối chiếu trên ảnh"
-                        >
-                          <ScanSearch className="size-3" />
-                          <span>Phóng vào vùng này</span>
-                        </Button>
-                      </>
-                    ) : null}
+                    )}
                   </>
-                ) : (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] py-0 px-1.5 border-primary/30 bg-primary/5 text-primary font-normal"
-                  >
-                    {isDocx
-                      ? "Tệp Word (.docx) gốc"
-                      : `Tệp PDF gốc · Trang ${activePageNumber}${
-                          totalPages > 0 ? ` / ${totalPages}` : ""
-                        }`}
-                  </Badge>
-                )}
+                ) : null}
               </div>
 
-              {/* Điều khiển Phóng to / Thu nhỏ / Vừa chiều ngang / Mở rộng */}
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant={zoomMode === "fit-width" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-7 px-2 text-xs font-medium"
-                  onClick={handleToggleFit}
-                  title={
-                    zoomMode === "fit-width"
-                      ? "Đang vừa bề ngang (nhấp để chuyển sang vừa trọn trang)"
-                      : "Đang vừa trọn trang (nhấp để chuyển sang vừa bề ngang)"
-                  }
-                >
-                  <span>
-                    {zoomMode === "fit-width" ? "Vừa ngang" : "Trọn trang"}
-                  </span>
-                </Button>
-
-                <div className="h-3.5 w-px bg-border/60 mx-0.5" />
-
+              {/* Điều khiển Phóng to / Thu nhỏ CANH GIỮA (mặc định vừa chiều ngang) */}
+              <div className="flex items-center justify-center gap-1 shrink-0">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="size-7 p-0 text-muted-foreground hover:text-foreground"
                   onClick={handleZoomOut}
-                  aria-label="Thu nhỏ ảnh"
+                  aria-label="Thu nhỏ"
                   title="Thu nhỏ"
                 >
                   <ZoomOut className="size-3.5" />
                 </Button>
-                <span className="text-[11px] font-mono min-w-9 text-center text-muted-foreground">
-                  {customZoom !== 100
-                    ? `${customZoom}%`
-                    : zoomMode === "fit-width"
-                      ? "Ngang"
-                      : "Trọn"}
+                <span className="text-[11px] font-mono min-w-9 text-center text-muted-foreground select-none">
+                  {customZoom}%
                 </span>
                 <Button
                   type="button"
@@ -1031,7 +999,7 @@ export function OcrComparisonView({
                   size="sm"
                   className="size-7 p-0 text-muted-foreground hover:text-foreground"
                   onClick={handleZoomIn}
-                  aria-label="Phóng to ảnh"
+                  aria-label="Phóng to"
                   title="Phóng to"
                 >
                   <ZoomIn className="size-3.5" />
@@ -1042,7 +1010,7 @@ export function OcrComparisonView({
                   size="sm"
                   className="size-7 p-0 text-muted-foreground hover:text-foreground"
                   onClick={handleResetZoom}
-                  aria-label="Đặt lại tỷ lệ phóng"
+                  aria-label="Đặt lại vừa chiều ngang"
                   title="Đặt lại vừa chiều ngang"
                 >
                   <RotateCcw className="size-3" />
@@ -1061,6 +1029,9 @@ export function OcrComparisonView({
                   </Button>
                 ) : null}
               </div>
+
+              {/* Cột phải cân bằng khoảng trống */}
+              <div className="flex items-center justify-end flex-1 min-w-0" />
             </div>
 
             {leftPaneMode === "original" ? (
@@ -1335,7 +1306,7 @@ export function OcrComparisonView({
         >
           <Card
             className={cn(
-              "rounded-xl shadow-2xs overflow-hidden flex-col lg:h-[calc(100vh-14rem)] min-h-[480px] lg:min-h-[580px] border-border/80 w-full",
+              "rounded-xl shadow-2xs overflow-hidden flex-col lg:h-[calc(100vh-9rem)] min-h-[520px] lg:min-h-[640px] border-border/80 w-full",
               activeMobilePane !== "image" ? "flex" : "hidden lg:flex",
             )}
           >

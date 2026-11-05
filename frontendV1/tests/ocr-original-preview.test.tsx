@@ -478,10 +478,7 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
       />,
     );
 
-    // Must show independent scroll container and honest pagination limitation note
-    expect(
-      screen.getByTestId("docx-original-limitation-note").textContent,
-    ).toContain("thanh cuộn độc lập");
+    // Must show independent scroll container
     expect(screen.getByTestId("docx-original-scroll-container")).toBeTruthy();
 
     // Wait for docx-preview's real renderAsync() to populate sections, table, and footer
@@ -560,8 +557,8 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
         />,
       );
 
-      // In unprocessed state, 'Xem tệp gốc' is active by default alongside 'Bắt đầu bóc tách ngay'
-      expect(screen.getByText("Tệp gốc")).toBeTruthy();
+      // In unprocessed state, original file preview is active by default alongside 'Bắt đầu bóc tách ngay'
+      expect(await screen.findByTestId("docx-original-viewer")).toBeTruthy();
       expect(screen.queryByTestId("left-pane-mode-ocr")).toBeNull();
       if (!completed) {
         expect(
@@ -700,7 +697,6 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
     );
 
     expect(await screen.findByTestId("docx-original-viewer")).toBeTruthy();
-    expect(screen.getByText("Tài liệu Word")).toBeTruthy();
     expect(screen.queryByTestId("left-pane-mode-ocr")).toBeNull();
     expect(mocks.readRenderedPdfBlob).not.toHaveBeenCalled();
   });
@@ -980,7 +976,7 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
     expect(target.textContent).not.toContain("NỘI DUNG CŨ PHIÊN BẢN 1");
   });
 
-  it("8. Synchronizes split ratio presets with keyboard separator navigation and preserves state on mobile pane switch", () => {
+  it("8. Preserves focused unit and bbox highlight across mobile pane switch", () => {
     const { run, detail, doc } = buildCompletedRun();
     mocks.runs = [run];
     mocks.runDetail = detail;
@@ -995,27 +991,6 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
         onSearchChange={vi.fn()}
       />,
     );
-
-    const btnEven = screen.getByRole("button", { name: "50:50" });
-    const btnWideLeft = screen.getByRole("button", { name: "Rộng ảnh" });
-    const btnWideRight = screen.getByRole("button", { name: "Rộng chữ" });
-    const separator = screen.getByRole("separator", {
-      name: /Kéo để thay đổi độ rộng cột ảnh và cột văn bản/i,
-    });
-
-    expect(btnEven.getAttribute("aria-pressed")).toBe("true");
-
-    // Keyboard End -> 62% left ("Rộng ảnh" active)
-    fireEvent.keyDown(separator, { key: "End" });
-    expect(btnWideLeft.getAttribute("aria-pressed")).toBe("true");
-
-    // Keyboard Home -> 38% left ("Rộng chữ" active)
-    fireEvent.keyDown(separator, { key: "Home" });
-    expect(btnWideRight.getAttribute("aria-pressed")).toBe("true");
-
-    // Keyboard Enter -> reset to 50:50
-    fireEvent.keyDown(separator, { key: "Enter" });
-    expect(btnEven.getAttribute("aria-pressed")).toBe("true");
 
     // Focus unit on page 1, switch mobile tabs (Ảnh trang 1 <-> Văn bản) -> focused unit & bbox remain intact
     fireEvent.click(screen.getByRole("button", { name: /^Đoạn văn 1$/i }));

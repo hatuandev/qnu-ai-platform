@@ -131,9 +131,9 @@ export function FolderTreePanel({
               <span className="size-4 shrink-0" />
             )}
             {isExpanded || isSelected ? (
-              <FolderOpen className="size-3.5 shrink-0 text-primary" />
+              <FolderOpen className="size-3.5 shrink-0 text-amber-500 fill-amber-500/20" />
             ) : (
-              <Folder className="size-3.5 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
+              <Folder className="size-3.5 shrink-0 text-amber-500/80 fill-amber-500/10 group-hover:text-amber-500 transition-colors" />
             )}
             <span className="truncate">{folder.name}</span>
           </div>

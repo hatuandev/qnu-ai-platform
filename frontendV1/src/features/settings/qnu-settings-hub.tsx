@@ -26,7 +26,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { canManageKnowledge } from "@/features/knowledge/permissions";
 import {
+  useCallerWorkspaceRole,
   useWorkspaceQuery,
   useWorkspacesQuery,
 } from "@/features/workspaces/queries";
@@ -43,6 +45,11 @@ export function QnuSettingsHub() {
   const activeWorkspaceId =
     scope.workspaceId ?? workspacesQuery.data?.items?.[0]?.id ?? "";
   const workspaceQuery = useWorkspaceQuery(activeWorkspaceId);
+  const workspaceRole = useCallerWorkspaceRole(activeWorkspaceId);
+  const canEvaluate =
+    isAuthenticated &&
+    !workspaceRole.isPending &&
+    canManageKnowledge(workspaceRole.role);
   const activeWorkspace =
     workspacesQuery.data?.items?.find((w) => w.id === activeWorkspaceId) ??
     workspaceQuery.data;
@@ -51,6 +58,11 @@ export function QnuSettingsHub() {
     isAuthenticated && hasV1Permission(actor, "ai.models.manage");
   const isPlatformAdmin = isPlatformWorkspaceAdmin(actor);
   const targetScope = { workspaceId: activeWorkspaceId || undefined };
+  const evaluationScope = {
+    ...targetScope,
+    collectionId:
+      scope.workspaceId === activeWorkspaceId ? scope.collectionId : undefined,
+  };
 
   return (
     <div className="space-y-8">
@@ -218,6 +230,18 @@ export function QnuSettingsHub() {
                 </span>
                 <ArrowUpRight className="size-3.5 text-muted-foreground" />
               </Link>
+              {canEvaluate && (
+                <Link
+                  {...featureTarget("evaluation", evaluationScope)}
+                  className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/15 px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-muted/40"
+                >
+                  <span className="flex items-center gap-2">
+                    <Gauge className="size-3.5 text-muted-foreground" />
+                    Đánh giá RAG
+                  </span>
+                  <ArrowUpRight className="size-3.5 text-muted-foreground" />
+                </Link>
+              )}
             </CardContent>
           </Card>
         </div>

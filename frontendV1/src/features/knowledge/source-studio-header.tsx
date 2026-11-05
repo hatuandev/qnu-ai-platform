@@ -5,6 +5,7 @@ import {
   ClipboardList,
   Download,
   FilePlus2,
+  FileSpreadsheet,
   FileText,
   History,
   Loader2,
@@ -36,6 +37,101 @@ import {
 import type { ReviewDocument } from "@/features/knowledge/ocr-types";
 import type { ProcessingStatusDescriptor } from "@/features/knowledge/schemas";
 import type { KBSource } from "@/features/knowledge/types";
+import { cn } from "@/lib/utils";
+
+export function SourceTypeIcon({
+  source,
+  isDocxFile,
+  className,
+}: {
+  source: KBSource;
+  isDocxFile?: boolean;
+  className?: string;
+}) {
+  const fileName = (source.file_name || source.title || "").toLowerCase();
+  const contentType = (source.content_type || "").toLowerCase();
+
+  const isWord =
+    Boolean(isDocxFile) ||
+    fileName.endsWith(".docx") ||
+    fileName.endsWith(".doc") ||
+    contentType.includes("word") ||
+    contentType.includes("officedocument.wordprocessingml");
+
+  const isPdf = fileName.endsWith(".pdf") || contentType === "application/pdf";
+
+  const isExcel =
+    fileName.endsWith(".xlsx") ||
+    fileName.endsWith(".xls") ||
+    fileName.endsWith(".csv") ||
+    contentType.includes("spreadsheet") ||
+    contentType.includes("excel");
+
+  if (isWord) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={cn(
+          "size-4.5 text-blue-600 dark:text-blue-400 shrink-0",
+          className,
+        )}
+        aria-label="Tệp Word (.docx)"
+        role="img"
+      >
+        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+        <polyline points="14 2 14 8 20 8" />
+        <path d="m9 12.5 1.2 5 1.8-4.5 1.8 4.5 1.2-5" strokeWidth="2.2" />
+      </svg>
+    );
+  }
+
+  if (isPdf) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={cn(
+          "size-4.5 text-rose-600 dark:text-rose-400 shrink-0",
+          className,
+        )}
+        aria-label="Tệp PDF"
+        role="img"
+      >
+        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+        <polyline points="14 2 14 8 20 8" />
+        <path d="M10 12h2a1.5 1.5 0 0 1 0 3h-2v3" strokeWidth="2" />
+      </svg>
+    );
+  }
+
+  if (isExcel) {
+    return (
+      <FileSpreadsheet
+        className={cn(
+          "size-4.5 text-emerald-600 dark:text-emerald-400 shrink-0",
+          className,
+        )}
+        aria-label="Bảng tính Excel"
+      />
+    );
+  }
+
+  return (
+    <FileText
+      className={cn("size-4.5 text-primary shrink-0", className)}
+      aria-label="Tệp tài liệu"
+    />
+  );
+}
 
 export interface SourceStudioHeaderProps {
   source: KBSource;
@@ -130,7 +226,7 @@ export function SourceStudioHeader({
           </Button>
 
           <div className="flex items-center gap-1.5 min-w-0">
-            <FileText className="size-4.5 text-primary shrink-0" />
+            <SourceTypeIcon source={source} isDocxFile={isDocxFile} />
             <h1
               className="text-base sm:text-lg font-bold tracking-tight text-foreground truncate max-w-[280px] sm:max-w-[420px]"
               title={source.title}
@@ -256,13 +352,14 @@ export function SourceStudioHeader({
               className="h-8 text-xs gap-1.5 shadow-xs"
               disabled={isExtractionPending}
               onClick={onStartExtraction}
+              aria-label="Bắt đầu bóc tách"
             >
               {isExtractionPending ? (
                 <Loader2 className="size-3.5 animate-spin" />
               ) : (
                 <Play className="size-3.5" />
               )}
-              <span>Bắt đầu bóc tách</span>
+              <span>Bóc tách</span>
             </Button>
           ) : null}
 
@@ -275,13 +372,14 @@ export function SourceStudioHeader({
               className="h-8 text-xs gap-1.5"
               disabled={isSpellCheckRunning}
               onClick={onOpenSpellCheck}
+              aria-label="Kiểm tra chính tả"
             >
               {isSpellCheckRunning ? (
                 <Loader2 className="size-3.5 animate-spin text-primary" />
               ) : (
                 <Sparkles className="size-3.5 text-primary" />
               )}
-              <span>Kiểm tra chính tả</span>
+              <span>Soát chính tả</span>
             </Button>
           ) : null}
 
@@ -294,9 +392,10 @@ export function SourceStudioHeader({
               className="h-8 text-xs gap-1.5"
               disabled={!hasUnsavedDraft || isSaving || baseMovedOn}
               onClick={onOpenSaveModal}
+              aria-label="Lưu thay đổi"
             >
               <Save className="size-3.5" />
-              <span>Lưu thay đổi</span>
+              <span>Lưu</span>
               {hasUnsavedDraft ? (
                 <Badge
                   variant="warning"
@@ -316,9 +415,10 @@ export function SourceStudioHeader({
               variant={hasUnsavedDraft ? "outline" : "default"}
               className="h-8 text-xs gap-1.5"
               onClick={onOpenCompileDialog}
+              aria-label="Biên soạn (Dùng để biên soạn)"
             >
               <ClipboardList className="size-3.5" />
-              <span>Dùng để biên soạn</span>
+              <span>Biên soạn</span>
             </Button>
           ) : null}
 

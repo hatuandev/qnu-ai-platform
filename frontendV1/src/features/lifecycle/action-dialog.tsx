@@ -193,7 +193,12 @@ function LifecycleActionForm({
         ["v1", sessionId, "lifecycle-action", workspaceId, result.id],
         result,
       );
-      void queryClient.invalidateQueries({ queryKey: ["v1", sessionId] });
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[0] === "v1" &&
+          query.queryKey[1] === sessionId &&
+          query.queryKey[2] !== "lifecycle-action",
+      });
     } catch (cause) {
       if (!current()) return;
       setError(
@@ -228,7 +233,7 @@ function LifecycleActionForm({
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
             {confirmationOnly ? (
-              <>Bạn có muốn xóa “{label}” không?</>
+              label
             ) : (
               <>{label}. Xem phạm vi ảnh hưởng trước khi xác nhận.</>
             )}
@@ -244,23 +249,15 @@ function LifecycleActionForm({
             <div className="space-y-3 text-sm">
               <p>
                 {permanent
-                  ? "Xóa vĩnh viễn tệp gốc, các phiên bản và dữ liệu xử lý liên quan. Không thể khôi phục từ QNU."
+                  ? "Xóa tệp gốc, các phiên bản và dữ liệu liên quan. Không thể khôi phục."
                   : "Mục này sẽ được đưa vào thùng rác và có thể khôi phục."}
               </p>
               {permanent &&
               preview &&
               Number(preview.impact.compiled_versions_to_delete) > 0 ? (
-                <p>
-                  Các bản biên soạn phụ thuộc sẽ bị xóa. Những tệp nguồn khác
-                  vẫn được giữ.
-                </p>
+                <p>Xóa cả các bản biên soạn phụ thuộc.</p>
               ) : null}
-              {permanent ? (
-                <p className="text-muted-foreground">
-                  Bản sao lưu đã tạo được quản lý theo chính sách sao lưu riêng.
-                </p>
-              ) : null}
-              {!preview && !error ? (
+              {!permanent && !preview && !error ? (
                 <p role="status" className="text-muted-foreground">
                   Đang chuẩn bị xác nhận…
                 </p>
@@ -268,12 +265,12 @@ function LifecycleActionForm({
               {preview &&
               typeof preview.impact.jobs_to_cancel === "number" &&
               preview.impact.jobs_to_cancel > 0 ? (
-                <p>Các tác vụ liên quan sẽ được dừng.</p>
+                <p>Tác vụ liên quan sẽ dừng.</p>
               ) : null}
               {preview &&
               typeof preview.impact.published_versions_affected === "number" &&
               preview.impact.published_versions_affected > 0 ? (
-                <p>Nội dung xuất bản liên quan sẽ ngừng phục vụ.</p>
+                <p>Nội dung liên quan sẽ ngừng phục vụ.</p>
               ) : null}
               {live &&
               ["pending", "completed", "failed"].includes(live.status) ? (
@@ -281,11 +278,11 @@ function LifecycleActionForm({
                   <p role="status">
                     {live.status === "completed"
                       ? isSourcePurgeCompleted(live)
-                        ? "Đã xóa vĩnh viễn tài liệu."
+                        ? "Đã xóa tài liệu."
                         : "Máy chủ chưa xác nhận xóa vĩnh viễn. Hãy nạp lại API/worker V1 và kiểm tra mục Hoàn tất xóa trong kho."
                       : live.error_code
-                        ? "Xóa chưa hoàn tất. Bạn có thể tiếp tục cùng thao tác."
-                        : "Đã nhận yêu cầu xóa. Đang chờ dừng tác vụ và dọn dữ liệu liên quan."}
+                        ? "Xóa chưa xong. Vui lòng thử lại."
+                        : "Đang xóa tài liệu…"}
                   </p>
                 ) : (
                   <LifecycleReceiptView
@@ -396,6 +393,7 @@ function LifecycleActionForm({
             <Button
               variant={target.action === "delete" ? "destructive" : "default"}
               onClick={() => void accept()}
+              aria-busy={busy || purgeInProgress}
               disabled={
                 busy ||
                 purgeInProgress ||
@@ -403,8 +401,10 @@ function LifecycleActionForm({
                 (!confirmationOnly && !confirmed)
               }
             >
-              {busy
-                ? "Đang xác nhận…"
+              {busy && (acceptStarted || !confirmationOnly)
+                ? permanent
+                  ? "Đang xóa…"
+                  : "Đang xác nhận…"
                 : purgeInProgress
                   ? "Đang xóa…"
                   : acceptStarted

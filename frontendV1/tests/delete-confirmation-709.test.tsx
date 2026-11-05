@@ -206,6 +206,33 @@ test("cancel never calls the deletion endpoint", async () => {
   expect(accepted).toHaveLength(0);
 });
 
+test("preparing the preview never flashes a deletion-in-progress state", async () => {
+  const fetchCurrent = globalThis.fetch;
+  let release: (() => void) | undefined;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string, init?: RequestInit) => {
+      if (init?.method === "POST" && String(input).endsWith("/previews")) {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+      return fetchCurrent(input, init);
+    }),
+  );
+  mount();
+  await waitFor(() => expect(release).toBeTypeOf("function"));
+  const prematureProgress = screen.queryByRole("button", { name: "Đang xóa…" });
+  const dialog = screen.getByRole("dialog");
+  await act(async () => {
+    release?.();
+  });
+  await ready();
+  expect(prematureProgress).toBeNull();
+  expect(screen.getByRole("dialog")).toBe(dialog);
+  expect(accepted).toHaveLength(0);
+});
+
 test("preview failure blocks delete and allows retry", async () => {
   mode = "preview-error";
   mount();
@@ -237,7 +264,7 @@ test("accepted source deletion shows progress until the receipt completes", asyn
   const close = mount();
   await ready();
   fireEvent.click(screen.getByRole("button", { name: "Xóa vĩnh viễn" }));
-  await screen.findByText(/Đã nhận yêu cầu xóa/);
+  await screen.findByText("Đang xóa tài liệu…");
   expect(screen.getByRole("button", { name: "Đang xóa…" })).toHaveProperty(
     "disabled",
     true,
@@ -261,6 +288,108 @@ test("accepted source deletion shows progress until the receipt completes", asyn
   });
   await waitFor(() => expect(close).toHaveBeenCalledOnce());
   expect(accepted).toHaveLength(1);
+});
+
+test("a stale preview read cannot turn an accepted deletion into another confirmation", async () => {
+  const fetchCurrent = globalThis.fetch;
+  let stalePreview: LifecycleAction;
+  let readStale = true;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        const result = await fetchCurrent(input, init);
+        if (String(input).endsWith("/previews")) stalePreview = { ...row };
+        return result;
+      }
+      return readStale ? response(stalePreview) : fetchCurrent(input, init);
+    }),
+  );
+  mode = "pending";
+  const close = mount();
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Xóa vĩnh viễn" }));
+  await waitFor(() => expect(accepted).toHaveLength(1));
+  await act(async () => {
+    await clients.at(-1)?.invalidateQueries();
+  });
+  expect(
+    screen.queryByRole("button", { name: "Thử lại cùng thao tác" }),
+  ).toBeNull();
+  expect(screen.getByRole("button", { name: "Đang xóa…" })).toHaveProperty(
+    "disabled",
+    true,
+  );
+  expect(close).not.toHaveBeenCalled();
+  expect(previewCount).toBe(1);
+  expect(accepted).toHaveLength(1);
+  readStale = false;
+  row = {
+    ...row,
+    status: "completed",
+    result: {
+      permanent: true,
+      originals_retained: false,
+      restore_available: false,
+    },
+  };
+  await act(async () => {
+    await clients.at(-1)?.invalidateQueries();
+  });
+  await waitFor(() => expect(close).toHaveBeenCalledOnce());
+  expect(accepted).toHaveLength(1);
+});
+
+test("source deletion stays on the same progress label while the accept response is delayed", async () => {
+  const fetchCurrent = globalThis.fetch;
+  let release: (() => void) | undefined;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string, init?: RequestInit) => {
+      if (init?.method === "POST" && !String(input).endsWith("/previews")) {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+      return fetchCurrent(input, init);
+    }),
+  );
+  mode = "pending";
+  mount();
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Xóa vĩnh viễn" }));
+  const progress = screen.queryByRole("button", { name: "Đang xóa…" });
+  if (progress) fireEvent.click(progress);
+  await act(async () => {
+    release?.();
+  });
+  expect(progress).not.toBeNull();
+  await screen.findByText("Đang xóa tài liệu…");
+  expect(screen.getByRole("button", { name: "Đang xóa…" })).toHaveProperty(
+    "disabled",
+    true,
+  );
+  expect(accepted).toHaveLength(1);
+});
+
+test("a worker error exposes an explicit retry using the same accepted deletion", async () => {
+  mode = "pending";
+  row.error_code = "purge_storage_failed";
+  const close = mount();
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Xóa vĩnh viễn" }));
+  await screen.findByText("Xóa chưa xong. Vui lòng thử lại.");
+  expect(close).not.toHaveBeenCalled();
+  expect(accepted).toHaveLength(1);
+  mode = "ok";
+  row.error_code = null;
+  fireEvent.click(
+    screen.getByRole("button", { name: "Thử lại cùng thao tác" }),
+  );
+  await waitFor(() => expect(close).toHaveBeenCalledOnce());
+  expect(accepted).toHaveLength(2);
+  expect(accepted[1]).toEqual(accepted[0]);
+  expect(previewCount).toBe(1);
 });
 
 test("a stale preview requires another explicit delete confirmation", async () => {

@@ -1,5 +1,19 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên888 — Đánh giá RAG trong Cấu hình](2026-11-06_phien_888_danh_gia_rag_trong_cau_hinh.md).
+
+- [Phiên887 — Gọn menu quản lý kho](2026-11-06_phien_887_menu_quan_ly_kho.md).
+
+- [Phiên886 — Gọn thao tác bóc tách](2026-11-06_phien_886_gon_thao_tac_boc_tach.md).
+
+- [Phiên885 — Kiểm chứng xóa vĩnh viễn](2026-11-05_phien_885_kiem_chung_xoa_vinh_vien.md).
+
+- [Phiên884 — Hộp thoại xóa không nháy, lời xác nhận ngắn](2026-11-05_phien_884_nhay_hop_thoai_xoa.md).
+
+- [Phiên883 — Trạng thái xóa vĩnh viễn](2026-11-05_phien_883_trang_thai_xoa_vinh_vien.md).
+
+- [Phiên882 — Kéo/thả và thao tác văn bản](2026-11-05_phien_882_keo_tha_va_thao_tac_van_ban.md).
+
 - [Phiên881 — Chuẩn hóa tài liệu về V1, dán nhãn lịch sử](2026-11-05_phien_881_cap_nhat_tai_lieu_sang_v1.md).
 
 - [Phiên880 — Metadata động và tương thích](2026-11-05_phien_880_metadata_dong_va_tuong_thich.md).

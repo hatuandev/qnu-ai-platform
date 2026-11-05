@@ -184,7 +184,14 @@ export function FolderMoveDialog({
                   }}
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <Folder className="size-3.5 shrink-0 text-primary" />
+                    <Folder
+                      className={cn(
+                        "size-3.5 shrink-0",
+                        isSelected
+                          ? "text-primary-foreground fill-primary-foreground/30"
+                          : "text-amber-500 fill-amber-500/20",
+                      )}
+                    />
                     <span className="truncate">{f.name}</span>
                   </div>
                   {isIllegal ? (

@@ -778,7 +778,7 @@ function SourceDetailSession({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       {lifecycleDialog}
       {/* 1. Header Studio thống nhất: Breadcrumb, tiêu đề, trạng thái, phiên bản & hành động */}
       <SourceStudioHeader

@@ -3,15 +3,33 @@ import { useEffect, useRef } from "react";
 import { v1Client } from "@/app/api/v1";
 import { useV1Auth } from "@/app/auth/v1";
 import { getLifecycleAction, listArchivedResources } from "./requests";
+import type { LifecycleAction } from "./types";
 
 export function useLifecycleAction(workspaceId: string, id?: string) {
   const { sessionId } = useV1Auth();
   const queryClient = useQueryClient();
   const completed = useRef("");
+  const queryKey = ["v1", sessionId, "lifecycle-action", workspaceId, id];
   const query = useQuery({
-    queryKey: ["v1", sessionId, "lifecycle-action", workspaceId, id],
-    queryFn: ({ signal }) =>
-      getLifecycleAction(v1Client, workspaceId, id ?? "", signal),
+    queryKey,
+    queryFn: async ({ signal }) => {
+      const received = await getLifecycleAction(
+        v1Client,
+        workspaceId,
+        id ?? "",
+        signal,
+      );
+      const cached = queryClient.getQueryData<LifecycleAction>(queryKey);
+      // An accepted receipt cannot become an unconfirmed preview again.
+      // Read the cache after I/O: acceptance may finish while this GET is in flight.
+      if (
+        received.status === "preview" &&
+        cached &&
+        cached.status !== "preview"
+      )
+        return cached;
+      return received;
+    },
     enabled: Boolean(id && workspaceId),
     retry: false,
     refetchInterval: (q) => (q.state.data?.status === "pending" ? 2500 : false),

@@ -129,9 +129,22 @@ export function DocxOriginalViewer({
 }: DocxOriginalViewerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const renderTargetRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
   const [isRendering, setIsRendering] = useState(true);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const updateSize = () => {
+      setContainerWidth(el.clientWidth);
+    };
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     void revisionKey;
@@ -200,12 +213,17 @@ export function DocxOriginalViewer({
     };
   }, [blob, revisionKey, retryCount]);
 
+  const fitWidthScale =
+    containerWidth > 0
+      ? Math.min(1.05, Math.max(0.35, (containerWidth - 36) / 816))
+      : 1;
+
   const effectiveScale =
     zoomMode === "custom"
-      ? Math.max(0.5, Math.min(2.5, zoomPercent / 100))
+      ? Math.max(0.4, Math.min(2.5, zoomPercent / 100))
       : zoomMode === "fit-page"
-        ? 0.85
-        : 1;
+        ? Math.min(0.85, fitWidthScale * 0.85)
+        : fitWidthScale;
 
   return (
     <div
@@ -259,6 +277,7 @@ export function DocxOriginalViewer({
           style={{
             isolation: "isolate",
             display: renderError ? "none" : "flex",
+            zoom: effectiveScale !== 1 ? effectiveScale : undefined,
           }}
         >
           <style>{`
@@ -269,21 +288,19 @@ export function DocxOriginalViewer({
               flex-direction: column;
               align-items: center;
               gap: 1rem;
+              max-width: 100%;
             }
             .qnu-docx-preview-scope section.qnu-docx-preview {
               box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.12), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
               border-radius: 4px;
               margin-bottom: 0.5rem !important;
               max-width: 100%;
-              overflow-x: auto;
             }
           `}</style>
           <div
             ref={renderTargetRef}
             data-testid="docx-original-render-target"
             style={{
-              transform:
-                effectiveScale !== 1 ? `scale(${effectiveScale})` : undefined,
               transformOrigin: "top center",
             }}
           />

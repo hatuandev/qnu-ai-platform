@@ -63,8 +63,10 @@ Vào **Bộ sưu tập → Chỉ mục & Tìm kiếm**, tìm thử rồi chọn 
 
 ## 4. Đánh giá truy xuất
 
-Tại tab chỉ mục, chọn **Đánh giá RAG** (quản trị hoặc biên tập). Đây là trang
-riêng, có liên kết về bộ sưu tập; snapshot được chọn có thể mở lại bằng URL.
+Vào **Cấu hình → Nhật ký & Bảo trì dữ liệu → Đánh giá RAG** (quản trị hoặc
+biên tập), chọn kho cần đánh giá. Đây là trang riêng, có liên kết về bộ sưu
+tập; snapshot được chọn có thể mở lại bằng URL. Trang kho không còn nút
+Quản trị chỉ mục/Công cụ nâng cao; chỉ mục được cập nhật tự động sau phát hành.
 
 1. Chọn generation hoàn tất đang phục vụ. FE đọc run và manifest, tự ghim ID/hash.
 2. Nhập phiên bản bộ nhãn, người gán nhãn, K và ngân sách ứng viên (1–50,

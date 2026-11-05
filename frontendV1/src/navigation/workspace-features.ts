@@ -57,7 +57,7 @@ export const workspaceFeatures = {
   },
   evaluation: {
     title: "Đánh giá RAG",
-    group: "Tri thức",
+    group: "Cấu hình đơn vị",
     icon: Gauge,
     kind: "collection",
     page: "evaluations",
@@ -334,6 +334,7 @@ export function isPrimarySidebarFeatureActive(
   search: Record<string, unknown>,
 ): boolean {
   if (feature === "collections") {
+    if (isFeatureActive("evaluation", pathname, search)) return false;
     if (
       pathname.startsWith("/workspaces/choose/") &&
       [
@@ -366,6 +367,7 @@ export function isSettingsRouteActive(
   search: Record<string, unknown>,
 ): boolean {
   if (isProviderRouteActive(pathname)) return false;
+  if (isFeatureActive("evaluation", pathname, search)) return true;
   if (
     pathname === "/settings" ||
     pathname.startsWith("/settings/") ||

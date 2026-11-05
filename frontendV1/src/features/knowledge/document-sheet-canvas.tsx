@@ -137,7 +137,7 @@ export function DocumentSheetCanvas({
               key={block.unit.evidence_id}
               data-evidence-id={block.unit.evidence_id}
               className={cn(
-                "group relative py-1.5 px-2.5 -mx-1.5 rounded-lg transition-all",
+                "group relative py-1.5 pl-7 pr-2.5 sm:pl-2.5 -mx-1.5 rounded-lg transition-all",
                 isFocused
                   ? "ring-2 ring-primary bg-primary/5 border border-primary/30"
                   : block.hasUnsavedDraft
@@ -147,15 +147,8 @@ export function DocumentSheetCanvas({
                       : "hover:bg-muted/40",
               )}
             >
-              {/* Subtle floating action toolbar on hover */}
-              <div
-                className={cn(
-                  "flex items-center gap-1 absolute top-1.5 right-1.5 transition-opacity z-10",
-                  isFocused || block.hasUnsavedDraft
-                    ? "opacity-100"
-                    : "opacity-0 group-hover:opacity-100",
-                )}
-              >
+              {/* Keep actions visible and in flow for touch and keyboard access. */}
+              <div className="flex flex-wrap items-center justify-end gap-1 mb-1">
                 {/* Locator pill */}
                 <button
                   type="button"
@@ -223,18 +216,11 @@ export function DocumentSheetCanvas({
                 ) : null}
               </div>
 
-              {/* Selection Checkbox for Spell Check (visible on hover or when selected) */}
+              {/* Keep the checkbox within the canvas gutter on narrow screens. */}
               {canManage &&
               onToggleUnitSelection &&
               block.currentText.trim().length > 0 ? (
-                <div
-                  className={cn(
-                    "absolute -left-6 top-2 transition-opacity",
-                    isSelected
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100",
-                  )}
-                >
+                <div className="absolute left-1 sm:-left-4 top-2">
                   <Checkbox
                     checked={isSelected}
                     onCheckedChange={() =>
@@ -247,11 +233,11 @@ export function DocumentSheetCanvas({
 
               {/* Clean continuous typography */}
               {block.unit.kind === "heading" ? (
-                <h3 className="text-sm sm:text-base font-bold text-foreground leading-snug whitespace-pre-wrap pr-16 sm:pr-24">
+                <h3 className="text-sm sm:text-base font-bold text-foreground leading-snug whitespace-pre-wrap">
                   {block.currentText}
                 </h3>
               ) : (
-                <p className="text-sm text-foreground leading-relaxed font-sans whitespace-pre-wrap pr-8 sm:pr-16">
+                <p className="text-sm text-foreground leading-relaxed font-sans whitespace-pre-wrap">
                   {block.currentText}
                 </p>
               )}
