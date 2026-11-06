@@ -5,9 +5,7 @@ import { ApiProblemError } from "@/app/api/v1";
 import { getTokenState, subscribeToken } from "@/app/api/v1/session-token";
 import {
   Field,
-  FieldDescription,
   FieldError,
-  FieldLabel,
 } from "@/components/admin/field";
 import { FileUpload } from "@/components/admin/file-upload";
 import {
@@ -63,7 +61,7 @@ function RevisionUploadSession({
   workspaceId,
   collectionId,
   sourceId,
-  sourceTitle,
+  sourceTitle: _sourceTitle,
 }: RevisionUploadProps) {
   const addRevisionMutation = useAddRevision(
     workspaceId,
@@ -155,12 +153,10 @@ function RevisionUploadSession({
             <span className="flex size-8 items-center justify-center rounded-lg bg-muted">
               <FilePlus2 className="size-4" />
             </span>
-            Tải lên phiên bản mới
+            Tải tệp mới
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-xs">
-            Thêm một phiên bản tài liệu mới cho nguồn &ldquo;
-            {sourceTitle || sourceId}&rdquo;. Phiên bản cũ được lưu giữ bất biến
-            trong lịch sử.
+            Tải lên tệp mới cho tài liệu này. Phiên bản cũ vẫn được lưu trong lịch sử để đối chiếu.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
@@ -180,9 +176,6 @@ function RevisionUploadSession({
             ) : null}
 
             <Field>
-              <FieldLabel htmlFor="revision-file">
-                Tệp phiên bản mới <span className="text-destructive">*</span>
-              </FieldLabel>
               <FileUpload
                 accept={ACCEPT_UPLOAD}
                 multiple={false}
@@ -190,40 +183,37 @@ function RevisionUploadSession({
                 disabled={isSubmitting}
                 value={file ? [file] : []}
                 onFilesChange={handleFileChange}
+                compact
               />
-              {fileError ? (
-                <FieldError>{fileError}</FieldError>
-              ) : (
-                <FieldDescription>
-                  Chỉ chọn 1 tệp PDF hoặc DOCX (tối đa 60 MB). Tiêu đề nguồn sẽ
-                  được giữ nguyên.
-                </FieldDescription>
-              )}
+              {fileError ? <FieldError>{fileError}</FieldError> : null}
             </Field>
 
-            <div className="space-y-2 rounded-lg border p-3">
-              <div className="flex items-start gap-2">
+            <div className="space-y-1.5 rounded-lg border bg-muted/15 p-3">
+              <div className="flex items-start gap-2.5">
                 <Checkbox
                   id="revision-staged"
                   checked={staged}
                   disabled={isSubmitting}
+                  className="mt-0.5"
                   onCheckedChange={(checked) => {
                     setStaged(checked === true);
                     idempotencyKeyRef.current = generateIdempotencyKey();
                   }}
                 />
-                <Label
-                  htmlFor="revision-staged"
-                  className="text-sm leading-relaxed"
-                >
-                  Chuẩn bị bản thay thế, giữ bản đang phục vụ
-                </Label>
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="revision-staged"
+                    className="text-xs font-medium leading-none cursor-pointer select-none text-foreground"
+                  >
+                    Chế độ chuẩn bị (giữ bản hiện tại tiếp tục hoạt động)
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    {staged
+                      ? "Bản mới sẽ được đưa vào chế độ nháp để bóc tách và đối chiếu. Bản cũ vẫn phục vụ bình thường cho đến khi bạn xuất bản."
+                      : "Bản mới sẽ thay thế bản hiện tại ngay lập tức sau khi tải lên."}
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {staged
-                  ? "Sau upload: OCR → sửa văn bản → Compiler → duyệt phiên bản → Thay bản phục vụ. Chỉ chuyển khi chỉ mục mới sẵn sàng."
-                  : "Bản mới trở thành revision hiện hành ngay; nội dung cũ có thể hết phù hợp cho RAG trước khi bạn xuất bản lại."}
-              </p>
             </div>
 
             {isSubmitting ? (
@@ -255,7 +245,7 @@ function RevisionUploadSession({
               ) : (
                 <>
                   <FilePlus2 className="size-3.5" />
-                  <span>Tải lên phiên bản</span>
+                  <span>Tải lên</span>
                 </>
               )}
             </Button>

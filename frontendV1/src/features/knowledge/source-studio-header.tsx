@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import {
-  Archive,
   ArrowLeft,
   ClipboardList,
   Download,
@@ -10,12 +9,10 @@ import {
   History,
   Loader2,
   MoreHorizontal,
-  Pencil,
   Play,
   RotateCcw,
   Save,
   Sparkles,
-  Trash2,
   Undo2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -162,10 +159,10 @@ export interface SourceStudioHeaderProps {
   onDownload: (format: "raw" | "md" | "json" | "zip" | "pdf") => void;
   onOpenReRunDialog: () => void;
   onOpenUploadRevision: () => void;
-  onOpenRenameDialog: () => void;
-  onLifecycleAction: (action: "archive" | "delete") => void;
-  canArchive: boolean;
-  canDelete: boolean;
+  onOpenRenameDialog?: () => void;
+  onLifecycleAction?: (action: "archive" | "delete") => void;
+  canArchive?: boolean;
+  canDelete?: boolean;
 }
 
 export function SourceStudioHeader({
@@ -197,10 +194,10 @@ export function SourceStudioHeader({
   onDownload,
   onOpenReRunDialog,
   onOpenUploadRevision,
-  onOpenRenameDialog,
-  onLifecycleAction,
-  canArchive,
-  canDelete,
+  onOpenRenameDialog: _onOpenRenameDialog,
+  onLifecycleAction: _onLifecycleAction,
+  canArchive: _canArchive,
+  canDelete: _canDelete,
 }: SourceStudioHeaderProps) {
   return (
     <header className="border-b border-border/60 pb-2.5">
@@ -239,15 +236,17 @@ export function SourceStudioHeader({
             Tệp v{activeRevisionNo}
           </Badge>
 
-          <Badge
-            variant={statusInfo.variant}
-            className="text-xs font-normal h-5 shrink-0"
-          >
-            {statusInfo.status === "running" ? (
-              <Loader2 className="size-3 animate-spin mr-1 inline" />
-            ) : null}
-            {statusInfo.label}
-          </Badge>
+          {statusInfo.status !== "completed" ? (
+            <Badge
+              variant={statusInfo.variant}
+              className="text-xs font-normal h-5 shrink-0"
+            >
+              {statusInfo.status === "running" ? (
+                <Loader2 className="size-3 animate-spin mr-1 inline" />
+              ) : null}
+              {statusInfo.label}
+            </Badge>
+          ) : null}
 
           {!canManage ? (
             <Badge
@@ -261,9 +260,8 @@ export function SourceStudioHeader({
           {/* Integrated Version & Draft Selector */}
           {statusInfo.status === "completed" && doc ? (
             <div className="flex items-center gap-1.5 pl-1.5 border-l border-border/60 shrink-0">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <History className="size-3 text-primary" />
-                <span className="hidden sm:inline">Bản văn bản:</span>
+              <div className="flex items-center text-muted-foreground" title="Phiên bản văn bản">
+                <History className="size-3.5 text-muted-foreground" />
               </div>
               <Select
                 value={
@@ -331,14 +329,7 @@ export function SourceStudioHeader({
                     </Button>
                   ) : null}
                 </div>
-              ) : (
-                <Badge
-                  variant="secondary"
-                  className="text-[11px] py-0 h-6 hidden md:inline-flex"
-                >
-                  Đã lưu (v{doc.version})
-                </Badge>
-              )}
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -383,27 +374,25 @@ export function SourceStudioHeader({
             </Button>
           ) : null}
 
-          {/* Save changes (Primary when unsaved drafts exist) */}
-          {canManage && statusInfo.status === "completed" ? (
+          {/* Save changes (Only visible when unsaved drafts exist) */}
+          {canManage && statusInfo.status === "completed" && hasUnsavedDraft ? (
             <Button
               type="button"
               size="sm"
-              variant={hasUnsavedDraft ? "default" : "outline"}
-              className="h-8 text-xs gap-1.5"
-              disabled={!hasUnsavedDraft || isSaving || baseMovedOn}
+              variant="default"
+              className="h-8 text-xs gap-1.5 shadow-xs"
+              disabled={isSaving || baseMovedOn}
               onClick={onOpenSaveModal}
               aria-label="Lưu thay đổi"
             >
               <Save className="size-3.5" />
               <span>Lưu</span>
-              {hasUnsavedDraft ? (
-                <Badge
-                  variant="warning"
-                  className="ml-0.5 text-[10px] py-0 px-1 font-mono"
-                >
-                  {draftCount}
-                </Badge>
-              ) : null}
+              <Badge
+                variant="warning"
+                className="ml-0.5 text-[10px] py-0 px-1 font-mono"
+              >
+                {draftCount}
+              </Badge>
             </Button>
           ) : null}
 
@@ -438,16 +427,22 @@ export function SourceStudioHeader({
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-60 text-xs">
+            <DropdownMenuContent align="end" className="w-52 text-xs">
               <DropdownMenuItem
                 className="gap-2"
                 disabled={downloadingType !== null}
                 onClick={() => onDownload("raw")}
               >
                 <Download className="size-3.5 text-muted-foreground" />
-                <span className="truncate">
-                  Tải tệp gốc ({source.file_name})
-                </span>
+                {(() => {
+                  const extMatch = source.file_name?.match(/\.([a-zA-Z0-9]+)$/);
+                  const ext = extMatch ? `.${extMatch[1]}` : "";
+                  return (
+                    <span className="truncate">
+                      Tải tệp gốc {ext ? `(${ext})` : ""}
+                    </span>
+                  );
+                })()}
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="gap-2"
@@ -459,36 +454,6 @@ export function SourceStudioHeader({
                 <Download className="size-3.5 text-muted-foreground" />
                 <span>Tải bản Markdown (.md)</span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className="gap-2"
-                disabled={
-                  statusInfo.status !== "completed" || downloadingType !== null
-                }
-                onClick={() => onDownload("json")}
-              >
-                <Download className="size-3.5 text-muted-foreground" />
-                <span>Tải bản JSON cấu trúc (.json)</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="gap-2"
-                disabled={
-                  statusInfo.status !== "completed" || downloadingType !== null
-                }
-                onClick={() => onDownload("zip")}
-              >
-                <Download className="size-3.5 text-muted-foreground" />
-                <span>Tải gói ZIP kèm ảnh (.zip)</span>
-              </DropdownMenuItem>
-              {isDocxFile && statusInfo.status === "completed" && (
-                <DropdownMenuItem
-                  className="gap-2"
-                  disabled={downloadingType !== null}
-                  onClick={() => onDownload("pdf")}
-                >
-                  <Download className="size-3.5 text-muted-foreground" />
-                  <span>Tải PDF kết xuất từ Word (.pdf)</span>
-                </DropdownMenuItem>
-              )}
 
               {canManage ? (
                 <>
@@ -510,40 +475,10 @@ export function SourceStudioHeader({
                     onClick={onOpenUploadRevision}
                   >
                     <FilePlus2 className="size-3.5 text-muted-foreground" />
-                    <span>Tải phiên bản mới</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="gap-2"
-                    onClick={onOpenRenameDialog}
-                  >
-                    <Pencil className="size-3.5 text-muted-foreground" />
-                    <span>Đổi tên tài liệu</span>
+                    <span>Tải tệp mới</span>
                   </DropdownMenuItem>
                 </>
               ) : null}
-
-              {canArchive && (
-                <DropdownMenuItem
-                  className="gap-2"
-                  onClick={() => onLifecycleAction("archive")}
-                >
-                  <Archive className="size-3.5 text-muted-foreground" />
-                  <span>Lưu trữ tài liệu</span>
-                </DropdownMenuItem>
-              )}
-
-              {canDelete && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="gap-2 text-destructive focus:text-destructive"
-                    onClick={() => onLifecycleAction("delete")}
-                  >
-                    <Trash2 className="size-3.5" />
-                    <span>Xóa vĩnh viễn tài liệu</span>
-                  </DropdownMenuItem>
-                </>
-              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

@@ -1321,8 +1321,8 @@ export function OcrComparisonView({
                 className="flex-1 flex flex-col h-full min-h-0"
               >
                 {/* Header Tabs: Văn bản trang | Markdown | Chi tiết kỹ thuật */}
-                <div className="p-2 border-b bg-muted/20 flex items-center justify-between gap-2 flex-wrap">
-                  <TabsList className="h-8">
+                <div className="px-3 py-1.5 border-b bg-muted/20 flex items-center justify-between gap-2">
+                  <TabsList className="h-8 shrink-0">
                     {documentReviewOpen && (
                       <TabsTrigger
                         value="document-spelling"
@@ -1351,11 +1351,37 @@ export function OcrComparisonView({
                     </TabsTrigger>
                     <TabsTrigger value="json" className="text-xs gap-1.5 h-7">
                       <Code className="size-3 text-primary" />
-                      <span>Dữ liệu kỹ thuật</span>
+                      <span>JSON</span>
                     </TabsTrigger>
                   </TabsList>
 
                   <div className="flex items-center gap-1.5 text-xs">
+                    {activeTabRight === "content" &&
+                    canManage &&
+                    onSelectPageUnits &&
+                    selectablePageUnits.length > 0 ? (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
+                        <Checkbox
+                          id={`select-all-page-${activePageNumber}`}
+                          checked={allPageUnitsSelected}
+                          onCheckedChange={(checked) =>
+                            onSelectPageUnits(
+                              selectablePageUnits.map((u) => u.evidence_id),
+                              Boolean(checked),
+                            )
+                          }
+                          aria-label={`Chọn tất cả đoạn trên trang ${activePageNumber}`}
+                          className="size-3.5"
+                        />
+                        <label
+                          htmlFor={`select-all-page-${activePageNumber}`}
+                          className="text-[11px] font-medium text-muted-foreground hover:text-foreground cursor-pointer select-none"
+                        >
+                          {allPageUnitsSelected ? "Bỏ chọn" : "Chọn tất cả"}
+                        </label>
+                      </div>
+                    ) : null}
+
                     {activeTabRight === "markdown" ? (
                       <Button
                         type="button"
@@ -1481,49 +1507,30 @@ export function OcrComparisonView({
                         : "block",
                     )}
                   >
-                    {/* Thanh chọn phạm vi đoạn văn trên trang để gửi AI kiểm tra chính tả */}
+                    {/* Thanh thao tác hàng loạt - Chỉ hiển thị khi có đoạn được chọn */}
                     {canManage &&
                     selectablePageUnits.length > 0 &&
-                    (onToggleUnitSelection || onStartSpellCheck) ? (
-                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/30 px-3 py-1.5 text-xs">
-                        <div className="flex items-center gap-2 flex-wrap">
+                    selectedOnPageCount > 0 ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs animate-in fade-in-50">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="default" className="text-[11px] py-0 h-5">
+                            Đã chọn {selectedOnPageCount} / {selectablePageUnits.length} đoạn
+                          </Badge>
                           {onSelectPageUnits ? (
-                            <div className="flex items-center gap-2">
-                              <Checkbox
-                                id={`select-all-page-${activePageNumber}`}
-                                checked={allPageUnitsSelected}
-                                onCheckedChange={(checked) =>
-                                  onSelectPageUnits(
-                                    selectablePageUnits.map(
-                                      (u) => u.evidence_id,
-                                    ),
-                                    Boolean(checked),
-                                  )
-                                }
-                                aria-label={`Chọn tất cả đoạn trên trang ${activePageNumber}`}
-                              />
-                              <label
-                                htmlFor={`select-all-page-${activePageNumber}`}
-                                className="font-medium text-foreground cursor-pointer select-none"
-                              >
-                                Chọn đoạn trên trang {activePageNumber}
-                              </label>
-                            </div>
-                          ) : (
-                            <span className="font-medium text-foreground">
-                              Trang {activePageNumber}:{" "}
-                              {selectablePageUnits.length} đoạn/ô có chữ
-                            </span>
-                          )}
-
-                          {selectedUnitIds ? (
-                            <Badge
-                              variant="secondary"
-                              className="text-[11px] py-0"
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                              onClick={() =>
+                                onSelectPageUnits(
+                                  selectablePageUnits.map((u) => u.evidence_id),
+                                  false,
+                                )
+                              }
                             >
-                              Đã chọn {selectedOnPageCount} /{" "}
-                              {selectablePageUnits.length} đoạn trên trang
-                            </Badge>
+                              Bỏ chọn
+                            </Button>
                           ) : null}
                         </div>
 
@@ -1531,28 +1538,17 @@ export function OcrComparisonView({
                           <Button
                             type="button"
                             size="sm"
-                            variant="outline"
-                            className="h-7 px-2.5 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
+                            className="h-7 px-2.5 text-xs gap-1.5"
                             onClick={() =>
                               onStartSpellCheck(
-                                selectedOnPageCount > 0 && selectedUnitIds
-                                  ? selectablePageUnits
-                                      .filter((u) =>
-                                        selectedUnitIds.has(u.evidence_id),
-                                      )
-                                      .map((u) => u.evidence_id)
-                                  : selectablePageUnits.map(
-                                      (u) => u.evidence_id,
-                                    ),
+                                selectablePageUnits
+                                  .filter((u) => selectedUnitIds?.has(u.evidence_id))
+                                  .map((u) => u.evidence_id),
                               )
                             }
                           >
                             <Sparkles className="size-3.5" />
-                            <span>
-                              {selectedOnPageCount > 0
-                                ? `Kiểm tra ${selectedOnPageCount} đoạn đã chọn`
-                                : `Kiểm tra trang ${activePageNumber} (${selectablePageUnits.length} đoạn)`}
-                            </span>
+                            <span>Soát {selectedOnPageCount} đoạn đã chọn</span>
                           </Button>
                         ) : null}
                       </div>

@@ -29,6 +29,7 @@ export type FileUploadProps = {
   progress?: number;
   progressLabel?: string;
   className?: string;
+  compact?: boolean;
 };
 
 function formatFileSize(size: number): string {
@@ -160,6 +161,7 @@ function FileUpload({
   progress,
   progressLabel = "Đang tải",
   className,
+  compact = false,
 }: FileUploadProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
@@ -274,17 +276,18 @@ function FileUpload({
             disabled
               ? "pointer-events-none opacity-50 cursor-not-allowed"
               : "cursor-pointer hover:border-primary/60 hover:bg-muted/35",
-            "p-6 sm:p-7",
+            compact ? "p-4 sm:p-5" : "p-6 sm:p-7",
             dragging && "border-primary bg-primary/10 ring-2 ring-primary/20 scale-[0.99]",
           )}
         >
           <div
             className={cn(
-              "flex size-13 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20 shadow-xs transition-transform duration-200 group-hover:scale-105",
+              "flex items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20 shadow-xs transition-transform duration-200 group-hover:scale-105",
+              compact ? "size-10 rounded-xl" : "size-13 rounded-2xl",
               dragging && "scale-110 bg-primary/20 animate-pulse",
             )}
           >
-            <UploadCloud className="size-6 text-primary" />
+            <UploadCloud className={cn("text-primary", compact ? "size-5" : "size-6")} />
           </div>
 
           <div className="mt-3 space-y-1">
@@ -324,19 +327,21 @@ function FileUpload({
             ) : null}
           </div>
 
-          <div className="mt-3.5">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={disabled}
-              className="h-8 pointer-events-none border-primary/30 text-primary shadow-2xs group-hover:bg-primary group-hover:text-primary-foreground transition-colors gap-1.5 text-xs font-medium"
-              tabIndex={-1}
-            >
-              <Upload className="size-3.5" />
-              <span>Duyệt tệp từ thiết bị</span>
-            </Button>
-          </div>
+          {!compact ? (
+            <div className="mt-3.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={disabled}
+                className="h-8 pointer-events-none border-primary/30 text-primary shadow-2xs group-hover:bg-primary group-hover:text-primary-foreground transition-colors gap-1.5 text-xs font-medium"
+                tabIndex={-1}
+              >
+                <Upload className="size-3.5" />
+                <span>Duyệt tệp từ thiết bị</span>
+              </Button>
+            </div>
+          ) : null}
         </label>
       ) : (
         /* Trường hợp 2: Đã có tệp được chọn -> Thanh công cụ + Danh sách tệp + Dải thả thêm */
