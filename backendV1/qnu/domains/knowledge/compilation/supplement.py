@@ -6,11 +6,13 @@ import hashlib
 import re
 from collections import defaultdict
 from datetime import date
+from itertools import groupby
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.schemas import SegmentDraftContent
+from qnu.domains.knowledge.compilation.units import Unit, build_units
 from qnu.domains.knowledge.metadata import RetrievalAnnotation, _invalid, attribute_in_quote
 from qnu.domains.knowledge.source_sections import source_sections
 
@@ -28,6 +30,14 @@ Scope local gắn vào đoạn/ô, row nếu ghi rõ cho toàn hàng, section n�
 trực tiếp nêu giá trị cho cả mục, document chỉ cho thông tin
 ban hành/hiệu lực toàn văn. Bỏ đề xuất không đủ căn cứ. Dùng [] cho danh sách rỗng.
 """
+SELECTIVE_PROMPT = (
+    SUPPLEMENT_PROMPT
+    + """
+Chỉ trả gợi ý hữu ích cho khối owned. Nếu đề xuất tiêu đề, nêu ngắn gọn nhóm nội dung
+mà tiêu đề bao quát và dẫn đúng các khối liên quan. Không chép lại đoạn nguồn,
+không đề xuất tiêu đề đã có. Khi thiếu căn cứ để bổ sung, trả danh sách rỗng.
+"""
+)
 RULE_VERSION = "qnu.compiler.metadata-rules/v1"
 KNOWN_FIELDS = {
     "issued_year",
@@ -47,6 +57,64 @@ EFFECTIVE = {
 }
 NUMERIC_DATE = r"\s*(?:ngày\s+)?(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?!\d)"
 WRITTEN_DATE = r"\s*ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})(?!\d)"
+_DOCUMENT_FIELD = re.compile(
+    r"(?im)^\s*(?:số\s+hiệu(?:\s+văn\s+bản)?|ký\s+hiệu\s+văn\s+bản|"
+    r"số\s+văn\s+bản|ngày\s+ký|ngày\s+phát\s+hành)\s*[:：]\s*\S"
+)
+
+
+def select_units(documents: list[dict]) -> list[Unit]:
+    """Select unlabeled narrative and explicit, unresolved document fields."""
+    outline = source_sections(documents)
+    units = build_units(documents)
+    prose = set()
+    metadata = set()
+    for unit in units:
+        pages = documents[unit.document_index]["pages"]
+        blocks = pages[unit.page_index]["blocks"]
+        block = blocks[unit.block_index]
+        if block.get("table") or block.get("requires_review") or block.get("type") == "figure":
+            continue
+        text = block["text"].strip()
+        ref = f"{unit.ocr_run_id}:{unit.evidence_id}"
+        if len(text.split()) >= 12 and not outline[ref].heading:
+            prose.add(unit)
+        boundary = (unit.page_index == 0 and unit.block_index < 8) or (
+            unit.page_index == len(pages) - 1 and unit.block_index >= len(blocks) - 8
+        )
+        if boundary and _DOCUMENT_FIELD.search(text) and not _rules(ref, text, boundary):
+            metadata.add(unit)
+
+    def location(unit: Unit) -> tuple[int, int, bool]:
+        return unit.document_index, unit.page_index, unit in prose
+
+    selected = set(metadata)
+    for (_, _, eligible), group in groupby(units, key=location):
+        blocks = list(group)
+        if eligible and len(blocks) >= 2:
+            selected.update(blocks)
+    return [unit for unit in units if unit in selected]
+
+
+def useful_sections(part: dict, owned: list[dict], documents: list[dict]) -> list[dict]:
+    def normalized(text: str) -> str:
+        return " ".join(text.casefold().split())
+
+    owned_texts = _source_texts(owned)
+    original = {normalized(text) for text, _ in _source_texts(documents).values()}
+    sections = []
+    for section in part["sections"]:
+        if normalized(section["heading"]) in original:
+            continue
+        paragraphs = [
+            paragraph
+            for paragraph in section["paragraphs"]
+            if any(ref in owned_texts for ref in paragraph["citations"])
+            and normalized(paragraph["text"]) not in original
+        ]
+        if paragraphs:
+            sections.append({**section, "paragraphs": paragraphs})
+    return sections
 
 
 class MetadataCandidate(BaseModel):

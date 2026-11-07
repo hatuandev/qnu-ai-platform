@@ -92,11 +92,11 @@ def compiler_url(workspace_id: str, collection_id: str) -> str:
     return f"{API}/workspaces/{workspace_id}/collections/{collection_id}/compilation-runs"
 
 
-def processed_input(client, *, code="compiler-input") -> dict:
+def processed_input(client, *, code="compiler-input", response: str | None = None) -> dict:
     workspace = workspace_with_editor(client, code)
     as_actor(EDITOR)
     with FakeNemotron() as provider:
-        provider.responses = [TABLE_RESPONSE]
+        provider.responses = [TABLE_RESPONSE if response is None else response]
         ocr_provider = setup_ocr_provider(client, workspace["id"], provider.base_url)
         collection, source, revision = prepare_source(client, workspace["id"], "Compiler input")
         requested = request_run(

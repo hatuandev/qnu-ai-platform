@@ -63,79 +63,37 @@ const props = {
   onClose: vi.fn(),
 };
 
-it("submits the pinned version in fast mode without AI generation settings", async () => {
-  render(<CompilationDialog {...props} initialRun={run} />);
-  fireEvent.click(screen.getByRole("checkbox", { name: "Biên soạn nhanh" }));
-  expect(screen.queryByRole("button", { name: "Cài đặt nâng cao" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu biên soạn" }));
-  await waitFor(() => expect(create).toHaveBeenCalledOnce());
-  expect(create.mock.calls[0][0].input).toEqual({
-    topic: "Source",
-    ocr_run_ids: ["run-1"],
-    text_versions: { "run-1": 1 },
-    source_first: true,
-    auto_review: false,
-  });
-});
-it("keeps compiler configuration when parent renders the same pinned input again", async () => {
+it("keeps the request key when the parent rerenders the same pinned source", async () => {
   const view = render(<CompilationDialog {...props} initialRun={{ ...run }} />);
-  fireEvent.change(screen.getByLabelText(/Chủ đề biên soạn/), {
-    target: { value: "User-entered topic" },
-  });
-  expect(
-    (screen.getByLabelText(/Chủ đề biên soạn/) as HTMLTextAreaElement).value,
-  ).toBe("User-entered topic");
-  fireEvent.click(screen.getByRole("button", { name: "Cài đặt nâng cao" }));
-  fireEvent.change(
-    screen.getByLabelText(/Giới hạn Output Tokens \(Tùy chọn\)/),
-    { target: { value: "2048" } },
-  );
-  fireEvent.click(screen.getByRole("switch"));
-  view.rerender(<CompilationDialog {...props} initialRun={{ ...run }} />);
-  expect(
-    (screen.getByLabelText(/Chủ đề biên soạn/) as HTMLTextAreaElement).value,
-  ).toBe("User-entered topic");
-  expect(
-    (
-      screen.getByLabelText(
-        /Giới hạn Output Tokens \(Tùy chọn\)/,
-      ) as HTMLInputElement
-    ).value,
-  ).toBe("2048");
-  expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");
-  fireEvent.click(screen.getByRole("button", { name: "Cài đặt nâng cao" }));
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu biên soạn" }));
   await waitFor(() => expect(create).toHaveBeenCalledOnce());
-  expect(create.mock.calls[0][0]).toMatchObject({
-    input: {
-      topic: "User-entered topic",
-      text_versions: { "run-1": 1 },
-      max_output_tokens: 2048,
-      auto_review: false,
-    },
-  });
+  view.rerender(<CompilationDialog {...props} initialRun={{ ...run }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu biên soạn" }));
+  await waitFor(() => expect(create).toHaveBeenCalledTimes(2));
+  expect(create.mock.calls[0][0]).toEqual(create.mock.calls[1][0]);
 });
-it("starts a fresh configuration when reopened or switched to another pinned version", () => {
+it("uses a fresh request key on reopening or switching the pinned version", async () => {
   const view = render(<CompilationDialog {...props} initialRun={run} />);
-  const enter = () =>
-    fireEvent.change(screen.getByLabelText(/Chủ đề biên soạn/), {
-      target: { value: "Old topic" },
-    });
-  enter();
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu biên soạn" }));
+  await waitFor(() => expect(create).toHaveBeenCalledOnce());
   view.rerender(
     <CompilationDialog {...props} isOpen={false} initialRun={run} />,
   );
   view.rerender(<CompilationDialog {...props} initialRun={run} />);
-  expect(
-    (screen.getByLabelText(/Chủ đề biên soạn/) as HTMLTextAreaElement).value,
-  ).toBe("");
-  enter();
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu biên soạn" }));
+  await waitFor(() => expect(create).toHaveBeenCalledTimes(2));
   view.rerender(
     <CompilationDialog {...props} initialRun={{ ...run, textVersion: 2 }} />,
   );
-  expect(
-    (screen.getByLabelText(/Chủ đề biên soạn/) as HTMLTextAreaElement).value,
-  ).toBe("");
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu biên soạn" }));
+  await waitFor(() => expect(create).toHaveBeenCalledTimes(3));
+  const keys = create.mock.calls.map(([request]) => request.idempotencyKey);
+  expect(keys.every((key) => typeof key === "string")).toBe(true);
+  expect(new Set(keys).size).toBe(3);
+  expect(create.mock.calls[2][0].input).toMatchObject({
+    ocr_run_ids: ["run-1"],
+    text_versions: { "run-1": 2 },
+  });
 });
 
 it("opens with the pinned saved version and automatic settings, without technical fields", async () => {
@@ -143,30 +101,30 @@ it("opens with the pinned saved version and automatic settings, without technica
     <CompilationDialog {...props} initialRun={{ ...run, textVersion: 6 }} />,
   );
   expect(screen.getByText("Bản đã lưu v6 · Tệp v1")).toBeTruthy();
+  expect(screen.queryByLabelText(/Chủ đề biên soạn/)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Thêm tài liệu" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Thao tác nguồn/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Cài đặt nâng cao" })).toBeNull();
+  expect(
+    screen.queryByRole("checkbox", { name: "Biên soạn nhanh" }),
+  ).toBeNull();
+  expect(screen.queryByRole("switch")).toBeNull();
   expect(screen.queryByLabelText(/Giới hạn Output Tokens/)).toBeNull();
   expect(screen.queryByText("Tài liệu nguồn")).toBeNull();
   expect(screen.queryByText(/Run ID:|Gen #|Khóa:/)).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu biên soạn" }));
   await waitFor(() => expect(create).toHaveBeenCalledOnce());
-  expect(create.mock.calls[0][0]).toMatchObject({
-    input: {
-      topic: "Source",
-      ocr_run_ids: ["run-1"],
-      text_versions: { "run-1": 6 },
-      provider_id: null,
-      max_output_tokens: null,
-      structured_output: false,
-      auto_review: true,
-      review_provider_id: null,
-      review_max_output_tokens: null,
-    },
+  expect(create.mock.calls[0][0].input).toEqual({
+    topic: "Source",
+    ocr_run_ids: ["run-1"],
+    text_versions: { "run-1": 6 },
+    selective_supplement: true,
+    auto_review: false,
   });
 });
 
-it("lets a user open source selection and advanced options only when needed", () => {
-  render(<CompilationDialog {...props} initialRun={run} />);
-  fireEvent.click(screen.getByRole("button", { name: "Thêm tài liệu" }));
-  expect(screen.getByText("Tài liệu nguồn")).toBeTruthy();
+it("keeps advanced options in the collection entry point", () => {
+  render(<CompilationDialog {...props} />);
   fireEvent.click(screen.getByRole("button", { name: "Cài đặt nâng cao" }));
   expect(
     screen.getByLabelText(/Giới hạn Output Tokens \(Tùy chọn\)/),
@@ -177,6 +135,8 @@ it("lets a user open source selection and advanced options only when needed", ()
 
 it("opens the source picker for compilation started from a collection", () => {
   render(<CompilationDialog {...props} />);
+  expect(screen.getByLabelText(/Chủ đề biên soạn/)).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Thêm tài liệu" })).toBeTruthy();
   expect(screen.getByText("Tài liệu nguồn")).toBeTruthy();
   expect(
     screen
@@ -184,22 +144,16 @@ it("opens the source picker for compilation started from a collection", () => {
       .hasAttribute("disabled"),
   ).toBe(true);
 });
-it("sends the hybrid mode with the saved source version and an automatic budget", async () => {
-  render(<CompilationDialog {...props} initialRun={run} />);
+it("keeps the legacy hybrid controls at the collection entry point", () => {
+  render(<CompilationDialog {...props} />);
   fireEvent.click(screen.getByRole("checkbox", { name: "Biên soạn nhanh" }));
   fireEvent.click(
     screen.getByRole("checkbox", { name: "AI bổ sung cấu trúc và metadata" }),
   );
-  expect(screen.getByRole("button", { name: "Cài đặt nâng cao" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu biên soạn" }));
-  await waitFor(() => expect(create).toHaveBeenCalledOnce());
-  const input = create.mock.calls[0][0].input;
-  expect(input).toMatchObject({
-    ai_supplement: true,
-    text_versions: { "run-1": 1 },
-    provider_id: null,
-    max_output_tokens: null,
-    auto_review: false,
-  });
-  expect(input).not.toHaveProperty("source_first");
+  fireEvent.click(screen.getByRole("button", { name: "Cài đặt nâng cao" }));
+  expect(
+    screen
+      .getByRole("switch", { name: "Rà soát sau khi biên soạn" })
+      .getAttribute("aria-checked"),
+  ).toBe("false");
 });

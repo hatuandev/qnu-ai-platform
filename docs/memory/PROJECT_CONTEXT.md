@@ -7,6 +7,20 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-11-07 — Context895 — Nút đóng bảng biên soạn.** Nút × ẩn toàn bộ bảng, không hủy job; lượt mới tự hiện. 26 ca FE liên quan, Biome/build và Chromium390/1280px đạt. Không đổi DB/backend/dịch vụ. [Nhật ký](../nhat_ky/2026-11-07_phien_895_dong_bang_bien_soan.md), [Snapshot](./snapshots/2026-11-07_session_895.md).
+
+- **2026-11-07 — Context894 — Theo dõi biên soạn nền.** Tạo lượt giữ nguyên trang tệp, bảng góc phải theo dõi tiến độ nhóm thật; thu gọn/chuyển trang không dừng job. Danh sách theo actor/session, không lưu browser storage. 24 FE liên quan, Biome/build/TypeScript và Chromium390/1280px sáng/tối đạt; full FE842 pass/10 fail ngoài phạm vi ở OCR806/replacement678/publication. Không gọi model/sửa DB/restart app/push. [Nhật ký](../nhat_ky/2026-11-07_phien_894_bang_tien_do_bien_soan.md), [Snapshot](./snapshots/2026-11-07_session_894.md).
+
+- **2026-11-07 — Context893 — Biên soạn thống nhất.** Từ tài liệu giữ bản nền đầy đủ và chỉ AI bổ sung nhóm được chọn, xem trước sớm; lỗi AI giữ nguồn và gợi ý con đã hoàn tất, báo incomplete. Không auto review; metadata cần người dùng xác nhận. 32 ca backend liên quan, 21 FE, Ruff/Biome/build và Chromium 390/1280 px đạt. Full backend 1.477 pass/9 fail/3 skip; lỗi helper và môi trường đã kiểm lại đạt, còn hai lỗi nền chunker770/context767 ngoài batch. Chưa gọi model thật mới, không thay dữ liệu ứng dụng hoặc push. [Nhật ký](../nhat_ky/2026-11-07_phien_893_bien_soan_thong_nhat.md), [Snapshot](./snapshots/2026-11-07_session_893.md).
+
+- **2026-11-06 — Context892 — Kiểm chứng biên soạn kết hợp với Qwen.** Lượt live đầu tiên đạt 4/4 nhóm với độ đồng thời 2, hoàn tất sau 38,84 giây và dùng tổng 80.926 token. Bản nháp giữ 433/433 khối chữ. Bốn đoạn AI đều trùng nguồn, ba đề xuất metadata cùng giá trị cục bộ. Chưa kết luận lợi ích trên tài liệu có bảng hoặc PDF scan. [Nhật ký](../nhat_ky/2026-11-06_phien_892_bien_soan_ket_hop_live.md), [Snapshot](./snapshots/2026-11-06_session_892.md).
+
+- **2026-11-06 — Context891 — Dùng cấu hình mặc định khi biên soạn tệp.** Hộp thoại tài liệu bỏ Cài đặt nâng cao, dùng mặc định ModelOps và hiển thị công tắc rà soát cho chế độ AI. Tùy chọn nâng cao vẫn có ở bộ sưu tập. Biome, build, 32 test FE và Chromium ở 390, 1280 px đạt. [Nhật ký](../nhat_ky/2026-11-06_phien_891_bien_soan_mac_dinh_modelops.md), [Snapshot](./snapshots/2026-11-06_session_891.md).
+
+- **2026-11-06 — Context890 — Biên soạn tệp đang mở.** Hộp thoại từ trang tài liệu dùng tên tệp và đúng phiên bản đang xem, ẩn ô chủ đề và nút thêm nguồn. Biome, build, 32 test FE và Chromium ở 390, 1280 px đạt. [Nhật ký](../nhat_ky/2026-11-06_phien_890_gon_hop_thoai_bien_soan.md), [Snapshot](./snapshots/2026-11-06_session_890.md).
+
+- **2026-11-06 — Context889 — Hiển thị ô Chọn tất cả trong OCR.** Thanh tab và thao tác tự chia hàng để ô chọn không bị cắt. Biome, build và Chromium ở 320, 390, 1280 px đạt. [Nhật ký](../nhat_ky/2026-11-06_phien_889_ocr_chon_tat_ca.md), [Snapshot](./snapshots/2026-11-06_session_889.md).
+
 - **2026-11-06 — Context888 — Đánh giá RAG trong Cấu hình.** Bỏ Công cụ nâng cao và liên kết chỉ mục khỏi trang kho; chuyển đánh giá vào Nhật ký & Bảo trì dữ liệu theo quyền quản trị/editor, sidebar đánh dấu Cấu hình. Settings hiện khởi tạo lại shell nên chọn kho trước. 62 test FE, build/TypeScript đạt; Chromium390px/1280px đọc toolbar/Settings và chọn kho mở evaluation, đã xem ảnh. Biome exit0 còn một warning cũ; không thay backend/index tự động/dữ liệu/dịch vụ. [Nhật ký](../nhat_ky/2026-11-06_phien_888_danh_gia_rag_trong_cau_hinh.md), [Snapshot](./snapshots/2026-11-06_session_888.md).
 
 - **2026-11-06 — Context887 — Gọn menu quản lý kho.** Giữ bốn thao tác quản lý theo quyền, bỏ lối hỏi đáp; chuyển chỉ mục/đánh giá RAG vào Công cụ nâng cao ở thanh danh sách tài liệu. 40 ca FE, build/TypeScript đạt; Chromium đọc app thật 390px/1280px kiểm hai menu, đã xem ảnh. Biome exit0 còn một warning cũ. Không đổi backend hoặc dữ liệu/dịch vụ. [Nhật ký](../nhat_ky/2026-11-06_phien_887_menu_quan_ly_kho.md), [Snapshot](./snapshots/2026-11-06_session_887.md).

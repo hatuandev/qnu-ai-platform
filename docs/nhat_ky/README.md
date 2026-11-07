@@ -1,5 +1,19 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên895 — Đóng bảng biên soạn](2026-11-07_phien_895_dong_bang_bien_soan.md).
+
+- [Phiên894 — Bảng tiến độ biên soạn nền](2026-11-07_phien_894_bang_tien_do_bien_soan.md).
+
+- [Phiên893 — Biên soạn thống nhất, bổ sung AI có chọn lọc](2026-11-07_phien_893_bien_soan_thong_nhat.md).
+
+- [Phiên892 — Kiểm chứng biên soạn kết hợp với Qwen](2026-11-06_phien_892_bien_soan_ket_hop_live.md).
+
+- [Phiên891 — Dùng cấu hình mặc định khi biên soạn tệp](2026-11-06_phien_891_bien_soan_mac_dinh_modelops.md).
+
+- [Phiên890 — Biên soạn tệp đang mở](2026-11-06_phien_890_gon_hop_thoai_bien_soan.md).
+
+- [Phiên889 — Hiển thị ô Chọn tất cả trong OCR](2026-11-06_phien_889_ocr_chon_tat_ca.md).
+
 - [Phiên888 — Đánh giá RAG trong Cấu hình](2026-11-06_phien_888_danh_gia_rag_trong_cau_hinh.md).
 
 - [Phiên887 — Gọn menu quản lý kho](2026-11-06_phien_887_menu_quan_ly_kho.md).

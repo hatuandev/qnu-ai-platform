@@ -128,14 +128,19 @@ function CompilationDetailSession({
   const run = runQuery.data;
 
   const isCompleted = run?.status === "completed";
+  const isActive = run?.status === "queued" || run?.status === "running";
+  const isSourcePreview = Boolean(run?.selective_supplement && !isCompleted);
   const draftQuery = useCompilationDraftQuery(
     workspaceId,
     collectionId,
     runId,
     {
       enabled: Boolean(
-        isCompleted && (visitedTabs.has("draft") || isRegisterDialogOpen),
+        (isCompleted || isSourcePreview) &&
+          (visitedTabs.has("draft") || isRegisterDialogOpen),
       ),
+      partial: isSourcePreview,
+      poll: isSourcePreview && isActive,
     },
   );
 
@@ -378,20 +383,6 @@ function CompilationDetailSession({
             </div>
           </div>
 
-          {/* Điều kiện chuyển bước rõ ràng */}
-          <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground flex flex-wrap items-center justify-between gap-2">
-            <span>
-              <strong className="text-foreground">
-                Điều kiện chuyển bước:
-              </strong>{" "}
-              {isCompleted
-                ? "1. Xem nội dung, dẫn chứng và báo cáo AI nếu có → 2. Chỉnh sửa nếu cần, xem trước và xác nhận lưu bản mới → 3. Đăng ký đúng bản đã kiểm tra để Duyệt & Phát hành."
-                : run.status === "running" || run.status === "queued"
-                  ? "Đang chờ tiến trình biên soạn hoàn tất sinh bản thảo có trích dẫn…"
-                  : "Lượt biên soạn chưa hoàn tất. Hãy kiểm tra thông báo lỗi hoặc tạo lượt biên soạn mới."}
-            </span>
-          </div>
-
           {/* Metadata Row */}
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 pt-2 border-t text-xs text-muted-foreground">
             <div>
@@ -417,11 +408,13 @@ function CompilationDetailSession({
               ) : (
                 <span className="inline-flex items-center gap-1 font-semibold text-primary">
                   <Sparkles className="size-3" />
-                  {run.source_first
-                    ? "Biên soạn nhanh từ nguồn"
-                    : run.ai_supplement
-                      ? "Biên soạn nhanh + AI bổ sung"
-                      : "AI Compiler"}
+                  {run.selective_supplement
+                    ? "Biên soạn từ nguồn"
+                    : run.source_first
+                      ? "Biên soạn nhanh từ nguồn"
+                      : run.ai_supplement
+                        ? "Biên soạn nhanh + AI bổ sung"
+                        : "AI Compiler"}
                 </span>
               )}
             </div>
@@ -466,15 +459,17 @@ function CompilationDetailSession({
       </Card>
 
       {/* Running / Queued Polling Banner */}
-      {(run.status === "running" || run.status === "queued") && (
+      {isActive && (
         <Alert className="rounded-xl border-primary/30 bg-primary/5 text-xs py-3">
           <Loader2 className="size-4 animate-spin text-primary shrink-0" />
           <AlertTitle className="text-xs font-semibold text-foreground">
             {run.status === "queued"
               ? "Lượt biên soạn đang chờ xếp lịch xử lý..."
-              : run.source_first
-                ? "Đang kiểm tra nguồn và dựng bản nháp..."
-                : "Mô hình AI đang tổng hợp và trích xuất bản biên soạn..."}
+              : isSourcePreview && draft
+                ? "Bản nháp đã có. Đang chuẩn bị đề xuất bổ sung…"
+                : run.source_first || run.selective_supplement
+                  ? "Đang kiểm tra nguồn và dựng bản nháp..."
+                  : "Mô hình AI đang tổng hợp và trích xuất bản biên soạn..."}
           </AlertTitle>
           <AlertDescription className="text-muted-foreground text-[11px] mt-1">
             Giao diện sẽ tự động cập nhật ngay khi quá trình hoàn tất. Bạn có
@@ -539,7 +534,7 @@ function CompilationDetailSession({
           hidden={currentTab !== "draft"}
           className="space-y-6 pt-4 data-[state=inactive]:hidden"
         >
-          {!isCompleted ? (
+          {!isCompleted && !draft && !draftQuery.isError ? (
             <Card className="rounded-xl p-10 text-center text-xs text-muted-foreground">
               <p>
                 Chưa có bản nháp biên soạn cho lượt này (trạng thái:{" "}
@@ -560,59 +555,83 @@ function CompilationDetailSession({
             </Card>
           ) : (
             <div className="space-y-6">
+              {draft.supplement?.state === "incomplete" && (
+                <Alert>
+                  <AlertCircle className="size-4" />
+                  <AlertTitle>
+                    Bản nháp đã sẵn sàng. Phần AI chưa hoàn tất.
+                  </AlertTitle>
+                  <AlertDescription>
+                    {(draft.supplement.failure_code ||
+                      draft.supplement.planning_error) &&
+                      formatCompilationError(
+                        draft.supplement.failure_code ||
+                          draft.supplement.planning_error ||
+                          "",
+                        "Chưa hoàn tất phần bổ sung bằng AI.",
+                      )}
+                    <ul className="list-disc pl-4">
+                      {draft.supplement.incomplete_groups?.map((group) => (
+                        <li key={group.index}>
+                          Nhóm {group.index} ·{" "}
+                          {group.code
+                            ? formatCompilationError(
+                                group.code,
+                                "Chưa có kết quả.",
+                              )
+                            : "Chưa xử lý"}
+                        </li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
               {draft.supplement &&
                 (draft.supplement.sections.length > 0 ||
                   draft.supplement.metadata.length > 0) && (
-                  <section className="space-y-2 text-sm">
-                    <h2 className="font-semibold">Đề xuất bổ sung</h2>
-                    <p className="text-muted-foreground">
-                      {draft.supplement.metadata.length} đề xuất metadata có dẫn
-                      chứng. Có thể đối chiếu và xác nhận khi đăng ký tài liệu.
-                    </p>
+                  <div className="space-y-3">
+                    {draft.supplement.metadata.length > 0 && (
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-primary/25 bg-primary/5 text-xs text-primary shadow-2xs">
+                        <span className="flex items-center gap-2 font-medium">
+                          <Sparkles className="size-4 text-primary shrink-0" />
+                          <span>
+                            Có <strong>{draft.supplement.metadata.length}</strong> đề xuất metadata có dẫn chứng từ mô hình AI (đối chiếu và xác nhận khi đăng ký).
+                          </span>
+                        </span>
+                      </div>
+                    )}
                     {draft.supplement.sections.map((part) => (
-                      <details key={part.segment} className="border-b py-2">
-                        <summary className="cursor-pointer">
-                          Gợi ý AI · Nhóm {part.segment}
+                      <details
+                        key={part.segment}
+                        className="rounded-xl border border-border/70 bg-card p-3 text-xs"
+                      >
+                        <summary className="cursor-pointer font-semibold flex items-center justify-between">
+                          <span>Gợi ý AI · Nhóm {part.segment}</span>
+                          <span className="text-[11px] text-muted-foreground font-normal">
+                            Nhấp để xem
+                          </span>
                         </summary>
-                        <div className="space-y-2 py-2">
+                        <div className="space-y-2 pt-3 border-t mt-2">
                           <CompilationDraftSections
                             sections={part.sections}
                             onSelectCitation={handleOpenCitation}
                           />
                           {part.unknowns.length > 0 && (
-                            <p className="text-muted-foreground">
-                              Cần đối chiếu · {part.unknowns.join(" · ")}
+                            <p className="text-muted-foreground italic">
+                              Cần đối chiếu: {part.unknowns.join(" · ")}
                             </p>
                           )}
                         </div>
                       </details>
                     ))}
-                  </section>
-                )}
-              {/* Draft Document View */}
-              <Card className="rounded-xl shadow-2xs">
-                <CardHeader className="p-4 sm:p-5 border-b bg-muted/10">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <CardTitle className="text-base font-bold text-foreground">
-                      {draft.title}
-                    </CardTitle>
-                    <Badge
-                      variant="outline"
-                      className="text-[11px] self-start sm:self-auto"
-                    >
-                      Bản nháp chưa duyệt (Draft)
-                    </Badge>
                   </div>
-                </CardHeader>
-
-                <CardContent className="p-4 sm:p-6 space-y-6 text-sm">
-                  <CompilationDraftSections
-                    sections={draft.sections}
-                    readingGroups={draft.reading_groups}
-                    onSelectCitation={handleOpenCitation}
-                  />
-                </CardContent>
-              </Card>
+                )}
+              {/* Draft Document View (Studio 2 Cột / Bảng / Toàn văn) */}
+              <CompilationDraftSections
+                sections={draft.sections}
+                readingGroups={draft.reading_groups}
+                onSelectCitation={handleOpenCitation}
+              />
 
               {/* Unknowns Callout */}
               {draft.unknowns && draft.unknowns.length > 0 && (
@@ -644,49 +663,54 @@ function CompilationDetailSession({
                 </Card>
               )}
 
-              {/* Source Tables (Read-Only) */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                    <Layers className="size-4 text-primary" />
-                    <span>
-                      Các bảng nguồn đính kèm (
-                      {draft.source_tables?.length ?? 0})
+              {/* Source Tables (Read-Only) - Chỉ hiển thị khi có bảng thực tế */}
+              {draft.source_tables && draft.source_tables.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      <Layers className="size-4 text-primary" />
+                      <span>
+                        Các bảng nguồn đính kèm ({draft.source_tables.length})
+                      </span>
+                    </h3>
+                    <span className="text-[11px] text-muted-foreground">
+                      Bảo toàn nguyên cấu trúc hàng, cột, ô trống và số liệu gốc.
                     </span>
-                  </h3>
-                  <span className="text-[11px] text-muted-foreground">
-                    Bảo toàn nguyên cấu trúc hàng, cột, ô trống và số liệu gốc.
-                  </span>
+                  </div>
+                  <SourceTablesView
+                    tables={draft.source_tables}
+                    onSelectCitation={handleOpenCitation}
+                    deferContent
+                  />
                 </div>
-                <SourceTablesView
-                  tables={draft.source_tables ?? []}
-                  onSelectCitation={handleOpenCitation}
-                  deferContent
-                />
-              </div>
+              )}
 
-              {/* Sources Metadata Summary */}
+              {/* Sources Metadata Summary - Thu gọn gọn gàng */}
               {draft.sources && draft.sources.length > 0 && (
-                <Card className="rounded-xl shadow-2xs text-xs">
-                  <CardHeader className="p-3 sm:p-4 bg-muted/20 border-b">
-                    <CardTitle className="text-xs font-semibold">
-                      Danh mục tài liệu nguồn đã sử dụng ({draft.sources.length}
-                      )
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-3 sm:p-4 space-y-2">
+                <details className="rounded-xl border border-border/70 bg-card text-xs group shadow-2xs overflow-hidden">
+                  <summary className="p-3 bg-muted/20 cursor-pointer font-semibold flex items-center justify-between text-muted-foreground hover:text-foreground select-none">
+                    <span className="flex items-center gap-1.5">
+                      <FolderOpen className="size-3.5 text-primary" />
+                      <span>
+                        Danh mục tài liệu nguồn đã sử dụng ({draft.sources.length})
+                      </span>
+                    </span>
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      Nhấp để xem chi tiết
+                    </span>
+                  </summary>
+                  <div className="p-3 sm:p-4 space-y-2 border-t border-border/60">
                     {draft.sources.map((s) => (
                       <div
                         key={s.ocr_run_id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-2 rounded bg-card border text-[11px]"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-2 rounded bg-background border text-[11px]"
                       >
                         <div className="space-y-0.5">
                           <span className="font-semibold text-foreground">
                             {s.identity.filename}
                           </span>
                           <div className="text-muted-foreground font-mono text-[10px]">
-                            OCR Run: {s.ocr_run_id} · Rev:{" "}
-                            {s.identity.revision_id}
+                            OCR Run: {s.ocr_run_id} · Rev: {s.identity.revision_id}
                           </div>
                         </div>
                         {s.text_version ? (
@@ -706,8 +730,8 @@ function CompilationDetailSession({
                         )}
                       </div>
                     ))}
-                  </CardContent>
-                </Card>
+                  </div>
+                </details>
               )}
 
               {/* LLM Raw Response On-Demand */}

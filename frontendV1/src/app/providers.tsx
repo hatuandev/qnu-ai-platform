@@ -5,6 +5,7 @@ import { V1AuthProvider } from "@/app/auth/v1";
 import { queryClient } from "@/app/query-client";
 import { ThemeProvider } from "@/app/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { CompilationActivityProvider } from "@/features/knowledge/compilation-activity";
 import { RbacProvider } from "@/rbac/context";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
@@ -17,7 +18,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           <V1AuthProvider>
             <TooltipProvider delayDuration={250}>
               <RbacProvider>
-                {children}
+                <CompilationActivityProvider>
+                  {children}
+                </CompilationActivityProvider>
                 <Toaster richColors position="bottom-right" />
               </RbacProvider>
             </TooltipProvider>

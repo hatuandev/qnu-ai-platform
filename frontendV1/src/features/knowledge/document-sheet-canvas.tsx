@@ -120,7 +120,7 @@ export function DocumentSheetCanvas({
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-3 sm:px-6 py-5 bg-card border border-border/80 rounded-xl shadow-2xs space-y-3 font-sans">
+    <div className="mx-auto max-w-3xl px-3.5 sm:px-6 py-5 bg-card border border-border/80 rounded-xl shadow-2xs space-y-2.5 font-sans">
       {sequentialBlocks.map((block) => {
         if (block.type === "prose") {
           const isFocused = focusedEvidenceId === block.unit.evidence_id;
@@ -137,99 +137,106 @@ export function DocumentSheetCanvas({
               key={block.unit.evidence_id}
               data-evidence-id={block.unit.evidence_id}
               className={cn(
-                "group relative py-1.5 pl-7 pr-2.5 sm:pl-2.5 -mx-1.5 rounded-lg transition-all",
+                "group relative px-3 py-2 rounded-lg transition-all",
                 isFocused
-                  ? "ring-2 ring-primary bg-primary/5 border border-primary/30"
-                  : block.hasUnsavedDraft
-                    ? "bg-amber-500/10 border-l-2 border-l-amber-500 pl-3"
-                    : block.wasSavedPreviously
-                      ? "bg-muted/30 border-l-2 border-l-primary/50 pl-3"
-                      : "hover:bg-muted/40",
+                  ? "ring-2 ring-primary/40 bg-primary/5 border border-primary/30"
+                  : isSelected
+                    ? "bg-primary/5 ring-1 ring-primary/20"
+                    : block.hasUnsavedDraft
+                      ? "bg-amber-500/10 border-l-2 border-l-amber-500 pl-3.5"
+                      : block.wasSavedPreviously
+                        ? "bg-muted/30 border-l-2 border-l-primary/50 pl-3.5"
+                        : "hover:bg-muted/40",
               )}
             >
-              {/* Keep actions visible and in flow for touch and keyboard access. */}
-              <div className="flex flex-wrap items-center justify-end gap-1 mb-1">
-                {/* Locator pill */}
-                <button
-                  type="button"
-                  className="text-[10px] font-mono text-muted-foreground bg-background/90 backdrop-blur-xs px-1.5 py-0.5 rounded border border-border/60 hover:text-primary transition-colors flex items-center gap-1 cursor-pointer"
-                  onClick={() =>
-                    onFocusUnit?.(isFocused ? null : block.unit.evidence_id)
-                  }
-                  title={
-                    canCompareOcr && hasBbox
-                      ? "Nhấp để đánh dấu vị trí đoạn này trên ảnh gốc"
-                      : "Chọn đoạn văn bản này"
-                  }
-                >
-                  <span>{locator}</span>
-                  {canCompareOcr && hasBbox ? (
-                    <ScanSearch className="size-2.5 text-primary/70" />
+              {/* Thanh tiêu đề khối: Checkbox + Vị trí bên trái, Trạng thái + Thao tác bên phải */}
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                {/* Nhóm trái: Checkbox và định danh đoạn */}
+                <div className="flex items-center gap-2 min-w-0">
+                  {canManage &&
+                  onToggleUnitSelection &&
+                  block.currentText.trim().length > 0 ? (
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() =>
+                        onToggleUnitSelection(block.unit.evidence_id)
+                      }
+                      aria-label={`Chọn ${locator} để kiểm tra chính tả`}
+                      className="size-4 shrink-0"
+                    />
                   ) : null}
-                </button>
 
-                {block.hasUnsavedDraft ? (
-                  <Badge
-                    variant="warning"
-                    className="text-[10px] py-0 px-1.5 h-5"
+                  <button
+                    type="button"
+                    className="text-[10px] sm:text-[11px] font-mono text-muted-foreground bg-background/90 hover:bg-muted px-1.5 sm:px-2 py-0.5 rounded border border-border/60 hover:text-primary hover:border-primary/40 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                    onClick={() =>
+                      onFocusUnit?.(isFocused ? null : block.unit.evidence_id)
+                    }
+                    title={
+                      canCompareOcr && hasBbox
+                        ? "Nhấp để đánh dấu vị trí đoạn này trên ảnh gốc"
+                        : "Chọn đoạn văn bản này"
+                    }
                   >
-                    Nháp
-                  </Badge>
-                ) : block.wasSavedPreviously ? (
-                  <Badge
-                    variant="secondary"
-                    className="text-[10px] py-0 px-1.5 h-5 hidden sm:inline-flex"
-                  >
-                    Đã sửa
-                  </Badge>
-                ) : null}
+                    <span>{locator}</span>
+                    {canCompareOcr && hasBbox ? (
+                      <ScanSearch className="size-2.5 sm:size-3 text-primary/70" />
+                    ) : null}
+                  </button>
+                </div>
 
-                {canManage ? (
-                  <div className="flex items-center gap-0.5 bg-background/90 backdrop-blur-xs rounded border border-border/60 p-0.5 shadow-2xs">
-                    {block.hasUnsavedDraft && onRevertUnitDraft ? (
+                {/* Nhóm phải: Huy hiệu và nút sửa */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {block.hasUnsavedDraft ? (
+                    <Badge
+                      variant="warning"
+                      className="text-[10px] py-0 px-1.5 h-5"
+                    >
+                      Nháp
+                    </Badge>
+                  ) : block.wasSavedPreviously ? (
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] py-0 px-1.5 h-5 hidden sm:inline-flex"
+                    >
+                      Đã sửa
+                    </Badge>
+                  ) : null}
+
+                  {canManage ? (
+                    <div className="flex items-center gap-0.5 bg-background/90 backdrop-blur-xs rounded border border-border/60 p-0.5 shadow-2xs">
+                      {block.hasUnsavedDraft && onRevertUnitDraft ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 px-1 text-[11px] text-muted-foreground hover:text-destructive"
+                          onClick={() =>
+                            onRevertUnitDraft(block.unit.evidence_id)
+                          }
+                          title="Khôi phục đoạn này về bản đã lưu"
+                        >
+                          <RotateCcw className="size-2.5 mr-0.5" />
+                          <span>Hủy</span>
+                        </Button>
+                      ) : null}
                       <Button
                         type="button"
                         size="sm"
                         variant="ghost"
-                        className="h-5 px-1 text-[11px] text-muted-foreground hover:text-destructive"
+                        className="h-5 px-1.5 text-[11px] text-primary hover:text-primary hover:bg-primary/10 gap-1 font-medium"
                         onClick={() =>
-                          onRevertUnitDraft(block.unit.evidence_id)
+                          onStartEdit(block.unit, block.currentText)
                         }
-                        title="Khôi phục đoạn này về bản đã lưu"
+                        aria-label={`Sửa ${locator}`}
                       >
-                        <RotateCcw className="size-2.5 mr-0.5" />
-                        <span>Hủy</span>
+                        <Edit3 className="size-2.5" />
+                        <span>Sửa</span>
                       </Button>
-                    ) : null}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-5 px-1.5 text-[11px] text-primary hover:text-primary hover:bg-primary/10 gap-1 font-medium"
-                      onClick={() => onStartEdit(block.unit, block.currentText)}
-                      aria-label={`Sửa ${locator}`}
-                    >
-                      <Edit3 className="size-2.5" />
-                      <span>Sửa</span>
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Keep the checkbox within the canvas gutter on narrow screens. */}
-              {canManage &&
-              onToggleUnitSelection &&
-              block.currentText.trim().length > 0 ? (
-                <div className="absolute left-1 sm:-left-4 top-2">
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={() =>
-                      onToggleUnitSelection(block.unit.evidence_id)
-                    }
-                    aria-label={`Chọn ${locator} để kiểm tra chính tả`}
-                  />
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
+              </div>
 
               {/* Clean continuous typography */}
               {block.unit.kind === "heading" ? (

@@ -1321,8 +1321,8 @@ export function OcrComparisonView({
                 className="flex-1 flex flex-col h-full min-h-0"
               >
                 {/* Header Tabs: Văn bản trang | Markdown | Chi tiết kỹ thuật */}
-                <div className="px-3 py-1.5 border-b bg-muted/20 flex items-center justify-between gap-2">
-                  <TabsList className="h-8 shrink-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b bg-muted/20 px-3 py-1.5">
+                  <TabsList className="h-8 w-auto min-w-0 flex-auto">
                     {documentReviewOpen && (
                       <TabsTrigger
                         value="document-spelling"
@@ -1355,7 +1355,7 @@ export function OcrComparisonView({
                     </TabsTrigger>
                   </TabsList>
 
-                  <div className="flex items-center gap-1.5 text-xs">
+                  <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5 text-xs">
                     {activeTabRight === "content" &&
                     canManage &&
                     onSelectPageUnits &&
@@ -1513,8 +1513,12 @@ export function OcrComparisonView({
                     selectedOnPageCount > 0 ? (
                       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs animate-in fade-in-50">
                         <div className="flex items-center gap-2">
-                          <Badge variant="default" className="text-[11px] py-0 h-5">
-                            Đã chọn {selectedOnPageCount} / {selectablePageUnits.length} đoạn
+                          <Badge
+                            variant="default"
+                            className="text-[11px] py-0 h-5"
+                          >
+                            Đã chọn {selectedOnPageCount} /{" "}
+                            {selectablePageUnits.length} đoạn
                           </Badge>
                           {onSelectPageUnits ? (
                             <Button
@@ -1542,7 +1546,9 @@ export function OcrComparisonView({
                             onClick={() =>
                               onStartSpellCheck(
                                 selectablePageUnits
-                                  .filter((u) => selectedUnitIds?.has(u.evidence_id))
+                                  .filter((u) =>
+                                    selectedUnitIds?.has(u.evidence_id),
+                                  )
                                   .map((u) => u.evidence_id),
                               )
                             }

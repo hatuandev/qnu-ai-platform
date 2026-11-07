@@ -1244,12 +1244,6 @@ function SourceDetailSession({
             generation: activeRun?.generation ?? 1,
             textVersion: selectedVersion ?? doc?.version ?? 0,
           }}
-          onSuccess={(runId) => {
-            void navigate({
-              to: "/workspaces/$workspaceId/collections/$collectionId/compilations/$runId",
-              params: { workspaceId, collectionId, runId },
-            });
-          }}
         />
       )}
     </div>

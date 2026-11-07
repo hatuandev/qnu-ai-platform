@@ -41,12 +41,21 @@ export type CompilationRunResponse = {
   origin: CompilationOrigin;
   source_first?: boolean;
   ai_supplement?: boolean;
+  selective_supplement?: boolean;
 };
 
 export type CompilationCreatedResponse = {
   run: CompilationRunResponse;
   created: boolean;
   dispatched: boolean;
+};
+
+export type CompilationProgressResponse = {
+  run_id: string;
+  status: CompilationStatus;
+  total: number;
+  completed: number;
+  latest_output_partial: boolean | null;
 };
 
 export type CompilationRequestInput = {
@@ -57,6 +66,7 @@ export type CompilationRequestInput = {
   structured_output?: boolean;
   source_first?: boolean;
   ai_supplement?: boolean;
+  selective_supplement?: boolean;
   text_versions?: Record<string, number>;
   auto_review?: boolean;
   review_provider_id?: string | null;
@@ -156,6 +166,10 @@ export type CompilerMetadataProposal = {
 };
 
 export type CompilerSupplement = {
+  state?: "skipped" | "running" | "completed" | "incomplete";
+  incomplete_groups?: { index: number; status: string; code: string | null }[];
+  planning_error?: string;
+  failure_code?: string | null;
   metadata: CompilerMetadataProposal[];
   sections: { segment: number; sections: DraftSection[]; unknowns: string[] }[];
 };

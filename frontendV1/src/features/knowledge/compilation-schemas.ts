@@ -62,6 +62,7 @@ export const compilationRequestSchema = z
     structured_output: z.boolean().default(false),
     source_first: z.boolean().optional(),
     ai_supplement: z.boolean().optional(),
+    selective_supplement: z.boolean().optional(),
     auto_review: z.boolean().default(true),
     review_provider_id: z.string().nullable().optional(),
     review_max_output_tokens: z

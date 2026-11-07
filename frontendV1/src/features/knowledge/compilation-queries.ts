@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { v1Client } from "@/app/api/v1";
+import { ApiProblemError, v1Client } from "@/app/api/v1";
 import { useV1Auth } from "@/app/auth/v1";
+import { useCompilationActivity } from "./compilation-activity";
 import {
   acceptEdit,
   createCompilationReview,
@@ -283,25 +284,46 @@ export function useCompilationDraftQuery(
   workspaceId: string,
   collectionId: string,
   runId: string | null | undefined,
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean; partial?: boolean; poll?: boolean },
 ) {
   const { sessionId } = useV1Auth();
-  return useQuery<DraftDocumentResponse>({
-    queryKey: compilationKeys.draft(
-      workspaceId,
-      collectionId,
-      runId ?? "",
-      sessionId,
-    ),
-    queryFn: ({ signal }) => {
+  const key = compilationKeys.draft(
+    workspaceId,
+    collectionId,
+    runId ?? "",
+    sessionId,
+  );
+  return useQuery<DraftDocumentResponse | null>({
+    queryKey: options?.partial ? [...key, "partial"] : key,
+    queryFn: async ({ signal }) => {
       if (!runId) throw new Error("runId is required");
-      return getCompilationDraft(v1Client, workspaceId, collectionId, runId, {
-        signal,
-      });
+      try {
+        return await getCompilationDraft(
+          v1Client,
+          workspaceId,
+          collectionId,
+          runId,
+          {
+            signal,
+            partial: options?.partial,
+          },
+        );
+      } catch (error) {
+        if (
+          options?.partial &&
+          error instanceof ApiProblemError &&
+          error.code === "compilation_partial_not_found"
+        ) {
+          return null;
+        }
+        throw error;
+      }
     },
     enabled:
       Boolean(workspaceId && collectionId && runId) &&
       (options?.enabled ?? true),
+    refetchInterval: (query) =>
+      options?.poll && !query.state.data ? 3000 : false,
   });
 }
 
@@ -555,6 +577,7 @@ export function useCreateCompilationMutation(
 ) {
   const queryClient = useQueryClient();
   const { sessionId } = useV1Auth();
+  const activity = useCompilationActivity();
 
   return useMutation({
     mutationFn: (args: {
@@ -578,6 +601,7 @@ export function useCreateCompilationMutation(
         ),
       });
       if (data.run?.id) {
+        activity?.track(data.run);
         queryClient.setQueryData(
           compilationKeys.run(
             workspaceId,

@@ -33,6 +33,10 @@ class CompilationRun(Base):
     def ai_supplement(self) -> bool:
         return self.config.get("ai_supplement") is True
 
+    @property
+    def selective_supplement(self) -> bool:
+        return self.config.get("selective_supplement") is True
+
     __tablename__ = "kb_compilation_runs"
     __table_args__ = (
         ForeignKeyConstraint(

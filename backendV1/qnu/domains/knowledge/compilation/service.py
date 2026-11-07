@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation import outputs as compilation_outputs
-from qnu.domains.knowledge.compilation import refinement
+from qnu.domains.knowledge.compilation import refinement, supplement
 from qnu.domains.knowledge.compilation import segments as split
 from qnu.domains.knowledge.compilation.artifacts import (
     artifact,
@@ -67,6 +67,11 @@ SEGMENTED_CODES = {
     "model_context_limit_exceeded",
     "model_input_limit_exceeded",
     "model_output_limit_exceeded",
+}
+OPTIONAL_PLANNING_ERRORS = SEGMENTED_CODES | {
+    "model_capacity_required",
+    "compilation_segment_too_large",
+    "compilation_segment_output_too_large",
 }
 
 
@@ -162,6 +167,7 @@ async def request_run(
                     "review_structured_output",
                     "source_first",
                     "ai_supplement",
+                    "selective_supplement",
                 )
                 if not getattr(req, key)
             }
@@ -220,7 +226,13 @@ async def request_run(
         )
         or 0
     )
-    if req.source_first:
+    selected_units = (
+        await asyncio.to_thread(supplement.select_units, documents)
+        if req.selective_supplement
+        else None
+    )
+
+    async def persist_source_draft(error_code: str | None = None) -> CompilationOutcome:
         provider = await assert_provider_allowed(db, actor, workspace_id, "chat", req.provider_id)
         run = CompilationRun(
             id=new_id("cmp"),
@@ -236,6 +248,8 @@ async def request_run(
             provider_id=provider.id,
             config={
                 "source_first": True,
+                **({"selective_supplement": True} if req.selective_supplement else {}),
+                **({"supplement_plan_error": error_code} if error_code else {}),
                 "workflow_version": "qnu.compiler.source-first/v1",
                 "auto_review": False,
                 "review": {"provider_id": provider.id},
@@ -244,11 +258,16 @@ async def request_run(
         db.add(run)
         await db.flush()
         return await _persist_inputs(db, blob, actor, run, documents, payload, queue)
-    schema = output_schema(documents) if req.structured_output and not req.ai_supplement else None
+
+    if req.source_first or selected_units == []:
+        return await persist_source_draft()
+    has_supplement = req.ai_supplement or req.selective_supplement
+    auto_review = req.auto_review and not req.selective_supplement
+    schema = output_schema(documents) if req.structured_output and not has_supplement else None
     requested_output = req.max_output_tokens
     provider_id = req.provider_id
     planned_runtime = None
-    if req.max_output_tokens is None and not req.ai_supplement:
+    if req.max_output_tokens is None and not has_supplement:
         planned_runtime, _ = await prepare_chat_limits(
             db,
             actor,
@@ -260,15 +279,22 @@ async def request_run(
         provider_id = planned_runtime.provider_id
     plans: list[split.SegmentPlan] = []
     projection = split.PROJECTION_SUPPLEMENT if req.ai_supplement else split.PROJECTION_V4
-    if req.ai_supplement:
-        runtime, budget = await prepare_chat_limits(
-            db,
-            actor,
-            workspace_id,
-            provider_id=provider_id,
-            task="compiler",
-            max_output_tokens=requested_output,
-        )
+    if req.selective_supplement:
+        projection = split.PROJECTION_SELECTIVE
+    if has_supplement:
+        try:
+            runtime, budget = await prepare_chat_limits(
+                db,
+                actor,
+                workspace_id,
+                provider_id=provider_id,
+                task="compiler",
+                max_output_tokens=requested_output,
+            )
+        except AppException as exc:
+            if req.selective_supplement and exc.code in OPTIONAL_PLANNING_ERRORS:
+                return await persist_source_draft(exc.code)
+            raise
     else:
         try:
             runtime, _, budget = await prepare_chat_request(
@@ -334,30 +360,40 @@ async def request_run(
     if not plans:
         capacity = available_input_tokens(runtime.token_limits, budget.max_output_tokens)
         if capacity is None:
+            if req.selective_supplement:
+                return await persist_source_draft("model_capacity_required")
             raise AppException(
                 "Chưa xác định được ngân sách biên soạn.", code="model_capacity_required"
             )
-        plans = await asyncio.to_thread(
-            split.plan_segments,
-            documents,
-            req.topic,
-            capacity=capacity,
-            structured=req.structured_output,
-            projection=projection,
-            output_tokens=budget.max_output_tokens,
-        )
-        plans = await asyncio.to_thread(
-            split.finalize_plans,
-            plans,
-            documents,
-            req.topic,
-            capacity=capacity,
-            structured=req.structured_output,
-            projection=projection,
-        )
+        try:
+            plans = await asyncio.to_thread(
+                split.plan_segments,
+                documents,
+                req.topic,
+                capacity=capacity,
+                structured=req.structured_output,
+                projection=projection,
+                output_tokens=budget.max_output_tokens,
+                selected_units=selected_units,
+            )
+            plans = await asyncio.to_thread(
+                split.finalize_plans,
+                plans,
+                documents,
+                req.topic,
+                capacity=capacity,
+                structured=req.structured_output,
+                projection=projection,
+                selected_units=selected_units,
+            )
+        except AppException as exc:
+            if req.selective_supplement and exc.code in OPTIONAL_PLANNING_ERRORS:
+                return await persist_source_draft(exc.code)
+            raise
     reasoning_directive = runtime.reasoning_directive("compiler")
     config = {
-        **({"ai_supplement": True} if req.ai_supplement else {}),
+        **({"ai_supplement": True} if has_supplement else {}),
+        **({"selective_supplement": True} if req.selective_supplement else {}),
         "refinement": {
             "version": 1,
             "max_depth": 4,
@@ -365,7 +401,7 @@ async def request_run(
             "max_seconds": 1500,
         },
         "workflow_version": "qnu.compiler.workflow/v2" if plans else "qnu.compiler.workflow/v1",
-        "auto_review": req.auto_review,
+        "auto_review": auto_review,
         "review": {
             "provider_id": req.review_provider_id or runtime.provider_id,
             "max_output_tokens": req.review_max_output_tokens,
@@ -381,12 +417,12 @@ async def request_run(
             reasoning_directive.public_dict() if reasoning_directive is not None else None
         ),
         "prompt_version": split.prompt_version_for(projection)
-        if req.ai_supplement
+        if has_supplement
         else PROMPT_VERSION,
         "prompt_sha256": hashlib.sha256(
             (
                 split.segment_system(1, len(plans), projection=projection)
-                if req.ai_supplement
+                if has_supplement
                 else SYSTEM_PROMPT
             ).encode()
         ).hexdigest(),
@@ -454,7 +490,7 @@ async def request_run(
             "configuration_hash": runtime.configuration_hash,
             "max_output_tokens": budget.max_output_tokens,
             "structured_output": bool(req.structured_output),
-            "auto_review": req.auto_review,
+            "auto_review": auto_review,
             "projection_version": projection,
             # Stored verbatim so a resume sends the same reasoning contract or fails.
             "reasoning": reasoning_public,
@@ -591,6 +627,12 @@ async def read_draft_view(
     db: AsyncSession, blob: BlobStore, run: CompilationRun
 ) -> tuple[str, dict]:
     _, payload = await read_result(db, blob, run, "draft_json")
+    return await _group_draft(db, blob, run, payload)
+
+
+async def _group_draft(
+    db: AsyncSession, blob: BlobStore, run: CompilationRun, payload: bytes
+) -> tuple[str, dict]:
     snapshot, raw_input = await read(db, blob, run, "input_snapshot")
     if snapshot.sha256 != run.input_sha256:
         raise Conflict("Snapshot Compiler khác nguồn đã ghim.", code="compilation_source_mismatch")
@@ -732,6 +774,8 @@ async def read_partial_draft(
     workspace_id: str,
     collection_id: str,
     run_id: str,
+    *,
+    group_by_source: bool = False,
 ) -> tuple[str, bytes]:
     """Latest partial JSON generation; never the final publication pointer."""
     run = await get_run(db, actor, workspace_id, collection_id, run_id)
@@ -739,6 +783,9 @@ async def read_partial_draft(
     if row is None:
         raise EntityNotFound("Chưa có bản nháp từng phần.", code="compilation_partial_not_found")
     draft, _ = await compilation_outputs.read_output(db, blob, row)
+    if group_by_source:
+        sha, content = await _group_draft(db, blob, run, draft)
+        return sha, json_bytes(content)
     return row.draft_sha256, draft
 
 

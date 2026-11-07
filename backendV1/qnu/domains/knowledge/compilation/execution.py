@@ -147,6 +147,11 @@ async def _compile(db: AsyncSession, blob: BlobStore, run: CompilationRun, model
         draft = await asyncio.to_thread(
             supplement.attach, draft, documents, [], run.input_sha256, {}
         )
+        if run.selective_supplement:
+            error_code = run.config.get("supplement_plan_error")
+            draft["supplement"]["state"] = "incomplete" if error_code else "skipped"
+            if error_code:
+                draft["supplement"]["planning_error"] = error_code
         await _store_final_draft(db, blob, run, draft)
         return await finish(db, run, "completed")
     if run.config.get("workflow_version") == "qnu.compiler.workflow/v2":
@@ -635,11 +640,13 @@ async def _run_leaf(
         await _settle_part_usage(usage.id, result.total_tokens, failed=False)
         content = result.content
     draft = split.parse_segment_draft(content, set(citations), plan.projection)
-    if plan.projection == split.PROJECTION_SUPPLEMENT:
+    if plan.projection in split.SUPPLEMENT_PROJECTIONS:
         from qnu.domains.knowledge.compilation.projection import project_documents
 
         owned = project_documents(documents, plan.owned, [])
         draft["metadata"] = supplement.owned_metadata(draft, owned)
+        if plan.projection == split.PROJECTION_SELECTIVE:
+            draft["sections"] = supplement.useful_sections(draft, owned, documents)
     if run.config.get("refinement"):
         await refinement.save_pair(
             db, blob, run, segment, refinement.node_content(segment, draft, documents)
@@ -663,6 +670,37 @@ async def _completed_parts(
         _, payload = await read_segment(db, blob, segment, "draft_json")
         parts.append((segment.segment_index, json.loads(payload)))
     return parts
+
+
+async def _supplement_segments(
+    db: AsyncSession, roots: list[CompilationSegment]
+) -> list[CompilationSegment]:
+    """Keep completed children of an unfinished root, in source order, once."""
+    nodes = list(
+        (
+            await db.scalars(
+                select(CompilationSegment)
+                .where(CompilationSegment.run_id == roots[0].run_id)
+                .order_by(CompilationSegment.segment_index)
+            )
+        ).all()
+    )
+    children: dict[str, list[CompilationSegment]] = {}
+    for node in nodes:
+        if node.parent_segment_id:
+            children.setdefault(node.parent_segment_id, []).append(node)
+    completed = []
+
+    def collect(node: CompilationSegment) -> None:
+        if node.status == "completed":
+            completed.append(node)
+            return
+        for child in children.get(node.id, []):
+            collect(child)
+
+    for root in roots:
+        collect(root)
+    return completed
 
 
 def _coverage(segments: list[CompilationSegment]) -> dict:
@@ -734,7 +772,16 @@ def _source_with_supplement(
     draft = build_source_draft(run.topic, documents, run.id)
     draft["segmentation"] = coverage
     draft["partial"] = partial
-    return supplement.attach(draft, documents, parts, run.input_sha256, run.config)
+    supplement.attach(draft, documents, parts, run.input_sha256, run.config)
+    if run.selective_supplement:
+        draft["supplement"]["state"] = (
+            "running"
+            if partial
+            else "completed"
+            if coverage["state"] == "completed"
+            else "incomplete"
+        )
+    return draft
 
 
 async def _merged_draft(
@@ -771,7 +818,10 @@ async def _write_partial(
         segment.status == "completed" for segment in segments
     ):
         return
-    parts = await _completed_parts(db, blob, segments)
+    complete_nodes = (
+        await _supplement_segments(db, segments) if run.selective_supplement else segments
+    )
+    parts = await _completed_parts(db, blob, complete_nodes)
     coverage = _coverage(segments)
     merged = await _merged_draft(run, documents, parts, coverage, partial=True)
     await compilation_outputs.store_output(
@@ -899,9 +949,12 @@ async def _compile_segmented(
             continue
         await _resume_segment(db, blob, run, segment)
         if segment.status in {"failed", "uncertain"}:
-            return await finish(
+            return await _finish_segment_problem(
                 db,
+                blob,
                 run,
+                documents,
+                segments,
                 "uncertain" if segment.status == "uncertain" else "failed",
                 segment.error_code,
             )
@@ -949,7 +1002,15 @@ async def _compile_segmented(
             if failures and not uncertain:
                 first = failures[0]
                 code = first.code if isinstance(first, AppException) else "compilation_failed"
-            return await finish(db, run, "uncertain" if uncertain else "failed", code)
+            return await _finish_segment_problem(
+                db,
+                blob,
+                run,
+                documents,
+                segments,
+                "uncertain" if uncertain else "failed",
+                code,
+            )
     if not pending and run.config.get("refinement"):
         nodes = list(
             (
@@ -964,8 +1025,82 @@ async def _compile_segmented(
     coverage = _coverage(segments)
     if coverage["state"] != "completed":
         return await finish(db, run, "failed", "compilation_segments_incomplete")
-    parts = await _completed_parts(db, blob, segments)
+    return await _finalize_segmented(db, blob, run, documents, segments, coverage)
+
+
+def _optional_ai_failure(code: str | None) -> bool:
+    if code in {
+        "chat_provider_changed",
+        "model_token_limits_stale",
+        "model_token_limits_invalid",
+        "model_connection_mismatch",
+        "model_mismatch",
+    }:
+        return False
+    return bool(
+        code
+        and (
+            code.startswith(("chat_", "quota_", "model_"))
+            or code
+            in {
+                "compilation_draft_invalid",
+                "compilation_citation_invalid",
+                "compilation_request_interrupted",
+                "compilation_refinement_time_exhausted",
+                "compilation_refinement_atomic_limit",
+                "compilation_refinement_depth_exhausted",
+                "compilation_refinement_nodes_exhausted",
+            }
+        )
+    )
+
+
+async def _finish_segment_problem(
+    db: AsyncSession,
+    blob: BlobStore,
+    run: CompilationRun,
+    documents: list[dict],
+    segments: list[CompilationSegment],
+    status: str,
+    code: str | None,
+) -> str:
+    if (
+        run.selective_supplement
+        and _optional_ai_failure(code)
+        and all(
+            _optional_ai_failure(segment.error_code)
+            for segment in segments
+            if segment.status in {"failed", "uncertain"}
+        )
+    ):
+        return await _finalize_segmented(
+            db, blob, run, documents, segments, _coverage(segments), failure_code=code
+        )
+    return await finish(db, run, status, code)
+
+
+async def _finalize_segmented(
+    db: AsyncSession,
+    blob: BlobStore,
+    run: CompilationRun,
+    documents: list[dict],
+    segments: list[CompilationSegment],
+    coverage: dict,
+    *,
+    failure_code: str | None = None,
+) -> str:
+    complete_nodes = (
+        await _supplement_segments(db, segments) if run.selective_supplement else segments
+    )
+    parts = await _completed_parts(db, blob, complete_nodes)
     draft = await _merged_draft(run, documents, parts, coverage, partial=False)
+    if run.selective_supplement and coverage["state"] != "completed":
+        draft["supplement"]["failure_code"] = failure_code
+        draft["supplement"]["incomplete_groups"] = [
+            {"index": segment.segment_index, "status": segment.status, "code": segment.error_code}
+            for segment in segments
+            if segment.status != "completed"
+        ]
     await assert_claim(db, run)
     draft["compilation_nodes"] = [
         {
@@ -974,7 +1109,8 @@ async def _compile_segmented(
             "json": f"segments/{segment.segment_index}/artifacts/draft_json",
             "markdown": f"segments/{segment.segment_index}/artifacts/markdown",
         }
-        for segment in segments
+        for segment in complete_nodes
+        if segment.status == "completed"
     ]
     await _store_generation(db, blob, run, draft, coverage, partial=False)
     if not run.config.get("refinement"):

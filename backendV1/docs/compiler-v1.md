@@ -47,6 +47,20 @@ theo chính sách server hiện có; body Compiler không được nhận URL/se
 
 Tiền tố: `/platform/v1alpha1/workspaces/{workspace_id}/collections/{collection_id}/compilation-runs`.
 
+Luồng một tài liệu từ FE dùng `selective_supplement=true`, `auto_review=false` và
+`text_versions` ghim bản đã lưu. Bản v0 được biểu diễn bằng cách không khai báo
+entry của run trong `text_versions`. Model/output bỏ trống để ModelOps giải quyết.
+Không gửi `source_first` hoặc `ai_supplement` cùng chế độ này.
+
+Worker giữ toàn bộ bản nền từ nguồn, chỉ gọi AI cho nhóm cần bổ sung. Gợi ý nằm
+trong `supplement`, tách khỏi bản nền; metadata cần người dùng xác nhận khi đăng ký.
+`supplement.state` phân biệt `running`, `completed`, `skipped` và `incomplete`.
+`GET /{run_id}/draft?partial=true&group_by_source=true` đọc bản xem trước có nhóm;
+404 `compilation_partial_not_found` nghĩa là chưa có bản xem trước, không phải lỗi
+nguồn. Bản xem trước không được đăng ký. Khi AI tùy chọn lỗi, bản hoàn tất vẫn giữ
+nguồn đầy đủ, báo `failure_code`/`planning_error` và `incomplete_groups` riêng.
+Lỗi source hash, quyền, storage hoặc đổi cấu hình đã ghim không được bỏ qua.
+
 | Phương thức | Đường dẫn sau tiền tố | Mục đích |
 |---|---|---|
 | POST | rỗng | Tạo job; bắt buộc `Idempotency-Key` |

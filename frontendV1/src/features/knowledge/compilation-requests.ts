@@ -9,6 +9,7 @@ import type {
   AcceptEditRequest,
   AutoReviewResponse,
   CompilationCreatedResponse,
+  CompilationProgressResponse,
   CompilationRequestInput,
   CompilationReviewResponse,
   CompilationRunResponse,
@@ -67,16 +68,32 @@ export async function getCompilationRun(
   });
 }
 
-export async function getCompilationDraft(
+export async function getCompilationProgress(
   client: V1Client,
   workspaceId: string,
   collectionId: string,
   runId: string,
   options?: { signal?: AbortSignal },
+): Promise<CompilationProgressResponse> {
+  return client.get<CompilationProgressResponse>(
+    `${compilationPaths.run(workspaceId, collectionId, runId)}/progress`,
+    { signal: options?.signal },
+  );
+}
+
+export async function getCompilationDraft(
+  client: V1Client,
+  workspaceId: string,
+  collectionId: string,
+  runId: string,
+  options?: { signal?: AbortSignal; partial?: boolean },
 ): Promise<DraftDocumentResponse> {
   const path = compilationPaths.draft(workspaceId, collectionId, runId);
   return client.get<DraftDocumentResponse>(path, {
-    searchParams: { group_by_source: true },
+    searchParams: {
+      group_by_source: true,
+      ...(options?.partial ? { partial: true } : {}),
+    },
     signal: options?.signal,
   });
 }

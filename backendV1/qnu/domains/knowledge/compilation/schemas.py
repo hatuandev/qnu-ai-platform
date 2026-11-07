@@ -19,6 +19,7 @@ class CompilationRequest(BaseModel):
     structured_output: bool = Field(False, strict=True)
     source_first: bool = Field(False, strict=True)
     ai_supplement: bool = Field(False, strict=True)
+    selective_supplement: bool = Field(False, strict=True)
     text_versions: dict[str, Annotated[int, Field(strict=True, ge=0)]] = Field(default_factory=dict)
     auto_review: bool = Field(True, strict=True)
     review_provider_id: str | None = Field(None, min_length=1, max_length=64)
@@ -30,6 +31,8 @@ class CompilationRequest(BaseModel):
         if set(self.text_versions) - set(self.ocr_run_ids):
             raise ValueError("Phiên bản văn bản phải thuộc OCR đã chọn.")
         if self.source_first and self.ai_supplement:
+            raise ValueError("Chọn một chế độ biên soạn.")
+        if self.selective_supplement and (self.source_first or self.ai_supplement):
             raise ValueError("Chọn một chế độ biên soạn.")
         if self.source_first and (self.structured_output or self.max_output_tokens is not None):
             raise ValueError("Biên soạn nhanh không nhận tùy chọn sinh văn bản bằng AI.")
@@ -98,6 +101,7 @@ class CompilationResponse(BaseModel):
     origin: str
     source_first: bool = False
     ai_supplement: bool = False
+    selective_supplement: bool = False
 
 
 class CompilationCreated(BaseModel):

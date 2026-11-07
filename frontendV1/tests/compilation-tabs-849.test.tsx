@@ -14,6 +14,9 @@ import { CompilationEditorTab } from "@/features/knowledge/compilation-editor-ta
 
 const ports = vi.hoisted(() => ({
   session: 1,
+  status: "completed",
+  selective: false,
+  incomplete: false,
   preview: vi.fn(),
   blocker: vi.fn(),
 }));
@@ -66,7 +69,8 @@ vi.mock("@/features/knowledge/compilation-queries", () => ({
   useCompilationRunQuery: (_w: string, _c: string, id: string) => ({
     data: {
       id,
-      status: "completed",
+      status: ports.status,
+      selective_supplement: ports.selective,
       topic: "Topic",
       origin: "ai_compiler",
       generation: 1,
@@ -74,7 +78,24 @@ vi.mock("@/features/knowledge/compilation-queries", () => ({
     },
   }),
   useCompilationDraftQuery: (_w: string, _c: string, id: string) => ({
-    data: { ...content(id), sources: [], source_tables: [], citations },
+    data: {
+      ...content(id),
+      sources: [],
+      source_tables: [],
+      citations,
+      ...(ports.incomplete
+        ? {
+            supplement: {
+              state: "incomplete",
+              metadata: [],
+              sections: [],
+              incomplete_groups: [
+                { index: 1, code: "compilation_draft_invalid" },
+              ],
+            },
+          }
+        : {}),
+    },
   }),
   useEditContextQuery: (_w: string, _c: string, id: string) => ({
     data: {
@@ -95,6 +116,9 @@ vi.mock("@/features/knowledge/compilation-queries", () => ({
 const props = { workspaceId: "w", collectionId: "c", runId: "A" };
 beforeEach(() => {
   ports.session = 1;
+  ports.status = "completed";
+  ports.selective = false;
+  ports.incomplete = false;
   ports.preview.mockReset();
   ports.blocker.mockClear();
   vi.stubGlobal(
@@ -109,6 +133,26 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+});
+
+test("shows the source draft early and reports incomplete AI after completion", () => {
+  ports.status = "running";
+  ports.selective = true;
+  const view = render(<CompilationDetailPage {...props} />);
+  expect(screen.getByText("First paragraph")).toBeTruthy();
+  expect(
+    screen.queryByRole("button", { name: "Đăng ký thành tài liệu biên soạn" }),
+  ).toBeNull();
+  ports.status = "completed";
+  ports.incomplete = true;
+  view.rerender(<CompilationDetailPage {...props} />);
+  expect(screen.getByText("First paragraph")).toBeTruthy();
+  expect(
+    screen.getByText("Bản nháp đã sẵn sàng. Phần AI chưa hoàn tất."),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Đăng ký thành tài liệu biên soạn" }),
+  ).toBeTruthy();
 });
 
 test("a tab is created on first visit and retains the editor DOM and unsaved text across other tabs", async () => {

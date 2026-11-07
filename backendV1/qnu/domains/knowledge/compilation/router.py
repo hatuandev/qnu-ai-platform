@@ -90,7 +90,7 @@ async def compilation_draft(
 ) -> dict:
     if partial:
         sha256, payload = await service.read_partial_draft(
-            db, blob, actor, workspace_id, collection_id, run_id
+            db, blob, actor, workspace_id, collection_id, run_id, group_by_source=group_by_source
         )
         response.headers.update({"ETag": f'"{sha256}"', "Cache-Control": "private, no-store"})
         return json.loads(payload)

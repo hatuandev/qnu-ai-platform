@@ -30,7 +30,11 @@ from qnu.domains.knowledge.compilation.projection import (
     project_table_block,
 )
 from qnu.domains.knowledge.compilation.schemas import SegmentDraftContent
-from qnu.domains.knowledge.compilation.supplement import SUPPLEMENT_PROMPT, SupplementPart
+from qnu.domains.knowledge.compilation.supplement import (
+    SELECTIVE_PROMPT,
+    SUPPLEMENT_PROMPT,
+    SupplementPart,
+)
 from qnu.domains.knowledge.compilation.units import (
     Unit,
     _ref_key,
@@ -49,6 +53,8 @@ PROJECTION_V2 = "qnu.compiler.projection/v2"
 PROJECTION_V3 = "qnu.compiler.projection/v3"
 PROJECTION_V4 = "qnu.compiler.projection/v4"
 PROJECTION_SUPPLEMENT = "qnu.compiler.projection/supplement-v1"
+PROJECTION_SELECTIVE = "qnu.compiler.projection/selective-supplement-v1"
+SUPPLEMENT_PROJECTIONS = {PROJECTION_SUPPLEMENT, PROJECTION_SELECTIVE}
 PROMPT_VERSION = "qnu.compiler.segment.prompt/v4"
 PLANNER_VERSION = "qnu.compiler.plan/v5"
 MANIFEST_VERSION = "qnu.compiler.segment-manifest/v2"
@@ -58,6 +64,7 @@ PROMPT_VERSIONS = {
     PROJECTION_V3: "qnu.compiler.segment.prompt/v3",
     PROJECTION_V4: PROMPT_VERSION,
     PROJECTION_SUPPLEMENT: "qnu.compiler.supplement.prompt/v1",
+    PROJECTION_SELECTIVE: "qnu.compiler.selective-supplement.prompt/v1",
 }
 
 TARGET_RATIO = 0.7
@@ -479,7 +486,7 @@ def build_projection(
 ) -> tuple[dict, list[str]]:
     if projection == PROJECTION_V2:
         return segments_v2.build_projection(topic, documents, owned, context, index)
-    if projection not in {PROJECTION_V3, PROJECTION_V4, PROJECTION_SUPPLEMENT}:
+    if projection not in {PROJECTION_V3, PROJECTION_V4, *SUPPLEMENT_PROJECTIONS}:
         raise AppException(
             "Phần biên soạn dùng phiên bản projection không hỗ trợ.",
             code="compilation_segment_version_unsupported",
@@ -487,7 +494,11 @@ def build_projection(
         )
     projected = project_documents(documents, owned, context)
     citations = citations_in(projected)
-    layouts = build_layouts(documents, legacy_v3=projection == PROJECTION_V3)
+    layouts = (
+        []
+        if projection == PROJECTION_SELECTIVE
+        else build_layouts(documents, legacy_v3=projection == PROJECTION_V3)
+    )
     payload = {
         "topic": topic,
         "part": {
@@ -497,7 +508,7 @@ def build_projection(
             "context_only": list(context),
             "note": _part_note(index, total or index),
         },
-        "outline": document_outline(documents, layouts),
+        "outline": document_outline(documents, layouts) if layouts else {},
         "table_links": [link for layout in layouts for link in layout.table_links],
         "documents": projected,
         "allowed_citations": citations,
@@ -510,6 +521,8 @@ def segment_system(index: int, total: int, *, projection: str = PROJECTION_V4) -
         return segments_v2.segment_system(index, total)
     if projection == PROJECTION_SUPPLEMENT:
         return SUPPLEMENT_PROMPT
+    if projection == PROJECTION_SELECTIVE:
+        return SELECTIVE_PROMPT
     prompt = SYSTEM_PROMPT + (
         f"\nĐây là phần {index}/{total} của một tài liệu dài. Chỉ trả nội dung của phần "
         "này, viết gọn và không lặp lại nội dung phần khác. Không tạo lại bảng: hệ thống "
@@ -530,7 +543,7 @@ def segment_system(index: int, total: int, *, projection: str = PROJECTION_V4) -
 
 
 def segment_schema(citations: list[str], projection: str = PROJECTION_V4) -> dict:
-    contract = SupplementPart if projection == PROJECTION_SUPPLEMENT else SegmentDraftContent
+    contract = SupplementPart if projection in SUPPLEMENT_PROJECTIONS else SegmentDraftContent
     schema = contract.model_json_schema()
     schema["$defs"]["DraftParagraph"]["properties"]["citations"]["items"]["enum"] = citations
     return schema
@@ -561,7 +574,9 @@ class Budget:
         self.documents = documents
         self.projection = projection
         self.layouts = build_layouts(documents)
-        self.outline = document_outline(documents, self.layouts)
+        self.outline = (
+            {} if projection == PROJECTION_SELECTIVE else document_outline(documents, self.layouts)
+        )
         self.outline_bytes = len(
             json.dumps(self.outline, ensure_ascii=False, sort_keys=True).encode("utf-8")
         )
@@ -689,9 +704,10 @@ def plan_segments(
     target_ratio: float = TARGET_RATIO,
     output_tokens: int | None = None,
     projection: str = PROJECTION_V4,
+    selected_units: list[Unit] | None = None,
 ) -> list[SegmentPlan]:
     """Pack units in reading order; split only at block boundaries or whole rows."""
-    units = build_units(documents)
+    units = build_units(documents) if selected_units is None else selected_units
     if not units:
         raise _invalid("Nguồn không có khối để biên soạn.", "compilation_source_empty")
     target = max(1, min(capacity, max(1024, int(capacity * target_ratio))))
@@ -803,6 +819,7 @@ def finalize_plans(
     capacity: int,
     structured: bool,
     projection: str = PROJECTION_V4,
+    selected_units: list[Unit] | None = None,
 ) -> list[SegmentPlan]:
     """Rebuild every part with its final index/total and the exact request bound.
 
@@ -850,7 +867,8 @@ def finalize_plans(
             "Không chốt được kế hoạch biên soạn trong ngân sách model.",
             "compilation_segment_too_large",
         )
-    expected = [ref for unit in build_units(documents) for ref in owned_refs([unit])]
+    expected_units = build_units(documents) if selected_units is None else selected_units
+    expected = [ref for unit in expected_units for ref in owned_refs([unit])]
     actual = [ref for plan in finalized for ref in plan.owned]
 
     def atoms(refs):
@@ -938,7 +956,7 @@ def plan_from_scope(scope: dict) -> SegmentPlan:
 def parse_segment_draft(
     content: str, allowed_citations: set[str], projection: str = PROJECTION_V4
 ) -> dict:
-    contract = SupplementPart if projection == PROJECTION_SUPPLEMENT else SegmentDraftContent
+    contract = SupplementPart if projection in SUPPLEMENT_PROJECTIONS else SegmentDraftContent
     try:
         value = contract.model_validate_json(content)
     except Exception as exc:  # Pydantic validation is reported as one stable contract

@@ -224,10 +224,8 @@ async def accept(db, blob, actor, workspace_id, collection_id, run_id, req, key,
         attempt_count=0,
         config={
             **run.config,
-            "auto_review": not run.source_first,
-            "review": run.config.get(
-                "review", {"provider_id": run.provider_id}
-            ),
+            "auto_review": not (run.source_first or run.selective_supplement),
+            "review": run.config.get("review", {"provider_id": run.provider_id}),
             "workflow_version": "qnu.compiler.workflow/v1",
             "edit": {
                 "preview_id": row.id,
