@@ -13,9 +13,13 @@ from qnu.platform.schema import SCHEMA_HEAD
 def test_single_initial_revision_has_no_dependencies():
     scripts = ScriptDirectory.from_config(Config("alembic.ini"))
     revisions = list(scripts.walk_revisions())
-    assert len(revisions) == 14
+    assert len(revisions) == 16
     assert scripts.get_revision("0014_publication_index_sync").down_revision == "0013_queued_review"
-    assert scripts.get_revision(SCHEMA_HEAD).down_revision == "0013_queued_review"
+    assert scripts.get_revision(SCHEMA_HEAD).down_revision == "0015_preparation_intent"
+    assert scripts.get_revision("0016_review_submission").down_revision == "0015_preparation_intent"
+    assert scripts.get_revision("0015_preparation_intent").down_revision == (
+        "0014_publication_index_sync"
+    )
     assert scripts.get_revision("0013_queued_review").down_revision == "0012_assistant_auto_output"
     assert scripts.get_revision("0012_assistant_auto_output").down_revision == "0011_mineru_ocr"
     assert scripts.get_heads() == [SCHEMA_HEAD]
@@ -62,7 +66,7 @@ def test_initial_schema_offline_sql_creates_v1_without_touching_legacy():
     assert "CREATE TABLE alembic_version (" not in sql
     assert "DROP TABLE" not in sql
     assert "0001_initial_schema" in sql
-    assert len(list(Path("alembic/versions").glob("[0-9]*.py"))) == 14
+    assert len(list(Path("alembic/versions").glob("[0-9]*.py"))) == 16
     assert "CREATE TABLE kb_index_sync" in sql
     assert "ADD COLUMN vectors_retired_at" in sql
     assert "'mineru'" in sql and "'provider_document'" in sql

@@ -7,7 +7,10 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
+from qnu.contracts.pagination import Page
+from qnu.domains.knowledge.index.schemas import IndexReadiness
 from qnu.domains.knowledge.metadata import MetadataValues, RetrievalAnnotation
+from qnu.domains.knowledge.policies.capabilities import SummaryCapabilities
 
 Action = Literal["approve", "publish", "withdraw"]
 
@@ -141,6 +144,38 @@ class VersionResponse(BaseModel):
         return digest(
             [a.model_dump(mode="json", exclude_none=True) for a in self.retrieval_metadata]
         )
+
+
+class VersionOrigin(BaseModel):
+    """One exact Compiler input that contributed evidence to a version."""
+
+    source_id: str
+    source_title: str
+    revision_id: str
+    revision_no: int
+    file_name: str
+    sha256: str
+    ocr_run_id: str
+    ocr_generation: int
+    text_version_id: str | None = None
+    text_version_no: int | None = None
+
+
+class VersionSummary(VersionResponse):
+    origins: list[VersionOrigin] = Field(default_factory=list)
+
+
+class DocumentSummaryResponse(BaseModel):
+    observed_at: datetime
+    document: DocumentResponse
+    prepared_version: VersionResponse | None = None
+    published_version: VersionResponse | None = None
+    served_version: VersionResponse | None = None
+    published_decision_id: str | None = None
+    readiness: IndexReadiness
+    serving_matches_published: bool = False
+    versions: Page[VersionSummary]
+    capabilities: SummaryCapabilities
 
 
 class RegistrationResponse(BaseModel):

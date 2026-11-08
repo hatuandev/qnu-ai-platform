@@ -54,3 +54,19 @@ class AssistantResponse(AssistantConfig):
     created_by: str
     created_at: datetime
     updated_at: datetime
+
+
+class AssistantReadiness(BaseModel):
+    assistant_id: str
+    collection_id: str
+    collection_name: str
+    status: Literal[
+        "empty", "syncing", "ready", "outdated", "not_indexed", "failed", "uncertain"
+    ]
+    published_document_count: int
+    served_document_count: int
+    index_run_id: str | None = None
+    index_generation: int | None = None
+    sync_status: str
+    sync_error_code: str | None = None
+    checked_at: datetime

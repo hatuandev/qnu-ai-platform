@@ -9,6 +9,7 @@ from datetime import timedelta
 from sqlalchemy import select, update
 
 from qnu.api.wiring import build_container, close_container
+from qnu.domains.knowledge.preparation import service as preparation
 from qnu.domains.ocr.execution import execute_run, job_id_for
 from qnu.domains.ocr.models import OcrProcessingRun, utcnow
 from qnu.platform.config import get_settings
@@ -47,6 +48,8 @@ async def ocr_process_run(ctx: dict, run_id: str) -> str:
             engine=container.ocr_engine,
             job_queue=container.job_queue,
         )
+        if outcome.status in {"completed", "failed", "uncertain", "cancelled"}:
+            await preparation.notify_for_ocr_run(db, run_id, container.job_queue)
     return outcome.status
 
 

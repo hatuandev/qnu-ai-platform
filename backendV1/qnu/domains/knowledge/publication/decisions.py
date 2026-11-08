@@ -318,6 +318,13 @@ async def _apply(
         },
     )
     db.add(row)
+    closed_submission_id = None
+    if preview.action == "approve":
+        from qnu.domains.knowledge.review.service import resolve_on_approval
+
+        closed_submission_id = await resolve_on_approval(
+            db, actor, doc, target, row.id, preview.reason
+        )
     if preview.action in {"publish", "withdraw"}:
         from qnu.domains.knowledge.index.sync import mark_pending
 
@@ -335,6 +342,7 @@ async def _apply(
             "review_mode": (preview.review_ack or {}).get("mode", "reviewed")
             if preview.action == "approve"
             else None,
+            "closed_submission_id": closed_submission_id,
         },
     )
     if commit:

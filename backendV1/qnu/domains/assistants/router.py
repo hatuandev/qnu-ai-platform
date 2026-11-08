@@ -3,14 +3,21 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from qnu.api.dependencies import get_actor, get_db
+from qnu.api.dependencies import get_actor, get_blob_store, get_db
 from qnu.domains.assistants import service
-from qnu.domains.assistants.schemas import AssistantCreate, AssistantResponse, AssistantUpdate
+from qnu.domains.assistants.schemas import (
+    AssistantCreate,
+    AssistantReadiness,
+    AssistantResponse,
+    AssistantUpdate,
+)
 from qnu.domains.identity.actor import AuthActor
+from qnu.ports.blob_store import BlobStore
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/assistants", tags=["Assistants"])
 DB = Annotated[AsyncSession, Depends(get_db)]
 Actor = Annotated[AuthActor, Depends(get_actor)]
+Blob = Annotated[BlobStore, Depends(get_blob_store)]
 
 
 @router.post("", response_model=AssistantResponse, status_code=201)
@@ -32,6 +39,11 @@ async def listing(
 @router.get("/{assistant_id}", response_model=AssistantResponse)
 async def detail(workspace_id: str, assistant_id: str, db: DB, actor: Actor):
     return await service.get_assistant(db, actor, workspace_id, assistant_id)
+
+
+@router.get("/{assistant_id}/readiness", response_model=AssistantReadiness)
+async def readiness(workspace_id: str, assistant_id: str, db: DB, actor: Actor, blob: Blob):
+    return await service.assistant_readiness(db, blob, actor, workspace_id, assistant_id)
 
 
 @router.put("/{assistant_id}", response_model=AssistantResponse)

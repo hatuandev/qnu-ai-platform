@@ -315,6 +315,7 @@ def test_old_source_content_is_hidden_after_withdrawal(client, chat_session):
         response.json()[0]["source_status"] == "unavailable"
         and response.json()[0]["result"] is None
     )
+    assert "thay đổi" in response.json()[0]["source_status_reason"]
     assert send(client, chat_session).json()["code"] == "answer_evidence_changed"
 
 

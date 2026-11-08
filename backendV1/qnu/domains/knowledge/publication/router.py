@@ -9,7 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.api.dependencies import get_actor, get_blob_store, get_db, get_job_queue
 from qnu.domains.identity.actor import AuthActor
-from qnu.domains.knowledge.publication import access, decisions, reading, review_gate, service
+from qnu.domains.knowledge.publication import (
+    access,
+    decisions,
+    reading,
+    review_gate,
+    service,
+    summary,
+)
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.knowledge.publication.models import (
     CompiledDocument,
@@ -23,6 +30,7 @@ from qnu.domains.knowledge.publication.schemas import (
     CreateDocumentRequest,
     DecisionResponse,
     DocumentResponse,
+    DocumentSummaryResponse,
     PreviewRequest,
     PreviewResponse,
     PublishedResponse,
@@ -104,6 +112,29 @@ async def document_detail(
 ) -> CompiledDocument:
     await access.authorize(db, actor, workspace_id, collection_id)
     return await access.document(db, workspace_id, collection_id, document_id)
+
+
+@router.get("/{document_id}/summary", response_model=DocumentSummaryResponse)
+async def document_summary(
+    workspace_id: str,
+    collection_id: str,
+    document_id: str,
+    db: DB,
+    actor: Actor,
+    blob: Blob,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+) -> DocumentSummaryResponse:
+    return await summary.read_document_summary(
+        db,
+        blob,
+        actor,
+        workspace_id,
+        collection_id,
+        document_id,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.post("/{document_id}/versions", response_model=RegistrationResponse, status_code=201)

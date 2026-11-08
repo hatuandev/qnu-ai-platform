@@ -21,6 +21,7 @@ from qnu.workers.tasks.operations import (
     evidence_backup_job,
     operations_reconcile,
 )
+from qnu.workers.tasks.preparation import preparation_job, preparation_reconcile
 
 settings = get_settings()
 
@@ -36,6 +37,8 @@ class WorkerSettings:
         func(compiler_review_job, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         func(manual_compiler_review_job, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         compiler_review_reconcile,
+        preparation_job,
+        preparation_reconcile,
         func(index_run, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         index_reconcile,
         index_sync,
@@ -52,6 +55,7 @@ class WorkerSettings:
             cron(ocr_reconcile_queued, minute=set(range(0, 60, 5))),
             cron(compilation_reconcile, minute=set(range(0, 60, 5))),
             cron(compiler_review_reconcile, minute=set(range(0, 60, 5))),
+            cron(preparation_reconcile, minute=set(range(0, 60, 5))),
             cron(index_reconcile, minute=set(range(0, 60, 5))),
             cron(index_maintenance, minute=set(range(60)), run_at_startup=True),
             cron(operations_reconcile, minute=set(range(0, 60, 5))),

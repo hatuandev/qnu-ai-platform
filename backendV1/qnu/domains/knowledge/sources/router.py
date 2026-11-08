@@ -16,11 +16,13 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.artifacts.files import content_disposition, read_limited
 from qnu.domains.knowledge.models import KBSource, KBSourceRevision
 from qnu.domains.knowledge.policies.access import READ_ROLES, WRITE_ROLES
+from qnu.domains.knowledge.sources import summary
 from qnu.domains.knowledge.sources.schemas import (
     RevisionResponse,
     SourceMoveRequest,
     SourceRenameRequest,
     SourceResponse,
+    SourceSummaryResponse,
     SourceUploadResponse,
 )
 from qnu.domains.knowledge.sources.service import source_service
@@ -212,6 +214,35 @@ async def get_source(
     source, revision = await source_service.get(db, workspace, collection_id, source_id)
     processing = await source_service.processing_for_revisions(db, [revision.id])
     return _source_out(source, revision, processing.get(revision.id))
+
+
+@router.get(
+    "/{source_id}/summary",
+    response_model=SourceSummaryResponse,
+    summary="Tổng hợp nguồn: lần xử lý, dẫn xuất và tình trạng phục vụ",
+)
+async def source_summary(
+    workspace_id: str,
+    collection_id: str,
+    source_id: str,
+    revision_id: str | None = Query(None, min_length=1, max_length=64),
+    runs_limit: int = Query(10, ge=1, le=20),
+    derivations_limit: int = Query(20, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+    blob_store: BlobStore = Depends(get_blob_store),
+    actor: AuthActor = Depends(get_actor),
+) -> SourceSummaryResponse:
+    return await summary.read_summary(
+        db,
+        blob_store,
+        actor,
+        workspace_id,
+        collection_id,
+        source_id,
+        revision_id=revision_id,
+        runs_limit=runs_limit,
+        derivations_limit=derivations_limit,
+    )
 
 
 @router.get(

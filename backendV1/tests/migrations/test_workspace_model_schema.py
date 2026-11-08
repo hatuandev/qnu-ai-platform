@@ -23,7 +23,9 @@ from qnu.domains.knowledge.compilation import models as compilation_models  # no
 from qnu.domains.knowledge.compilation.review import models as review_models  # noqa: F401
 from qnu.domains.knowledge.compilation.workflow import models as workflow_models  # noqa: F401
 from qnu.domains.knowledge.index import models as index_models  # noqa: F401
+from qnu.domains.knowledge.preparation import models as preparation_models  # noqa: F401
 from qnu.domains.knowledge.publication import models as publication_models  # noqa: F401
+from qnu.domains.knowledge.review import models as review_submission_models  # noqa: F401
 from qnu.domains.lifecycle import models as lifecycle_models  # noqa: F401
 from qnu.domains.modelops import models as modelops_models  # noqa: F401
 from qnu.domains.ocr import models as ocr_models  # noqa: F401

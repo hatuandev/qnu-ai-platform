@@ -101,6 +101,16 @@ async def resolve_workspace_access(
     return workspace
 
 
+async def caller_workspace_role(db: AsyncSession, actor: AuthActor, workspace_id: str) -> str:
+    """Role for read-model capabilities only; call after ``resolve_workspace_access``."""
+    if is_platform_admin(actor):
+        return "admin"
+    membership = await find_active_membership(db, workspace_id, actor_ref(actor))
+    if membership is None:
+        raise EntityNotFound("Không tìm thấy workspace.", code="workspace_not_found")
+    return membership.role
+
+
 async def list_visible_workspaces(db: AsyncSession, actor: AuthActor) -> list[Workspace]:
     """Workspaces the actor may see: all for platform admins, memberships otherwise."""
     if is_platform_admin(actor):

@@ -333,6 +333,18 @@ def test_replacement_keeps_old_serving_until_index_completes(client, indexed, fa
         # Candidate index is requested before its atomic publication decision.
         # Readiness must follow the binding, not requested_at >= published_at.
         assert readiness.json()["index_run_id"] == run_id
+    as_actor(PLATFORM)
+    summary = client.get(data["document_url"] + "/summary").json()
+    assert summary["published_version"]["id"] == active_id
+    assert summary["served_version"]["id"] == active_id
+    if failure:
+        # The approved candidate remains prepared, but the old publication and
+        # its exact index binding are still the ones serving.
+        assert summary["prepared_version"]["id"] == version_id
+        assert summary["serving_matches_published"] is True
+    else:
+        assert summary["prepared_version"] is None
+    as_actor(EDITOR)
     data["embedding"].mode = "ok"
     hits = client.post(data["base"] + "/search", json={"query": "Q"}).json()["hits"]
     assert hits and all(h["version_id"] == active_id for h in hits)

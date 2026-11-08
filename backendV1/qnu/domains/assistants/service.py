@@ -1,12 +1,17 @@
+from datetime import UTC, datetime
+
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.assistants.models import Assistant
-from qnu.domains.assistants.schemas import AssistantConfig, AssistantUpdate
+from qnu.domains.assistants.schemas import AssistantConfig, AssistantReadiness, AssistantUpdate
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import utcnow
+from qnu.domains.knowledge.index.models import IndexInput, IndexRun, IndexSync
+from qnu.domains.knowledge.index.snapshots import current_snapshot, publication_identity
 from qnu.domains.knowledge.policies.access import load_collection
+from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.lifecycle.effects import cancel_related_jobs
 from qnu.domains.lifecycle.guards import require_available, visible
 from qnu.domains.modelops.public_api import assert_provider_allowed
@@ -15,6 +20,7 @@ from qnu.domains.rag.policy import RagPolicy
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.errors import AppException, Conflict, EntityNotFound
+from qnu.ports.blob_store import BlobStore
 
 
 async def get_assistant(
@@ -144,3 +150,92 @@ async def save_assistant(
     await db.commit()
     await db.refresh(row)
     return row
+
+
+async def assistant_readiness(
+    db: AsyncSession,
+    blob: BlobStore,
+    actor: AuthActor,
+    workspace_id: str,
+    assistant_id: str,
+) -> AssistantReadiness:
+    assistant = await get_assistant(db, actor, workspace_id, assistant_id)
+    collection = await load_collection(db, workspace_id, assistant.collection_id)
+    published = []
+    try:
+        published = await current_snapshot(db, blob, actor, workspace_id, assistant.collection_id)
+    except AppException as exc:
+        if exc.code != "index_no_published_documents":
+            raise
+    active = await db.scalar(
+        select(IndexRun).where(
+            IndexRun.workspace_id == workspace_id,
+            IndexRun.collection_id == assistant.collection_id,
+            IndexRun.is_active.is_(True),
+            IndexRun.status == "completed",
+        )
+    )
+    served = 0
+    matches = False
+    if active is not None and published:
+        bindings = {
+            tuple(row)
+            for row in (
+                await db.execute(
+                    select(
+                        IndexInput.document_id,
+                        IndexInput.version_id,
+                        IndexInput.publication_decision_id,
+                        IndexInput.bundle_sha256,
+                        IndexInput.version_state,
+                    ).where(IndexInput.run_id == active.id)
+                )
+            ).all()
+        }
+        identities = [publication_identity(item) for item in published]
+        served = sum(
+            1
+            for item in identities
+            if (
+                item["document_id"],
+                item["version_id"],
+                item["publication_decision_id"],
+                item["bundle_sha256"],
+                item["version_state"],
+            )
+            in bindings
+        )
+        matches = active.input_sha256 == digest(identities)
+    sync = await db.get(IndexSync, assistant.collection_id)
+    sync_status = sync.status if sync is not None else "not_requested"
+    sync_error = sync.error_code if sync is not None else None
+    published_count = len(published)
+
+    if published_count == 0:
+        status = "empty"
+    elif active is not None and matches:
+        # The active generation already carries the exact current publication;
+        # a lagging outbox row cannot make that content stale.
+        status = "ready"
+    elif sync_status in {"pending", "building"}:
+        status = "syncing"
+    elif sync_status in {"failed", "uncertain"}:
+        status = sync_status
+    elif active is None:
+        status = "not_indexed"
+    else:
+        status = "outdated"
+
+    return AssistantReadiness(
+        assistant_id=assistant.id,
+        collection_id=assistant.collection_id,
+        collection_name=collection.name,
+        status=status,
+        published_document_count=published_count,
+        served_document_count=served,
+        index_run_id=active.id if active is not None else None,
+        index_generation=active.generation if active is not None else None,
+        sync_status=sync_status,
+        sync_error_code=sync_error,
+        checked_at=datetime.now(UTC),
+    )

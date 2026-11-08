@@ -47,6 +47,10 @@ v1_owned:
   - kb_compiled_versions
   - kb_publication_previews
   - kb_publication_decisions
+  # Batch 2026-11-08 — review handoff receipts and previews
+  - kb_review_submissions
+  - kb_review_submission_previews
+  - kb_review_submission_actions
   # Batch 2026-10-26 — isolated dense generations and publication-bound chunks
   - kb_index_runs
   - kb_index_sync

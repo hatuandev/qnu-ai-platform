@@ -13,6 +13,7 @@ from qnu.domains.knowledge.compilation.review.models import CompilationReview
 from qnu.domains.knowledge.compilation.review.service import dispatch_review
 from qnu.domains.knowledge.compilation.workflow import automatic
 from qnu.domains.knowledge.compilation.workflow.models import AutoReviewJob
+from qnu.domains.knowledge.preparation import service as preparation
 from qnu.platform.config import get_settings
 from qnu.platform.database import AsyncSessionFactory
 from qnu.platform.logging import get_logger
@@ -32,6 +33,8 @@ async def compile_run(ctx: dict, run_id: str) -> str:
         )
         if status in {"completed", "not_claimed"}:
             await automatic.dispatch(db, run_id, container.job_queue)
+        if status in {"completed", "failed", "uncertain", "cancelled", "not_claimed"}:
+            await preparation.notify_for_compilation(db, run_id, container.job_queue)
         return status
 
 

@@ -75,5 +75,6 @@ class TurnResponse(BaseModel):
     result: AnswerResponse | DirectReply | None
     rewrite_trace: dict | None
     source_status: str = "current"
+    source_status_reason: str | None = None
     created_at: datetime
     finished_at: datetime | None

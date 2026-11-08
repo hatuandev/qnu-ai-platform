@@ -15,6 +15,18 @@ from qnu.platform.errors import AppException, EntityNotFound
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.vector_store import VectorStore
 
+UNAVAILABLE_REASONS = {
+    "resource_unavailable": "Nguồn của câu trả lời đã bị lưu trữ hoặc xóa.",
+    "answer_evidence_changed": "Bằng chứng nguồn hoặc phiên bản xuất bản đã thay đổi.",
+    "index_outdated": "Chỉ mục đã thay đổi so với lúc trả lời.",
+    "index_configuration_changed": "Cấu hình chỉ mục hoặc mô hình embedding đã thay đổi.",
+    "embedding_dimension_stale": "Mô hình embedding của chỉ mục không còn tương thích.",
+    "provider_inactive": "Nhà cung cấp mô hình của chỉ mục đã ngừng hoạt động.",
+    "provider_not_found": "Không còn nhà cung cấp mô hình của chỉ mục.",
+    "publication_source_stale": "Nguồn dùng để xuất bản đã thay đổi.",
+    "published_compilation_not_found": "Bản xuất bản nguồn không còn tồn tại.",
+}
+
 
 async def readable(
     db: AsyncSession,
@@ -62,6 +74,9 @@ async def readable(
             }:
                 value.result = None
                 value.source_status = "unavailable"
+                value.source_status_reason = UNAVAILABLE_REASONS.get(
+                    exc.code, "Nguồn của câu trả lời không còn khả dụng."
+                )
             else:
                 raise
     return value

@@ -13,6 +13,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from qnu.domains.answer_review import models as _answer_review_models  # noqa: F401
 from qnu.domains.assistants import models as _assistant_models  # noqa: F401
 from qnu.domains.conversations import models as _conversation_models  # noqa: F401
 from qnu.domains.knowledge import models as _knowledge_models  # noqa: F401 - register tables
@@ -20,7 +21,9 @@ from qnu.domains.knowledge.compilation import models as _compilation_models  # n
 from qnu.domains.knowledge.compilation.review import models as _review_models  # noqa: F401
 from qnu.domains.knowledge.compilation.workflow import models as _workflow_models  # noqa: F401
 from qnu.domains.knowledge.index import models as _index_models  # noqa: F401
+from qnu.domains.knowledge.preparation import models as _preparation_models  # noqa: F401
 from qnu.domains.knowledge.publication import models as _publication_models  # noqa: F401
+from qnu.domains.knowledge.review import models as _review_submission_models  # noqa: F401
 from qnu.domains.lifecycle import models as _lifecycle_models  # noqa: F401
 from qnu.domains.modelops import models as _modelops_models  # noqa: F401 - register tables
 from qnu.domains.ocr import models as _ocr_models  # noqa: F401 - register tables

@@ -11,6 +11,7 @@ TABLES = frozenset(
     {
         "kb_sources",
         "kb_source_revisions",
+        "kb_preparation_intents",
         "ocr_processing_runs",
         "ocr_run_pages",
         "ocr_run_artifacts",
@@ -29,6 +30,9 @@ TABLES = frozenset(
         "kb_compilation_review_jobs",
         "kb_compilation_edit_previews",
         "kb_compiled_versions",
+        "kb_review_submissions",
+        "kb_review_submission_previews",
+        "kb_review_submission_actions",
         "kb_publication_previews",
         "kb_publication_decisions",
         "kb_index_inputs",
