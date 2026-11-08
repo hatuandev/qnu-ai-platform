@@ -77,6 +77,7 @@ Tiền tố `P`:
 |---|---|---|
 | POST | `P` | Tạo tài liệu và phiên bản 1 từ Compiler completed |
 | GET | `P` | Danh sách tài liệu |
+| GET | `P/registration-metadata/{run}` | Tự nhận diện thông tin có căn cứ từ nguồn đã ghim của bản completed |
 | GET | `P/{doc}` | Metadata tài liệu |
 | POST | `P/{doc}/versions` | Đăng ký phiên bản tiếp theo từ Compiler completed |
 | GET | `P/{doc}/versions` | Lịch sử phiên bản, mới trước |
@@ -91,6 +92,28 @@ List/history hỗ trợ `limit=1..100`, `offset>=0`. Đăng ký và commit decis
 `Idempotency-Key` (1–128 ký tự ASCII chữ/số/`_.:-`). Tạo mới trả 201, replay đăng ký
 trả 200 cùng version. Quyết định trả 200; cùng key/body trả receipt cũ, không áp lại.
 Key trùng nhưng body/path khác trả 409. Dùng key mới không vượt được preview đã dùng.
+
+### Tự nhận diện thông tin nguồn (Context896)
+
+Giao diện đăng ký đọc `GET P/registration-metadata/{run}` trước khi lưu. Server kiểm
+quyền workspace/collection, load bundle bất biến và trả `rules_version`, `annotations`,
+`sha256`. Trường chuẩn tách năm ban hành/năm dữ liệu/hiệu lực/ngành/đợt; thuộc tính
+khác lưu trong `values.attributes` JSON nếu nguồn có nhãn và giá trị tường minh.
+Không dùng tên tệp, không áp năm/ngành/đợt cục bộ cho toàn văn. Mâu thuẫn/không rõ
+không được tự điền. Đề xuất AI lịch sử được kiểm lại về nguồn và vai trò trường.
+Không gọi thêm LLM. Kết quả rỗng hợp lệ, không cản đăng ký.
+
+POST tạo tài liệu hoặc phiên bản gửi `automatic_metadata_sha256` đúng như GET vừa
+trả. Server tính lại từ bundle và so hash trước khi lưu. Sai hash trả
+`409 registration_metadata_changed`; không ghi dữ liệu. Thông tin được lưu trong
+`retrieval_metadata`, đưa vào bundle hash và ghi provenance `automatic_metadata`
+(`source_verified`, rules/hash/input hash). Điều này không có nghĩa đã được người
+duyệt xác nhận hoặc đã xuất bản: trạng thái vẫn là `draft`, giữ review gate và
+quyết định duyệt/phát hành hiện có. Chính người dùng yêu cầu thao tác tạo tài liệu.
+
+Client cũ bỏ trường mới giữ nguyên hành vi/hash idempotency. Khai báo hoặc lựa chọn
+thủ công vẫn được hỗ trợ riêng; không trộn với hash tự nhận diện trong cùng yêu cầu
+(`409 registration_metadata_conflict`). Cùng key/body replay đúng bản đã tạo.
 
 Tạo tài liệu (thay ID mẫu bằng run đã hoàn tất):
 

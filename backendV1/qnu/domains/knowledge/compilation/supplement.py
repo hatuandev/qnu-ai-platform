@@ -26,6 +26,8 @@ khối hoặc ô trực tiếp chứng minh giá trị. Không dựa vào tên t
 data_year cho năm dữ liệu, effective_from/effective_until cho ngày bắt đầu/kết thúc hiệu lực
 (YYYY-MM-DD), program cho ngành và intake cho đợt. Với thuộc tính khác, dùng nhãn rõ nghĩa.
 Không gán năm ban hành làm năm dữ liệu. Không đoán phạm vi của bảng nhiều năm.
+Program chỉ nhận tên ngành/chương trình được nguồn gọi rõ; mùa tuyển sinh không phải ngành.
+Intake phải là đợt/kỳ được nêu rõ; năm tuyển sinh riêng lẻ dùng data_year, không dùng intake.
 Scope local gắn vào đoạn/ô, row nếu ghi rõ cho toàn hàng, section nếu tiêu đề nguồn
 trực tiếp nêu giá trị cho cả mục, document chỉ cho thông tin
 ban hành/hiệu lực toàn văn. Bỏ đề xuất không đủ căn cứ. Dùng [] cho danh sách rỗng.
@@ -38,7 +40,7 @@ mà tiêu đề bao quát và dẫn đúng các khối liên quan. Không chép 
 không đề xuất tiêu đề đã có. Khi thiếu căn cứ để bổ sung, trả danh sách rỗng.
 """
 )
-RULE_VERSION = "qnu.compiler.metadata-rules/v1"
+RULE_VERSION = "qnu.compiler.metadata-rules/v2"
 KNOWN_FIELDS = {
     "issued_year",
     "data_year",
@@ -50,7 +52,11 @@ KNOWN_FIELDS = {
 ISSUED_YEAR = r"\bnăm\s+ban\s+hành\s*[:–-]?\s*(\d{4})(?!\d)"
 ISSUED_DATE = r"\bngày\s+ban\s+hành\s*[:–-]?"
 PLACE_DATE = r"(?m)^[^\d,\n:;.!?]{2,60},[ \t]*(?=ngày\b)"
-DATA = r"(?:năm\s+dữ\s+liệu|niên\s+độ\s+báo\s+cáo)\s*[:–-]?\s*(\d{4})(?!\d)"
+DATA = (
+    r"(?:năm\s+dữ\s+liệu|niên\s+độ\s+báo\s+cáo|mùa\s+tuyển\s+sinh|"
+    r"năm\s+tuyển\s+sinh|tuyển\s+sinh(?:\s+năm)?)\s*[:–-]?\s*"
+    r"(\d{4})(?!\d|\s*(?:[/–-]|và)\s*\d{2,4})"
+)
 EFFECTIVE = {
     "effective_from": r"(?:có\s+hiệu\s+lực\s+(?:thi\s+hành\s+)?(?:kể\s+)?từ|(?:^|[.!?;\n]\s*)hiệu\s+lực\s+từ)",
     "effective_until": r"(?:có\s+hiệu\s+lực\s+(?:thi\s+hành\s+)?đến\s+hết|(?:^|[.!?;\n]\s*)hiệu\s+lực\s+đến\s+hết)",
@@ -225,14 +231,87 @@ def _proposal_values(candidate: MetadataCandidate, boundary: bool) -> dict:
     ):
         return {}
     if field in KNOWN_FIELDS:
-        if field in {"program", "intake"} and (
-            not isinstance(value, str) or value.casefold() not in candidate.quote.casefold()
-        ):
-            return {}
+        if field in {"program", "intake"}:
+            role = (
+                r"(?:ngành(?:\s+đào\s+tạo)?|chương\s+trình(?:\s+đào\s+tạo)?)"
+                if field == "program"
+                else r"(?:đợt|kỳ)(?:\s+tuyển\s+sinh)?"
+            )
+            if not isinstance(value, str) or not re.search(
+                r"\b" + role + r"\s*[:：–-]?\s*" + re.escape(value) + r"(?=$|[\s,.;)])",
+                candidate.quote,
+                re.IGNORECASE,
+            ):
+                return {}
         return {field: value}
     if field.casefold() in KNOWN_FIELDS or not attribute_in_quote(field, value, candidate.quote):
         return {}
     return {"attributes": {field: value}}
+
+
+def automatic_entries(draft: dict, documents: list[dict]) -> list[dict]:
+    """Recheck old model proposals and mine explicit label/value pairs, without inference."""
+    candidates = []
+    aliases = {
+        "ngành": "program",
+        "ngành đào tạo": "program",
+        "chương trình": "program",
+        "chương trình đào tạo": "program",
+        "đợt": "intake",
+        "đợt tuyển sinh": "intake",
+        "kỳ": "intake",
+        "kỳ tuyển sinh": "intake",
+    }
+    reserved = {
+        *KNOWN_FIELDS,
+        "attributes",
+        "năm ban hành",
+        "ngày ban hành",
+        "năm dữ liệu",
+        "niên độ báo cáo",
+        "hiệu lực từ",
+        "hiệu lực đến hết",
+    }
+    for citation, (text, _) in _source_texts(documents).items():
+        for line in text.splitlines():
+            match = re.fullmatch(r"\s*([^\n:：]{2,80})\s*[:：]\s*(\S[^\n]{0,499})\s*", line)
+            if not match:
+                continue
+            label, value = (part.strip() for part in match.groups())
+            folded = label.casefold()
+            if folded in reserved:
+                continue
+            candidates.append(
+                {
+                    "field": aliases.get(folded, label),
+                    "value": value,
+                    "citation": citation,
+                    "quote": line.strip(),
+                    "scope": "local",
+                }
+            )
+    # Historical drafts are immutable. Their proposed labels are never trusted just
+    # because an older compiler accepted them; current proof/role checks run again.
+    for entry in draft.get("supplement", {}).get("metadata", []):
+        item = entry["annotation"]
+        for evidence in item["evidence"]:
+            values = item["values"]
+            for field, value in {**values, **values.get("attributes", {})}.items():
+                if field == "attributes" or value is None:
+                    continue
+                if field not in KNOWN_FIELDS:
+                    # Automatic custom attributes require an explicit label/value pair,
+                    # already mined above; scattered occurrences are not a binding.
+                    continue
+                candidates.append(
+                    {
+                        "field": field,
+                        "value": value,
+                        **evidence,
+                        "scope": "document" if item["target"] == "document" else "local",
+                    }
+                )
+    return _proposal_entries(draft, documents, [(0, {"metadata": candidates})])
 
 
 def _annotation(candidate: MetadataCandidate, target: str, values: dict) -> dict | None:

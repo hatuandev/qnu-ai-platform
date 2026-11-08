@@ -63,8 +63,8 @@ PROMPT_VERSIONS = {
     PROJECTION_V2: segments_v2.PROMPT_VERSION,
     PROJECTION_V3: "qnu.compiler.segment.prompt/v3",
     PROJECTION_V4: PROMPT_VERSION,
-    PROJECTION_SUPPLEMENT: "qnu.compiler.supplement.prompt/v1",
-    PROJECTION_SELECTIVE: "qnu.compiler.selective-supplement.prompt/v1",
+    PROJECTION_SUPPLEMENT: "qnu.compiler.supplement.prompt/v2",
+    PROJECTION_SELECTIVE: "qnu.compiler.selective-supplement.prompt/v2",
 }
 
 TARGET_RATIO = 0.7

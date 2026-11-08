@@ -18,6 +18,7 @@ from qnu.domains.knowledge.publication.models import (
     PublicationPreview,
 )
 from qnu.domains.knowledge.publication.schemas import (
+    AutomaticMetadataPreview,
     CommitRequest,
     CreateDocumentRequest,
     DecisionResponse,
@@ -83,6 +84,18 @@ async def list_documents(
     offset: int = Query(0, ge=0),
 ) -> list[CompiledDocument]:
     return await service.list_documents(db, actor, workspace_id, collection_id, limit, offset)
+
+
+@router.get("/registration-metadata/{run_id}", response_model=AutomaticMetadataPreview)
+async def registration_metadata(
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    db: DB,
+    actor: Actor,
+    blob: Blob,
+) -> dict:
+    return await service.registration_metadata(db, blob, actor, workspace_id, collection_id, run_id)
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)

@@ -595,7 +595,8 @@ function CompilationDetailSession({
                         <span className="flex items-center gap-2 font-medium">
                           <Sparkles className="size-4 text-primary shrink-0" />
                           <span>
-                            Có <strong>{draft.supplement.metadata.length}</strong> đề xuất metadata có dẫn chứng từ mô hình AI (đối chiếu và xác nhận khi đăng ký).
+                            Thông tin hỗ trợ tìm kiếm sẽ được tự nhận diện khi
+                            đăng ký tài liệu.
                           </span>
                         </span>
                       </div>
@@ -674,7 +675,8 @@ function CompilationDetailSession({
                       </span>
                     </h3>
                     <span className="text-[11px] text-muted-foreground">
-                      Bảo toàn nguyên cấu trúc hàng, cột, ô trống và số liệu gốc.
+                      Bảo toàn nguyên cấu trúc hàng, cột, ô trống và số liệu
+                      gốc.
                     </span>
                   </div>
                   <SourceTablesView
@@ -692,7 +694,8 @@ function CompilationDetailSession({
                     <span className="flex items-center gap-1.5">
                       <FolderOpen className="size-3.5 text-primary" />
                       <span>
-                        Danh mục tài liệu nguồn đã sử dụng ({draft.sources.length})
+                        Danh mục tài liệu nguồn đã sử dụng (
+                        {draft.sources.length})
                       </span>
                     </span>
                     <span className="text-[11px] font-normal text-muted-foreground">
@@ -710,7 +713,8 @@ function CompilationDetailSession({
                             {s.identity.filename}
                           </span>
                           <div className="text-muted-foreground font-mono text-[10px]">
-                            OCR Run: {s.ocr_run_id} · Rev: {s.identity.revision_id}
+                            OCR Run: {s.ocr_run_id} · Rev:{" "}
+                            {s.identity.revision_id}
                           </div>
                         </div>
                         {s.text_version ? (
@@ -829,7 +833,6 @@ function CompilationDetailSession({
         collectionId={collectionId}
         compilationRunId={run.id}
         defaultTitle={draft?.title || run.topic}
-        proposals={draft?.supplement?.metadata}
         draftState={draft ? "ready" : draftQuery.isError ? "error" : "loading"}
         isOpen={isRegisterDialogOpen}
         onClose={() => setIsRegisterDialogOpen(false)}

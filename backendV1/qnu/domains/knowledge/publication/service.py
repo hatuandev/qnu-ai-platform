@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.supplement import confirm
+from qnu.domains.knowledge.publication import automatic_metadata
 from qnu.domains.knowledge.publication.access import authorize, document
 from qnu.domains.knowledge.publication.evidence import digest, load_bundle, registered_bundle_hash
 from qnu.domains.knowledge.publication.models import (
@@ -53,6 +54,8 @@ async def _replay(
 
 def _request_payload(req: RegisterVersionRequest) -> dict:
     payload = req.model_dump(mode="json")
+    if payload["automatic_metadata_sha256"] is None:
+        del payload["automatic_metadata_sha256"]
     for field in ("metadata_proposal_ids", "metadata_proposal_edits", "retrieval_metadata"):
         if not payload[field]:
             del payload[field]
@@ -67,6 +70,19 @@ def _request_payload(req: RegisterVersionRequest) -> dict:
     if req.metadata_proposal_ids:
         payload["metadata_proposal_ids"] = sorted(req.metadata_proposal_ids)
     return payload
+
+
+async def registration_metadata(
+    db: AsyncSession,
+    blob: BlobStore,
+    actor: AuthActor,
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+) -> dict:
+    await authorize(db, actor, workspace_id, collection_id)
+    bundle = await load_bundle(db, blob, workspace_id, collection_id, run_id)
+    return automatic_metadata.preview(bundle)
 
 
 async def create_document(
@@ -158,6 +174,22 @@ async def _register(
         [a.model_dump(mode="json", exclude_none=True) for a in req.retrieval_metadata],
         _request_payload(req).get("metadata_proposal_edits", {}),
     )
+    automatic = None
+    if req.automatic_metadata_sha256 is not None:
+        automatic = automatic_metadata.preview(bundle)
+        if automatic["sha256"] != req.automatic_metadata_sha256:
+            raise Conflict(
+                "Thông tin tài liệu đã thay đổi. Hãy mở lại cửa sổ đăng ký.",
+                code="registration_metadata_changed",
+            )
+        # Explicit manual input remains supported by older clients. Do not silently
+        # overwrite either set; combining both requires an explicit resolved request.
+        if annotations:
+            raise Conflict(
+                "Không trộn thông tin tự nhận diện với khai báo thủ công.",
+                code="registration_metadata_conflict",
+            )
+        annotations = automatic["annotations"]
     bundle_hash = registered_bundle_hash(bundle, annotations)
     if await db.scalar(
         select(CompiledVersion.id).where(CompiledVersion.compilation_run_id == run_id)
@@ -182,6 +214,18 @@ async def _register(
         retrieval_metadata=annotations,
         provenance={
             **bundle.provenance,
+            **(
+                {
+                    "automatic_metadata": {
+                        "status": "source_verified",
+                        "rules_version": automatic["rules_version"],
+                        "sha256": automatic["sha256"],
+                        "input_sha256": bundle.input_sha256,
+                    }
+                }
+                if automatic is not None
+                else {}
+            ),
             **(
                 {
                     "metadata_confirmation": {

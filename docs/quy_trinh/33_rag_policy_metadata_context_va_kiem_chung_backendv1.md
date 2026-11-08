@@ -1,5 +1,22 @@
 # 33 — RAG policy, metadata, context và kiểm chứng backendV1
 
+### Bổ sung896: tự nhận diện thông tin khi đăng ký
+
+Người dùng không cần nhập hay đánh dấu metadata. Khi mở đăng ký, server đọc lại
+nguồn của bản biên soạn đã hoàn tất, nhận diện giá trị có căn cứ và trả bản xem
+trước gắn hash. Bấm tạo tài liệu/thêm phiên bản lưu đúng thông tin đó vào bản nháp.
+Từ897, hộp đăng ký ẩn phần thông tin chỉ để xem; vẫn giữ bước nhận diện và kiểm
+hash khi lưu. Chỉ hiện lựa chọn thêm phiên bản khi kho có tài liệu đích.
+Các trường ngoài nhóm chuẩn lưu trong `attributes` JSON; không cần thêm cột DB.
+Giá trị mâu thuẫn/không rõ giữ unknown. Năm dữ liệu, ngành và đợt chỉ áp dụng tại
+đoạn/ô có căn cứ; không suy phạm vi toàn tài liệu từ một lần xuất hiện.
+
+Đề xuất AI không được chấp nhận chỉ vì chuỗi giá trị xuất hiện trong nguồn: phải
+đúng vai trò trường. Ví dụ “mùa tuyển sinh 2026” là năm dữ liệu, không là ngành
+hay đợt. Luồng này không gọi thêm model, không sửa bản nguồn và không tự phê duyệt.
+Hash thông tin tự nhận diện vẫn nằm trong bundle phiên bản và được kiểm khi duyệt.
+API khai báo thủ công cũ giữ tương thích; giao diện đăng ký dùng luồng tự nhận diện.
+
 ### Bổ sung861: cần đọc gì, đã bao quát gì, còn thiếu gì
 
 - Sau retrieval, nhận diện nhóm điều/mục/danh sách trong nguồn canonical đã ghim;

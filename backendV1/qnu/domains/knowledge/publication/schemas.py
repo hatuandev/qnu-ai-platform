@@ -47,6 +47,7 @@ class MetadataProposalEdit(BaseModel):
 class RegisterVersionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     compilation_run_id: str = Field(min_length=1, max_length=64)
+    automatic_metadata_sha256: str | None = Field(None, pattern=r"^[0-9a-f]{64}$")
     retrieval_metadata: list[RetrievalAnnotation] = Field(default_factory=list, max_length=10000)
     metadata_proposal_ids: list[Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]] = Field(
         default_factory=list, max_length=10000
@@ -55,6 +56,12 @@ class RegisterVersionRequest(BaseModel):
     metadata_proposal_edits: dict[
         Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")], MetadataProposalEdit
     ] = Field(default_factory=dict, max_length=10000)
+
+
+class AutomaticMetadataPreview(BaseModel):
+    rules_version: str
+    annotations: list[RetrievalAnnotation]
+    sha256: str
 
 
 class CreateDocumentRequest(RegisterVersionRequest):

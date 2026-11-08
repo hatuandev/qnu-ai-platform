@@ -2,6 +2,7 @@ import { ApiProblemError, type V1Client } from "../../app/api/v1/client.ts";
 import { compiledDocumentPaths } from "../../app/api/v1/endpoints.ts";
 import type { DraftDocumentResponse } from "./compilation-types.ts";
 import type {
+  AutomaticMetadataPreview,
   CreateDocumentRequest,
   DecisionCommitRequest,
   DecisionPreviewRequest,
@@ -14,6 +15,20 @@ import type {
   ReviewGateResponse,
   VersionResponse,
 } from "./publication-types.ts";
+
+export function getRegistrationMetadata(
+  client: V1Client,
+  workspaceId: string,
+  collectionId: string,
+  runId: string,
+  signal?: AbortSignal,
+): Promise<AutomaticMetadataPreview> {
+  const path = compiledDocumentPaths.documents(workspaceId, collectionId);
+  return client.get(
+    `${path}/registration-metadata/${encodeURIComponent(runId)}`,
+    { signal },
+  );
+}
 
 export async function createCompiledDocument(
   client: V1Client,

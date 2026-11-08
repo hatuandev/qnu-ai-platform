@@ -7,6 +7,10 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-11-08 — Context897 — Gọn hộp đăng ký tài liệu.** Bỏ phần thông tin chỉ để xem, giữ tự nhận diện/hash khi lưu. Chỉ hiện thêm phiên bản khi có tài liệu đích; báo lỗi tải danh sách riêng, kiểm lại lựa chọn đích trước gửi. 7 ca FE trọng tâm, Biome/build và 8 tổ hợp Chromium390/1280px sáng/tối, kho trống/có đích đạt. Không sửa backend/DB, không gọi model hoặc khởi động lại app; full suite không chạy lại, giữ giới hạn và lỗi nền896. [Nhật ký](../nhat_ky/2026-11-08_phien_897_gon_dang_ky_tai_lieu.md), [Snapshot](./snapshots/2026-11-08_session_897.md).
+
+- **2026-11-07 — Context896 — Tự nhận diện thông tin tài liệu.** Đăng ký dùng preview nguồn và hash; tự lưu metadata có căn cứ, bỏ chọn/nhập từng đề xuất. Kiểm đúng vai trò năm/ngành/đợt, JSON thuộc tính động, không mở rộng phạm vi hoặc sửa nguồn/phiên bản cũ. Người dùng vẫn tạo bản nháp và duyệt/phát hành riêng.15 test backend/13 FE trọng tâm, Ruff/Biome/build và Chromium390/1280px sáng/tối đạt. FullFE853 pass/10 fail trùng baseline; fullBE1001 pass/3 fail,502 chưa hoàn tất do một nhóm crash Windows; không tuyên bố toàn hệ thống PASS. Không model thật/restart/reindex/push. [Nhật ký](../nhat_ky/2026-11-07_phien_896_tu_nhan_dien_thong_tin_tai_lieu.md), [Snapshot](./snapshots/2026-11-07_session_896.md).
+
 - **2026-11-07 — Context895 — Nút đóng bảng biên soạn.** Nút × ẩn toàn bộ bảng, không hủy job; lượt mới tự hiện. 26 ca FE liên quan, Biome/build và Chromium390/1280px đạt. Không đổi DB/backend/dịch vụ. [Nhật ký](../nhat_ky/2026-11-07_phien_895_dong_bang_bien_soan.md), [Snapshot](./snapshots/2026-11-07_session_895.md).
 
 - **2026-11-07 — Context894 — Theo dõi biên soạn nền.** Tạo lượt giữ nguyên trang tệp, bảng góc phải theo dõi tiến độ nhóm thật; thu gọn/chuyển trang không dừng job. Danh sách theo actor/session, không lưu browser storage. 24 FE liên quan, Biome/build/TypeScript và Chromium390/1280px sáng/tối đạt; full FE842 pass/10 fail ngoài phạm vi ở OCR806/replacement678/publication. Không gọi model/sửa DB/restart app/push. [Nhật ký](../nhat_ky/2026-11-07_phien_894_bang_tien_do_bien_soan.md), [Snapshot](./snapshots/2026-11-07_session_894.md).

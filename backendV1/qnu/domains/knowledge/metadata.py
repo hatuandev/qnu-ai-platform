@@ -1,4 +1,4 @@
-"""Human-reviewed, source-bound annotations; unknown values never match a filter."""
+"""Source-bound annotations; unknown values never match a filter."""
 
 import re
 from datetime import date

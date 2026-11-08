@@ -16,10 +16,12 @@ import {
   getCompiledVersionDraft,
   getCompiledVersionReviewGate,
   getPublishedCompiledDocument,
+  getRegistrationMetadata,
   listCompiledDocuments,
   listCompiledVersions,
 } from "./publication-requests.ts";
 import type {
+  AutomaticMetadataPreview,
   CreateDocumentRequest,
   DecisionCommitRequest,
   DecisionPreviewRequest,
@@ -198,6 +200,36 @@ export const publicationKeys = {
 // ==========================================
 // Query Hooks
 // ==========================================
+
+export function useAutomaticMetadataQuery(
+  workspaceId: string,
+  collectionId: string,
+  runId: string,
+  options: { enabled: boolean },
+) {
+  const { sessionId } = useV1Auth();
+  return useQuery<AutomaticMetadataPreview>({
+    queryKey: [
+      ...publicationKeys.document(
+        workspaceId,
+        collectionId,
+        "registration-metadata",
+        sessionId,
+      ),
+      runId,
+    ],
+    queryFn: ({ signal }) =>
+      getRegistrationMetadata(
+        v1Client,
+        workspaceId,
+        collectionId,
+        runId,
+        signal,
+      ),
+    enabled: Boolean(workspaceId && collectionId && runId) && options.enabled,
+    retry: false,
+  });
+}
 
 export function useCompiledDocumentsQuery(
   workspaceId: string,

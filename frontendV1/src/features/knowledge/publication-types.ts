@@ -40,7 +40,7 @@ export interface VersionResponse {
   markdown_sha256: string;
   bundle_sha256: string;
   provenance: Record<string, unknown>;
-  /** Human-declared metadata bound to this exact version (Context673). */
+  /** Source-verified automatic or explicitly declared metadata bound to this version. */
   retrieval_metadata: RetrievalAnnotation[];
   /**
    * SHA-256 of `retrieval_metadata`, computed by the backend. The reviewer sends
@@ -89,6 +89,7 @@ export interface ReviewGateResponse {
 }
 
 export interface CreateDocumentRequest {
+  automatic_metadata_sha256?: string;
   document_key: string;
   title: string;
   compilation_run_id: string;
@@ -101,6 +102,7 @@ export interface CreateDocumentRequest {
 }
 
 export interface RegisterVersionRequest {
+  automatic_metadata_sha256?: string;
   compilation_run_id: string;
   retrieval_metadata?: RetrievalAnnotation[];
   metadata_proposal_ids?: string[];
@@ -108,6 +110,12 @@ export interface RegisterVersionRequest {
     string,
     { values: MetadataValues; quote: string }
   >;
+}
+
+export interface AutomaticMetadataPreview {
+  rules_version: string;
+  sha256: string;
+  annotations: RetrievalAnnotation[];
 }
 
 export interface DecisionPreviewRequest {

@@ -1,5 +1,9 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên897 — Gọn hộp đăng ký tài liệu](2026-11-08_phien_897_gon_dang_ky_tai_lieu.md).
+
+- [Phiên896 — Tự nhận diện thông tin tài liệu](2026-11-07_phien_896_tu_nhan_dien_thong_tin_tai_lieu.md).
+
 - [Phiên895 — Đóng bảng biên soạn](2026-11-07_phien_895_dong_bang_bien_soan.md).
 
 - [Phiên894 — Bảng tiến độ biên soạn nền](2026-11-07_phien_894_bang_tien_do_bien_soan.md).
