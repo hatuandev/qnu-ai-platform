@@ -895,7 +895,7 @@ export function KnowledgeDetailPage({
                         });
                       }}
                       className={cn(
-                        "p-4 rounded-xl border border-border/70 hover:border-primary/50 hover:bg-muted/20 hover:shadow-xs transition-all group relative flex flex-col justify-between select-none cursor-pointer",
+                        "min-w-0 p-4 rounded-xl border border-border/70 hover:border-primary/50 hover:bg-muted/20 hover:shadow-xs transition-all group relative flex flex-col justify-between select-none cursor-pointer",
                         isDragging &&
                           "opacity-40 scale-95 border-dashed border-primary ring-2 ring-primary/20",
                       )}

@@ -151,7 +151,7 @@ export function SourceLineagePanel({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 min-w-0 gap-2 px-1.5 text-xs font-semibold"
+              className="h-7 min-w-0 flex-wrap gap-2 px-1.5 text-xs font-semibold"
             >
               <GitBranch className="size-3.5 text-primary" />
               <span>Dẫn xuất & phục vụ</span>

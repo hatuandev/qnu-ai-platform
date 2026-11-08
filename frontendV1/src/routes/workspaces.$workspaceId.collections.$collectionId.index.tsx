@@ -4,6 +4,10 @@ import { pageSearchSchema } from "@/features/workspaces/search";
 
 const collectionDetailSearchSchema = pageSearchSchema.extend({
   sourceAction: z.enum(["ocr"]).optional(),
+  stage: z
+    .enum(["files", "ocr", "compiler", "publication", "serving"])
+    .optional()
+    .catch("files"),
   tab: z
     .enum(["sources", "compilations", "documents", "index"])
     .optional()
@@ -27,9 +31,8 @@ export const Route = createFileRoute(
     const stage =
       search.sourceAction === "ocr"
         ? "ocr"
-        : search.tab
-          ? stageMap[search.tab] ?? "files"
-          : "files";
+        : (search.stage ??
+          (search.tab ? (stageMap[search.tab] ?? "files") : "files"));
 
     throw redirect({
       to: "/workspaces/$workspaceId/knowledge/$knowledgeId",
