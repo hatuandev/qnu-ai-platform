@@ -33,6 +33,10 @@
 
 ### 1.2 Luồng hệ thống V1
 
+- [46 — Pilot QNU V1 và đóng phạm vi bản đầu](./46_pilot_qnu_v1_va_dong_pham_vi.md): chọn đơn vị
+  và người tham gia, kịch bản đo thời gian, ma trận tình huống lỗi, nghiệm thu và rollout/rollback.
+- [45 — Gửi duyệt, yêu cầu sửa và danh sách “Cần xử lý”](./45_ban_giao_duyet_va_can_xu_ly_v1.md):
+  submission riêng, preview/idempotency, hàng chờ đọc trạng thái thật và deep link.
 - [44 — Điều hướng workspace V1](./44_dieu_huong_workspace_v1.md): bộ chọn workspace, URL gọn và
   liên kết tài liệu có kiểm quyền.
 - [43 — Bóc tách tự động sau upload](./43_boc_tach_tu_dong_backend_v1.md): native-first PDF/DOCX,

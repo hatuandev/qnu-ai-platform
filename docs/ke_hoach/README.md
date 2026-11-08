@@ -9,6 +9,10 @@ Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thu�
 
 ---
 
+## Kế hoạch QNU V1 hiện tại
+
+- [15 — Trải nghiệm người dùng QNU V1](./15_ke_hoach_trai_nghiem_nguoi_dung_qnu_v1.md): ngày 2026-11-08, baseline `09a173a2`, nhánh `feat/v1-user-workflow`. Tám gói P0–P7 từ hợp đồng/quyền, điều hướng, tài liệu xuyên suốt đến chuẩn bị nền, bàn giao duyệt, phục vụ, trợ lý và pilot; kèm backlog, kiểm thử và rollback. P1, P2, P3, P4 và P5 đã triển khai (2026-11-08); P6–P7 chưa bắt đầu.
+
 ## 📌 Danh Mục Kế Hoạch
 
 - [Prompt sửa 26 test FE và 4 P2 — phiên 794](./PROMPT_FIX_FE_26_TEST_VA_4_P2_794.md): danh sách test chính xác, sửa catalog BE–FE/confirmation/error mapping/provenance và kiểm chứng offline, không retry để làm xanh kết quả.

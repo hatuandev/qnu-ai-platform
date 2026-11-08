@@ -1,5 +1,19 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context904 — Chuẩn bị môi trường pilot P7](nhat_ky/2026-11-08_phien_904_moi_truong_pilot.md).
+
+- [Context903 — Pilot và đóng phạm vi bản đầu](nhat_ky/2026-11-08_phien_903_pilot_va_dong_pham_vi.md).
+
+- [Context902 — Trợ lý dễ cấu hình và kiểm thử câu trả lời](nhat_ky/2026-11-08_phien_902_tro_ly_kiem_thu_tra_loi.md).
+
+- [Context901 — Xuất bản, cập nhật và trạng thái phục vụ trung thực](nhat_ky/2026-11-08_phien_901_xuat_ban_va_trang_thai_phuc_vu.md).
+
+- [Context900 — Bàn giao duyệt và danh sách “Cần xử lý”](nhat_ky/2026-11-08_phien_900_ban_giao_duyet_va_inbox.md).
+
+- [Context899 — Chuẩn bị nội dung bền vững](nhat_ky/2026-11-08_phien_899_chuan_bi_noi_dung_ben_vung.md).
+
+- [Context898 — Read model và trang tài liệu](nhat_ky/2026-11-08_phien_898_read_model_va_trang_tai_lieu.md).
+
 - [Context897 — Gọn hộp đăng ký tài liệu](nhat_ky/2026-11-08_phien_897_gon_dang_ky_tai_lieu.md).
 
 - [Context896 — Tự nhận diện thông tin tài liệu](nhat_ky/2026-11-07_phien_896_tu_nhan_dien_thong_tin_tai_lieu.md).

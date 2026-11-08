@@ -85,8 +85,13 @@ Tải xuống tra đúng ID phiên bản hiện tại; không lấy số phiên 
 4. Trang tài liệu biên soạn có **Thay bản phục vụ**: chọn phiên bản **đã duyệt**.
    Danh sách có phân trang; draft/published không trở thành ứng viên thay thế.
 5. Xem trước tác động và xác nhận. Backend chuẩn bị generation mới; FE báo
-   **Đang xử lý**, giữ thông báo bản cũ còn phục vụ. Chỉ báo hoàn tất khi backend
-   xác nhận đã chuyển publication/serving revision/index.
+   **Đang xử lý** và chỉ nói bản xuất bản hiện tại được giữ khi biên nhận server
+   xác nhận (`current_publication_retained`). Nếu chưa có xác nhận, đọc trạng
+   thái thật tại trang tài liệu thay vì kết luận bản cũ vẫn phục vụ. Chỉ báo hoàn
+   tất khi backend xác nhận đã chuyển publication/serving revision/index.
+
+Trang tài liệu hiển thị riêng bản chuẩn bị, bản đã xuất bản và bản đang phục vụ;
+bản đang phục vụ chỉ hiện khi chỉ mục hoạt động khớp đúng phiên bản đó.
 
 Trang nguồn phân biệt bản tải lên mới nhất và serving revision từ backend;
 thiếu serving revision trên response cũ giữ “Chưa xác định”. Bỏ chế độ chuẩn bị

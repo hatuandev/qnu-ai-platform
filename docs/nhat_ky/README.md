@@ -1,5 +1,19 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên904 — Chuẩn bị môi trường pilot P7](2026-11-08_phien_904_moi_truong_pilot.md).
+
+- [Phiên903 — Pilot và đóng phạm vi bản đầu](2026-11-08_phien_903_pilot_va_dong_pham_vi.md).
+
+- [Phiên902 — Trợ lý dễ cấu hình và kiểm thử câu trả lời](2026-11-08_phien_902_tro_ly_kiem_thu_tra_loi.md).
+
+- [Phiên901 — Xuất bản, cập nhật và trạng thái phục vụ trung thực](2026-11-08_phien_901_xuat_ban_va_trang_thai_phuc_vu.md).
+
+- [Phiên900 — Bàn giao duyệt và danh sách “Cần xử lý”](2026-11-08_phien_900_ban_giao_duyet_va_inbox.md).
+
+- [Phiên899 — Chuẩn bị nội dung bền vững](2026-11-08_phien_899_chuan_bi_noi_dung_ben_vung.md).
+
+- [Phiên898 — Read model và trang tài liệu](2026-11-08_phien_898_read_model_va_trang_tai_lieu.md).
+
 - [Phiên897 — Gọn hộp đăng ký tài liệu](2026-11-08_phien_897_gon_dang_ky_tai_lieu.md).
 
 - [Phiên896 — Tự nhận diện thông tin tài liệu](2026-11-07_phien_896_tu_nhan_dien_thong_tin_tai_lieu.md).
