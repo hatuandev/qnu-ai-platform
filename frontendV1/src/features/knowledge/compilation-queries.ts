@@ -31,6 +31,7 @@ import type {
   ReviewRequestInput,
 } from "./compilation-types";
 import { readArrayPage } from "./list-pagination";
+import { invalidateSourceSummaries } from "./summary-queries";
 
 // ==========================================
 // Scoped Query Keys
@@ -600,6 +601,12 @@ export function useCreateCompilationMutation(
           sessionId,
         ),
       });
+      invalidateSourceSummaries(
+        queryClient,
+        sessionId,
+        workspaceId,
+        collectionId,
+      );
       if (data.run?.id) {
         activity?.track(data.run);
         queryClient.setQueryData(
@@ -700,6 +707,12 @@ export function useAcceptEditMutation(
           sessionId,
         ),
       });
+      invalidateSourceSummaries(
+        queryClient,
+        sessionId,
+        workspaceId,
+        collectionId,
+      );
       if (data.run?.id) {
         queryClient.setQueryData(
           compilationKeys.run(

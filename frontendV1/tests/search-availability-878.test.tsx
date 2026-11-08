@@ -90,7 +90,7 @@ test("a ready generation with the wrong version never displays ready", async () 
   });
   mount();
   await screen.findByText("Tài liệu chưa được cập nhật cho trợ lý AI.");
-  expect(screen.queryByText("Sẵn sàng cho trợ lý AI.")).toBeNull();
+  expect(screen.queryByText("Sẵn sàng tra cứu cho trợ lý AI.")).toBeNull();
 });
 
 test("ready requires matching published version state and bundle", async () => {
@@ -106,7 +106,7 @@ test("ready requires matching published version state and bundle", async () => {
     bundle_sha256: version.bundle_sha256,
   });
   mount();
-  await screen.findByText("Sẵn sàng cho trợ lý AI.");
+  await screen.findByText("Sẵn sàng tra cứu cho trợ lý AI.");
 });
 
 test("uncertain work needs an explicit request and warns before creating new work", async () => {
@@ -156,7 +156,7 @@ test.each([
   });
   mount();
   await screen.findByText("Tài liệu chưa được cập nhật cho trợ lý AI.");
-  expect(screen.queryByText("Sẵn sàng cho trợ lý AI.")).toBeNull();
+  expect(screen.queryByText("Sẵn sàng tra cứu cho trợ lý AI.")).toBeNull();
 });
 
 test("a readiness read error offers refresh without automatically starting work", async () => {

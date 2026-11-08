@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { LayoutDashboard, Settings2 } from "lucide-react";
+import { isV1Route } from "@/app/api/v1/endpoints";
 import { hasV1Permission, useV1Auth } from "@/app/auth/v1";
 import {
   SidebarGroup,
@@ -8,12 +9,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import {
-  isPrimarySidebarFeatureActive,
+  activePrimaryWorkspaceFeature,
   isSettingsRouteActive,
-  primaryWorkspaceFeatureKeys,
   providerNavigation,
   workspaceFeatures,
+  workspacePrimaryFeatures,
 } from "@/navigation/config";
 import { useFeatureScope } from "@/navigation/use-feature-scope.tsx";
 import {
@@ -25,8 +27,19 @@ export function WorkspaceSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { isAuthenticated, actor } = useV1Auth();
   const scope = useFeatureScope();
   const location = useRouterState({ select: (state) => state.location });
+  const role = useCallerWorkspaceRole(
+    isV1Route(location.pathname) ? (scope.workspaceId ?? "") : "",
+  );
   if (!isAuthenticated) return null;
 
+  const primaryFeatures = workspacePrimaryFeatures(
+    role.isPending ? undefined : role.role,
+  );
+  const activePrimary = activePrimaryWorkspaceFeature(
+    primaryFeatures,
+    location.pathname,
+    location.search,
+  );
   const isDashboardActive = location.pathname === "/dashboard";
   const isProviderActive = isProviderRouteActive(location.pathname);
   const ProviderIcon = providerNavigation.icon;
@@ -57,13 +70,9 @@ export function WorkspaceSidebar({ onNavigate }: { onNavigate?: () => void }) {
           </SidebarMenuButton>
         </SidebarMenuItem>
 
-        {primaryWorkspaceFeatureKeys.map((key) => {
+        {primaryFeatures.map((key) => {
           const { title, icon: Icon } = workspaceFeatures[key];
-          const active = isPrimarySidebarFeatureActive(
-            key,
-            location.pathname,
-            location.search,
-          );
+          const active = activePrimary === key;
           return (
             <SidebarMenuItem key={key}>
               <SidebarMenuButton asChild tooltip={title} isActive={active}>

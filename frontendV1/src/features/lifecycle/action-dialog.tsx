@@ -255,7 +255,7 @@ function LifecycleActionForm({
               {permanent &&
               preview &&
               Number(preview.impact.compiled_versions_to_delete) > 0 ? (
-                <p>Xóa cả các bản biên soạn phụ thuộc.</p>
+                <p>Xóa cả các bản xuất bản phụ thuộc.</p>
               ) : null}
               {!permanent && !preview && !error ? (
                 <p role="status" className="text-muted-foreground">

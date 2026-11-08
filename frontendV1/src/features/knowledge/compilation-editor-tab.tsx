@@ -379,12 +379,12 @@ function CompilationEditorSession({
     if (!baseContext || !editContextQuery.data) return;
     if (baseContext.bundle_sha256 !== editContextQuery.data.bundle_sha256) {
       toast.error(
-        "Nguồn biên soạn đã thay đổi. Hãy mở lại bản mới trước khi lưu.",
+        "Dữ liệu nguồn đã thay đổi. Hãy mở lại bản mới trước khi lưu.",
       );
       return;
     }
     if (!title.trim()) {
-      toast.error("Vui lòng nhập tiêu đề bản biên soạn.");
+      toast.error("Vui lòng nhập tiêu đề nội dung.");
       return;
     }
     if (!reason.trim()) {
@@ -447,7 +447,7 @@ function CompilationEditorSession({
       });
       if (!mountedRef.current) return;
 
-      toast.success("Đã tạo bản biên soạn mới.");
+      toast.success("Đã tạo bản chuẩn bị mới.");
       savedRef.current = true;
       setPreviewModalOpen(false);
 
@@ -549,7 +549,7 @@ function CompilationEditorSession({
               <div className="flex items-center gap-2">
                 <FileEdit className="size-4 text-primary" />
                 <span className="font-semibold text-sm text-foreground">
-                  Trình chỉnh sửa bản biên soạn có cấu trúc
+                  Trình chỉnh sửa nội dung có cấu trúc
                 </span>
                 <Badge variant="outline" className="font-mono text-[10px]">
                   Số bản sửa con: {context.edit_count}
@@ -596,7 +596,7 @@ function CompilationEditorSession({
         {/* Title */}
         <div className="space-y-1.5">
           <Label htmlFor="editor-title" className="text-xs font-semibold">
-            Tiêu đề bản biên soạn <span className="text-destructive">*</span>
+            Tiêu đề nội dung <span className="text-destructive">*</span>
           </Label>
           <Input
             id="editor-title"
@@ -802,7 +802,7 @@ function CompilationEditorSession({
               id="editor-reason"
               rows={2}
               className="text-xs resize-none"
-              placeholder="Giải thích lý do điều chỉnh bản biên soạn (ví dụ: Bổ sung điều kiện trúng tuyển bị bỏ sót sau đối chiếu nguồn)..."
+              placeholder="Giải thích lý do điều chỉnh nội dung (ví dụ: Bổ sung điều kiện trúng tuyển bị bỏ sót sau đối chiếu nguồn)..."
               value={reason}
               onChange={(e) => handleReasonChange(e.target.value)}
               maxLength={2000}

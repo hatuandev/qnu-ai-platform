@@ -35,6 +35,7 @@ export function LifecycleReceiptView({
     completed: "Hoàn tất",
     failed: "Thất bại",
   };
+  const retained = action.result?.current_publication_retained === true;
   return (
     <div className="space-y-2 rounded-lg border p-3 text-sm" aria-live="polite">
       <div className="flex flex-wrap items-center gap-2">
@@ -58,11 +59,26 @@ export function LifecycleReceiptView({
           {action.error_code}
         </p>
       ) : null}
-      {action.status === "pending" && action.action === "replace" ? (
+      {action.action === "replace" && action.status === "pending" ? (
         <p>
-          Bản cũ tiếp tục phục vụ trong khi chỉ mục mới được chuẩn bị. Chưa
-          chuyển sang bản mới.
+          Chưa chuyển sang bản mới.{" "}
+          {retained
+            ? "Máy chủ xác nhận bản xuất bản hiện tại được giữ nguyên trong lúc chuẩn bị chỉ mục mới."
+            : "Đang chờ máy chủ xác nhận việc giữ bản xuất bản hiện tại."}
         </p>
+      ) : null}
+      {action.action === "replace" && action.status === "failed" ? (
+        <p>
+          Chưa chuyển sang bản mới.{" "}
+          {retained
+            ? "Máy chủ xác nhận bản xuất bản hiện tại không bị thay đổi; kiểm tra trạng thái phục vụ thực tế ở trang tài liệu."
+            : "Không xác nhận được bản xuất bản hiện tại còn được giữ; kiểm tra trạng thái phục vụ thực tế ở trang tài liệu."}
+        </p>
+      ) : null}
+      {action.action === "replace" &&
+      action.status === "completed" &&
+      action.result?.current_publication_retained === false ? (
+        <p>Đã chuyển bản xuất bản và chỉ mục sang phiên bản thay thế.</p>
       ) : null}
       {typeof action.result?.index_run_id === "string" ? (
         <p className="break-all text-xs">

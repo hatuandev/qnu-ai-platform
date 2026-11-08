@@ -71,7 +71,7 @@ export type ResourcePage = {
 export const RESOURCE_LABEL: Record<ResourceKind, string> = {
   collection: "Kho tri thức",
   source: "Văn bản nguồn",
-  document: "Tài liệu biên soạn",
+  document: "Tài liệu xuất bản",
   assistant: "Trợ lý",
   conversation: "Hội thoại",
   job: "Tác vụ",

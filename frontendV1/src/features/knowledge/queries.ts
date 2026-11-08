@@ -23,6 +23,7 @@ import {
   updateFolder,
   uploadSource,
 } from "@/features/knowledge/requests";
+import { summaryKeys } from "@/features/knowledge/summary-queries";
 import type {
   CollectionCreateInput,
   CollectionUpdateInput,
@@ -644,6 +645,14 @@ export function useRenameSource(workspaceId: string, collectionId: string) {
           "sources",
         ],
       });
+      void queryClient.invalidateQueries({
+        queryKey: summaryKeys.sourceBase(
+          sessionId,
+          workspaceId,
+          collectionId,
+          vars.sourceId,
+        ),
+      });
     },
   });
 }
@@ -699,6 +708,14 @@ export function useAddRevision(
           collectionId,
           "sources",
         ],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: summaryKeys.sourceBase(
+          sessionId,
+          workspaceId,
+          collectionId,
+          sourceId,
+        ),
       });
     },
   });

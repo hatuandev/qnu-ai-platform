@@ -262,9 +262,11 @@ test("member source menu keeps read actions without delete", () => {
   expect(screen.queryByRole("menuitem", { name: /Xóa/ })).toBeNull();
   expect(screen.getByRole("menuitem", { name: /chi tiết/i })).toBeTruthy();
   expect(
-    screen.getByRole("menuitem", { name: "Xem kết quả bóc tách" }),
+    screen.getByRole("menuitem", { name: "Xem nội dung đã đọc" }),
   ).toBeTruthy();
-  expect(screen.queryByRole("menuitem", { name: "Bóc tách lại" })).toBeNull();
+  expect(
+    screen.queryByRole("menuitem", { name: "Đọc lại nội dung" }),
+  ).toBeNull();
 });
 
 test("collection management contains only its four ordinary actions", () => {
@@ -331,7 +333,7 @@ test("collection removes the global extraction action; viewing a result never su
     },
   );
   fireEvent.click(
-    screen.getByRole("menuitem", { name: "Xem kết quả bóc tách" }),
+    screen.getByRole("menuitem", { name: "Xem nội dung đã đọc" }),
   );
   expect(state.navigate).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -358,12 +360,12 @@ test("rerun confirms once and targets the source's exact current revision", asyn
       pointerType: "mouse",
     },
   );
-  fireEvent.click(screen.getByRole("menuitem", { name: "Bóc tách lại" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Đọc lại nội dung" }));
   expect(state.requestRun).not.toHaveBeenCalled();
   expect(screen.getByRole("dialog").textContent).toContain(
     "Kết quả cũ được giữ lại",
   );
-  const confirm = screen.getByRole("button", { name: "Bắt đầu bóc tách lại" });
+  const confirm = screen.getByRole("button", { name: "Bắt đầu đọc lại" });
   fireEvent.click(confirm);
   fireEvent.click(confirm);
   expect(state.requestRun).toHaveBeenCalledTimes(1);
@@ -400,7 +402,7 @@ test.each(["queued", "running", "dispatch"])(
     );
     expect(
       screen
-        .getByRole("menuitem", { name: "Bóc tách lại" })
+        .getByRole("menuitem", { name: "Đọc lại nội dung" })
         .getAttribute("aria-disabled"),
     ).toBe("true");
     expect(state.requestRun).not.toHaveBeenCalled();
@@ -421,11 +423,11 @@ test.each(["missing", "error"])(
         pointerType: "mouse",
       },
     );
-    fireEvent.click(screen.getByRole("menuitem", { name: "Bóc tách lại" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Đọc lại nội dung" }));
     expect(
       (
         screen.getByRole("button", {
-          name: "Bắt đầu bóc tách lại",
+          name: "Bắt đầu đọc lại",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -439,7 +441,7 @@ test.each(["compiler", "publication", "serving"] as const)(
     page(stage);
     if (stage === "compiler") {
       expect(
-        await screen.findByText("Chưa có lượt biên soạn nào"),
+        await screen.findByText("Chưa có lần chuẩn bị nội dung nào"),
       ).toBeTruthy();
     } else if (stage === "publication") {
       expect(await screen.findByText(/Chưa có tài liệu/)).toBeTruthy();
@@ -495,9 +497,11 @@ test("table view has the same document management menu", () => {
     { button: 0, ctrlKey: false, pointerType: "mouse" },
   );
   expect(screen.getByRole("menuitem", { name: "Tải xuống" })).toBeTruthy();
-  expect(screen.getByRole("menuitem", { name: "Bóc tách lại" })).toBeTruthy();
   expect(
-    screen.getByRole("menuitem", { name: "Xem kết quả bóc tách" }),
+    screen.getByRole("menuitem", { name: "Đọc lại nội dung" }),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole("menuitem", { name: "Xem nội dung đã đọc" }),
   ).toBeTruthy();
   expect(screen.getByRole("menuitem", { name: /Xóa/ })).toBeTruthy();
 });

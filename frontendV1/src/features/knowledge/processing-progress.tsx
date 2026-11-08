@@ -110,7 +110,7 @@ export function computeProcessingProgress(
     const boundedPercent = Math.max(0, Math.min(98, rawPercent));
     const failedSuffix = failed > 0 ? ` · ${failed} ${unitLabel} lỗi` : "";
     return {
-      stageLabel: "Đang bóc tách nội dung",
+      stageLabel: "Đang đọc nội dung",
       detailLabel: `Đã xử lý ${done}/${total} ${unitLabel}${failedSuffix}`,
       percent: boundedPercent,
       isIndeterminate: false,

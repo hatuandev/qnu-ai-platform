@@ -197,11 +197,11 @@ export function CompilationDialog({
 
   const handleAddRun = (run: { id: string; generation: number }) => {
     if (selectedRuns.some((r) => r.runId === run.id)) {
-      toast.error("Kết quả bóc tách này đã được chọn.");
+      toast.error("Kết quả đọc nội dung này đã được chọn.");
       return;
     }
     if (selectedRuns.length >= 20) {
-      toast.error("Tối đa 20 lượt xử lý OCR cho một lần biên soạn.");
+      toast.error("Tối đa 20 lượt đọc nội dung cho một lần chuẩn bị.");
       return;
     }
     const sourceObj = sourcesQuery.data?.items.find(
@@ -296,8 +296,8 @@ export function CompilationDialog({
 
       toast.success(
         outcome.created
-          ? "Đang biên soạn nền. Xem tiến độ ở góc phải."
-          : "Đã mở lại lượt biên soạn hiện có.",
+          ? "Đang chuẩn bị nội dung ở nền. Xem tiến độ ở góc phải."
+          : "Đã mở lại lần chuẩn bị nội dung hiện có.",
       );
       onClose();
       onSuccess?.(outcome.run.id);
@@ -305,14 +305,14 @@ export function CompilationDialog({
       if (error instanceof ApiProblemError) {
         toast.error(formatCompilationError(error.code, error.message));
       } else {
-        toast.error("Không thể tạo lượt biên soạn.");
+        toast.error("Không thể tạo lần chuẩn bị nội dung.");
       }
     }
   };
 
   const autoReviewToggle = (
     <div className="flex items-center justify-between gap-2">
-      <Label htmlFor="compiler-auto-review">Rà soát sau khi biên soạn</Label>
+      <Label htmlFor="compiler-auto-review">Rà soát sau khi chuẩn bị</Label>
       <Switch
         id="compiler-auto-review"
         checked={autoReview}
@@ -334,10 +334,10 @@ export function CompilationDialog({
             </div>
             <div>
               <DialogTitle className="text-base font-semibold">
-                Biên soạn tài liệu
+                Chuẩn bị nội dung
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Tạo bản nháp có dẫn chứng để xem và duyệt.
+                Tạo bản nháp có dẫn chứng từ nội dung đã đọc để xem và duyệt.
               </DialogDescription>
             </div>
           </div>
@@ -351,7 +351,7 @@ export function CompilationDialog({
                   htmlFor="compiler-topic"
                   className="text-xs font-semibold"
                 >
-                  Chủ đề biên soạn (tùy chọn)
+                  Chủ đề (tùy chọn)
                 </Label>
                 <Textarea
                   id="compiler-topic"
@@ -471,7 +471,7 @@ export function CompilationDialog({
                     {pickerRevisionId && (
                       <div className="pt-2 border-t space-y-1.5">
                         <Label className="text-[11px] text-muted-foreground">
-                          Kết quả bóc tách đã hoàn tất
+                          Kết quả đọc nội dung đã hoàn tất
                         </Label>
                         {availableRunsQuery.isLoading ? (
                           <Skeleton className="h-8 w-full" />
@@ -503,7 +503,7 @@ export function CompilationDialog({
                                     ) : (
                                       <Plus className="size-3" />
                                     )}
-                                    <span>Lần bóc tách {r.generation}</span>
+                                    <span>Lần đọc {r.generation}</span>
                                   </Button>
                                 );
                               })}
@@ -511,7 +511,7 @@ export function CompilationDialog({
                               (r) => r.status === "completed",
                             ).length === 0 && (
                               <p className="text-[11px] text-muted-foreground italic">
-                                Phiên bản tệp này chưa bóc tách xong.
+                                Phiên bản tệp này chưa đọc xong.
                               </p>
                             )}
                           </div>
@@ -534,7 +534,7 @@ export function CompilationDialog({
                   }}
                 />
                 <div>
-                  <Label htmlFor="compiler-source-first">Biên soạn nhanh</Label>
+                  <Label htmlFor="compiler-source-first">Chuẩn bị nhanh</Label>
                   <p className="text-xs text-muted-foreground">
                     Giữ nguyên văn bản và bảng.
                     {!initialRun && " Chủ đề dùng làm tiêu đề."}
@@ -580,7 +580,7 @@ export function CompilationDialog({
                   {/* Model & Output Settings */}
                   <div className="space-y-3 pt-2 border-t">
                     <Label className="text-xs font-semibold">
-                      Cấu hình mô hình biên soạn
+                      Cấu hình mô hình
                     </Label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1.5">
@@ -588,7 +588,7 @@ export function CompilationDialog({
                           htmlFor="compiler-provider"
                           className="text-[11px] text-muted-foreground"
                         >
-                          Model biên soạn (Capability Chat)
+                          Mô hình (Capability Chat)
                         </Label>
                         <Select
                           value={providerId}
@@ -798,7 +798,7 @@ export function CompilationDialog({
                 ) : (
                   <>
                     <Cpu className="size-3.5" />
-                    <span>Bắt đầu biên soạn</span>
+                    <span>Bắt đầu chuẩn bị</span>
                   </>
                 )}
               </Button>
@@ -847,7 +847,7 @@ function SelectedRunRow({
         <p className="text-xs text-muted-foreground">
           {item.textVersion > 0
             ? `Bản đã lưu v${item.textVersion}`
-            : "Bản bóc tách gốc v0"}{" "}
+            : "Bản đọc gốc v0"}{" "}
           · Tệp v{item.revisionNo}
         </p>
         {versionPickerOpen && onTextVersionChange && (
@@ -867,7 +867,7 @@ function SelectedRunRow({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="0" className="text-xs">
-                  Bản bóc tách gốc v0
+                  Bản đọc gốc v0
                 </SelectItem>
                 {maxVersion > 0 &&
                   Array.from({ length: maxVersion }, (_, i) => i + 1).map(

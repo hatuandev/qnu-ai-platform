@@ -78,7 +78,7 @@ export type Readiness = {
 };
 export const JOB_LABEL: Record<JobKind, string> = {
   ocr: "OCR",
-  compiler: "Biên soạn",
+  compiler: "Chuẩn bị nội dung",
   index: "Chỉ mục",
   auto_review: "Rà soát tự động",
   review: "Rà soát ngữ nghĩa",

@@ -81,7 +81,7 @@ export function formatProcessingStatus(
 ): ProcessingStatusDescriptor {
   if (!processing) {
     return {
-      label: "Đã lưu · Chưa bóc tách",
+      label: "Đã lưu · Chưa đọc nội dung",
       variant: "secondary",
       status: "unprocessed",
     };
@@ -100,8 +100,8 @@ export function formatProcessingStatus(
     const pagesDone = processing.pages_done ?? 0;
     const label =
       pagesTotal && pagesTotal > 0
-        ? `Đang bóc tách (${pagesDone}/${pagesTotal} trang)`
-        : "Đang bóc tách…";
+        ? `Đang đọc nội dung (${pagesDone}/${pagesTotal} trang)`
+        : "Đang đọc nội dung…";
     return {
       label,
       variant: "default",
@@ -111,7 +111,7 @@ export function formatProcessingStatus(
 
   if (processing.status === "completed") {
     return {
-      label: "Đã bóc tách",
+      label: "Đã đọc nội dung",
       variant: "success",
       status: "completed",
     };
@@ -134,7 +134,7 @@ export function formatProcessingStatus(
   }
 
   return {
-    label: "Đã lưu · Chưa bóc tách",
+    label: "Đã lưu · Chưa đọc nội dung",
     variant: "secondary",
     status: "unprocessed",
   };

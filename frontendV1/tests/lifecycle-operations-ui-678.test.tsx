@@ -667,9 +667,15 @@ test("replacement keeps the serving version until the server reports completion"
     />,
   );
   await preview();
+  action = {
+    ...action,
+    result: { index_run_id: "prep-index", current_publication_retained: true },
+  };
   fireEvent.click(screen.getByRole("checkbox"));
   fireEvent.click(screen.getByRole("button", { name: "Xác nhận thao tác" }));
-  await screen.findByText(/Bản cũ tiếp tục phục vụ trong khi chỉ mục mới/);
+  await screen.findByText(
+    /Máy chủ xác nhận bản xuất bản hiện tại được giữ nguyên trong lúc chuẩn bị chỉ mục mới/,
+  );
   expect(postCalls[0].body).toMatchObject({
     action: "replace",
     replacement_version_id: "approved-version",
@@ -682,6 +688,7 @@ test("replacement keeps the serving version until the server reports completion"
     result: {
       index_run_id: "new-index",
       publication_decision_id: "new-publication",
+      current_publication_retained: false,
     },
   };
   await act(async () => {
@@ -697,6 +704,13 @@ test("replacement keeps the serving version until the server reports completion"
   });
   await screen.findByText("Hoàn tất");
   expect(
-    screen.queryByText(/Bản cũ tiếp tục phục vụ trong khi chỉ mục mới/),
+    screen.queryByText(
+      /Máy chủ xác nhận bản xuất bản hiện tại được giữ nguyên/,
+    ),
   ).toBeNull();
+  expect(
+    screen.getByText(
+      "Đã chuyển bản xuất bản và chỉ mục sang phiên bản thay thế.",
+    ),
+  ).toBeTruthy();
 });

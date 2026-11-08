@@ -132,6 +132,45 @@ vi.mock("@/features/knowledge/ocr-requests", () => ({
   readRenderedPdfBlob: vi.fn(),
 }));
 
+vi.mock("@/features/knowledge/summary-queries", () => ({
+  hasActiveSourceTask: () => false,
+  useSourceSummaryQuery: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}));
+
+vi.mock("@/features/knowledge/preparation-queries", () => ({
+  preparationKeys: {
+    root: () => ["preparation"],
+    list: () => ["preparation", "list"],
+    intent: () => ["preparation", "intent"],
+  },
+  usePreparationIntentsQuery: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  usePreparationIntentQuery: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useCreatePreparationIntentMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useCancelPreparationIntentMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+}));
+
 vi.mock("@/features/knowledge/ocr-queries", () => ({
   useProcessingRunsQuery: () => ({
     data: {
@@ -238,6 +277,21 @@ vi.mock("@/features/knowledge/ocr-queries", () => ({
     isLoading: false,
     error: null,
   }),
+}));
+
+vi.mock("@/features/knowledge/preparation-dialog", () => ({
+  PreparationDialog: ({
+    isOpen,
+    savedTextVersion,
+  }: {
+    isOpen: boolean;
+    savedTextVersion: number;
+  }) =>
+    isOpen ? (
+      <div data-testid="preparation-dialog">
+        Chuẩn bị từ phiên bản v{savedTextVersion}
+      </div>
+    ) : null,
 }));
 
 vi.mock("@/features/knowledge/compilation-dialog", () => ({
@@ -413,10 +467,10 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
     );
     const surface = screen.getByAltText("Bản gốc trang 1").parentElement;
     const beforeWidth = surface?.style.width;
-    fireEvent.click(screen.getByRole("button", { name: "Phóng to ảnh" }));
+    fireEvent.click(screen.getByRole("button", { name: "Phóng to" }));
     expect(surface?.style.width).toBe(beforeWidth);
   });
-  it("hands the newly saved version to Compiler after editing an explicitly selected version", async () => {
+  it("hands the newly saved version to preparation after editing an explicitly selected version", async () => {
     Element.prototype.scrollIntoView = vi.fn();
     const previous = { ...buildDefaultDoc(), version: 1 };
     const saved = { ...previous, version: 2, canonical_sha256: "c".repeat(64) };
@@ -456,11 +510,9 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
       }),
     );
     await waitFor(() => expect(mocks.saveMutateAsync).toHaveBeenCalledTimes(1));
-    await waitFor(() =>
-      expect(screen.queryByText(/Bản nháp: 1 đoạn chưa lưu/i)).toBeNull(),
-    );
-    fireEvent.click(screen.getByRole("button", { name: /Dùng để biên soạn/i }));
-    expect(screen.getByTestId("compilation-dialog").textContent).toContain(
+    await waitFor(() => expect(screen.queryByText(/Nháp: 1 đoạn/i)).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Chuẩn bị nội dung" }));
+    expect(screen.getByTestId("preparation-dialog").textContent).toContain(
       "v2",
     );
   });
@@ -562,7 +614,6 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
     );
 
     // Verify workflow microcopy is visible and raw sha256/evidence_id are hidden from main view
-    expect(screen.getByText(/Quy trình: AI gợi ý sửa/i)).toBeTruthy();
     expect(screen.queryByText("ev-p1-1")).toBeNull();
 
     // Open spell check dialog
@@ -819,7 +870,7 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
 
     // Draft banner must show 1 unsaved unit
     await waitFor(() => {
-      expect(screen.getByText(/Bản nháp: 1 đoạn chưa lưu/i)).toBeTruthy();
+      expect(screen.getByText(/Nháp: 1 đoạn/i)).toBeTruthy();
     });
 
     // Open resolved items to verify status is "Đã áp dụng vào nháp"
@@ -943,7 +994,7 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
     expect(firstKey).toMatch(/^qnu-up-/);
 
     // Draft MUST still be preserved after failed save
-    expect(screen.getByText(/Bản nháp: 1 đoạn chưa lưu/i)).toBeTruthy();
+    expect(screen.getByText(/Nháp: 1 đoạn/i)).toBeTruthy();
 
     // Retry inside the still-open dialog (or reopen if closed) without editing draft -> must reuse the EXACT same Idempotency-Key
     const confirmBtns = screen.queryAllByRole("button", {
@@ -967,7 +1018,7 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
 
     // After success, draft banner disappears
     await waitFor(() => {
-      expect(screen.queryByText(/Bản nháp: 1 đoạn chưa lưu/i)).toBeNull();
+      expect(screen.queryByText(/Nháp: 1 đoạn/i)).toBeNull();
     });
   });
 
@@ -993,7 +1044,7 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
       within(editDialog).getByRole("button", { name: /Áp dụng vào nháp/i }),
     );
 
-    expect(screen.getByText(/Bản nháp: 1 đoạn chưa lưu/i)).toBeTruthy();
+    expect(screen.getByText(/Nháp: 1 đoạn/i)).toBeTruthy();
 
     // Switch mobile panes: Ảnh -> Gợi ý -> Văn bản
     const mobileTabs = screen.getByRole("tablist", {
@@ -1133,7 +1184,7 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
     expect(screen.queryByTestId("ocr-bbox-highlight")).toBeNull();
     expect(screen.getByText(/\(không có tọa độ vùng ảnh\)/i)).toBeTruthy();
 
-    // Edit unit 1 into draft -> clicking "Dùng để biên soạn" must NOT open CompilationDialog while draft is unsaved
+    // Edit unit 1 into draft -> clicking "Chuẩn bị nội dung" must not open any preparation dialog while draft is unsaved
     fireEvent.click(screen.getByRole("button", { name: /Sửa Đoạn văn 1/i }));
     const editDialog = await screen.findByRole("dialog");
     fireEvent.change(within(editDialog).getByLabelText(/Nội dung hiệu đính/i), {
@@ -1142,7 +1193,8 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
     fireEvent.click(
       within(editDialog).getByRole("button", { name: /Áp dụng vào nháp/i }),
     );
-    fireEvent.click(screen.getByRole("button", { name: /Dùng để biên soạn/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Chuẩn bị nội dung" }));
+    expect(screen.queryByTestId("preparation-dialog")).toBeNull();
     expect(screen.queryByTestId("compilation-dialog")).toBeNull();
 
     // Start an in-flight spell check on src-1
@@ -1201,9 +1253,6 @@ describe("Context 806 — Post-OCR Review & Spelling Correction UX", () => {
         name: /Kéo để thay đổi độ rộng cột ảnh và cột văn bản/i,
       }),
     ).toBeTruthy();
-    expect(screen.getByRole("button", { name: "50:50" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Rộng ảnh" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Rộng chữ" })).toBeTruthy();
 
     // Edit prose unit on page 1 ("cơ huyên" -> "cơ bản")
     fireEvent.click(screen.getByRole("button", { name: /Sửa Đoạn văn 1/i }));

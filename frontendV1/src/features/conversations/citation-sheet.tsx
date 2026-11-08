@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import {
   BookOpen,
-  CheckCircle2,
   ExternalLink,
   FileText,
   Hash,
+  Info,
   Layers,
   Sparkles,
 } from "lucide-react";
@@ -317,10 +317,11 @@ export function CitationSheet({
         </div>
 
         <div className="border-t bg-muted/10 px-6 py-3 shrink-0 flex items-center justify-between text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5 text-success">
-            <CheckCircle2 className="size-3.5" />
+          <div className="flex items-center gap-1.5">
+            <Info className="size-3.5 shrink-0" />
             <span className="text-[11px]">
-              Bằng chứng đã qua kiểm tra xuất bản
+              Dẫn chứng được xác minh khi tải câu trả lời; mở nguồn sẽ kiểm tra
+              lại quyền và trạng thái xuất bản.
             </span>
           </div>
         </div>

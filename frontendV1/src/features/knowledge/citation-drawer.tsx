@@ -53,7 +53,7 @@ export function CitationDrawer({
             </SheetTitle>
           </div>
           <SheetDescription className="text-xs text-muted-foreground">
-            Bằng chứng nguồn đối chiếu cho trích đoạn biên soạn.
+            Bằng chứng nguồn đối chiếu cho trích đoạn đã chuẩn bị.
           </SheetDescription>
         </SheetHeader>
 

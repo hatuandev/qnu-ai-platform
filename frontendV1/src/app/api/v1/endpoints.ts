@@ -132,6 +132,12 @@ export const knowledgePaths = {
     `/workspaces/${workspaceId}/collections/${collectionId}/sources`,
   source: (workspaceId: string, collectionId: string, sourceId: string) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}`,
+  sourceSummary: (
+    workspaceId: string,
+    collectionId: string,
+    sourceId: string,
+  ) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/summary`,
   sourceMove: (workspaceId: string, collectionId: string, sourceId: string) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/move`,
   sourceRename: (workspaceId: string, collectionId: string, sourceId: string) =>
@@ -165,6 +171,19 @@ export const assistantPaths = {
   list: (workspaceId: string) => `/workspaces/${workspaceId}/assistants`,
   detail: (workspaceId: string, assistantId: string) =>
     `/workspaces/${workspaceId}/assistants/${assistantId}`,
+  readiness: (workspaceId: string, assistantId: string) =>
+    `/workspaces/${workspaceId}/assistants/${assistantId}/readiness`,
+  answerReviews: (workspaceId: string, assistantId: string) =>
+    `/workspaces/${workspaceId}/assistants/${assistantId}/answer-reviews`,
+  answerReview: (workspaceId: string, assistantId: string, reviewId: string) =>
+    `/workspaces/${workspaceId}/assistants/${assistantId}/answer-reviews/${reviewId}`,
+  answerReviewItem: (
+    workspaceId: string,
+    assistantId: string,
+    reviewId: string,
+    itemId: string,
+  ) =>
+    `/workspaces/${workspaceId}/assistants/${assistantId}/answer-reviews/${reviewId}/items/${itemId}`,
 } as const;
 
 export const conversationPaths = {
@@ -319,6 +338,19 @@ export const ocrPaths = {
     `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/images/${assetNo}`,
 } as const;
 
+/**
+ * Server-recorded preparation intents chain source → OCR → compiler and stop
+ * at a draft awaiting review. Mirrors `knowledge/preparation/router.py`.
+ */
+export const preparationPaths = {
+  intents: (workspaceId: string, collectionId: string, sourceId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/preparation-intents`,
+  intent: (workspaceId: string, collectionId: string, intentId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/preparation-intents/${intentId}`,
+  cancel: (workspaceId: string, collectionId: string, intentId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/preparation-intents/${intentId}/cancel`,
+} as const;
+
 export const compilationPaths = {
   runs: (workspaceId: string, collectionId: string) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/compilation-runs`,
@@ -433,6 +465,30 @@ export const compiledDocumentPaths = {
     `/workspaces/${workspaceId}/collections/${collectionId}/compiled-documents/${documentId}/history`,
   published: (workspaceId: string, collectionId: string, documentId: string) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/compiled-documents/${documentId}/published`,
+  summary: (workspaceId: string, collectionId: string, documentId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/compiled-documents/${documentId}/summary`,
+} as const;
+
+/**
+ * Review handoff commands and reads. Mirrors
+ * `backendV1/qnu/domains/knowledge/review/router.py`.
+ */
+export const reviewSubmissionPaths = {
+  submissions: (workspaceId: string, collectionId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/review-submissions`,
+  submission: (
+    workspaceId: string,
+    collectionId: string,
+    submissionId: string,
+  ) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/review-submissions/${submissionId}`,
+  previews: (workspaceId: string, collectionId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/review-submissions/previews`,
+} as const;
+
+/** Workspace inbox of work derived from current resource state. */
+export const inboxPaths = {
+  inbox: (workspaceId: string) => `/workspaces/${workspaceId}/inbox`,
 } as const;
 
 /** Permissions enforced by backendV1 for the screens in this batch. */

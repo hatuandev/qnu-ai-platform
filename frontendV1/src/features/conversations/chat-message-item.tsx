@@ -5,9 +5,14 @@ import {
   Bot,
   Clock,
   ExternalLink,
+  HelpCircle,
   Info,
   Loader2,
+  type LucideIcon,
   RefreshCw,
+  ServerCrash,
+  ShieldAlert,
+  ShieldCheck,
   SlidersHorizontal,
   User,
 } from "lucide-react";
@@ -27,7 +32,10 @@ import {
 } from "@/features/rag/verification-panel";
 import { formatDateTimeValue } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
-import { formatConversationError } from "./schemas";
+import {
+  classifyConversationFailure,
+  formatConversationError,
+} from "./schemas";
 import type { Statement, TurnResponse } from "./types";
 
 export function ChatMessageItem({
@@ -171,39 +179,19 @@ export function ChatMessageItem({
             </Alert>
           )}
 
-          {/* Failed State */}
-          {isFailed && (
-            <Alert variant="destructive" className="py-3">
-              <AlertCircle className="size-4" />
-              <div className="space-y-2">
-                <AlertDescription className="text-xs">
-                  {formatConversationError(
-                    turn.error_code,
-                    "Không thể tạo câu trả lời cho lượt hỏi này.",
-                  )}
-                </AlertDescription>
-                {onRetry && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs gap-1.5"
-                    onClick={() => onRetry(turn)}
-                  >
-                    <RefreshCw className="size-3" />
-                    Thử lại với cùng khóa
-                  </Button>
-                )}
-              </div>
-            </Alert>
-          )}
+          {/* Failed State: each cause gets its own honest message */}
+          {isFailed && <FailedTurnAlert turn={turn} onRetry={onRetry} />}
 
           {/* Uncertain State */}
           {isUncertain && (
             <Alert className="border-warning/50 bg-warning/10 text-foreground py-3">
               <AlertTriangle className="size-4 text-warning" />
               <AlertDescription className="text-xs">
-                Lượt hỏi chưa thể xác định kết quả (quá thời hạn xử lý lease).
-                Vui lòng kiểm tra lại trước khi gửi câu hỏi tiếp theo.
+                {formatConversationError(
+                  turn.error_code,
+                  "Lượt hỏi chưa thể xác định kết quả (có thể do vượt thời hạn xử lý); không có câu trả lời nào được xác nhận.",
+                )}{" "}
+                Kiểm tra lại trước khi gửi câu hỏi tiếp theo.
               </AlertDescription>
             </Alert>
           )}
@@ -214,8 +202,9 @@ export function ChatMessageItem({
               <Alert variant="destructive" className="py-3">
                 <AlertCircle className="size-4" />
                 <AlertDescription className="text-xs">
-                  Nguồn tài liệu chứng minh cho lượt hỏi này đã thay đổi hoặc
-                  không còn khả dụng. Câu trả lời cũ không còn hiệu lực.
+                  {turn.source_status_reason ??
+                    "Nguồn tài liệu chứng minh cho lượt hỏi này đã thay đổi hoặc không còn khả dụng."}{" "}
+                  Câu trả lời cũ không còn hiệu lực.
                 </AlertDescription>
               </Alert>
             ) : result?.status === "insufficient_evidence" ? (
@@ -373,3 +362,98 @@ export function ChatMessageItem({
 
 /** Re-exported for tests that assert the judge report shape. */
 export type { VerificationFinding };
+
+type FailedTurnPresentation = {
+  variant: "warning" | "destructive";
+  icon: LucideIcon;
+  title?: string;
+  hint?: string;
+  canRetry: boolean;
+};
+
+function failedTurnPresentation(code?: string | null): FailedTurnPresentation {
+  switch (classifyConversationFailure(code)) {
+    case "clarification":
+      return {
+        variant: "warning",
+        icon: HelpCircle,
+        title: "Cần hỏi rõ hơn",
+        hint: "Hãy đặt lại câu hỏi đầy đủ hơn (nêu rõ chủ thể, năm hoặc tài liệu cần tra).",
+        canRetry: false,
+      };
+    case "permission":
+      return {
+        variant: "destructive",
+        icon: ShieldAlert,
+        title: "Không có quyền truy cập",
+        hint: "Yêu cầu bị từ chối ở máy chủ. Liên hệ quản trị workspace nếu bạn cần quyền xem hội thoại này.",
+        canRetry: false,
+      };
+    case "verification":
+      return {
+        variant: "warning",
+        icon: ShieldCheck,
+        title: "Không phát hành câu trả lời",
+        hint: "Đây là kết quả kiểm chứng nguồn, không phải lỗi kết nối hay thiếu dữ liệu.",
+        canRetry: false,
+      };
+    case "infrastructure":
+      return {
+        variant: "destructive",
+        icon: ServerCrash,
+        title: "Lỗi hạ tầng khi trả lời",
+        hint: "Đây là lỗi hệ thống hoặc model, không phải kết quả “không có dữ liệu”.",
+        canRetry: true,
+      };
+    default:
+      return { variant: "destructive", icon: AlertCircle, canRetry: true };
+  }
+}
+
+function FailedTurnAlert({
+  turn,
+  onRetry,
+}: {
+  turn: TurnResponse;
+  onRetry?: (turn: TurnResponse) => void;
+}) {
+  const meta = failedTurnPresentation(turn.error_code);
+  const Icon = meta.icon;
+
+  return (
+    <Alert variant={meta.variant} className="py-3">
+      <Icon className="size-4" />
+      <div className="space-y-2">
+        {meta.title ? (
+          <p className="text-xs font-semibold">{meta.title}</p>
+        ) : null}
+        <AlertDescription className="text-xs">
+          {formatConversationError(
+            turn.error_code,
+            "Không thể tạo câu trả lời cho lượt hỏi này.",
+          )}
+        </AlertDescription>
+        {meta.hint ? (
+          <p className="text-[11px] text-muted-foreground">{meta.hint}</p>
+        ) : null}
+        {meta.canRetry && onRetry ? (
+          <div className="space-y-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1.5"
+              onClick={() => onRetry(turn)}
+            >
+              <RefreshCw className="size-3" />
+              Hỏi lại câu này
+            </Button>
+            <p className="text-[11px] text-muted-foreground">
+              Tạo một lượt hỏi mới với cùng nội dung; lượt lỗi trước được giữ
+              nguyên.
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </Alert>
+  );
+}

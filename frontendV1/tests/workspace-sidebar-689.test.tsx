@@ -7,6 +7,9 @@ import { WorkspaceSidebar } from "@/layouts/workspace-sidebar";
 const session = vi.hoisted(() => ({
   authenticated: true,
   scope: {} as { workspaceId?: string; collectionId?: string },
+  role: { kind: "platform-admin" } as
+    | { kind: "platform-admin" }
+    | { kind: "member"; role: "admin" | "editor" | "reviewer" | "member" },
 }));
 vi.mock("@/app/auth/v1", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/app/auth/v1")>();
@@ -23,6 +26,7 @@ vi.mock("@/navigation/use-feature-scope", () => ({
 }));
 vi.mock("@/features/workspaces/queries", () => ({
   useWorkspaceQuery: () => ({ data: { name: "Workspace thử" } }),
+  useCallerWorkspaceRole: () => ({ isPending: false, role: session.role }),
 }));
 vi.mock("@/features/knowledge/queries", () => ({
   useCollectionQuery: () => ({ data: { name: "Kho thử" } }),
@@ -67,6 +71,7 @@ afterEach(() => {
   cleanup();
   session.authenticated = true;
   session.scope = {};
+  session.role = { kind: "platform-admin" };
 });
 
 test("without workspace the available actions guide the user to workspace selection", () => {
@@ -107,4 +112,49 @@ test("workspace actions are hidden without a V1 session", () => {
   session.scope = { workspaceId: "ws-example" };
   render(<WorkspaceSidebar />);
   expect(screen.queryByRole("link", { name: "Trợ lý AI" })).toBeNull();
+});
+
+test("a member keeps only lookup entries", () => {
+  session.role = { kind: "member", role: "member" };
+  session.scope = { workspaceId: "ws-example" };
+  render(<WorkspaceSidebar />);
+  for (const label of ["Trợ lý AI", "Hội thoại", "Kho tri thức"]) {
+    expect(screen.getByRole("link", { name: label })).toBeTruthy();
+  }
+  for (const label of ["Chuẩn bị nội dung", "Xuất bản", "Tác vụ"]) {
+    expect(screen.queryByRole("link", { name: label })).toBeNull();
+  }
+});
+
+test("an editor gets preparation and publication entries scoped to the collection", () => {
+  session.role = { kind: "member", role: "editor" };
+  session.scope = { workspaceId: "ws-example", collectionId: "col-1" };
+  render(<WorkspaceSidebar />);
+  const compiler = screen.getByRole("link", { name: "Chuẩn bị nội dung" });
+  expect(compiler.getAttribute("data-route")).toBe(
+    "/workspaces/$workspaceId/collections/$collectionId",
+  );
+  expect(JSON.parse(compiler.getAttribute("data-search") ?? "null").tab).toBe(
+    "compilations",
+  );
+  const documents = screen.getByRole("link", { name: "Xuất bản" });
+  expect(JSON.parse(documents.getAttribute("data-search") ?? "null").tab).toBe(
+    "documents",
+  );
+  expect(screen.getByRole("link", { name: "Tác vụ" })).toBeTruthy();
+});
+
+test("a reviewer sees publication before the knowledge folder", () => {
+  session.role = { kind: "member", role: "reviewer" };
+  session.scope = { workspaceId: "ws-example" };
+  render(<WorkspaceSidebar />);
+  const labels = screen
+    .getAllByRole("link")
+    .map((link) => link.textContent?.trim())
+    .filter((label): label is string => Boolean(label));
+  expect(labels.indexOf("Xuất bản")).toBeLessThan(
+    labels.indexOf("Kho tri thức"),
+  );
+  expect(screen.queryByRole("link", { name: "Tác vụ" })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Chuẩn bị nội dung" })).toBeNull();
 });

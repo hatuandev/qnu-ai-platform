@@ -133,14 +133,13 @@ afterEach(cleanup);
 
 test("F1: switching to another run cannot submit the previous draft with the new hash", async () => {
   const view = render(<CompilationEditorTab {...props} />);
-  fireEvent.change(await screen.findByLabelText(/Tiêu đề bản biên soạn/), {
+  fireEvent.change(await screen.findByLabelText(/Tiêu đề nội dung/), {
     target: { value: "A edited" },
   });
   view.rerender(<CompilationEditorTab {...props} runId="B" />);
   await waitFor(() =>
     expect(
-      (screen.getByLabelText(/Tiêu đề bản biên soạn/) as HTMLInputElement)
-        .value,
+      (screen.getByLabelText(/Tiêu đề nội dung/) as HTMLInputElement).value,
     ).toBe("Document B"),
   );
   fireEvent.change(screen.getByLabelText(/Lý do/), {
@@ -245,7 +244,7 @@ test("completed AI review leads to human editing without automatically saving ch
     await screen.findByText("Người dùng kiểm tra trước khi duyệt"),
   ).toBeTruthy();
   fireEvent.click(
-    screen.getByRole("button", { name: "Xem và chỉnh sửa bản biên soạn" }),
+    screen.getByRole("button", { name: "Xem và chỉnh sửa nội dung" }),
   );
   expect(edit).toHaveBeenCalledTimes(1);
   expect(ports.preview).not.toHaveBeenCalled();
@@ -261,7 +260,7 @@ test("a viewer can read the review but has no transition to editing", async () =
   render(<CompilationReviewTab {...props} canReview={false} />);
   expect(await screen.findByText("Missing admission condition")).toBeTruthy();
   expect(
-    screen.queryByRole("button", { name: "Xem và chỉnh sửa bản biên soạn" }),
+    screen.queryByRole("button", { name: "Xem và chỉnh sửa nội dung" }),
   ).toBeNull();
 });
 
@@ -279,7 +278,7 @@ test("human compiler edits require preview then explicit save of the new version
   ports.accept.mockResolvedValue({ run: { id: "child" }, created: true });
   const onChild = vi.fn();
   render(<CompilationEditorTab {...props} onNavigateToChild={onChild} />);
-  fireEvent.change(await screen.findByLabelText(/Tiêu đề bản biên soạn/), {
+  fireEvent.change(await screen.findByLabelText(/Tiêu đề nội dung/), {
     target: { value: "Corrected title" },
   });
   fireEvent.change(screen.getByLabelText(/Lý do/), {

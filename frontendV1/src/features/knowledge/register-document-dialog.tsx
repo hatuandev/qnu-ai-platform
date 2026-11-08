@@ -182,7 +182,7 @@ export function RegisterDocumentDialog({
         toast.success(
           result.created
             ? "Tạo tài liệu và phiên bản mới thành công"
-            : "Tài liệu đã tồn tại (Replay)",
+            : "Tài liệu đã tồn tại, không tạo trùng",
         );
         onSuccess?.(result.document.id, result.version.id);
         onClose();
@@ -222,7 +222,7 @@ export function RegisterDocumentDialog({
         toast.success(
           result.created
             ? `Thêm phiên bản v${result.version.version_no} thành công`
-            : "Phiên bản đã được đăng ký trước đó (Replay)",
+            : "Phiên bản đã được đăng ký trước đó",
         );
         onSuccess?.(result.document.id, result.version.id);
         onClose();
@@ -249,11 +249,11 @@ export function RegisterDocumentDialog({
             </div>
             <div>
               <DialogTitle className="text-base font-semibold">
-                Đăng ký tài liệu biên soạn
+                Đăng ký xuất bản
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Lưu kết quả biên soạn đã hoàn tất thành một tài liệu hoặc phiên
-                bản mới trong kho tri thức.
+                Đưa nội dung đã chuẩn bị vào danh sách tài liệu để duyệt và xuất
+                bản.
               </DialogDescription>
             </div>
           </div>
@@ -303,8 +303,7 @@ export function RegisterDocumentDialog({
                       Tạo tài liệu mới
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Khởi tạo danh tính tài liệu độc lập với key và tiêu đề
-                      riêng
+                      Tạo tài liệu mới với mã và tiêu đề riêng
                     </p>
                   </div>
                 </label>
@@ -328,7 +327,8 @@ export function RegisterDocumentDialog({
                       Thêm phiên bản mới
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Nâng cấp nội dung cho một tài liệu biên soạn đã có sẵn
+                      Thêm nội dung đã chuẩn bị làm phiên bản mới của một tài
+                      liệu đã có
                     </p>
                   </div>
                 </label>
@@ -356,7 +356,7 @@ export function RegisterDocumentDialog({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="doc-key" className="text-xs font-medium">
-                    Document Key <span className="text-destructive">*</span>
+                    Mã tài liệu <span className="text-destructive">*</span>
                   </Label>
                   <Button
                     type="button"
@@ -379,8 +379,8 @@ export function RegisterDocumentDialog({
                   disabled={isPending}
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Định danh cố định trong URL/hệ thống. Chỉ gồm chữ thường không
-                  dấu, số, dấu gạch nối, gạch dưới.
+                  Mã cố định dùng trong đường dẫn. Chỉ gồm chữ thường không dấu,
+                  số, dấu gạch nối hoặc gạch dưới.
                 </p>
               </div>
             </div>
@@ -399,7 +399,7 @@ export function RegisterDocumentDialog({
                   disabled={isPending}
                 >
                   <SelectTrigger id="select-doc" className="text-xs h-9">
-                    <SelectValue placeholder="Chọn một tài liệu biên soạn..." />
+                    <SelectValue placeholder="Chọn một tài liệu..." />
                   </SelectTrigger>
                   <SelectContent>
                     {existingDocs.map((doc) => (
@@ -467,8 +467,8 @@ export function RegisterDocumentDialog({
           {draftState !== "ready" && (
             <p role="status" className="text-xs text-muted-foreground">
               {draftState === "error"
-                ? "Chưa tải được bản biên soạn. Hãy đóng cửa sổ rồi mở lại."
-                : "Đang tải bản biên soạn…"}
+                ? "Chưa tải được bản đã chuẩn bị. Hãy đóng cửa sổ rồi mở lại."
+                : "Đang tải bản đã chuẩn bị…"}
             </p>
           )}
 

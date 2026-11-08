@@ -151,7 +151,7 @@ test("compilationRequestSchema trims topic and rejects empty topic", () => {
   assert.throws(
     () =>
       compilationRequestSchema.parse({ topic: "   ", ocr_run_ids: ["ocr_1"] }),
-    /Chủ đề biên soạn không được để trống/,
+    /Chủ đề không được để trống/,
   );
 
   const parsed = compilationRequestSchema.parse({
@@ -297,15 +297,18 @@ test("validateReviewIdempotencyKey rejects auto: prefix", () => {
 
 test("formatCompilationStatus maps all known statuses", () => {
   assert.equal(formatCompilationStatus("queued").label, "Đang chờ xếp lịch");
-  assert.equal(formatCompilationStatus("running").label, "Đang biên soạn");
+  assert.equal(
+    formatCompilationStatus("running").label,
+    "Đang chuẩn bị nội dung",
+  );
   assert.equal(formatCompilationStatus("completed").label, "Đã hoàn thành");
   assert.equal(formatCompilationStatus("failed").label, "Thất bại");
   assert.equal(formatCompilationStatus("uncertain").label, "Chưa chắc chắn");
   assert.equal(formatCompilationStatus("cancelled").label, "Đã hủy");
 });
 
-test("formatCompilationOrigin identifies AI vs human edit", () => {
-  assert.equal(formatCompilationOrigin("compiler").label, "AI Biên soạn");
+test("formatCompilationOrigin identifies automatic vs human edit", () => {
+  assert.equal(formatCompilationOrigin("compiler").label, "Tự động");
   assert.equal(
     formatCompilationOrigin("user_edit").label,
     "Người dùng chỉnh sửa",
@@ -379,7 +382,7 @@ test("formatDraftAssessmentStatus maps draft assessments", () => {
 test("formatCompilationError maps known error codes", () => {
   assert.equal(
     formatCompilationError("compilation_not_found"),
-    "Không tìm thấy lượt biên soạn trong kho tri thức.",
+    "Không tìm thấy lần chuẩn bị nội dung trong kho tri thức.",
   );
   assert.equal(
     formatCompilationError("compilation_draft_invalid"),

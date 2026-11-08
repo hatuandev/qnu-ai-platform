@@ -8,7 +8,6 @@ import {
   Plus,
   RefreshCw,
   Sparkles,
-  Zap,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,7 +67,7 @@ export function CompilationRunsList({
       <Card className="rounded-xl border-destructive/20 bg-destructive/5 p-4 text-xs">
         <div className="flex items-center gap-2 text-destructive font-semibold">
           <AlertCircle className="size-4 shrink-0" />
-          <span>Không thể tải danh sách lượt biên soạn</span>
+          <span>Không thể tải các lần chuẩn bị nội dung</span>
         </div>
         <p className="text-muted-foreground mt-1">
           {runsQuery.error instanceof Error
@@ -90,7 +89,7 @@ export function CompilationRunsList({
           onPageChange={onPageChange}
           onPageSizeChange={onPageSizeChange}
           hasNext={false}
-          label="lượt biên soạn"
+          label="lần chuẩn bị"
         />
       </Card>
     );
@@ -103,11 +102,11 @@ export function CompilationRunsList({
         <div>
           <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
             <BookOpen className="size-4 text-primary" />
-            <span>Danh sách lượt biên soạn (Compiler)</span>
+            <span>Các lần chuẩn bị nội dung</span>
           </h2>
           <p className="text-xs text-muted-foreground">
-            Trang {page} · tối đa {pageSize} lượt biên soạn (sắp xếp theo thế hệ
-            giảm dần).
+            Trang {page} · tối đa {pageSize} lần chuẩn bị nội dung (mới nhất
+            trước).
           </p>
         </div>
 
@@ -119,7 +118,7 @@ export function CompilationRunsList({
               onClick={onOpenCreateDialog}
             >
               <Plus className="size-3.5" />
-              <span>Biên soạn mới</span>
+              <span>Chuẩn bị nội dung</span>
             </Button>
           )}
         </div>
@@ -133,11 +132,11 @@ export function CompilationRunsList({
             </div>
             <div className="space-y-1">
               <h3 className="text-sm font-semibold text-foreground">
-                Chưa có lượt biên soạn nào
+                Chưa có lần chuẩn bị nội dung nào
               </h3>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                Tạo lượt biên soạn đầu tiên để tổng hợp các kết quả OCR thành
-                bản nháp tài liệu có cấu trúc và dẫn chứng.
+                Bắt đầu lần chuẩn bị đầu tiên để tổng hợp nội dung đã đọc thành
+                bản nháp có cấu trúc kèm dẫn chứng.
               </p>
             </div>
             {canManage && (
@@ -147,7 +146,7 @@ export function CompilationRunsList({
                 onClick={onOpenCreateDialog}
               >
                 <Plus className="size-3.5" />
-                <span>Bắt đầu biên soạn</span>
+                <span>Bắt đầu chuẩn bị</span>
               </Button>
             )}
           </CardContent>
@@ -158,14 +157,11 @@ export function CompilationRunsList({
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="w-16 text-xs">Gen</TableHead>
                   <TableHead className="text-xs min-w-[200px]">
-                    Chủ đề biên soạn
+                    Chủ đề
                   </TableHead>
-                  <TableHead className="w-28 text-xs">Nguồn gốc</TableHead>
+                  <TableHead className="w-28 text-xs">Cách tạo</TableHead>
                   <TableHead className="w-32 text-xs">Trạng thái</TableHead>
-                  <TableHead className="w-28 text-xs">Mô hình</TableHead>
-                  <TableHead className="w-24 text-xs">Tokens</TableHead>
                   <TableHead className="w-36 text-xs">Thời điểm</TableHead>
                   <TableHead className="w-24 text-right text-xs">
                     Thao tác
@@ -179,27 +175,18 @@ export function CompilationRunsList({
 
                   return (
                     <TableRow key={run.id} className="hover:bg-muted/10">
-                      <TableCell className="font-mono text-xs font-semibold text-foreground">
-                        #{run.generation}
-                      </TableCell>
-
                       <TableCell className="text-xs">
-                        <div className="space-y-0.5">
-                          <Link
-                            to="/workspaces/$workspaceId/collections/$collectionId/compilations/$runId"
-                            params={{
-                              workspaceId,
-                              collectionId,
-                              runId: run.id,
-                            }}
-                            className="font-medium text-foreground hover:text-primary transition-colors line-clamp-1 block"
-                          >
-                            {run.topic}
-                          </Link>
-                          <div className="text-[11px] text-muted-foreground font-mono truncate max-w-[240px]">
-                            ID: {run.id}
-                          </div>
-                        </div>
+                        <Link
+                          to="/workspaces/$workspaceId/collections/$collectionId/compilations/$runId"
+                          params={{
+                            workspaceId,
+                            collectionId,
+                            runId: run.id,
+                          }}
+                          className="font-medium text-foreground hover:text-primary transition-colors line-clamp-1 block"
+                        >
+                          {run.topic}
+                        </Link>
                       </TableCell>
 
                       <TableCell className="text-xs">
@@ -213,8 +200,8 @@ export function CompilationRunsList({
                               <span>Bản sửa</span>
                             </Badge>
                             {run.parent_run_id && (
-                              <div className="text-[10px] text-muted-foreground font-mono">
-                                từ {run.parent_run_id.slice(0, 8)}...
+                              <div className="text-[10px] text-muted-foreground">
+                                từ lần trước
                               </div>
                             )}
                           </div>
@@ -224,7 +211,7 @@ export function CompilationRunsList({
                             className="text-[10px] py-0 gap-1"
                           >
                             <Sparkles className="size-2.5 text-primary" />
-                            <span>AI Compiler</span>
+                            <span>Tự động</span>
                           </Badge>
                         )}
                       </TableCell>
@@ -234,6 +221,7 @@ export function CompilationRunsList({
                           <Badge
                             variant={statusInfo.variant}
                             className="text-[11px] py-0 font-normal"
+                            title={run.error_code ?? undefined}
                           >
                             {statusInfo.label}
                           </Badge>
@@ -241,28 +229,6 @@ export function CompilationRunsList({
                             <Loader2 className="size-3 animate-spin text-primary" />
                           )}
                         </div>
-                        {run.error_code && (
-                          <span className="text-[10px] text-destructive block font-mono mt-0.5">
-                            {run.error_code}
-                          </span>
-                        )}
-                      </TableCell>
-
-                      <TableCell className="text-xs font-mono text-muted-foreground truncate max-w-[120px]">
-                        {run.provider_id || "Mặc định"}
-                      </TableCell>
-
-                      <TableCell className="text-xs font-mono text-muted-foreground">
-                        {run.usage_tokens !== null ? (
-                          <div className="flex items-center gap-1">
-                            <Zap className="size-3 text-warning shrink-0" />
-                            <span>{run.usage_tokens.toLocaleString()}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground/60 italic text-[11px]">
-                            Chưa xác định
-                          </span>
-                        )}
                       </TableCell>
 
                       <TableCell className="text-xs text-muted-foreground">
@@ -309,7 +275,7 @@ export function CompilationRunsList({
         onPageSizeChange={onPageSizeChange}
         hasNext={(runsQuery.data?.length ?? 0) > pageSize}
         disabled={runsQuery.isFetching}
-        label="lượt biên soạn"
+        label="lần chuẩn bị"
       />
     </div>
   );

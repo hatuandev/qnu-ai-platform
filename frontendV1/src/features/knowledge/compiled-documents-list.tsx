@@ -70,11 +70,11 @@ export function CompiledDocumentsList({
         <div>
           <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
             <BookMarked className="size-4 text-primary" />
-            Tài liệu biên soạn trong kho
+            Tài liệu xuất bản
           </h2>
           <p className="text-xs text-muted-foreground">
-            Danh sách các tài liệu đã được hình thành từ các kết quả biên soạn
-            (Compiler runs).
+            Các tài liệu đã đăng ký từ nội dung đã chuẩn bị, sẵn sàng để duyệt
+            và xuất bản.
           </p>
         </div>
 
@@ -118,7 +118,7 @@ export function CompiledDocumentsList({
         <Card className="rounded-xl border-destructive/20 bg-destructive/5 p-4 text-xs space-y-2">
           <div className="flex items-center gap-2 text-destructive font-semibold">
             <AlertCircle className="size-4 shrink-0" />
-            <span>Không thể tải danh sách tài liệu biên soạn</span>
+            <span>Không thể tải danh sách tài liệu xuất bản</span>
           </div>
           <p className="text-muted-foreground">
             {documentsQuery.error instanceof Error
@@ -144,12 +144,12 @@ export function CompiledDocumentsList({
               <h3 className="text-sm font-semibold text-foreground">
                 {searchQuery.trim()
                   ? "Không tìm thấy tài liệu phù hợp"
-                  : "Chưa có tài liệu biên soạn nào"}
+                  : "Chưa có tài liệu xuất bản nào"}
               </h3>
               <p className="text-xs text-muted-foreground max-w-md mx-auto">
                 {searchQuery.trim()
                   ? `Không tìm thấy tài liệu nào khớp với từ khóa "${searchQuery}".`
-                  : "Tài liệu biên soạn được tạo từ các lượt Compiler run đã hoàn tất. Vào tab 'Biên soạn tri thức' để bắt đầu biên soạn và đăng ký."}
+                  : "Tài liệu xuất bản được đăng ký từ nội dung đã chuẩn bị. Vào mục 'Chuẩn bị nội dung' để bắt đầu."}
               </p>
             </div>
             {onOpenCompilationTab && !searchQuery.trim() && (
@@ -162,8 +162,8 @@ export function CompiledDocumentsList({
                 <FileText className="size-3.5" />
                 <span>
                   {canRegister
-                    ? "Bắt đầu biên soạn trong kho"
-                    : "Xem danh sách lượt biên soạn"}
+                    ? "Bắt đầu chuẩn bị nội dung"
+                    : "Xem các lần chuẩn bị"}
                 </span>
               </Button>
             )}
@@ -175,10 +175,10 @@ export function CompiledDocumentsList({
             <TableHeader>
               <TableRow className="bg-muted/30">
                 <TableHead className="text-xs font-semibold">
-                  Tài liệu & Key
+                  Tài liệu
                 </TableHead>
-                <TableHead className="text-xs font-semibold text-center w-28">
-                  Thay đổi (#)
+                <TableHead className="text-xs font-semibold text-center w-32">
+                  Lần thay đổi
                 </TableHead>
                 <TableHead className="text-xs font-semibold text-right w-44">
                   Ngày tạo
@@ -193,35 +193,22 @@ export function CompiledDocumentsList({
                   className="hover:bg-muted/40 transition-colors"
                 >
                   <TableCell className="py-3">
-                    <div className="space-y-1 min-w-0">
-                      <Link
-                        to="/workspaces/$workspaceId/collections/$collectionId/documents/$documentId"
-                        params={{
-                          workspaceId,
-                          collectionId,
-                          documentId: doc.id,
-                        }}
-                        className="text-xs sm:text-sm font-semibold text-foreground hover:text-primary transition-colors line-clamp-1 block"
-                      >
-                        {doc.title}
-                      </Link>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge
-                          variant="outline"
-                          className="font-mono text-[11px] bg-muted/40 text-muted-foreground border-border"
-                        >
-                          key: {doc.document_key}
-                        </Badge>
-                        <span className="text-[11px] font-mono text-muted-foreground/70">
-                          {doc.id}
-                        </span>
-                      </div>
-                    </div>
+                    <Link
+                      to="/workspaces/$workspaceId/collections/$collectionId/documents/$documentId"
+                      params={{
+                        workspaceId,
+                        collectionId,
+                        documentId: doc.id,
+                      }}
+                      className="text-xs sm:text-sm font-semibold text-foreground hover:text-primary transition-colors line-clamp-1 block"
+                    >
+                      {doc.title}
+                    </Link>
                   </TableCell>
 
                   <TableCell className="py-3 text-center">
-                    <Badge variant="secondary" className="font-mono text-xs">
-                      seq #{doc.change_sequence}
+                    <Badge variant="secondary" className="text-xs">
+                      Lần {doc.change_sequence}
                     </Badge>
                   </TableCell>
 
@@ -265,7 +252,7 @@ export function CompiledDocumentsList({
         onPageSizeChange={onPageSizeChange}
         hasNext={(documentsQuery.data?.length ?? 0) > pageSize}
         disabled={documentsQuery.isFetching}
-        label="tài liệu biên soạn"
+        label="tài liệu xuất bản"
       />
     </div>
   );

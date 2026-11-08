@@ -174,7 +174,7 @@ export function StageOcrPanel({
         <CardContent className="grid p-0 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x">
           <KpiMetric
             icon={ScanLine}
-            label="Tổng tài liệu bóc tách"
+            label="Tổng tài liệu đã đọc"
             value={(sourcesQuery.data?.meta.total ?? 0).toLocaleString("vi-VN")}
           />
           <KpiMetric
@@ -348,7 +348,7 @@ export function StageOcrPanel({
                             size="sm"
                             variant="outline"
                             className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                            title="Yêu cầu bóc tách OCR"
+                            title="Yêu cầu đọc nội dung"
                             onClick={() => {
                               setSourceForOcr(s);
                               setOcrDialogOpen(true);
@@ -382,7 +382,7 @@ export function StageOcrPanel({
           setPage(1);
         }}
       />
-      {/* Dialog kích hoạt bóc tách OCR */}
+      {/* Dialog kích hoạt đọc nội dung */}
       {sourceForOcr && (
         <OcrSourceTriggerDialog
           workspaceId={workspaceId}
@@ -536,14 +536,14 @@ function OcrStudioWorkspace({
           </div>
         </div>
 
-        {/* Chuyển sang Chặng 3: Biên soạn */}
+        {/* Chuyển sang Chặng 3: Chuẩn bị nội dung */}
         {onProceedToCompiler && (
           <Button
             size="sm"
             className="h-8 px-3 text-xs gap-1.5 shadow-xs shrink-0 bg-primary"
             onClick={onProceedToCompiler}
           >
-            <span>Tiến tới Chặng 3: Biên soạn</span>
+            <span>Tiến tới Chặng 3: Chuẩn bị nội dung</span>
             <ArrowRight className="size-3.5" />
           </Button>
         )}

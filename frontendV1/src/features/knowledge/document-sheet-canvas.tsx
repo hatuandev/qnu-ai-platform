@@ -110,7 +110,7 @@ export function DocumentSheetCanvas({
           activePageInfo?.status === "pending" ? (
           <div className="flex flex-col items-center gap-2 py-4">
             <Loader2 className="size-5 animate-spin text-primary" />
-            <p>Trang {activePageNumber} đang trong quá trình bóc tách…</p>
+            <p>Trang {activePageNumber} đang trong quá trình đọc nội dung…</p>
           </div>
         ) : (
           <p>Chưa có nội dung văn bản nào cho trang {activePageNumber}.</p>

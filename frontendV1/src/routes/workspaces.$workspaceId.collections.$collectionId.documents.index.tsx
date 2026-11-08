@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, FileCheck, FolderOpen, Library } from "lucide-react";
+import { Building2, FolderOpen, Library } from "lucide-react";
 import { PageBreadcrumbs } from "@/components/admin/page-breadcrumbs";
 import { CompiledDocumentsList } from "@/features/knowledge/compiled-documents-list";
 import { canRegisterCompiledDocument } from "@/features/knowledge/permissions";
 import { useCollectionQuery } from "@/features/knowledge/queries";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { pageSearchSchema } from "@/features/workspaces/search";
+import { workspaceFeatureBreadcrumb } from "@/navigation/workspace-features";
 
 export const Route = createFileRoute(
   "/workspaces/$workspaceId/collections/$collectionId/documents/",
@@ -52,8 +53,10 @@ function CompiledDocumentsListRoute() {
             maxChars: 24,
           },
           {
-            label: "Tài liệu biên soạn",
-            icon: FileCheck,
+            ...workspaceFeatureBreadcrumb("documents", {
+              workspaceId,
+              collectionId,
+            }),
             current: true,
           },
         ]}

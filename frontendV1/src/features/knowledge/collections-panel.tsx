@@ -166,7 +166,7 @@ export function CollectionsPanel({
       <PageHeader
         eyebrow="QNU AI · TRI THỨC"
         title="Kho tri thức"
-        description="Quản lý các kho tài liệu, tổ chức thư mục, bóc tách và hiệu đính nội dung."
+        description="Quản lý các kho tài liệu, tổ chức thư mục, đọc nội dung và hiệu đính."
         actions={
           canManage ? (
             <Button

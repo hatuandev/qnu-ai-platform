@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, FolderOpen, Library, Sparkles } from "lucide-react";
+import { Building2, FolderOpen, Library } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 import { PageBreadcrumbs } from "@/components/admin/page-breadcrumbs";
@@ -9,6 +9,7 @@ import { canCreateOrEditCompilation } from "@/features/knowledge/permissions";
 import { useCollectionQuery } from "@/features/knowledge/queries";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { pageSearchSchema } from "@/features/workspaces/search";
+import { workspaceFeatureBreadcrumb } from "@/navigation/workspace-features";
 
 const compilationsSearchSchema = pageSearchSchema.partial().extend({
   create: z.boolean().optional(),
@@ -82,8 +83,10 @@ function CompilationsListRoute() {
             maxChars: 24,
           },
           {
-            label: "Biên soạn tri thức",
-            icon: Sparkles,
+            ...workspaceFeatureBreadcrumb("compiler", {
+              workspaceId,
+              collectionId,
+            }),
             current: true,
           },
         ]}

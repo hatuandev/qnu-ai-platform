@@ -91,7 +91,7 @@ export function SearchAvailability({
   if (isReady)
     return (
       <p role="status" className="text-sm text-success">
-        Sẵn sàng cho trợ lý AI.
+        Sẵn sàng tra cứu cho trợ lý AI.
       </p>
     );
   if (
@@ -118,7 +118,7 @@ export function SearchAvailability({
           {sync.isError || readiness.isError
             ? "Chưa xác minh được trạng thái phục vụ trợ lý."
             : hasFailed
-              ? "Tài liệu đã phát hành, nhưng cập nhật tìm kiếm chưa hoàn tất."
+              ? "Tài liệu đã xuất bản, nhưng cập nhật tìm kiếm chưa hoàn tất."
               : "Tài liệu chưa được cập nhật cho trợ lý AI."}
         </p>
         {(sync.isError || readiness.isError) && (
@@ -153,7 +153,7 @@ export function SearchAvailability({
             Thử cập nhật
           </Button>
         )}
-        {sync.data?.error_code && (
+        {canRetry && sync.data?.error_code && (
           <details className="mt-2">
             <summary>Chi tiết kỹ thuật</summary>
             <code>{sync.data.error_code}</code>

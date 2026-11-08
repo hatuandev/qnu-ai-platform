@@ -62,6 +62,7 @@ export {
   modelopsPaths,
   ocrPaths,
   operationsPaths,
+  preparationPaths,
   QNU_PERMISSIONS,
   V1_ROUTE_PREFIXES,
   workspacePaths,

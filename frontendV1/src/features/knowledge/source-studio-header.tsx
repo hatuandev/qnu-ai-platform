@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   FileText,
   History,
+  Layers,
   Loader2,
   MoreHorizontal,
   Play,
@@ -144,7 +145,6 @@ export interface SourceStudioHeaderProps {
   baseMovedOn: boolean;
   canManage: boolean;
   canCompile: boolean;
-  selectedRunId: string | null;
   downloadingType: "raw" | "md" | "json" | "zip" | "pdf" | null;
   isDocxFile: boolean;
   isExtractionPending: boolean;
@@ -155,7 +155,8 @@ export interface SourceStudioHeaderProps {
   onStartExtraction: () => void;
   onOpenSpellCheck: () => void;
   onOpenSaveModal: () => void;
-  onOpenCompileDialog: () => void;
+  onOpenPreparation: () => void;
+  onOpenAdvancedCompile?: () => void;
   onDownload: (format: "raw" | "md" | "json" | "zip" | "pdf") => void;
   onOpenReRunDialog: () => void;
   onOpenUploadRevision: () => void;
@@ -179,7 +180,6 @@ export function SourceStudioHeader({
   baseMovedOn,
   canManage,
   canCompile,
-  selectedRunId,
   downloadingType,
   isDocxFile,
   isExtractionPending,
@@ -190,7 +190,8 @@ export function SourceStudioHeader({
   onStartExtraction,
   onOpenSpellCheck,
   onOpenSaveModal,
-  onOpenCompileDialog,
+  onOpenPreparation,
+  onOpenAdvancedCompile,
   onDownload,
   onOpenReRunDialog,
   onOpenUploadRevision,
@@ -260,7 +261,10 @@ export function SourceStudioHeader({
           {/* Integrated Version & Draft Selector */}
           {statusInfo.status === "completed" && doc ? (
             <div className="flex items-center gap-1.5 pl-1.5 border-l border-border/60 shrink-0">
-              <div className="flex items-center text-muted-foreground" title="Phiên bản văn bản">
+              <div
+                className="flex items-center text-muted-foreground"
+                title="Phiên bản văn bản"
+              >
                 <History className="size-3.5 text-muted-foreground" />
               </div>
               <Select
@@ -291,7 +295,7 @@ export function SourceStudioHeader({
                     Mới nhất (v{doc.version})
                   </SelectItem>
                   <SelectItem value="0" className="text-xs">
-                    v0 (OCR gốc)
+                    v0 (bản đọc gốc)
                   </SelectItem>
                   {doc.version > 0
                     ? Array.from({ length: doc.version }, (_, i) => i + 1).map(
@@ -343,14 +347,14 @@ export function SourceStudioHeader({
               className="h-8 text-xs gap-1.5 shadow-xs"
               disabled={isExtractionPending}
               onClick={onStartExtraction}
-              aria-label="Bắt đầu bóc tách"
+              aria-label="Bắt đầu đọc nội dung"
             >
               {isExtractionPending ? (
                 <Loader2 className="size-3.5 animate-spin" />
               ) : (
                 <Play className="size-3.5" />
               )}
-              <span>Bóc tách</span>
+              <span>Đọc nội dung</span>
             </Button>
           ) : null}
 
@@ -396,18 +400,18 @@ export function SourceStudioHeader({
             </Button>
           ) : null}
 
-          {/* Compilation trigger */}
-          {canCompile && statusInfo.status === "completed" && selectedRunId ? (
+          {/* Preparation trigger: works from any processing state and chains OCR itself. */}
+          {canCompile ? (
             <Button
               type="button"
               size="sm"
               variant={hasUnsavedDraft ? "outline" : "default"}
               className="h-8 text-xs gap-1.5"
-              onClick={onOpenCompileDialog}
-              aria-label="Biên soạn (Dùng để biên soạn)"
+              onClick={onOpenPreparation}
+              aria-label="Chuẩn bị nội dung"
             >
               <ClipboardList className="size-3.5" />
-              <span>Biên soạn</span>
+              <span>Chuẩn bị nội dung</span>
             </Button>
           ) : null}
 
@@ -459,6 +463,16 @@ export function SourceStudioHeader({
                 <>
                   <DropdownMenuSeparator />
 
+                  {canCompile && onOpenAdvancedCompile ? (
+                    <DropdownMenuItem
+                      className="gap-2"
+                      onClick={onOpenAdvancedCompile}
+                    >
+                      <Layers className="size-3.5 text-muted-foreground" />
+                      <span>Chuẩn bị nâng cao</span>
+                    </DropdownMenuItem>
+                  ) : null}
+
                   {statusInfo.status !== "unprocessed" &&
                   statusInfo.status !== "running" ? (
                     <DropdownMenuItem
@@ -466,7 +480,7 @@ export function SourceStudioHeader({
                       onClick={onOpenReRunDialog}
                     >
                       <RotateCcw className="size-3.5 text-muted-foreground" />
-                      <span>Bóc tách lại</span>
+                      <span>Đọc lại nội dung</span>
                     </DropdownMenuItem>
                   ) : null}
 

@@ -34,6 +34,8 @@ import type {
   ReviewGateResponse,
   VersionResponse,
 } from "./publication-types.ts";
+import { invalidateSubmissionScopes } from "./review-queries";
+import { invalidateSourceSummaries, summaryKeys } from "./summary-queries";
 
 // ==========================================
 // Scoped Query Keys
@@ -549,6 +551,12 @@ export function useCreateCompiledDocumentMutation(
           sessionId,
         ),
       });
+      invalidateSourceSummaries(
+        queryClient,
+        sessionId,
+        workspaceId,
+        collectionId,
+      );
       if (data.document?.id) {
         queryClient.setQueryData(
           publicationKeys.document(
@@ -559,6 +567,14 @@ export function useCreateCompiledDocumentMutation(
           ),
           data.document,
         );
+        void queryClient.invalidateQueries({
+          queryKey: summaryKeys.documentBase(
+            sessionId,
+            workspaceId,
+            collectionId,
+            data.document.id,
+          ),
+        });
       }
     },
   });
@@ -605,6 +621,12 @@ export function useCreateCompiledVersionMutation(
           sessionId,
         ),
       });
+      invalidateSourceSummaries(
+        queryClient,
+        sessionId,
+        workspaceId,
+        collectionId,
+      );
       if (data.version?.id) {
         queryClient.setQueryData(
           publicationKeys.version(
@@ -617,6 +639,14 @@ export function useCreateCompiledVersionMutation(
           data.version,
         );
       }
+      void queryClient.invalidateQueries({
+        queryKey: summaryKeys.documentBase(
+          sessionId,
+          workspaceId,
+          collectionId,
+          documentId,
+        ),
+      });
     },
   });
 }
@@ -724,6 +754,27 @@ export function useCommitDecisionMutation(
           sessionId,
         ),
       });
+      void queryClient.invalidateQueries({
+        queryKey: summaryKeys.documentBase(
+          sessionId,
+          workspaceId,
+          collectionId,
+          documentId,
+        ),
+      });
+      invalidateSourceSummaries(
+        queryClient,
+        sessionId,
+        workspaceId,
+        collectionId,
+      );
+      // An approval closes the matching handoff in the same transaction.
+      invalidateSubmissionScopes(
+        queryClient,
+        sessionId,
+        workspaceId,
+        collectionId,
+      );
     },
   });
 }

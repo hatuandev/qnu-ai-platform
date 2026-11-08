@@ -68,6 +68,85 @@ export function generateIdempotencyKey(): string {
   return `key_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
 }
 
+export type ConversationFailureCategory =
+  | "clarification"
+  | "permission"
+  | "verification"
+  | "infrastructure"
+  | "state"
+  | "not_found"
+  | "cancelled"
+  | "unknown";
+
+const CLARIFICATION_CODES = new Set([
+  "conversation_clarification_required",
+  "answer_scope_clarification_required",
+]);
+
+const PERMISSION_CODES = new Set([
+  "workspace_forbidden",
+  "workspace_suspended",
+]);
+
+const VERIFICATION_CODES = new Set([
+  "answer_not_supported",
+  "answer_verification_uncertain",
+  "answer_verification_invalid",
+]);
+
+const INFRASTRUCTURE_CODES = new Set([
+  "chat_provider_unavailable",
+  "chat_provider_changed",
+  "conversation_route_invalid",
+  "conversation_turn_failed",
+]);
+
+const NOT_FOUND_CODES = new Set([
+  "conversation_not_found",
+  "conversation_turn_not_found",
+  "workspace_not_found",
+]);
+
+const CANCELLED_CODES = new Set([
+  "operation_cancelled",
+  "conversation_turn_cancelled",
+]);
+
+const STATE_CODES = new Set([
+  "conversation_busy",
+  "conversation_sequence_conflict",
+  "idempotency_conflict",
+  "conversation_turn_running",
+  "conversation_turn_expired",
+  "conversation_turn_interrupted",
+  "conversation_assistant_changed",
+  "conversation_archived",
+  "conversation_scope_conflict",
+  "conversation_history_limit",
+  "assistant_inactive",
+  "answer_evidence_changed",
+  "answer_context_budget_exceeded",
+  "query_scope_too_large",
+]);
+
+/**
+ * Groups transport/business failures so the chat UI never presents a model or
+ * permission failure as "no data in the knowledge base".
+ */
+export function classifyConversationFailure(
+  code?: string | null,
+): ConversationFailureCategory {
+  if (!code) return "unknown";
+  if (CLARIFICATION_CODES.has(code)) return "clarification";
+  if (PERMISSION_CODES.has(code)) return "permission";
+  if (VERIFICATION_CODES.has(code)) return "verification";
+  if (INFRASTRUCTURE_CODES.has(code)) return "infrastructure";
+  if (NOT_FOUND_CODES.has(code)) return "not_found";
+  if (CANCELLED_CODES.has(code)) return "cancelled";
+  if (STATE_CODES.has(code)) return "state";
+  return "unknown";
+}
+
 /**
  * Maps standard backend error codes into honest, user-friendly Vietnamese explanations.
  */
@@ -98,6 +177,24 @@ export function formatConversationError(
       return "Lượt hỏi đã hết hạn thực thi (quá thời hạn lease).";
     case "conversation_turn_interrupted":
       return "Lượt hỏi bị gián đoạn hoặc chưa thể xác định kết quả.";
+    case "conversation_clarification_required":
+      return "Câu hỏi nối tiếp chưa rõ chủ thể. Hãy hỏi lại đầy đủ hơn (nêu rõ đối tượng, năm hoặc tài liệu cần tra). Đây không phải lỗi kết nối hay lỗi model.";
+    case "answer_scope_clarification_required":
+      return "Phạm vi tra cứu chưa rõ. Hãy nêu rõ năm hoặc đơn vị áp dụng trong câu hỏi.";
+    case "conversation_history_limit":
+      return "Lịch sử hội thoại vượt ngân sách ngữ cảnh. Mở hội thoại mới hoặc giảm số lượt lịch sử trong cấu hình trợ lý.";
+    case "conversation_route_invalid":
+      return "Bước điều phối hội thoại trả về kết quả không hợp lệ nên lượt hỏi chưa được trả lời. Đây là lỗi hệ thống, không phải thiếu dữ liệu.";
+    case "chat_provider_changed":
+      return "Cấu hình model đã thay đổi trong lúc xử lý nên lượt hỏi dừng để tránh trộn cấu hình. Hỏi lại để dùng cấu hình hiện tại.";
+    case "chat_provider_unavailable":
+      return "Không kết nối được model trả lời. Đây là lỗi hạ tầng, không phải kết quả 'không tìm thấy dữ liệu'.";
+    case "conversation_turn_failed":
+      return "Lượt hỏi dừng do lỗi hệ thống khi xử lý. Không có câu trả lời nào được ghi nhận.";
+    case "conversation_turn_uncertain":
+      return "Lượt hỏi chưa xác định được kết quả; không có câu trả lời nào được xác nhận.";
+    case "conversation_turn_cancelled":
+      return "Lượt hỏi đã bị hủy trước khi trợ lý hoàn tất.";
     case "operation_cancelled":
       return "Lượt hỏi đã bị hủy trước khi hoàn tất (dừng trợ lý hoặc lưu trữ hội thoại). Không có câu trả lời nào được ghi nhận.";
     case "conversation_scope_conflict":
@@ -114,6 +211,12 @@ export function formatConversationError(
       return "Không tìm thấy hội thoại yêu cầu.";
     case "conversation_turn_not_found":
       return "Không tìm thấy lượt hỏi yêu cầu.";
+    case "workspace_forbidden":
+      return "Bạn không có quyền truy cập workspace hoặc tài nguyên này. Hãy liên hệ quản trị workspace.";
+    case "workspace_suspended":
+      return "Workspace đang tạm dừng nên không thể xử lý câu hỏi.";
+    case "workspace_not_found":
+      return "Không tìm thấy workspace yêu cầu hoặc bạn không có quyền truy cập.";
     default:
       return fallbackMessage || `Yêu cầu thất bại với mã lỗi: ${code}`;
   }

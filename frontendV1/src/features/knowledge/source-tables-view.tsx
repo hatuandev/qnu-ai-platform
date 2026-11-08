@@ -21,7 +21,7 @@ export function SourceTablesView({
   if (!tables || tables.length === 0) {
     return (
       <div className="text-center py-6 text-xs text-muted-foreground italic">
-        Không có bảng nguồn nào được đính kèm trong bản biên soạn này.
+        Không có bảng nguồn nào được đính kèm trong bản đã chuẩn bị này.
       </div>
     );
   }

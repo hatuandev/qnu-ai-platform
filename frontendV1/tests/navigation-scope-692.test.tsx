@@ -82,7 +82,7 @@ test("selector scope and breadcrumbs come from selected workspace and feature", 
   });
   expect(
     getBreadcrumbs("/workspaces/choose/compiler").map((x) => x.label),
-  ).toEqual(["QNU AI", "Tri thức", "Biên soạn"]);
+  ).toEqual(["QNU AI", "Tri thức", "Chuẩn bị nội dung"]);
   expect(
     getBreadcrumbs("/workspaces/ws/operations", { view: "backups" }).at(-1)
       ?.label,

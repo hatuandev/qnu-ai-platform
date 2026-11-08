@@ -30,6 +30,7 @@ import type {
   SaveReviewInput,
 } from "@/features/knowledge/ocr-types";
 import { downloadRevisionContent } from "@/features/knowledge/requests";
+import { summaryKeys } from "@/features/knowledge/summary-queries";
 
 // ============================================================================
 // Query Key Factory
@@ -375,6 +376,14 @@ export function useRequestProcessingRunMutation(
           revisionId,
         ),
       });
+      void queryClient.invalidateQueries({
+        queryKey: summaryKeys.sourceBase(
+          sessionId,
+          workspaceId,
+          collectionId,
+          sourceId,
+        ),
+      });
     },
   });
 }
@@ -514,6 +523,14 @@ export function useSaveTextReviewMutation(
           collectionId,
           sourceId,
           revisionId,
+        ),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: summaryKeys.sourceBase(
+          sessionId,
+          workspaceId,
+          collectionId,
+          sourceId,
         ),
       });
     },

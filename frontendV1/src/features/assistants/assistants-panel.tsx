@@ -180,7 +180,7 @@ export function AssistantsPanel({
             <EmptyState
               icon={Bot}
               title="Chưa có trợ lý AI nào"
-              description="Workspace chưa có trợ lý AI nào được tạo. Tạo trợ lý để kết nối kho tri thức đã biên soạn với model chat phục vụ người dùng."
+              description="Workspace chưa có trợ lý AI nào được tạo. Tạo trợ lý để kết nối kho tri thức đã xuất bản với model chat phục vụ người dùng."
               action={
                 canManage
                   ? {

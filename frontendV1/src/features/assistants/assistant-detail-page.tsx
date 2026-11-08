@@ -10,8 +10,9 @@ import {
   Cpu,
   Database,
   ExternalLink,
-  HelpCircle,
+  FlaskConical,
   Layers,
+  Loader2,
   MessageSquare,
   Pencil,
   Sliders,
@@ -32,9 +33,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AnswerReviewSheet } from "@/features/answer-review/answer-review-sheet";
+import { canLabelAnswerReviews } from "@/features/answer-review/permissions";
 import { AssistantFormDialog } from "@/features/assistants/assistant-form-dialog";
 import { canManageAssistants } from "@/features/assistants/permissions";
-import { useAssistantQuery } from "@/features/assistants/queries";
+import {
+  useAssistantQuery,
+  useAssistantReadinessQuery,
+} from "@/features/assistants/queries";
+import {
+  READINESS_BADGE,
+  readinessDetail,
+} from "@/features/assistants/readiness";
 import { DEFAULT_ASSISTANT_SEARCH } from "@/features/assistants/schemas";
 import { ConversationCreateDialog } from "@/features/conversations/conversation-create-dialog";
 import { useCollectionQuery } from "@/features/knowledge/queries";
@@ -59,9 +69,11 @@ export function AssistantDetailPage({
   const { role, isPending: rolePending } = useCallerWorkspaceRole(workspaceId);
   const workspaceQuery = useWorkspaceQuery(workspaceId);
   const assistantQuery = useAssistantQuery(workspaceId, assistantId);
+  const readinessQuery = useAssistantReadinessQuery(workspaceId, assistantId);
 
   const assistant = assistantQuery.data;
   const collectionId = assistant?.collection_id ?? "";
+  const readiness = readinessQuery.data;
 
   // Related collection query
   const collectionQuery = useCollectionQuery(workspaceId, collectionId);
@@ -70,8 +82,10 @@ export function AssistantDetailPage({
 
   const [editOpen, setEditOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [testOpen, setTestOpen] = useState(false);
 
   const canManage = !rolePending && canManageAssistants(role);
+  const canLabel = !rolePending && canLabelAnswerReviews(role);
 
   // Model details from catalog
   const catalogItem = assistant?.chat_provider_id
@@ -208,6 +222,16 @@ export function AssistantDetailPage({
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={() => setTestOpen(true)}
+              >
+                <FlaskConical className="size-3.5" />
+                Kiểm thử
+              </Button>
+
               <Button
                 size="sm"
                 variant={assistant.is_active ? "default" : "secondary"}
@@ -356,6 +380,35 @@ export function AssistantDetailPage({
                       {collectionQuery.data.description}
                     </p>
                   )}
+                  {readinessQuery.isPending ? (
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground pt-1">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Đang kiểm tra phạm vi tài liệu phục vụ...
+                    </div>
+                  ) : readinessQuery.isError ? (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300 pt-1">
+                      Không kiểm tra được trạng thái tài liệu phục vụ. Mở kho
+                      tri thức để xem trực tiếp.
+                    </p>
+                  ) : readiness ? (
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant={READINESS_BADGE[readiness.status].variant}
+                          className="text-[10px]"
+                        >
+                          {READINESS_BADGE[readiness.status].label}
+                        </Badge>
+                        <span className="text-[11px] text-muted-foreground">
+                          {readiness.published_document_count} tài liệu xuất bản
+                          · {readiness.served_document_count} đang phục vụ
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        {readinessDetail(readiness)}
+                      </p>
+                    </div>
+                  ) : null}
                   <div className="pt-2 border-t text-[11px] text-muted-foreground flex items-center justify-between">
                     <span>
                       Mã bộ sưu tập:{" "}
@@ -470,7 +523,7 @@ export function AssistantDetailPage({
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <Layers className="size-4 text-primary" />
-                  Chỉ dẫn hệ thống (Persona)
+                  Hướng dẫn trả lời
                 </CardTitle>
                 {assistant.persona && (
                   <CopyButton
@@ -482,8 +535,7 @@ export function AssistantDetailPage({
                 )}
               </div>
               <CardDescription className="text-xs">
-                Lời nhắc định hình phong cách, giới hạn nghiệp vụ và căn cứ trả
-                lời của trợ lý.
+                Quy định giọng điệu, phạm vi và căn cứ trả lời của trợ lý.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
@@ -607,24 +659,41 @@ export function AssistantDetailPage({
                 </div>
               </div>
 
-              {/* Check 3: Runtime vector indexing (Honest indicator) */}
-              <div className="flex items-start gap-2.5 opacity-80">
-                <HelpCircle className="size-4 text-muted-foreground shrink-0 mt-0.5" />
+              {/* Check 3: Runtime publication & index readiness */}
+              <div className="flex items-start gap-2.5">
+                {readiness?.status === "ready" ? (
+                  <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                ) : readiness?.status === "syncing" ||
+                  readinessQuery.isPending ? (
+                  <Loader2 className="size-4 text-info animate-spin shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="size-4 text-amber-500 shrink-0 mt-0.5" />
+                )}
                 <div>
                   <div className="font-medium text-foreground flex items-center gap-1">
-                    Index & Xuất bản tri thức
-                    <Badge variant="outline" className="text-[10px] py-0">
-                      Chưa kiểm tra runtime
-                    </Badge>
+                    Tài liệu phục vụ
+                    {readiness ? (
+                      <Badge
+                        variant={READINESS_BADGE[readiness.status].variant}
+                        className="text-[10px] py-0"
+                      >
+                        {READINESS_BADGE[readiness.status].label}
+                      </Badge>
+                    ) : null}
                   </div>
                   <div className="text-muted-foreground text-[11px]">
-                    Trạng thái sẵn sàng của tài liệu trong kho tri thức cần được
-                    nghiệm thu tại bước truy xuất thực tế.
+                    {readinessQuery.isPending
+                      ? "Đang kiểm tra tài liệu xuất bản và chỉ mục đang phục vụ..."
+                      : readinessQuery.isError
+                        ? "Không kiểm tra được trạng thái tài liệu phục vụ. Mở kho tri thức để xem trực tiếp."
+                        : readiness
+                          ? readinessDetail(readiness)
+                          : "Chưa có thông tin trạng thái tài liệu phục vụ."}
                   </div>
                 </div>
               </div>
 
-              {/* Check 4: Inference test (Honest indicator) */}
+              {/* Check 4: Conversation entry */}
               <div className="flex items-start gap-2.5">
                 <Sparkles className="size-4 text-primary shrink-0 mt-0.5" />
                 <div>
@@ -635,8 +704,9 @@ export function AssistantDetailPage({
                     </Badge>
                   </div>
                   <div className="text-muted-foreground text-[11px]">
-                    Bấm &ldquo;Chat thử&rdquo; trên thanh đầu trang để mở phiên
-                    hội thoại và kiểm tra câu trả lời có dẫn nguồn bằng chứng.
+                    Bấm &ldquo;Trò chuyện&rdquo; trên thanh đầu trang để mở
+                    phiên hội thoại thật và kiểm tra câu trả lời có dẫn nguồn
+                    bằng chứng.
                   </div>
                 </div>
               </div>
@@ -660,6 +730,18 @@ export function AssistantDetailPage({
         open={chatOpen}
         onOpenChange={setChatOpen}
         preselectedAssistant={assistant}
+      />
+
+      {/* Answer test sheet on published sources */}
+      <AnswerReviewSheet
+        workspaceId={workspaceId}
+        assistant={assistant}
+        readiness={readiness}
+        isReadinessPending={readinessQuery.isPending}
+        isReadinessError={readinessQuery.isError}
+        canLabel={canLabel}
+        open={testOpen}
+        onOpenChange={setTestOpen}
       />
     </div>
   );

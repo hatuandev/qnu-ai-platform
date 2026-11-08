@@ -140,9 +140,7 @@ test("shows the source draft early and reports incomplete AI after completion", 
   ports.selective = true;
   const view = render(<CompilationDetailPage {...props} />);
   expect(screen.getByText("First paragraph")).toBeTruthy();
-  expect(
-    screen.queryByRole("button", { name: "Đăng ký thành tài liệu biên soạn" }),
-  ).toBeNull();
+  expect(screen.queryByRole("button", { name: "Đăng ký xuất bản" })).toBeNull();
   ports.status = "completed";
   ports.incomplete = true;
   view.rerender(<CompilationDetailPage {...props} />);
@@ -150,43 +148,39 @@ test("shows the source draft early and reports incomplete AI after completion", 
   expect(
     screen.getByText("Bản nháp đã sẵn sàng. Phần AI chưa hoàn tất."),
   ).toBeTruthy();
-  expect(
-    screen.getByRole("button", { name: "Đăng ký thành tài liệu biên soạn" }),
-  ).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Đăng ký xuất bản" })).toBeTruthy();
 });
 
 test("a tab is created on first visit and retains the editor DOM and unsaved text across other tabs", async () => {
   render(<CompilationDetailPage {...props} />);
-  expect(screen.queryByLabelText(/Tiêu đề bản biên soạn/)).toBeNull();
-  fireEvent.keyDown(
-    screen.getByRole("tab", { name: "Chỉnh sửa bản biên soạn" }),
-    { key: "Enter" },
-  );
-  const title = await screen.findByLabelText(/Tiêu đề bản biên soạn/);
+  expect(screen.queryByLabelText(/Tiêu đề nội dung/)).toBeNull();
+  fireEvent.keyDown(screen.getByRole("tab", { name: "Chỉnh sửa nội dung" }), {
+    key: "Enter",
+  });
+  const title = await screen.findByLabelText(/Tiêu đề nội dung/);
   fireEvent.change(title, { target: { value: "Unsaved correction" } });
   fireEvent.keyDown(screen.getByRole("tab", { name: "Rà soát & Đánh giá" }), {
     key: "Enter",
   });
   expect(title.isConnected).toBe(true);
   expect(
-    screen.queryByRole("textbox", { name: /Tiêu đề bản biên soạn/ }),
+    screen.queryByRole("textbox", { name: /Tiêu đề nội dung/ }),
   ).toBeNull();
   fireEvent.keyDown(
-    screen.getByRole("tab", { name: "Bản biên soạn & Dẫn chứng" }),
+    screen.getByRole("tab", { name: "Bản đã chuẩn bị & Dẫn chứng" }),
     { key: "Enter" },
   );
-  fireEvent.keyDown(
-    screen.getByRole("tab", { name: "Chỉnh sửa bản biên soạn" }),
-    { key: "Enter" },
-  );
-  expect(screen.getByLabelText(/Tiêu đề bản biên soạn/)).toBe(title);
+  fireEvent.keyDown(screen.getByRole("tab", { name: "Chỉnh sửa nội dung" }), {
+    key: "Enter",
+  });
+  expect(screen.getByLabelText(/Tiêu đề nội dung/)).toBe(title);
   expect((title as HTMLInputElement).value).toBe("Unsaved correction");
   expect(ports.preview).not.toHaveBeenCalled();
 });
 
 test("kept tabs reset on another run or auth session", async () => {
   const view = render(<CompilationDetailPage {...props} initialTab="edit" />);
-  fireEvent.change(await screen.findByLabelText(/Tiêu đề bản biên soạn/), {
+  fireEvent.change(await screen.findByLabelText(/Tiêu đề nội dung/), {
     target: { value: "Private draft" },
   });
   view.rerender(
@@ -194,11 +188,10 @@ test("kept tabs reset on another run or auth session", async () => {
   );
   await waitFor(() =>
     expect(
-      (screen.getByLabelText(/Tiêu đề bản biên soạn/) as HTMLInputElement)
-        .value,
+      (screen.getByLabelText(/Tiêu đề nội dung/) as HTMLInputElement).value,
     ).toBe("Document B"),
   );
-  fireEvent.change(screen.getByLabelText(/Tiêu đề bản biên soạn/), {
+  fireEvent.change(screen.getByLabelText(/Tiêu đề nội dung/), {
     target: { value: "Session draft" },
   });
   ports.session = 2;
@@ -207,15 +200,14 @@ test("kept tabs reset on another run or auth session", async () => {
   );
   await waitFor(() =>
     expect(
-      (screen.getByLabelText(/Tiêu đề bản biên soạn/) as HTMLInputElement)
-        .value,
+      (screen.getByLabelText(/Tiêu đề nội dung/) as HTMLInputElement).value,
     ).toBe("Document B"),
   );
 });
 
 test("unsaved edits allow search-only tab navigation while leaving the page stays protected", async () => {
   render(<CompilationEditorTab {...props} canEdit />);
-  fireEvent.change(await screen.findByLabelText(/Tiêu đề bản biên soạn/), {
+  fireEvent.change(await screen.findByLabelText(/Tiêu đề nội dung/), {
     target: { value: "Unsaved" },
   });
   const options = ports.blocker.mock.lastCall?.[0] as {
@@ -242,7 +234,7 @@ test("unsaved edits allow search-only tab navigation while leaving the page stay
 
 test("citation choices are mounted on demand, paginated and retained when changing page", async () => {
   render(<CompilationEditorTab {...props} canEdit />);
-  await screen.findByLabelText(/Tiêu đề bản biên soạn/);
+  await screen.findByLabelText(/Tiêu đề nội dung/);
   expect(screen.queryByRole("checkbox")).toBeNull();
   fireEvent.keyDown(screen.getByRole("button", { name: "Thao tác đoạn 1.1" }), {
     key: "Enter",

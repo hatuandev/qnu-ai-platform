@@ -435,7 +435,7 @@ export function KnowledgeDetailPage({
             </span>
           </div>
 
-          {/* Tab Giai đoạn (Tài liệu / Biên soạn / Phát hành) */}
+          {/* Tab Giai đoạn (Tài liệu / Chuẩn bị nội dung / Xuất bản) */}
           <div
             role="tablist"
             aria-label="Giai đoạn kho tri thức"
@@ -469,7 +469,7 @@ export function KnowledgeDetailPage({
               )}
             >
               <ClipboardList className="size-3" />
-              <span>Biên soạn</span>
+              <span>Chuẩn bị nội dung</span>
             </button>
             <button
               type="button"
@@ -484,7 +484,7 @@ export function KnowledgeDetailPage({
               )}
             >
               <BookMarked className="size-3" />
-              <span>Phát hành</span>
+              <span>Xuất bản</span>
             </button>
           </div>
         </div>
@@ -618,27 +618,8 @@ export function KnowledgeDetailPage({
               onDropTarget={handleDropOnFolder}
             />
 
-            {/* Nhóm công cụ bên phải: Thêm thư mục + Tìm kiếm + Chế độ xem */}
+            {/* Nhóm công cụ bên phải: Tìm kiếm + Chế độ xem */}
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:flex-1">
-              {canManage && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-2.5 text-xs gap-1.5 shadow-2xs"
-                  onClick={() => {
-                    setFolderToEdit(null);
-                    setFolderParentForCreate({
-                      id: currentFolderId,
-                      name: currentFolder?.name ?? "Gốc kho tri thức",
-                    });
-                    setFolderFormOpen(true);
-                  }}
-                >
-                  <FolderPlus className="size-3.5 text-muted-foreground" />
-                  <span>Thư mục mới</span>
-                </Button>
-              )}
-
               <div className="w-full sm:w-52 lg:w-64">
                 <DebouncedSearchInput
                   value={searchQuery}
@@ -857,7 +838,7 @@ export function KnowledgeDetailPage({
                   description={
                     searchQuery
                       ? "Hãy thử tìm kiếm với từ khóa hoặc tên tệp khác."
-                      : "Tải lên tài liệu PDF hoặc Word (.docx) để lưu trữ an toàn và tiến hành bóc tách OCR."
+                      : "Tải lên tài liệu PDF hoặc Word (.docx) để lưu trữ an toàn và đọc nội dung."
                   }
                   action={
                     canManage && !searchQuery
@@ -1087,7 +1068,7 @@ export function KnowledgeDetailPage({
                         Phiên bản
                       </TableHead>
                       <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
-                        Trạng thái bóc tách
+                        Trạng thái đọc nội dung
                       </TableHead>
                       <TableHead className="font-semibold text-xs text-muted-foreground uppercase tracking-wider py-3">
                         Cập nhật
@@ -1250,7 +1231,7 @@ export function KnowledgeDetailPage({
         </div>
       )}
 
-      {/* Khu vực Biên soạn trực tiếp trong kho (không qua màn trung gian) */}
+      {/* Khu vực Chuẩn bị nội dung trực tiếp trong kho (không qua màn trung gian) */}
       {activeStage === "compiler" && (
         <div className="space-y-4">
           <CompilationRunsList
@@ -1272,7 +1253,7 @@ export function KnowledgeDetailPage({
         </div>
       )}
 
-      {/* Khu vực Phát hành trực tiếp trong kho (không qua màn trung gian) */}
+      {/* Khu vực Xuất bản trực tiếp trong kho (không qua màn trung gian) */}
       {activeStage === "publication" && (
         <CompiledDocumentsList
           workspaceId={workspaceId}

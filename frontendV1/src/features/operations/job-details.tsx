@@ -98,7 +98,7 @@ export function JobDetails({
                       runId: query.data.compilation_run_id ?? query.data.id,
                     }}
                   >
-                    <span>Mở bản biên soạn</span>
+                    <span>Mở nội dung đã chuẩn bị</span>
                     <ExternalLink className="size-3.5" />
                   </Link>
                 </Button>

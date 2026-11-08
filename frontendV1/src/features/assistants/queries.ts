@@ -4,6 +4,7 @@ import { useV1Auth } from "@/app/auth/v1";
 import {
   createAssistant,
   getAssistant,
+  getAssistantReadiness,
   listAssistants,
   updateAssistant,
 } from "@/features/assistants/requests";
@@ -11,6 +12,7 @@ import type {
   Assistant,
   AssistantCreateInput,
   AssistantListParams,
+  AssistantReadiness,
   AssistantUpdateInput,
 } from "@/features/assistants/types";
 
@@ -52,6 +54,25 @@ export const assistantKeys = {
           assistantId,
         ] as const)
       : (["v1", "assistants", "detail"] as const),
+
+  readiness: (
+    sessionId?: number,
+    workspaceId?: string,
+    assistantId?: string,
+  ) =>
+    sessionId !== undefined &&
+    workspaceId !== undefined &&
+    assistantId !== undefined
+      ? ([
+          "v1",
+          sessionId,
+          "workspaces",
+          workspaceId,
+          "assistants",
+          "readiness",
+          assistantId,
+        ] as const)
+      : (["v1", "assistants", "readiness"] as const),
 };
 
 export function useAssistantsQuery(
@@ -74,6 +95,22 @@ export function useAssistantQuery(workspaceId: string, assistantId: string) {
     queryFn: ({ signal }) =>
       getAssistant(v1Client, workspaceId, assistantId, { signal }),
     enabled: Boolean(workspaceId && assistantId),
+  });
+}
+
+export function useAssistantReadinessQuery(
+  workspaceId: string,
+  assistantId: string,
+) {
+  const { sessionId } = useV1Auth();
+  return useQuery<AssistantReadiness>({
+    queryKey: assistantKeys.readiness(sessionId, workspaceId, assistantId),
+    queryFn: ({ signal }) =>
+      getAssistantReadiness(v1Client, workspaceId, assistantId, { signal }),
+    enabled: Boolean(workspaceId && assistantId),
+    // Truthful live state only: poll while publication/index is being prepared.
+    refetchInterval: (query) =>
+      query.state.data?.status === "syncing" ? 5000 : false,
   });
 }
 

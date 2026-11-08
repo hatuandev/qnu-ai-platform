@@ -45,9 +45,9 @@ function isUnavailable(error: Error | null) {
 
 const statusLabels: Record<CompilationStatus, string> = {
   queued: "Đang chờ",
-  running: "Đang biên soạn",
-  completed: "Đã biên soạn · Mở để xem và duyệt",
-  failed: "Biên soạn thất bại · Mở để xem lỗi",
+  running: "Đang chuẩn bị nội dung",
+  completed: "Đã chuẩn bị nội dung · Mở để xem và duyệt",
+  failed: "Chuẩn bị nội dung thất bại · Mở để xem lỗi",
   uncertain: "Chưa xác định kết quả · Mở để kiểm tra",
   cancelled: "Đã dừng",
 };
@@ -60,7 +60,7 @@ export function CompilationActivityPanel() {
     <Collapsible
       open={activity.isExpanded}
       onOpenChange={activity.setExpanded}
-      aria-label="Tiến độ biên soạn"
+      aria-label="Tiến độ chuẩn bị nội dung"
       className="fixed right-3 bottom-3 z-40 w-[calc(100%-1.5rem)] max-w-sm rounded-xl border bg-card text-card-foreground shadow-lg sm:right-6 sm:bottom-6"
     >
       <div className="flex items-center gap-1 pr-2">
@@ -70,13 +70,13 @@ export function CompilationActivityPanel() {
             className="h-12 min-w-0 flex-1 justify-between px-4"
             aria-label={
               activity.isExpanded
-                ? "Thu gọn tiến độ biên soạn"
-                : "Mở tiến độ biên soạn"
+                ? "Thu gọn tiến độ chuẩn bị nội dung"
+                : "Mở tiến độ chuẩn bị nội dung"
             }
           >
             <span className="flex items-center gap-2">
               <BookOpen className="size-4" />
-              Biên soạn ({activity.runs.length})
+              Chuẩn bị nội dung ({activity.runs.length})
             </span>
             <ChevronDown
               className={`size-4 ${activity.isExpanded ? "" : "rotate-180"}`}
@@ -86,7 +86,7 @@ export function CompilationActivityPanel() {
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Đóng bảng tiến độ biên soạn"
+          aria-label="Đóng bảng tiến độ chuẩn bị nội dung"
           title="Đóng bảng · Tác vụ vẫn chạy nền"
           onClick={activity.dismissAll}
         >

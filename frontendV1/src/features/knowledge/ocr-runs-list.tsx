@@ -276,7 +276,7 @@ export function OcrRunsList({
                             size="sm"
                             variant="outline"
                             className="h-7 px-2 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/5"
-                            title="Sử dụng lượt OCR này để tạo bản biên soạn"
+                            title="Sử dụng lượt đọc này để chuẩn bị nội dung"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Link
@@ -294,7 +294,7 @@ export function OcrRunsList({
                             >
                               <BookOpen className="size-3" />
                               <span className="hidden sm:inline">
-                                Biên soạn
+                                Chuẩn bị nội dung
                               </span>
                             </Link>
                           </Button>

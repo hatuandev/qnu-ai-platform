@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, FolderOpen, Library, Search } from "lucide-react";
+import { Building2, FolderOpen, Library } from "lucide-react";
 import { PageBreadcrumbs } from "@/components/admin/page-breadcrumbs";
 import { IndexPanel } from "@/features/knowledge/index-panel";
 import { canManageKnowledge } from "@/features/knowledge/permissions";
 import { useCollectionQuery } from "@/features/knowledge/queries";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { pageSearchSchema } from "@/features/workspaces/search";
+import { workspaceFeatureBreadcrumb } from "@/navigation/workspace-features";
 
 export const Route = createFileRoute(
   "/workspaces/$workspaceId/collections/$collectionId/search",
@@ -54,8 +55,10 @@ function CollectionSearchRoute() {
             maxChars: 24,
           },
           {
-            label: "Tìm kiếm & Chỉ mục",
-            icon: Search,
+            ...workspaceFeatureBreadcrumb("search", {
+              workspaceId,
+              collectionId,
+            }),
             current: true,
           },
         ]}
@@ -84,4 +87,3 @@ function CollectionSearchRoute() {
     </div>
   );
 }
-

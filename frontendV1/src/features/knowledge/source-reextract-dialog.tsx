@@ -51,14 +51,14 @@ export function SourceReextractDialog({
         force: true,
       });
       if (!current()) return;
-      toast.success("Đã gửi yêu cầu bóc tách lại.");
+      toast.success("Đã gửi yêu cầu đọc lại nội dung.");
       onStarted(revision.id, result.run.id);
     } catch (error) {
       if (!current()) return;
       toast.error(
         error instanceof ApiProblemError
           ? error.message
-          : "Không thể yêu cầu bóc tách lại. Hãy kiểm tra trạng thái tài liệu.",
+          : "Không thể yêu cầu đọc lại nội dung. Hãy kiểm tra trạng thái tài liệu.",
       );
     } finally {
       submitted.current = false;
@@ -73,10 +73,11 @@ export function SourceReextractDialog({
         <ResponsiveDialogHeader className="border-b bg-muted/20 px-6 py-4">
           <ResponsiveDialogTitle className="flex items-center gap-2">
             <RotateCcw className="size-4 text-primary" />
-            Bóc tách lại
+            Đọc lại nội dung
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
-            Tạo lượt bóc tách mới cho “{source.title}”. Kết quả cũ được giữ lại.
+            Tạo lượt đọc nội dung mới cho “{source.title}”. Kết quả cũ được giữ
+            lại.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         <div className="px-6 py-4 text-sm">
@@ -105,7 +106,7 @@ export function SourceReextractDialog({
             onClick={() => void handleStart()}
           >
             {request.isPending && <Loader2 className="size-4 animate-spin" />}
-            {request.isPending ? "Đang gửi…" : "Bắt đầu bóc tách lại"}
+            {request.isPending ? "Đang gửi…" : "Bắt đầu đọc lại"}
           </Button>
         </ResponsiveDialogFooter>
       </ResponsiveDialogContent>

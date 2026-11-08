@@ -26,6 +26,7 @@ test("renders a greeting as chat text without an evidence warning", () => {
         },
         rewrite_trace: null,
         source_status: "current",
+        source_status_reason: null,
         created_at: "2026-11-03T10:00:00Z",
         finished_at: "2026-11-03T10:00:00Z",
       }}

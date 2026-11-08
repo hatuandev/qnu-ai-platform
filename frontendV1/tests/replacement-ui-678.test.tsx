@@ -121,7 +121,7 @@ test("revision upload defaults to staged mode, preserving the serving revision",
     "checked",
   );
   fireEvent.click(screen.getByRole("button", { name: "Chọn PDF thử" }));
-  fireEvent.click(screen.getByRole("button", { name: /Tải lên phiên bản/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^Tải lên$/ }));
   await waitFor(() => expect(ports.upload).toHaveBeenCalledTimes(1));
   expect(ports.upload.mock.calls[0][0]).toEqual(
     expect.objectContaining({
@@ -143,7 +143,7 @@ test("changing upload mode gives the new intent a new key, while a retry retains
     />,
   );
   fireEvent.click(screen.getByRole("button", { name: "Chọn PDF thử" }));
-  const submit = screen.getByRole("button", { name: /Tải lên phiên bản/ });
+  const submit = screen.getByRole("button", { name: /^Tải lên$/ });
   fireEvent.click(submit);
   await waitFor(() => expect(ports.upload).toHaveBeenCalledTimes(1));
   fireEvent.click(submit);
@@ -182,7 +182,7 @@ test("changing source clears the selected replacement file instead of uploading 
       />
     </QueryClientProvider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: /Tải lên phiên bản/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^Tải lên$/ }));
   await act(async () => {
     await Promise.resolve();
   });
@@ -211,5 +211,9 @@ test("only an approved version is selectable for replacement, never draft or pub
   ).toBeTruthy();
   expect(screen.queryByRole("option", { name: /Phiên bản 3/ })).toBeNull();
   expect(screen.queryByRole("option", { name: /Phiên bản 1/ })).toBeNull();
-  expect(screen.getByText(/Bản cũ tiếp tục phục vụ/)).toBeTruthy();
+  expect(
+    screen.getByText(
+      /bản xuất bản hiện tại được giữ nguyên trong lúc chuẩn bị/,
+    ),
+  ).toBeTruthy();
 });

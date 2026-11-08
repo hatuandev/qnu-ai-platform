@@ -128,7 +128,7 @@ export function SourceActions({
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={onOcr}>
             <ScanLine />
-            Xem kết quả bóc tách
+            Xem nội dung đã đọc
           </DropdownMenuItem>
           {canManage && onReextract && (
             <DropdownMenuItem
@@ -140,7 +140,7 @@ export function SourceActions({
               onSelect={onReextract}
             >
               <RotateCcw />
-              Bóc tách lại
+              Đọc lại nội dung
             </DropdownMenuItem>
           )}
           {canManage && (

@@ -188,8 +188,8 @@ export function SourceUploadDialog({
 
       toast.success(
         files.length === 1
-          ? "Đã tải tệp lên kho và bắt đầu tự động bóc tách."
-          : `Đã tải lên ${successCount}/${files.length} tệp và bắt đầu tự động bóc tách.`,
+          ? "Đã tải tệp lên kho và bắt đầu tự động đọc nội dung."
+          : `Đã tải lên ${successCount}/${files.length} tệp và bắt đầu tự động đọc nội dung.`,
       );
       onOpenChange(false);
       if (lastSourceId) {
@@ -333,7 +333,7 @@ export function SourceUploadDialog({
                 <div className="space-y-2 rounded-xl border border-border/70 bg-muted/15 p-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-foreground">
-                      Tiến độ tải lên & khởi tạo bóc tách
+                      Tiến độ tải lên & khởi tạo đọc nội dung
                     </span>
                     <span className="font-mono text-muted-foreground">
                       Đã hoàn tất tải {completedFilesCount}/{fileStates.length}{" "}

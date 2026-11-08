@@ -3,10 +3,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { ApiProblemError } from "@/app/api/v1";
 import { getTokenState, subscribeToken } from "@/app/api/v1/session-token";
-import {
-  Field,
-  FieldError,
-} from "@/components/admin/field";
+import { Field, FieldError } from "@/components/admin/field";
 import { FileUpload } from "@/components/admin/file-upload";
 import {
   ResponsiveDialog,
@@ -122,8 +119,8 @@ function RevisionUploadSession({
       if (!current()) return;
       toast.success(
         staged
-          ? "Đã tải bản chuẩn bị và bắt đầu tự động bóc tách; bản đang phục vụ được giữ nguyên."
-          : "Đã tải phiên bản mới và bắt đầu tự động bóc tách.",
+          ? "Đã tải bản chuẩn bị và bắt đầu tự động đọc nội dung; bản đang phục vụ được giữ nguyên."
+          : "Đã tải phiên bản mới và bắt đầu tự động đọc nội dung.",
       );
       onOpenChange(false);
     } catch (error) {
@@ -156,7 +153,8 @@ function RevisionUploadSession({
             Tải tệp mới
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-xs">
-            Tải lên tệp mới cho tài liệu này. Phiên bản cũ vẫn được lưu trong lịch sử để đối chiếu.
+            Tải lên tệp mới cho tài liệu này. Phiên bản cũ vẫn được lưu trong
+            lịch sử để đối chiếu.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
@@ -209,7 +207,7 @@ function RevisionUploadSession({
                   </Label>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
                     {staged
-                      ? "Bản mới sẽ được đưa vào chế độ nháp để bóc tách và đối chiếu. Bản cũ vẫn phục vụ bình thường cho đến khi bạn xuất bản."
+                      ? "Bản mới sẽ được đưa vào chế độ nháp để đọc nội dung và đối chiếu. Bản cũ vẫn phục vụ bình thường cho đến khi bạn xuất bản."
                       : "Bản mới sẽ thay thế bản hiện tại ngay lập tức sau khi tải lên."}
                   </p>
                 </div>

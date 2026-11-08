@@ -67,3 +67,26 @@ export type AssistantListParams = {
   limit?: number;
   offset?: number;
 };
+
+export type AssistantReadinessStatus =
+  | "empty"
+  | "syncing"
+  | "ready"
+  | "outdated"
+  | "not_indexed"
+  | "failed"
+  | "uncertain";
+
+export type AssistantReadiness = {
+  assistant_id: string;
+  collection_id: string;
+  collection_name: string;
+  status: AssistantReadinessStatus;
+  published_document_count: number;
+  served_document_count: number;
+  index_run_id: string | null;
+  index_generation: number | null;
+  sync_status: string;
+  sync_error_code: string | null;
+  checked_at: string;
+};

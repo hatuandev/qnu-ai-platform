@@ -92,7 +92,7 @@ function renderJobResourceLink(workspaceId: string, job: JobView) {
             runId: compilationRunId,
           }}
         >
-          <span>Mở bản biên soạn</span>
+          <span>Mở nội dung đã chuẩn bị</span>
           <ExternalLink className="size-3" />
         </Link>
       </Button>
@@ -247,7 +247,7 @@ function OperationsJobs({ workspaceId, search, onSearch }: Props) {
           <h1 className="type-page-title">Tác vụ</h1>
           <p className="text-sm text-muted-foreground">
             Danh sách công việc đang chạy hoặc cần xử lý, tiến độ thực tế và
-            liên kết quay về đúng tài liệu hoặc bản biên soạn.
+            liên kết quay về đúng tài liệu hoặc nội dung đã chuẩn bị.
           </p>
         </div>
         <Button

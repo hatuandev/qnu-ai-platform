@@ -49,7 +49,11 @@ import {
   useSendTurn,
 } from "./queries";
 import { getTurn } from "./requests";
-import { formatConversationError, generateIdempotencyKey } from "./schemas";
+import {
+  classifyConversationFailure,
+  formatConversationError,
+  generateIdempotencyKey,
+} from "./schemas";
 import type { EvidenceSource, Statement, TurnResponse } from "./types";
 
 type ChatViewProps = {
@@ -116,6 +120,7 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
           result: null,
           rewrite_trace: null,
           source_status: "current",
+          source_status_reason: null,
           created_at: new Date(sendTurnMutation.submittedAt).toISOString(),
           finished_at: null,
         }
@@ -166,14 +171,6 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
       )
       .map(([key]) => key),
   ];
-
-  // Attempt tracking for idempotency & retry
-  const [lastAttempt, setLastAttempt] = useState<{
-    key: string;
-    question: string;
-    expected_turn_no: number;
-    metadata_filter: MetadataFilter | null;
-  } | null>(null);
 
   // Polling for running turn
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -324,14 +321,6 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
         ? explicitFilter
         : null;
 
-    const attempt = {
-      key: idempotencyKey,
-      question: questionText,
-      expected_turn_no: expectedTurnNo,
-      metadata_filter: attemptFilter,
-    };
-    setLastAttempt(attempt);
-
     if (!overrideAttempt) {
       setQuestion(""); // clear input box
     }
@@ -349,17 +338,23 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
       });
     } catch (err) {
       if (err instanceof ApiProblemError) {
-        toast.error(formatConversationError(err.code, err.message));
-        if (err.code === "conversation_sequence_conflict") {
-          // Re-fetch conversation to sync last_turn_no
-          void queryClient.invalidateQueries({
-            queryKey: conversationsQueryKeys.detail(
-              sessionId,
-              workspaceId,
-              conversationId,
-            ),
-          });
+        if (classifyConversationFailure(err.code) === "clarification") {
+          // The follow-up lacked a clear subject. Put the text back so the user
+          // can rephrase instead of retrying the same ambiguous question.
+          setQuestion(questionText);
+          toast.warning(formatConversationError(err.code, err.message));
+        } else {
+          toast.error(formatConversationError(err.code, err.message));
         }
+        // A rejected request may still have reserved a turn server-side; refresh
+        // so its stored failed/cancelled status appears in history.
+        void queryClient.invalidateQueries({
+          queryKey: conversationsQueryKeys.detail(
+            sessionId,
+            workspaceId,
+            conversationId,
+          ),
+        });
         if (err.code === "conversation_scope_conflict") {
           // The pinned scope rejected this filter: open the panel so the user can
           // see and correct it rather than retrying blindly.
@@ -388,18 +383,14 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
 
   const handleRetryLast = (turn: TurnResponse) => {
     if (!conversation) return;
-    if (lastAttempt && lastAttempt.question === turn.question) {
-      void handleSend(lastAttempt);
-    } else {
-      // Re-send with turn's data. The scope comes from the turn itself when the
-      // backend recorded one; otherwise it inherits, exactly like the first send.
-      void handleSend({
-        key: generateIdempotencyKey(),
-        question: turn.question,
-        expected_turn_no: conversation.last_turn_no,
-        metadata_filter: turn.metadata_filter ?? null,
-      });
-    }
+    // A stored failed/uncertain turn is terminal for its idempotency key: the
+    // backend refuses to re-run it. Ask again as a new turn instead.
+    void handleSend({
+      key: generateIdempotencyKey(),
+      question: turn.question,
+      expected_turn_no: conversation.last_turn_no,
+      metadata_filter: turn.metadata_filter ?? null,
+    });
   };
 
   if (conversationQuery.isPending) {
@@ -413,11 +404,18 @@ function ChatSession({ workspaceId, conversationId, onBack }: ChatViewProps) {
   }
 
   if (conversationQuery.isError || !conversation) {
+    const error = conversationQuery.error;
+    const isAccessDenied =
+      error instanceof ApiProblemError &&
+      (error.status === 403 ||
+        classifyConversationFailure(error.code) === "permission");
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 space-y-4 text-center">
         <Alert variant="destructive" className="max-w-md">
           <AlertDescription>
-            Không tìm thấy cuộc trò chuyện này hoặc bạn không có quyền truy cập.
+            {isAccessDenied
+              ? "Bạn không có quyền truy cập hội thoại này. Liên hệ quản trị workspace nếu bạn cần quyền xem."
+              : "Không tìm thấy cuộc trò chuyện này. Hội thoại có thể đã bị xóa hoặc không còn khả dụng."}
           </AlertDescription>
         </Alert>
         {onBack && (

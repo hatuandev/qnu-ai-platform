@@ -5,6 +5,7 @@ import {
   BookOpen,
   BookPlus,
   Building2,
+  ChevronDown,
   Download,
   FileCheck2,
   FileCode,
@@ -15,6 +16,8 @@ import {
   Layers,
   Library,
   Loader2,
+  MoreHorizontal,
+  RefreshCw,
   Sparkles,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -26,10 +29,22 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { formatDateTimeValue } from "@/lib/date-utils";
+import { workspaceFeatureBreadcrumb } from "@/navigation/workspace-features";
 import { CitationDrawer } from "./citation-drawer";
 import { CompilationDraftSections } from "./compilation-draft-sections";
 import { CompilationEditorTab } from "./compilation-editor-tab";
@@ -262,10 +277,11 @@ function CompilationDetailSession({
         <Card className="rounded-xl border-destructive/20 bg-destructive/5 p-5 text-xs space-y-2">
           <div className="flex items-center gap-2 text-destructive font-semibold">
             <AlertCircle className="size-4 shrink-0" />
-            <span>Không tìm thấy lượt biên soạn</span>
+            <span>Không tìm thấy lần chuẩn bị nội dung</span>
           </div>
           <p className="text-muted-foreground">
-            Lượt biên soạn không tồn tại hoặc bạn không có quyền truy cập.
+            Lần chuẩn bị nội dung không tồn tại hoặc bạn không có quyền truy
+            cập.
           </p>
         </Card>
       </div>
@@ -303,8 +319,10 @@ function CompilationDetailSession({
             maxChars: 24,
           },
           {
-            label: `Biên soạn Gen #${run.generation}`,
-            icon: Sparkles,
+            ...workspaceFeatureBreadcrumb("compiler", {
+              workspaceId,
+              collectionId,
+            }),
             current: true,
           },
         ]}
@@ -320,9 +338,6 @@ function CompilationDetailSession({
                 <h1 className="text-base sm:text-lg font-bold text-foreground">
                   {draft?.title || run.topic}
                 </h1>
-                <Badge variant="outline" className="font-mono text-xs">
-                  Gen #{run.generation}
-                </Badge>
                 <Badge
                   variant={statusInfo.variant}
                   className="text-xs font-normal"
@@ -355,29 +370,32 @@ function CompilationDetailSession({
                       onClick={() => setIsRegisterDialogOpen(true)}
                     >
                       <BookPlus className="size-3.5" />
-                      <span>Đăng ký thành tài liệu biên soạn</span>
+                      <span>Đăng ký xuất bản</span>
                     </Button>
                   )}
 
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs gap-1.5"
-                    onClick={handleDownloadMarkdown}
-                  >
-                    <Download className="size-3.5" />
-                    <span className="hidden sm:inline">Tải Markdown</span>
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs gap-1.5"
-                    onClick={handleDownloadDraftJson}
-                  >
-                    <FileCode className="size-3.5" />
-                    <span className="hidden sm:inline">Tải JSON</span>
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="size-8"
+                        aria-label="Thao tác khác"
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52 text-xs">
+                      <DropdownMenuItem onSelect={handleDownloadMarkdown}>
+                        <Download className="size-3.5 text-muted-foreground" />
+                        <span>Tải Markdown</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={handleDownloadDraftJson}>
+                        <FileCode className="size-3.5 text-muted-foreground" />
+                        <span>Tải JSON</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </>
               )}
             </div>
@@ -399,9 +417,9 @@ function CompilationDetailSession({
                         collectionId,
                         runId: run.parent_run_id,
                       }}
-                      className="ml-1 font-mono text-[11px] underline hover:text-foreground"
+                      className="ml-1 text-[11px] underline hover:text-foreground"
                     >
-                      (Bản gốc: {run.parent_run_id.slice(0, 8)}...)
+                      từ lần trước
                     </Link>
                   )}
                 </span>
@@ -409,34 +427,14 @@ function CompilationDetailSession({
                 <span className="inline-flex items-center gap-1 font-semibold text-primary">
                   <Sparkles className="size-3" />
                   {run.selective_supplement
-                    ? "Biên soạn từ nguồn"
+                    ? "Chuẩn bị từ nguồn"
                     : run.source_first
-                      ? "Biên soạn nhanh từ nguồn"
+                      ? "Chuẩn bị nhanh từ nguồn"
                       : run.ai_supplement
-                        ? "Biên soạn nhanh + AI bổ sung"
-                        : "AI Compiler"}
+                        ? "Chuẩn bị nhanh + Bổ sung bằng AI"
+                        : "Tự động"}
                 </span>
               )}
-            </div>
-
-            {!run.source_first && (
-              <div>
-                Mô hình:{" "}
-                <span className="font-mono text-foreground">
-                  {run.provider_id || "Mặc định workspace"}
-                </span>
-              </div>
-            )}
-
-            <div>
-              Tokens:{" "}
-              <span className="font-mono text-foreground font-semibold">
-                {run.source_first
-                  ? "0 (không gọi mô hình)"
-                  : run.usage_tokens !== null
-                    ? run.usage_tokens.toLocaleString()
-                    : "Chưa xác định"}
-              </span>
             </div>
 
             <div>
@@ -455,6 +453,39 @@ function CompilationDetailSession({
               </div>
             )}
           </div>
+
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px] text-muted-foreground gap-1"
+              >
+                <ChevronDown className="size-3" />
+                <span>Chi tiết kỹ thuật</span>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 pt-1 text-[11px] text-muted-foreground font-mono">
+                <span>Lần #{run.generation}</span>
+                {!run.source_first && (
+                  <span>
+                    Mô hình: {run.provider_id || "Mặc định workspace"}
+                  </span>
+                )}
+                <span>
+                  Tokens:{" "}
+                  {run.source_first
+                    ? "0 (không gọi mô hình)"
+                    : run.usage_tokens !== null
+                      ? run.usage_tokens.toLocaleString()
+                      : "Chưa xác định"}
+                </span>
+                <span>ID: {run.id}</span>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </CardContent>
       </Card>
 
@@ -464,12 +495,12 @@ function CompilationDetailSession({
           <Loader2 className="size-4 animate-spin text-primary shrink-0" />
           <AlertTitle className="text-xs font-semibold text-foreground">
             {run.status === "queued"
-              ? "Lượt biên soạn đang chờ xếp lịch xử lý..."
+              ? "Lần chuẩn bị nội dung đang chờ xếp lịch xử lý..."
               : isSourcePreview && draft
                 ? "Bản nháp đã có. Đang chuẩn bị đề xuất bổ sung…"
                 : run.source_first || run.selective_supplement
                   ? "Đang kiểm tra nguồn và dựng bản nháp..."
-                  : "Mô hình AI đang tổng hợp và trích xuất bản biên soạn..."}
+                  : "Mô hình AI đang tổng hợp và trích xuất bản đã chuẩn bị..."}
           </AlertTitle>
           <AlertDescription className="text-muted-foreground text-[11px] mt-1">
             Giao diện sẽ tự động cập nhật ngay khi quá trình hoàn tất. Bạn có
@@ -481,13 +512,13 @@ function CompilationDetailSession({
       {(run.status === "failed" || run.status === "uncertain") && (
         <Alert variant="destructive">
           <AlertCircle className="size-4" />
-          <AlertTitle>Lượt biên soạn chưa hoàn tất</AlertTitle>
+          <AlertTitle>Lần chuẩn bị nội dung chưa hoàn tất</AlertTitle>
           <AlertDescription>
             {formatCompilationError(
               run.error_code ?? undefined,
               run.status === "uncertain"
                 ? "Chưa xác định được kết quả xử lý của một hoặc nhiều nhóm."
-                : "Đã xảy ra lỗi trong quá trình xử lý biên soạn.",
+                : "Đã xảy ra lỗi trong quá trình chuẩn bị nội dung.",
             )}
             {run.error_code && (
               <details className="mt-2">
@@ -511,7 +542,7 @@ function CompilationDetailSession({
         <TabsList className="h-9 p-0.5 bg-muted/40 text-xs">
           <TabsTrigger value="draft" className="text-xs h-8 px-4 gap-1.5">
             <BookOpen className="size-3.5" />
-            <span>Bản biên soạn & Dẫn chứng</span>
+            <span>Bản đã chuẩn bị & Dẫn chứng</span>
           </TabsTrigger>
 
           <TabsTrigger value="review" className="text-xs h-8 px-4 gap-1.5">
@@ -522,7 +553,7 @@ function CompilationDetailSession({
           {canEdit && (
             <TabsTrigger value="edit" className="text-xs h-8 px-4 gap-1.5">
               <FileEdit className="size-3.5" />
-              <span>Chỉnh sửa bản biên soạn</span>
+              <span>Chỉnh sửa nội dung</span>
             </TabsTrigger>
           )}
         </TabsList>
@@ -537,7 +568,7 @@ function CompilationDetailSession({
           {!isCompleted && !draft && !draftQuery.isError ? (
             <Card className="rounded-xl p-10 text-center text-xs text-muted-foreground">
               <p>
-                Chưa có bản nháp biên soạn cho lượt này (trạng thái:{" "}
+                Chưa có bản nháp chuẩn bị nội dung cho lần này (trạng thái:{" "}
                 {statusInfo.label}).
               </p>
             </Card>
@@ -549,9 +580,26 @@ function CompilationDetailSession({
             </Card>
           ) : draftQuery.isError || !draft ? (
             <Card className="rounded-xl border-destructive/20 bg-destructive/5 p-4 text-xs">
-              <p className="text-destructive font-semibold">
-                Không thể tải nội dung bản nháp.
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-destructive font-semibold">
+                  Không thể tải nội dung bản nháp.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => void draftQuery.refetch()}
+                  disabled={draftQuery.isFetching}
+                >
+                  <RefreshCw
+                    className={
+                      draftQuery.isFetching ? "size-3 animate-spin" : "size-3"
+                    }
+                  />
+                  <span>Thử lại</span>
+                </Button>
+              </div>
             </Card>
           ) : (
             <div className="space-y-6">

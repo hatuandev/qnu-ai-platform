@@ -18,11 +18,12 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
+import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import {
-  primaryWorkspaceFeatureKeys,
   workspaceFeatureGroups,
   workspaceFeatureKeys,
   workspaceFeatures,
+  workspacePrimaryFeatures,
 } from "@/navigation/config";
 import { useFeatureScope } from "@/navigation/use-feature-scope.tsx";
 import { featureTarget } from "@/navigation/workspace-features";
@@ -38,6 +39,12 @@ export function QnuCommandMenu({
   const scope = useFeatureScope();
   const auth = useV1Auth();
   const { resolvedTheme, setTheme } = useTheme();
+  const role = useCallerWorkspaceRole(
+    auth.isAuthenticated ? (scope.workspaceId ?? "") : "",
+  );
+  const primaryFeatures = workspacePrimaryFeatures(
+    role.isPending ? undefined : role.role,
+  );
   const canManageModels =
     auth.isAuthenticated && hasV1Permission(auth.actor, "ai.models.manage");
 
@@ -47,7 +54,7 @@ export function QnuCommandMenu({
       onOpenChange={onOpenChange}
       title="Chuyển đến chức năng QNU AI"
     >
-      <CommandInput placeholder="Tìm đơn vị, kho tri thức, trợ lý, tác vụ hoặc cấu hình…" />
+      <CommandInput placeholder="Tìm tài liệu, trợ lý, tác vụ hoặc cấu hình…" />
       <CommandList>
         <CommandEmpty>Không tìm thấy chức năng phù hợp.</CommandEmpty>
         {auth.isAuthenticated && (
@@ -65,13 +72,13 @@ export function QnuCommandMenu({
               <LayoutDashboard className="size-4" />
               Tổng quan
             </CommandItem>
-            {primaryWorkspaceFeatureKeys.map((key) => {
+            {primaryFeatures.map((key) => {
               const item = workspaceFeatures[key];
               const Icon = item.icon;
               return (
                 <CommandItem
                   key={`primary-${key}`}
-                  value={item.title}
+                  value={`${item.title} ${item.group}`}
                   onSelect={() => {
                     onOpenChange(false);
                     void router.navigate(featureTarget(key, scope));
@@ -99,7 +106,7 @@ export function QnuCommandMenu({
             const subKeys = workspaceFeatureKeys.filter(
               (key) =>
                 workspaceFeatures[key].group === group &&
-                !primaryWorkspaceFeatureKeys.includes(key),
+                !primaryFeatures.includes(key),
             );
             if (subKeys.length === 0) return null;
             return (

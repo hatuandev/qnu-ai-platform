@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   ExternalLink,
   Eye,
@@ -11,16 +12,25 @@ import {
   Layers,
   Loader2,
   MoreHorizontal,
+  RefreshCw,
+  RotateCcw,
+  Send,
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { ApiProblemError } from "@/app/api/v1";
+import { useV1Auth } from "@/app/auth/v1";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +51,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useCallerWorkspaceRole } from "@/features/workspaces/queries";
 import { formatDateTimeValue } from "@/lib/date-utils";
+import { cn } from "@/lib/utils";
 import { CitationDrawer } from "./citation-drawer";
 import { CompilationDraftSections } from "./compilation-draft-sections";
 import type { CitationDetail } from "./compilation-types";
@@ -61,15 +72,66 @@ import {
   formatPublicationError,
   formatPublicationStatus,
 } from "./publication-schemas";
-import type { DecisionPreviewResponse } from "./publication-types";
+import type {
+  CompiledDocumentStatus,
+  DecisionPreviewResponse,
+} from "./publication-types";
 import { useCollectionQuery } from "./queries";
 import { RetrievalMetadataView } from "./retrieval-metadata-view";
 import { ReviewGateDialog } from "./review-gate-dialog";
+import { useVersionSubmissionsQuery } from "./review-queries";
+import {
+  canCancelSubmission,
+  canRequestSubmissionChanges,
+  canSubmitForReview,
+  isSubmittableVersionStatus,
+  submissionStatusLabel,
+  submissionStatusVariant,
+} from "./review-schemas";
+import { ReviewSubmissionDialog } from "./review-submission-dialog";
+import type { SubmissionPreviewAction } from "./review-types";
 import {
   SearchAvailability,
   useSearchAvailability,
 } from "./search-availability";
 import { SourceTablesView } from "./source-tables-view";
+
+function describeNextStep({
+  status,
+  isReadyForQuery,
+  hasChangesRequested,
+  hasOpenSubmission,
+  canSubmit,
+  canApprove,
+}: {
+  status: CompiledDocumentStatus;
+  isReadyForQuery: boolean;
+  hasChangesRequested: boolean;
+  hasOpenSubmission: boolean;
+  canSubmit: boolean;
+  canApprove: boolean;
+}): string {
+  if (hasChangesRequested) {
+    return "Người duyệt đã yêu cầu sửa. Chuẩn bị một phiên bản mới từ nội dung đã điều chỉnh rồi gửi duyệt lại; phiên bản hiện tại giữ nguyên lịch sử.";
+  }
+  if (hasOpenSubmission) {
+    return "Yêu cầu duyệt đang chờ người duyệt xem xét. Có thể rút yêu cầu nếu cần chỉnh sửa thêm.";
+  }
+  switch (status) {
+    case "draft":
+      return canSubmit && !canApprove
+        ? 'Chọn "Gửi duyệt" để chuyển phiên bản cho người duyệt. Sau khi được duyệt, quản trị đơn vị sẽ xuất bản.'
+        : 'Chọn "Duyệt phiên bản" sau khi hoàn tất rà soát. Có thể bỏ qua rà soát bằng thao tác phụ trong menu "⋯". Sau khi duyệt, có thể xuất bản.';
+    case "approved":
+      return 'Phiên bản đã được duyệt. Chọn "Xuất bản" để phát hành chính thức cho trợ lý AI.';
+    case "published":
+      return isReadyForQuery
+        ? "Đã xuất bản và sẵn sàng tra cứu có trích dẫn."
+        : "Đang đồng bộ cho trợ lý AI. Trạng thái bên dưới sẽ báo khi sẵn sàng.";
+    default:
+      return "Phiên bản này đã bị thay thế hoặc thu hồi. Có thể duyệt lại nếu cần khôi phục.";
+  }
+}
 
 export function CompiledVersionDetailPage({
   workspaceId,
@@ -83,6 +145,7 @@ export function CompiledVersionDetailPage({
   versionId: string;
 }) {
   const { role, isPending: rolePending } = useCallerWorkspaceRole(workspaceId);
+  const { actor } = useV1Auth();
 
   const canApprove = !rolePending && canApproveCompiledVersion(role);
   const canPublish = !rolePending && canPublishCompiledVersion(role);
@@ -112,6 +175,12 @@ export function CompiledVersionDetailPage({
     documentId,
     versionId,
   );
+  const submissionsQuery = useVersionSubmissionsQuery(
+    workspaceId,
+    collectionId,
+    documentId,
+    versionId,
+  );
 
   const previewMutation = useDecisionPreviewMutation(
     workspaceId,
@@ -133,6 +202,10 @@ export function CompiledVersionDetailPage({
   const [quickReason, setQuickReason] = useState("");
   const [confirmedSkip, setConfirmedSkip] = useState(false);
   const [quickActionError, setQuickActionError] = useState<string | null>(null);
+
+  // Review handoff dialog (submit / request changes / cancel)
+  const [submissionAction, setSubmissionAction] =
+    useState<SubmissionPreviewAction | null>(null);
 
   // Citation Drawer
   const [selectedCitation, setSelectedCitation] = useState<{
@@ -184,13 +257,13 @@ export function CompiledVersionDetailPage({
             params={{ workspaceId, collectionId, documentId }}
           >
             <ArrowLeft className="size-3.5" />
-            <span>Quay lại tài liệu biên soạn</span>
+            <span>Quay lại tài liệu xuất bản</span>
           </Link>
         </Button>
         <Card className="rounded-xl border-destructive/20 bg-destructive/5 p-5 text-xs space-y-2">
           <div className="flex items-center gap-2 text-destructive font-semibold">
             <AlertCircle className="size-4 shrink-0" />
-            <span>Không tìm thấy phiên bản biên soạn</span>
+            <span>Không tìm thấy phiên bản tài liệu</span>
           </div>
           <p className="text-muted-foreground">
             Phiên bản không tồn tại hoặc bạn không có quyền truy cập.
@@ -214,6 +287,33 @@ export function CompiledVersionDetailPage({
 
   const canPerformWithdraw =
     canWithdraw && (ver.status === "approved" || ver.status === "published");
+
+  const submissions = submissionsQuery.data?.items ?? [];
+  const openSubmission = submissions.find((entry) => entry.is_open) ?? null;
+  const latestSubmission = submissions[0] ?? null;
+  const hasChangesRequested =
+    latestSubmission?.status === "changes_requested" &&
+    openSubmission?.id !== latestSubmission.id;
+  const canPerformSubmit =
+    !submissionsQuery.isPending &&
+    canSubmitForReview(role) &&
+    !rolePending &&
+    isSubmittableVersionStatus(ver.status) &&
+    !openSubmission &&
+    !hasChangesRequested;
+  const canPerformRequestChanges =
+    !submissionsQuery.isPending &&
+    canRequestSubmissionChanges(role) &&
+    !rolePending &&
+    openSubmission?.status === "pending";
+  const canPerformCancel =
+    !submissionsQuery.isPending &&
+    openSubmission?.status === "pending" &&
+    canCancelSubmission({
+      role,
+      actorRef: actor?.actor_id,
+      submittedBy: openSubmission?.submitted_by,
+    });
 
   const handleOpenCitation = (citationId: string) => {
     const detail = draft?.citations?.[citationId] ?? null;
@@ -243,7 +343,7 @@ export function CompiledVersionDetailPage({
       (!confirmedSkip || quickReason.trim().length < 10)
     ) {
       setQuickActionError(
-        "Xác nhận bỏ qua review và nhập lý do ít nhất 10 ký tự.",
+        "Xác nhận bỏ qua rà soát và nhập lý do ít nhất 10 ký tự.",
       );
       return;
     }
@@ -346,64 +446,65 @@ export function CompiledVersionDetailPage({
                   className={`text-xs ${statusInfo.badgeClass}`}
                 >
                   {ver.status === "published"
-                    ? "Đã phát hành"
+                    ? "Đã xuất bản"
                     : statusInfo.label}
                 </Badge>
                 {skippedReview && (
-                  <Badge variant="warning">Chưa qua review</Badge>
+                  <Badge variant="warning">Chưa qua rà soát</Badge>
+                )}
+                {openSubmission?.status === "pending" && (
+                  <Badge variant="info">Chờ người duyệt</Badge>
+                )}
+                {hasChangesRequested && (
+                  <Badge variant="warning">Đã yêu cầu sửa</Badge>
                 )}
               </div>
 
-              <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono flex-wrap">
-                <span>ID: {ver.id}</span>
-                <span>•</span>
-                <Link
-                  to="/workspaces/$workspaceId/collections/$collectionId/compilations/$runId"
-                  params={{
-                    workspaceId,
-                    collectionId,
-                    runId: ver.compilation_run_id,
-                  }}
-                  className="text-primary hover:underline inline-flex items-center gap-1"
-                >
-                  <span>Compiler Run: {ver.compilation_run_id}</span>
-                  <ExternalLink className="size-3" />
-                </Link>
+              <div className="text-xs text-muted-foreground">
+                Tạo bởi{" "}
+                <span className="font-medium text-foreground">
+                  {ver.created_by}
+                </span>{" "}
+                vào {formatDateTimeValue(ver.created_at)}
               </div>
             </div>
 
-            {/* Lifecycle Action Buttons */}
+            {/* Lifecycle Action Buttons: one primary CTA, the rest in ⋯ */}
             <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {canPerformSubmit && !canApprove && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-8 text-xs gap-1.5"
+                  onClick={() => setSubmissionAction("submit")}
+                >
+                  <Send className="size-3.5" />
+                  <span>Gửi duyệt</span>
+                </Button>
+              )}
+
+              {canPerformRequestChanges && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs gap-1.5"
+                  onClick={() => setSubmissionAction("request_changes")}
+                >
+                  <RotateCcw className="size-3.5" />
+                  <span>Yêu cầu sửa</span>
+                </Button>
+              )}
+
               {canPerformApprove && (
                 <Button
                   size="sm"
-                  variant="secondary"
+                  variant="default"
                   className="h-8 text-xs gap-1.5"
                   onClick={() => setIsReviewGateOpen(true)}
                 >
                   <ShieldCheck className="size-3.5" />
-                  <span>Duyệt phiên bản (Approve)</span>
+                  <span>Duyệt phiên bản</span>
                 </Button>
-              )}
-              {canPerformApprove && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Thao tác khác"
-                    >
-                      <MoreHorizontal className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onSelect={() => handleOpenQuickAction("approve")}
-                    >
-                      Duyệt nhanh, bỏ qua review
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               )}
 
               {canPerformPublish && (
@@ -414,20 +515,61 @@ export function CompiledVersionDetailPage({
                   onClick={() => handleOpenQuickAction("publish")}
                 >
                   <CheckCircle2 className="size-3.5" />
-                  <span>Xuất bản (Publish)</span>
+                  <span>Xuất bản</span>
                 </Button>
               )}
 
-              {canPerformWithdraw && (
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="h-8 text-xs gap-1.5"
-                  onClick={() => handleOpenQuickAction("withdraw")}
-                >
-                  <ShieldAlert className="size-3.5" />
-                  <span>Thu hồi (Withdraw)</span>
-                </Button>
+              {(canPerformApprove ||
+                canPerformWithdraw ||
+                (canPerformSubmit && canApprove) ||
+                canPerformCancel) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label="Thao tác khác"
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-60 text-xs">
+                    {canPerformSubmit && canApprove && (
+                      <DropdownMenuItem
+                        onSelect={() => setSubmissionAction("submit")}
+                      >
+                        <Send className="size-3.5 text-muted-foreground" />
+                        <span>Gửi duyệt phiên bản</span>
+                      </DropdownMenuItem>
+                    )}
+                    {canPerformCancel && (
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() => setSubmissionAction("cancel")}
+                      >
+                        <RotateCcw className="size-3.5" />
+                        <span>Rút yêu cầu duyệt</span>
+                      </DropdownMenuItem>
+                    )}
+                    {canPerformApprove && (
+                      <DropdownMenuItem
+                        onSelect={() => handleOpenQuickAction("approve")}
+                      >
+                        <ShieldCheck className="size-3.5 text-muted-foreground" />
+                        <span>Duyệt nhanh, bỏ qua rà soát</span>
+                      </DropdownMenuItem>
+                    )}
+                    {canPerformWithdraw && (
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() => handleOpenQuickAction("withdraw")}
+                      >
+                        <ShieldAlert className="size-3.5" />
+                        <span>Thu hồi phiên bản</span>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           </div>
@@ -438,50 +580,118 @@ export function CompiledVersionDetailPage({
 
           {/* Điều kiện chuyển bước rõ ràng */}
           <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            <strong className="text-foreground">Điều kiện chuyển bước:</strong>{" "}
-            {ver.status === "draft"
-              ? 'Duyệt với báo cáo review, hoặc chọn "Duyệt nhanh, bỏ qua review" trong menu. Sau khi xác nhận duyệt, có thể xuất bản.'
-              : ver.status === "approved"
-                ? 'Phiên bản đã được duyệt. Bấm "Xuất bản (Publish)" để đưa phiên bản này thành bản phát hành chính thức của tài liệu.'
-                : ver.status === "published"
-                  ? isReadyForQA
-                    ? "Đã phát hành và đã có trong chỉ mục tìm kiếm hiện hành — Sẵn sàng phục vụ hỏi đáp có trích dẫn."
-                    : "Hệ thống đang tự cập nhật tài liệu cho trợ lý AI. Trạng thái bên dưới sẽ báo khi sẵn sàng."
-                  : "Phiên bản này đã bị thay thế hoặc thu hồi. Có thể duyệt lại nếu cần khôi phục."}
+            <strong className="text-foreground">Bước tiếp theo:</strong>{" "}
+            {describeNextStep({
+              status: ver.status,
+              isReadyForQuery: isReadyForQA,
+              hasChangesRequested,
+              hasOpenSubmission: openSubmission?.status === "pending",
+              canSubmit:
+                canSubmitForReview(role) &&
+                !rolePending &&
+                isSubmittableVersionStatus(ver.status) &&
+                !hasChangesRequested,
+              canApprove,
+            })}
           </div>
 
-          {/* Hashes & Metadata Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-3 border-t text-[11px] text-muted-foreground font-mono">
-            <div>
-              <span className="text-muted-foreground/80 font-sans">
-                State version:
-              </span>{" "}
-              <span className="font-semibold text-foreground">
-                #{ver.state_version}
-              </span>
+          {latestSubmission && (
+            <div className="rounded-lg border border-border/70 px-3 py-2 text-xs space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant={submissionStatusVariant(latestSubmission.status)}
+                >
+                  {submissionStatusLabel(latestSubmission.status)}
+                </Badge>
+                <span className="text-muted-foreground">
+                  Gửi bởi{" "}
+                  <span className="font-medium text-foreground">
+                    {latestSubmission.submitted_by}
+                  </span>{" "}
+                  lúc {formatDateTimeValue(latestSubmission.submitted_at)}
+                </span>
+              </div>
+              {latestSubmission.note && (
+                <p className="text-muted-foreground">
+                  Ghi chú: {latestSubmission.note}
+                </p>
+              )}
+              {latestSubmission.close_reason && (
+                <p className="text-muted-foreground">
+                  Kết quả: {latestSubmission.close_reason}
+                </p>
+              )}
+              {latestSubmission.status === "changes_requested" && (
+                <p className="text-muted-foreground">
+                  Tạo phiên bản mới từ nội dung đã điều chỉnh rồi gửi duyệt lại.
+                  Nội dung phiên bản hiện tại không bị thay đổi.
+                </p>
+              )}
+              {latestSubmission.status === "pending" && (
+                <p className="text-muted-foreground">
+                  Đang chờ người duyệt xem xét. Trạng thái sẽ cập nhật khi có
+                  quyết định.
+                </p>
+              )}
             </div>
-            <div
-              className="truncate"
-              title={`bundle_sha256: ${ver.bundle_sha256}`}
-            >
-              <span className="font-sans">Bundle:</span>{" "}
-              {ver.bundle_sha256.slice(0, 16)}...
-            </div>
-            <div
-              className="truncate"
-              title={`draft_sha256: ${ver.draft_sha256}`}
-            >
-              <span className="font-sans">Draft:</span>{" "}
-              {ver.draft_sha256.slice(0, 16)}...
-            </div>
-            <div className="text-right truncate font-sans">
-              Tạo bởi{" "}
-              <span className="font-mono text-foreground">
-                {ver.created_by}
-              </span>{" "}
-              vào {formatDateTimeValue(ver.created_at)}
-            </div>
-          </div>
+          )}
+
+          {/* Technical details stay available but collapsed by default */}
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px] text-muted-foreground gap-1"
+              >
+                <ChevronDown className="size-3" />
+                <span>Chi tiết kỹ thuật</span>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 text-[11px] text-muted-foreground font-mono">
+                <div className="truncate">
+                  <span className="text-muted-foreground/80 font-sans">
+                    ID phiên bản:
+                  </span>{" "}
+                  <span className="text-foreground">{ver.id}</span>
+                </div>
+                <div>
+                  <span className="font-sans">State version:</span>{" "}
+                  <span className="font-semibold text-foreground">
+                    #{ver.state_version}
+                  </span>
+                </div>
+                <div
+                  className="truncate"
+                  title={`bundle_sha256: ${ver.bundle_sha256}`}
+                >
+                  <span className="font-sans">Bundle:</span>{" "}
+                  {ver.bundle_sha256.slice(0, 16)}...
+                </div>
+                <div
+                  className="truncate"
+                  title={`draft_sha256: ${ver.draft_sha256}`}
+                >
+                  <span className="font-sans">Draft:</span>{" "}
+                  {ver.draft_sha256.slice(0, 16)}...
+                </div>
+                <Link
+                  to="/workspaces/$workspaceId/collections/$collectionId/compilations/$runId"
+                  params={{
+                    workspaceId,
+                    collectionId,
+                    runId: ver.compilation_run_id,
+                  }}
+                  className="text-primary hover:underline inline-flex items-center gap-1 font-sans"
+                >
+                  <span>Lần chuẩn bị nội dung: {ver.compilation_run_id}</span>
+                  <ExternalLink className="size-3" />
+                </Link>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </CardContent>
       </Card>
 
@@ -521,10 +731,26 @@ export function CompiledVersionDetailPage({
               <Skeleton className="h-40 w-full" />
             </Card>
           ) : draftQuery.isError || !draft ? (
-            <Card className="rounded-xl border-destructive/20 bg-destructive/5 p-4 text-xs">
+            <Card className="rounded-xl border-destructive/20 bg-destructive/5 p-4 text-xs space-y-2">
               <p className="text-destructive font-semibold">
                 Không thể tải nội dung bản nháp của phiên bản này.
               </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1.5"
+                disabled={draftQuery.isFetching}
+                onClick={() => void draftQuery.refetch()}
+              >
+                <RefreshCw
+                  className={cn(
+                    "size-3",
+                    draftQuery.isFetching && "animate-spin",
+                  )}
+                />
+                <span>Thử lại</span>
+              </Button>
             </Card>
           ) : (
             <div className="space-y-6">
@@ -644,7 +870,7 @@ export function CompiledVersionDetailPage({
                   {quickAction === "withdraw"
                     ? "Nhập lý do thu hồi để chuẩn bị bản xem trước quyết định."
                     : quickAction === "approve"
-                      ? "Bỏ lần kiểm tra của model review. Quyết định này được ghi rõ là chưa qua review."
+                      ? "Bỏ qua bước rà soát. Quyết định này được ghi rõ là chưa qua rà soát."
                       : "Nhập lý do xuất bản để chuẩn bị bản xem trước quyết định."}
                 </DialogDescription>
               </div>
@@ -660,8 +886,8 @@ export function CompiledVersionDetailPage({
                   onCheckedChange={(value) => setConfirmedSkip(value === true)}
                 />
                 <Label htmlFor="skip-review">
-                  Tôi xác nhận bỏ qua review cho bản này và chịu trách nhiệm
-                  quyết định xuất bản.
+                  Tôi xác nhận bỏ qua rà soát cho bản này và chịu trách nhiệm
+                  quyết định duyệt.
                 </Label>
               </div>
             )}
@@ -754,6 +980,26 @@ export function CompiledVersionDetailPage({
           setActivePreview(null);
           void versionQuery.refetch();
           void documentQuery.refetch();
+        }}
+      />
+
+      {/* Review handoff: submit, request changes or withdraw an open request */}
+      <ReviewSubmissionDialog
+        key={submissionAction ?? "closed"}
+        workspaceId={workspaceId}
+        collectionId={collectionId}
+        documentId={documentId}
+        versionId={versionId}
+        versionNo={ver.version_no}
+        action={submissionAction}
+        submission={openSubmission}
+        isOpen={Boolean(submissionAction)}
+        onClose={() => setSubmissionAction(null)}
+        onSuccess={() => {
+          void submissionsQuery.refetch();
+          void versionQuery.refetch();
+          void documentQuery.refetch();
+          void historyQuery.refetch();
         }}
       />
 

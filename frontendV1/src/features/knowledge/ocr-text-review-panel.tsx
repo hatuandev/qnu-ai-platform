@@ -638,11 +638,11 @@ function OcrTextReviewSession({
                 size="sm"
                 variant="outline"
                 className="h-8 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
-                title="Sử dụng lượt OCR và phiên bản văn bản đã lưu để tạo bản biên soạn"
+                title="Sử dụng lượt đọc và phiên bản văn bản đã lưu để chuẩn bị nội dung"
                 onClick={() => {
                   if (pendingChanges.length > 0) {
                     toast.warning(
-                      "Bạn đang có thay đổi nháp chưa lưu. Trình biên soạn chỉ dùng phiên bản đã lưu trên máy chủ — vui lòng bấm Lưu trước khi dùng để biên soạn.",
+                      "Bạn đang có thay đổi nháp chưa lưu. Quá trình chuẩn bị nội dung chỉ dùng phiên bản đã lưu trên máy chủ — vui lòng bấm Lưu trước khi tiếp tục.",
                     );
                     return;
                   }
@@ -662,7 +662,7 @@ function OcrTextReviewSession({
                 }}
               >
                 <BookOpen className="size-3.5" />
-                <span>Dùng để biên soạn</span>
+                <span>Dùng để chuẩn bị nội dung</span>
               </Button>
             )}
           </div>

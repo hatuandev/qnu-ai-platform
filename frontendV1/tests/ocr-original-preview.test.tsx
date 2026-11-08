@@ -122,6 +122,45 @@ vi.mock("@/features/knowledge/ocr-requests", () => ({
     mocks.readRenderedPdfBlob(...args),
 }));
 
+vi.mock("@/features/knowledge/summary-queries", () => ({
+  hasActiveSourceTask: () => false,
+  useSourceSummaryQuery: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}));
+
+vi.mock("@/features/knowledge/preparation-queries", () => ({
+  preparationKeys: {
+    root: () => ["preparation"],
+    list: () => ["preparation", "list"],
+    intent: () => ["preparation", "intent"],
+  },
+  usePreparationIntentsQuery: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  usePreparationIntentQuery: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useCreatePreparationIntentMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useCancelPreparationIntentMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+}));
+
 vi.mock("@/features/knowledge/ocr-queries", () => ({
   useProcessingRunsQuery: () => ({
     data: {
@@ -931,7 +970,7 @@ describe("Original File Preview (Xem tệp gốc) & Two-Pane OCR Comparison", ()
 
     // Failed extraction leaves the original directly available.
     expect(
-      screen.getAllByText(/Bóc tách chưa thành công/i).length,
+      screen.getAllByText(/Đọc nội dung chưa thành công/i).length,
     ).toBeGreaterThan(0);
     expect(screen.queryByTestId("left-pane-mode-ocr")).toBeNull();
 

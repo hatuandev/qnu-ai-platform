@@ -135,6 +135,7 @@ export type TurnResponse = {
   result: AnswerResponse | DirectReply | null;
   rewrite_trace: Record<string, unknown> | null;
   source_status: SourceStatus;
+  source_status_reason: string | null;
   created_at: string;
   finished_at: string | null;
 };

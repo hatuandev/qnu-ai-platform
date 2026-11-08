@@ -699,7 +699,7 @@ export function OcrComparisonView({
                 {activePageInfo.status === "blank"
                   ? "Trang trắng (không có chữ)"
                   : activePageInfo.status === "completed"
-                    ? "Đã bóc tách"
+                    ? "Đã đọc nội dung"
                     : activePageInfo.status === "in_flight" ||
                         activePageInfo.status === "pending"
                       ? "Đang xử lý…"
@@ -1098,12 +1098,13 @@ export function OcrComparisonView({
                   <div className="flex flex-col items-center gap-2.5 text-xs text-muted-foreground py-12 text-center max-w-xs">
                     <ScanSearch className="size-7 text-muted-foreground/60" />
                     <span className="font-medium text-foreground">
-                      Chưa có lượt bóc tách OCR
+                      Chưa có lượt đọc nội dung
                     </span>
                     <span className="text-[11px] text-muted-foreground">
-                      Tài liệu chưa được bóc tách. Bạn có thể đọc nội dung ở tab{" "}
+                      Tài liệu chưa được đọc nội dung. Bạn có thể đọc trực tiếp
+                      ở tab{" "}
                       <strong className="text-foreground">Xem tệp gốc</strong>{" "}
-                      hoặc bấm bắt đầu bóc tách.
+                      hoặc bấm bắt đầu đọc nội dung.
                     </span>
                     <Button
                       type="button"
@@ -1125,7 +1126,7 @@ export function OcrComparisonView({
                   <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground py-12 text-center max-w-xs">
                     <Loader2 className="size-6 animate-spin text-primary" />
                     <span className="font-medium text-foreground">
-                      Đang bóc tách và tạo bản xem trước...
+                      Đang đọc nội dung và tạo bản xem trước...
                     </span>
                     <span className="text-[11px] text-muted-foreground">
                       Hệ thống đang chuyển đổi tài liệu và kết xuất các trang.
@@ -1229,7 +1230,7 @@ export function OcrComparisonView({
                       activePageInfo?.status === "pending"
                         ? "Trang đang chờ kết xuất..."
                         : run.status === "failed" || run.status === "uncertain"
-                          ? "Lượt bóc tách chưa thành công nên chưa có ảnh đối chiếu OCR."
+                          ? "Lượt đọc nội dung chưa thành công nên chưa có ảnh đối chiếu."
                           : "Chưa có ảnh cho trang này."}
                     </span>
                     <Button
@@ -1296,7 +1297,7 @@ export function OcrComparisonView({
           <div className="h-12 w-1 rounded-full bg-border group-hover:bg-primary/60 group-focus-visible:bg-primary transition-colors" />
         </Separator>
 
-        {/* CỘT PHẢI: Văn bản bóc tách & Gợi ý chính tả */}
+        {/* CỘT PHẢI: Văn bản đã đọc & Gợi ý chính tả */}
         <Panel
           id="ocr-content-panel"
           defaultSize="50%"

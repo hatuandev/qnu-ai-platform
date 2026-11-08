@@ -295,7 +295,7 @@ test("formatDecisionAction returns proper Vietnamese action texts", () => {
 test("formatPublicationError handles RFC 7807 error codes properly", () => {
   assert.match(
     formatPublicationError("compiled_document_key_exists"),
-    /Document key đã tồn tại/,
+    /Mã tài liệu đã tồn tại/,
   );
   assert.match(
     formatPublicationError("compiled_run_registered"),
@@ -303,7 +303,7 @@ test("formatPublicationError handles RFC 7807 error codes properly", () => {
   );
   assert.match(
     formatPublicationError("publication_review_required"),
-    /Cần có lượt rà soát/,
+    /Cần hoàn tất rà soát/,
   );
   assert.match(
     formatPublicationError("publication_approval_required"),
@@ -588,7 +588,7 @@ test("createDecisionPreview, draft, review-gate and history transport properly",
   assert.match(requests[0].url, /decision-preview$/);
 
   await getCompiledVersionDraft(client, "ws_1", "col_1", "cdoc_1", "cver_1");
-  assert.match(requests[1].url, /draft$/);
+  assert.match(requests[1].url, /\/draft(\?|$)/);
 
   await getCompiledVersionReviewGate(
     client,

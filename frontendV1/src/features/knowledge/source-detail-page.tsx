@@ -76,6 +76,8 @@ import {
   canCreateOrEditCompilation,
   canManageKnowledge,
 } from "@/features/knowledge/permissions";
+import { PreparationDialog } from "@/features/knowledge/preparation-dialog";
+import { PreparationStatusBar } from "@/features/knowledge/preparation-status-bar";
 import { ProcessingProgress } from "@/features/knowledge/processing-progress";
 import {
   useCollectionQuery,
@@ -85,6 +87,7 @@ import {
 import { downloadRevisionContent } from "@/features/knowledge/requests";
 import { RevisionUploadDialog } from "@/features/knowledge/revision-upload-dialog";
 import { formatProcessingStatus } from "@/features/knowledge/schemas";
+import { SourceLineagePanel } from "@/features/knowledge/source-lineage-panel";
 import { SourceRenameDialog } from "@/features/knowledge/source-rename-dialog";
 import { SourceStudioHeader } from "@/features/knowledge/source-studio-header";
 import { SpellingResultPanel } from "@/features/knowledge/spelling-result-panel";
@@ -203,6 +206,7 @@ function SourceDetailSession({
   const [spellCheckConfigOpen, setSpellCheckConfigOpen] = useState(false);
   const [wholeDocumentCheck, setWholeDocumentCheck] = useState(true);
   const [compilationDialogOpen, setCompilationDialogOpen] = useState(false);
+  const [preparationDialogOpen, setPreparationDialogOpen] = useState(false);
   const [lifecycleOp, setLifecycleOp] = useState<LifecycleOperation | null>(
     null,
   );
@@ -394,8 +398,8 @@ function SourceDetailSession({
 
       toast.success(
         res.created
-          ? "Đã gửi yêu cầu bóc tách tài liệu."
-          : "Đã mở tiến trình bóc tách hiện có.",
+          ? "Đã gửi yêu cầu đọc nội dung tài liệu."
+          : "Đã mở tiến trình đọc nội dung hiện có.",
       );
       void runsQuery.refetch();
       void sourceQuery.refetch();
@@ -404,7 +408,7 @@ function SourceDetailSession({
       toast.error(
         err instanceof ApiProblemError
           ? err.message
-          : "Không thể bắt đầu bóc tách tài liệu.",
+          : "Không thể bắt đầu đọc nội dung tài liệu.",
       );
     }
   };
@@ -693,6 +697,15 @@ function SourceDetailSession({
     }
   };
 
+  // Preparation and compilation only read the saved server text, never the draft.
+  const blockIfUnsavedDraft = (): boolean => {
+    if (!hasUnsavedDraft) return false;
+    toast.warning(
+      `Bạn đang có ${draftCount} đoạn sửa nháp chưa lưu. Quá trình chuẩn bị nội dung chỉ sử dụng phiên bản đã lưu trên máy chủ (v${doc?.version ?? 0}). Vui lòng bấm "Lưu thay đổi" trước khi tiếp tục.`,
+    );
+    return true;
+  };
+
   // Status computation
   const activeProcessing = activeRun ?? source?.processing;
   const statusInfo = formatProcessingStatus(activeProcessing);
@@ -795,7 +808,6 @@ function SourceDetailSession({
         baseMovedOn={baseMovedOn}
         canManage={canManage}
         canCompile={canCompile}
-        selectedRunId={selectedRunId}
         downloadingType={downloadingType}
         isDocxFile={isDocxFile}
         isExtractionPending={requestRunMutation.isPending}
@@ -813,13 +825,12 @@ function SourceDetailSession({
         onStartExtraction={() => void handleStartExtraction(false)}
         onOpenSpellCheck={handleOpenSpellCheckConfig}
         onOpenSaveModal={() => setSaveModalOpen(true)}
-        onOpenCompileDialog={() => {
-          if (hasUnsavedDraft) {
-            toast.warning(
-              `Bạn đang có ${draftCount} đoạn sửa nháp chưa lưu. Trình biên soạn chỉ sử dụng phiên bản đã lưu trên máy chủ (v${doc?.version ?? 0}). Vui lòng bấm "Lưu thay đổi" trước khi biên soạn.`,
-            );
-            return;
-          }
+        onOpenPreparation={() => {
+          if (blockIfUnsavedDraft()) return;
+          setPreparationDialogOpen(true);
+        }}
+        onOpenAdvancedCompile={() => {
+          if (blockIfUnsavedDraft()) return;
           setCompilationDialogOpen(true);
         }}
         onDownload={(fmt) => void handleDownload(fmt)}
@@ -830,6 +841,22 @@ function SourceDetailSession({
         canArchive={canLifecycleAction(role, "source", "archive")}
         canDelete={canLifecycleAction(role, "source", "delete")}
       />
+
+      <PreparationStatusBar
+        workspaceId={workspaceId}
+        collectionId={collectionId}
+        sourceId={sourceId}
+        onOpen={() => setPreparationDialogOpen(true)}
+      />
+
+      {activeRevisionId ? (
+        <SourceLineagePanel
+          workspaceId={workspaceId}
+          collectionId={collectionId}
+          sourceId={sourceId}
+          revisionId={activeRevisionId}
+        />
+      ) : null}
 
       {/* Cảnh báo khi phiên bản trên máy chủ đã tiến lên sau khi tạo nháp */}
       {baseMovedOn && doc ? (
@@ -914,7 +941,7 @@ function SourceDetailSession({
         </Alert>
       ) : null}
 
-      {/* Thanh tiến độ dùng chung khi đang bóc tách / chờ xử lý */}
+      {/* Thanh tiến độ dùng chung khi đang đọc nội dung / chờ xử lý */}
       {activeProcessing &&
       (activeProcessing.status === "queued" ||
         activeProcessing.status === "running" ||
@@ -945,11 +972,11 @@ function SourceDetailSession({
         />
       ) : null}
 
-      {/* Cảnh báo lỗi bóc tách nếu có */}
+      {/* Cảnh báo lỗi đọc nội dung nếu có */}
       {activeRun && ["failed", "uncertain"].includes(activeRun.status) && (
         <Alert variant="destructive" role="alert">
           <AlertCircle className="size-4" />
-          <AlertTitle>Bóc tách chưa thành công</AlertTitle>
+          <AlertTitle>Đọc nội dung chưa thành công</AlertTitle>
           <AlertDescription className="text-xs mt-1 space-y-1">
             <p>
               {formatOcrError(activeRun.error_code, activeRun.error_detail)}
@@ -1046,10 +1073,10 @@ function SourceDetailSession({
                 Tài liệu đã được lưu trữ an toàn
               </h3>
               <p className="text-xs text-muted-foreground">
-                Tài liệu này chưa được bóc tách. Bạn có thể đọc trực tiếp ở chế
-                độ <strong className="text-foreground">Xem tệp gốc</strong> bên
-                trái, hoặc nhấn &ldquo;Bắt đầu bóc tách&rdquo; để trích xuất văn
-                bản, cấu trúc bảng và ảnh đối chiếu.
+                Tài liệu này chưa được đọc nội dung. Bạn có thể đọc trực tiếp ở
+                chế độ <strong className="text-foreground">Xem tệp gốc</strong>{" "}
+                bên trái, hoặc nhấn &ldquo;Bắt đầu đọc nội dung&rdquo; để trích
+                xuất văn bản, cấu trúc bảng và ảnh đối chiếu.
               </p>
             </div>
             {canManage ? (
@@ -1064,7 +1091,7 @@ function SourceDetailSession({
                 ) : (
                   <Play className="size-3.5" />
                 )}
-                <span>Bắt đầu bóc tách ngay</span>
+                <span>Đọc nội dung ngay</span>
               </Button>
             ) : null}
           </div>
@@ -1125,18 +1152,18 @@ function SourceDetailSession({
       />
 
       {/* 3. MODALS & DIALOGS */}
-      {/* Modal xác nhận Bóc tách lại */}
+      {/* Modal xác nhận đọc lại nội dung */}
       <Dialog open={reRunConfirmOpen} onOpenChange={setReRunConfirmOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold flex items-center gap-2">
               <RotateCcw className="size-4 text-primary" />
-              <span>Xác nhận bóc tách lại</span>
+              <span>Xác nhận đọc lại nội dung</span>
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Thao tác này sẽ tạo một lượt bóc tách mới cho phiên bản tài liệu
-              hiện hành. Kết quả và bằng chứng của các lượt trước được bảo toàn
-              bất biến trong lịch sử.
+              Thao tác này sẽ tạo một lượt đọc nội dung mới cho phiên bản tài
+              liệu hiện hành. Kết quả và bằng chứng của các lượt trước được bảo
+              toàn bất biến trong lịch sử.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1228,24 +1255,45 @@ function SourceDetailSession({
         onSuccess={() => void sourceQuery.refetch()}
       />
 
-      {/* Compilation Dialog (từ đúng phiên bản đã lưu) */}
-      {selectedRunId && (
+      {/* Preparation Dialog: server-truth preview, then durable intent status */}
+      {activeRevisionId ? (
+        <PreparationDialog
+          workspaceId={workspaceId}
+          collectionId={collectionId}
+          sourceId={sourceId}
+          sourceTitle={source.title}
+          revisionId={activeRevisionId}
+          revisionNo={activeRevisionNo}
+          revisionSha256={activeRevision?.sha256 ?? ""}
+          savedRunId={doc && selectedRunId ? selectedRunId : null}
+          savedTextVersion={doc ? (selectedVersion ?? doc.version) : 0}
+          isOpen={preparationDialogOpen}
+          onClose={() => setPreparationDialogOpen(false)}
+        />
+      ) : null}
+
+      {/* Advanced multi-document compilation (kept in the ⋯ menu) */}
+      {canCompile ? (
         <CompilationDialog
           isOpen={compilationDialogOpen}
           onClose={() => setCompilationDialogOpen(false)}
           workspaceId={workspaceId}
           collectionId={collectionId}
-          initialRun={{
-            runId: selectedRunId,
-            sourceId,
-            sourceTitle: source.title,
-            revisionId: activeRevisionId,
-            revisionNo: activeRevisionNo,
-            generation: activeRun?.generation ?? 1,
-            textVersion: selectedVersion ?? doc?.version ?? 0,
-          }}
+          initialRun={
+            selectedRunId
+              ? {
+                  runId: selectedRunId,
+                  sourceId,
+                  sourceTitle: source.title,
+                  revisionId: activeRevisionId,
+                  revisionNo: activeRevisionNo,
+                  generation: activeRun?.generation ?? 1,
+                  textVersion: selectedVersion ?? doc?.version ?? 0,
+                }
+              : null
+          }
         />
-      )}
+      ) : null}
     </div>
   );
 }

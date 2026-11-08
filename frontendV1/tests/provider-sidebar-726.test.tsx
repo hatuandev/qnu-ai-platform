@@ -13,6 +13,13 @@ vi.mock("@/app/auth/v1", () => ({
 vi.mock("@/navigation/use-feature-scope.tsx", () => ({
   useFeatureScope: () => ({}),
 }));
+vi.mock("@/features/workspaces/queries", () => ({
+  useCallerWorkspaceRole: () => ({
+    role: { kind: "member", role: "member" },
+    isPending: false,
+    error: null,
+  }),
+}));
 vi.mock("@tanstack/react-router", () => ({
   useRouterState: () => ({ pathname: session.pathname, search: {} }),
   Link: ({

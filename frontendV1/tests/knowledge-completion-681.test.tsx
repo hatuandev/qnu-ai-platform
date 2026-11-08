@@ -310,7 +310,7 @@ test("a failed Compiler page still allows returning to the previous page", async
       onPageChange={change}
     />,
   );
-  await screen.findByText("Không thể tải danh sách lượt biên soạn");
+  await screen.findByText("Không thể tải các lần chuẩn bị nội dung");
   fireEvent.click(screen.getByRole("button", { name: "Trang trước" }));
   expect(change).toHaveBeenCalledWith(2);
   expect(

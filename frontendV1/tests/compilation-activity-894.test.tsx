@@ -165,10 +165,12 @@ test("route changes and tracking a replay preserve one entry; collapse never can
   fireEvent.click(screen.getByText("Theo dõi"));
   expect(screen.getAllByRole("link", { name: run.topic })).toHaveLength(1);
   fireEvent.click(
-    screen.getByRole("button", { name: "Thu gọn tiến độ biên soạn" }),
+    screen.getByRole("button", { name: "Thu gọn tiến độ chuẩn bị nội dung" }),
   );
   expect(screen.queryByRole("link", { name: run.topic })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Mở tiến độ biên soạn" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Mở tiến độ chuẩn bị nội dung" }),
+  );
   expect(screen.getByRole("link", { name: run.topic })).toBeTruthy();
   expect(v1Client.post).not.toHaveBeenCalled();
 });
@@ -177,7 +179,7 @@ test("progress continues while collapsed and stops polling after a terminal resp
   render(<App />);
   await track();
   fireEvent.click(
-    screen.getByRole("button", { name: "Thu gọn tiến độ biên soạn" }),
+    screen.getByRole("button", { name: "Thu gọn tiến độ chuẩn bị nội dung" }),
   );
   vi.mocked(v1Client.get).mockResolvedValue(observed("completed", 4, 4));
   await act(async () => {
@@ -188,8 +190,12 @@ test("progress continues while collapsed and stops polling after a terminal resp
     await vi.advanceTimersByTimeAsync(10000);
   });
   expect(v1Client.get).toHaveBeenCalledTimes(2);
-  fireEvent.click(screen.getByRole("button", { name: "Mở tiến độ biên soạn" }));
-  expect(screen.getByText("Đã biên soạn · Mở để xem và duyệt")).toBeTruthy();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Mở tiến độ chuẩn bị nội dung" }),
+  );
+  expect(
+    screen.getByText("Đã chuẩn bị nội dung · Mở để xem và duyệt"),
+  ).toBeTruthy();
 });
 
 test("closing clears the whole panel without cancelling jobs, and a newly tracked run opens it again", async () => {
@@ -198,18 +204,18 @@ test("closing clears the whole panel without cancelling jobs, and a newly tracke
   fireEvent.click(screen.getByText("Thêm lượt"));
   await waitFor(() => expect(v1Client.get).toHaveBeenCalledTimes(2));
   fireEvent.click(
-    screen.getByRole("button", { name: "Đóng bảng tiến độ biên soạn" }),
+    screen.getByRole("button", { name: "Đóng bảng tiến độ chuẩn bị nội dung" }),
   );
   expect(screen.queryByRole("link", { name: run.topic })).toBeNull();
   expect(screen.queryByRole("link", { name: "Tài liệu khác" })).toBeNull();
   expect(
-    screen.queryByRole("button", { name: "Mở tiến độ biên soạn" }),
+    screen.queryByRole("button", { name: "Mở tiến độ chuẩn bị nội dung" }),
   ).toBeNull();
   expect(v1Client.post).not.toHaveBeenCalled();
   fireEvent.click(screen.getByText("Thêm lượt"));
   expect(screen.getByRole("link", { name: "Tài liệu khác" })).toBeTruthy();
   expect(
-    screen.getByRole("button", { name: "Đóng bảng tiến độ biên soạn" }),
+    screen.getByRole("button", { name: "Đóng bảng tiến độ chuẩn bị nội dung" }),
   ).toBeTruthy();
 });
 
@@ -218,16 +224,20 @@ test("the close control remains available when collapsed or completed", async ()
   render(<App />);
   fireEvent.click(screen.getByText("Theo dõi"));
   await waitFor(() =>
-    expect(screen.getByText("Đã biên soạn · Mở để xem và duyệt")).toBeTruthy(),
+    expect(
+      screen.getByText("Đã chuẩn bị nội dung · Mở để xem và duyệt"),
+    ).toBeTruthy(),
   );
   fireEvent.click(
-    screen.getByRole("button", { name: "Thu gọn tiến độ biên soạn" }),
+    screen.getByRole("button", { name: "Thu gọn tiến độ chuẩn bị nội dung" }),
   );
   fireEvent.click(
-    screen.getByRole("button", { name: "Đóng bảng tiến độ biên soạn" }),
+    screen.getByRole("button", { name: "Đóng bảng tiến độ chuẩn bị nội dung" }),
   );
   expect(
-    screen.queryByRole("button", { name: "Đóng bảng tiến độ biên soạn" }),
+    screen.queryByRole("button", {
+      name: "Đóng bảng tiến độ chuẩn bị nội dung",
+    }),
   ).toBeNull();
   expect(v1Client.post).not.toHaveBeenCalled();
 });
@@ -274,7 +284,7 @@ test("logout, session change or actor change clears the panel before another act
   auth.isAuthenticated = false;
   view.rerender(<App />);
   expect(
-    screen.queryByRole("button", { name: "Thu gọn tiến độ biên soạn" }),
+    screen.queryByRole("button", { name: "Thu gọn tiến độ chuẩn bị nội dung" }),
   ).toBeNull();
 });
 test.each([403, 404])(
@@ -291,7 +301,9 @@ test.each([403, 404])(
     fireEvent.click(screen.getByText("Theo dõi"));
     await waitFor(() =>
       expect(
-        screen.queryByRole("button", { name: "Thu gọn tiến độ biên soạn" }),
+        screen.queryByRole("button", {
+          name: "Thu gọn tiến độ chuẩn bị nội dung",
+        }),
       ).toBeNull(),
     );
     expect(v1Client.post).not.toHaveBeenCalled();
@@ -339,7 +351,9 @@ test.each(["failed", "uncertain", "cancelled"])(
     await waitFor(() =>
       expect(screen.getByText("Bản nháp còn phần chưa hoàn tất.")).toBeTruthy(),
     );
-    expect(screen.queryByText("Đã biên soạn · Mở để xem và duyệt")).toBeNull();
+    expect(
+      screen.queryByText("Đã chuẩn bị nội dung · Mở để xem và duyệt"),
+    ).toBeNull();
     expect(v1Client.post).not.toHaveBeenCalled();
   },
 );

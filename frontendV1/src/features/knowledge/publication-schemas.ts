@@ -10,11 +10,11 @@ export const SHA256_HEX_REGEX = /^[0-9a-f]{64}$/;
 export const createDocumentSchema = z.object({
   document_key: z
     .string()
-    .min(1, "Document key không được để trống")
-    .max(120, "Document key tối đa 120 ký tự")
+    .min(1, "Mã tài liệu không được để trống")
+    .max(120, "Mã tài liệu tối đa 120 ký tự")
     .regex(
       DOCUMENT_KEY_REGEX,
-      "Key chỉ gồm chữ thường không dấu, số, gạch ngang, gạch dưới hoặc dấu chấm (bắt đầu bằng chữ hoặc số)",
+      "Mã tài liệu chỉ gồm chữ thường không dấu, số, gạch ngang, gạch dưới hoặc dấu chấm (bắt đầu bằng chữ hoặc số)",
     ),
   title: z
     .string()
@@ -27,15 +27,15 @@ export const createDocumentSchema = z.object({
     ),
   compilation_run_id: z
     .string()
-    .min(1, "Chưa chọn lượt biên soạn")
-    .max(64, "Mã lượt biên soạn không hợp lệ"),
+    .min(1, "Chưa chọn lần chuẩn bị nội dung")
+    .max(64, "Mã lần chuẩn bị không hợp lệ"),
 });
 
 export const registerVersionSchema = z.object({
   compilation_run_id: z
     .string()
-    .min(1, "Chưa chọn lượt biên soạn")
-    .max(64, "Mã lượt biên soạn không hợp lệ"),
+    .min(1, "Chưa chọn lần chuẩn bị nội dung")
+    .max(64, "Mã lần chuẩn bị không hợp lệ"),
 });
 
 export const findingResolutionSchema = z.object({
@@ -204,15 +204,15 @@ export function formatPublicationError(
 ): string {
   switch (code) {
     case "compiled_document_key_exists":
-      return "Document key đã tồn tại trong kho này. Vui lòng chọn tài liệu có sẵn để thêm phiên bản mới.";
+      return "Mã tài liệu đã tồn tại trong kho này. Vui lòng chọn tài liệu có sẵn để thêm phiên bản mới.";
     case "compiled_run_registered":
-      return "Lượt biên soạn này đã được đăng ký thành phiên bản tài liệu trước đó.";
+      return "Nội dung đã chuẩn bị này đã được đăng ký thành phiên bản tài liệu trước đó.";
     case "compiled_document_not_found":
-      return "Không tìm thấy tài liệu biên soạn.";
+      return "Không tìm thấy tài liệu xuất bản.";
     case "compiled_version_not_found":
-      return "Không tìm thấy phiên bản biên soạn.";
+      return "Không tìm thấy phiên bản tài liệu.";
     case "publication_review_required":
-      return "Cần có lượt rà soát (Review) hoàn tất khớp phiên bản trước khi duyệt.";
+      return "Cần hoàn tất rà soát khớp phiên bản trước khi duyệt.";
     case "publication_review_invalid":
       return "Báo cáo rà soát không khớp với phiên bản hiện tại.";
     case "publication_review_stale":
@@ -222,7 +222,7 @@ export function formatPublicationError(
     case "publication_metadata_review_required":
       return "Cần xác nhận đã xem đúng metadata truy xuất của phiên bản trước khi duyệt.";
     case "retrieval_metadata_invalid":
-      return "Metadata truy xuất không hợp lệ: target phải tồn tại trong bản biên soạn, mỗi giá trị phải xuất hiện trong trích đoạn nguồn và không được trùng target.";
+      return "Metadata truy xuất không hợp lệ: target phải tồn tại trong bản đã chuẩn bị, mỗi giá trị phải xuất hiện trong trích đoạn nguồn và không được trùng target.";
     case "publication_bundle_changed":
       return "Nội dung hoặc metadata đã khác bản đã đăng ký/duyệt. Vui lòng đăng ký lại phiên bản.";
     case "publication_approval_required":
@@ -246,7 +246,7 @@ export function formatPublicationError(
     default:
       return (
         fallbackMessage ||
-        "Đã xảy ra lỗi trong quá trình xử lý tài liệu biên soạn."
+        "Đã xảy ra lỗi trong quá trình xử lý tài liệu xuất bản."
       );
   }
 }

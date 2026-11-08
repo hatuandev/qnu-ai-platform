@@ -57,9 +57,15 @@ function ReplacementSession({
       <CardContent className="space-y-3 p-4">
         <h2 className="font-semibold text-sm">Thay bản phục vụ</h2>
         <p className="text-sm text-muted-foreground">
-          Bản cũ tiếp tục phục vụ trong lúc chuẩn bị bản mới. Upload revision ở
-          chế độ chuẩn bị → OCR → Compiler → đăng ký và duyệt phiên bản → chọn
-          bản thay thế tại đây.
+          Theo cơ chế thay thế, bản xuất bản hiện tại được giữ nguyên trong lúc
+          chuẩn bị; chỉ chuyển khi chỉ mục mới sẵn sàng. Upload revision ở chế
+          độ chuẩn bị → OCR → Compiler → đăng ký và duyệt phiên bản → chọn bản
+          thay thế tại đây.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Chỉ phiên bản đã duyệt mới có thể thay bản phục vụ. Bản xem trước sẽ
+          báo nếu tài liệu chưa xuất bản hoặc nguồn dùng chung xung đột; hệ
+          thống không tự thay thế hàng loạt.
         </p>
         <Button asChild variant="outline" size="sm">
           <Link

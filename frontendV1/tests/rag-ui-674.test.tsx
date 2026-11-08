@@ -134,6 +134,7 @@ const baseTurn = {
   finished_at: "2026-10-27T00:00:01Z",
   status: "completed",
   source_status: "current",
+  source_status_reason: null,
   error_code: null,
 };
 

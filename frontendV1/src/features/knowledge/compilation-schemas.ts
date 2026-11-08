@@ -27,7 +27,7 @@ export const draftSectionSchema = z.object({
 });
 
 export const draftContentSchema = z.object({
-  title: z.string().min(1, "Tiêu đề bản biên soạn không được rỗng").max(500),
+  title: z.string().min(1, "Tiêu đề nội dung không được để trống").max(500),
   sections: z.array(draftSectionSchema).min(1, "Cần ít nhất 1 mục nội dung"),
   unknowns: z.array(z.string().min(1).max(2000)).default([]),
 });
@@ -40,7 +40,7 @@ export const compilationRequestSchema = z
       .pipe(
         z
           .string()
-          .min(1, "Chủ đề biên soạn không được để trống")
+          .min(1, "Chủ đề không được để trống")
           .max(2000, "Chủ đề tối đa 2000 ký tự"),
       ),
     ocr_run_ids: z
@@ -131,7 +131,7 @@ export function formatCompilationStatus(status: CompilationStatus): {
     case "queued":
       return { label: "Đang chờ xếp lịch", variant: "secondary" };
     case "running":
-      return { label: "Đang biên soạn", variant: "default" };
+      return { label: "Đang chuẩn bị nội dung", variant: "default" };
     case "completed":
       return { label: "Đã hoàn thành", variant: "outline" };
     case "failed":
@@ -153,7 +153,7 @@ export function formatCompilationOrigin(origin: CompilationOrigin): {
     case "user_edit":
       return { label: "Người dùng chỉnh sửa", isEdit: true };
     default:
-      return { label: "AI Biên soạn", isEdit: false };
+      return { label: "Tự động", isEdit: false };
   }
 }
 
@@ -253,7 +253,7 @@ export function formatSourceAssessmentStatus(status: SourceAssessmentStatus): {
     case "out_of_scope":
       return {
         label: "Ngoài phạm vi chủ đề",
-        description: "Nội dung nguồn nằm ngoài chủ đề biên soạn.",
+        description: "Nội dung nguồn nằm ngoài chủ đề đã chọn.",
         badgeClass: "bg-muted text-muted-foreground border-border",
       };
     case "uncertain":
@@ -280,13 +280,13 @@ export function formatDraftAssessmentStatus(status: DraftAssessmentStatus): {
     case "supported":
       return {
         label: "Có căn cứ nguồn",
-        description: "Đoạn biên soạn khớp với bằng chứng nguồn.",
+        description: "Đoạn nội dung khớp với bằng chứng nguồn.",
         badgeClass: "bg-success/15 text-success border-success/30",
       };
     case "contradicted":
       return {
         label: "Có thể diễn giải sai",
-        description: "Đoạn biên soạn mâu thuẫn hoặc đảo ngược ý so với nguồn.",
+        description: "Đoạn nội dung mâu thuẫn hoặc đảo ngược ý so với nguồn.",
         badgeClass: "bg-destructive/15 text-destructive border-destructive/30",
       };
     case "unsupported":
@@ -317,7 +317,7 @@ export function formatCompilationError(
 ): string {
   switch (code) {
     case "compilation_not_found":
-      return "Không tìm thấy lượt biên soạn trong kho tri thức.";
+      return "Không tìm thấy lần chuẩn bị nội dung trong kho tri thức.";
     case "compilation_source_mismatch":
       return "Bằng chứng OCR hoặc bản sửa đã bị thay đổi so với thời điểm yêu cầu.";
     case "ocr_run_not_found":
@@ -329,9 +329,9 @@ export function formatCompilationError(
     case "compilation_source_limits_exceeded":
       return "Nguồn vượt dung lượng cấu trúc của một bản nháp. Hãy chọn ít nguồn hơn cho lượt này.";
     case "compilation_failed":
-      return "Hệ thống gặp lỗi khi xử lý kết quả biên soạn.";
+      return "Hệ thống gặp lỗi khi xử lý kết quả chuẩn bị nội dung.";
     case "chat_output_truncated":
-      return "Phản hồi của mô hình bị cắt trước khi nhóm biên soạn hoàn tất.";
+      return "Phản hồi của mô hình bị cắt trước khi quá trình chuẩn bị nội dung hoàn tất.";
     case "compilation_citation_invalid":
       return "Bản nháp có citation không thuộc tập bằng chứng nguồn đã cấp.";
     case "compilation_edit_stale":
@@ -347,7 +347,7 @@ export function formatCompilationError(
     case "idempotency_conflict":
       return "Khóa lưu trùng lặp với một thao tác khác.";
     case "compilation_auto_review_not_found":
-      return "Chưa có yêu cầu review tự động cho lượt này.";
+      return "Chưa có yêu cầu rà soát tự động cho lần này.";
     case "compilation_review_invalid":
       return "Reviewer trả kết quả không đúng schema hoặc thiếu đối chiếu ID.";
     case "model_token_limits_stale":
@@ -367,7 +367,7 @@ export function formatCompilationError(
       return "Model trả về dữ liệu không đúng định dạng JSON/schema yêu cầu.";
     default:
       return (
-        fallbackMessage || "Đã xảy ra lỗi trong quá trình xử lý biên soạn."
+        fallbackMessage || "Đã xảy ra lỗi trong quá trình chuẩn bị nội dung."
       );
   }
 }

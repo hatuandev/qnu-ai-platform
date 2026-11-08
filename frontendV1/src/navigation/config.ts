@@ -40,12 +40,15 @@ export const providerNavigation = {
 } satisfies NavItem;
 
 export {
+  activePrimaryWorkspaceFeature,
   isPrimarySidebarFeatureActive,
   isSettingsRouteActive,
   primaryWorkspaceFeatureKeys,
+  resolveWorkspaceExperience,
   workspaceFeatureGroups,
   workspaceFeatureKeys,
   workspaceFeatures,
+  workspacePrimaryFeatures,
 } from "./workspace-features";
 
 export const navigationGroups: NavGroup[] = [

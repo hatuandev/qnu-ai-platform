@@ -105,6 +105,7 @@ export function AssistantFormDialog({
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [ragOpen, setRagOpen] = useState(false);
 
   // Queries for dynamic dependencies: collections & model catalog
@@ -313,8 +314,8 @@ export function AssistantFormDialog({
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-xs">
             {isEdit
-              ? "Cập nhật thông tin trợ lý, hướng dẫn persona, model chat và tham số tạo phản hồi."
-              : "Tạo trợ lý mới gắn với một bộ sưu tập kho tri thức và model chat được cấp phép."}
+              ? "Cập nhật tên, mục đích và hướng dẫn trả lời. Cấu hình kỹ thuật nằm trong mục nâng cao."
+              : "Đặt tên, chọn bộ sưu tập tri thức và hướng dẫn trả lời; tham số kỹ thuật dùng mặc định an toàn."}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
@@ -427,20 +428,20 @@ export function AssistantFormDialog({
                   return (
                     <Field>
                       <FieldLabel htmlFor={descInputId}>
-                        Mô tả trợ lý
+                        Mục đích sử dụng
                       </FieldLabel>
                       <Textarea
                         id={descInputId}
                         value={field.state.value}
                         onChange={(e) => field.handleChange(e.target.value)}
                         onBlur={field.handleBlur}
-                        placeholder="Mô tả mục đích sử dụng, đối tượng phục vụ..."
+                        placeholder="Trợ lý phục vụ việc gì, cho ai..."
                         rows={2}
                         maxLength={2000}
                         aria-invalid={Boolean(error)}
                       />
                       <FieldDescription>
-                        Mô tả ngắn gọn mục đích sử dụng (tối đa 2000 ký tự).
+                        Trợ lý phục vụ việc gì và cho ai (tối đa 2000 ký tự).
                       </FieldDescription>
                       {error ? <FieldError>{error}</FieldError> : null}
                     </Field>
@@ -524,105 +525,11 @@ export function AssistantFormDialog({
               )}
             </div>
 
-            {/* Section 3: ModelOps Chat Model Selection */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-1.5">
-                <Cpu className="size-3.5" />
-                Model hội thoại (ModelOps)
-              </div>
-
-              {savedProviderMissing && (
-                <Alert className="border-amber-500/40 bg-amber-500/5 text-amber-900 dark:text-amber-200">
-                  <AlertCircle className="size-4 text-amber-600 dark:text-amber-400" />
-                  <AlertTitle className="text-xs font-semibold">
-                    Provider cấu hình không còn trong Catalog
-                  </AlertTitle>
-                  <AlertDescription className="text-xs">
-                    Provider ID{" "}
-                    <code className="font-mono">
-                      {assistant?.chat_provider_id}
-                    </code>{" "}
-                    đã được lưu trước đó hiện không còn trong danh mục chat khả
-                    dụng của workspace. Bạn có thể giữ nguyên hoặc chọn model
-                    khác.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <form.Field name="chat_provider_id">
-                {(field) => {
-                  const error = fieldError(field.state.meta.errors);
-                  const selectedVal =
-                    field.state.value === null || field.state.value === ""
-                      ? WORKSPACE_DEFAULT_PROVIDER
-                      : field.state.value;
-
-                  return (
-                    <Field>
-                      <FieldLabel>Model Chat</FieldLabel>
-                      <Select
-                        value={selectedVal}
-                        onValueChange={(val) => {
-                          field.handleChange(
-                            val === WORKSPACE_DEFAULT_PROVIDER ? null : val,
-                          );
-                        }}
-                        disabled={catalogQuery.isPending}
-                      >
-                        <SelectTrigger
-                          aria-invalid={Boolean(error)}
-                          className="w-full"
-                        >
-                          <SelectValue placeholder="Chọn model..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={WORKSPACE_DEFAULT_PROVIDER}>
-                            <span className="font-medium">
-                              Theo mặc định workspace
-                            </span>
-                            <span className="ml-2 text-xs text-muted-foreground">
-                              (Giải quyết động qua cấu hình ModelOps)
-                            </span>
-                          </SelectItem>
-                          {chatCatalog.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              <span>{item.name}</span>
-                              <span className="ml-2 font-mono text-xs text-muted-foreground">
-                                [{item.model_name}]
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FieldDescription>
-                        {field.state.value === null
-                          ? "Hệ thống sẽ dùng model chat mặc định được gán cho workspace này."
-                          : "Chỉ định provider cụ thể trong số các provider có capability chat được cấp phép."}
-                      </FieldDescription>
-                      <ConsumerModelBudgetNotice
-                        model={chatCatalog.find(
-                          (item) => item.id === field.state.value,
-                        )}
-                        defaultModel={chatCatalog.find((item) =>
-                          item.default_capabilities?.includes("chat"),
-                        )}
-                        isDefaultSelection={
-                          field.state.value === null || field.state.value === ""
-                        }
-                        capability="chat"
-                      />
-                      {error ? <FieldError>{error}</FieldError> : null}
-                    </Field>
-                  );
-                }}
-              </form.Field>
-            </div>
-
-            {/* Section 4: System Persona / Instructions */}
+            {/* Section 3: Answer guidance */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-1.5">
                 <Layers className="size-3.5" />
-                Chỉ dẫn hệ thống (Persona)
+                Hướng dẫn trả lời
               </div>
 
               <form.Field name="persona">
@@ -631,7 +538,7 @@ export function AssistantFormDialog({
                   return (
                     <Field>
                       <FieldLabel htmlFor={personaInputId}>
-                        Persona / Lời nhắc hệ thống
+                        Hướng dẫn trả lời
                       </FieldLabel>
                       <Textarea
                         id={personaInputId}
@@ -644,8 +551,8 @@ export function AssistantFormDialog({
                         aria-invalid={Boolean(error)}
                       />
                       <FieldDescription>
-                        Định hướng phong cách, vai trò và giới hạn trả lời của
-                        trợ lý (tối đa 4000 ký tự).
+                        Quy định giọng điệu, phạm vi và cách trợ lý phản hồi khi
+                        thiếu căn cứ (tối đa 4000 ký tự).
                       </FieldDescription>
                       {error ? <FieldError>{error}</FieldError> : null}
                     </Field>
@@ -654,257 +561,549 @@ export function AssistantFormDialog({
               </form.Field>
             </div>
 
-            {/* Section 5: Retrieval & Generation Parameters */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-1.5">
-                <Sliders className="size-3.5" />
-                Tham số truy xuất & cấu hình phản hồi
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* top_k */}
-                <form.Field name="top_k">
-                  {(field) => {
-                    const error = fieldError(field.state.meta.errors);
-                    return (
-                      <Field>
-                        <FieldLabel htmlFor={topKInputId}>
-                          Top K Chunks{" "}
-                          <span className="text-destructive">*</span>
-                        </FieldLabel>
-                        <Input
-                          id={topKInputId}
-                          type="number"
-                          min={1}
-                          max={20}
-                          value={field.state.value}
-                          onChange={(e) =>
-                            field.handleChange(
-                              e.target.value === ""
-                                ? 5
-                                : Number(e.target.value),
-                            )
-                          }
-                          onBlur={field.handleBlur}
-                          aria-invalid={Boolean(error)}
-                        />
-                        <FieldDescription>
-                          Số đoạn trích (1–20, mặc định 5).
-                        </FieldDescription>
-                        {error ? <FieldError>{error}</FieldError> : null}
-                      </Field>
-                    );
-                  }}
-                </form.Field>
-
-                {/* history_turns */}
-                <form.Field name="history_turns">
-                  {(field) => {
-                    const error = fieldError(field.state.meta.errors);
-                    return (
-                      <Field>
-                        <FieldLabel htmlFor={turnsInputId}>
-                          Lượt ngữ cảnh{" "}
-                          <span className="text-destructive">*</span>
-                        </FieldLabel>
-                        <Input
-                          id={turnsInputId}
-                          type="number"
-                          min={0}
-                          max={10}
-                          value={field.state.value}
-                          onChange={(e) =>
-                            field.handleChange(
-                              e.target.value === ""
-                                ? 3
-                                : Number(e.target.value),
-                            )
-                          }
-                          onBlur={field.handleBlur}
-                          aria-invalid={Boolean(error)}
-                        />
-                        <FieldDescription>
-                          Lịch sử hội thoại (0–10, mặc định 3).
-                        </FieldDescription>
-                        {error ? <FieldError>{error}</FieldError> : null}
-                      </Field>
-                    );
-                  }}
-                </form.Field>
-
-                {/* max_output_tokens */}
-                <form.Field name="max_output_tokens">
-                  {(field) => {
-                    const error = fieldError(field.state.meta.errors);
-                    return (
-                      <Field>
-                        <FieldLabel htmlFor={tokensInputId}>
-                          Token đầu ra
-                        </FieldLabel>
-                        <Input
-                          id={tokensInputId}
-                          type="number"
-                          min={1}
-                          step={128}
-                          value={field.state.value ?? ""}
-                          placeholder="Tự động"
-                          onChange={(e) =>
-                            field.handleChange(
-                              e.target.value === ""
-                                ? null
-                                : Number(e.target.value),
-                            )
-                          }
-                          onBlur={field.handleBlur}
-                          aria-invalid={Boolean(error)}
-                        />
-                        <FieldDescription>
-                          Để trống để ModelOps tự tính ngân sách.
-                        </FieldDescription>
-                        {error ? <FieldError>{error}</FieldError> : null}
-                      </Field>
-                    );
-                  }}
-                </form.Field>
-              </div>
-
-              {/* RAG policy: retrieval mode, budgets, context and verification */}
-              <div className="space-y-4 rounded-lg border p-3.5 bg-muted/10">
-                <Collapsible open={ragOpen} onOpenChange={setRagOpen}>
-                  <CollapsibleTrigger asChild>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between gap-2 text-left"
-                    >
+            {/* Advanced configuration: model, retrieval & generation */}
+            <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+              <div className="rounded-lg border bg-muted/10">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 p-3.5 text-left"
+                  >
+                    <span className="space-y-0.5">
                       <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        <Sparkles className="size-3.5" />
-                        Truy xuất &amp; kiểm chứng nâng cao (RAG)
+                        <Sliders className="size-3.5" />
+                        Cấu hình nâng cao
                       </span>
-                      <ChevronDown
-                        className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${
-                          ragOpen ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
-                  </CollapsibleTrigger>
+                      <span className="block text-[11px] text-muted-foreground">
+                        Model chat, số đoạn trích, kiểm chứng và bộ lọc
+                        metadata. Mặc định đã đủ dùng cho hầu hết trợ lý.
+                      </span>
+                    </span>
+                    <ChevronDown
+                      className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${
+                        advancedOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                </CollapsibleTrigger>
 
-                  <CollapsibleContent className="pt-4 space-y-4">
-                    <p className="text-[11px] leading-relaxed text-muted-foreground">
-                      Trợ lý mới mặc định dùng Dense, lấy thêm tối đa 1 đoạn
-                      liền kề mỗi phía và tắt kiểm chứng. Thay đổi cấu hình chỉ
-                      áp dụng cho hội thoại mới.
-                    </p>
+                <CollapsibleContent className="space-y-5 border-t p-3.5">
+                  {/* Section 4: ModelOps Chat Model Selection */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-1.5">
+                      <Cpu className="size-3.5" />
+                      Model hội thoại (ModelOps)
+                    </div>
 
-                    <form.Field name="rag_policy.scope_resolution">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor="assistant-scope-resolution">
-                            Phạm vi câu hỏi
-                          </FieldLabel>
-                          <Select
-                            value={field.state.value}
-                            onValueChange={(value) =>
-                              field.handleChange(
-                                value === "catalog" ? "catalog" : "explicit",
-                              )
-                            }
-                          >
-                            <SelectTrigger id="assistant-scope-resolution">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="explicit">
-                                Theo bộ lọc đã chọn
-                              </SelectItem>
-                              <SelectItem value="catalog">
-                                Nhận diện từ dữ liệu đã xuất bản
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FieldDescription>
-                            Khi chưa rõ ngành, khóa hoặc năm, hệ thống yêu cầu
-                            làm rõ trước khi trả lời. Chỉ nhận diện giá trị có
-                            căn cứ; giữ nguyên bộ lọc đã chọn.
-                          </FieldDescription>
-                        </Field>
-                      )}
-                    </form.Field>
-                    <form.Field name="rag_policy.retrieval_mode">
+                    {savedProviderMissing && (
+                      <Alert className="border-amber-500/40 bg-amber-500/5 text-amber-900 dark:text-amber-200">
+                        <AlertCircle className="size-4 text-amber-600 dark:text-amber-400" />
+                        <AlertTitle className="text-xs font-semibold">
+                          Provider cấu hình không còn trong Catalog
+                        </AlertTitle>
+                        <AlertDescription className="text-xs">
+                          Provider ID{" "}
+                          <code className="font-mono">
+                            {assistant?.chat_provider_id}
+                          </code>{" "}
+                          đã được lưu trước đó hiện không còn trong danh mục
+                          chat khả dụng của workspace. Bạn có thể giữ nguyên
+                          hoặc chọn model khác.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    <form.Field name="chat_provider_id">
                       {(field) => {
                         const error = fieldError(field.state.meta.errors);
+                        const selectedVal =
+                          field.state.value === null || field.state.value === ""
+                            ? WORKSPACE_DEFAULT_PROVIDER
+                            : field.state.value;
+
                         return (
                           <Field>
-                            <FieldLabel htmlFor={retrievalModeId}>
-                              Chế độ truy xuất
-                            </FieldLabel>
+                            <FieldLabel>Model Chat</FieldLabel>
                             <Select
-                              value={field.state.value}
-                              onValueChange={(value) =>
-                                field.handleChange(asRetrievalMode(value))
-                              }
+                              value={selectedVal}
+                              onValueChange={(val) => {
+                                field.handleChange(
+                                  val === WORKSPACE_DEFAULT_PROVIDER
+                                    ? null
+                                    : val,
+                                );
+                              }}
+                              disabled={catalogQuery.isPending}
                             >
                               <SelectTrigger
-                                id={retrievalModeId}
-                                className="w-full text-xs"
                                 aria-invalid={Boolean(error)}
+                                className="w-full"
                               >
-                                <SelectValue />
+                                <SelectValue placeholder="Chọn model..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {(
-                                  Object.keys(
-                                    RETRIEVAL_MODE_LABEL,
-                                  ) as RetrievalMode[]
-                                ).map((mode) => (
-                                  <SelectItem
-                                    key={mode}
-                                    value={mode}
-                                    className="text-xs"
-                                  >
-                                    {RETRIEVAL_MODE_LABEL[mode]}
+                                <SelectItem value={WORKSPACE_DEFAULT_PROVIDER}>
+                                  <span className="font-medium">
+                                    Theo mặc định workspace
+                                  </span>
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    (Giải quyết động qua cấu hình ModelOps)
+                                  </span>
+                                </SelectItem>
+                                {chatCatalog.map((item) => (
+                                  <SelectItem key={item.id} value={item.id}>
+                                    <span>{item.name}</span>
+                                    <span className="ml-2 font-mono text-xs text-muted-foreground">
+                                      [{item.model_name}]
+                                    </span>
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-                            <FieldDescription className="text-[11px]">
-                              Dense chỉ dùng vector. Hybrid thêm tìm từ khóa
-                              PostgreSQL và hợp nhất RRF. Hybrid + Rerank cần
-                              thêm provider rerank được workspace cấp phép.
+                            <FieldDescription>
+                              {field.state.value === null
+                                ? "Hệ thống sẽ dùng model chat mặc định được gán cho workspace này."
+                                : "Chỉ định provider cụ thể trong số các provider có capability chat được cấp phép."}
                             </FieldDescription>
+                            <ConsumerModelBudgetNotice
+                              model={chatCatalog.find(
+                                (item) => item.id === field.state.value,
+                              )}
+                              defaultModel={chatCatalog.find((item) =>
+                                item.default_capabilities?.includes("chat"),
+                              )}
+                              isDefaultSelection={
+                                field.state.value === null ||
+                                field.state.value === ""
+                              }
+                              capability="chat"
+                            />
                             {error ? <FieldError>{error}</FieldError> : null}
                           </Field>
                         );
                       }}
                     </form.Field>
+                  </div>
 
-                    <form.Subscribe
-                      selector={(state) =>
-                        state.values.rag_policy.retrieval_mode
-                      }
-                    >
-                      {(mode) =>
-                        mode === "dense" ? null : (
+                  {/* Section 5: Retrieval & Generation Parameters */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-1.5">
+                      <Sliders className="size-3.5" />
+                      Tham số truy xuất & cấu hình phản hồi
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* top_k */}
+                      <form.Field name="top_k">
+                        {(field) => {
+                          const error = fieldError(field.state.meta.errors);
+                          return (
+                            <Field>
+                              <FieldLabel htmlFor={topKInputId}>
+                                Top K Chunks{" "}
+                                <span className="text-destructive">*</span>
+                              </FieldLabel>
+                              <Input
+                                id={topKInputId}
+                                type="number"
+                                min={1}
+                                max={20}
+                                value={field.state.value}
+                                onChange={(e) =>
+                                  field.handleChange(
+                                    e.target.value === ""
+                                      ? 5
+                                      : Number(e.target.value),
+                                  )
+                                }
+                                onBlur={field.handleBlur}
+                                aria-invalid={Boolean(error)}
+                              />
+                              <FieldDescription>
+                                Số đoạn trích (1–20, mặc định 5).
+                              </FieldDescription>
+                              {error ? <FieldError>{error}</FieldError> : null}
+                            </Field>
+                          );
+                        }}
+                      </form.Field>
+
+                      {/* history_turns */}
+                      <form.Field name="history_turns">
+                        {(field) => {
+                          const error = fieldError(field.state.meta.errors);
+                          return (
+                            <Field>
+                              <FieldLabel htmlFor={turnsInputId}>
+                                Lượt ngữ cảnh{" "}
+                                <span className="text-destructive">*</span>
+                              </FieldLabel>
+                              <Input
+                                id={turnsInputId}
+                                type="number"
+                                min={0}
+                                max={10}
+                                value={field.state.value}
+                                onChange={(e) =>
+                                  field.handleChange(
+                                    e.target.value === ""
+                                      ? 3
+                                      : Number(e.target.value),
+                                  )
+                                }
+                                onBlur={field.handleBlur}
+                                aria-invalid={Boolean(error)}
+                              />
+                              <FieldDescription>
+                                Lịch sử hội thoại (0–10, mặc định 3).
+                              </FieldDescription>
+                              {error ? <FieldError>{error}</FieldError> : null}
+                            </Field>
+                          );
+                        }}
+                      </form.Field>
+
+                      {/* max_output_tokens */}
+                      <form.Field name="max_output_tokens">
+                        {(field) => {
+                          const error = fieldError(field.state.meta.errors);
+                          return (
+                            <Field>
+                              <FieldLabel htmlFor={tokensInputId}>
+                                Token đầu ra
+                              </FieldLabel>
+                              <Input
+                                id={tokensInputId}
+                                type="number"
+                                min={1}
+                                step={128}
+                                value={field.state.value ?? ""}
+                                placeholder="Tự động"
+                                onChange={(e) =>
+                                  field.handleChange(
+                                    e.target.value === ""
+                                      ? null
+                                      : Number(e.target.value),
+                                  )
+                                }
+                                onBlur={field.handleBlur}
+                                aria-invalid={Boolean(error)}
+                              />
+                              <FieldDescription>
+                                Để trống để ModelOps tự tính ngân sách.
+                              </FieldDescription>
+                              {error ? <FieldError>{error}</FieldError> : null}
+                            </Field>
+                          );
+                        }}
+                      </form.Field>
+                    </div>
+
+                    {/* RAG policy: retrieval mode, budgets, context and verification */}
+                    <div className="space-y-4 rounded-lg border p-3.5 bg-muted/10">
+                      <Collapsible open={ragOpen} onOpenChange={setRagOpen}>
+                        <CollapsibleTrigger asChild>
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-2 text-left"
+                          >
+                            <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                              <Sparkles className="size-3.5" />
+                              Truy xuất &amp; kiểm chứng nâng cao (RAG)
+                            </span>
+                            <ChevronDown
+                              className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${
+                                ragOpen ? "rotate-180" : ""
+                              }`}
+                            />
+                          </button>
+                        </CollapsibleTrigger>
+
+                        <CollapsibleContent className="pt-4 space-y-4">
+                          <p className="text-[11px] leading-relaxed text-muted-foreground">
+                            Trợ lý mới mặc định dùng Dense, lấy thêm tối đa 1
+                            đoạn liền kề mỗi phía và tắt kiểm chứng. Thay đổi
+                            cấu hình chỉ áp dụng cho hội thoại mới.
+                          </p>
+
+                          <form.Field name="rag_policy.scope_resolution">
+                            {(field) => (
+                              <Field>
+                                <FieldLabel htmlFor="assistant-scope-resolution">
+                                  Phạm vi câu hỏi
+                                </FieldLabel>
+                                <Select
+                                  value={field.state.value}
+                                  onValueChange={(value) =>
+                                    field.handleChange(
+                                      value === "catalog"
+                                        ? "catalog"
+                                        : "explicit",
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger id="assistant-scope-resolution">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="explicit">
+                                      Theo bộ lọc đã chọn
+                                    </SelectItem>
+                                    <SelectItem value="catalog">
+                                      Nhận diện từ dữ liệu đã xuất bản
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FieldDescription>
+                                  Khi chưa rõ ngành, khóa hoặc năm, hệ thống yêu
+                                  cầu làm rõ trước khi trả lời. Chỉ nhận diện
+                                  giá trị có căn cứ; giữ nguyên bộ lọc đã chọn.
+                                </FieldDescription>
+                              </Field>
+                            )}
+                          </form.Field>
+                          <form.Field name="rag_policy.retrieval_mode">
+                            {(field) => {
+                              const error = fieldError(field.state.meta.errors);
+                              return (
+                                <Field>
+                                  <FieldLabel htmlFor={retrievalModeId}>
+                                    Chế độ truy xuất
+                                  </FieldLabel>
+                                  <Select
+                                    value={field.state.value}
+                                    onValueChange={(value) =>
+                                      field.handleChange(asRetrievalMode(value))
+                                    }
+                                  >
+                                    <SelectTrigger
+                                      id={retrievalModeId}
+                                      className="w-full text-xs"
+                                      aria-invalid={Boolean(error)}
+                                    >
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {(
+                                        Object.keys(
+                                          RETRIEVAL_MODE_LABEL,
+                                        ) as RetrievalMode[]
+                                      ).map((mode) => (
+                                        <SelectItem
+                                          key={mode}
+                                          value={mode}
+                                          className="text-xs"
+                                        >
+                                          {RETRIEVAL_MODE_LABEL[mode]}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FieldDescription className="text-[11px]">
+                                    Dense chỉ dùng vector. Hybrid thêm tìm từ
+                                    khóa PostgreSQL và hợp nhất RRF. Hybrid +
+                                    Rerank cần thêm provider rerank được
+                                    workspace cấp phép.
+                                  </FieldDescription>
+                                  {error ? (
+                                    <FieldError>{error}</FieldError>
+                                  ) : null}
+                                </Field>
+                              );
+                            }}
+                          </form.Field>
+
+                          <form.Subscribe
+                            selector={(state) =>
+                              state.values.rag_policy.retrieval_mode
+                            }
+                          >
+                            {(mode) =>
+                              mode === "dense" ? null : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  <form.Field name="rag_policy.candidate_k">
+                                    {(field) => {
+                                      const error = fieldError(
+                                        field.state.meta.errors,
+                                      );
+                                      return (
+                                        <Field>
+                                          <FieldLabel htmlFor={candidateKId}>
+                                            Ngân sách ứng viên (candidate_k)
+                                          </FieldLabel>
+                                          <Input
+                                            id={candidateKId}
+                                            type="number"
+                                            min={1}
+                                            max={100}
+                                            value={field.state.value}
+                                            onChange={(e) =>
+                                              field.handleChange(
+                                                e.target.value === ""
+                                                  ? 30
+                                                  : Number(e.target.value),
+                                              )
+                                            }
+                                            onBlur={field.handleBlur}
+                                            aria-invalid={Boolean(error)}
+                                            className="text-xs"
+                                          />
+                                          <FieldDescription className="text-[11px]">
+                                            Số ứng viên trước khi cắt Top K
+                                            (1–100).
+                                          </FieldDescription>
+                                          {error ? (
+                                            <FieldError>{error}</FieldError>
+                                          ) : null}
+                                        </Field>
+                                      );
+                                    }}
+                                  </form.Field>
+
+                                  <form.Field name="rag_policy.rrf_k">
+                                    {(field) => {
+                                      const error = fieldError(
+                                        field.state.meta.errors,
+                                      );
+                                      return (
+                                        <Field>
+                                          <FieldLabel htmlFor={rrfKId}>
+                                            Hằng số RRF (rrf_k)
+                                          </FieldLabel>
+                                          <Input
+                                            id={rrfKId}
+                                            type="number"
+                                            min={1}
+                                            max={1000}
+                                            value={field.state.value}
+                                            onChange={(e) =>
+                                              field.handleChange(
+                                                e.target.value === ""
+                                                  ? 60
+                                                  : Number(e.target.value),
+                                              )
+                                            }
+                                            onBlur={field.handleBlur}
+                                            aria-invalid={Boolean(error)}
+                                            className="text-xs"
+                                          />
+                                          <FieldDescription className="text-[11px]">
+                                            Dùng khi hợp nhất thứ hạng dense và
+                                            từ khóa (1–1000).
+                                          </FieldDescription>
+                                          {error ? (
+                                            <FieldError>{error}</FieldError>
+                                          ) : null}
+                                        </Field>
+                                      );
+                                    }}
+                                  </form.Field>
+                                </div>
+                              )
+                            }
+                          </form.Subscribe>
+
+                          <form.Subscribe
+                            selector={(state) =>
+                              state.values.rag_policy.retrieval_mode
+                            }
+                          >
+                            {(mode) =>
+                              mode === "hybrid_rerank" ? (
+                                <form.Field name="rag_policy.rerank_provider_id">
+                                  {(field) => {
+                                    const error = fieldError(
+                                      field.state.meta.errors,
+                                    );
+                                    return (
+                                      <Field>
+                                        <FieldLabel htmlFor={rerankProviderId}>
+                                          Provider rerank
+                                        </FieldLabel>
+                                        <Select
+                                          value={
+                                            field.state.value ??
+                                            NO_PROVIDER_VALUE
+                                          }
+                                          onValueChange={(value) =>
+                                            field.handleChange(
+                                              value === NO_PROVIDER_VALUE
+                                                ? null
+                                                : value,
+                                            )
+                                          }
+                                          disabled={catalogQuery.isPending}
+                                        >
+                                          <SelectTrigger
+                                            id={rerankProviderId}
+                                            className="w-full text-xs"
+                                            aria-invalid={Boolean(error)}
+                                          >
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem
+                                              value={NO_PROVIDER_VALUE}
+                                              className="text-xs"
+                                            >
+                                              Không dùng rerank
+                                            </SelectItem>
+                                            {rerankCatalog.map((item) => (
+                                              <SelectItem
+                                                key={item.id}
+                                                value={item.id}
+                                                className="text-xs"
+                                              >
+                                                {item.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        <FieldDescription className="text-[11px]">
+                                          Chỉ liệt kê provider có capability
+                                          rerank trong danh mục workspace. Điểm
+                                          rerank là thang riêng, không phải xác
+                                          suất đúng.
+                                        </FieldDescription>
+                                        {rerankCatalog.length === 0 &&
+                                        !catalogQuery.isPending ? (
+                                          <p className="text-[11px] text-muted-foreground">
+                                            Workspace chưa có provider rerank
+                                            được cấp phép.
+                                          </p>
+                                        ) : null}
+                                        {error ? (
+                                          <FieldError>{error}</FieldError>
+                                        ) : null}
+                                      </Field>
+                                    );
+                                  }}
+                                </form.Field>
+                              ) : null
+                            }
+                          </form.Subscribe>
+
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <form.Field name="rag_policy.candidate_k">
+                            <form.Field name="rag_policy.context_window">
                               {(field) => {
                                 const error = fieldError(
                                   field.state.meta.errors,
                                 );
                                 return (
                                   <Field>
-                                    <FieldLabel htmlFor={candidateKId}>
-                                      Ngân sách ứng viên (candidate_k)
+                                    <FieldLabel htmlFor={contextWindowId}>
+                                      Cửa sổ ngữ cảnh (context_window)
                                     </FieldLabel>
                                     <Input
-                                      id={candidateKId}
+                                      id={contextWindowId}
                                       type="number"
-                                      min={1}
-                                      max={100}
+                                      min={0}
+                                      max={5}
                                       value={field.state.value}
                                       onChange={(e) =>
                                         field.handleChange(
                                           e.target.value === ""
-                                            ? 30
+                                            ? 0
                                             : Number(e.target.value),
                                         )
                                       }
@@ -913,7 +1112,8 @@ export function AssistantFormDialog({
                                       className="text-xs"
                                     />
                                     <FieldDescription className="text-[11px]">
-                                      Số ứng viên trước khi cắt Top K (1–100).
+                                      Số đoạn liền kề mỗi phía (0–5). Chọn 0 để
+                                      tắt lấy thêm đoạn liền kề.
                                     </FieldDescription>
                                     {error ? (
                                       <FieldError>{error}</FieldError>
@@ -923,26 +1123,27 @@ export function AssistantFormDialog({
                               }}
                             </form.Field>
 
-                            <form.Field name="rag_policy.rrf_k">
+                            <form.Field name="rag_policy.context_max_bytes">
                               {(field) => {
                                 const error = fieldError(
                                   field.state.meta.errors,
                                 );
                                 return (
                                   <Field>
-                                    <FieldLabel htmlFor={rrfKId}>
-                                      Hằng số RRF (rrf_k)
+                                    <FieldLabel htmlFor={contextBytesId}>
+                                      Ngân sách ngữ cảnh (byte)
                                     </FieldLabel>
                                     <Input
-                                      id={rrfKId}
+                                      id={contextBytesId}
                                       type="number"
-                                      min={1}
-                                      max={1000}
+                                      min={256}
+                                      max={128000}
+                                      step={256}
                                       value={field.state.value}
                                       onChange={(e) =>
                                         field.handleChange(
                                           e.target.value === ""
-                                            ? 60
+                                            ? 16000
                                             : Number(e.target.value),
                                         )
                                       }
@@ -951,8 +1152,8 @@ export function AssistantFormDialog({
                                       className="text-xs"
                                     />
                                     <FieldDescription className="text-[11px]">
-                                      Dùng khi hợp nhất thứ hạng dense và từ
-                                      khóa (1–1000).
+                                      Giới hạn JSON evidence gửi model
+                                      (256–128000 byte), không phải số token.
                                     </FieldDescription>
                                     {error ? (
                                       <FieldError>{error}</FieldError>
@@ -962,75 +1163,52 @@ export function AssistantFormDialog({
                               }}
                             </form.Field>
                           </div>
-                        )
-                      }
-                    </form.Subscribe>
 
-                    <form.Subscribe
-                      selector={(state) =>
-                        state.values.rag_policy.retrieval_mode
-                      }
-                    >
-                      {(mode) =>
-                        mode === "hybrid_rerank" ? (
-                          <form.Field name="rag_policy.rerank_provider_id">
+                          <form.Field name="rag_policy.verification_mode">
                             {(field) => {
                               const error = fieldError(field.state.meta.errors);
                               return (
                                 <Field>
-                                  <FieldLabel htmlFor={rerankProviderId}>
-                                    Provider rerank
+                                  <FieldLabel htmlFor={verificationModeId}>
+                                    Kiểm chứng câu trả lời
                                   </FieldLabel>
                                   <Select
-                                    value={
-                                      field.state.value ?? NO_PROVIDER_VALUE
-                                    }
+                                    value={field.state.value}
                                     onValueChange={(value) =>
                                       field.handleChange(
-                                        value === NO_PROVIDER_VALUE
-                                          ? null
-                                          : value,
+                                        asVerificationMode(value),
                                       )
                                     }
-                                    disabled={catalogQuery.isPending}
                                   >
                                     <SelectTrigger
-                                      id={rerankProviderId}
+                                      id={verificationModeId}
                                       className="w-full text-xs"
                                       aria-invalid={Boolean(error)}
                                     >
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem
-                                        value={NO_PROVIDER_VALUE}
-                                        className="text-xs"
-                                      >
-                                        Không dùng rerank
-                                      </SelectItem>
-                                      {rerankCatalog.map((item) => (
+                                      {(
+                                        Object.keys(
+                                          VERIFICATION_MODE_LABEL,
+                                        ) as VerificationMode[]
+                                      ).map((mode) => (
                                         <SelectItem
-                                          key={item.id}
-                                          value={item.id}
+                                          key={mode}
+                                          value={mode}
                                           className="text-xs"
                                         >
-                                          {item.name}
+                                          {VERIFICATION_MODE_LABEL[mode]}
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
                                   <FieldDescription className="text-[11px]">
-                                    Chỉ liệt kê provider có capability rerank
-                                    trong danh mục workspace. Điểm rerank là
-                                    thang riêng, không phải xác suất đúng.
+                                    Quan sát chỉ gắn cảnh báo vào câu trả lời.
+                                    Chặn giữ câu trả lời lại khi nguồn không xác
+                                    nhận. Nên chạy quan sát trước khi bật chặn
+                                    cho dữ liệu thật.
                                   </FieldDescription>
-                                  {rerankCatalog.length === 0 &&
-                                  !catalogQuery.isPending ? (
-                                    <p className="text-[11px] text-muted-foreground">
-                                      Workspace chưa có provider rerank được cấp
-                                      phép.
-                                    </p>
-                                  ) : null}
                                   {error ? (
                                     <FieldError>{error}</FieldError>
                                   ) : null}
@@ -1038,216 +1216,166 @@ export function AssistantFormDialog({
                               );
                             }}
                           </form.Field>
-                        ) : null
-                      }
-                    </form.Subscribe>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <form.Field name="rag_policy.context_window">
-                        {(field) => {
-                          const error = fieldError(field.state.meta.errors);
-                          return (
-                            <Field>
-                              <FieldLabel htmlFor={contextWindowId}>
-                                Cửa sổ ngữ cảnh (context_window)
-                              </FieldLabel>
-                              <Input
-                                id={contextWindowId}
-                                type="number"
-                                min={0}
-                                max={5}
-                                value={field.state.value}
-                                onChange={(e) =>
-                                  field.handleChange(
-                                    e.target.value === ""
-                                      ? 0
-                                      : Number(e.target.value),
-                                  )
-                                }
-                                onBlur={field.handleBlur}
-                                aria-invalid={Boolean(error)}
-                                className="text-xs"
-                              />
-                              <FieldDescription className="text-[11px]">
-                                Số đoạn liền kề mỗi phía (0–5). Chọn 0 để tắt
-                                lấy thêm đoạn liền kề.
-                              </FieldDescription>
-                              {error ? <FieldError>{error}</FieldError> : null}
-                            </Field>
-                          );
-                        }}
-                      </form.Field>
-
-                      <form.Field name="rag_policy.context_max_bytes">
-                        {(field) => {
-                          const error = fieldError(field.state.meta.errors);
-                          return (
-                            <Field>
-                              <FieldLabel htmlFor={contextBytesId}>
-                                Ngân sách ngữ cảnh (byte)
-                              </FieldLabel>
-                              <Input
-                                id={contextBytesId}
-                                type="number"
-                                min={256}
-                                max={128000}
-                                step={256}
-                                value={field.state.value}
-                                onChange={(e) =>
-                                  field.handleChange(
-                                    e.target.value === ""
-                                      ? 16000
-                                      : Number(e.target.value),
-                                  )
-                                }
-                                onBlur={field.handleBlur}
-                                aria-invalid={Boolean(error)}
-                                className="text-xs"
-                              />
-                              <FieldDescription className="text-[11px]">
-                                Giới hạn JSON evidence gửi model (256–128000
-                                byte), không phải số token.
-                              </FieldDescription>
-                              {error ? <FieldError>{error}</FieldError> : null}
-                            </Field>
-                          );
-                        }}
-                      </form.Field>
-                    </div>
-
-                    <form.Field name="rag_policy.verification_mode">
-                      {(field) => {
-                        const error = fieldError(field.state.meta.errors);
-                        return (
-                          <Field>
-                            <FieldLabel htmlFor={verificationModeId}>
-                              Kiểm chứng câu trả lời
-                            </FieldLabel>
-                            <Select
-                              value={field.state.value}
-                              onValueChange={(value) =>
-                                field.handleChange(asVerificationMode(value))
-                              }
-                            >
-                              <SelectTrigger
-                                id={verificationModeId}
-                                className="w-full text-xs"
-                                aria-invalid={Boolean(error)}
-                              >
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {(
-                                  Object.keys(
-                                    VERIFICATION_MODE_LABEL,
-                                  ) as VerificationMode[]
-                                ).map((mode) => (
-                                  <SelectItem
-                                    key={mode}
-                                    value={mode}
-                                    className="text-xs"
-                                  >
-                                    {VERIFICATION_MODE_LABEL[mode]}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FieldDescription className="text-[11px]">
-                              Quan sát chỉ gắn cảnh báo vào câu trả lời. Chặn
-                              giữ câu trả lời lại khi nguồn không xác nhận. Nên
-                              chạy quan sát trước khi bật chặn cho dữ liệu thật.
-                            </FieldDescription>
-                            {error ? <FieldError>{error}</FieldError> : null}
-                          </Field>
-                        );
-                      }}
-                    </form.Field>
-
-                    <form.Subscribe
-                      selector={(state) =>
-                        state.values.rag_policy.verification_mode
-                      }
-                    >
-                      {(mode) =>
-                        mode === "off" ? null : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <form.Field name="rag_policy.verification_provider_id">
-                              {(field) => {
-                                const error = fieldError(
-                                  field.state.meta.errors,
-                                );
-                                return (
-                                  <Field>
-                                    <FieldLabel
-                                      htmlFor={verificationProviderId}
-                                    >
-                                      Provider kiểm chứng
-                                    </FieldLabel>
-                                    <Select
-                                      value={
-                                        field.state.value ?? NO_PROVIDER_VALUE
-                                      }
-                                      onValueChange={(value) =>
-                                        field.handleChange(
-                                          value === NO_PROVIDER_VALUE
-                                            ? null
-                                            : value,
-                                        )
-                                      }
-                                      disabled={catalogQuery.isPending}
-                                    >
-                                      <SelectTrigger
-                                        id={verificationProviderId}
-                                        className="w-full text-xs"
-                                        aria-invalid={Boolean(error)}
-                                      >
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem
-                                          value={NO_PROVIDER_VALUE}
-                                          className="text-xs"
-                                        >
-                                          Dùng model chat của yêu cầu
-                                        </SelectItem>
-                                        {chatCatalog.map((item) => (
-                                          <SelectItem
-                                            key={item.id}
-                                            value={item.id}
-                                            className="text-xs"
+                          <form.Subscribe
+                            selector={(state) =>
+                              state.values.rag_policy.verification_mode
+                            }
+                          >
+                            {(mode) =>
+                              mode === "off" ? null : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  <form.Field name="rag_policy.verification_provider_id">
+                                    {(field) => {
+                                      const error = fieldError(
+                                        field.state.meta.errors,
+                                      );
+                                      return (
+                                        <Field>
+                                          <FieldLabel
+                                            htmlFor={verificationProviderId}
                                           >
-                                            {item.name}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <FieldDescription className="text-[11px]">
-                                      Chỉ provider có capability chat. Bỏ trống
-                                      để dùng model chat mặc định.
-                                    </FieldDescription>
-                                    {error ? (
-                                      <FieldError>{error}</FieldError>
-                                    ) : null}
-                                  </Field>
-                                );
-                              }}
-                            </form.Field>
+                                            Provider kiểm chứng
+                                          </FieldLabel>
+                                          <Select
+                                            value={
+                                              field.state.value ??
+                                              NO_PROVIDER_VALUE
+                                            }
+                                            onValueChange={(value) =>
+                                              field.handleChange(
+                                                value === NO_PROVIDER_VALUE
+                                                  ? null
+                                                  : value,
+                                              )
+                                            }
+                                            disabled={catalogQuery.isPending}
+                                          >
+                                            <SelectTrigger
+                                              id={verificationProviderId}
+                                              className="w-full text-xs"
+                                              aria-invalid={Boolean(error)}
+                                            >
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem
+                                                value={NO_PROVIDER_VALUE}
+                                                className="text-xs"
+                                              >
+                                                Dùng model chat của yêu cầu
+                                              </SelectItem>
+                                              {chatCatalog.map((item) => (
+                                                <SelectItem
+                                                  key={item.id}
+                                                  value={item.id}
+                                                  className="text-xs"
+                                                >
+                                                  {item.name}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                          <FieldDescription className="text-[11px]">
+                                            Chỉ provider có capability chat. Bỏ
+                                            trống để dùng model chat mặc định.
+                                          </FieldDescription>
+                                          {error ? (
+                                            <FieldError>{error}</FieldError>
+                                          ) : null}
+                                        </Field>
+                                      );
+                                    }}
+                                  </form.Field>
 
-                            <form.Field name="rag_policy.verification_max_output_tokens">
-                              {(field) => {
-                                const error = fieldError(
-                                  field.state.meta.errors,
-                                );
-                                return (
+                                  <form.Field name="rag_policy.verification_max_output_tokens">
+                                    {(field) => {
+                                      const error = fieldError(
+                                        field.state.meta.errors,
+                                      );
+                                      return (
+                                        <Field>
+                                          <FieldLabel
+                                            htmlFor={verificationTokensId}
+                                          >
+                                            Token xuất tối đa cho kiểm chứng
+                                          </FieldLabel>
+                                          <Input
+                                            id={verificationTokensId}
+                                            type="number"
+                                            min={1}
+                                            placeholder="Tự động"
+                                            value={field.state.value ?? ""}
+                                            onChange={(e) =>
+                                              field.handleChange(
+                                                e.target.value === ""
+                                                  ? null
+                                                  : Number(e.target.value),
+                                              )
+                                            }
+                                            onBlur={field.handleBlur}
+                                            aria-invalid={Boolean(error)}
+                                            className="text-xs"
+                                          />
+                                          <FieldDescription className="text-[11px]">
+                                            Để trống để ModelOps tự tính ngân
+                                            sách kiểm chứng, độc lập với ngân
+                                            sách trả lời.
+                                          </FieldDescription>
+                                          {error ? (
+                                            <FieldError>{error}</FieldError>
+                                          ) : null}
+                                        </Field>
+                                      );
+                                    }}
+                                  </form.Field>
+                                </div>
+                              )
+                            }
+                          </form.Subscribe>
+
+                          <div className="space-y-3 border-t pt-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Phạm vi metadata mặc định
+                            </p>
+                            <p className="text-[11px] leading-relaxed text-muted-foreground">
+                              Lọc theo metadata đã được người duyệt gắn cho tài
+                              liệu. Bỏ trống nghĩa là không giới hạn. Trường nào
+                              cũng phải khớp trên cùng một đơn vị được
+                              annotation; giá trị unknown không khớp bộ lọc đã
+                              đặt.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <form.Subscribe
+                                selector={(state) => state.values.collection_id}
+                              >
+                                {(collectionId) =>
+                                  collectionId && (
+                                    <form.Field name="rag_policy.filter_attributes">
+                                      {(field) => (
+                                        <MetadataFacetFields
+                                          workspaceId={workspaceId}
+                                          collectionId={collectionId}
+                                          attributes={field.state.value}
+                                          onChange={field.handleChange}
+                                        />
+                                      )}
+                                    </form.Field>
+                                  )
+                                }
+                              </form.Subscribe>
+                              <form.Field name="rag_policy.filter_data_year">
+                                {(field) => (
                                   <Field>
-                                    <FieldLabel htmlFor={verificationTokensId}>
-                                      Token xuất tối đa cho kiểm chứng
+                                    <FieldLabel htmlFor={dataYearId}>
+                                      Năm dữ liệu
                                     </FieldLabel>
                                     <Input
-                                      id={verificationTokensId}
+                                      id={dataYearId}
                                       type="number"
-                                      min={1}
-                                      placeholder="Tự động"
+                                      min={1000}
+                                      max={9999}
+                                      placeholder="Không giới hạn"
                                       value={field.state.value ?? ""}
                                       onChange={(e) =>
                                         field.handleChange(
@@ -1257,198 +1385,138 @@ export function AssistantFormDialog({
                                         )
                                       }
                                       onBlur={field.handleBlur}
-                                      aria-invalid={Boolean(error)}
+                                      className="text-xs"
+                                    />
+                                  </Field>
+                                )}
+                              </form.Field>
+
+                              <form.Field name="rag_policy.filter_issued_year">
+                                {(field) => (
+                                  <Field>
+                                    <FieldLabel htmlFor={issuedYearId}>
+                                      Năm ban hành
+                                    </FieldLabel>
+                                    <Input
+                                      id={issuedYearId}
+                                      type="number"
+                                      min={1000}
+                                      max={9999}
+                                      placeholder="Không giới hạn"
+                                      value={field.state.value ?? ""}
+                                      onChange={(e) =>
+                                        field.handleChange(
+                                          e.target.value === ""
+                                            ? null
+                                            : Number(e.target.value),
+                                        )
+                                      }
+                                      onBlur={field.handleBlur}
+                                      className="text-xs"
+                                    />
+                                  </Field>
+                                )}
+                              </form.Field>
+
+                              <form.Field name="rag_policy.filter_effective_on">
+                                {(field) => (
+                                  <Field>
+                                    <FieldLabel htmlFor={effectiveOnId}>
+                                      Hiệu lực tại ngày
+                                    </FieldLabel>
+                                    <Input
+                                      id={effectiveOnId}
+                                      type="date"
+                                      value={field.state.value}
+                                      onChange={(e) =>
+                                        field.handleChange(e.target.value)
+                                      }
+                                      onBlur={field.handleBlur}
                                       className="text-xs"
                                     />
                                     <FieldDescription className="text-[11px]">
-                                      Để trống để ModelOps tự tính ngân sách
-                                      kiểm chứng, độc lập với ngân sách trả lời.
+                                      Chỉ khớp khi tài liệu có đủ cả ngày bắt
+                                      đầu và kết thúc hiệu lực.
                                     </FieldDescription>
-                                    {error ? (
-                                      <FieldError>{error}</FieldError>
-                                    ) : null}
                                   </Field>
-                                );
-                              }}
-                            </form.Field>
-                          </div>
-                        )
-                      }
-                    </form.Subscribe>
-
-                    <div className="space-y-3 border-t pt-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Phạm vi metadata mặc định
-                      </p>
-                      <p className="text-[11px] leading-relaxed text-muted-foreground">
-                        Lọc theo metadata đã được người duyệt gắn cho tài liệu.
-                        Bỏ trống nghĩa là không giới hạn. Trường nào cũng phải
-                        khớp trên cùng một đơn vị được annotation; giá trị
-                        unknown không khớp bộ lọc đã đặt.
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <form.Subscribe
-                          selector={(state) => state.values.collection_id}
-                        >
-                          {(collectionId) =>
-                            collectionId && (
-                              <form.Field name="rag_policy.filter_attributes">
-                                {(field) => (
-                                  <MetadataFacetFields
-                                    workspaceId={workspaceId}
-                                    collectionId={collectionId}
-                                    attributes={field.state.value}
-                                    onChange={field.handleChange}
-                                  />
                                 )}
                               </form.Field>
-                            )
-                          }
-                        </form.Subscribe>
-                        <form.Field name="rag_policy.filter_data_year">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor={dataYearId}>
-                                Năm dữ liệu
-                              </FieldLabel>
-                              <Input
-                                id={dataYearId}
-                                type="number"
-                                min={1000}
-                                max={9999}
-                                placeholder="Không giới hạn"
-                                value={field.state.value ?? ""}
-                                onChange={(e) =>
-                                  field.handleChange(
-                                    e.target.value === ""
-                                      ? null
-                                      : Number(e.target.value),
-                                  )
-                                }
-                                onBlur={field.handleBlur}
-                                className="text-xs"
-                              />
-                            </Field>
-                          )}
-                        </form.Field>
 
-                        <form.Field name="rag_policy.filter_issued_year">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor={issuedYearId}>
-                                Năm ban hành
-                              </FieldLabel>
-                              <Input
-                                id={issuedYearId}
-                                type="number"
-                                min={1000}
-                                max={9999}
-                                placeholder="Không giới hạn"
-                                value={field.state.value ?? ""}
-                                onChange={(e) =>
-                                  field.handleChange(
-                                    e.target.value === ""
-                                      ? null
-                                      : Number(e.target.value),
-                                  )
-                                }
-                                onBlur={field.handleBlur}
-                                className="text-xs"
-                              />
-                            </Field>
-                          )}
-                        </form.Field>
+                              <form.Field name="rag_policy.filter_program">
+                                {(field) => (
+                                  <Field>
+                                    <FieldLabel htmlFor={programId}>
+                                      Ngành
+                                    </FieldLabel>
+                                    <Input
+                                      id={programId}
+                                      maxLength={160}
+                                      placeholder="VD: Kỹ thuật phần mềm"
+                                      value={field.state.value}
+                                      onChange={(e) =>
+                                        field.handleChange(e.target.value)
+                                      }
+                                      onBlur={field.handleBlur}
+                                      className="text-xs"
+                                    />
+                                  </Field>
+                                )}
+                              </form.Field>
 
-                        <form.Field name="rag_policy.filter_effective_on">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor={effectiveOnId}>
-                                Hiệu lực tại ngày
-                              </FieldLabel>
-                              <Input
-                                id={effectiveOnId}
-                                type="date"
-                                value={field.state.value}
-                                onChange={(e) =>
-                                  field.handleChange(e.target.value)
-                                }
-                                onBlur={field.handleBlur}
-                                className="text-xs"
-                              />
-                              <FieldDescription className="text-[11px]">
-                                Chỉ khớp khi tài liệu có đủ cả ngày bắt đầu và
-                                kết thúc hiệu lực.
-                              </FieldDescription>
-                            </Field>
-                          )}
-                        </form.Field>
-
-                        <form.Field name="rag_policy.filter_program">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor={programId}>Ngành</FieldLabel>
-                              <Input
-                                id={programId}
-                                maxLength={160}
-                                placeholder="VD: Kỹ thuật phần mềm"
-                                value={field.state.value}
-                                onChange={(e) =>
-                                  field.handleChange(e.target.value)
-                                }
-                                onBlur={field.handleBlur}
-                                className="text-xs"
-                              />
-                            </Field>
-                          )}
-                        </form.Field>
-
-                        <form.Field name="rag_policy.filter_intake">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor={intakeId}>Đợt</FieldLabel>
-                              <Input
-                                id={intakeId}
-                                maxLength={160}
-                                placeholder="VD: Đợt 1 - 2026"
-                                value={field.state.value}
-                                onChange={(e) =>
-                                  field.handleChange(e.target.value)
-                                }
-                                onBlur={field.handleBlur}
-                                className="text-xs"
-                              />
-                            </Field>
-                          )}
-                        </form.Field>
-                      </div>
+                              <form.Field name="rag_policy.filter_intake">
+                                {(field) => (
+                                  <Field>
+                                    <FieldLabel htmlFor={intakeId}>
+                                      Đợt
+                                    </FieldLabel>
+                                    <Input
+                                      id={intakeId}
+                                      maxLength={160}
+                                      placeholder="VD: Đợt 1 - 2026"
+                                      value={field.state.value}
+                                      onChange={(e) =>
+                                        field.handleChange(e.target.value)
+                                      }
+                                      onBlur={field.handleBlur}
+                                      className="text-xs"
+                                    />
+                                  </Field>
+                                )}
+                              </form.Field>
+                            </div>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
 
-              {/* is_active */}
-              <form.Field name="is_active">
-                {(field) => (
-                  <div className="flex items-center justify-between rounded-lg border p-3.5 bg-muted/10">
-                    <div className="space-y-0.5">
-                      <FieldLabel htmlFor={activeSwitchId}>
-                        Trạng thái kích hoạt (Active)
-                      </FieldLabel>
-                      <p className="text-xs text-muted-foreground">
-                        Bật trợ lý cho phép sử dụng trong workspace. Lưu ý: Cần
-                        đảm bảo tài liệu trong kho tri thức đã được xử lý và
-                        model chat sẵn sàng.
-                      </p>
-                    </div>
-                    <Switch
-                      id={activeSwitchId}
-                      checked={field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                    />
+                    {/* is_active */}
+                    <form.Field name="is_active">
+                      {(field) => (
+                        <div className="flex items-center justify-between rounded-lg border p-3.5 bg-muted/10">
+                          <div className="space-y-0.5">
+                            <FieldLabel htmlFor={activeSwitchId}>
+                              Trạng thái kích hoạt (Active)
+                            </FieldLabel>
+                            <p className="text-xs text-muted-foreground">
+                              Bật trợ lý cho phép sử dụng trong workspace. Lưu
+                              ý: Cần đảm bảo tài liệu trong kho tri thức đã được
+                              xử lý và model chat sẵn sàng.
+                            </p>
+                          </div>
+                          <Switch
+                            id={activeSwitchId}
+                            checked={field.state.value}
+                            onCheckedChange={(checked) =>
+                              field.handleChange(checked)
+                            }
+                          />
+                        </div>
+                      )}
+                    </form.Field>
                   </div>
-                )}
-              </form.Field>
-            </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
           </div>
 
           <ResponsiveDialogFooter className="border-t bg-muted/20 px-4 py-3 sm:px-6 flex items-center justify-between">

@@ -191,8 +191,8 @@ export function CompilationReviewTab({
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Đánh giá hai chiều giữa bằng chứng nguồn và bản nháp biên soạn.
-                Kiểm tra bỏ sót và sai diễn giải.
+                Đánh giá hai chiều giữa bằng chứng nguồn và bản nháp đã chuẩn
+                bị. Kiểm tra bỏ sót và sai diễn giải.
               </p>
             </div>
 
@@ -309,7 +309,7 @@ export function CompilationReviewTab({
             <p className="text-xs text-muted-foreground max-w-sm mx-auto">
               {isAutoReviewPending
                 ? "Hệ thống đang tiến hành rà soát tự động, vui lòng chờ trong giây lát..."
-                : "Bạn có thể chủ động yêu cầu reviewer rà soát và đánh giá tính trung thực của bản biên soạn."}
+                : "Bạn có thể chủ động yêu cầu reviewer rà soát và đánh giá tính trung thực của bản đã chuẩn bị."}
             </p>
             {canReview && !isAutoReviewPending && (
               <Button
@@ -397,7 +397,7 @@ export function CompilationReviewTab({
             {onEdit ? (
               <Button variant="outline" size="sm" onClick={onEdit}>
                 <FileEdit className="size-4" />
-                Xem và chỉnh sửa bản biên soạn
+                Xem và chỉnh sửa nội dung
               </Button>
             ) : null}
           </div>
@@ -535,10 +535,10 @@ function ReportViewer({
               value="source_assessments"
               className="text-xs h-7 px-3"
             >
-              Nguồn → Bản biên soạn ({report.source_assessments.length})
+              Nguồn → Nội dung ({report.source_assessments.length})
             </TabsTrigger>
             <TabsTrigger value="draft_assessments" className="text-xs h-7 px-3">
-              Bản biên soạn → Nguồn ({report.draft_assessments.length})
+              Nội dung → Nguồn ({report.draft_assessments.length})
             </TabsTrigger>
           </TabsList>
 
@@ -672,7 +672,7 @@ function ReportViewer({
 
                   <div className="p-2 rounded bg-muted/20 border text-foreground text-xs leading-relaxed">
                     <span className="text-[11px] text-muted-foreground font-semibold block mb-0.5">
-                      Đoạn biên soạn:
+                      Đoạn nội dung:
                     </span>
                     {item.draft?.text || "(Không có trích đoạn)"}
                   </div>
@@ -792,7 +792,7 @@ export function FindingCard({
 
           <div className="p-2.5 rounded-lg bg-muted/20 border space-y-1">
             <span className="text-[11px] font-semibold text-muted-foreground block">
-              Trích đoạn bản biên soạn:
+              Trích đoạn nội dung:
             </span>
             {finding.draft_excerpts.length === 0 ? (
               <span className="text-[11px] text-muted-foreground italic">

@@ -4,6 +4,7 @@ import type {
   Assistant,
   AssistantCreateInput,
   AssistantListParams,
+  AssistantReadiness,
   AssistantUpdateInput,
 } from "@/features/assistants/types";
 import { NEW_ASSISTANT_RAG_POLICY } from "@/features/rag/types";
@@ -38,6 +39,23 @@ export function getAssistant(
 ): Promise<Assistant> {
   return client.get<Assistant>(
     assistantPaths.detail(workspaceId, assistantId),
+    {
+      signal: options?.signal,
+    },
+  );
+}
+
+/**
+ * Retrieves the published/served scope of the collection bound to an assistant.
+ */
+export function getAssistantReadiness(
+  client: V1Client,
+  workspaceId: string,
+  assistantId: string,
+  options?: { signal?: AbortSignal },
+): Promise<AssistantReadiness> {
+  return client.get<AssistantReadiness>(
+    assistantPaths.readiness(workspaceId, assistantId),
     {
       signal: options?.signal,
     },

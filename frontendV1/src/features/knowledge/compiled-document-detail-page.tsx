@@ -5,6 +5,7 @@ import {
   ArrowRight,
   BookMarked,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Clock,
   ExternalLink,
@@ -13,12 +14,17 @@ import {
   Plus,
   RefreshCw,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiProblemError } from "@/app/api/v1";
 import { ErrorState } from "@/components/admin/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -43,7 +49,6 @@ import {
 import {
   useCompiledDocumentHistoryQuery,
   useCompiledDocumentQuery,
-  useCompiledVersionsQuery,
   usePublishedCompiledDocumentQuery,
 } from "./publication-queries";
 import {
@@ -55,6 +60,9 @@ import {
   SearchAvailability,
   useSearchAvailability,
 } from "./search-availability";
+import { ServingReferencesCard } from "./serving-references";
+import { useCompiledDocumentSummaryQuery } from "./summary-queries";
+import { READINESS_LABELS } from "./summary-schemas";
 
 /**
  * Explains a failed published-version read without pretending the document has
@@ -71,10 +79,10 @@ export function describePublishedReadError(error: unknown): string {
       case "permission_denied":
         return "Bạn không có quyền đọc trạng thái xuất bản của tài liệu này.";
       case "compiled_document_not_found":
-        return "Không tìm thấy tài liệu biên soạn trong bộ sưu tập này. Kiểm tra lại đường dẫn hoặc quyền truy cập.";
+        return "Không tìm thấy tài liệu xuất bản trong kho này. Kiểm tra lại đường dẫn hoặc quyền truy cập.";
       case "network_unreachable":
       case "request_aborted":
-        return "Không kết nối được backendV1. Kiểm tra dịch vụ đang chạy ở cổng 8002.";
+        return "Không kết nối được máy chủ. Kiểm tra kết nối rồi thử lại; nếu vẫn lỗi, báo quản trị viên.";
       default:
         return error.message;
     }
@@ -120,14 +128,6 @@ export function CompiledDocumentDetailPage({
     collectionId,
     documentId,
   );
-  const versionsQuery = useCompiledVersionsQuery(
-    workspaceId,
-    collectionId,
-    documentId,
-    pageSize,
-    (page - 1) * pageSize,
-    { lookahead: true },
-  );
   const publishedQuery = usePublishedCompiledDocumentQuery(
     workspaceId,
     collectionId,
@@ -145,7 +145,6 @@ export function CompiledDocumentDetailPage({
   const collection = collectionQuery.data;
   const doc = documentQuery.data;
   const published = publishedQuery.data;
-  const versions = (versionsQuery.data ?? []).slice(0, pageSize);
   const history = (historyQuery.data ?? []).slice(0, pageSize);
 
   const availability = useSearchAvailability(
@@ -154,6 +153,31 @@ export function CompiledDocumentDetailPage({
     documentId,
     published?.version,
   );
+  const summaryQuery = useCompiledDocumentSummaryQuery(
+    workspaceId,
+    collectionId,
+    documentId,
+    page,
+    pageSize,
+    { isActiveTask: availability.isUpdating },
+  );
+  const summary = summaryQuery.data;
+  const versions = summary?.versions.items ?? [];
+  const versionsTotal = summary?.versions.meta.total ?? 0;
+
+  // The sync query is the only active-task signal; when it reaches a terminal
+  // state, fetch the summary once more so readiness is not left mid-flight.
+  const wasIndexTaskActive = useRef(false);
+  const refetchSummary = summaryQuery.refetch;
+  useEffect(() => {
+    if (availability.isUpdating) {
+      wasIndexTaskActive.current = true;
+      return;
+    }
+    if (!wasIndexTaskActive.current) return;
+    wasIndexTaskActive.current = false;
+    void refetchSummary();
+  }, [availability.isUpdating, refetchSummary]);
 
   if (documentQuery.isLoading || collectionQuery.isLoading) {
     return (
@@ -181,7 +205,7 @@ export function CompiledDocumentDetailPage({
         <Card className="rounded-xl border-destructive/20 bg-destructive/5 p-5 text-xs space-y-2">
           <div className="flex items-center gap-2 text-destructive font-semibold">
             <AlertCircle className="size-4 shrink-0" />
-            <span>Không tìm thấy tài liệu biên soạn</span>
+            <span>Không tìm thấy tài liệu xuất bản</span>
           </div>
           <p className="text-muted-foreground">
             Tài liệu không tồn tại hoặc bạn không có quyền truy cập.
@@ -236,16 +260,7 @@ export function CompiledDocumentDetailPage({
                 <h1 className="text-base sm:text-xl font-bold text-foreground">
                   {doc.title}
                 </h1>
-                <Badge
-                  variant="outline"
-                  className="font-mono text-xs bg-muted/40 text-muted-foreground"
-                >
-                  key: {doc.document_key}
-                </Badge>
               </div>
-              <p className="text-xs text-muted-foreground font-mono">
-                ID: {doc.id}
-              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -264,7 +279,7 @@ export function CompiledDocumentDetailPage({
                     search={{ page: 1, pageSize: 20, tab: "compilations" }}
                   >
                     <Plus className="size-3.5" />
-                    <span>Thêm phiên bản từ Compiler</span>
+                    <span>Thêm phiên bản mới</span>
                   </Link>
                 </Button>
               )}
@@ -273,16 +288,13 @@ export function CompiledDocumentDetailPage({
 
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 pt-2 border-t text-xs text-muted-foreground">
             <div>
-              Thứ tự thay đổi:{" "}
-              <span className="font-mono font-semibold text-foreground">
-                seq #{doc.change_sequence}
+              Lần thay đổi:{" "}
+              <span className="font-semibold text-foreground">
+                {doc.change_sequence}
               </span>
             </div>
             <div>
-              Tạo bởi:{" "}
-              <span className="font-mono text-foreground">
-                {doc.created_by}
-              </span>
+              Tạo bởi: <span className="text-foreground">{doc.created_by}</span>
             </div>
             <div>
               Ngày tạo:{" "}
@@ -291,6 +303,32 @@ export function CompiledDocumentDetailPage({
               </span>
             </div>
           </div>
+
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px] text-muted-foreground gap-1"
+              >
+                <ChevronDown className="size-3" />
+                <span>Chi tiết kỹ thuật</span>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 pt-1 text-[11px] text-muted-foreground font-mono">
+                <span>Mã tài liệu: {doc.document_key}</span>
+                <span>ID: {doc.id}</span>
+                {summary ? (
+                  <span>
+                    Trạng thái đọc lúc:{" "}
+                    {formatDateTimeValue(summary.observed_at)}
+                  </span>
+                ) : null}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </CardContent>
       </Card>
 
@@ -343,18 +381,18 @@ export function CompiledDocumentDetailPage({
               <div className="flex items-center gap-2 flex-wrap">
                 <CheckCircle2 className="size-4 text-success shrink-0" />
                 <span className="text-xs font-semibold text-foreground">
-                  Phiên bản đang phát hành hiện hành
+                  Phiên bản đang xuất bản
                 </span>
                 <Badge
                   variant="default"
                   className="text-xs bg-success text-success-foreground font-semibold"
                 >
-                  Đã phát hành · v{published.version.version_no}
+                  Đã xuất bản · v{published.version.version_no}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Được phê duyệt và phát hành bởi{" "}
-                <span className="font-mono text-foreground font-medium">
+                Được duyệt và xuất bản bởi{" "}
+                <span className="text-foreground font-medium">
                   {published.decision.actor_ref}
                 </span>{" "}
                 vào {formatDateTimeValue(published.decision.created_at)}.
@@ -378,7 +416,7 @@ export function CompiledDocumentDetailPage({
                     versionId: published.version.id,
                   }}
                 >
-                  <span>Xem bản phát hành</span>
+                  <span>Xem bản xuất bản</span>
                   <ArrowRight className="size-3.5" />
                 </Link>
               </Button>
@@ -398,6 +436,13 @@ export function CompiledDocumentDetailPage({
           </CardContent>
         </Card>
       )}
+
+      <ServingReferencesCard
+        summary={summary}
+        workspaceId={workspaceId}
+        collectionId={collectionId}
+        documentId={documentId}
+      />
 
       {isLifecycleAdmin(role) ? (
         <DocumentReplacement
@@ -432,12 +477,12 @@ export function CompiledDocumentDetailPage({
 
         {/* Tab 1: Versions List */}
         <TabsContent value="versions" className="space-y-3 m-0">
-          {versionsQuery.isLoading ? (
+          {summaryQuery.isLoading ? (
             <Skeleton className="h-48 w-full rounded-xl" />
-          ) : versionsQuery.isError ? (
+          ) : summaryQuery.isError ? (
             <ErrorState
-              error={versionsQuery.error}
-              onRetry={() => void versionsQuery.refetch()}
+              error={summaryQuery.error}
+              onRetry={() => void summaryQuery.refetch()}
             />
           ) : versions.length === 0 ? (
             <Card className="rounded-xl p-8 text-center text-xs text-muted-foreground">
@@ -451,11 +496,14 @@ export function CompiledDocumentDetailPage({
                     <TableHead className="text-xs font-semibold w-24">
                       Phiên bản
                     </TableHead>
-                    <TableHead className="text-xs font-semibold w-32">
+                    <TableHead className="text-xs font-semibold w-36">
                       Trạng thái
                     </TableHead>
                     <TableHead className="text-xs font-semibold">
-                      Compiler Run & Hashes
+                      Nguồn dẫn xuất
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold">
+                      Lần chuẩn bị nội dung
                     </TableHead>
                     <TableHead className="text-xs font-semibold text-right w-44">
                       Thời điểm tạo
@@ -466,6 +514,8 @@ export function CompiledDocumentDetailPage({
                 <TableBody>
                   {versions.map((ver) => {
                     const statusInfo = formatPublicationStatus(ver.status);
+                    const isPublished =
+                      ver.id === summary?.published_version?.id;
                     return (
                       <TableRow
                         key={ver.id}
@@ -487,28 +537,75 @@ export function CompiledDocumentDetailPage({
                           >
                             {statusInfo.label}
                           </Badge>
+                          {isPublished && summary ? (
+                            <div className="mt-1 flex flex-wrap items-center gap-1">
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] font-normal"
+                              >
+                                {READINESS_LABELS[summary.readiness.status]}
+                              </Badge>
+                              {summary.served_version?.id === ver.id ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] font-normal border-success/40 text-success"
+                                >
+                                  Đang phục vụ
+                                </Badge>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </TableCell>
 
                         <TableCell className="py-3 text-xs">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <Link
-                                to="/workspaces/$workspaceId/collections/$collectionId/compilations/$runId"
-                                params={{
-                                  workspaceId,
-                                  collectionId,
-                                  runId: ver.compilation_run_id,
-                                }}
-                                className="font-mono text-primary hover:underline inline-flex items-center gap-1"
-                              >
-                                <span>{ver.compilation_run_id}</span>
-                                <ExternalLink className="size-2.5" />
-                              </Link>
+                          {ver.origins.length === 0 ? (
+                            <span className="text-muted-foreground">
+                              Không còn nguồn hiển thị
+                            </span>
+                          ) : (
+                            <div
+                              className="flex flex-wrap items-center gap-1"
+                              title={ver.origins
+                                .map(
+                                  (origin) =>
+                                    `${origin.source_title} · v${origin.revision_no}`,
+                                )
+                                .join("\n")}
+                            >
+                              {ver.origins.slice(0, 2).map((origin) => (
+                                <Badge
+                                  key={origin.revision_id}
+                                  variant="secondary"
+                                  className="max-w-[180px] truncate text-[11px] font-normal"
+                                >
+                                  {origin.source_title} · v{origin.revision_no}
+                                </Badge>
+                              ))}
+                              {ver.origins.length > 2 ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[11px] font-normal"
+                                >
+                                  +{ver.origins.length - 2} nguồn
+                                </Badge>
+                              ) : null}
                             </div>
-                            <div className="text-[11px] font-mono text-muted-foreground truncate max-w-xs sm:max-w-md">
-                              bundle: {ver.bundle_sha256}
-                            </div>
-                          </div>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="py-3 text-xs">
+                          <Link
+                            to="/workspaces/$workspaceId/collections/$collectionId/compilations/$runId"
+                            params={{
+                              workspaceId,
+                              collectionId,
+                              runId: ver.compilation_run_id,
+                            }}
+                            className="text-primary hover:underline inline-flex items-center gap-1"
+                          >
+                            <span>Xem lần chuẩn bị nội dung</span>
+                            <ExternalLink className="size-2.5" />
+                          </Link>
                         </TableCell>
 
                         <TableCell className="py-3 text-right text-xs text-muted-foreground">
@@ -557,11 +654,8 @@ export function CompiledDocumentDetailPage({
                 ? (pageSize) => onSearchChange({ pageSize, page: 1 })
                 : undefined
             }
-            hasNext={
-              !versionsQuery.isError &&
-              (versionsQuery.data?.length ?? 0) > pageSize
-            }
-            disabled={versionsQuery.isFetching}
+            hasNext={!summaryQuery.isError && page * pageSize < versionsTotal}
+            disabled={summaryQuery.isFetching}
             label="phiên bản"
           />
         </TabsContent>
@@ -586,7 +680,7 @@ export function CompiledDocumentDetailPage({
                 <TableHeader>
                   <TableRow className="bg-muted/30">
                     <TableHead className="text-xs font-semibold w-24">
-                      Seq (#)
+                      Lần
                     </TableHead>
                     <TableHead className="text-xs font-semibold w-36">
                       Quyết định
@@ -629,10 +723,11 @@ export function CompiledDocumentDetailPage({
                           <p className="font-medium text-foreground whitespace-pre-wrap">
                             {dec.reason}
                           </p>
-                          <div className="flex items-center gap-3 text-[11px] text-muted-foreground font-mono flex-wrap">
-                            <span>Actor: {dec.actor_ref}</span>
-                            <span>Version: {dec.version_id}</span>
-                            <span>Decision: {dec.id}</span>
+                          <div
+                            className="text-[11px] text-muted-foreground"
+                            title={`version_id: ${dec.version_id}\ndecision_id: ${dec.id}`}
+                          >
+                            Người thực hiện: {dec.actor_ref}
                           </div>
                         </TableCell>
 

@@ -87,7 +87,9 @@ test("empty collection chooser lets an admin create in the selected workspace", 
     await screen.findByRole("button", { name: "Tạo kho đầu tiên" }),
   );
   expect((await screen.findByRole("dialog")).textContent).toBe("ws-test");
-  expect(screen.getByRole("heading", { name: "Biên soạn" })).toBeTruthy();
+  expect(
+    screen.getByRole("heading", { name: "Chuẩn bị nội dung" }),
+  ).toBeTruthy();
 });
 
 test("read-only members see guidance without a mutation action", async () => {

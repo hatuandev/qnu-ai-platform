@@ -121,6 +121,7 @@ const mockTurn: TurnResponse = {
   },
   rewrite_trace: null,
   source_status: "current",
+  source_status_reason: null,
   created_at: "2026-10-27T08:05:00Z",
   finished_at: "2026-10-27T08:05:02Z",
 };
