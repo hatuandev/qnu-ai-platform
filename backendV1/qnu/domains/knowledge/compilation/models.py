@@ -85,8 +85,9 @@ class CompilationRun(Base):
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
     request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     input_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
-    provider_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("providers.id", ondelete="RESTRICT"), nullable=False
+    # Source-only runs legitimately have no chat model; AI runs keep the pinned target.
+    provider_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("providers.id", ondelete="RESTRICT")
     )
     config: Mapped[dict] = mapped_column(JSONB, nullable=False)
     requested_at: Mapped[datetime] = mapped_column(

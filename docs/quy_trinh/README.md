@@ -33,6 +33,8 @@
 
 ### 1.2 Luồng hệ thống V1
 
+- [47 — Hợp đồng luồng chính backend V1 cho FE mới](./47_hop_dong_luong_chinh_backend_v1.md): API tối
+  giản cho tải → chuẩn bị tự động → xem/sửa → duyệt/phát hành → readiness; tách API quản trị.
 - [46 — Pilot QNU V1 và đóng phạm vi bản đầu](./46_pilot_qnu_v1_va_dong_pham_vi.md): chọn đơn vị
   và người tham gia, kịch bản đo thời gian, ma trận tình huống lỗi, nghiệm thu và rollout/rollback.
 - [45 — Gửi duyệt, yêu cầu sửa và danh sách “Cần xử lý”](./45_ban_giao_duyet_va_can_xu_ly_v1.md):

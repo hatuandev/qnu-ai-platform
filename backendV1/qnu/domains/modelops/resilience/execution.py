@@ -254,7 +254,7 @@ class ManagedChatModel:
 
 
 class ManagedOcrEngine:
-    name = "nemotron"
+    name = "ocr"
 
     def __init__(self, adapter, executor=None, *, document_adapter=None):
         self.adapter, self.executor = adapter, executor or CredentialExecutor()
@@ -266,12 +266,16 @@ class ManagedOcrEngine:
         )
 
     async def extract_document(self, pdf, request, *, checkpoint, save, guard):
-        from qnu.adapters.providers.mineru import MineruOcrEngine
-
+        if self.document_adapter is None:
+            raise AppException(
+                "Chưa cấu hình adapter OCR tài liệu ở composition root.",
+                code="ocr_document_adapter_missing",
+                status_code=503,
+            )
         return await self.executor.call(
             "ocr",
             request,
-            lambda req: (self.document_adapter or MineruOcrEngine()).extract_document(
+            lambda req: self.document_adapter.extract_document(
                 pdf, req, checkpoint=checkpoint, save=save, guard=guard
             ),
         )

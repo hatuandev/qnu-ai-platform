@@ -34,6 +34,22 @@ from qnu.platform.crypto import decrypt
 from qnu.platform.errors import AppException, DependencyUnavailable
 from qnu.ports.provider_execution import ProviderExecution
 
+# A chat step declared optional by policy may proceed without a target only for these
+# codes. An explicit provider/model choice must still fail loudly.
+OPTIONAL_CHAT_UNAVAILABLE_CODES = frozenset(
+    {
+        "chat_credentials_missing",
+        "chat_credentials_unreadable",
+        "provider_keys_unavailable",
+        "model_not_configured",
+        "provider_not_found",
+        "provider_inactive",
+        "provider_capability_mismatch",
+        "model_required",
+        "chat_provider_type_unsupported",
+    }
+)
+
 
 def _wait_for_completion(provider: Provider) -> bool:
     from qnu.domains.modelops.resilience.service import effective_policy

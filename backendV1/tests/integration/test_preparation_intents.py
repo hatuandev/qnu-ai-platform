@@ -144,7 +144,9 @@ def test_golden_path_reaches_ready_without_opening_ocr_or_compiler(client):
         body = created.json()
         intent = body["intent"]
         assert body["created"] is True and body["dispatched"] is True
-        assert intent["status"] == "queued" and intent["mode"] == "source"
+        assert intent["status"] == "queued" and intent["mode"] == "auto"
+        assert intent["policy"]["supplement"] == "disabled"
+        assert intent["policy"]["reason"] == "chat_credentials_missing"
         assert intent["revision_no"] == 1 and len(intent["revision_sha256"]) == 64
 
         assert advance(client, intent["id"], queue) == "waiting_ocr"
@@ -563,6 +565,95 @@ def test_auto_mode_without_chat_key_keeps_source_and_reports_reason(client):
         assert not chat_api.requests
 
 
+def test_auto_mode_degrades_when_granted_chat_adapter_is_missing(client):
+    with FakeNemotron() as ocr_api:
+        data = prepared_workspace(client, "prep-auto-noadapter", ocr_api)
+        as_actor(PLATFORM)
+        response = client.post(
+            f"{API}/modelops/providers",
+            json={
+                "name": "chat-no-adapter-" + data["workspace"]["id"],
+                "provider_type": "gemini",
+                "base_url": "http://127.0.0.1:9",
+                "model_name": "gemini-test",
+                "capabilities": ["chat"],
+                "timeout_seconds": 5,
+                "token_limits": {"context_window_tokens": 131072, "max_output_tokens": 8192},
+            },
+        )
+        assert response.status_code == 201, response.text
+        provider = response.json()
+        assert (
+            client.post(
+                f"{API}/modelops/providers/{provider['id']}/keys",
+                json={"name": "test", "secret": "no-adapter-secret"},
+            ).status_code
+            == 201
+        )
+        assert (
+            client.put(
+                f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
+                json={
+                    "provider_ids": [data["ocr_provider"]["id"], provider["id"]],
+                    "defaults": {"ocr": data["ocr_provider"]["id"], "chat": provider["id"]},
+                },
+            ).status_code
+            == 200
+        )
+        as_actor(EDITOR)
+
+        queue = FakeJobQueue()
+        created = create_intent(client, data, key="prep-auto-noadapter", queue=queue)
+        assert created.status_code == 201, created.text
+        intent = created.json()["intent"]
+        assert intent["provider_id"] == provider["id"]
+        assert intent["policy"] == {
+            "version": "qnu.preparation.auto/v1",
+            "supplement": "disabled",
+            "reason": "chat_provider_type_unsupported",
+        }
+
+        assert advance(client, intent["id"], queue) == "waiting_ocr"
+        run_id = client.get(_status_url(data, intent["id"])).json()["ocr_run_id"]
+        assert execute_now(client, run_id).status == "completed"
+        assert advance(client, intent["id"], queue) == "compiling"
+        compilation_id = client.get(_status_url(data, intent["id"])).json()["compilation_run_id"]
+        assert execute_compile(client, compilation_id) == "completed"
+        assert advance(client, intent["id"], queue) == "ready"
+
+        run = client.get(_compilation_url(data, compilation_id)).json()
+        assert run["source_first"] is True
+        assert run["ai_supplement"] is False and run["selective_supplement"] is False
+        assert run["provider_id"] is None
+        draft = client.get(_draft_url(data, compilation_id))
+        assert draft.status_code == 200, draft.text
+        body = draft.json()
+        assert body["sections"]
+        assert body["validation"]["source_copy"] == "retained"
+        assert body["validation"]["quality"]["checks"]["source_binding"] == (
+            "confirmed_by_source"
+        )
+
+        explicit = create_intent(
+            client,
+            data,
+            key="prep-ai-noadapter",
+            mode="ai",
+            provider_id=provider["id"],
+            queue=queue,
+        )
+        assert explicit.status_code == 201, explicit.text
+        explicit_id = explicit.json()["intent"]["id"]
+        outcome = advance(client, explicit_id, queue)
+        if outcome == "waiting_ocr":
+            explicit_ocr = client.get(_status_url(data, explicit_id)).json()["ocr_run_id"]
+            assert execute_now(client, explicit_ocr).status == "completed"
+            outcome = advance(client, explicit_id, queue)
+        assert outcome == "failed"
+        failed = client.get(_status_url(data, explicit_id)).json()
+        assert failed["error_code"] == "chat_provider_type_unsupported"
+
+
 def test_auto_mode_reuses_a_completed_compilation_only_for_the_same_fingerprint(client):
     with FakeNemotron() as ocr_api, FakeChat() as chat_api:
         data = prepared_workspace(client, "prep-auto-reuse", ocr_api)
@@ -630,6 +721,77 @@ def test_cancel_stops_the_active_compilation_run(client):
         assert client.portal.call(compilation_status) == "cancelled"
         assert execute_compile(client, compilation_id) == "not_claimed"
         assert client.portal.call(compilation_status) == "cancelled"
+
+
+def test_minimal_request_is_automatic_and_continues_without_optional_ai(client):
+    with FakeNemotron() as ocr_api:
+        data = prepared_workspace(client, "prep-auto-default", ocr_api)
+        queue = FakeJobQueue()
+        created = create_intent(client, data, key="prep-auto-default", queue=queue)
+        assert created.status_code == 201, created.text
+        intent = created.json()["intent"]
+        assert intent["mode"] == "auto"
+        assert intent["provider_id"] is None
+        assert intent["policy"] == {
+            "version": "qnu.preparation.auto/v1",
+            "supplement": "disabled",
+            "reason": "model_not_configured",
+        }
+
+        explicit_ai = create_intent(client, data, key="prep-auto-no-chat", mode="ai")
+        assert explicit_ai.status_code == 409, explicit_ai.text
+        assert explicit_ai.json()["code"] == "model_not_configured"
+
+        assert advance(client, intent["id"], queue) == "waiting_ocr"
+        run_id = client.get(_status_url(data, intent["id"])).json()["ocr_run_id"]
+        assert execute_now(client, run_id).status == "completed"
+        assert advance(client, intent["id"], queue) == "compiling"
+        compilation_id = client.get(_status_url(data, intent["id"])).json()["compilation_run_id"]
+        assert execute_compile(client, compilation_id) == "completed"
+        assert advance(client, intent["id"], queue) == "ready"
+
+        run = client.get(_compilation_url(data, compilation_id)).json()
+        assert run["source_first"] is True
+        assert run["ai_supplement"] is False and run["selective_supplement"] is False
+
+
+def test_explicit_source_ignores_an_available_chat_model(client):
+    with FakeNemotron() as ocr_api, FakeChat() as chat_api:
+        data = prepared_workspace(client, "prep-source-explicit", ocr_api)
+        chat_provider(client, data, chat_api.base_url)
+        queue = FakeJobQueue()
+        created = create_intent(client, data, key="prep-source-explicit", mode="source", queue=queue)
+        assert created.status_code == 201, created.text
+        intent = created.json()["intent"]
+        assert intent["mode"] == "source" and intent["policy"] is None
+
+        assert advance(client, intent["id"], queue) == "waiting_ocr"
+        run_id = client.get(_status_url(data, intent["id"])).json()["ocr_run_id"]
+        assert execute_now(client, run_id).status == "completed"
+        assert advance(client, intent["id"], queue) == "compiling"
+        compilation_id = client.get(_status_url(data, intent["id"])).json()["compilation_run_id"]
+        assert execute_compile(client, compilation_id) == "completed"
+        assert advance(client, intent["id"], queue) == "ready"
+
+        run = client.get(_compilation_url(data, compilation_id)).json()
+        assert run["source_first"] is True and run["selective_supplement"] is False
+        assert not chat_api.requests
+
+
+def test_omitted_mode_retry_of_a_legacy_source_intent_returns_it(client):
+    with FakeNemotron() as ocr_api:
+        data = prepared_workspace(client, "prep-legacy-bridge", ocr_api)
+        queue = FakeJobQueue()
+        first = create_intent(client, data, key="prep-legacy-bridge", mode="source", queue=queue)
+        assert first.status_code == 201, first.text
+        assert first.json()["intent"]["mode"] == "source"
+
+        replay = create_intent(client, data, key="prep-legacy-bridge", queue=queue)
+        assert replay.status_code == 200, replay.text
+        assert replay.json()["created"] is False
+        assert replay.json()["intent"]["id"] == first.json()["intent"]["id"]
+        assert replay.json()["intent"]["mode"] == "source"
+        assert count(client, PreparationIntent) == 1
 
 
 def test_cancel_during_worker_advance_is_not_overwritten(client):

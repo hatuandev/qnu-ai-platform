@@ -9,8 +9,15 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 class PreparationRequest(BaseModel):
+    """Automatic preparation is the main flow; the server picks the permitted policy.
+
+    A normal caller sends only the document identity and an idempotency key. The
+    explicit ``source`` and ``ai`` modes remain for known edit paths, while the
+    advanced compiler API keeps its own multi-run and review controls.
+    """
+
     model_config = ConfigDict(extra="forbid")
-    mode: Literal["source", "ai", "auto"] = "source"
+    mode: Literal["source", "ai", "auto"] = "auto"
     revision_id: str | None = Field(None, min_length=1, max_length=64)
     ocr_run_id: str | None = Field(None, min_length=1, max_length=64)
     text_version: Annotated[int, Field(strict=True, ge=0)] = 0

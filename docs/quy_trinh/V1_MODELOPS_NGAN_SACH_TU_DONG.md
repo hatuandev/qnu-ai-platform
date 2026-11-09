@@ -21,8 +21,10 @@ request để trống. Viết lại câu hỏi nối tiếp không còn tự gá
 kiểm chứng để trống gửi null; các mức cũ được lưu trong policy vẫn giữ nguyên.
 
 Các biến môi trường COMPILER_MAX_OUTPUT_TOKENS, RAG_MAX_OUTPUT_TOKENS và
-CONVERSATION_REWRITE_MAX_OUTPUT_TOKENS giữ để đọc cấu hình triển khai cũ, không còn
-đặt trần cho request tự động mới. OCR ảnh cũ có OCR_MAX_OUTPUT_TOKENS tùy chọn;
+CONVERSATION_REWRITE_MAX_OUTPUT_TOKENS đã được gỡ khỏi runtime V1; giá trị còn
+trong cấu hình triển khai cũ bị bỏ qua, không đặt trần cho request tự động mới.
+QDRANT_COLLECTION/VECTOR_SIZE cũng đã gỡ: tên collection và số chiều do index
+run/embedding model quyết định. OCR ảnh cũ có OCR_MAX_OUTPUT_TOKENS tùy chọn;
 không đặt biến này thì dùng ngân sách ModelOps. Run cũ giữ số đã ghim. MinerU
 không dùng token LLM. Request chẩn đoán kết nối vẫn nhỏ có chủ đích, không phải
 giới hạn cho công việc thực tế. Số mặc định trong planner review chỉ phục vụ

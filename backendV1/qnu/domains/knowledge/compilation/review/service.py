@@ -1,4 +1,4 @@
-"""Authorize and pin review targets, persist request before quota can commit."""
+"""Prepare, cancel and dispatch durable reviews with pinned targets and budgets."""
 
 import asyncio
 import hashlib
@@ -12,26 +12,37 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.models import CompilationRun, utcnow
 from qnu.domains.knowledge.compilation.review import artifacts, parts, refinement
+from qnu.domains.knowledge.compilation.review.access import (
+    REVIEW_ROLES,
+    authorize,
+    can_resume_segmented,
+    checkpoint,
+    expire,
+    get_review,
+    list_reviews,
+    target_matches,
+    untouched,
+)
 from qnu.domains.knowledge.compilation.review.material import ReviewMaterial, load_material
 from qnu.domains.knowledge.compilation.review.models import (
     CompilationReview,
     CompilationReviewSegment,
-    ReviewArtifact,
+)
+from qnu.domains.knowledge.compilation.review.readers import (
+    artifacts_payload,
+    progress,
+    read_output,
+    read_segment_artifact,
+    read_segment_raw,
 )
 from qnu.domains.knowledge.compilation.review.report import (
     PROMPT_VERSION,
     SYSTEM,
-    VERSION,
     messages_for,
     output_schema,
 )
-from qnu.domains.knowledge.compilation.review.schemas import (
-    ReviewProgress,
-    ReviewRequest,
-    ReviewSegmentProgress,
-)
+from qnu.domains.knowledge.compilation.review.schemas import ReviewRequest
 from qnu.domains.knowledge.compilation.service import get_run
-from qnu.domains.knowledge.policies.access import READ_ROLES, load_collection
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.modelops.inference.service import (
     available_input_tokens,
@@ -40,15 +51,34 @@ from qnu.domains.modelops.inference.service import (
 )
 from qnu.domains.modelops.public_api import ChatRuntime, resolve_chat_runtime
 from qnu.domains.ocr.ids import new_id
-from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
+from qnu.domains.workspaces.access import actor_ref
 from qnu.domains.workspaces.public_api import record_workspace_event
-from qnu.platform.errors import AppException, Conflict, EntityNotFound
+from qnu.platform.errors import AppException, Conflict
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.chat_model import ChatMessage, ChatRequest
 from qnu.ports.job_queue import JobQueue
 
-REVIEW_ROLES = ("admin", "editor", "reviewer")
+__all__ = [
+    "REVIEW_ROLES",
+    "PreparedReview",
+    "artifacts_payload",
+    "authorize",
+    "cancel_review",
+    "checkpoint",
+    "dispatch_review",
+    "expire",
+    "get_review",
+    "list_reviews",
+    "prepare",
+    "progress",
+    "read_output",
+    "read_segment_artifact",
+    "read_segment_raw",
+    "target_matches",
+    "untouched",
+]
+
 logger = get_logger(__name__)
 SEGMENTED_CODES = {
     "model_context_limit_exceeded",
@@ -67,167 +97,6 @@ class PreparedReview:
     request: ChatRequest | None = None
     messages: list[ChatMessage] | None = None
     segmented: bool = False
-
-
-async def authorize(
-    db: AsyncSession,
-    actor: AuthActor,
-    workspace_id: str,
-    collection_id: str,
-    *,
-    write: bool = False,
-) -> None:
-    await resolve_workspace_access(
-        db,
-        actor,
-        workspace_id,
-        required_roles=REVIEW_ROLES if write else READ_ROLES,
-        for_update=write,
-    )
-    await load_collection(db, workspace_id, collection_id)
-
-
-async def expire(db: AsyncSession, row: CompilationReview) -> None:
-    if row.status == "running" and row.expires_at <= utcnow():
-        await db.refresh(row, with_for_update=True)
-        if row.status != "running" or row.expires_at > utcnow():
-            return
-        row.status, row.error_code, row.finished_at = (
-            "uncertain",
-            "compilation_review_interrupted",
-            utcnow(),
-        )
-        await db.commit()
-
-
-async def get_review(
-    db: AsyncSession,
-    actor: AuthActor,
-    workspace_id: str,
-    collection_id: str,
-    run_id: str,
-    review_id: str,
-) -> CompilationReview:
-    await get_run(db, actor, workspace_id, collection_id, run_id)
-    row = await db.scalar(
-        select(CompilationReview).where(
-            CompilationReview.id == review_id,
-            CompilationReview.compilation_run_id == run_id,
-            CompilationReview.workspace_id == workspace_id,
-            CompilationReview.collection_id == collection_id,
-        )
-    )
-    if row is None:
-        raise EntityNotFound("Không tìm thấy lượt review.", code="compilation_review_not_found")
-    await expire(db, row)
-    return row
-
-
-async def list_reviews(
-    db: AsyncSession,
-    actor: AuthActor,
-    workspace_id: str,
-    collection_id: str,
-    run_id: str,
-    limit: int,
-    offset: int,
-) -> list[CompilationReview]:
-    await get_run(db, actor, workspace_id, collection_id, run_id)
-    rows = list(
-        (
-            await db.scalars(
-                select(CompilationReview)
-                .where(
-                    CompilationReview.compilation_run_id == run_id,
-                    CompilationReview.workspace_id == workspace_id,
-                    CompilationReview.collection_id == collection_id,
-                )
-                .order_by(CompilationReview.created_at.desc(), CompilationReview.id)
-                .limit(limit)
-                .offset(offset)
-            )
-        ).all()
-    )
-    for row in rows:
-        await expire(db, row)
-    return rows
-
-
-async def target_matches(
-    db: AsyncSession, blob: BlobStore, row: CompilationReview, run: CompilationRun
-) -> ReviewMaterial:
-    material = await load_material(db, blob, run)
-    if (row.input_sha256, row.draft_sha256, row.bundle_sha256) != (
-        material.bundle.input_sha256,
-        material.bundle.draft_sha256,
-        material.bundle.bundle_sha256,
-    ):
-        raise Conflict(
-            "Nguồn hoặc bản nháp đã khác đối tượng review.",
-            code="compilation_review_target_changed",
-        )
-    return material
-
-
-async def _can_resume_segmented(db: AsyncSession, previous: CompilationReview) -> bool:
-    if previous.status not in {"failed", "uncertain"}:
-        return False
-    has_manifest = bool((previous.trace.get("segmentation") or {}).get("manifest_sha256"))
-    if not has_manifest:
-        return await untouched(db, previous.id)
-    if previous.status == "uncertain" or await untouched(db, previous.id):
-        return True
-    segments = list(
-        (
-            await db.scalars(
-                select(CompilationReviewSegment)
-                .where(CompilationReviewSegment.review_id == previous.id)
-                .order_by(CompilationReviewSegment.segment_index)
-            )
-        ).all()
-    )
-    if not segments:
-        return False
-    leaves = refinement.ordered_leaves(segments)
-    if any(leaf.status == "uncertain" for leaf in leaves):
-        return False
-    return any(
-        leaf.status in {"pending", "running", "received"}
-        or refinement.refine_reason(leaf) is not None
-        for leaf in leaves
-    )
-
-
-async def untouched(db: AsyncSession, review_id: str) -> bool:
-    """True only when no part ever reached the provider, so a replay cannot duplicate work."""
-    segments = list(
-        (
-            await db.scalars(
-                select(CompilationReviewSegment).where(
-                    CompilationReviewSegment.review_id == review_id
-                )
-            )
-        ).all()
-    )
-    if not segments:
-        return False
-    for segment in segments:
-        if segment.attempt_count or segment.request_started_at is not None:
-            return False
-        for kind in ("raw_response", "assessment_json"):
-            if await artifacts.segment_artifact(db, segment.id, kind) is not None:
-                return False
-    return True
-
-
-async def checkpoint(
-    db: AsyncSession, blob: BlobStore, actor: AuthActor, row: CompilationReview, run: CompilationRun
-) -> None:
-    await authorize(db, actor, row.workspace_id, row.collection_id, write=True)
-    await db.refresh(row, with_for_update=True)
-    if row.status != "running" or row.expires_at <= utcnow():
-        raise Conflict("Lượt review đã hết thời gian chờ.", code="compilation_review_expired")
-    await target_matches(db, blob, row, run)
 
 
 async def prepare(
@@ -275,7 +144,7 @@ async def prepare(
         # Never resume a request that may still be in flight; a concurrent replay
         # could send the same part twice. Only a stopped review can continue, and a
         # stop before the first request is replayed because it sent nothing.
-        if await _can_resume_segmented(db, previous):
+        if await can_resume_segmented(db, previous):
             segment_count = await db.scalar(
                 select(func.count())
                 .select_from(CompilationReviewSegment)
@@ -524,16 +393,6 @@ async def dispatch_review(queue: JobQueue | None, review_id: str) -> bool:
         return False
 
 
-def _segment_progress_status(review: CompilationReview, segment: CompilationReviewSegment) -> str:
-    if review.status != "cancelled":
-        return segment.status
-    if segment.status == "running" and segment.request_started_at is not None:
-        return "uncertain"
-    if segment.status in {"pending", "running", "received"}:
-        return "cancelled"
-    return segment.status
-
-
 async def _store_segments(
     db: AsyncSession,
     blob: BlobStore,
@@ -597,166 +456,3 @@ async def _store_segments(
             )
         )
     await db.flush()
-
-
-def artifacts_payload(material: ReviewMaterial) -> bytes:
-    return json_bytes(
-        {
-            "schema_version": VERSION,
-            "bundle_sha256": material.bundle.bundle_sha256,
-            **material.payload,
-        }
-    )
-
-
-async def read_output(
-    db: AsyncSession,
-    blob: BlobStore,
-    actor: AuthActor,
-    workspace_id: str,
-    collection_id: str,
-    run_id: str,
-    review_id: str,
-    kind: str,
-) -> tuple[ReviewArtifact, bytes]:
-    row = await get_review(db, actor, workspace_id, collection_id, run_id, review_id)
-    if kind in {"report_json", "markdown"}:
-        if row.status != "completed":
-            raise Conflict(
-                "Review chưa có báo cáo hoàn tất.", code="compilation_review_not_completed"
-            )
-        run = await get_run(db, actor, workspace_id, collection_id, run_id)
-        await target_matches(db, blob, row, run)
-    return await artifacts.read(db, blob, row, kind)
-
-
-async def progress(
-    db: AsyncSession,
-    actor: AuthActor,
-    workspace_id: str,
-    collection_id: str,
-    run_id: str,
-    review_id: str,
-) -> ReviewProgress:
-    """Report durable part states; token counts are provider-observed, not estimated."""
-    row = await get_review(db, actor, workspace_id, collection_id, run_id, review_id)
-    segments = list(
-        (
-            await db.scalars(
-                select(CompilationReviewSegment)
-                .where(CompilationReviewSegment.review_id == row.id)
-                .order_by(CompilationReviewSegment.segment_index)
-            )
-        ).all()
-    )
-    leaves = refinement.ordered_leaves(segments)
-    parent_ids = refinement.parent_ids_for(segments)
-    counts: dict[str, int] = {}
-    for segment in leaves:
-        status = _segment_progress_status(row, segment)
-        counts[status] = counts.get(status, 0) + 1
-    segmented = bool(row.trace.get("segmentation")) or bool(segments)
-    if segmented:
-        completed = counts.get("completed", 0)
-        pending = counts.get("pending", 0)
-        # A received part already has provider bytes but is still being validated.
-        running = counts.get("running", 0) + counts.get("received", 0)
-        failed = counts.get("failed", 0)
-        uncertain = counts.get("uncertain", 0)
-        cancelled = counts.get("cancelled", 0)
-        any_called = any(refinement.request_usage(segment)[0] for segment in segments)
-        usage_tokens = refinement.total_usage(segments) if any_called else row.usage_tokens
-    else:
-        completed = int(row.status == "completed")
-        pending = int(row.status == "queued")
-        running = int(row.status == "running")
-        failed = int(row.status == "failed")
-        uncertain = int(row.status == "uncertain")
-        cancelled = int(row.status == "cancelled")
-        usage_tokens = row.usage_tokens
-    return ReviewProgress(
-        review_id=row.id,
-        status=row.status,
-        verdict=row.verdict,
-        segmented=segmented,
-        total=len(leaves) if segmented else 1,
-        completed=completed,
-        pending=pending,
-        running=running,
-        failed=failed,
-        uncertain=uncertain,
-        cancelled=cancelled,
-        usage_tokens=usage_tokens,
-        created_at=row.created_at,
-        request_started_at=row.request_started_at,
-        finished_at=row.finished_at,
-        segments=[
-            ReviewSegmentProgress(
-                id=segment.id,
-                index=segment.segment_index,
-                parent_segment_id=segment.parent_segment_id,
-                depth=refinement.segment_depth(segment),
-                is_leaf=segment.id not in parent_ids,
-                status=_segment_progress_status(row, segment),
-                attempt_count=segment.attempt_count,
-                usage_tokens=segment.usage_tokens,
-                error_code=segment.error_code,
-                started_at=segment.started_at,
-                finished_at=segment.finished_at,
-            )
-            for segment in segments
-        ],
-    )
-
-
-async def read_segment_artifact(
-    db: AsyncSession,
-    blob: BlobStore,
-    actor: AuthActor,
-    workspace_id: str,
-    collection_id: str,
-    run_id: str,
-    review_id: str,
-    segment_index: int,
-    kind: str,
-) -> tuple[str, str, bytes]:
-    row = await get_review(db, actor, workspace_id, collection_id, run_id, review_id)
-    segment = await db.scalar(
-        select(CompilationReviewSegment).where(
-            CompilationReviewSegment.review_id == row.id,
-            CompilationReviewSegment.segment_index == segment_index,
-        )
-    )
-    if segment is None:
-        raise EntityNotFound(
-            "Không tìm thấy phần review.", code="compilation_review_segment_not_found"
-        )
-    if kind in {"assessment_json", "markdown"} and segment.status != "completed":
-        raise Conflict(
-            "Phần review chưa hoàn tất.", code="compilation_review_segment_not_completed"
-        )
-    artifact, payload = await artifacts.read_segment(db, blob, segment, kind)
-    return artifact.content_type, artifact.sha256, payload
-
-
-async def read_segment_raw(
-    db: AsyncSession,
-    blob: BlobStore,
-    actor: AuthActor,
-    workspace_id: str,
-    collection_id: str,
-    run_id: str,
-    review_id: str,
-    segment_index: int,
-) -> tuple[str, str, bytes]:
-    return await read_segment_artifact(
-        db,
-        blob,
-        actor,
-        workspace_id,
-        collection_id,
-        run_id,
-        review_id,
-        segment_index,
-        "raw_response",
-    )

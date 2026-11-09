@@ -11,7 +11,7 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.modelops.schemas import QuotaResponse, QuotaUpdateRequest, UsageResponse
 from qnu.domains.modelops.usage.service import month_start, usage_service
 
-router = APIRouter(prefix="/workspaces", tags=["Workspaces · Quota & usage"])
+router = APIRouter(prefix="/workspaces", tags=["Workspaces · Usage"])
 
 
 @router.get("/{workspace_id}/quota", response_model=QuotaResponse)
@@ -21,6 +21,12 @@ async def get_quota(
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(get_actor),
 ) -> QuotaResponse:
+    """Read monthly token totals for a workspace.
+
+    Monthly token limits are retired: `monthly_token_limit` is always null and
+    `is_blocked` is always false. `configured` only says whether the period has
+    usage rows; it never gates inference or indexing.
+    """
     month = month_start(period)
     row = await usage_service.read_quota(db, actor, workspace_id, month)
     if row is not None:
@@ -46,6 +52,12 @@ async def set_quota(
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(get_actor),
 ) -> QuotaResponse:
+    """Legacy compatibility shim: accepts old payloads but never applies limits.
+
+    The body is validated and discarded; the call only ensures the usage period
+    row exists, then returns the same retired-limit shape as GET. Inference,
+    indexing and readiness do not depend on this endpoint.
+    """
     return QuotaResponse.model_validate(
         await usage_service.initialize_legacy_period(db, actor, workspace_id, month_start(period))
     )

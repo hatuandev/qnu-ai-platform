@@ -1,7 +1,6 @@
 """Retrieval → evidence → ModelOps generation → citation and current-source validation."""
 
 import asyncio
-import json
 import time
 import uuid
 from collections.abc import Awaitable, Callable
@@ -16,14 +15,13 @@ from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.modelops.inference.service import prepare_chat_request
 from qnu.domains.modelops.public_api import resolve_chat_runtime
 from qnu.domains.modelops.usage.service import usage_service
-from qnu.domains.rag.answer.cells import PROJECTION_VERSION, catalog, materialize
+from qnu.domains.rag.answer.cells import PROJECTION_VERSION, materialize
 from qnu.domains.rag.answer.cells import VERSION as CELLS_VERSION
 from qnu.domains.rag.answer.context import expand_context
 from qnu.domains.rag.answer.coverage import VERSION as COVERAGE_VERSION
-from qnu.domains.rag.answer.coverage import assess, plan_for, referenced_ids
+from qnu.domains.rag.answer.coverage import assess, referenced_ids
 from qnu.domains.rag.answer.drafting import (
     PROMPT_VERSION,
-    messages_for,
     output_schema,
     parse_answer,
     payload_metrics,
@@ -31,12 +29,12 @@ from qnu.domains.rag.answer.drafting import (
     sources_for,
 )
 from qnu.domains.rag.answer.narrative import continuation_supports
+from qnu.domains.rag.answer.packing import pack_messages as _pack_messages
 from qnu.domains.rag.answer.projection import PAYLOAD_VERSION
 from qnu.domains.rag.answer.retrieval import search
 from qnu.domains.rag.answer.schemas import AnswerRequest, AnswerResponse, AnswerTrace
 from qnu.domains.rag.answer.selection import select_hits
 from qnu.domains.rag.answer.source_text import attach_source_text
-from qnu.domains.rag.answer.table_selection import select_catalog
 from qnu.domains.rag.answer.verification import verify
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.errors import AppException, Conflict
@@ -49,48 +47,6 @@ from qnu.ports.reranker import Reranker
 from qnu.ports.vector_store import VectorStore
 
 logger = get_logger(__name__)
-
-
-def _pack_messages(req, sources, context, **options):
-    """Trim optional neighbors against the actual evidence envelope."""
-    optional = {
-        item["chunk_id"]
-        for item in context.get("added", [])
-        if item.get("kind") not in {"clause", "structure"}
-    }
-    skipped = []
-    while True:
-        cells = catalog(sources, context.get("table_links"))
-        cells = select_catalog(
-            cells,
-            sources,
-            options.get("resolved_question") or req.question,
-            context.get("table_links", []),
-        )
-        messages = messages_for(
-            req.question,
-            sources,
-            table_context=context.get("table_links"),
-            table_cells=cells,
-            answer_plan=plan_for(sources, context),
-            **options,
-        )
-        envelope = json.loads(messages[-1].content)
-        evidence = {
-            key: envelope[key]
-            for key in ("evidence", "tables", "unselectable", "reading", "plan")
-            if key in envelope
-        }
-        size = len(json.dumps(evidence, ensure_ascii=False, separators=(",", ":")).encode())
-        if size <= req.context_max_bytes:
-            return messages, cells, evidence, size, skipped
-        if not sources or sources[-1].chunk_id not in optional:
-            raise AppException(
-                "Bằng chứng bắt buộc vượt ngân sách context.",
-                code="answer_context_budget_exceeded",
-                status_code=422,
-            )
-        skipped.append(sources.pop().chunk_id)
 
 
 async def answer(

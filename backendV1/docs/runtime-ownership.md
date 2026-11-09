@@ -10,7 +10,7 @@
 | Blob kho tri thức | `documents/…` legacy | `v1/workspaces/{ws}/collections/{col}/blobs/…` |
 | Blob bằng chứng OCR | `ocr/…` legacy | `v1/workspaces/{ws}/ocr/{run_id}/{kind}/p{page}-{sha256}.{ext}` |
 | Job OCR | `ocr_process_source` (legacy) | `ocr_process_run`, `ocr_reconcile_queued` trên queue v1 |
-| Qdrant | collection chung | collection riêng (`QDRANT_COLLECTION`) |
+| Qdrant | collection chung | collection riêng theo index run/embedding model |
 | Migration | `alembic_version` | `alembic_version_backendv1` |
 
 Nguyên tắc: **một job chỉ do một backend sở hữu**; v1 không bao giờ nhặt job của legacy.

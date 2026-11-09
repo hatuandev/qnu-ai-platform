@@ -1,5 +1,15 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên913 — Chốt mốc backend và rà vòng đời ngược](2026-11-09_phien_913_moc_backend_va_vong_doi_nguoc.md).
+
+- [Phiên912 — Hợp đồng duyệt/phát hành và policy auto khi thiếu adapter chat](2026-11-09_phien_912_hop_dong_duyet_phat_hanh.md).
+
+- [Phiên911 — Làm sạch backend V1 trước FE mới](2026-11-09_phien_911_lam_sach_backend_v1.md).
+
+- [Phiên910 — Rà backend trước FE mới](2026-11-09_phien_910_ra_soat_backend.md).
+
+- [Phiên909 — Cập nhật schema app dev](2026-11-09_phien_909_cap_nhat_schema_dev.md).
+
 - [Phiên908 — Thu gọn bảng, nối ngữ cảnh và verifier RAG](2026-11-09_phien_908_rag_context_va_verifier.md).
 
 - [Phiên907 — Tối ưu context RAG và kiểm chứng](./2026-11-08_phien_907_toi_uu_context_rag.md).

@@ -51,20 +51,21 @@ Quy tắc phụ thuộc: `api → domains → ports/contracts → platform`; ada
 `api/wiring.py`. Mỗi domain giao tiếp qua `public_api.py` — xem
 [module-boundaries.md](../backendV1/docs/module-boundaries.md).
 
-### Domain (16)
+### Domain (13)
 
 `identity`, `workspaces`, `modelops`, `knowledge`, `ocr`, `rag`, `assistants`,
-`conversations`, `lifecycle`, `operations`, `evaluation`, `integration`, `document_types`,
-`tools`, `workflows`, `node_catalog`.
+`conversations`, `lifecycle`, `operations`, `evaluation`, `integration`, `answer_review`.
 
-`tools`, `workflows`, `node_catalog` hiện chỉ là khung (README + `__init__.py`), chưa có engine.
+Các khung Phase 0 rỗng (`document_types`, `node_catalog`, `tools`, `workflows` và các
+package con `knowledge/chunks|facts|glossary|...`, `rag/search|...`) đã được xóa ngày
+2026-11-09 vì không có import/consumer. Kế hoạch taxonomy/nút/DAG vẫn nằm ngoài MVP,
+không còn xuất hiện như module sản phẩm.
 
 ### Dữ liệu
 
-- PostgreSQL 16, 53 bảng, chuỗi Alembic riêng `0001…0014`
-  (bảng version `alembic_version_backendv1`).
+- PostgreSQL 16, chuỗi Alembic riêng `0001…0019` (bảng version `alembic_version_backendv1`).
 - Redis: queue ARQ `qnu:v1:jobs` + cache namespace `qnu:v1:cache:`.
-- Qdrant: collection vector 1024 chiều theo generation.
+- Qdrant: collection riêng theo generation/embedding model; chiều vector theo model đã cấu hình.
 - MinIO/S3 hoặc local: tệp gốc và artifact content-addressed.
 
 ## 4. Luồng dữ liệu
@@ -95,11 +96,12 @@ backup bằng chứng, dọn dữ liệu dẫn xuất; API tích hợp cho ứng
 
 **Chưa có:** DAG engine và tool gateway; kênh public (widget/Messenger/Zalo); streaming/SSE;
 chia sẻ chatbot công khai; xuất Word Nghị định 30 / Excel Bloom; Structured Fact Layer, wiki,
-glossary (các thư mục này chỉ còn `__init__.py`); benchmark/quality gate tự động cho RAG của V1.
+glossary; benchmark/quality gate tự động cho RAG của V1.
 
 **Không còn dùng:** `provider_type` `gemini` và `paddleocr` chỉ tồn tại để tương thích dữ liệu
 cũ; registry đánh dấu “chưa có adapter” và runtime từ chối bằng mã
-`*_provider_type_unsupported`. OCR hiện hành là MinerU/native.
+`*_provider_type_unsupported`. Hai module stub chỉ ném `NotImplementedError` đã được xóa ngày
+2026-11-09. OCR hiện hành là MinerU/native.
 
 ## 6. Công nghệ
 

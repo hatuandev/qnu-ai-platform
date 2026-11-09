@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from qnu.adapters.providers.embedding import ModelOpsEmbeddingModel
+from qnu.adapters.providers.mineru import MineruOcrEngine
 from qnu.adapters.providers.nemotron import NemotronOcrEngine
 from qnu.adapters.providers.openai_compatible import OpenAICompatibleChatModel
 from qnu.adapters.providers.reranker import ModelOpsReranker
@@ -52,7 +53,7 @@ def build_container(settings: Settings) -> Container:
         settings=settings,
         blob_store=blob_store,
         job_queue=queue,
-        ocr_engine=ManagedOcrEngine(NemotronOcrEngine()),
+        ocr_engine=ManagedOcrEngine(NemotronOcrEngine(), document_adapter=MineruOcrEngine()),
         chat_model=ManagedChatModel(OpenAICompatibleChatModel()),
         embedding_model=ManagedEmbeddingModel(ModelOpsEmbeddingModel()),
         vector_store=QdrantVectorStore(settings.QDRANT_URL),

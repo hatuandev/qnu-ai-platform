@@ -87,7 +87,7 @@ class CompilationResponse(BaseModel):
     generation: int
     topic: str
     status: str
-    provider_id: str
+    provider_id: str | None
     requested_by: str
     requested_at: datetime
     dispatched_at: datetime | None

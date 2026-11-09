@@ -210,6 +210,20 @@ def test_key_rotation_keeps_secrets_encrypted_and_audited(client):
     client.portal.call(ciphertext)
 
 
+def test_quota_read_before_usage_starts_at_zero_without_limits(client):
+    ws = _create_workspace(client, "workspace-a")
+    _add_member(client, ws["id"], MEMBER_A.actor_id, "member")
+    _as(MEMBER_A)
+    response = client.get(f"{API}/workspaces/{ws['id']}/quota")
+    assert response.status_code == 200, response.text
+    quota = response.json()
+    assert quota["configured"] is False
+    assert quota["tokens_used"] == 0
+    assert quota["tokens_reserved"] == 0
+    assert quota["monthly_token_limit"] is None
+    assert quota["is_blocked"] is False
+
+
 def test_concurrent_reservations_record_usage_without_monthly_limit(client):
     ws, _ = setup_policy(client, limit=100)
 

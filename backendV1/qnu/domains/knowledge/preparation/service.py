@@ -9,8 +9,6 @@ call and a revoked member cannot start the next step.
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import json
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -30,6 +28,7 @@ from qnu.domains.knowledge.policies.access import (
     load_revision,
     load_source,
 )
+from qnu.domains.knowledge.preparation import plan as preparation_plan
 from qnu.domains.knowledge.preparation.models import (
     ACTIVE_PREPARATION_STATUSES,
     TERMINAL_PREPARATION_STATUSES,
@@ -37,17 +36,14 @@ from qnu.domains.knowledge.preparation.models import (
 )
 from qnu.domains.knowledge.preparation.schemas import PreparationRequest
 from qnu.domains.knowledge.public_api import resolve_revision_scope
-from qnu.domains.modelops.public_api import (
-    assert_provider_allowed,
-    resolve_chat_runtime,
-)
+from qnu.domains.modelops.public_api import assert_provider_allowed
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.ocr.models import OcrProcessingRun
 from qnu.domains.ocr.review.models import TextVersion
 from qnu.domains.ocr.service import processing_service
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
-from qnu.platform.errors import AppException, Conflict, DependencyUnavailable, EntityNotFound
+from qnu.platform.errors import AppException, Conflict, EntityNotFound
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.job_queue import JobQueue
@@ -57,138 +53,11 @@ TASK_NAME = "preparation_job"
 LEASE_SECONDS = 180
 ADVANCING_OCR_STATUSES = ("queued", "running")
 FAILED_OCR_STATUSES = ("failed", "uncertain", "cancelled")
-POLICY_VERSION = "qnu.preparation.auto/v1"
-REUSE_VERSION = "qnu.preparation.reuse/v1"
-AI_UNAVAILABLE_CODES = frozenset(
-    {"chat_credentials_missing", "chat_credentials_unreadable", "provider_keys_unavailable"}
-)
-
-
 @dataclass(frozen=True, slots=True)
 class PreparationOutcome:
     intent: PreparationIntent
     created: bool
     dispatched: bool
-
-
-def _request_hash(
-    collection_id: str,
-    source_id: str,
-    revision_id: str,
-    req: PreparationRequest,
-    topic: str,
-) -> str:
-    material = {
-        "version": 1,
-        "collection_id": collection_id,
-        "source_id": source_id,
-        "revision_id": revision_id,
-        "mode": req.mode,
-        "ocr_run_id": req.ocr_run_id,
-        "text_version": req.text_version,
-        "topic": topic,
-        "provider_id": req.provider_id,
-        "max_output_tokens": req.max_output_tokens,
-    }
-    return hashlib.sha256(
-        json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
-            "utf-8"
-        )
-    ).hexdigest()
-
-
-async def _resolve_auto_policy(
-    db: AsyncSession, workspace_id: str, provider_id: str
-) -> dict:
-    """Pin one safe policy: selective source supplement when chat is usable, else source."""
-    policy = {
-        "version": POLICY_VERSION,
-        "supplement": "disabled",
-        "reason": None,
-        "provider_id": provider_id,
-    }
-    try:
-        runtime = await resolve_chat_runtime(db, workspace_id, provider_id)
-    except DependencyUnavailable as exc:
-        if exc.code not in AI_UNAVAILABLE_CODES:
-            raise
-        policy["reason"] = exc.code
-        return policy
-    policy.update(
-        {
-            "supplement": "selective",
-            "configuration_hash": runtime.inference_configuration_hash("compiler"),
-            "provider_name": runtime.provider_name,
-            "model_name": runtime.model_name,
-        }
-    )
-    return policy
-
-
-async def _verify_auto_policy(
-    db: AsyncSession, intent: PreparationIntent, workspace_id: str
-) -> None:
-    """Honor the pinned policy; never swap model silently or reuse an old cache."""
-    policy = dict(intent.config.get("policy") or {})
-    if policy.get("supplement") != "selective":
-        return
-    try:
-        runtime = await resolve_chat_runtime(db, workspace_id, intent.provider_id)
-    except DependencyUnavailable as exc:
-        if exc.code not in AI_UNAVAILABLE_CODES:
-            raise
-        policy.update({"supplement": "disabled", "reason": exc.code})
-        intent.config = {**intent.config, "policy": policy, "ai_supplement": False}
-        await db.commit()
-        return
-    if runtime.inference_configuration_hash("compiler") != policy.get("configuration_hash"):
-        raise Conflict(
-            "Model hoặc chính sách đã thay đổi từ lúc tạo yêu cầu; hãy chuẩn bị lại.",
-            code="preparation_policy_changed",
-        )
-
-
-def _reuse_key(intent: PreparationIntent, run: OcrProcessingRun) -> str:
-    policy = intent.config.get("policy") or {}
-    material = {
-        "version": REUSE_VERSION,
-        "workspace_id": intent.workspace_id,
-        "collection_id": intent.collection_id,
-        "source_id": intent.source_id,
-        "revision_id": intent.revision_id,
-        "revision_sha256": intent.revision_sha256,
-        "ocr_run_id": run.id,
-        "ocr_config_fingerprint": run.config_fingerprint,
-        "text_version": intent.text_version,
-        "text_version_id": intent.text_version_id,
-        "text_canonical_sha256": intent.text_canonical_sha256,
-        "topic": intent.topic,
-        "policy_version": policy.get("version"),
-        "provider_id": intent.provider_id,
-        "configuration_hash": policy.get("configuration_hash"),
-        "supplement": policy.get("supplement"),
-    }
-    return hashlib.sha256(
-        json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
-            "utf-8"
-        )
-    ).hexdigest()
-
-
-async def _reusable_compilation(
-    db: AsyncSession, intent: PreparationIntent, key: str
-) -> CompilationRun | None:
-    return await db.scalar(
-        select(CompilationRun)
-        .where(
-            CompilationRun.workspace_id == intent.workspace_id,
-            CompilationRun.collection_id == intent.collection_id,
-            CompilationRun.config["reuse_key"].as_string() == key,
-            CompilationRun.status.in_(("queued", "running", "completed")),
-        )
-        .order_by(CompilationRun.requested_at.desc())
-        .limit(1)
-    )
 
 
 async def create_intent(
@@ -212,7 +81,7 @@ async def create_intent(
             "Thiếu chủ đề chuẩn bị.", code="preparation_topic_required", status_code=422
         )
 
-    request_hash = _request_hash(collection_id, source_id, revision.id, req, topic)
+    request_hash = preparation_plan.request_hash(collection_id, source_id, revision.id, req, topic)
     ref = actor_ref(actor)
     existing = await db.scalar(
         select(PreparationIntent).where(
@@ -223,9 +92,21 @@ async def create_intent(
     )
     if existing is not None:
         if existing.request_hash != request_hash:
-            raise Conflict(
-                "Idempotency-Key đã dùng cho một yêu cầu khác.", code="idempotency_conflict"
+            # One-release bridge: before automatic preparation became the default,
+            # an omitted mode hashed as "source". A retry of that exact durable
+            # key must still return its intent instead of conflicting.
+            legacy = (
+                "mode" not in req.model_fields_set
+                and existing.mode == "source"
+                and preparation_plan.request_hash(
+                    collection_id, source_id, revision.id, req, topic, mode="source"
+                )
             )
+            if existing.request_hash != legacy:
+                raise Conflict(
+                    "Idempotency-Key đã dùng cho một yêu cầu khác.",
+                    code="idempotency_conflict",
+                )
         if existing.status in ACTIVE_PREPARATION_STATUSES:
             # A retried request may recover an enqueue that failed earlier; the
             # row and its hashes still decide whether the step may run.
@@ -237,9 +118,7 @@ async def create_intent(
     provider_id = req.provider_id
     policy: dict | None = None
     if req.mode == "auto":
-        provider = await assert_provider_allowed(db, actor, workspace_id, "chat", None)
-        provider_id = provider.id
-        policy = await _resolve_auto_policy(db, workspace_id, provider.id)
+        policy, provider_id = await preparation_plan.auto_policy(db, actor, workspace_id)
     await _check_pinned_run(db, workspace_id, collection_id, revision, req)
     text_version_id, text_canonical_sha256 = await _saved_version(
         db, workspace_id, collection_id, req
@@ -265,10 +144,7 @@ async def create_intent(
         max_output_tokens=req.max_output_tokens,
         config={
             "workflow_version": "qnu.preparation/v1",
-            "source_first": req.mode in {"source", "auto"},
-            "ai_supplement": req.mode == "ai"
-            or bool(policy and policy.get("supplement") == "selective"),
-            "auto_review": False,
+            **preparation_plan.plan_flags(req.mode, policy),
             **({"policy": policy} if policy is not None else {}),
         },
         ocr_run_id=req.ocr_run_id,
@@ -676,7 +552,7 @@ async def _advance(
             "Phiên bản nguồn đã thay đổi; không dùng nội dung cũ.",
         )
     if intent.mode == "auto":
-        await _verify_auto_policy(db, intent, workspace_id)
+        await preparation_plan.verify_auto_policy(db, intent, workspace_id)
 
     if intent.ocr_run_id:
         run = await _pinned_run(db, intent, workspace_id, collection_id)
@@ -735,8 +611,8 @@ async def _advance(
         compilation = None
         reuse_key = None
         if intent.mode == "auto":
-            reuse_key = _reuse_key(intent, run)
-            compilation = await _reusable_compilation(db, intent, reuse_key)
+            reuse_key = preparation_plan.reuse_key(intent, run)
+            compilation = await preparation_plan.reusable_compilation(db, intent, reuse_key)
         if compilation is not None:
             intent.compilation_run_id = compilation.id
             intent.config = {**intent.config, "reused": True}
@@ -779,33 +655,15 @@ async def _advance(
 
 def _compilation_request(intent: PreparationIntent, run: OcrProcessingRun) -> CompilationRequest:
     versions = {run.id: intent.text_version} if intent.text_version else {}
-    if intent.mode == "ai":
-        return CompilationRequest(
-            topic=intent.topic,
-            ocr_run_ids=[run.id],
-            text_versions=versions,
-            provider_id=intent.provider_id,
-            max_output_tokens=intent.max_output_tokens,
-            ai_supplement=True,
-            auto_review=False,
-        )
-    if intent.mode == "auto" and (intent.config.get("policy") or {}).get(
-        "supplement"
-    ) == "selective":
-        return CompilationRequest(
-            topic=intent.topic,
-            ocr_run_ids=[run.id],
-            text_versions=versions,
-            provider_id=intent.provider_id,
-            selective_supplement=True,
-            auto_review=False,
-        )
+    flags = preparation_plan.plan_flags(intent.mode, intent.config.get("policy"))
+    uses_ai = flags["ai_supplement"] or flags["selective_supplement"]
     return CompilationRequest(
         topic=intent.topic,
         ocr_run_ids=[run.id],
         text_versions=versions,
-        source_first=True,
-        auto_review=False,
+        provider_id=intent.provider_id if uses_ai else None,
+        max_output_tokens=intent.max_output_tokens if flags["ai_supplement"] else None,
+        **flags,
     )
 
 

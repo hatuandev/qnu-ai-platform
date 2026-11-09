@@ -3,7 +3,6 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.api.dependencies import get_actor, get_blob_store, get_db, get_job_queue
@@ -19,8 +18,7 @@ from qnu.domains.knowledge.index.schemas import (
     SearchRequest,
     SearchResponse,
 )
-from qnu.domains.knowledge.index.service import get_run, request_index
-from qnu.domains.knowledge.publication.access import authorize
+from qnu.domains.knowledge.index.service import get_run, list_runs, request_index
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.job_queue import JobQueue
 
@@ -121,20 +119,7 @@ async def list_indexes(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ) -> list[IndexRun]:
-    await authorize(db, actor, workspace_id, collection_id)
-    return list(
-        (
-            await db.scalars(
-                select(IndexRun)
-                .where(
-                    IndexRun.workspace_id == workspace_id, IndexRun.collection_id == collection_id
-                )
-                .order_by(IndexRun.generation.desc())
-                .offset(offset)
-                .limit(limit)
-            )
-        ).all()
-    )
+    return await list_runs(db, actor, workspace_id, collection_id, limit, offset)
 
 
 @router.get("/compiled-documents/{document_id}/index-readiness", response_model=IndexReadiness)

@@ -67,14 +67,14 @@ Xem [Compiler v1](compiler-v1.md) và [báo cáo645](../../docs/bao_cao/context6
 | identity | 🟡 dev + SSO JWT/JWKS | Dev gate tường minh, RSA/issuer/audience/expiry có test; chưa live QNU SSO |
 | workspaces | 🟢 API + PostgreSQL test | Membership, role, audit, revocation/case/concurrency; resolver là cổng quyền |
 | modelops | 🟡 control plane + OCR/chat/embedding/rerank | Provider/key/default/grants, quota/usage; dimension/capacity gắn endpoint/model; chưa probe API/lease/fallback runtime |
-| document_types | ⬜ khung | |
+| document_types | ❌ bỏ khung | Khung rỗng không import/consumer đã xóa 2026-11-09; kế hoạch taxonomy ở [03_ke_hoach](../../docs/ke_hoach/03_ke_hoach_dong_bo_taxonomy_loai_van_ban.md) |
 | repository | ❌ bỏ | Theo quyết định 2026-10-26; nguồn file thuộc trực tiếp collection (Context637) |
 | ocr | 🟢 PDF/DOCX → bằng chứng + API | Render, ModelOps Nemotron, raw/canonical/markdown/manifest; PDF thật riêng đã chạy, chưa quality acceptance |
 | knowledge | 🟡 collections + Compiler/publication/index | Upload/revision, draft/lifecycle và index/search ghim publication theo generation |
 | rag | 🟡 dense/hybrid/rerank + answer | Search/answer chọn mode; scope/citation kiểm sau HTTP; conversation mặc định dense, chưa streaming |
 | assistants | 🟡 config BE | Một collection, ModelOps chat, persona/style, budgets, revision/active; chưa public/tools/SSE |
 | conversations | 🟡 owned persistent chat | Question/result/source/error, follow-up, idempotency/sequence/lease; chưa share/FE/stream |
-| tools / workflows | ⬜ khung | ngoài MVP |
+| tools / workflows / node_catalog | ❌ bỏ khung | Khung rỗng không import/consumer đã xóa 2026-11-09; kế hoạch tool/DAG ngoài MVP |
 | evaluation | 🟡 so sánh retrieval qua API | Snapshot/candidates/labels/metrics/errors; chưa human benchmark/answer quality gate |
 | operations | 🟡 jobs/evidence backups | Progress/usage thật, recovery preview/outbox, retention thủ công; chưa full DR restore |
 

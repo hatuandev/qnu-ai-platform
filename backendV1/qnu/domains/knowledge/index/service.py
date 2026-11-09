@@ -269,3 +269,28 @@ async def get_run(
     if row is None:
         raise EntityNotFound("Không tìm thấy indexing run.", code="index_not_found")
     return row
+
+
+async def list_runs(
+    db: AsyncSession,
+    actor: AuthActor,
+    workspace_id: str,
+    collection_id: str,
+    limit: int,
+    offset: int,
+) -> list[IndexRun]:
+    await authorize(db, actor, workspace_id, collection_id)
+    return list(
+        (
+            await db.scalars(
+                select(IndexRun)
+                .where(
+                    IndexRun.workspace_id == workspace_id,
+                    IndexRun.collection_id == collection_id,
+                )
+                .order_by(IndexRun.generation.desc())
+                .offset(offset)
+                .limit(limit)
+            )
+        ).all()
+    )

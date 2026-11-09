@@ -82,8 +82,8 @@ Body tạo job:
 ```
 
 `provider_id` bỏ trống thì chọn default chat của workspace. `max_output_tokens`
-bỏ trống thì ModelOps tự chọn theo model và context còn lại, không áp trần
-COMPILER_MAX_OUTPUT_TOKENS. Planner chia theo cấu trúc khi tài liệu cần nhiều
+bỏ trống thì ModelOps tự chọn theo model và context còn lại; không có trần cấu
+hình môi trường nào được áp. Planner chia theo cấu trúc khi tài liệu cần nhiều
 request, giữ nguồn và kết quả từng phần. Lỗi token xác định được chỉ chia lại
 phần lỗi. Xem [luồng tài liệu lớn](../../docs/quy_trinh/V1_COMPILER_TAI_LIEU_LON.md).
 
