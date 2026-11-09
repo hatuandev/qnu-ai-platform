@@ -18,7 +18,7 @@ Tài liệu này là cẩm nang bắt buộc cho mọi kỹ sư Frontend và AI 
 - Dùng font, màu Teal, semantic tokens và primitives của `frontendV1/`. Tạo thứ bậc bằng cách nhóm và khoảng cách trong hệ thống hiện có; không tự đổi nhận diện vì tham khảo phong cách mới.
 - Giữ thuật ngữ nhất quán từ nút đến toast/trạng thái. Khi sửa UI, tự đối chiếu ảnh chụp desktop/mobile và các trạng thái liên quan nếu có công cụ; báo phần chưa kiểm thay vì suy kết quả từ build. Kiểm chứng theo mục8, không chạy test ứng dụng cho task chỉ sửa skill/tài liệu.
 
-Tham khảo tư duy thiết kế từ [frontend-design của Anthropic](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md), áp dụng trong các giới hạn QNU dưới đây; giữ nguyên kiến trúc, luồng API và quy tắc dữ liệu thật.
+Tham khảo tư duy thiết kế từ [frontend-design của Anthropic](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md) và bộ nguyên tắc Art Direction chống "AI Slop" từ [Taste Skill (tasteskill.dev)](https://www.tasteskill.dev/), áp dụng trong các giới hạn QNU dưới đây; giữ nguyên kiến trúc, luồng API và quy tắc dữ liệu thật.
 
 ## 1. Tôn Chỉ Thiết Kế & Hệ Thống Nhận Diện QNU
 
