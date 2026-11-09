@@ -29,6 +29,20 @@ export interface AdmissionsDocEntry {
   source?: Source;
   publication?: Publication;
   compilationHistory?: Publication[];
+  /** Số trang quan sát được sau extraction (DOCX/PDF chưa biết trước). */
+  pages?: number;
+  prepare?: {
+    id: string;
+    status: string;
+    policy?: {
+      version: string;
+      supplement: string;
+      reason?: string | null;
+    } | null;
+    compilation_run_id?: string | null;
+    text_version: number;
+    text_canonical_sha256?: string | null;
+  };
 }
 export interface Checkpoint {
   runId: string;

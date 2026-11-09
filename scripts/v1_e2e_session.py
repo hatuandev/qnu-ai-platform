@@ -556,7 +556,14 @@ def _serve(directory, manifest):
 
 
 def run_stage(
-    directory, manifest, stage, headed, recover=False, skip_review=False, ocr_dpi=None
+    directory,
+    manifest,
+    stage,
+    headed,
+    recover=False,
+    skip_review=False,
+    ocr_dpi=None,
+    prepare="direct",
 ):
     state = read(directory / "checkpoint.json")
     model_test = stage in MODEL_STAGES
@@ -655,6 +662,7 @@ def run_stage(
         # An inherited shell value must not silently change the reviewed workflow.
         env["E2E_SCAN_OCR_DPI"] = str(ocr_dpi) if ocr_dpi is not None else ""
         env["E2E_SKIP_REVIEW"] = "1" if fast_publication else "0"
+        env["E2E_PREPARE_MODE"] = prepare
         args = [
             shutil.which("node"),
             FE / "node_modules/@playwright/test/cli.js",
@@ -777,6 +785,12 @@ def main(argv=None):
         action="store_true",
         help="Xuất bản nhanh bản nháp E2E, ghi rõ bỏ qua model review.",
     )
+    parser.add_argument(
+        "--prepare",
+        choices=("direct", "auto"),
+        default="direct",
+        help="direct: biên soạn giữ nguồn trực tiếp (A); auto: ý định chuẩn bị tự động (B).",
+    )
     args = parser.parse_args(argv)
     if args.ocr_dpi is not None and (
         args.command != "run"
@@ -788,6 +802,13 @@ def main(argv=None):
         args.command != "run" or args.stage != "admissions-publication"
     ):
         parser.error("--skip-review chỉ áp dụng cho run admissions-publication")
+    if args.prepare != "direct" and (
+        args.command != "run"
+        or args.stage not in {"admissions-draft", "admissions-publication"}
+    ):
+        parser.error(
+            "--prepare auto chỉ áp dụng cho run admissions-draft/admissions-publication"
+        )
     try:
         if args.command == "help":
             parser.print_help()
@@ -816,6 +837,7 @@ def main(argv=None):
                         args.recover,
                         args.skip_review,
                         args.ocr_dpi,
+                        args.prepare,
                     )
                     if code:
                         return code

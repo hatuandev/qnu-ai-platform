@@ -18,8 +18,11 @@ import {
   listPreparationIntents,
 } from "../src/features/knowledge/preparation-requests.ts";
 import {
+  formatElapsedDuration,
   formatPreparationError,
   isPreparationActive,
+  preparationModeLabel,
+  preparationPolicySummary,
   preparationStatusLabel,
   preparationStatusVariant,
   shortHash,
@@ -61,6 +64,8 @@ function buildIntent(
     updated_at: "2026-11-08T08:00:00Z",
     started_at: null,
     finished_at: null,
+    policy: null,
+    reused: false,
     ...overrides,
   };
 }
@@ -112,13 +117,17 @@ test("preparation paths pin the source-scoped create/list and collection-scoped 
 test("create sends POST with the idempotency key and the server-pinned input", async () => {
   const { calls, fetchImpl } = createMockFetch(() =>
     jsonResponse(
-      { intent: buildIntent(), created: true, dispatched: true },
+      {
+        intent: buildIntent({ mode: "auto" }),
+        created: true,
+        dispatched: true,
+      },
       201,
     ),
   );
   const client = createV1Client({ fetchImpl, getToken: () => "token" });
   const input: PreparationRequestInput = {
-    mode: "source",
+    mode: "auto",
     revision_id: "rev-2",
     ocr_run_id: "run-9",
     text_version: 4,
@@ -286,4 +295,57 @@ test("shortHash never invents a hash", () => {
   assert.equal(shortHash("b".repeat(64)), "b".repeat(12));
   assert.equal(shortHash(null), "");
   assert.equal(shortHash(undefined), "");
+});
+
+test("auto policy explains supplements and truthful downgrades", () => {
+  assert.equal(preparationModeLabel("auto"), "Tự động theo chính sách");
+  assert.equal(preparationModeLabel("source"), "Giữ nguyên nguồn");
+  assert.equal(preparationModeLabel("ai"), "Bổ sung bằng AI");
+
+  assert.match(
+    preparationPolicySummary({
+      version: "qnu.preparation.auto/v1",
+      supplement: "selective",
+      reason: null,
+    }),
+    /Có bổ sung bằng AI/,
+  );
+  assert.match(
+    preparationPolicySummary({
+      version: "qnu.preparation.auto/v1",
+      supplement: "disabled",
+      reason: "chat_credentials_missing",
+    }),
+    /chưa có khóa model chat.*Bản nguồn vẫn được giữ/,
+  );
+  assert.match(
+    preparationPolicySummary({
+      version: "qnu.preparation.auto/v1",
+      supplement: "disabled",
+      reason: "unknown_reason",
+    }),
+    /model chat chưa sẵn sàng/,
+  );
+  assert.match(preparationPolicySummary(null), /tự chọn cách chuẩn bị/);
+});
+
+test("elapsed duration never reports a negative or invented span", () => {
+  assert.equal(
+    formatElapsedDuration("2026-11-08T08:00:00Z", "2026-11-08T08:00:42Z"),
+    "42 giây",
+  );
+  assert.equal(
+    formatElapsedDuration("2026-11-08T08:00:00Z", "2026-11-08T08:07:00Z"),
+    "7 phút",
+  );
+  assert.equal(
+    formatElapsedDuration("2026-11-08T08:00:00Z", "2026-11-08T10:05:00Z"),
+    "2 giờ 5 phút",
+  );
+  assert.equal(
+    formatElapsedDuration("2026-11-08T08:00:00Z", "2026-11-08T07:00:00Z"),
+    "0 giây",
+  );
+  assert.equal(formatElapsedDuration(null), "");
+  assert.equal(formatElapsedDuration("not-a-date", null), "");
 });

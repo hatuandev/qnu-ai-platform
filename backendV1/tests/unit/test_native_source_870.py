@@ -148,6 +148,14 @@ def test_empty_crop_keeps_an_explicit_unresolved_warning():
     assert layout.warnings == ("image_text_unresolved:10001",)
 
 
+def test_crop_without_a_blocks_key_is_empty_not_invalid():
+    raw = region_raw()
+    raw["image_ocr"][0]["result"]["page"] = {"page_idx": 0}
+    layout = parse_mineru_page(raw)
+    assert layout.blocks == ()
+    assert layout.warnings == ("image_text_unresolved:10001",)
+
+
 @pytest.mark.parametrize("case", ["bbox", "duplicate", "nested", "result"])
 def test_image_projection_rejects_invalid_or_unbounded_provenance(case):
     raw = region_raw()

@@ -7,6 +7,9 @@ from typing import Any
 from redis.asyncio import Redis, from_url
 
 from qnu.platform.config import get_settings
+from qnu.platform.logging import get_logger
+
+logger = get_logger(__name__)
 
 _client: Redis | None = None
 
@@ -46,6 +49,11 @@ async def set_json(key: str, value: Any, ttl_seconds: int) -> None:
 
 async def close_redis() -> None:
     global _client
-    if _client is not None:
-        await _client.aclose()
-        _client = None
+    client, _client = _client, None
+    if client is None:
+        return
+    try:
+        await client.aclose()
+    except RuntimeError as exc:
+        # Tests may reuse this process-global client from another event loop.
+        logger.warning("redis_close_cross_loop_skipped", error=str(exc))

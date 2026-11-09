@@ -29,6 +29,12 @@ from qnu.domains.knowledge.compilation.projection import (
     project_documents,
     project_table_block,
 )
+from qnu.domains.knowledge.compilation.quality import (
+    NO_ERROR_FOUND,
+    NOT_CHECKED,
+    PARTIALLY_CHECKED,
+    quality_validation,
+)
 from qnu.domains.knowledge.compilation.schemas import SegmentDraftContent
 from qnu.domains.knowledge.compilation.supplement import (
     SELECTIVE_PROMPT,
@@ -1089,6 +1095,14 @@ def merge_drafts(
             "semantic_faithfulness": "not_evaluated",
             "unread_source_blocks": "retained",
             "segmentation": segmentation,
+            "quality": quality_validation(
+                source_binding=NOT_CHECKED,
+                coverage=(
+                    NO_ERROR_FOUND
+                    if segmentation.get("state") == "completed" and not partial
+                    else PARTIALLY_CHECKED
+                ),
+            ),
         },
     }
     if partial:

@@ -15,8 +15,13 @@ from qnu.domains.knowledge.metadata import chunk_metadata
 from qnu.domains.knowledge.source_sections import SourceSection, shared_section, source_sections
 from qnu.platform.errors import AppException
 
-CHUNKER_VERSION = "qnu.published-chunks/v5"
-READABLE_CHUNKER_VERSIONS = {"qnu.published-chunks/v3", "qnu.published-chunks/v4", CHUNKER_VERSION}
+CHUNKER_VERSION = "qnu.published-chunks/v6"
+READABLE_CHUNKER_VERSIONS = {
+    "qnu.published-chunks/v3",
+    "qnu.published-chunks/v4",
+    "qnu.published-chunks/v5",
+    CHUNKER_VERSION,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +107,34 @@ def _row_groups(rows: list[list[dict]], header_indices: list[int]) -> list[list[
     return result
 
 
+def _covering_rows(rows: list[list[dict]], group: list[int], part: list[int]) -> list[int]:
+    """Earlier rows of the same group whose rowspan still labels this part."""
+    first = part[0]
+    return [
+        anchor
+        for anchor in group
+        if anchor < first
+        and any(
+            cell.get("row_span", 1) > 1 and anchor + cell["row_span"] > first
+            for cell in rows[anchor]
+        )
+    ]
+
+
+def _split_group(group: list[int], fits: Callable[[list[int]], bool]) -> list[list[int]]:
+    """Last resort for a group over budget: contiguous parts, each row must fit alone."""
+    parts, start = [], 0
+    while start < len(group):
+        end = start + 1
+        if not fits(group[start:end]):
+            raise _too_large("index_table_group_too_large")
+        while end < len(group) and fits(group[start : end + 1]):
+            end += 1
+        parts.append(group[start:end])
+        start = end
+    return parts
+
+
 def _table_chunks(
     title: str,
     entry: dict,
@@ -133,8 +166,12 @@ def _table_chunks(
     groups = _row_groups(rows, headers) or [[]]
     run_id = entry["citation"].split(":", 1)[0]
 
-    def fragment(body_rows: list[int]) -> Chunk:
-        selected = sorted(set(headers + body_rows))
+    def fragment(
+        body_rows: list[int],
+        context_rows: list[int] = (),
+        split: tuple[list[int], int, int] | None = None,
+    ) -> Chunk:
+        selected = sorted(set(headers + list(context_rows) + body_rows))
         structure = {
             "source_table_citation": entry["citation"],
             "original_row_count": table["row_count"],
@@ -143,18 +180,49 @@ def _table_chunks(
             "rows": [rows[i] for i in selected],
             "page_notes": notes,
         }
+        if split is not None:
+            group, part_index, part_count = split
+            structure["rowspan_split"] = {
+                "group_start_row": group[0],
+                "group_end_row": group[-1],
+                "part": part_index,
+                "parts": part_count,
+            }
         text = prefix + json.dumps(structure, ensure_ascii=False, sort_keys=True)
         refs = [entry["citation"], *note_refs] + [
             run_id + ":" + cell["evidence_id"] for i in selected for cell in rows[i]
         ]
         return prepare(Chunk("table", text, {r: index[r] for r in refs}, structure), len(chunks))
 
+    def part_fragment(group: list[int], part: list[int], part_index: int, part_count: int) -> Chunk:
+        return fragment(part, _covering_rows(rows, group, part), (group, part_index, part_count))
+
     chunks, pending = [], []
     for group in groups:
+        if size(fragment(group)) > maximum:
+            if pending:
+                chunks.append(fragment(pending))
+                pending = []
+            group_rows = group
+            parts = _split_group(
+                group_rows,
+                lambda part, group=group_rows: (
+                    size(
+                        fragment(
+                            part,
+                            _covering_rows(rows, group, part),
+                            # Worst-case marker width, so the final chunk stays under budget.
+                            (group, len(group), len(group)),
+                        )
+                    )
+                    <= maximum
+                ),
+            )
+            for part_index, part in enumerate(parts):
+                chunks.append(part_fragment(group, part, part_index, len(parts)))
+            continue
         candidate = fragment(pending + group)
         if size(candidate) > maximum:
-            if not pending or size(fragment(group)) > maximum:
-                raise _too_large("index_table_group_too_large")
             chunks.append(fragment(pending))
             pending = []
         pending += group

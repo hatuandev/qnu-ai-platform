@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 class PreparationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    mode: Literal["source", "ai"] = "source"
+    mode: Literal["source", "ai", "auto"] = "source"
     revision_id: str | None = Field(None, min_length=1, max_length=64)
     ocr_run_id: str | None = Field(None, min_length=1, max_length=64)
     text_version: Annotated[int, Field(strict=True, ge=0)] = 0
@@ -27,9 +27,20 @@ class PreparationRequest(BaseModel):
     def coherent_mode(self):
         if self.mode == "source" and (self.provider_id or self.max_output_tokens is not None):
             raise ValueError("Chế độ giữ nguyên nguồn không nhận tùy chọn sinh văn bản bằng AI.")
+        if self.mode == "auto" and (self.provider_id or self.max_output_tokens is not None):
+            raise ValueError("Chế độ tự động tự chọn model, không nhận tùy chọn thủ công.")
         if self.text_version > 0 and not self.ocr_run_id:
             raise ValueError("Bản văn bản đã sửa phải chỉ rõ lượt đọc nội dung đã lưu.")
         return self
+
+
+class PreparationPolicyView(BaseModel):
+    """Safe explanation of the pinned automatic policy; never a credential or endpoint."""
+
+    model_config = ConfigDict(extra="ignore")
+    version: str
+    supplement: str
+    reason: str | None = None
 
 
 class PreparationResponse(BaseModel):
@@ -56,6 +67,20 @@ class PreparationResponse(BaseModel):
     updated_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    policy: PreparationPolicyView | None = None
+    reused: bool = False
+
+
+def preparation_response(row) -> PreparationResponse:
+    config = row.config or {}
+    policy = config.get("policy")
+    response = PreparationResponse.model_validate(row)
+    return response.model_copy(
+        update={
+            "policy": PreparationPolicyView.model_validate(policy) if policy else None,
+            "reused": bool(config.get("reused")),
+        }
+    )
 
 
 class PreparationCreated(BaseModel):

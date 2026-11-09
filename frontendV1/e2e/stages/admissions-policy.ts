@@ -158,6 +158,43 @@ export function planAdmissionsBudget(provider: Provider) {
   };
 }
 
+// Planning ratio for rerank input. Vietnamese UTF-8 text spends 2-3 bytes per
+// character, so tokenizers normally emit well under one token per byte; 2 is a
+// conservative planning value, never a tokenizer guarantee.
+export const RERANK_PLAN_BYTES_PER_TOKEN = 2;
+
+export function planAdmissionsRerankPair(
+  provider: Provider,
+  chunkMaxBytes: number,
+  maxQuestionBytes: number,
+) {
+  const limits = provider.token_limits;
+  const limit = limits?.max_input_tokens ?? limits?.context_window_tokens;
+  if (provider.capacity_status !== "configured" || !limit)
+    throw new Error("BLOCKED: chưa biết capacity rerank.");
+  // Mirrors the production per-pair byte bound in modelops/rerank.py budget().
+  const pairBytes = chunkMaxBytes + maxQuestionBytes + 64;
+  if (!Number.isSafeInteger(pairBytes) || pairBytes < 1)
+    throw new Error("BLOCKED: dự toán cặp query/chunk không hợp lệ.");
+  const tokenEstimate = Math.ceil(pairBytes / RERANK_PLAN_BYTES_PER_TOKEN);
+  // A token cannot decode to fewer than one UTF-8 byte, so byte count bounds
+  // tokens from above. The production guard compares this same byte count to
+  // the token limit; the estimate above is for quota planning only.
+  const tokenUpperBound = pairBytes + 2;
+  if (pairBytes > limit)
+    throw new Error(
+      "BLOCKED: cận trên byte của cặp query/chunk vượt rerank input; kiểm tra cấu hình index/provider.",
+    );
+  return {
+    pair_bytes: pairBytes,
+    input_tokens_limit: limit,
+    plan_bytes_per_token: RERANK_PLAN_BYTES_PER_TOKEN,
+    token_estimate: tokenEstimate,
+    token_upper_bound: tokenUpperBound,
+    worst_case_within_byte_guard: pairBytes <= limit,
+  };
+}
+
 export function freezeCohort(state: Checkpoint, value: unknown) {
   const scenario = state.admissions;
   if (!scenario) throw new Error("BLOCKED: thiếu admissions.");

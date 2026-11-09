@@ -9,6 +9,10 @@ from pydantic import ValidationError
 
 from qnu.domains.knowledge.compilation.evidence import citation_index, literal_tables
 from qnu.domains.knowledge.compilation.limitations import retain_limitations
+from qnu.domains.knowledge.compilation.quality import (
+    NOT_CHECKED,
+    quality_validation,
+)
 from qnu.domains.knowledge.compilation.schemas import DraftContent
 from qnu.platform.errors import AppException
 from qnu.ports.chat_model import ChatMessage
@@ -100,6 +104,10 @@ def validated_draft(draft: DraftContent, topic: str, documents: list[dict], run_
             "citation_membership": "passed",
             "semantic_faithfulness": "not_evaluated",
             "unread_source_blocks": "retained",
+            "quality": quality_validation(
+                source_binding=NOT_CHECKED,
+                coverage=NOT_CHECKED,
+            ),
         },
     }
 

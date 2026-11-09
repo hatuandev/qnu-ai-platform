@@ -19,7 +19,7 @@ def test_partial_answer_contract_and_foreign_coverage_rejection(
     def respond(index):
         payload = json.loads(chat.requests[index]["body"]["messages"][-1]["content"])
         paragraph = next(e for e in payload["evidence"] if e["kind"] != "table")
-        eid = paragraph["evidence_id"]
+        eid = paragraph["id"]
         value = {
             "status": "answered",
             "lookups": [],
@@ -53,7 +53,7 @@ def test_partial_answer_contract_and_foreign_coverage_rejection(
     assert body["status"] == "answered" and body["statements"]
     assert body["coverage"]["status"] == "partial"
     assert body["coverage"]["requirements"][1]["label"] == "Danh sách chi tiết"
-    assert body["trace"]["coverage"]["version"] == "qnu.rag.coverage/v1"
+    assert body["trace"]["coverage"]["version"] == "qnu.rag.coverage/v2"
     assert body["sources"] and all(s["publication_decision_id"] for s in body["sources"])
 
 
@@ -68,13 +68,13 @@ def test_unused_coverage_witness_stays_in_the_revalidated_response(
         payload = json.loads(chat.requests[index]["body"]["messages"][-1]["content"])
         source = next(e for e in payload["evidence"] if e["kind"] != "table")
         witness = next(e for e in payload["evidence"] if e != source)
-        witnesses.append(witness["evidence_id"])
+        witnesses.append(witness["id"])
         content = {
             "status": "insufficient_evidence" if abstain else "answered",
             "lookups": [],
             "statements": []
             if abstain
-            else [{"text": source["text"], "evidence_ids": [source["evidence_id"]]}],
+            else [{"text": source["text"], "evidence_ids": [source["id"]]}],
             "assessment": [
                 {"label": "Missing detail", "status": "missing", "evidence_ids": witnesses}
             ],

@@ -26,16 +26,17 @@ def test_wrapped_subject_reaches_reranker_as_words_without_json_noise():
     original = copy.deepcopy(item)
     assert rerank_text(item) == "Title row[1]: Particle Physics | 42"
     sent = evidence_item(item, "E3")
-    assert sent["structure"] == structure
+    assert "structure" not in sent
     assert sent["text"] == reading_text(item)
     assert item == original
-    assert sent["structure"]["rows"][0][0]["row_span"] == 2
+    assert item.structure["rows"][0][0]["row_span"] == 2
 
 
 def test_unrecognized_or_incomplete_serialization_is_not_reinterpreted():
     item = source('{"text":"keep\\nthis"}', {"rows": [[{"text": "raw"}]]})
     assert reading_text(item) == item.text
-    assert evidence_item(item, "E2")["structure"] == item.structure
+    assert evidence_item(item, "E2")["text"] == item.text
+    assert item.structure == {"rows": [[{"text": "raw"}]]}
 
 
 def test_paragraph_normalization_does_not_rewrite_fact_or_select_an_exception():

@@ -1,14 +1,18 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
   AlertCircle,
   ArrowRight,
+  Check,
   CheckCircle2,
+  Circle,
   ClipboardList,
   Loader2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ApiProblemError } from "@/app/api/v1";
+import { ApiProblemError, v1Client } from "@/app/api/v1";
+import { useV1Auth } from "@/app/auth/v1";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,20 +24,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ConsumerModelBudgetNotice } from "@/features/modelops/capacity-badge";
-import { useCatalogQuery } from "@/features/modelops/queries";
 import { formatDateTimeValue } from "@/lib/date-utils";
+import { compilationKeys } from "./compilation-queries";
+import { getCompilationProgress } from "./compilation-requests";
 import {
   useCancelPreparationIntentMutation,
   useCreatePreparationIntentMutation,
@@ -41,8 +35,11 @@ import {
   usePreparationIntentsQuery,
 } from "./preparation-queries";
 import {
+  formatElapsedDuration,
   formatPreparationError,
   isPreparationActive,
+  preparationModeLabel,
+  preparationPolicySummary,
   preparationStatusHint,
   preparationStatusLabel,
   preparationStatusVariant,
@@ -50,10 +47,45 @@ import {
 } from "./preparation-schemas";
 import type {
   PreparationIntent,
-  PreparationMode,
   PreparationRequestInput,
+  PreparationStatus,
 } from "./preparation-types";
 import { generateIdempotencyKey } from "./schemas";
+
+const PREPARATION_STEPS = [
+  "Ghi nhận yêu cầu",
+  "Đọc nội dung nguồn",
+  "Tạo bản nháp có dẫn chứng",
+] as const;
+
+function activeStepIndex(status: PreparationStatus): number | null {
+  switch (status) {
+    case "queued":
+      return 0;
+    case "waiting_ocr":
+      return 1;
+    case "compiling":
+      return 2;
+    default:
+      return null;
+  }
+}
+
+function completedStepCount(
+  status: PreparationStatus,
+  hasCompilation: boolean,
+): number {
+  if (status === "ready") {
+    return PREPARATION_STEPS.length;
+  }
+  const active = activeStepIndex(status);
+  if (active !== null) {
+    return active;
+  }
+  // A terminal intent without a compilation proves only that the request was
+  // recorded; a compilation run proves the source was read.
+  return hasCompilation ? 2 : 1;
+}
 
 export function PreparationDialog({
   workspaceId,
@@ -80,22 +112,19 @@ export function PreparationDialog({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const [mode, setMode] = useState<PreparationMode>("source");
-  const [providerId, setProviderId] = useState("default");
-  const [maxOutputTokens, setMaxOutputTokens] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(generateIdempotencyKey);
   const [createdIntentId, setCreatedIntentId] = useState<string | null>(null);
+  const [isRestarting, setIsRestarting] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
       setCreatedIntentId(null);
+      setIsRestarting(false);
       return;
     }
-    setMode("source");
-    setProviderId("default");
-    setMaxOutputTokens("");
     setIdempotencyKey(generateIdempotencyKey());
     setCreatedIntentId(null);
+    setIsRestarting(false);
   }, [isOpen]);
 
   const intentsQuery = usePreparationIntentsQuery(
@@ -109,26 +138,17 @@ export function PreparationDialog({
     () => (intentsQuery.data ?? []).find(isPreparationActive) ?? null,
     [intentsQuery.data],
   );
-  const intentId = createdIntentId ?? activeIntent?.id ?? null;
+  // Server state survives reload: reopen on the latest (or still running) intent.
+  const knownIntent = activeIntent ?? intentsQuery.data?.[0] ?? null;
+  const intentId =
+    createdIntentId ?? (isRestarting ? null : (knownIntent?.id ?? null));
   const intentQuery = usePreparationIntentQuery(
     workspaceId,
     collectionId,
     intentId,
     { enabled: isOpen && Boolean(intentId) },
   );
-  const intent = intentQuery.data ?? activeIntent;
-
-  const catalogQuery = useCatalogQuery(workspaceId, {
-    enabled: isOpen && mode === "ai" && !intentId,
-  });
-  const chatProviders = useMemo(
-    () =>
-      (catalogQuery.data ?? []).filter((p) => p.capabilities.includes("chat")),
-    [catalogQuery.data],
-  );
-  const defaultChatProvider = chatProviders.find((p) =>
-    p.default_capabilities?.includes("chat"),
-  );
+  const intent = intentQuery.data ?? knownIntent;
 
   const createMutation = useCreatePreparationIntentMutation(
     workspaceId,
@@ -146,16 +166,10 @@ export function PreparationDialog({
     if (!revisionId) return;
 
     const input: PreparationRequestInput = {
-      mode,
+      mode: "auto",
       revision_id: revisionId,
       ocr_run_id: savedRunId,
       text_version: savedRunId ? savedTextVersion : 0,
-      ...(mode === "ai"
-        ? {
-            provider_id: providerId === "default" ? null : providerId,
-            max_output_tokens: maxOutputTokens ? Number(maxOutputTokens) : null,
-          }
-        : {}),
     };
 
     try {
@@ -164,10 +178,11 @@ export function PreparationDialog({
         idempotencyKey,
       });
       setCreatedIntentId(outcome.intent.id);
+      setIsRestarting(false);
       setIdempotencyKey(generateIdempotencyKey());
       toast.success(
         outcome.created
-          ? "Đã ghi nhận yêu cầu chuẩn bị nội dung."
+          ? "Đã ghi nhận. Hệ thống đang chuẩn bị ở nền."
           : "Đã mở lại yêu cầu chuẩn bị hiện có.",
       );
     } catch (error: unknown) {
@@ -182,21 +197,29 @@ export function PreparationDialog({
   const handleCancel = async () => {
     if (!intentId || cancelMutation.isPending) return;
     try {
-      await cancelMutation.mutateAsync(intentId);
-      setCreatedIntentId(null);
+      const updated = await cancelMutation.mutateAsync(intentId);
+      // Keep pointing at the intent the user acted on: if it finished first,
+      // the server returns that terminal state instead of cancelling it.
+      setCreatedIntentId(updated.id);
+      setIsRestarting(false);
       setIdempotencyKey(generateIdempotencyKey());
-      toast.info("Đã hủy yêu cầu. Hệ thống không chạy bước kế tiếp.");
+      toast.info(
+        updated.status === "cancelled"
+          ? "Đã dừng yêu cầu. Hệ thống không chạy bước kế tiếp."
+          : "Yêu cầu đã kết thúc trước khi dừng; trạng thái thật hiển thị bên dưới.",
+      );
     } catch (error: unknown) {
       toast.error(
         error instanceof ApiProblemError
           ? formatPreparationError(error.code)
-          : "Không thể hủy yêu cầu chuẩn bị.",
+          : "Không thể dừng yêu cầu chuẩn bị.",
       );
     }
   };
 
   const handleNewRequest = () => {
     setCreatedIntentId(null);
+    setIsRestarting(true);
     setIdempotencyKey(generateIdempotencyKey());
   };
 
@@ -206,8 +229,6 @@ export function PreparationDialog({
     intent?.status === "failed" ||
     intent?.status === "uncertain" ||
     intent?.status === "cancelled";
-  const aiUnavailable =
-    mode === "ai" && catalogQuery.isSuccess && chatProviders.length === 0;
   const savedTextLabel =
     savedTextVersion > 0
       ? `Bản đã lưu v${savedTextVersion}`
@@ -217,7 +238,11 @@ export function PreparationDialog({
 
   const statusView = intentId ? (
     intent ? (
-      <PreparationStatusView intent={intent} />
+      <PreparationStatusView
+        intent={intent}
+        workspaceId={workspaceId}
+        collectionId={collectionId}
+      />
     ) : intentQuery.isError ? (
       <Alert variant="destructive" className="py-2.5">
         <AlertCircle className="size-4" />
@@ -296,7 +321,7 @@ export function PreparationDialog({
                     {cancelMutation.isPending ? (
                       <Loader2 className="size-3.5 animate-spin" />
                     ) : null}
-                    Hủy yêu cầu
+                    Dừng
                   </Button>
                 ) : null}
                 {canRetry ? (
@@ -375,125 +400,14 @@ export function PreparationDialog({
                 </dl>
               </div>
 
-              <div className="space-y-2 pt-3 border-t">
+              <div className="space-y-1 pt-3 border-t">
                 <p className="text-xs font-semibold">Cách chuẩn bị</p>
-                <RadioGroup
-                  value={mode}
-                  onValueChange={(value) => {
-                    setMode(value as PreparationMode);
-                    setIdempotencyKey(generateIdempotencyKey());
-                  }}
-                  className="space-y-2.5"
-                >
-                  <div className="flex items-start gap-2.5">
-                    <RadioGroupItem
-                      id="prep-mode-source"
-                      value="source"
-                      className="mt-0.5"
-                    />
-                    <div className="space-y-0.5">
-                      <Label
-                        htmlFor="prep-mode-source"
-                        className="text-xs font-medium"
-                      >
-                        Giữ nguyên nguồn
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        Dựng cấu trúc và bảng từ văn bản đã đọc, không gọi AI.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <RadioGroupItem
-                      id="prep-mode-ai"
-                      value="ai"
-                      className="mt-0.5"
-                    />
-                    <div className="space-y-0.5">
-                      <Label
-                        htmlFor="prep-mode-ai"
-                        className="text-xs font-medium"
-                      >
-                        Bổ sung bằng AI
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        AI gợi ý cấu trúc và metadata có dẫn chứng. Dùng
-                        ModelOps và quota; nội dung nguồn vẫn được giữ.
-                      </p>
-                    </div>
-                  </div>
-                </RadioGroup>
+                <p className="text-xs text-muted-foreground">
+                  Hệ thống tự chọn cách phù hợp, model và ngân sách theo chính
+                  sách của đơn vị. Bản nguồn được giữ nguyên; AI chỉ bổ sung khi
+                  cần và luôn kèm dẫn chứng.
+                </p>
               </div>
-
-              {mode === "ai" ? (
-                <div className="space-y-2 pl-6">
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="prep-provider"
-                      className="text-[11px] text-muted-foreground"
-                    >
-                      Model (chat)
-                    </Label>
-                    <Select
-                      value={providerId}
-                      onValueChange={(value) => {
-                        setProviderId(value);
-                        setIdempotencyKey(generateIdempotencyKey());
-                      }}
-                    >
-                      <SelectTrigger id="prep-provider" className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="default" className="text-xs">
-                          Theo mặc định workspace
-                        </SelectItem>
-                        {chatProviders.map((provider) => (
-                          <SelectItem
-                            key={provider.id}
-                            value={provider.id}
-                            className="text-xs"
-                          >
-                            {provider.name} ({provider.model_name})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <ConsumerModelBudgetNotice
-                      model={chatProviders.find((p) => p.id === providerId)}
-                      defaultModel={defaultChatProvider}
-                      isDefaultSelection={providerId === "default"}
-                      capability="chat"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="prep-max-tokens"
-                      className="text-[11px] text-muted-foreground"
-                    >
-                      Giới hạn output tokens (tùy chọn)
-                    </Label>
-                    <Input
-                      id="prep-max-tokens"
-                      type="number"
-                      min={1}
-                      className="h-8 text-xs font-mono"
-                      placeholder="Mặc định theo model"
-                      value={maxOutputTokens}
-                      onChange={(event) => {
-                        setMaxOutputTokens(event.target.value);
-                        setIdempotencyKey(generateIdempotencyKey());
-                      }}
-                    />
-                  </div>
-                  {aiUnavailable ? (
-                    <p className="text-xs text-destructive">
-                      Chưa có model chat được cấp cho workspace. Hãy cấu hình
-                      trong ModelOps trước khi dùng chế độ này.
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
 
               <div className="space-y-1 pt-3 border-t text-xs text-muted-foreground">
                 <p className="font-semibold text-foreground">Khi xác nhận</p>
@@ -501,8 +415,14 @@ export function PreparationDialog({
                   <li>
                     Hệ thống dùng đúng tệp v{revisionNo} và bản văn bản đã lưu.
                   </li>
-                  <li>Tạo bản nháp có dẫn chứng rồi dừng lại để bạn xem.</li>
-                  <li>Không tự đăng ký hay xuất bản.</li>
+                  <li>
+                    Chỉ tạo bản nháp để bạn xem và sửa; không tự đăng ký, duyệt
+                    hay xuất bản.
+                  </li>
+                  <li>
+                    Có thể đóng hộp thoại; tác vụ chạy ở nền và trạng thái được
+                    lấy lại từ máy chủ.
+                  </li>
                 </ul>
               </div>
             </div>
@@ -522,7 +442,7 @@ export function PreparationDialog({
                 type="submit"
                 size="sm"
                 className="h-8 text-xs gap-1.5"
-                disabled={createMutation.isPending || aiUnavailable}
+                disabled={createMutation.isPending}
               >
                 {createMutation.isPending ? (
                   <>
@@ -532,7 +452,7 @@ export function PreparationDialog({
                 ) : (
                   <>
                     <ClipboardList className="size-3.5" />
-                    <span>Bắt đầu chuẩn bị</span>
+                    <span>Chuẩn bị nội dung</span>
                   </>
                 )}
               </Button>
@@ -544,10 +464,22 @@ export function PreparationDialog({
   );
 }
 
-function PreparationStatusView({ intent }: { intent: PreparationIntent }) {
+function PreparationStatusView({
+  intent,
+  workspaceId,
+  collectionId,
+}: {
+  intent: PreparationIntent;
+  workspaceId: string;
+  collectionId: string;
+}) {
   const isActive = isPreparationActive(intent);
   const isReady = intent.status === "ready";
   const isFailed = intent.status === "failed" || intent.status === "uncertain";
+  const elapsed = formatElapsedDuration(
+    intent.started_at ?? intent.created_at,
+    intent.finished_at,
+  );
 
   return (
     <div className="space-y-4">
@@ -568,13 +500,67 @@ function PreparationStatusView({ intent }: { intent: PreparationIntent }) {
         {preparationStatusHint(intent.status)}
       </p>
 
+      <PreparationSteps
+        status={intent.status}
+        hasCompilation={Boolean(intent.compilation_run_id)}
+      />
+
+      <dl className="space-y-1 text-xs">
+        <div className="flex justify-between gap-3">
+          <dt className="text-muted-foreground">Cách chuẩn bị</dt>
+          <dd>{preparationModeLabel(intent.mode)}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-muted-foreground">Chính sách</dt>
+          <dd className="max-w-[70%] text-right text-muted-foreground">
+            {preparationPolicySummary(intent.policy)}
+          </dd>
+        </div>
+        {intent.reused ? (
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Kết quả</dt>
+            <dd className="text-right">
+              Dùng lại bản nháp đã có cho đúng nguồn và chính sách
+            </dd>
+          </div>
+        ) : null}
+        <div className="flex justify-between gap-3">
+          <dt className="text-muted-foreground">Văn bản</dt>
+          <dd>
+            {intent.text_version > 0
+              ? `Bản đã lưu v${intent.text_version}`
+              : "Bản đọc gốc v0"}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-muted-foreground">Gửi lúc</dt>
+          <dd>{formatDateTimeValue(intent.created_at)}</dd>
+        </div>
+        {elapsed ? (
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">
+              {intent.finished_at ? "Thời gian chạy" : "Đã chạy"}
+            </dt>
+            <dd>{elapsed}</dd>
+          </div>
+        ) : null}
+      </dl>
+
+      {intent.status === "compiling" && intent.compilation_run_id ? (
+        <PreparationPartProgress
+          workspaceId={workspaceId}
+          collectionId={collectionId}
+          runId={intent.compilation_run_id}
+        />
+      ) : null}
+
       {isReady ? (
         <Alert variant="success" className="py-2.5">
           <CheckCircle2 className="size-4" />
           <AlertTitle className="text-xs">Bản nháp đã sẵn sàng</AlertTitle>
           <AlertDescription className="text-xs">
-            Xem và quyết định đăng ký ở bước tiếp theo. Hệ thống không tự đăng
-            ký hay xuất bản.
+            Mở bản nháp để xem nội dung, chỗ cần chú ý và gửi duyệt. Hệ thống
+            không tự đăng ký hay xuất bản.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -599,31 +585,115 @@ function PreparationStatusView({ intent }: { intent: PreparationIntent }) {
         </Alert>
       ) : null}
 
-      <dl className="space-y-1 text-xs">
-        <div className="flex justify-between gap-3">
-          <dt className="text-muted-foreground">Chế độ</dt>
-          <dd>
-            {intent.mode === "ai" ? "Bổ sung bằng AI" : "Giữ nguyên nguồn"}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className="text-muted-foreground">Văn bản</dt>
-          <dd>
-            {intent.text_version > 0
-              ? `Bản đã lưu v${intent.text_version}`
-              : "Bản đọc gốc v0"}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className="text-muted-foreground">Gửi lúc</dt>
-          <dd>{formatDateTimeValue(intent.created_at)}</dd>
-        </div>
-      </dl>
-
       {isActive ? (
         <p className="text-[11px] text-muted-foreground">
-          Hủy chỉ ngăn bước kế tiếp; tác vụ đã gửi tới nhà cung cấp có thể vẫn
+          Dừng chỉ ngăn bước kế tiếp; phần đã gửi tới nhà cung cấp có thể vẫn
           hoàn tất. Bạn có thể đóng hộp thoại, yêu cầu vẫn chạy ở nền.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function PreparationSteps({
+  status,
+  hasCompilation,
+}: {
+  status: PreparationStatus;
+  hasCompilation: boolean;
+}) {
+  const completed = completedStepCount(status, hasCompilation);
+  const isRunning = activeStepIndex(status) !== null;
+  const isHalted = status === "failed" || status === "uncertain";
+  return (
+    <ol aria-label="Các bước chuẩn bị" className="space-y-1.5">
+      {PREPARATION_STEPS.map((label, index) => {
+        const isDone = index < completed;
+        const isCurrent = isRunning && index === completed;
+        const isFault = isHalted && index === completed;
+        return (
+          <li
+            key={label}
+            aria-current={isCurrent ? "step" : undefined}
+            className="flex items-center gap-2"
+          >
+            {isDone ? (
+              <Check className="size-3.5 text-success" aria-hidden />
+            ) : isFault ? (
+              <AlertCircle className="size-3.5 text-destructive" aria-hidden />
+            ) : isCurrent ? (
+              <Loader2
+                className="size-3.5 animate-spin text-primary motion-reduce:animate-none"
+                aria-hidden
+              />
+            ) : (
+              <Circle className="size-3.5 text-muted-foreground" aria-hidden />
+            )}
+            <span
+              className={
+                isDone || isCurrent
+                  ? "text-xs"
+                  : "text-xs text-muted-foreground"
+              }
+            >
+              {label}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function PreparationPartProgress({
+  workspaceId,
+  collectionId,
+  runId,
+}: {
+  workspaceId: string;
+  collectionId: string;
+  runId: string;
+}) {
+  const { sessionId } = useV1Auth();
+  const query = useQuery({
+    queryKey: [
+      ...compilationKeys.run(workspaceId, collectionId, runId, sessionId),
+      "progress",
+    ],
+    queryFn: ({ signal }) =>
+      getCompilationProgress(v1Client, workspaceId, collectionId, runId, {
+        signal,
+      }),
+    retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.status === "queued" ||
+      query.state.data?.status === "running"
+        ? 3000
+        : false,
+  });
+  const data = query.data;
+  if (query.isError) {
+    return (
+      <p className="text-[11px] text-muted-foreground">
+        Chưa đọc được tiến độ từng phần. Tác vụ chưa được xác nhận dừng.
+      </p>
+    );
+  }
+  if (!data || data.total <= 0) return null;
+  const details = [
+    `${data.completed}/${data.total} phần xong`,
+    data.running > 0 ? `${data.running} đang chạy` : null,
+    data.failed > 0 ? `${data.failed} lỗi` : null,
+    data.uncertain > 0 ? `${data.uncertain} chưa xác định` : null,
+  ].filter((item): item is string => item !== null);
+  return (
+    <div className="space-y-1 rounded-lg border bg-muted/30 px-3 py-2">
+      <p role="status" className="text-xs">
+        {details.join(" · ")}
+      </p>
+      {data.latest_output_partial ? (
+        <p className="text-[11px] text-warning">
+          Bản nháp hiện có còn phần chưa hoàn tất.
         </p>
       ) : null}
     </div>

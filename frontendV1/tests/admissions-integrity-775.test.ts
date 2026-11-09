@@ -13,6 +13,7 @@ import {
   fingerprint,
   freezeCohort,
   planAdmissionsBudget,
+  planAdmissionsRerankPair,
   requireAdmissionsQuota,
   verifyAdmissionsIndex,
 } from "../e2e/stages/admissions-policy";
@@ -384,6 +385,74 @@ test("declared maximum cannot silently consume the evidence reserve", () => {
       token_limits: { context_window_tokens: 32768, max_output_tokens: 16384 },
     }),
   ).toThrow(/BLOCKED/);
+});
+
+test("rerank preflight keeps bytes and tokens distinct", () => {
+  const plan = planAdmissionsRerankPair(
+    {
+      model_name: "bge-reranker-v2-m3",
+      capacity_status: "configured",
+      token_limits: { context_window_tokens: 8192 },
+    },
+    4000,
+    300,
+  );
+  expect(plan.pair_bytes).toBe(4364);
+  expect(plan.input_tokens_limit).toBe(8192);
+  expect(plan.token_estimate).toBe(Math.ceil(4364 / 2));
+  expect(plan.token_estimate).toBeLessThan(plan.pair_bytes);
+  expect(plan.token_upper_bound).toBe(4366);
+  expect(plan.worst_case_within_byte_guard).toBe(true);
+});
+
+test("rerank preflight rejects a byte upper bound above the token limit", () => {
+  expect(() =>
+    planAdmissionsRerankPair(
+      {
+        model_name: "bge-reranker-v2-m3",
+        capacity_status: "configured",
+        token_limits: { context_window_tokens: 8192 },
+      },
+      8160,
+      300,
+    ),
+  ).toThrow(/cận trên byte/);
+});
+
+test("rerank preflight still blocks a pair that cannot fit", () => {
+  expect(() =>
+    planAdmissionsRerankPair(
+      {
+        model_name: "bge-reranker-v2-m3",
+        capacity_status: "configured",
+        token_limits: { context_window_tokens: 8192 },
+      },
+      1_000_000,
+      300,
+    ),
+  ).toThrow(/rerank/);
+  expect(() =>
+    planAdmissionsRerankPair(
+      {
+        model_name: "tiny",
+        capacity_status: "configured",
+        token_limits: { max_input_tokens: 1024 },
+      },
+      3000,
+      500,
+    ),
+  ).toThrow(/rerank/);
+  expect(() =>
+    planAdmissionsRerankPair(
+      {
+        model_name: "unknown",
+        capacity_status: "unknown",
+        token_limits: null,
+      },
+      100,
+      50,
+    ),
+  ).toThrow(/capacity rerank/);
 });
 
 test("quota admission never increases an allowance or clears reservations", async () => {

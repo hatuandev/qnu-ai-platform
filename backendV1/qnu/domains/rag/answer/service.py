@@ -26,13 +26,17 @@ from qnu.domains.rag.answer.drafting import (
     messages_for,
     output_schema,
     parse_answer,
+    payload_metrics,
     response_observation,
     sources_for,
 )
 from qnu.domains.rag.answer.narrative import continuation_supports
+from qnu.domains.rag.answer.projection import PAYLOAD_VERSION
 from qnu.domains.rag.answer.retrieval import search
 from qnu.domains.rag.answer.schemas import AnswerRequest, AnswerResponse, AnswerTrace
+from qnu.domains.rag.answer.selection import select_hits
 from qnu.domains.rag.answer.source_text import attach_source_text
+from qnu.domains.rag.answer.table_selection import select_catalog
 from qnu.domains.rag.answer.verification import verify
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.errors import AppException, Conflict
@@ -50,11 +54,19 @@ logger = get_logger(__name__)
 def _pack_messages(req, sources, context, **options):
     """Trim optional neighbors against the actual evidence envelope."""
     optional = {
-        item["chunk_id"] for item in context.get("added", []) if item.get("kind") != "clause"
+        item["chunk_id"]
+        for item in context.get("added", [])
+        if item.get("kind") not in {"clause", "structure"}
     }
     skipped = []
     while True:
         cells = catalog(sources, context.get("table_links"))
+        cells = select_catalog(
+            cells,
+            sources,
+            options.get("resolved_question") or req.question,
+            context.get("table_links", []),
+        )
         messages = messages_for(
             req.question,
             sources,
@@ -66,13 +78,7 @@ def _pack_messages(req, sources, context, **options):
         envelope = json.loads(messages[-1].content)
         evidence = {
             key: envelope[key]
-            for key in (
-                "evidence",
-                "table_cells",
-                "table_context",
-                "narrative_context",
-                "answer_plan",
-            )
+            for key in ("evidence", "tables", "unselectable", "reading", "plan")
             if key in envelope
         }
         size = len(json.dumps(evidence, ensure_ascii=False, separators=(",", ":")).encode())
@@ -142,13 +148,36 @@ async def answer(
     context_started = time.monotonic()
     bundles = {}
     retrieval, trace.context = await expand_context(
-        db, blob, actor, workspace_id, collection_id, retrieval, req, bundles=bundles
+        db,
+        blob,
+        actor,
+        workspace_id,
+        collection_id,
+        retrieval,
+        req,
+        bundles=bundles,
+        resolved_question=retrieval_query,
     )
     trace.stage_ms["context"] = round((time.monotonic() - context_started) * 1000, 3)
     if not retrieval.hits:
         response.reason = retrieval.status
         trace.verification["skip_reason"] = "no_evidence"
         return response
+    selected_hits, selection = select_hits(
+        retrieval.hits,
+        trace.context,
+        req.question,
+        resolved_question=retrieval_query,
+    )
+    ranking = trace.retrieval.get("ranking") or {}
+    selection["candidate_count"] = len(
+        trace.retrieval.get("fusion_ranked_ids") or trace.retrieval.get("dense_ranked_ids") or []
+    )
+    selection["reranked_count"] = len(ranking.get("rerank") or [])
+    selection["rerank_applied"] = bool(ranking.get("rerank"))
+    trace.context["selection"] = selection
+    if len(selected_hits) != len(retrieval.hits):
+        retrieval = retrieval.model_copy(update={"hits": selected_hits})
     sources = sources_for(retrieval)
     await attach_source_text(db, blob, workspace_id, collection_id, sources, bundles=bundles)
     messages, cells, envelope, evidence_bytes, skipped = _pack_messages(
@@ -174,12 +203,25 @@ async def answer(
             item for item in trace.context["added"] if item["chunk_id"] not in skipped
         ]
         trace.context["skipped_envelope_budget"] = skipped
+    trace.context["selection"]["envelope_skipped"] = skipped
+    trace.context["selection"]["selected_count"] = len(sources)
+    trace.context["selection"]["selected_ids"] = [source.chunk_id for source in sources]
     trace.context["bytes_used"] = evidence_bytes
-    trace.context["narrative_groups"] = len(envelope.get("narrative_context", []))
-    trace.context["narrative_context_sha256"] = digest(envelope.get("narrative_context", []))
+    trace.context["table_selection"] = cells.get("selection", {})
+    trace.context["reading_groups"] = len(envelope.get("reading", []))
+    trace.context["reading_sha256"] = digest(envelope.get("reading", []))
     trace.grounding = {
         "version": CELLS_VERSION,
+        "payload_version": PAYLOAD_VERSION,
         "available_cells": sum(len(t["cells"]) for t in cells["tables"]),
+        "available_rows": len(
+            {
+                (table["evidence_id"], cell["cell_id"].split(":")[1])
+                for table in cells["tables"]
+                for cell in table["cells"]
+            }
+        ),
+        "selectable_tables": sum(bool(t["cells"]) for t in cells["tables"]),
         "unresolved_tables": len(cells["issues"]),
         "catalog_sha256": digest(cells),
     }
@@ -187,6 +229,7 @@ async def answer(
         db, blob, vectors, actor, workspace_id, collection_id, retrieval, req.document_ids
     )
     answer_schema = output_schema(sources)
+    trace.context["packing"] = payload_metrics(messages, answer_schema, evidence_bytes)
     runtime, request, budget = await prepare_chat_request(
         db,
         actor,

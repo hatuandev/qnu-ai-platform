@@ -16,6 +16,7 @@ export type ProviderSetupProfile = {
       {
         timeout_seconds?: number;
         wait_for_completion?: boolean;
+        reasoning_policy?: Record<string, unknown>;
         max_input_tokens?: number;
         ocr_page_input?: NonNullable<TokenLimits["ocr_page_input"]>;
       }
@@ -28,6 +29,31 @@ type CompletionWaitPolicy = {
   status: "configured" | "default" | "stale";
   policy: Record<string, unknown> & { wait_for_completion?: boolean };
 };
+
+export async function configureReasoning(
+  api: SetupApi,
+  providerId: string,
+  policy: Record<string, unknown> | undefined,
+) {
+  if (!policy) return;
+  const path = `/modelops/providers/${providerId}/reasoning`;
+  const current = await api.json<{ policy: Record<string, unknown> }>(
+    "GET",
+    path,
+  );
+  const matches = (saved: Record<string, unknown>) =>
+    Object.entries(policy).every(
+      ([key, value]) => JSON.stringify(saved[key]) === JSON.stringify(value),
+    );
+  if (matches(current.policy)) return;
+  await api.json("PUT", path, { policy });
+  const saved = await api.json<{ policy: Record<string, unknown> }>(
+    "GET",
+    path,
+  );
+  if (!matches(saved.policy))
+    throw new Error("BLOCKED: chưa lưu được cấu hình suy luận của profile.");
+}
 
 async function configureCompletionWait(
   api: SetupApi,
@@ -132,6 +158,11 @@ export async function configureTestModelCapacity(
       await api.json("PATCH", `/modelops/providers/${model.id}`, patch);
     }
     if (capability === "chat") {
+      await configureReasoning(
+        api,
+        model.id,
+        profile.model_runtime?.chat?.reasoning_policy,
+      );
       await configureCompletionWait(
         api,
         model.id,

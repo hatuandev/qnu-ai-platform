@@ -1,5 +1,13 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên908 — Thu gọn bảng, nối ngữ cảnh và verifier RAG](2026-11-09_phien_908_rag_context_va_verifier.md).
+
+- [Phiên907 — Tối ưu context RAG và kiểm chứng](./2026-11-08_phien_907_toi_uu_context_rag.md).
+
+- [Phiên906 — Kế hoạch hoàn thiện và nghiệm thu luồng mới](2026-11-08_phien_906_ke_hoach_nghiem_thu_luong_moi.md).
+
+- [Phiên905 — Seed đơn vị Trung tâm Số & Học liệu và kiểm chứng vai trò](2026-11-08_phien_905_seed_don_vi_shl.md).
+
 - [Phiên904 — Chuẩn bị môi trường pilot P7](2026-11-08_phien_904_moi_truong_pilot.md).
 
 - [Phiên903 — Pilot và đóng phạm vi bản đầu](2026-11-08_phien_903_pilot_va_dong_pham_vi.md).

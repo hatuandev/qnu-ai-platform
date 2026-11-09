@@ -1,4 +1,4 @@
-export type PreparationMode = "source" | "ai";
+export type PreparationMode = "source" | "ai" | "auto";
 
 export type PreparationStatus =
   | "queued"
@@ -8,6 +8,12 @@ export type PreparationStatus =
   | "failed"
   | "uncertain"
   | "cancelled";
+
+export interface PreparationPolicyView {
+  version: string;
+  supplement: string;
+  reason: string | null;
+}
 
 export interface PreparationIntent {
   id: string;
@@ -32,6 +38,8 @@ export interface PreparationIntent {
   updated_at: string;
   started_at: string | null;
   finished_at: string | null;
+  policy: PreparationPolicyView | null;
+  reused: boolean;
 }
 
 export interface PreparationRequestInput {

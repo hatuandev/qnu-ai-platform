@@ -37,7 +37,7 @@ PREPARATION_STATUSES = (
 )
 ACTIVE_PREPARATION_STATUSES = ("queued", "waiting_ocr", "compiling")
 TERMINAL_PREPARATION_STATUSES = ("ready", "failed", "uncertain", "cancelled")
-PREPARATION_MODES = ("source", "ai")
+PREPARATION_MODES = ("source", "ai", "auto")
 
 
 class PreparationIntent(Base):
@@ -70,7 +70,7 @@ class PreparationIntent(Base):
             "status IN ('queued','waiting_ocr','compiling','ready','failed','uncertain','cancelled')",
             name="ck_preparation_status",
         ),
-        CheckConstraint("mode IN ('source','ai')", name="ck_preparation_mode"),
+        CheckConstraint("mode IN ('source','ai','auto')", name="ck_preparation_mode"),
         CheckConstraint("revision_no >= 1", name="ck_preparation_revision"),
         CheckConstraint("text_version >= 0", name="ck_preparation_text_version"),
         CheckConstraint("char_length(revision_sha256) = 64", name="ck_preparation_sha256"),

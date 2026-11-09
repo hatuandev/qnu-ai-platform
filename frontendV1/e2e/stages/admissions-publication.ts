@@ -26,6 +26,7 @@ import {
   type Run,
   type Source,
   save,
+  sourceBase,
   versionBase,
 } from "./session";
 
@@ -75,15 +76,19 @@ async function compileAdmissionDocuments(
 
   // Validate every source before spending tokens on the first document.
   for (const [key, docMeta] of Object.entries(benchmark.documents)) {
-    const source = state.admissions.documents[key]?.source;
+    const entry = state.admissions.documents[key];
+    const source = entry?.source;
     if (!source || source.sha256 !== docMeta.sha256)
       throw new Error(`BLOCKED: thiếu/sai hash nguồn ${key}.`);
+    const pages = docMeta.pages > 0 ? docMeta.pages : entry?.pages;
+    if (!pages)
+      throw new Error(`BLOCKED: chưa có số trang extraction của ${key}.`);
     const run = await api.get<Run>(processing(context(state), source));
     if (
       run.status !== "completed" ||
       !run.results_ready ||
-      run.pages_done !== docMeta.pages ||
-      run.pages_total !== docMeta.pages
+      run.pages_done !== pages ||
+      run.pages_total !== pages
     )
       throw new Error(`BLOCKED: OCR ${key} chưa đủ trang/kết quả.`);
     await pinAdmissionText(api, state, source);
@@ -138,6 +143,120 @@ async function pinAdmissionText(api: Api, state: Checkpoint, source: Source) {
   save(state);
 }
 
+type PreparationIntent = {
+  id: string;
+  status: string;
+  mode: string;
+  provider_id: string | null;
+  text_version: number;
+  text_canonical_sha256: string | null;
+  ocr_run_id: string | null;
+  compilation_run_id: string | null;
+  error_code: string | null;
+  policy?: {
+    version: string;
+    supplement: string;
+    reason?: string | null;
+  } | null;
+  reused?: boolean;
+};
+
+async function prepareOneAdmissionSource(
+  api: Api,
+  state: Checkpoint,
+  docKey: string,
+  docMeta: BenchmarkDoc,
+  source: Source,
+  timeout: number,
+) {
+  const entry = state.admissions?.documents?.[docKey];
+  if (!entry)
+    throw new Error(`BLOCKED: thiếu thông tin lưu trữ cho ${docKey}.`);
+  if (!entry.prepare) {
+    if (entry.publication)
+      throw new Error(
+        `BLOCKED: [${docKey}] đã có lượt biên soạn trực tiếp; tạo phiên mới cho chế độ chuẩn bị tự động.`,
+      );
+    const created = await api.post<{
+      intent: PreparationIntent;
+      created: boolean;
+      dispatched: boolean;
+    }>(
+      `${sourceBase(context(state), source)}/preparation-intents`,
+      {
+        mode: "auto",
+        revision_id: source.revision,
+        ocr_run_id: source.run,
+        text_version: source.textVersion ?? 0,
+        topic: `Biên soạn đầy đủ tài liệu: ${docMeta.title}`,
+      },
+      `${state.runId}-${docKey}-prepare-v1`,
+    );
+    entry.prepare = {
+      id: created.intent.id,
+      status: created.intent.status,
+      policy: created.intent.policy ?? null,
+      text_version: created.intent.text_version,
+      text_canonical_sha256: created.intent.text_canonical_sha256,
+    };
+    save(state);
+    console.info(
+      `[${docKey}] Ý định chuẩn bị tự động ${created.intent.id}: created=${created.created}, dispatched=${created.dispatched}.`,
+    );
+  }
+
+  let intent: PreparationIntent | undefined;
+  await expect
+    .poll(
+      async () => {
+        intent = await api.get<PreparationIntent>(
+          `${collection(context(state))}/preparation-intents/${entry.prepare?.id}`,
+        );
+        if (["failed", "uncertain", "cancelled"].includes(intent.status)) {
+          throw new Error(
+            `[${docKey}] Chuẩn bị ${intent.status}: code=${intent.error_code ?? "unknown"}`,
+          );
+        }
+        return intent.status;
+      },
+      { timeout: Math.max(timeout * 4, 900_000), intervals: [500, 1000, 2000] },
+    )
+    .toBe("ready");
+  if (!intent)
+    throw new Error(`[${docKey}] Không đọc được trạng thái chuẩn bị.`);
+  if (
+    intent.mode !== "auto" ||
+    intent.provider_id !== state.runtimeDefaults?.chat
+  )
+    throw new Error(
+      `[${docKey}] Chuẩn bị không dùng Qwen đã ghim (mode=${intent.mode}, provider=${intent.provider_id ?? "null"}).`,
+    );
+  if (
+    intent.text_canonical_sha256 &&
+    source.textSha256 &&
+    intent.text_canonical_sha256 !== source.textSha256
+  )
+    throw new Error(
+      `[${docKey}] Chuẩn bị đã ghim bản văn bản khác lúc kiểm nguồn.`,
+    );
+  if (!intent.compilation_run_id)
+    throw new Error(`[${docKey}] Chuẩn bị ready nhưng thiếu lượt biên soạn.`);
+
+  console.info(
+    `[${docKey}] Chuẩn bị tự động ready: policy=${intent.policy?.version ?? "?"}/${intent.policy?.supplement ?? "?"}, reused=${intent.reused === true}.`,
+  );
+  entry.prepare = {
+    id: intent.id,
+    status: intent.status,
+    policy: intent.policy ?? null,
+    compilation_run_id: intent.compilation_run_id,
+    text_version: intent.text_version,
+    text_canonical_sha256: intent.text_canonical_sha256,
+  };
+  entry.publication = { run: intent.compilation_run_id };
+  save(state);
+}
+
 async function compileOneAdmissionSource(
   api: Api,
   state: Checkpoint,
@@ -152,12 +271,13 @@ async function compileOneAdmissionSource(
   if (!entry) {
     throw new Error(`BLOCKED: thiếu thông tin lưu trữ cho ${docKey}.`);
   }
+  const prepareMode = process.env.E2E_PREPARE_MODE === "auto";
   const previous = entry.publication;
   let replaceWith: "raise_output" | "new_run" | undefined;
   let reason = "";
   let recoverOutput: number | undefined;
 
-  if (previous) {
+  if (previous && !prepareMode) {
     const run = await api.get<Run>(`${base}/compilation-runs/${previous.run}`);
     let outputLimit: number | null | undefined;
     let facts: RunFacts = { ...run };
@@ -207,7 +327,16 @@ async function compileOneAdmissionSource(
     );
   }
 
-  if (!previous || replaceWith) {
+  if (prepareMode) {
+    await prepareOneAdmissionSource(
+      api,
+      state,
+      docKey,
+      docMeta,
+      source,
+      timeout,
+    );
+  } else if (!previous || replaceWith) {
     let idempotencyKey = `${state.runId}-${docKey}-compile-v5`;
     const history = previous
       ? [...(entry.compilationHistory ?? []), previous]
@@ -223,8 +352,7 @@ async function compileOneAdmissionSource(
       topic: `Biên soạn đầy đủ tài liệu: ${docMeta.title}`,
       ocr_run_ids: [source.run],
       text_versions: { [source.run]: source.textVersion },
-      provider_id: state.runtimeDefaults?.chat,
-      structured_output: true,
+      source_first: true,
       auto_review: false,
     };
     if (recoverOutput !== undefined) {
@@ -506,7 +634,7 @@ export async function publishAdmissionDraft(api: Api, state: Checkpoint) {
       }>(
         `${base}/compiled-documents`,
         {
-          document_key: `${key}-${state.runId}`,
+          document_key: `${key.toLowerCase()}-${state.runId}`,
           title: docMeta.title,
           compilation_run_id: publication.run,
         },
@@ -588,11 +716,15 @@ async function indexCombinedAdmissionsDrafts(api: Api, state: Checkpoint) {
   expect(run.provider_id).toBe(state.runtimeDefaults?.embedding);
   await verifyAdmissionsIndex(api, state);
 
-  const totalPages = Object.values(benchmark.documents).reduce(
-    (sum, d) => sum + d.pages,
+  const totalPages = Object.entries(benchmark.documents).reduce(
+    (sum, [key, d]) =>
+      sum +
+      (d.pages > 0
+        ? d.pages
+        : (state.admissions?.documents?.[key]?.pages ?? 0)),
     0,
   );
   console.info(
-    `Đã xuất bản và lập chỉ mục chung cho cả 3 PDF (${totalPages} trang, ${run.chunks_total} chunks).`,
+    `Đã xuất bản và lập chỉ mục chung cho cả ${Object.keys(benchmark.documents).length} tài liệu (${totalPages} trang, ${run.chunks_total} chunks).`,
   );
 }

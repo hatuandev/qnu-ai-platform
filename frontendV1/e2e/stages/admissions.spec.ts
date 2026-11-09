@@ -31,7 +31,9 @@ if (!stage || !(stage in steps))
   throw new Error("Chặng tuyển sinh không hợp lệ.");
 test.use({ trace: "off", video: "off", screenshot: "only-on-failure" });
 
-test(`Tuyển sinh QNU (3 tài liệu, 53 cases): ${stage}`, async ({ page }) => {
+test(`Tuyển sinh QNU (${Object.keys(benchmark.documents).length} tài liệu, ${benchmark.cases.length} cases): ${stage}`, async ({
+  page,
+}) => {
   const api = await authenticate(page);
   const state = checkpoint();
   if (state.mode !== "live" || !state.runtimeDefaults || !state.workspace)
@@ -40,8 +42,12 @@ test(`Tuyển sinh QNU (3 tài liệu, 53 cases): ${stage}`, async ({ page }) =>
     );
   checkAllSources();
   const timeout = await modelTimeout(api, state);
-  const totalPages = Object.values(benchmark.documents).reduce(
-    (sum, d) => sum + d.pages,
+  const totalPages = Object.entries(benchmark.documents).reduce(
+    (sum, [key, d]) =>
+      sum +
+      (d.pages > 0
+        ? d.pages
+        : (state.admissions?.documents?.[key]?.pages ?? 0)),
     0,
   );
   const perPart =

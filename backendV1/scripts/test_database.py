@@ -1,4 +1,4 @@
-"""Disposable PostgreSQL test database; never copy application rows or credentials."""
+"""Disposable PostgreSQL test DB and isolated Redis DB; never copy application rows or credentials."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ import sys
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 import asyncpg
 from sqlalchemy.engine import make_url
@@ -39,7 +40,12 @@ async def connection(url, database):
 def main() -> int:
     from qnu.platform.config import get_settings
 
-    url = make_url(get_settings().DATABASE_URL)
+    settings = get_settings()
+    url = make_url(settings.DATABASE_URL)
+    # Dedicated Redis logical DB so test leases and queues never touch dev data.
+    test_redis = os.environ.get("TEST_REDIS_URL") or urlunsplit(
+        urlsplit(settings.REDIS_URL)._replace(path="/15")
+    )
     if url.host not in {"127.0.0.1", "localhost", "::1"}:
         raise RuntimeError("Only loopback PostgreSQL is allowed by this test harness.")
     name = "qnu_v1_test_" + uuid.uuid4().hex[:16]
@@ -50,6 +56,9 @@ def main() -> int:
         os.environ,
         DATABASE_URL=url.set(database=name).render_as_string(hide_password=False),
         TEST_DATABASE_URL=url.set(database=name).render_as_string(hide_password=False),
+        REDIS_URL=test_redis,
+        TEST_REDIS_URL=test_redis,
+        CACHE_NAMESPACE="qnu:test:" + name + ":",
         ENVIRONMENT="test",
         STORAGE_DRIVER="local",
         LOCAL_STORAGE_PATH=str(runtime / "objects"),

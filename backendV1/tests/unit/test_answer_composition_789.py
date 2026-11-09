@@ -46,15 +46,8 @@ def test_narrative_order_uses_pinned_block_order_not_retrieval_rank():
     start = paragraph("E2", ["run:a"], docs)
     original = copy.deepcopy([end, start])
     view = json.loads(messages_for("What conditions apply?", [end, start])[-1].content)
-    group = view["narrative_context"][0]
-    assert (
-        group["text"]
-        == docs[0]["pages"][0]["blocks"][0]["text"]
-        + "\n"
-        + docs[0]["pages"][0]["blocks"][1]["text"]
-    )
-    assert group["evidence_ids"] == ["E2", "E1"]
-    assert [p["citation"] for p in group["fragments"]] == ["run:a", "run:b"]
+    assert view["reading"] == [["E2", "E1"]]
+    assert sum(item["text"].count("category A") for item in view["evidence"]) == 1
     assert [end, start] == original
 
 
@@ -72,18 +65,20 @@ def test_narrative_never_bridges_uncited_blocks_or_published_identities(boundary
     }.get(boundary)
     if field:
         setattr(c, field, "different")
-    groups = json.loads(messages_for("Rules?", [a, c])[-1].content)["narrative_context"]
-    assert len(groups) == 2
-    assert not any(len(g["evidence_ids"]) > 1 for g in groups)
+    view = json.loads(messages_for("Rules?", [a, c])[-1].content)
+    # A one-item run proves no adjacency; only multi-item verified runs are sent.
+    assert not view.get("reading")
 
 
-def test_overlapping_source_blocks_appear_once_with_all_original_owners():
+def test_partial_overlap_preserves_complete_sentence_in_each_owner():
     docs = documents()
     a = paragraph("E1", ["run:a", "run:b"], docs)
     b = paragraph("E2", ["run:b"], docs)
-    group = json.loads(messages_for("Rules?", [b, a])[-1].content)["narrative_context"][0]
-    assert group["text"].count("certificate score") == 1
-    assert group["fragments"][1]["evidence_ids"] == ["E2", "E1"]
+    view = json.loads(messages_for("Rules?", [b, a])[-1].content)
+    assert view["reading"] == [["E1", "E2"]]
+    assert view["evidence"][1]["text"] == "\n".join(p["text"] for p in a.source_passages)
+    assert "category A" in view["evidence"][1]["text"]
+    assert "certificate score" in view["evidence"][1]["text"]
 
 
 def test_mixed_answer_retains_only_paragraph_narrative_and_original_table_values():
@@ -163,6 +158,7 @@ async def test_added_reading_context_is_included_in_budget_before_dispatch(monke
     from qnu.domains.rag.answer.schemas import AnswerRequest
 
     docs = documents()
+    docs[0]["pages"][0]["blocks"][0]["text"] += " " + "extra condition " * 30
     sources = [paragraph("E1", ["run:a"], docs), paragraph("E2", ["run:b"], docs)]
     result = SearchResponse(
         index_run_id="idx",
@@ -174,7 +170,11 @@ async def test_added_reading_context_is_included_in_budget_before_dispatch(monke
     envelope = json.loads(messages_for("Conditions?", sources)[-1].content)
     old_size = len(
         json.dumps(
-            {k: envelope[k] for k in ("evidence", "table_cells")},
+            {
+                key: envelope[key]
+                for key in ("evidence", "tables", "unselectable", "reading", "plan")
+                if key in envelope
+            },
             ensure_ascii=False,
             separators=(",", ":"),
         ).encode()
@@ -195,7 +195,18 @@ async def test_added_reading_context_is_included_in_budget_before_dispatch(monke
             None,
             "ws",
             "col",
-            AnswerRequest(question="Conditions?", context_max_bytes=old_size + 1),
+            AnswerRequest(question="Conditions?", context_max_bytes=old_size - 1),
         )
     assert exc.value.code == "answer_context_budget_exceeded"
     prepare.assert_not_called()
+
+
+def test_same_alias_requires_identical_complete_ordered_passages():
+    docs = documents()
+    first = paragraph("E1", ["run:a", "run:b"], docs)
+    duplicate = paragraph("E2", ["run:a", "run:b"], docs)
+    view = json.loads(messages_for("Rules?", [first, duplicate])[-1].content)
+    assert view["evidence"][1] == {"id": "E2", "kind": "paragraph", "same": "E1"}
+    different = duplicate.model_copy(update={"publication_decision_id": "other"})
+    view = json.loads(messages_for("Rules?", [first, different])[-1].content)
+    assert all("text" in item for item in view["evidence"])

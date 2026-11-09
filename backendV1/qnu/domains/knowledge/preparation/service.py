@@ -37,14 +37,17 @@ from qnu.domains.knowledge.preparation.models import (
 )
 from qnu.domains.knowledge.preparation.schemas import PreparationRequest
 from qnu.domains.knowledge.public_api import resolve_revision_scope
-from qnu.domains.modelops.public_api import assert_provider_allowed
+from qnu.domains.modelops.public_api import (
+    assert_provider_allowed,
+    resolve_chat_runtime,
+)
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.ocr.models import OcrProcessingRun
 from qnu.domains.ocr.review.models import TextVersion
 from qnu.domains.ocr.service import processing_service
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
-from qnu.platform.errors import AppException, Conflict, EntityNotFound
+from qnu.platform.errors import AppException, Conflict, DependencyUnavailable, EntityNotFound
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.job_queue import JobQueue
@@ -54,6 +57,11 @@ TASK_NAME = "preparation_job"
 LEASE_SECONDS = 180
 ADVANCING_OCR_STATUSES = ("queued", "running")
 FAILED_OCR_STATUSES = ("failed", "uncertain", "cancelled")
+POLICY_VERSION = "qnu.preparation.auto/v1"
+REUSE_VERSION = "qnu.preparation.reuse/v1"
+AI_UNAVAILABLE_CODES = frozenset(
+    {"chat_credentials_missing", "chat_credentials_unreadable", "provider_keys_unavailable"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +95,100 @@ def _request_hash(
             "utf-8"
         )
     ).hexdigest()
+
+
+async def _resolve_auto_policy(
+    db: AsyncSession, workspace_id: str, provider_id: str
+) -> dict:
+    """Pin one safe policy: selective source supplement when chat is usable, else source."""
+    policy = {
+        "version": POLICY_VERSION,
+        "supplement": "disabled",
+        "reason": None,
+        "provider_id": provider_id,
+    }
+    try:
+        runtime = await resolve_chat_runtime(db, workspace_id, provider_id)
+    except DependencyUnavailable as exc:
+        if exc.code not in AI_UNAVAILABLE_CODES:
+            raise
+        policy["reason"] = exc.code
+        return policy
+    policy.update(
+        {
+            "supplement": "selective",
+            "configuration_hash": runtime.inference_configuration_hash("compiler"),
+            "provider_name": runtime.provider_name,
+            "model_name": runtime.model_name,
+        }
+    )
+    return policy
+
+
+async def _verify_auto_policy(
+    db: AsyncSession, intent: PreparationIntent, workspace_id: str
+) -> None:
+    """Honor the pinned policy; never swap model silently or reuse an old cache."""
+    policy = dict(intent.config.get("policy") or {})
+    if policy.get("supplement") != "selective":
+        return
+    try:
+        runtime = await resolve_chat_runtime(db, workspace_id, intent.provider_id)
+    except DependencyUnavailable as exc:
+        if exc.code not in AI_UNAVAILABLE_CODES:
+            raise
+        policy.update({"supplement": "disabled", "reason": exc.code})
+        intent.config = {**intent.config, "policy": policy, "ai_supplement": False}
+        await db.commit()
+        return
+    if runtime.inference_configuration_hash("compiler") != policy.get("configuration_hash"):
+        raise Conflict(
+            "Model hoặc chính sách đã thay đổi từ lúc tạo yêu cầu; hãy chuẩn bị lại.",
+            code="preparation_policy_changed",
+        )
+
+
+def _reuse_key(intent: PreparationIntent, run: OcrProcessingRun) -> str:
+    policy = intent.config.get("policy") or {}
+    material = {
+        "version": REUSE_VERSION,
+        "workspace_id": intent.workspace_id,
+        "collection_id": intent.collection_id,
+        "source_id": intent.source_id,
+        "revision_id": intent.revision_id,
+        "revision_sha256": intent.revision_sha256,
+        "ocr_run_id": run.id,
+        "ocr_config_fingerprint": run.config_fingerprint,
+        "text_version": intent.text_version,
+        "text_version_id": intent.text_version_id,
+        "text_canonical_sha256": intent.text_canonical_sha256,
+        "topic": intent.topic,
+        "policy_version": policy.get("version"),
+        "provider_id": intent.provider_id,
+        "configuration_hash": policy.get("configuration_hash"),
+        "supplement": policy.get("supplement"),
+    }
+    return hashlib.sha256(
+        json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+
+
+async def _reusable_compilation(
+    db: AsyncSession, intent: PreparationIntent, key: str
+) -> CompilationRun | None:
+    return await db.scalar(
+        select(CompilationRun)
+        .where(
+            CompilationRun.workspace_id == intent.workspace_id,
+            CompilationRun.collection_id == intent.collection_id,
+            CompilationRun.config["reuse_key"].as_string() == key,
+            CompilationRun.status.in_(("queued", "running", "completed")),
+        )
+        .order_by(CompilationRun.requested_at.desc())
+        .limit(1)
+    )
 
 
 async def create_intent(
@@ -132,6 +234,12 @@ async def create_intent(
 
     if req.mode == "ai":
         await assert_provider_allowed(db, actor, workspace_id, "chat", req.provider_id)
+    provider_id = req.provider_id
+    policy: dict | None = None
+    if req.mode == "auto":
+        provider = await assert_provider_allowed(db, actor, workspace_id, "chat", None)
+        provider_id = provider.id
+        policy = await _resolve_auto_policy(db, workspace_id, provider.id)
     await _check_pinned_run(db, workspace_id, collection_id, revision, req)
     text_version_id, text_canonical_sha256 = await _saved_version(
         db, workspace_id, collection_id, req
@@ -153,13 +261,15 @@ async def create_intent(
         text_version=req.text_version,
         text_version_id=text_version_id,
         text_canonical_sha256=text_canonical_sha256,
-        provider_id=req.provider_id,
+        provider_id=provider_id,
         max_output_tokens=req.max_output_tokens,
         config={
             "workflow_version": "qnu.preparation/v1",
-            "source_first": req.mode == "source",
-            "ai_supplement": req.mode == "ai",
+            "source_first": req.mode in {"source", "auto"},
+            "ai_supplement": req.mode == "ai"
+            or bool(policy and policy.get("supplement") == "selective"),
             "auto_review": False,
+            **({"policy": policy} if policy is not None else {}),
         },
         ocr_run_id=req.ocr_run_id,
     )
@@ -289,6 +399,23 @@ async def cancel(
     intent.finished_at = utcnow()
     intent.lease_expires_at = None
     intent.worker_id = None
+    if intent.compilation_run_id:
+        # Conditional update: a run that already settled is never rewritten as cancelled.
+        await db.execute(
+            update(CompilationRun)
+            .where(
+                CompilationRun.id == intent.compilation_run_id,
+                CompilationRun.workspace_id == workspace_id,
+                CompilationRun.status.in_(ADVANCING_OCR_STATUSES),
+            )
+            .values(
+                status="cancelled",
+                error_code="compilation_cancelled",
+                finished_at=utcnow(),
+                lease_expires_at=None,
+                worker_id=None,
+            )
+        )
     await record_workspace_event(
         db,
         workspace_id=workspace_id,
@@ -365,9 +492,14 @@ async def execute_intent(
         status = await _finish(
             db, intent_id, token, "failed", exc.code, exc.detail
         )
-    except Exception:
+    except Exception as exc:
         await db.rollback()
-        logger.exception("preparation_advance_failed", intent_id=intent_id)
+        logger.exception(
+            "preparation_advance_failed",
+            intent_id=intent_id,
+            error_type=type(exc).__name__,
+            error=str(exc)[:300],
+        )
         status = await _finish(
             db,
             intent_id,
@@ -543,6 +675,8 @@ async def _advance(
             "preparation_source_changed",
             "Phiên bản nguồn đã thay đổi; không dùng nội dung cũ.",
         )
+    if intent.mode == "auto":
+        await _verify_auto_policy(db, intent, workspace_id)
 
     if intent.ocr_run_id:
         run = await _pinned_run(db, intent, workspace_id, collection_id)
@@ -563,18 +697,18 @@ async def _advance(
         except Conflict as exc:
             if exc.code != "processing_run_active":
                 raise
-            intent.status = "waiting_ocr"
-            await db.commit()
-            return intent.status
+            waiting = await _advance_status(db, intent, "waiting_ocr")
+            return waiting
         run = outcome.run
         intent.ocr_run_id = run.id
         await db.commit()
 
     if run.status in ADVANCING_OCR_STATUSES:
-        intent.status = "waiting_ocr"
-        await db.commit()
+        waiting = await _advance_status(db, intent, "waiting_ocr")
+        if waiting != "waiting_ocr":
+            return waiting
         await processing_service.dispatch(db, run, queue)
-        return intent.status
+        return waiting
     if run.status in FAILED_OCR_STATUSES:
         return await _fail(
             db,
@@ -598,25 +732,37 @@ async def _advance(
                 "Mất lượt chuẩn bị nội dung đã ghim.",
             )
     else:
-        outcome = await compilation_service.request_run(
-            db,
-            blob,
-            actor,
-            workspace_id,
-            collection_id,
-            _compilation_request(intent, run),
-            f"prep:{intent.id}",
-            None,
-        )
-        compilation = outcome.run
-        intent.compilation_run_id = compilation.id
-        await db.commit()
+        compilation = None
+        reuse_key = None
+        if intent.mode == "auto":
+            reuse_key = _reuse_key(intent, run)
+            compilation = await _reusable_compilation(db, intent, reuse_key)
+        if compilation is not None:
+            intent.compilation_run_id = compilation.id
+            intent.config = {**intent.config, "reused": True}
+            await db.commit()
+        else:
+            outcome = await compilation_service.request_run(
+                db,
+                blob,
+                actor,
+                workspace_id,
+                collection_id,
+                _compilation_request(intent, run),
+                f"prep:{intent.id}",
+                None,
+                reuse_key=reuse_key,
+            )
+            compilation = outcome.run
+            intent.compilation_run_id = compilation.id
+            await db.commit()
 
     if compilation.status in ADVANCING_OCR_STATUSES:
-        intent.status = "compiling"
-        await db.commit()
+        compiling = await _advance_status(db, intent, "compiling")
+        if compiling != "compiling":
+            return compiling
         await compilation_service.dispatch(db, compilation, queue)
-        return intent.status
+        return compiling
     if compilation.status == "completed":
         return await _settle(db, intent, "ready", None, None)
     if compilation.status in FAILED_OCR_STATUSES:
@@ -641,6 +787,17 @@ def _compilation_request(intent: PreparationIntent, run: OcrProcessingRun) -> Co
             provider_id=intent.provider_id,
             max_output_tokens=intent.max_output_tokens,
             ai_supplement=True,
+            auto_review=False,
+        )
+    if intent.mode == "auto" and (intent.config.get("policy") or {}).get(
+        "supplement"
+    ) == "selective":
+        return CompilationRequest(
+            topic=intent.topic,
+            ocr_run_ids=[run.id],
+            text_versions=versions,
+            provider_id=intent.provider_id,
+            selective_supplement=True,
             auto_review=False,
         )
     return CompilationRequest(
@@ -683,13 +840,7 @@ async def _verify_text_version(
 async def _fail(
     db: AsyncSession, intent: PreparationIntent, code: str, detail: str | None
 ) -> str:
-    intent.status = "failed"
-    intent.error_code = code
-    intent.error_detail = (detail or "")[:500] or None
-    intent.finished_at = utcnow()
-    intent.lease_expires_at = None
-    await db.commit()
-    return intent.status
+    return await _settle(db, intent, "failed", code, detail)
 
 
 async def _settle(
@@ -699,13 +850,58 @@ async def _settle(
     error_code: str | None,
     error_detail: str | None,
 ) -> str:
-    intent.status = status
-    intent.error_code = error_code
-    intent.error_detail = (error_detail or "")[:500] or None
-    intent.finished_at = utcnow()
-    intent.lease_expires_at = None
+    """Finish an intent only while it is still active.
+
+    A user cancel commits from another session; an in-flight worker holding a
+    stale ORM row must not overwrite the stop with a later terminal status.
+    """
+    result = await db.execute(
+        update(PreparationIntent)
+        .where(
+            PreparationIntent.id == intent.id,
+            PreparationIntent.status.in_(ACTIVE_PREPARATION_STATUSES),
+        )
+        .values(
+            status=status,
+            error_code=error_code,
+            error_detail=(error_detail or "")[:500] or None,
+            finished_at=utcnow(),
+            lease_expires_at=None,
+            worker_id=None,
+        )
+        .returning(PreparationIntent.status)
+    )
     await db.commit()
-    return intent.status
+    settled = result.scalar_one_or_none()
+    if settled is not None:
+        return settled
+    return await _current_status(db, intent.id) or status
+
+
+async def _advance_status(
+    db: AsyncSession, intent: PreparationIntent, status: str
+) -> str:
+    """Publish an intermediate step without reviving a cancelled intent."""
+    result = await db.execute(
+        update(PreparationIntent)
+        .where(
+            PreparationIntent.id == intent.id,
+            PreparationIntent.status.in_(ACTIVE_PREPARATION_STATUSES),
+        )
+        .values(status=status)
+        .returning(PreparationIntent.status)
+    )
+    await db.commit()
+    applied = result.scalar_one_or_none()
+    if applied is not None:
+        return applied
+    return await _current_status(db, intent.id) or status
+
+
+async def _current_status(db: AsyncSession, intent_id: str) -> str | None:
+    return await db.scalar(
+        select(PreparationIntent.status).where(PreparationIntent.id == intent_id)
+    )
 
 
 async def _finish(

@@ -84,10 +84,37 @@ def test_table_fragments_repeat_headers_keep_values_notes_and_all_rows():
     assert "0" in texts and "-" in texts and "" in texts
 
 
-def test_rowspan_group_is_kept_or_rejected_never_split_silently():
+def test_oversized_rowspan_group_splits_with_anchor_context_and_marker():
     content, documents = fixture(10)
     table = content["source_tables"][0]["table"]
     table["rows"][1][0]["row_span"] = 8
+    chunks = build_chunks(content, documents, 1800)
+    tables = [c for c in chunks if c.kind == "table"]
+    marked = [c for c in tables if "rowspan_split" in c.structure]
+    assert len(marked) > 1
+    assert all(len(c.text.encode()) <= 1800 for c in tables)
+    assert [c.structure["rowspan_split"]["part"] for c in marked] == list(range(len(marked)))
+    assert all(c.structure["rowspan_split"]["parts"] == len(marked) for c in marked)
+    assert all(c.structure["rowspan_split"]["group_start_row"] == 1 for c in marked)
+    assert marked[0].structure["row_indices"][:2] == [0, 1]
+    for later in marked[1:]:
+        assert later.structure["row_indices"][:2] == [0, 1]
+    assert {row for c in tables for row in c.structure["row_indices"]} == set(range(10))
+    recovered = {}
+    for chunk in tables:
+        assert "Ghi chú" in chunk.text and "ocr-example:ev-note" in chunk.citations
+        for row in chunk.structure["rows"]:
+            for cell in row:
+                recovered[cell["evidence_id"]] = cell
+                assert "ocr-example:" + cell["evidence_id"] in chunk.citations
+    assert recovered == {cell["evidence_id"]: cell for row in table["rows"] for cell in row}
+
+
+def test_indivisible_row_inside_an_oversized_group_is_still_rejected():
+    content, documents = fixture(10)
+    table = content["source_tables"][0]["table"]
+    table["rows"][1][0]["row_span"] = 8
+    table["rows"][3][1]["text"] = "Nội dung " * 1000
     with pytest.raises(AppException) as exc:
         build_chunks(content, documents, 1800)
     assert exc.value.code == "index_table_group_too_large"

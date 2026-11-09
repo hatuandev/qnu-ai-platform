@@ -202,7 +202,10 @@ def _page_items(source: list):
 def parse_mineru_page(raw: dict) -> PageLayout:
     if raw.get("format") != VERSION:
         raise invalid()
-    source = raw.get("page", {}).get("blocks")
+    # MinerU omits "blocks" for a page or crop with no layout items; absence is
+    # not a malformed document. Non-blank whole pages still fail the caller's
+    # mineru_page_empty check, and empty crops keep an unresolved-image warning.
+    source = raw.get("page", {}).get("blocks", [])
     if not isinstance(source, list) or len(source) > 10000:
         raise invalid()
     blocks = []

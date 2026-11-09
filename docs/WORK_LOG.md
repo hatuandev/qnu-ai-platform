@@ -1,5 +1,11 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context908 — Thu gọn bảng, nối ngữ cảnh và verifier RAG](nhat_ky/2026-11-09_phien_908_rag_context_va_verifier.md).
+
+- [Context907 — Tối ưu context RAG, đo Qwen và giữ lỗi F13](nhat_ky/2026-11-08_phien_907_toi_uu_context_rag.md).
+
+- [Context906 — Kế hoạch hoàn thiện và nghiệm thu luồng mới](nhat_ky/2026-11-08_phien_906_ke_hoach_nghiem_thu_luong_moi.md).
+
 - [Context904 — Chuẩn bị môi trường pilot P7](nhat_ky/2026-11-08_phien_904_moi_truong_pilot.md).
 
 - [Context903 — Pilot và đóng phạm vi bản đầu](nhat_ky/2026-11-08_phien_903_pilot_va_dong_pham_vi.md).

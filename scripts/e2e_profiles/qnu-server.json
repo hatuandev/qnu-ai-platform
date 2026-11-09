@@ -27,7 +27,17 @@
     "rerank": "bge-reranker-v2-m3"
   },
   "model_runtime": {
-    "chat": { "timeout_seconds": 300, "wait_for_completion": true },
+    "chat": {
+      "timeout_seconds": 300,
+      "wait_for_completion": true,
+      "reasoning_policy": {
+        "mode": "chat_template_kwarg",
+        "parameter": "enable_thinking",
+        "off_value": false,
+        "tasks": { "off": ["compiler", "compiler_review", "answer", "ocr_review"] },
+        "verified": true
+      }
+    },
     "embedding": { "timeout_seconds": 60 },
     "rerank": { "timeout_seconds": 60 }
   }

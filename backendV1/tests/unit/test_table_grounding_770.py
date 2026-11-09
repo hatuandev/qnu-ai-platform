@@ -188,13 +188,18 @@ def test_source_instructions_do_not_bypass_plain_text_output_guard():
     assert exc.value.code == "answer_source_text_invalid"
 
 
-def test_layout_quality_and_prompt_include_derived_catalog_keep_raw_structure():
+def test_layout_quality_and_compact_prompt_keep_server_catalog():
     s = source([["Name", "Price"], ["Alpha", "18"]])
     assert quality(s.structure)["status"] == "structured"
     assert len(layout(s.structure)[0]) == 4
     payload = json.loads(messages_for("Price?", [s])[-1].content)
-    assert payload["evidence"][0]["structure"] == s.structure
-    assert payload["table_cells"]["tables"][0]["rows"]["r1"]["values"]["k1"] == [1, "18"]
+    assert "structure" not in payload["evidence"][0]
+    table = payload["tables"][0]
+    assert table["id"] == "E1"
+    assert table["columns"] == {"k0": "Name", "k1": "Price"}
+    assert table["rows"] == [{"subject": "Alpha", "cells": {"E1:r1:k1": "18"}}]
+    server = catalog([s])["tables"][0]["cells"][0]
+    assert server["cell_id"] == "E1:r1:k1" and server["source_cells"]
 
 
 @pytest.mark.asyncio
@@ -205,7 +210,8 @@ async def test_catalog_envelope_budget_is_checked_before_provider_dispatch(monke
     from qnu.domains.rag.answer import service
     from qnu.domains.rag.answer.schemas import AnswerRequest
 
-    s = source([["Name", "Price"], ["Alpha", "18"]])
+    rows = [["Name", "Price"]] + [[f"Item {i}", str(100 + i)] for i in range(20)]
+    s = source(rows)
     result = SearchResponse(
         index_run_id="idx",
         generation=1,
@@ -240,7 +246,7 @@ def test_ingestion_quality_and_dependencies_are_derived_not_source_rewrites():
     content, documents = fixture()
     original = copy.deepcopy((content, documents))
     chunks = build_chunks(content, documents, 1800)
-    assert CHUNKER_VERSION == "qnu.published-chunks/v4"
+    assert CHUNKER_VERSION == "qnu.published-chunks/v6"
     assert all(
         c.structure["reading_quality"]["status"] == "structured"
         for c in chunks

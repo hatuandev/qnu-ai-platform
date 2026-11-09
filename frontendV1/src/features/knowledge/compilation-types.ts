@@ -55,6 +55,12 @@ export type CompilationProgressResponse = {
   status: CompilationStatus;
   total: number;
   completed: number;
+  pending: number;
+  running: number;
+  failed: number;
+  uncertain: number;
+  cancelled: number;
+  elapsed_seconds: number | null;
   latest_output_partial: boolean | null;
 };
 

@@ -3,12 +3,13 @@
 import copy
 import json
 
+from qnu.domains.rag.answer.cells import catalog, prompt_catalog
 from qnu.domains.rag.answer.context import evidence_size
 from qnu.domains.rag.answer.drafting import PROMPT_VERSION, compact_evidence_item, messages_for
 from qnu.domains.rag.answer.schemas import EvidenceSource
 
 
-def source(text, structure):
+def source(text, structure, citations=None):
     return EvidenceSource(
         evidence_id="E20",
         chunk_id="chunk",
@@ -18,7 +19,7 @@ def source(text, structure):
         score=1,
         kind="table",
         text=text,
-        citations={},
+        citations=citations or {},
         structure=structure,
     )
 
@@ -27,10 +28,11 @@ def test_unparsed_table_keeps_raw_text_and_status():
     item = source("Bảng chưa dựng: Alpha 12; Beta 34", {"table_status": "unparsed"})
     sent = json.loads(messages_for("Question", [item])[-1].content)["evidence"][0]
     assert sent["text"] == item.text
-    assert sent["structure"] == item.structure
+    assert sent["table_status"] == "unparsed"
+    assert "structure" not in sent
 
 
-def test_compaction_retains_merged_cells_and_table_identity_without_duplicate_json():
+def test_merged_cells_keep_values_and_server_geometry_without_duplicate_json():
     structure = {
         "source_table_citation": "ocr:table",
         "original_row_count": 3,
@@ -46,21 +48,33 @@ def test_compaction_retains_merged_cells_and_table_identity_without_duplicate_js
             [{"text": "34", "col_span": 1, "row_span": 1, "header": False}],
         ],
     }
+    citations = {"ocr:table": {"page": 1}}
+    for i, row in enumerate(structure["rows"]):
+        for j, cell in enumerate(row):
+            cell["evidence_id"] = f"t-{i}-{j}"
+            citations[f"ocr:t-{i}-{j}"] = {"page": 1}
     raw = "Title\n" + json.dumps(structure, ensure_ascii=False, sort_keys=True)
-    item = source(raw, {**structure, "context": {"parent": "table:ocr:table"}})
+    item = source(
+        raw, {**structure, "context": {"parent": "table:ocr:table"}}, citations
+    )
     original = copy.deepcopy(item)
     sent = compact_evidence_item(item)
-    assert sent["structure"] == item.structure
-    assert sent["text"] == "Title\nrow[0]: Header\nrow[1]: Group | 12\nrow[2]: 34"
+    assert sent["id"] == item.evidence_id
+    assert sent["text"].startswith("Title")
+    assert "row[1]: Group | 12" in sent["text"]
+    assert "source_table_citation" not in sent["text"]
+    assert "structure" not in sent
     assert item == original
     assert evidence_size(item) == len(json.dumps(sent, ensure_ascii=False).encode()) + 2
-    old = {
-        "evidence_id": item.evidence_id,
-        "kind": item.kind,
-        "text": item.text,
-        "structure": item.structure,
-    }
-    assert len(json.dumps(sent)) < len(json.dumps(old))
+    cells = catalog([item])
+    view = prompt_catalog(cells)
+    table = view["tables"][0]
+    assert table["id"] == item.evidence_id
+    assert table["columns"] == {"k0": "Header", "k1": "Header"}
+    rendered = json.dumps(table["rows"])
+    assert "12" in rendered and "34" in rendered
+    assert "source_cells" not in rendered and "row_span" not in rendered
+    assert cells["tables"][0]["cells"][0]["source_cells"]
 
 
 def test_arbitrary_json_in_table_text_is_not_removed():
@@ -69,4 +83,4 @@ def test_arbitrary_json_in_table_text_is_not_removed():
 
 
 def test_new_answer_contract_has_a_distinct_prompt_version():
-    assert PROMPT_VERSION == "qnu.rag.answer/v18"
+    assert PROMPT_VERSION == "qnu.rag.answer/v20"

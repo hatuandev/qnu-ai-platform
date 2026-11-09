@@ -173,8 +173,9 @@ def test_glossary_mined_only_from_explicit_cited_definition_and_stays_out_of_ans
         publication_decision_id="p",
     )
     prompt = evidence_item(hit, "E1")
+    assert prompt["id"] == "E1"
     assert prompt["text"] == original[0].text
-    assert "search_context" not in prompt["structure"]
+    assert "structure" not in prompt
     changed = copy.deepcopy(enriched.structure)
     changed["search_context"]["original_text"] = "invented"
     with pytest.raises(AppException):

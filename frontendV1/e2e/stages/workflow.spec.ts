@@ -239,9 +239,10 @@ test(`V1 từng chặng: ${stage}`, async ({ page }) => {
     await expect(
       page.getByRole("heading", { name: /Kho tri thức/ }).first(),
     ).toBeVisible();
+    const sidebar = page.getByRole("complementary");
     for (const label of ["Kho tri thức", "Trợ lý AI", "Hội thoại"]) {
       await expect(
-        page.getByRole("link", { name: label, exact: true }),
+        sidebar.getByRole("link", { name: label, exact: true }),
       ).toBeVisible();
     }
   }

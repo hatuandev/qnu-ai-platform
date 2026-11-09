@@ -51,6 +51,12 @@ from qnu.domains.knowledge.compilation.models import (
     CompilationSegment,
     utcnow,
 )
+from qnu.domains.knowledge.compilation.quality import (
+    CONFIRMED_BY_SOURCE,
+    NO_ERROR_FOUND,
+    PARTIALLY_CHECKED,
+    quality_validation,
+)
 from qnu.domains.knowledge.compilation.scheduler import effective_concurrency, run_bounded
 from qnu.domains.knowledge.compilation.service import authorize_collection
 from qnu.domains.knowledge.compilation.source_first import build_source_draft
@@ -772,6 +778,14 @@ def _source_with_supplement(
     draft = build_source_draft(run.topic, documents, run.id)
     draft["segmentation"] = coverage
     draft["partial"] = partial
+    draft["validation"]["quality"] = quality_validation(
+        source_binding=CONFIRMED_BY_SOURCE,
+        coverage=(
+            NO_ERROR_FOUND
+            if coverage.get("state") == "completed" and not partial
+            else PARTIALLY_CHECKED
+        ),
+    )
     supplement.attach(draft, documents, parts, run.input_sha256, run.config)
     if run.selective_supplement:
         draft["supplement"]["state"] = (

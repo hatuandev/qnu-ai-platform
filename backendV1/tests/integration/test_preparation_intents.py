@@ -11,6 +11,7 @@ from qnu.domains.knowledge.compilation.models import CompilationInput, Compilati
 from qnu.domains.knowledge.preparation import service as preparation
 from qnu.domains.knowledge.preparation.models import PreparationIntent
 from qnu.domains.knowledge.publication.models import CompiledDocument, PublicationDecision
+from qnu.domains.modelops.models import Provider
 from qnu.domains.ocr.models import OcrProcessingRun
 from qnu.domains.ocr.review.models import TextVersion
 from qnu.main import app
@@ -62,6 +63,17 @@ def _review_url(data: dict, run_id: str) -> str:
         f"/sources/{data['source']['id']}/revisions/{data['revision']['id']}"
         f"/processing-runs/{run_id}/text-review"
     )
+
+
+def _compilation_url(data: dict, run_id: str) -> str:
+    return (
+        f"{API}/workspaces/{data['workspace']['id']}/collections/{data['collection']['id']}"
+        f"/compilation-runs/{run_id}"
+    )
+
+
+def _draft_url(data: dict, run_id: str) -> str:
+    return _compilation_url(data, run_id) + "/draft"
 
 
 def create_intent(client, data: dict, *, key: str = "prep-one", **body):
@@ -457,6 +469,10 @@ def test_ai_mode_uses_modelops_and_requires_a_grant(client):
             f"/{data['collection']['id']}/compilation-runs/{compilation_id}/draft"
         )
         assert draft.status_code == 200, draft.text
+        checks = draft.json()["validation"]["quality"]["checks"]
+        assert checks["source_binding"] == "confirmed_by_source"
+        assert checks["coverage"] == "no_error_found"
+        assert checks["semantic_faithfulness"] == "not_checked"
         run = client.get(
             f"{API}/workspaces/{data['workspace']['id']}/collections"
             f"/{data['collection']['id']}/compilation-runs/{compilation_id}"
@@ -475,3 +491,176 @@ def test_outsider_cannot_read_or_cancel_an_intent(client):
         assert client.post(_status_url(data, intent_id) + "/cancel").status_code == 404
         listing = client.get(_intent_url(data))
         assert listing.status_code == 404
+
+
+def test_auto_mode_pins_provider_policy_and_keeps_canonical_source(client):
+    with FakeNemotron() as ocr_api, FakeChat() as chat_api:
+        data = prepared_workspace(client, "prep-auto", ocr_api)
+        provider = chat_provider(client, data, chat_api.base_url)
+        queue = FakeJobQueue()
+        created = create_intent(client, data, key="prep-auto", mode="auto", queue=queue)
+        assert created.status_code == 201, created.text
+        intent = created.json()["intent"]
+        assert intent["mode"] == "auto"
+        assert intent["provider_id"] == provider["id"]
+        assert intent["policy"] == {
+            "version": "qnu.preparation.auto/v1",
+            "supplement": "selective",
+            "reason": None,
+        }
+        assert intent["reused"] is False
+
+        manual = create_intent(
+            client, data, key="prep-auto-manual", mode="auto", provider_id=provider["id"]
+        )
+        assert manual.status_code == 422
+
+        assert advance(client, intent["id"], queue) == "waiting_ocr"
+        run_id = client.get(_status_url(data, intent["id"])).json()["ocr_run_id"]
+        assert execute_now(client, run_id).status == "completed"
+        assert advance(client, intent["id"], queue) == "compiling"
+        compilation_id = client.get(_status_url(data, intent["id"])).json()["compilation_run_id"]
+        assert execute_compile(client, compilation_id) == "completed"
+        assert advance(client, intent["id"], queue) == "ready"
+
+        run = client.get(_compilation_url(data, compilation_id))
+        assert run.status_code == 200, run.text
+        assert run.json()["selective_supplement"] is True
+        assert run.json()["source_first"] is True
+        draft = client.get(_draft_url(data, compilation_id))
+        assert draft.status_code == 200, draft.text
+        validation = draft.json()["validation"]
+        assert validation["source_copy"] == "retained"
+        assert validation["quality"]["schema_version"] == "qnu.compiler.quality/v1"
+        checks = validation["quality"]["checks"]
+        assert checks["source_binding"] == "confirmed_by_source"
+        assert checks["coverage"] == "partially_checked"
+        assert checks["semantic_faithfulness"] == "not_checked"
+
+
+def test_auto_mode_without_chat_key_keeps_source_and_reports_reason(client):
+    with FakeNemotron() as ocr_api, FakeChat() as chat_api:
+        data = prepared_workspace(client, "prep-auto-nokey", ocr_api)
+        provider = chat_provider(client, data, chat_api.base_url, secret=None)
+        queue = FakeJobQueue()
+        created = create_intent(client, data, key="prep-auto-nokey", mode="auto", queue=queue)
+        assert created.status_code == 201, created.text
+        intent = created.json()["intent"]
+        assert intent["provider_id"] == provider["id"]
+        assert intent["policy"]["supplement"] == "disabled"
+        assert intent["policy"]["reason"] == "chat_credentials_missing"
+
+        assert advance(client, intent["id"], queue) == "waiting_ocr"
+        run_id = client.get(_status_url(data, intent["id"])).json()["ocr_run_id"]
+        assert execute_now(client, run_id).status == "completed"
+        assert advance(client, intent["id"], queue) == "compiling"
+        compilation_id = client.get(_status_url(data, intent["id"])).json()["compilation_run_id"]
+        assert execute_compile(client, compilation_id) == "completed"
+        assert advance(client, intent["id"], queue) == "ready"
+
+        run = client.get(_compilation_url(data, compilation_id)).json()
+        assert run["source_first"] is True and run["selective_supplement"] is False
+        assert not chat_api.requests
+
+
+def test_auto_mode_reuses_a_completed_compilation_only_for_the_same_fingerprint(client):
+    with FakeNemotron() as ocr_api, FakeChat() as chat_api:
+        data = prepared_workspace(client, "prep-auto-reuse", ocr_api)
+        chat_provider(client, data, chat_api.base_url, secret=None)
+        queue = FakeJobQueue()
+        first = create_intent(client, data, key="prep-auto-reuse-a", mode="auto", queue=queue)
+        intent_id = first.json()["intent"]["id"]
+        assert advance(client, intent_id, queue) == "waiting_ocr"
+        run_id = client.get(_status_url(data, intent_id)).json()["ocr_run_id"]
+        assert execute_now(client, run_id).status == "completed"
+        assert advance(client, intent_id, queue) == "compiling"
+        compilation_id = client.get(_status_url(data, intent_id)).json()["compilation_run_id"]
+        assert execute_compile(client, compilation_id) == "completed"
+        assert advance(client, intent_id, queue) == "ready"
+
+        second = create_intent(client, data, key="prep-auto-reuse-b", mode="auto", queue=queue)
+        assert second.status_code == 201, second.text
+        second_intent = second.json()["intent"]
+        assert advance(client, second_intent["id"], queue) == "ready"
+        settled = client.get(_status_url(data, second_intent["id"])).json()
+        assert settled["reused"] is True
+        assert settled["compilation_run_id"] == compilation_id
+        assert count(client, CompilationRun) == 1
+        assert count(client, OcrProcessingRun) == 1
+
+
+def test_auto_mode_refuses_a_silent_model_change(client):
+    with FakeNemotron() as ocr_api, FakeChat() as chat_api:
+        data = prepared_workspace(client, "prep-auto-change", ocr_api)
+        provider = chat_provider(client, data, chat_api.base_url)
+        created = create_intent(client, data, key="prep-auto-change", mode="auto")
+        intent_id = created.json()["intent"]["id"]
+        mutate(client, Provider, provider["id"], model_name="another-model")
+        assert advance(client, intent_id, FakeJobQueue()) == "failed"
+        failed = client.get(_status_url(data, intent_id)).json()
+        assert failed["error_code"] == "preparation_policy_changed"
+        assert count(client, OcrProcessingRun) == 0
+        assert count(client, CompilationRun) == 0
+
+
+def test_cancel_stops_the_active_compilation_run(client):
+    with FakeNemotron() as ocr_api, FakeChat() as chat_api:
+        data = prepared_workspace(client, "prep-cancel-run", ocr_api)
+        chat_provider(client, data, chat_api.base_url, secret=None)
+        queue = FakeJobQueue()
+        intent_id = create_intent(
+            client, data, key="prep-cancel-run", queue=queue
+        ).json()["intent"]["id"]
+        assert advance(client, intent_id, queue) == "waiting_ocr"
+        run_id = client.get(_status_url(data, intent_id)).json()["ocr_run_id"]
+        assert execute_now(client, run_id).status == "completed"
+        assert advance(client, intent_id, queue) == "compiling"
+        compilation_id = client.get(_status_url(data, intent_id)).json()["compilation_run_id"]
+
+        cancelled = client.post(_status_url(data, intent_id) + "/cancel")
+        assert cancelled.status_code == 200, cancelled.text
+        assert cancelled.json()["status"] == "cancelled"
+
+        async def compilation_status() -> str:
+            async with AsyncSessionFactory() as db:
+                return await db.scalar(
+                    select(CompilationRun.status).where(CompilationRun.id == compilation_id)
+                )
+
+        assert client.portal.call(compilation_status) == "cancelled"
+        assert execute_compile(client, compilation_id) == "not_claimed"
+        assert client.portal.call(compilation_status) == "cancelled"
+
+
+def test_cancel_during_worker_advance_is_not_overwritten(client):
+    """A stop committed mid-step must not be replaced by the worker's result."""
+    with FakeNemotron() as ocr_api:
+        data = prepared_workspace(client, "prep-cancel-race", ocr_api)
+        queue = FakeJobQueue()
+        intent_id = create_intent(
+            client, data, key="prep-cancel-race", queue=queue
+        ).json()["intent"]["id"]
+        assert advance(client, intent_id, queue) == "waiting_ocr"
+
+        async def worker_settles_after_cancel() -> str:
+            async with AsyncSessionFactory() as worker_db:
+                stale = await worker_db.get(
+                    PreparationIntent, intent_id, populate_existing=True
+                )
+                async with AsyncSessionFactory() as cancel_db:
+                    await preparation.cancel(
+                        cancel_db,
+                        EDITOR,
+                        data["workspace"]["id"],
+                        data["collection"]["id"],
+                        intent_id,
+                    )
+                return await preparation._settle(
+                    worker_db, stale, "ready", None, None
+                )
+
+        assert client.portal.call(worker_settles_after_cancel) == "cancelled"
+        status = client.get(_status_url(data, intent_id)).json()
+        assert status["status"] == "cancelled"
+        assert status["error_code"] == "preparation_cancelled"
+        assert status["compilation_run_id"] is None

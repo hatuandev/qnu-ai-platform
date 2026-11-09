@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from qnu.api.wiring import build_container, close_container
+from qnu.platform.cache import close_redis
 from qnu.platform.config import get_settings
 from qnu.platform.database import engine
 from qnu.platform.logging import get_logger
@@ -27,5 +28,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         await close_container(app.state.container)
+        await close_redis()
         await engine.dispose()
         logger.info("backend_v1_stopped")

@@ -208,6 +208,10 @@ def registered_bundle_hash(bundle: VersionBundle, annotations: list[dict]) -> st
     )
 
 
+# Registration adds audit-only provenance; the compiler identity is every other key.
+REGISTRATION_PROVENANCE_KEYS = frozenset({"automatic_metadata", "metadata_confirmation"})
+
+
 def assert_pinned(version: CompiledVersion, bundle: VersionBundle) -> None:
     if (
         version.input_sha256,
@@ -223,5 +227,10 @@ def assert_pinned(version: CompiledVersion, bundle: VersionBundle) -> None:
         raise Conflict(
             "Nội dung khác phiên bản đã đăng ký/duyệt.", code="publication_bundle_changed"
         )
-    if version.provenance != bundle.provenance:
+    compiler_owned = {
+        key: value
+        for key, value in version.provenance.items()
+        if key not in REGISTRATION_PROVENANCE_KEYS
+    }
+    if compiler_owned != bundle.provenance:
         raise Conflict("Provenance đã khác bản đã đăng ký.", code="publication_bundle_changed")

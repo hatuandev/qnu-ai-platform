@@ -48,7 +48,8 @@ def complete_citations(statements, sources):
     return statements
 
 
-def reading_groups(sources: list[EvidenceSource]) -> list[dict]:
+def reading_order(sources: list[EvidenceSource]) -> list[list[str]]:
+    """Verified contiguous runs by evidence ID only; text stays in each evidence item."""
     buckets = {}
     for source in sources:
         if source.kind == "table":
@@ -65,25 +66,22 @@ def reading_groups(sources: list[EvidenceSource]) -> list[dict]:
             )
             blocks = buckets.setdefault(identity, {})
             index = int(position)
-            block = blocks.setdefault(
-                index, {"citation": ref, "text": passage["text"], "evidence_ids": []}
-            )
+            block = blocks.setdefault(index, {"citation": ref, "text": passage["text"], "ids": []})
             if block["citation"] != ref or block["text"] != passage["text"]:
                 # Never expose an inferred relation for inconsistent source maps.
                 return []
-            if source.evidence_id not in block["evidence_ids"]:
-                block["evidence_ids"].append(source.evidence_id)
-    groups = []
+            if source.evidence_id not in block["ids"]:
+                block["ids"].append(source.evidence_id)
+    groups, current, previous = [], [], None
     for blocks in buckets.values():
-        previous = None
         for index, block in sorted(blocks.items()):
             if previous is None or index != previous + 1:
-                groups.append({"text": "", "evidence_ids": [], "fragments": []})
-            group = groups[-1]
-            group["text"] += ("\n" if group["text"] else "") + block["text"]
-            group["evidence_ids"] = list(
-                dict.fromkeys(group["evidence_ids"] + block["evidence_ids"])
-            )
-            group["fragments"].append({k: block[k] for k in ("citation", "evidence_ids")})
+                if len(current) > 1:
+                    groups.append(current)
+                current = []
+            current = list(dict.fromkeys([*current, *block["ids"]]))
             previous = index
+        if len(current) > 1:
+            groups.append(current)
+        current, previous = [], None
     return groups

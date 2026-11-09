@@ -117,7 +117,8 @@ def ensure_credentials() -> None:
         expected = {
             name: hashlib.sha256(credentials[name].encode()).hexdigest() for name in SEED_PROFILES
         }
-        if json.loads(ACCOUNTS_PATH.read_text(encoding="utf-8")) != expected:
+        registry = json.loads(ACCOUNTS_PATH.read_text(encoding="utf-8"))
+        if {name: registry.get(name) for name in SEED_PROFILES} != expected:
             raise RuntimeError("Tệp tài khoản local không khớp; seed không tự thay khóa.")
         return
     credentials = {name: secrets.token_urlsafe(32) for name in SEED_PROFILES}

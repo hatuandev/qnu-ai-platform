@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import {
@@ -11,6 +11,7 @@ import {
   fingerprint,
   freezeCohort,
   planAdmissionsBudget,
+  planAdmissionsRerankPair,
   requireAdmissionsQuota,
   verifyAdmissionsIndex,
 } from "./admissions-policy";
@@ -237,6 +238,57 @@ export function stopsAdmissionsCohort(message: string) {
   );
 }
 
+interface SemanticReviewRow {
+  case_id?: string;
+  verdict?: string;
+  benchmark?: string;
+  cohort_fingerprint?: string;
+}
+
+export function semanticReviewStatus(
+  cohort: { fingerprint: string } | undefined,
+) {
+  const file = path.join(
+    process.env.E2E_OUTPUT || "test-results",
+    "semantic-review.jsonl",
+  );
+  if (!existsSync(file))
+    return { status: "NOT_RUN", reason: "chưa có semantic-review.jsonl" };
+  const rows: SemanticReviewRow[] = readFileSync(file, "utf8")
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line) as SemanticReviewRow);
+  if (!cohort?.fingerprint || !rows.length)
+    return { status: "NOT_RUN", reason: "chưa chốt cohort hoặc review rỗng" };
+  if (
+    rows.some(
+      (row) =>
+        row.cohort_fingerprint !== cohort.fingerprint ||
+        row.benchmark !== benchmark.version,
+    )
+  )
+    return {
+      status: "NOT_RUN",
+      reason: "semantic review khác cohort/benchmark",
+    };
+  if (
+    rows.some(
+      (row) =>
+        !row.case_id || (row.verdict !== "PASS" && row.verdict !== "FAIL"),
+    )
+  )
+    return {
+      status: "NOT_RUN",
+      reason: "semantic review có dòng không hợp lệ",
+    };
+  const failed = rows.filter((row) => row.verdict === "FAIL").length;
+  return {
+    status: failed ? "FAIL" : "PASS",
+    reviewed: rows.length,
+    failed,
+  };
+}
+
 export async function questionAdmissionDraft(api: Api, state: Checkpoint) {
   if (!state.admissions?.combinedIndex && !state.admissions?.publication?.index)
     throw new Error("BLOCKED: chưa xuất bản/lập chỉ mục.");
@@ -259,6 +311,7 @@ export async function questionAdmissionDraft(api: Api, state: Checkpoint) {
       prompt_tokens?: number | null;
       completion_tokens?: number | null;
       total_tokens?: number | null;
+      rerank_tokens?: number | null;
     };
     response?: Answer;
     error?: string;
@@ -286,7 +339,7 @@ export async function questionAdmissionDraft(api: Api, state: Checkpoint) {
           documents: benchmark.documents,
           combined_index: state.admissions?.combinedIndex,
           label_status: benchmark.label_status,
-          semantic_review: "NOT_RUN",
+          semantic_review: semanticReviewStatus(state.admissions?.cohort),
           compilation_review:
             state.results["admissions-publication"]?.review_mode === "skipped"
               ? "SKIPPED_BY_USER"
@@ -333,20 +386,14 @@ export async function questionAdmissionDraft(api: Api, state: Checkpoint) {
     const rerank = await api.get<Parameters<typeof planAdmissionsBudget>[0]>(
       `/modelops/providers/${state.runtimeDefaults?.rerank}`,
     );
-    const rerankInput =
-      rerank.token_limits?.max_input_tokens ??
-      rerank.token_limits?.context_window_tokens;
-    if (rerank.capacity_status !== "configured" || !rerankInput)
-      throw new Error("BLOCKED: chưa biết capacity rerank.");
     const maxQuestion = Math.max(
       ...benchmark.cases.map((c) => Buffer.byteLength(c.question)),
     );
-    const rerankPair =
-      index.manifest.config.chunk_max_bytes + maxQuestion + 256;
-    if (!Number.isFinite(rerankPair) || rerankPair > rerankInput)
-      throw new Error(
-        "BLOCKED: dự toán cặp query/chunk vượt rerank input; kiểm tra cấu hình index/provider.",
-      );
+    const rerankPlan = planAdmissionsRerankPair(
+      rerank,
+      index.manifest.config.chunk_max_bytes,
+      maxQuestion,
+    );
     const fresh = benchmark.cases.filter(
       (c) => !state.admissions?.queries?.[c.id]?.turn,
     ).length;
@@ -354,17 +401,17 @@ export async function questionAdmissionDraft(api: Api, state: Checkpoint) {
       fresh *
       (budget.input_tokens_plan +
         budget.max_output_tokens +
-        50 * rerankPair +
+        50 * rerankPlan.token_estimate +
         maxQuestion +
         256);
     preflight = {
       budget,
       published: index.published,
-      rerank_pair_token_upper_plan: rerankPair,
+      rerank_pair: rerankPlan,
       fresh_cases: fresh,
       quota_tokens_plan: quotaEstimate,
       budget_basis:
-        "UTF8-byte conservative planning; final prompt/schema/catalog still guarded by ModelOps",
+        "UTF8-byte conservative planning; rerank bytes convert to a documented token estimate; per-pair bytes and final prompt/schema/catalog still guarded by ModelOps",
     };
     freezeCohort(state, {
       benchmark: fingerprint(benchmark),
@@ -400,6 +447,7 @@ export async function questionAdmissionDraft(api: Api, state: Checkpoint) {
           prompt_tokens: answer.trace.prompt_tokens,
           completion_tokens: answer.trace.completion_tokens,
           total_tokens: answer.trace.total_tokens,
+          rerank_tokens: answer.trace.rerank_tokens ?? null,
         };
         const cohort = state.admissions?.cohort;
         if (!answer.trace.prompt_version || !answer.trace.configuration_hash)

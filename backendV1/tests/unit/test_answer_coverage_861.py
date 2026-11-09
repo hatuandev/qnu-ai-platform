@@ -72,7 +72,7 @@ def test_source_article_crosses_pages_and_compiler_parts_without_next_article():
     groups = select_groups(rows, hits, bundles, "Which eligibility conditions apply?")
     assert groups[0]["kind"] == "article"
     assert groups[0]["required_ids"] == [str(i) for i in range(7)]
-    assert [u["chunk_ids"] for u in groups[0]["units"]] == [["2"], ["3"], ["5"], ["6"]]
+    assert [u["chunk_ids"] for u in groups[0]["units"]] == [[str(i)] for i in range(1, 7)]
     assert groups[0]["unindexed_refs"] == []
 
 
@@ -140,7 +140,7 @@ def test_answer_missing_prerequisites_is_partial_even_if_model_claims_covered():
     report = assess(answer, src, {"structure": {"groups": [group]}})
     assert report.status == "partial"
     assert report.structures[0].cited_units == 2
-    assert report.structures[0].required_units == 4
+    assert report.structures[0].required_units == 6
 
 
 def test_grounded_general_answer_can_expose_missing_details_without_abstaining():
@@ -195,7 +195,7 @@ def test_trimmed_structural_evidence_is_reported_missing_in_the_model_plan():
     rows, bundles = corpus()
     group = select_groups(rows, sources(rows[:1]), bundles, "Article 4 conditions")[0]
     plan = plan_for(sources(rows[:3]), {"structure": {"groups": [group]}})
-    assert plan["groups"][0]["unprovided_units"] == 3
+    assert plan["groups"][0]["unprovided_units"] == 4
     assert plan["scope"] == "retrieved_published_sources_only"
 
 

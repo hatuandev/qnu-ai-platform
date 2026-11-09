@@ -6,7 +6,9 @@ export interface BenchmarkDoc {
   key: string;
   path: string;
   sha256: string;
+  /** 0 = chưa biết trước (DOCX); số trang thực lưu ở checkpoint sau extraction. */
   pages: number;
+  format?: "pdf" | "docx";
   title: string;
   data_year: number;
 }
@@ -62,11 +64,12 @@ export const benchmark: BenchmarkMultiDocs = {
   source: rawBenchmark.documents.floor2026,
 };
 
-export const docPaths: Record<string, string> = {
-  floor2026: path.resolve("..", benchmark.documents.floor2026.path),
-  info2025: path.resolve("..", benchmark.documents.info2025.path),
-  report2024: path.resolve("..", benchmark.documents.report2024.path),
-};
+export const docPaths: Record<string, string> = Object.fromEntries(
+  Object.entries(benchmark.documents).map(([key, doc]) => [
+    key,
+    path.resolve("..", doc.path),
+  ]),
+);
 
 export const sourcePath = docPaths.floor2026;
 
@@ -89,7 +92,7 @@ export function checkAllSources() {
     const hash = sha256(bytes);
     if (hash !== doc.sha256) {
       throw new Error(
-        `BLOCKED: PDF ${key} (${doc.path}) đã đổi so với bộ câu hỏi: observed ${hash} != expected ${doc.sha256}.`,
+        `BLOCKED: nguồn ${key} (${doc.path}) đã đổi so với bộ câu hỏi: observed ${hash} != expected ${doc.sha256}.`,
       );
     }
   }

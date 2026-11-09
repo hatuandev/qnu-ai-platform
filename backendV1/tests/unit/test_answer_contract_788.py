@@ -115,7 +115,7 @@ def test_original_cited_passage_restores_conditions_without_rewriting_chunk():
     view = evidence_item(s, "E1")
     assert "registered in 2031" in view["text"]
     assert "Unpublished" not in view["text"]
-    assert s.text == original and view["source_passage_refs"] == ["run:block"]
+    assert s.text == original and "source_passage_refs" not in view
 
 
 def test_reasoning_observation_preserves_unknown_without_storing_thoughts():

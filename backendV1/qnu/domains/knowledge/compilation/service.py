@@ -155,6 +155,8 @@ async def request_run(
     req: CompilationRequest,
     idempotency_key: str,
     queue: JobQueue | None,
+    *,
+    reuse_key: str | None = None,
 ) -> CompilationOutcome:
     await authorize_collection(db, actor, workspace_id, collection_id, write=True, lock=True)
     ref = actor_ref(actor)
@@ -250,6 +252,7 @@ async def request_run(
                 "source_first": True,
                 **({"selective_supplement": True} if req.selective_supplement else {}),
                 **({"supplement_plan_error": error_code} if error_code else {}),
+                **({"reuse_key": reuse_key} if reuse_key else {}),
                 "workflow_version": "qnu.compiler.source-first/v1",
                 "auto_review": False,
                 "review": {"provider_id": provider.id},
@@ -394,6 +397,7 @@ async def request_run(
     config = {
         **({"ai_supplement": True} if has_supplement else {}),
         **({"selective_supplement": True} if req.selective_supplement else {}),
+        **({"reuse_key": reuse_key} if reuse_key else {}),
         "refinement": {
             "version": 1,
             "max_depth": 4,

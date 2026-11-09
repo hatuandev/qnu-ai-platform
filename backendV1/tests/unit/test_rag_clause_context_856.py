@@ -76,7 +76,7 @@ def test_exact_envelope_keeps_clause_and_removes_only_optional_tail():
     )
     assert used == size
     assert skipped == ["optional"]
-    assert [item["evidence_id"] for item in json.loads(messages[-1].content)["evidence"]] == [
+    assert [item["id"] for item in json.loads(messages[-1].content)["evidence"]] == [
         "E1",
         "E2",
     ]

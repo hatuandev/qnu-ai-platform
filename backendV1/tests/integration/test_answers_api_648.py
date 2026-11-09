@@ -35,19 +35,19 @@ class FakeAnswerChat(FakeNemotron):
         )
         value = {
             "status": "answered",
-            "statements": [{"text": "Chỉ tiêu là 150.", "evidence_ids": [source["evidence_id"]]}],
+            "statements": [{"text": "Chỉ tiêu là 150.", "evidence_ids": [source["id"]]}],
         }
         # The fake follows the production table contract; negative modes below
         # deliberately keep malformed prose/citations to exercise rejection.
         if self.mode in {"ok", "mixed_lookup", "mixed_narrative"}:
             choices = [
-                {"cell_id": f"{t['evidence_id']}:{row}:{key}", "value": value[1]}
-                for t in incoming["table_cells"]["tables"]
-                for row, r in t["rows"].items()
-                for key, value in r["values"].items()
+                {"cell_id": cell_id, "value": cell_value}
+                for t in incoming["tables"]
+                for row in t["rows"]
+                for cell_id, cell_value in row["cells"].items()
             ]
             if choices:
-                chosen = next(c for c in choices if c["value"] == "150")
+                chosen = next((c for c in choices if c["value"] == "150"), choices[0])
                 value = {
                     "status": "answered",
                     "statements": [],
@@ -57,13 +57,13 @@ class FakeAnswerChat(FakeNemotron):
                     value["statements"] = [
                         {
                             "text": "Chỉ tiêu là 999, phải nộp thêm phí.",
-                            "evidence_ids": [source["evidence_id"]],
+                            "evidence_ids": [source["id"]],
                         }
                     ]
                 if self.mode == "mixed_narrative":
                     paragraph = next(e for e in incoming["evidence"] if e["kind"] != "table")
                     value["statements"] = [
-                        {"text": paragraph["text"], "evidence_ids": [paragraph["evidence_id"]]}
+                        {"text": paragraph["text"], "evidence_ids": [paragraph["id"]]}
                     ]
         if self.mode == "foreign_cell":
             value = {"status": "answered", "statements": [], "lookups": [{"cell_id": "E999:r1:k2"}]}
@@ -147,7 +147,7 @@ def ready(client, indexed):  # noqa: F811 - shared pytest fixture
 def ask(client, data, **options):
     return client.post(
         data["answer_url"],
-        json={"question": "Chỉ tiêu tuyển sinh năm 2024 là bao nhiêu?", **options},
+        json={"question": "Chỉ tiêu trúng tuyển năm 2024 là bao nhiêu?", **options},
     )
 
 
@@ -179,26 +179,37 @@ def test_answer_projection_preserves_published_table_and_prompt_contract(client,
     response = ask(client, ready)
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["trace"]["prompt_version"] == "qnu.rag.answer/v18"
+    assert body["trace"]["prompt_version"] == "qnu.rag.answer/v20"
     assert body["trace"]["grounding"]["selected_cells"]
+    selection = body["trace"]["context"]["selection"]
+    packing = body["trace"]["context"]["packing"]
+    assert selection["version"] == "qnu.rag.selection/v2"
+    assert selection["selected_count"] >= 1
+    assert packing["payload_version"] == "qnu.answer-payload/v2"
+    assert packing["system_prompt_bytes"] and packing["component_bytes"]["evidence"] > 0
+    assert packing["request_bytes_estimate"] > packing["system_prompt_bytes"]
+    assert body["trace"]["grounding"]["payload_version"] == "qnu.answer-payload/v2"
     sent = json.loads(ready["answer_chat"].requests[0]["body"]["messages"][-1]["content"])
     schema = ready["answer_chat"].requests[0]["body"]["response_format"]["json_schema"]["schema"]
     assert schema["$defs"]["Statement"]["properties"]["evidence_ids"]["items"]["enum"] == [
-        s["evidence_id"] for s in sent["evidence"] if s["kind"] != "table"
+        s["id"] for s in sent["evidence"] if s["kind"] != "table"
     ]
     from qnu.domains.knowledge.publication.evidence import digest
 
     assert body["trace"]["contract"]["schema_sha256"] == digest(schema)
     source = next(s for s in body["sources"] if s["kind"] == "table")
-    projected = next(e for e in sent["evidence"] if e["evidence_id"] == source["evidence_id"])
-    assert projected["structure"] == source["structure"]
-    structure = projected["structure"]
-    if structure.get("rows"):
-        assert structure["source_table_citation"] in source["citations"]
-        assert structure["row_indices"]
-        assert all("col_span" in c and "row_span" in c for r in structure["rows"] for c in r)
-    else:
-        assert projected["text"] == source["text"]
+    projected = next(e for e in sent["evidence"] if e["id"] == source["evidence_id"])
+    assert "structure" not in projected
+    table = next(t for t in sent["tables"] if t["id"] == source["evidence_id"])
+    assert table["columns"] and table["rows"]
+    assert all(
+        cell_id.startswith(source["evidence_id"] + ":")
+        for row in table["rows"]
+        for cell_id in row["cells"]
+    )
+    assert "source_cells" not in json.dumps(table)
+    # Full source geometry remains available to the backend contract.
+    assert source["structure"]["source_table_citation"] in source["citations"]
 
 
 @pytest.mark.parametrize(
@@ -392,7 +403,7 @@ def test_mixed_lookup_returns_only_original_cells_with_projection_trace(client, 
     assert "999" not in body["answer"] and "phí" not in body["answer"]
     assert len(body["statements"]) == 1
     assert body["trace"]["grounding"]["projection"] == {
-        "version": "qnu.answer-projection/v3",
+        "version": "qnu.answer-projection/v4",
         "mode": "selected_cells",
         "omitted_model_statements": 1,
     }
@@ -409,11 +420,11 @@ def test_mixed_paragraph_and_selected_cell_survive_one_provider_call(client, rea
     paragraph = next(e for e in incoming["evidence"] if e["kind"] != "table")
     assert body["statements"][0] == {
         "text": paragraph["text"],
-        "evidence_ids": [paragraph["evidence_id"]],
+        "evidence_ids": [paragraph["id"]],
     }
     assert "150" in body["statements"][1]["text"]
     assert body["trace"]["grounding"]["projection"] == {
-        "version": "qnu.answer-projection/v3",
+        "version": "qnu.answer-projection/v4",
         "mode": "mixed",
         "omitted_model_statements": 0,
     }

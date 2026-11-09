@@ -43,6 +43,7 @@ export interface Answer {
     prompt_tokens?: number | null;
     completion_tokens?: number | null;
     total_tokens?: number | null;
+    rerank_tokens?: number | null;
   };
 }
 
@@ -170,12 +171,14 @@ export function checkAdmissionAnswer(
       "Sai quyết định xuất bản.",
     );
     requireThat(Object.keys(source.citations).length, "Thiếu citation.");
+    const knownPages =
+      documents[key].pages > 0 ? documents[key].pages : (entry?.pages ?? 0);
     for (const citation of Object.values(source.citations)) {
       requireThat(
         citation.source_sha256 === documents[key].sha256 &&
           citation.revision_id === entry?.source?.revision &&
           citation.page >= 1 &&
-          citation.page <= documents[key].pages,
+          (knownPages === 0 || citation.page <= knownPages),
         "Sai nguồn/hash/revision/page.",
       );
     }
@@ -216,10 +219,20 @@ export function checkAdmissionAnswer(
   );
   for (const fact of item.facts) {
     requireThat(
-      documents[fact.document]?.data_year === fact.data_year,
-      "Nhãn năm nguồn không khớp.",
+      documents[fact.document],
+      `Nhãn fact trỏ nguồn không có: ${fact.document}.`,
     );
     const entry = scenario?.documents?.[fact.document];
+    // A fact may describe a year different from the document's main data year
+    // (issuing date, previous-season row). Accept only years declared by this
+    // item's labels, never an unrelated season.
+    const allowedYears = new Set<number>([
+      fact.data_year,
+      documents[fact.document]?.data_year,
+      ...(item.facts ?? []).map((f) => f.data_year),
+    ]);
+    const pageMatches = (page: number) =>
+      fact.pages.length === 0 || fact.pages.includes(page);
     const claims =
       fact.support === "text"
         ? claimGroups(answer.statements)
@@ -231,8 +244,8 @@ export function checkAdmissionAnswer(
         matches(s.text, fact.metric_patterns) &&
         // Source binding proves the year even when the backend's copied cell
         // statement omits it. An explicitly different year cannot pass.
-        (s.text.match(/\b20\d{2}\b/g) || []).every(
-          (year) => Number(year) === fact.data_year,
+        (s.text.match(/\b20\d{2}\b/g) || []).every((year) =>
+          allowedYears.has(Number(year)),
         ),
     );
     const supported = candidates.some((statement) => {
@@ -242,7 +255,7 @@ export function checkAdmissionAnswer(
           (s) =>
             !!s &&
             s.document_id === entry?.publication?.document &&
-            Object.values(s.citations).some((c) => fact.pages.includes(c.page)),
+            Object.values(s.citations).some((c) => pageMatches(c.page)),
         );
       if (!cited.length) return false;
       if (fact.support === "text") {
@@ -287,7 +300,7 @@ export function checkAdmissionAnswer(
           // A matching number in a header/another page cannot prove the value.
           if (!cells.length) {
             if (!valuesMatch(cell.text, fact)) return false;
-            valuePageMatches = fact.pages.includes(source.citations[ref].page);
+            valuePageMatches = pageMatches(source.citations[ref].page);
           }
           cells.push(cell.text);
         }

@@ -63,7 +63,7 @@ def test_review_runs_on_published_sources_and_stores_human_labels(client, ready)
     assistant = create_assistant(client, ready)
     url = reviews_url(ready, assistant["id"])
     questions = [
-        "Chỉ tiêu tuyển sinh năm 2024 là bao nhiêu?",
+        "Chỉ tiêu trúng tuyển năm 2024 là bao nhiêu?",
         "Ngành nào có chỉ tiêu cao nhất?",
     ]
     response = client.post(

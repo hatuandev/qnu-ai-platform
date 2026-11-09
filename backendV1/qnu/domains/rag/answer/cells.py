@@ -9,8 +9,8 @@ from qnu.domains.rag.answer.narrative import complete_citations
 from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer, Statement
 from qnu.platform.errors import AppException
 
-VERSION = "qnu.answer-cells/v3"
-PROJECTION_VERSION = "qnu.answer-projection/v3"
+VERSION = "qnu.answer-cells/v4"
+PROJECTION_VERSION = "qnu.answer-projection/v4"
 
 
 def _same_input(left, right):
@@ -171,6 +171,7 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
                             else " / ".join(fields[str(s.column)]) + ": " + s.cell["text"]
                             for s in row_subjects
                         ),
+                        "subject_labels": [s.cell["text"] for s in row_subjects],
                         "column": p.column,
                         "value": p.cell["text"],
                         "evidence_ids": ids,
@@ -245,19 +246,38 @@ def materialize(answer: ModelAnswer, sources: list[EvidenceSource], cells: dict)
 
 
 def prompt_catalog(cells: dict) -> dict:
-    """Share row subjects/headers; keep full cell provenance in the server catalog."""
-    tables = []
+    """One presentation per value: header path, subject, value and full cell ID.
+
+    Geometry, spans, source cells and citation refs stay in the server catalog.
+    """
+    tables, unselectable = [], []
+    omitted = set(cells.get("selection", {}).get("omitted_tables", []))
     for table in cells["tables"]:
-        rows = {}
+        if not table["cells"]:
+            if table["evidence_id"] not in omitted:
+                unselectable.append(table["evidence_id"])
+            continue
+        rows, order = {}, []
         for cell in table["cells"]:
-            _, row, key = cell["cell_id"].split(":")
-            if row in rows and len(cell["subject"]) > len(rows[row]["subject"]):
+            row = cell["cell_id"].split(":")[1]
+            if row not in rows:
+                rows[row] = {"subject": cell["subject"], "cells": {}}
+                order.append(row)
+            elif len(cell["subject"]) > len(rows[row]["subject"]):
                 rows[row]["subject"] = cell["subject"]
-            rows.setdefault(row, {"subject": cell["subject"], "values": {}})["values"][key] = [
-                cell["column"],
-                cell["value"],
-            ]
+            rows[row]["cells"][cell["cell_id"]] = cell["value"]
+        columns = {
+            f"k{column}": " / ".join(path) for column, path in table["fields"].items()
+        }
         tables.append(
-            {"evidence_id": table["evidence_id"], "fields": table["fields"], "rows": rows}
+            {
+                "id": table["evidence_id"],
+                "columns": columns,
+                "rows": [
+                    {"subject": rows[row]["subject"], "cells": rows[row]["cells"]}
+                    for row in order
+                ],
+            }
         )
-    return {"version": VERSION, "tables": tables, "issues": cells["issues"]}
+    unselectable.extend(issue["evidence_id"] for issue in cells["issues"])
+    return {"tables": tables, "unselectable": list(dict.fromkeys(unselectable))}

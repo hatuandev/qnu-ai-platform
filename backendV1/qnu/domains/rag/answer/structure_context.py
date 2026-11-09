@@ -12,7 +12,7 @@ from qnu.domains.knowledge.index.schemas import SearchHit
 from qnu.domains.knowledge.publication.evidence import VersionBundle
 from qnu.domains.knowledge.source_sections import source_sections
 
-VERSION = "qnu.rag.structure/v2"
+VERSION = "qnu.rag.structure/v3"
 _ARTICLE = re.compile(r"^(?:điều|article|section)\s+(\d+[a-zđ]?)\s*[.:]\s*\S", re.IGNORECASE)
 _CHAPTER = re.compile(
     r"^(?:chương|chapter|phần|part|phụ\s+lục|appendix|annex)\s+(?:[IVXLCDM]+|\d+|[A-Z])\b",
@@ -73,7 +73,7 @@ def _owners(rows: list[IndexChunk], input_id: str, document: dict) -> dict[str, 
     return owners
 
 
-def _terms(text: str) -> set[str]:
+def content_terms(text: str) -> set[str]:
     # Linguistic stopwords only; no corpus titles, majors, years or answer keywords.
     ignored = {
         "theo",
@@ -111,7 +111,7 @@ def _records(document: dict, owners: dict) -> list[dict]:
         for block in page["blocks"]:
             text = (block.get("text") or "").strip()
             ref = run + ":" + block["evidence_id"]
-            is_table = bool(block.get("table")) or block.get("type") == "table"
+            is_table = bool(block.get("table")) or block.get("type") in {"table", "figure"}
             if not is_table and (not text or text.isdecimal()):
                 continue
             records.append(
@@ -188,13 +188,13 @@ def _candidate(kind, group, input_id, hit, primary, references, question):
         return None
     if explicit and not anchors:
         anchors = {hit.chunk_id}
-    terms = _terms(question)
-    title_terms = _terms(title)
+    terms = content_terms(question)
+    title_terms = content_terms(title)
     overlap = len(terms & title_terms)
     asks_list = enumeration_requested(question)
     if kind == "bullet_list":
         topic = _TOPIC_REQUEST.sub("", question.strip())
-        exact_topic = _terms(topic) == title_terms
+        exact_topic = content_terms(topic) == title_terms
         if not title_terms or (not exact_topic and not (asks_list and title_terms <= terms)):
             return None
     elif not asks_list and not references:
@@ -202,10 +202,10 @@ def _candidate(kind, group, input_id, hit, primary, references, question):
     if (
         kind == "article"
         and not explicit
-        and (overlap < 2 or overlap / max(1, len(_terms(title))) < 0.6)
+        and (overlap < 2 or overlap / max(1, len(content_terms(title))) < 0.6)
     ):
         return None
-    if kind == "list" and (not overlap or overlap / max(1, len(_terms(title))) < 0.5):
+    if kind == "list" and (not overlap or overlap / max(1, len(content_terms(title))) < 0.5):
         return None
     if references and not explicit:
         return None
@@ -225,7 +225,7 @@ def _candidate(kind, group, input_id, hit, primary, references, question):
         "units": [
             {"ref": r["ref"], "chunk_ids": r["ids"]}
             for r in group[1:]
-            if kind == "bullet_list" or (asks_list and not r["text"].endswith((":", "：")))
+            if kind == "bullet_list" or asks_list
         ],
         "unindexed_refs": [r["ref"] for r in group if not r["ids"]],
     }
@@ -269,3 +269,62 @@ def select_groups(
         ]
     # One anchored scope, not a claim that other sources/chapters do not exist.
     return [min(candidates, key=lambda pair: pair[0])[1]]
+
+
+def _continues(left: dict, right: dict) -> bool:
+    previous, following = left["text"].rstrip(), right["text"].lstrip()
+    if (
+        not previous
+        or not following
+        or left["is_table"]
+        or right["is_table"]
+        or previous.rstrip("\"”’')]} ").endswith((".", "!", "?", ";", ":", "：", "…"))
+        or right["ref"] == right["section"]
+        or _POINT.match(following)
+        or _ARTICLE.match(following)
+        or _CHAPTER.match(following)
+        or _BULLET.match(following)
+    ):
+        return False
+    return following[0].isalpha() or following[0].isdigit()
+
+
+def continuation_groups(rows: list[IndexChunk], hits: list[SearchHit], bundles: dict) -> list[dict]:
+    """Complete clipped sentences by canonical source order, including page breaks.
+
+    This adds source dependencies, not a claim of exhaustive topic coverage.
+    Unindexed pieces remain missing; no text or citation is manufactured.
+    """
+    by_id = {row.id: row for row in rows}
+    anchors = {hit.chunk_id: rank for rank, hit in enumerate(hits)}
+    visited, groups = set(), []
+    for hit in hits:
+        identity = (by_id[hit.chunk_id].input_id, hit.version_id)
+        bundle = bundles.get(hit.version_id)
+        if identity in visited or bundle is None:
+            continue
+        visited.add(identity)
+        for document in bundle.documents:
+            records = _records(document, _owners(rows, identity[0], document))
+            start = 0
+            while start < len(records):
+                stop = start + 1
+                while stop < len(records) and _continues(records[stop - 1], records[stop]):
+                    stop += 1
+                group = records[start:stop]
+                ids = list(dict.fromkeys(key for record in group for key in record["ids"]))
+                primary = anchors.keys() & set(ids)
+                if len(group) > 1 and primary:
+                    groups.append(
+                        {
+                            "kind": "continuation",
+                            "label": group[0]["text"],
+                            "input_id": identity[0],
+                            "primary_chunk_id": min(primary, key=anchors.get),
+                            "required_ids": ids,
+                            "units": [{"ref": r["ref"], "chunk_ids": r["ids"]} for r in group],
+                            "unindexed_refs": [r["ref"] for r in group if not r["ids"]],
+                        }
+                    )
+                start = stop
+    return groups

@@ -9,7 +9,7 @@ from qnu.platform.errors import AppException
 if TYPE_CHECKING:
     from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer
 
-VERSION = "qnu.rag.coverage/v1"
+VERSION = "qnu.rag.coverage/v2"
 
 
 class Requirement(BaseModel):
@@ -102,6 +102,9 @@ def _structures(
     by_chunk = {s.chunk_id: s.evidence_id for s in sources}
     for group in context.get("structure", {}).get("groups", []):
         units = [{by_chunk[c] for c in u["chunk_ids"] if c in by_chunk} for u in group["units"]]
+        if group["kind"] == "continuation" and not any(unit & used for unit in units):
+            # Completing a retrieved sentence does not make it a question requirement.
+            continue
         supplied = sum(bool(unit) for unit in units)
         cited = sum(bool(unit & used) for unit in units)
         structures.append(
@@ -124,7 +127,10 @@ def _scope_status(context: dict, structures: list[StructuralCoverage]) -> str:
         "unresolved"
         if context.get("structure", {}).get("unresolved_references")
         else "bounded"
-        if any(s.required_units for s in structures)
+        if any(
+            g.get("units") and g["kind"] != "continuation"
+            for g in context.get("structure", {}).get("groups", [])
+        )
         else "unresolved"
         if context.get("structure", {}).get("enumeration_requested", False)
         else "not_requested"

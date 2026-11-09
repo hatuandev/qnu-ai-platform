@@ -20,14 +20,14 @@ from qnu.domains.rag.answer.schemas import AnswerRequest
 from qnu.platform.errors import AppException
 
 
-def hit(text="Short evidence"):
+def hit(text="Short evidence", kind="paragraph"):
     return SearchHit(
         chunk_id="chunk",
         document_id="document",
         version_id="version",
         publication_decision_id="decision",
         score=1,
-        kind="paragraph",
+        kind=kind,
         text=text,
         citations={},
         structure=None,
@@ -61,7 +61,8 @@ async def test_window_zero_still_rejects_oversized_primary_evidence():
 
 @pytest.mark.asyncio
 async def test_window_zero_records_bounded_bytes_and_keeps_whole_evidence():
-    source = hit()
+    # Paragraph hits need DB-backed clause expansion; table-only hits short-circuit before DB.
+    source = hit(kind="table")
     original = result([source])
     expanded, trace = await expand_context(
         None,

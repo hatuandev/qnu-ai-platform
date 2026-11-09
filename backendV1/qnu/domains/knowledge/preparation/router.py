@@ -14,6 +14,7 @@ from qnu.domains.knowledge.preparation.schemas import (
     PreparationCreated,
     PreparationRequest,
     PreparationResponse,
+    preparation_response,
 )
 from qnu.ports.job_queue import JobQueue
 
@@ -47,7 +48,7 @@ async def create_preparation(
     if not outcome.created:
         response.status_code = 200
     return PreparationCreated(
-        intent=PreparationResponse.model_validate(outcome.intent),
+        intent=preparation_response(outcome.intent),
         created=outcome.created,
         dispatched=outcome.dispatched,
     )
@@ -68,7 +69,7 @@ async def list_preparations(
     rows = await service.list_intents(
         db, actor, workspace_id, collection_id, source_id, limit
     )
-    return [PreparationResponse.model_validate(row) for row in rows]
+    return [preparation_response(row) for row in rows]
 
 
 @router.get("/preparation-intents/{intent_id}", response_model=PreparationResponse)
@@ -80,7 +81,7 @@ async def preparation_status(
     actor: AuthActor = Depends(get_actor),
 ) -> PreparationResponse:
     row = await service.get_intent(db, actor, workspace_id, collection_id, intent_id)
-    return PreparationResponse.model_validate(row)
+    return preparation_response(row)
 
 
 @router.post("/preparation-intents/{intent_id}/cancel", response_model=PreparationResponse)
@@ -92,4 +93,4 @@ async def cancel_preparation(
     actor: AuthActor = Depends(get_actor),
 ) -> PreparationResponse:
     row = await service.cancel(db, actor, workspace_id, collection_id, intent_id)
-    return PreparationResponse.model_validate(row)
+    return preparation_response(row)

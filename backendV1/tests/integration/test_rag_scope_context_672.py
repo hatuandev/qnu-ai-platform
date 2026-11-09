@@ -142,7 +142,7 @@ def test_context_stays_in_same_section_publication_and_metadata_scope(client, me
     from qnu.domains.knowledge.index.schemas import SearchRequest
     from qnu.domains.knowledge.index.search import search
     from qnu.domains.knowledge.index.validation import validate_results
-    from qnu.domains.rag.answer.context import expand_context
+    from qnu.domains.rag.answer.context import evidence_size, expand_context
     from qnu.domains.rag.answer.schemas import AnswerRequest
     from qnu.main import app
     from tests.integration.knowledge_support import EDITOR
@@ -213,7 +213,9 @@ def test_context_stays_in_same_section_publication_and_metadata_scope(client, me
                     data["workspace"]["id"],
                     data["collection"]["id"],
                     original,
-                    req.model_copy(update={"context_max_bytes": 256}),
+                    req.model_copy(
+                        update={"context_max_bytes": evidence_size(original.hits[0]) + 1}
+                    ),
                 )
             assert error.value.code == "answer_context_budget_exceeded"
 

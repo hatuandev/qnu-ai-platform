@@ -17,6 +17,7 @@ from qnu.domains.rag.answer.schemas import AnswerRequest
 from qnu.domains.rag.answer.source_text import pinned_bundles
 from qnu.domains.rag.answer.structure_context import (
     VERSION,
+    continuation_groups,
     enumeration_requested,
     needs_structure,
     select_groups,
@@ -43,6 +44,7 @@ async def expand_context(
     req: AnswerRequest,
     *,
     bundles: dict | None = None,
+    resolved_question: str | None = None,
 ) -> tuple[SearchResponse, dict]:
     trace = {
         "window": req.context_window,
@@ -113,14 +115,17 @@ async def expand_context(
     additions = []
     truncated = 0
     structural = []
-    if needs_structure(req.question):
-        bundles = await pinned_bundles(db, blob, workspace_id, collection_id, result.hits, bundles)
-        structural = select_groups(rows, result.hits, bundles, req.question)
+    question = resolved_question or req.question
+    bundles = await pinned_bundles(db, blob, workspace_id, collection_id, result.hits, bundles)
+    if needs_structure(question):
+        structural = select_groups(rows, result.hits, bundles, question)
+    structural.extend(continuation_groups(rows, result.hits, bundles))
+    if structural or needs_structure(question):
         trace["structure"] = {
             "version": VERSION,
             "groups": structural,
-            "enumeration_requested": enumeration_requested(req.question),
-            "unresolved_references": unresolved_references(req.question, structural),
+            "enumeration_requested": enumeration_requested(question),
+            "unresolved_references": unresolved_references(question, structural),
         }
     for group in structural:
         eligible = [
@@ -145,7 +150,7 @@ async def expand_context(
         )
         for candidate in candidates:
             size = evidence_size(candidate)
-            if consumed + size > req.context_max_bytes or len(known) >= 20:
+            if consumed + size > req.context_max_bytes:
                 truncated += 1
                 continue
             additions.append(candidate)
@@ -158,7 +163,8 @@ async def expand_context(
                     "kind": "structure",
                 }
             )
-    for group in [] if structural else clause_groups(rows, set(anchors)):
+    bounded_scope = any(group["kind"] != "continuation" for group in structural)
+    for group in [] if bounded_scope else clause_groups(rows, set(anchors)):
         if not any(
             all(matches_metadata(row.structure, scope) for row in group) for scope in scopes
         ):
@@ -175,7 +181,7 @@ async def expand_context(
             sealed,
         )
         size = sum(evidence_size(hit) for hit in candidates)
-        if consumed + size > req.context_max_bytes or len(known) + len(candidates) > 20:
+        if consumed + size > req.context_max_bytes:
             raise AppException(
                 "Các điểm cùng khoản vượt ngân sách context.",
                 code="answer_context_budget_exceeded",
@@ -223,7 +229,7 @@ async def expand_context(
     )
     for candidate in candidates:
         size = evidence_size(candidate)
-        if consumed + size > req.context_max_bytes or len(result.hits) + len(additions) >= 20:
+        if consumed + size > req.context_max_bytes:
             truncated += 1
             continue
         additions.append(candidate)

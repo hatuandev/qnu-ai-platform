@@ -34,6 +34,14 @@ Ghi nhận tối thiểu (ẩn danh người, dùng mã):
 
 Không suy vai trò từ JWT, tên tài khoản hay AI; admin gán membership qua màn hình Thành viên và kiểm lại quyền thực tế.
 
+### 2.1. Đơn vị dev đã seed (chưa phải người thật)
+
+Ngày 2026-11-08, để kiểm thử vai trò ngay trên môi trường dev, đã seed idempotent workspace `shl` — “Trung tâm Số & Học liệu” (`ws_31a7278f42e7`) với 4 membership đang hoạt động: `act_dev_shl_admin` (admin), `act_dev_shl_editor` (editor), `act_dev_shl_reviewer` (reviewer), `act_dev_shl_reader` (member). Lệnh: `uv run --frozen --env-file ../.env python -m scripts.seed_shl_pilot`; chạy lại không tạo thêm, không đổi vai trò/trạng thái. Khóa dev nằm ở `backendV1/.local/shl-pilot-accounts.json` (đã Git ignore), không ghi vào log/tài liệu.
+
+Đã kiểm qua HTTP in-process (TestClient trên DB dev, không ghi dữ liệu): 4/4 tài khoản đăng nhập 200, `/auth/me` đúng `actor_id`, workspace hiển thị và chi tiết 200, danh sách 4 thành viên đúng vai trò; PATCH thành viên không tồn tại trả 403 cho editor/reviewer/reader và 404 cho admin đơn vị cùng platform admin. Ngày 2026-11-08, sau khi người dùng cho phép, API dev `127.0.0.1:8002` đã được khởi động lại bằng đúng lệnh cũ (từ thư mục gốc repo): `uv run --project ./backendV1 --frozen --extra dev uvicorn qnu.main:app --host 127.0.0.1 --port 8002`; log ghi tại `backendV1/storage/context636/dev-api.out.log` và `.err.log`. Sau restart: `/health` 200, kiểm HTTP thật 21/21 đạt (4/4 khóa seed đăng nhập, workspace/members 200, biên quyền PATCH 403/404, platform admin 200). Kiểm trình duyệt 1280px bằng Playwright với dev-key form: 4/4 vai trò đăng nhập được, trang Thành viên hiển thị đủ 4 dòng cho mọi vai trò; admin có nút “Thêm thành viên” bật và 4 ô chọn vai trò, các vai trò khác chỉ đọc; điều hướng theo vai trò đúng (admin/editor thấy Cần xử lý + Chuẩn bị nội dung + Xuất bản; reviewer không thấy Chuẩn bị nội dung; reader chỉ thấy nhóm tra cứu); 0 lỗi console — tổng 32/32 kiểm tra đạt.
+
+Đây là tài khoản dev để kiểm thử, **không phải người tham gia pilot**; T1–T6 với người thật vẫn NOT RUN cho tới khi có điều phối viên, thư ký ghi biên bản, trợ lý và kho tài liệu đã xuất bản.
+
 ## 3. P7.2 — Kịch bản tác vụ và đo thời gian
 
 Người dùng tự thao tác trên UI. Điều phối viên chỉ can thiệp khi người dùng bị chặn hoặc hỏi; mỗi lần can thiệp đếm là **một lần cần dev hỗ trợ**. Không thao tác hộ.
@@ -107,7 +115,7 @@ Chỉ điền PASS cho dòng có biên bản và bằng chứng thật. NOT RUN/
 
 - DB phát triển đã ở `0017_answer_review` từ 2026-11-08 (backup trước migrate: `storage/backups/qnu_pre_pilot_20261108_170941.dump`, 217K, 382 mục). Đây là DB dev, không phải staging/production; pilot thật vẫn phải chạy trên môi trường được phép với backup riêng.
 - Full backend suite chưa hoàn tất trong các phiên P4–P6; còn lỗi nền Redis751 đã biết, không tuyên bố toàn hệ thống PASS.
-- Kiểm thị giác trình duyệt desktop/mobile của P5/P6 **NOT RUN** trong các phiên trước; pilot phải kiểm trực tiếp.
+- Kiểm trình duyệt P1–P6 đã chạy 2026-11-08: 66 lượt tải (11 route × 390/768/1280 × sáng/tối) trên Vite dev, 0 lỗi console; phát hiện và đã sửa tràn ngang 390px ở thẻ nguồn/thanh “Dẫn xuất & phục vụ” và việc mất `stage=publication` khi mở link collection cũ (commit `f3f47284`), kiểm lại đạt. Đây là kiểm tự động kèm ảnh, không thay quan sát người dùng thật trong pilot.
 - Nhãn answer review là đánh giá của người kiểm thử, không phải gold retrieval; benchmark vẫn ở cấu hình kỹ thuật.
 - Chưa có sandbox thử bản nháp trước xuất bản (E6); không hứa “kiểm thử draft”.
 - Chưa có notification bền vững (E1); reviewer theo dõi qua “Cần xử lý”, không dựa vào thông báo tự động.
@@ -151,6 +159,8 @@ Bản đồ bất biến → test:
 Ghi receipt: tên DB thử, số test, `db_dropped`, `legacy_sentinel_preserved`, exit code, thời gian. Nếu gate FAIL, dừng pilot và xử lý theo §5.
 
 Lần chạy 2026-11-08 trên working tree P1–P6: **43 passed** trong 167,88s; receipt `qnu_v1_test_002421364e204f88`, `db_dropped: true`, `legacy_sentinel_preserved: true`, `pytest_exit: 0`, `seconds: 176.42`. Đây là gate bất biến trước pilot, không thay thế phiên pilot thật.
+
+Ma trận trình duyệt P1–P6 ngày 2026-11-08: 11 route × 3 khổ × 2 theme = 66 lượt trên Vite `127.0.0.1:3001` với auto-login dev; 0 lỗi console; sau sửa không còn tràn ngang; `?stage=publication` và các link cũ `?tab=sources|compilations|documents|index`, `?sourceAction=ocr` giữ đúng stage. Tab order qua brand, 8 mục điều hướng và menu tài khoản. Ảnh đã xem: nguồn 390px sáng, xuất bản 390px/1280px sáng; các tổ hợp còn lại dựa trên số đo và ảnh lưu ở thư mục tạm ngoài Git. Đây là gate UI trước pilot, không thay T1–T6 với người thật.
 
 Frontend tối thiểu (khi có sửa mã UI): `npm run typecheck`, `npx vitest run tests/v1-answer-review-p6.test.ts tests/v1-conversation-errors-p6.test.ts`, `npm run build`. Kiểm trình duyệt 390px/1280px cho các luồng §3–§4; ghi rõ ảnh đã xem hay chưa.
 

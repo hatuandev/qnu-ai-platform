@@ -1,4 +1,9 @@
-import type { PreparationIntent, PreparationStatus } from "./preparation-types";
+import type {
+  PreparationIntent,
+  PreparationMode,
+  PreparationPolicyView,
+  PreparationStatus,
+} from "./preparation-types";
 
 const ACTIVE_PREPARATION_STATUSES: ReadonlySet<PreparationStatus> = new Set([
   "queued",
@@ -111,4 +116,50 @@ export function formatPreparationError(
 export function shortHash(hash: string | null | undefined): string {
   if (!hash) return "";
   return hash.slice(0, 12);
+}
+
+const MODE_LABELS: Record<PreparationMode, string> = {
+  auto: "Tự động theo chính sách",
+  source: "Giữ nguyên nguồn",
+  ai: "Bổ sung bằng AI",
+};
+
+const POLICY_DOWNGRADE_REASONS: Record<string, string> = {
+  chat_credentials_missing: "chưa có khóa model chat được cấp cho đơn vị",
+  chat_credentials_unreadable: "không đọc được khóa model chat đã lưu",
+  provider_keys_unavailable: "model chat chưa sẵn sàng",
+};
+
+export function preparationModeLabel(mode: PreparationMode): string {
+  return MODE_LABELS[mode] ?? MODE_LABELS.auto;
+}
+
+export function preparationPolicySummary(
+  policy: PreparationPolicyView | null | undefined,
+): string {
+  if (!policy) {
+    return "Hệ thống tự chọn cách chuẩn bị phù hợp và ghim lựa chọn vào yêu cầu.";
+  }
+  if (policy.supplement === "selective") {
+    return "Có bổ sung bằng AI, tách khỏi bản nguồn và kèm dẫn chứng.";
+  }
+  const reason =
+    POLICY_DOWNGRADE_REASONS[policy.reason ?? ""] ?? "model chat chưa sẵn sàng";
+  return `Chưa bổ sung AI vì ${reason}. Bản nguồn vẫn được giữ đầy đủ.`;
+}
+
+export function formatElapsedDuration(
+  startIso: string | null | undefined,
+  endIso: string | null | undefined = null,
+): string {
+  if (!startIso) return "";
+  const start = new Date(startIso).getTime();
+  const end = endIso ? new Date(endIso).getTime() : Date.now();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return "";
+  const totalSeconds = Math.max(0, Math.floor((end - start) / 1000));
+  if (totalSeconds < 60) return `${totalSeconds} giây`;
+  const minutes = Math.floor(totalSeconds / 60);
+  if (minutes < 60) return `${minutes} phút`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} giờ ${minutes % 60} phút`;
 }

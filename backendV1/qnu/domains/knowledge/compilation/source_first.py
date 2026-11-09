@@ -3,6 +3,11 @@
 from pydantic import ValidationError
 
 from qnu.domains.knowledge.compilation.drafting import validated_draft
+from qnu.domains.knowledge.compilation.quality import (
+    CONFIRMED_BY_SOURCE,
+    PARTIALLY_CHECKED,
+    quality_validation,
+)
 from qnu.domains.knowledge.compilation.schemas import DRAFT_PARAGRAPH_TEXT_LIMIT, DraftContent
 from qnu.platform.errors import AppException
 
@@ -66,4 +71,8 @@ def build_source_draft(topic: str, documents: list[dict], run_id: str) -> dict:
         ) from exc
     draft = validated_draft(content, topic, documents, run_id)
     draft["validation"]["source_copy"] = "retained"
+    draft["validation"]["quality"] = quality_validation(
+        source_binding=CONFIRMED_BY_SOURCE,
+        coverage=PARTIALLY_CHECKED,
+    )
     return draft

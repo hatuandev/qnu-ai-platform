@@ -30,9 +30,9 @@ export async function uploadAdmissionSource(api: Api, state: Checkpoint) {
     const created = await api.post<{ id: string }>(
       `${workspace(state)}/collections`,
       {
-        name: `Tuyển sinh QNU (3 tài liệu) — ${state.runId}`,
+        name: `Tuyển sinh QNU (${Object.keys(benchmark.documents).length} tài liệu) — ${state.runId}`,
         description:
-          "Bộ tài liệu tuyển sinh QNU: Điểm sàn 2026 (8 trang), Thông tin 2025 (13 trang), Báo cáo 2024 (7 trang).",
+          "Bộ tài liệu tuyển sinh QNU phục vụ nghiệm thu KH16: quy chế, thông tin và báo cáo tuyển sinh nhiều năm.",
       },
     );
     state.admissions.collection = created.id;
@@ -86,19 +86,25 @@ export async function extractAdmissionSource(api: Api, state: Checkpoint) {
     if (!entry?.source) {
       throw new Error(`BLOCKED: chưa có source cho ${key}.`);
     }
+    const expectedPages = docMeta.pages > 0 ? docMeta.pages : 0;
     const run = await api.wait(
       processing(context(state), entry.source),
-      (config.timeout_seconds + 30) * 1000 * docMeta.pages,
+      (config.timeout_seconds + 30) * 1000 * Math.max(expectedPages, 20),
     );
     expect(run.results_ready).toBe(true);
-    expect(run.pages_total).toBe(docMeta.pages);
+    expect(run.pages_total ?? 0).toBeGreaterThan(0);
     expect(run.pages_done).toBe(run.pages_total);
+    if (expectedPages > 0) {
+      expect(run.pages_total).toBe(expectedPages);
+    }
+    entry.pages = run.pages_total;
+    save(state);
     totalPagesExtracted += run.pages_done ?? 0;
     console.info(
-      `Đã bóc tách đủ ${run.pages_done}/${docMeta.pages} trang cho ${key} (${path.basename(docPaths[key])}).`,
+      `Đã bóc tách đủ ${run.pages_done}/${run.pages_total} trang cho ${key} (${path.basename(docPaths[key])}).`,
     );
   }
   console.info(
-    `Hoàn tất OCR extraction cho cả 3 tài liệu: tổng ${totalPagesExtracted} trang.`,
+    `Hoàn tất OCR extraction cho cả ${Object.keys(benchmark.documents).length} tài liệu: tổng ${totalPagesExtracted} trang.`,
   );
 }
