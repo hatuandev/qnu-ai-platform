@@ -206,6 +206,7 @@ def test_source_revision_change_excludes_content_without_model_call(client, inde
         indexed["collection"]["id"],
         indexed["source"]["id"],
         payload=real_pdf(["new source"]),
+        staged=False,
     )
     assert result.status_code == 201, result.text
     response = client.post(indexed["base"] + "/search", json={"query": "x"})

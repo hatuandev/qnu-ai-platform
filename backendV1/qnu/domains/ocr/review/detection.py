@@ -198,13 +198,18 @@ async def inspect(
             result = await chat.complete(messages, bind_usage(request, usage.id))
         except ChatResponseError as exc:
             await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
-            await retain_raw(blob, row, exc.raw_body)
+            try:
+                # Best effort only: a run cancelled or purged mid-call must not
+                # regain raw evidence on the error path either.
+                await check_running(db, row)
+                await retain_raw(blob, row, exc.raw_body)
+            except (Exception, asyncio.CancelledError):
+                await db.rollback()
             raise
         except (Exception, asyncio.CancelledError):
             await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
             raise
         await usage_service.settle(db, usage.id, total_tokens=result.total_tokens)
-        await retain_raw(blob, row, result.raw_body)
         await authorize(db, actor, run, write=True, lock=True)
         await check_running(db, row)
         require_version(
@@ -216,6 +221,9 @@ async def inspect(
         if latest.configuration_hash != runtime.configuration_hash:
             raise Conflict("Model đã thay đổi trong lúc kiểm tra.", code="chat_provider_changed")
         suggestions, withheld = contextual_suggestions(result.content, units)
+        # Raw evidence is durable only while this check is still the live run; the
+        # write happens after every guard, while the row lock is still held.
+        await retain_raw(blob, row, result.raw_body)
         row.suggestions = [s.model_dump() for s in suggestions]
         row.trace = {**row.trace, "withheld_suggestions": [s.model_dump() for s in withheld]}
         row.status = "completed"
@@ -238,8 +246,13 @@ async def inspect(
 
 
 async def check_running(db: AsyncSession, row: SpellingRun) -> None:
-    await db.refresh(row, with_for_update=True)
-    if row.status != "running" or row.expires_at <= utcnow():
+    current = await db.scalar(
+        select(SpellingRun)
+        .where(SpellingRun.id == row.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if current is None or current.status != "running" or current.expires_at <= utcnow():
         raise Conflict(
             "Lượt kiểm tra đã hết thời gian chờ; không nhận kết quả muộn.",
             code="ocr_spelling_expired",
@@ -279,3 +292,18 @@ async def get_check(db: AsyncSession, run: OcrProcessingRun, check_id: str) -> D
     if row is None:
         raise EntityNotFound("Không tìm thấy lượt kiểm tra.", code="ocr_spelling_not_found")
     return await readable_check(db, row)
+
+
+async def list_checks(
+    db: AsyncSession, run: OcrProcessingRun, version: int | None = None
+) -> list[DetectionResponse]:
+    query = (
+        select(SpellingRun)
+        .where(SpellingRun.run_id == run.id)
+        .order_by(SpellingRun.created_at.desc())
+    )
+    if version is not None:
+        query = query.where(SpellingRun.version == version)
+    rows = (await db.scalars(query)).all()
+    return [await readable_check(db, r) for r in rows]
+

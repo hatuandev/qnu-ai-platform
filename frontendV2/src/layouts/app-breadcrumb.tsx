@@ -8,14 +8,19 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { useUiStore } from "@/lib/ui-store";
 
 type BreadcrumbEntry = {
   label: string;
   to?: string;
 };
 
-function getRouteCrumbs(pathname: string): BreadcrumbEntry[] {
-  const crumbs: BreadcrumbEntry[] = [{ label: "QNU AI Platform", to: "/" }];
+function getRouteCrumbs(
+  pathname: string,
+  workspaceName?: string,
+): BreadcrumbEntry[] {
+  const rootLabel = workspaceName || "QNU AI Platform";
+  const crumbs: BreadcrumbEntry[] = [{ label: rootLabel, to: "/" }];
 
   if (pathname === "/" || pathname === "") {
     crumbs.push({ label: "Tổng quan" });
@@ -26,7 +31,7 @@ function getRouteCrumbs(pathname: string): BreadcrumbEntry[] {
     crumbs.push({ label: "Kho tri thức", to: "/knowledge" });
 
     if (pathname !== "/knowledge") {
-      crumbs.push({ label: "Dữ liệu tri thức ĐH Quy Nhơn 2026" });
+      crumbs.push({ label: "Chi tiết tài liệu" });
     }
     return crumbs;
   }
@@ -52,7 +57,7 @@ function getRouteCrumbs(pathname: string): BreadcrumbEntry[] {
   }
 
   if (pathname.startsWith("/modelops")) {
-    crumbs.push({ label: "Mô hình AI (ModelOps)" });
+    crumbs.push({ label: "Nhà cung cấp" });
     return crumbs;
   }
 
@@ -77,7 +82,8 @@ function getRouteCrumbs(pathname: string): BreadcrumbEntry[] {
 
 export function AppBreadcrumb() {
   const { pathname } = useLocation();
-  const crumbs = getRouteCrumbs(pathname);
+  const activeWorkspace = useUiStore((s) => s.activeWorkspace);
+  const crumbs = getRouteCrumbs(pathname, activeWorkspace?.name);
 
   return (
     <Breadcrumb className="min-w-0">
@@ -89,7 +95,9 @@ export function AppBreadcrumb() {
             <Fragment
               key={crumb.to ? `link-${crumb.to}` : `page-${crumb.label}`}
             >
-              <BreadcrumbItem>
+              <BreadcrumbItem
+                className={isLast ? "min-w-0" : "hidden md:inline-flex"}
+              >
                 {isLast || !crumb.to ? (
                   <BreadcrumbPage className="font-semibold text-foreground truncate max-w-[200px] sm:max-w-[320px]">
                     {crumb.label}
@@ -107,7 +115,7 @@ export function AppBreadcrumb() {
               </BreadcrumbItem>
 
               {!isLast && (
-                <BreadcrumbSeparator className="text-muted-foreground/40">
+                <BreadcrumbSeparator className="hidden md:inline-flex text-muted-foreground/40">
                   /
                 </BreadcrumbSeparator>
               )}

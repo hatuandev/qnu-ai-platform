@@ -1,4 +1,5 @@
-import { Bell, Moon, Search, Sun, User } from "lucide-react";
+import { Bell, Menu, Moon, Search, Sun, User } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -7,16 +8,47 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { useUiStore } from "@/lib/ui-store";
 import { AppBreadcrumb } from "./app-breadcrumb";
+import { AppSidebar } from "./app-sidebar";
 
 export function AppTopbar() {
-  const { theme, setTheme } = useUiStore();
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const { theme, setTheme, devActor } = useUiStore();
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border/60 bg-card px-4 gap-4">
       {/* Left: Dynamic Route Breadcrumb */}
-      <div className="flex items-center min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
+        <Sheet open={navigationOpen} onOpenChange={setNavigationOpen}>
+          <SheetTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden shrink-0"
+              aria-label="Mở menu điều hướng"
+            >
+              <Menu className="size-4" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="p-0 md:hidden" side="left">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Điều hướng</SheetTitle>
+              <SheetDescription>
+                Chọn chức năng trong hệ thống.
+              </SheetDescription>
+            </SheetHeader>
+            <AppSidebar mobile onNavigate={() => setNavigationOpen(false)} />
+          </SheetContent>
+        </Sheet>
         <AppBreadcrumb />
       </div>
 
@@ -33,7 +65,7 @@ export function AppTopbar() {
       </div>
 
       {/* Right: Actions, Theme, User */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 shrink-0">
         <Button
           variant="ghost"
           size="sm"
@@ -73,10 +105,10 @@ export function AppTopbar() {
           <DropdownMenuContent align="end" className="w-52">
             <div className="flex flex-col space-y-1 p-2">
               <p className="text-xs font-medium text-foreground leading-none">
-                Quản trị viên
+                {devActor?.display_name || "Quản trị viên dev"}
               </p>
-              <p className="text-[11px] text-muted-foreground leading-none">
-                dev@qnu.edu.vn
+              <p className="text-[11px] text-muted-foreground leading-none font-mono">
+                {devActor?.username || devActor?.email || "dev@qnu.edu.vn"}
               </p>
             </div>
             <DropdownMenuSeparator />

@@ -10,9 +10,16 @@ export function Field({ className, ...props }: React.ComponentProps<"div">) {
 
 export function FieldLabel({
   className,
+  required,
+  children,
   ...props
-}: React.ComponentProps<typeof Label>) {
-  return <Label className={cn("font-medium", className)} {...props} />;
+}: React.ComponentProps<typeof Label> & { required?: boolean }) {
+  return (
+    <Label className={cn("font-medium", className)} {...props}>
+      {children}
+      {required ? <span className="ml-1 text-destructive">*</span> : null}
+    </Label>
+  );
 }
 
 export function FieldDescription({

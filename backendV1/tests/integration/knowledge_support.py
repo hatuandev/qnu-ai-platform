@@ -121,12 +121,13 @@ def add_revision(
     payload: bytes,
     filename: str = "de-an.pdf",
     idempotency_key: str | None = None,
+    staged: bool = True,
 ):
     headers = {"Idempotency-Key": idempotency_key} if idempotency_key else {}
     return client.post(
         f"{API}/workspaces/{workspace_id}/collections/{collection_id}/sources/{source_id}/revisions",
         files={"file": (filename, payload, "application/pdf")},
-        data={"auto_extract": "false"},
+        data={"auto_extract": "false", "staged": "true" if staged else "false"},
         headers=headers,
     )
 

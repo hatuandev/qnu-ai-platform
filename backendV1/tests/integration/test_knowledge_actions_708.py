@@ -25,6 +25,7 @@ from tests.integration.ocr_support import (
     setup_ocr_provider,
     use_queue,
 )
+from tests.integration.test_lifecycle_659 import accept, preview
 
 
 def test_nonempty_folder_delete_preserves_sources_and_directory(client):
@@ -55,6 +56,54 @@ def test_folder_with_children_cannot_be_deleted_but_empty_folder_can(client):
     assert client.delete(base + f"/{parent['id']}").status_code == 409
     assert client.delete(base + f"/{child['id']}").status_code == 200
     assert client.post(base + f"/{child['id']}/restore").status_code == 200
+
+
+def test_folder_restore_requires_visible_parent_and_free_name(client):
+    ws = workspace_with_editor(client, "folder-restore-708")
+    as_actor(EDITOR)
+    col = create_collection(client, ws["id"], "Folder restore")
+    base = f"{API}/workspaces/{ws['id']}/collections/{col['id']}/folders"
+    parent = client.post(base, json={"name": "Parent"}).json()
+    child = client.post(base, json={"name": "Child", "parent_id": parent["id"]}).json()
+    assert client.delete(base + f"/{child['id']}").status_code == 200
+    assert client.delete(base + f"/{parent['id']}").status_code == 200
+    blocked = client.post(base + f"/{child['id']}/restore")
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["code"] == "folder_parent_unavailable"
+    assert client.post(base + f"/{parent['id']}/restore").status_code == 200
+    assert client.post(base + f"/{child['id']}/restore").status_code == 200
+    restored = client.get(base + f"/{child['id']}")
+    assert restored.status_code == 200
+    assert restored.json()["parent_id"] == parent["id"]
+
+
+def test_folder_restore_rejects_case_insensitive_sibling(client):
+    ws = workspace_with_editor(client, "folder-name-708")
+    as_actor(EDITOR)
+    col = create_collection(client, ws["id"], "Folder names")
+    base = f"{API}/workspaces/{ws['id']}/collections/{col['id']}/folders"
+    first = client.post(base, json={"name": "Evidence"}).json()
+    assert client.delete(base + f"/{first['id']}").status_code == 200
+    second = client.post(base, json={"name": "evidence"}).json()
+    conflict = client.post(base + f"/{first['id']}/restore")
+    assert conflict.status_code == 409, conflict.text
+    assert conflict.json()["code"] == "folder_name_exists"
+    assert client.delete(base + f"/{second['id']}").status_code == 200
+    assert client.post(base + f"/{first['id']}/restore").status_code == 200
+
+
+def test_folder_restore_in_archived_collection_is_not_available(client):
+    ws = workspace_with_editor(client, "folder-archived-708")
+    as_actor(EDITOR)
+    col = create_collection(client, ws["id"], "Archived store")
+    base = f"{API}/workspaces/{ws['id']}/collections/{col['id']}/folders"
+    folder = client.post(base, json={"name": "Pending"}).json()
+    assert client.delete(base + f"/{folder['id']}").status_code == 200
+    archived = accept(client, ws, preview(client, ws, "collection", col["id"], "archive"))
+    assert archived.status_code == 200, archived.text
+    blocked = client.post(base + f"/{folder['id']}/restore")
+    assert blocked.status_code == 404, blocked.text
+    assert blocked.json()["code"] == "resource_unavailable"
 
 
 @pytest.mark.parametrize("gate_still_enabled", [True, False])

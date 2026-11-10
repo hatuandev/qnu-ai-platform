@@ -77,7 +77,7 @@ async def _add(db, graph, name, statement, workspace_id):
     return len(found) != before
 
 
-async def graph_for_source(db, workspace_id, source_id):
+async def graph_for_source(db, workspace_id, source_id, *, allow_published: bool = False):
     source, ocr, inputs, runs = map(
         table,
         (
@@ -172,7 +172,7 @@ async def graph_for_source(db, workspace_id, source_id):
             if parent is None or parent[owner_field] != row[owner_field]:
                 raise Conflict("Nhóm xử lý ngoài phạm vi xóa.", code="purge_scope_invalid")
     versions = list(graph.get("kb_compiled_versions", {}).values())
-    if any(row["status"] == "published" for row in versions):
+    if any(row["status"] == "published" for row in versions) and not allow_published:
         raise Conflict(
             "Tài liệu đang được phát hành. Hãy thu hồi/dừng phát hành các bản liên quan trước khi xóa.",
             code="source_publication_in_use",

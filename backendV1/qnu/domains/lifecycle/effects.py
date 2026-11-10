@@ -3,22 +3,68 @@
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from qnu.domains.knowledge.compilation.models import utcnow
+from qnu.domains.knowledge.compilation.models import CompilationInput, utcnow
 from qnu.domains.knowledge.index.models import IndexChunk, IndexRun
+from qnu.domains.knowledge.publication.models import CompiledDocument, CompiledVersion
 from qnu.domains.lifecycle.models import LifecycleAction, ResourceState
 from qnu.domains.lifecycle.targets import related_jobs
-from qnu.domains.ocr.models import OcrRunPage
+from qnu.domains.ocr.models import OcrProcessingRun, OcrRunPage
 from qnu.platform.database import Base
 from qnu.platform.errors import Conflict
 from qnu.ports.vector_store import VectorStore
+
+
+async def withdraw(db: AsyncSession, action: LifecycleAction, row: Base) -> dict:
+    """Ngừng dùng cho trợ lý: withdraw published versions, keep every file/revision."""
+    statement = select(CompiledVersion).where(
+        CompiledVersion.workspace_id == action.workspace_id,
+        CompiledVersion.status == "published",
+    )
+    if action.kind == "source":
+        statement = statement.where(
+            CompiledVersion.compilation_run_id.in_(
+                select(CompilationInput.run_id)
+                .join(OcrProcessingRun, OcrProcessingRun.id == CompilationInput.ocr_run_id)
+                .where(OcrProcessingRun.source_id == row.id)
+            )
+        )
+    elif action.kind == "document":
+        statement = statement.where(CompiledVersion.document_id == row.id)
+    else:
+        statement = statement.where(CompiledVersion.collection_id == row.id)
+    versions = list((await db.scalars(statement.with_for_update())).all())
+    documents: dict[str, CompiledDocument] = {}
+    for version in versions:
+        version.status, version.state_version = "withdrawn", version.state_version + 1
+        document = documents.get(version.document_id) or await db.get(
+            CompiledDocument, version.document_id
+        )
+        if document is not None:
+            document.change_sequence += 1
+            documents[document.id] = document
+    from qnu.domains.identity.background import background_actor
+    from qnu.domains.knowledge.index.sync import mark_pending
+
+    collection_id = row.id if action.kind == "collection" else row.collection_id
+    await mark_pending(
+        db, background_actor(action.actor_ref), action.workspace_id, collection_id
+    )
+    return {
+        "withdrawn_versions": [version.id for version in versions],
+        "serving_hidden_immediately": True,
+        "originals_retained": True,
+        "restore_available": True,
+    }
 
 
 async def cancel_job(db: AsyncSession, kind: str, job: Base) -> None:
     job.status, job.error_code = "cancelled", "operation_cancelled"
     if hasattr(job, "finished_at"):
         job.finished_at = utcnow()
-    if hasattr(job, "lease_expires_at"):
-        job.lease_expires_at = utcnow() if kind == "turn" else None
+    if hasattr(job, "lease_expires_at") and kind == "turn":
+        # A cancelled worker keeps its lease as a wait signal for purge; only a
+        # synchronous turn is expired here so the caller observes the stop at once.
+        job.lease_expires_at = utcnow()
     if kind == "ocr":
         await db.execute(
             update(OcrRunPage)
@@ -59,6 +105,8 @@ async def apply(db: AsyncSession, action: LifecycleAction, row: Base) -> dict:
     if action.action == "cancel":
         await cancel_job(db, action.parameters["job_kind"], row)
         return {"job_status": "cancelled", "upstream_abort_guaranteed": False}
+    if action.action == "withdraw":
+        return await withdraw(db, action, row)
     if action.action in {"archive", "delete", "pause"}:
         await cancel_related_jobs(db, action.workspace_id, action.kind, row)
     if action.action in {"pause", "resume"}:

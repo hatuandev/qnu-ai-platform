@@ -276,7 +276,7 @@ async def add_revision(
     request: Request,
     file: UploadFile = File(..., description="Tệp của phiên bản mới"),
     staged: bool = Form(
-        False, description="Giữ bản đang phục vụ đến khi thay thế nguyên tử cùng chỉ mục mới"
+        True, description="Giữ bản đang phục vụ đến khi thay thế nguyên tử cùng chỉ mục mới"
     ),
     auto_extract: bool = Form(True, description="Tự bóc tách phiên bản PDF/DOCX mới"),
     idempotency_key: str | None = Depends(idempotency_key_dep),

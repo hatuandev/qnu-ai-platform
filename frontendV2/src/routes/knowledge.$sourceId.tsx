@@ -1,29 +1,57 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   ArrowLeft,
-  Check,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Columns2,
-  Copy,
   Download,
-  Edit3,
+  Eye,
   FileCode,
-  FileDown,
-  MoreHorizontal,
+  FileJson,
+  FileText,
+  History,
+  Loader2,
+  MoreVertical,
   Pencil,
+  Plus,
   RefreshCw,
   Save,
+  ShieldCheck,
+  Sparkles,
+  StopCircle,
+  Table as TableIcon,
   Trash2,
-  Upload,
   X,
-  ZoomIn,
-  ZoomOut,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { DocumentTypeIcon } from "@/components/admin/document-file-icon";
+import { z } from "zod";
+import {
+  useCommitEditsMutation,
+  useCompilationDraftQuery,
+  useCompilationMarkdownQuery,
+  useCreateEditPreviewMutation,
+  useEditContextQuery,
+} from "@/api/compilation/queries";
+import type { DraftContent } from "@/api/compilation/types";
+import {
+  getRevisionContentBlob,
+  useCollectionsQuery,
+  useRevisionsQuery,
+  useSourceQuery,
+  useSourceSummaryQuery,
+} from "@/api/knowledge";
+import {
+  useCancelPreparationIntentMutation,
+  useCreatePreparationIntentMutation,
+  usePreparationIntentQuery,
+} from "@/api/preparation/queries";
+import { EmptyState } from "@/components/admin/empty-state";
+import { CitationBadge } from "@/components/knowledge/citation-badge";
+import { DocxViewer } from "@/components/knowledge/docx-viewer";
+import { JsonStructureDialog } from "@/components/knowledge/json-structure-dialog";
+import { MarkdownView } from "@/components/knowledge/markdown-view";
+import { PublicationDialog } from "@/components/knowledge/publication-dialog";
+import { SpellingStatusStrip } from "@/components/knowledge/spelling-status-strip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,991 +63,1572 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
+import {
+  buildCitationMap,
+  displayDocumentTitle,
+  findViewedDerivation,
+  resolveStudioAction,
+} from "@/lib/knowledge-studio-helpers";
+import { useUiStore } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
 
+const sourceStudioSearchSchema = z.object({
+  collectionId: z.string().optional(),
+});
+
 export const Route = createFileRoute("/knowledge/$sourceId")({
+  validateSearch: (search) => sourceStudioSearchSchema.parse(search),
   component: SourceStudioPage,
 });
 
-export type DocumentSection = {
+type EditableParagraph = {
   id: string;
-  type: "meta" | "heading" | "paragraph" | "table";
-  headingLevel?: number;
-  content: string;
-  editedContent?: string;
-  isEdited?: boolean;
-  tableData?: {
-    headers: string[];
-    rows: { stt: string; major: string; tuition: string; note?: string }[];
-  };
+  text: string;
+  citations: string[];
 };
 
-const initialSections: DocumentSection[] = [
-  {
-    id: "sec_meta",
-    type: "meta",
-    content:
-      "Phiên bản dữ liệu: 15/10/2026. Nguồn ưu tiên: Cổng thông tin chính thức qnu.edu.vn.",
-  },
-  {
-    id: "sec_scope",
-    type: "paragraph",
-    content:
-      "Phạm vi dữ liệu: nhận diện, lịch sử, triết lý giáo dục, sứ mạng, tầm nhìn, lãnh đạo, cơ cấu tổ chức, đào tạo, tuyển sinh năm 2026, nghiên cứu khoa học, kiểm định, hoạt động sinh viên và thông tin liên hệ. Các số liệu theo năm học hoặc thời điểm công bố được nêu cụ thể; không suy diễn khi nguồn không có số liệu cố định.",
-  },
-  {
-    id: "sec_h1",
-    type: "heading",
-    headingLevel: 2,
-    content: "1. Thông tin nhận diện Trường Đại học Quy Nhơn",
-  },
-  {
-    id: "sec_p1",
-    type: "paragraph",
-    content:
-      "Trường Đại học Quy Nhơn có tên tiếng Anh là Quy Nhon University, viết tắt là QNU. Trường Đại học Quy Nhơn là cơ sở giáo dục đại học công lập, trực thuộc Bộ Giáo dục và Đào tạo. Trụ sở chính của Trường Đại học Quy Nhơn theo công khai năm học 2026–2027 đặt tại số 170 đường An Dương Vương, phường Quy Nhơn Nam, tỉnh Gia Lai. Cổng thông tin chính thức của trường là https://www.qnu.edu.vn. [S1]",
-  },
-  {
-    id: "sec_p2",
-    type: "paragraph",
-    content:
-      "Mã cơ sở đào tạo của Trường Đại học Quy Nhơn sử dụng trong tuyển sinh đại học năm 2026 là DQN. Website thông tin tuyển sinh của Trường Đại học Quy Nhơn là https://tuyensinh.qnu.edu.vn. Mã DQN là thông tin tuyển sinh, khác với tên viết tắt QNU dùng để nhận diện trường trong tiếng Anh và truyền thông. [S0]",
-  },
-  {
-    id: "sec_h2",
-    type: "heading",
-    headingLevel: 2,
-    content: "2. Lịch sử hình thành và các mốc pháp lý",
-  },
-  {
-    id: "sec_p3",
-    type: "paragraph",
-    content:
-      "Ngày 21/12/1977, Bộ trưởng Bộ Giáo dục ban hành Quyết định số 1842/QĐ thành lập Cơ sở Đại học Sư phạm Quy Nhơn. Đây là mốc khởi đầu trong lịch sử hình thành Trường Đại học Quy Nhơn và là cơ sở để trường tính số năm truyền thống. Vì vậy, khi được hỏi Trường Đại học Quy Nhơn thành lập năm nào, mốc trả lời phù hợp theo lịch sử nhà trường là năm 1977, cụ thể ngày 21 tháng 12 năm 1977. [S1] [S2]",
-  },
-  {
-    id: "sec_p4",
-    type: "paragraph",
-    content:
-      "Ngày 13/7/1981, Hội đồng Bộ trưởng ban hành Quyết định số 02/HĐBT thành lập Trường Đại học Sư phạm Quy Nhơn. Mốc 13 tháng 7 năm 1981 đánh dấu việc thành lập trường đại học toàn diện trên nền tảng cơ sở đã mở từ năm 1977. Hai mốc năm 1977 và năm 1981 phản ánh hai sự kiện pháp lý khác nhau, không nên dùng thay thế cho nhau. [S2]",
-  },
-  {
-    id: "sec_p5",
-    type: "paragraph",
-    content:
-      "Ngày 30/10/2003, Thủ tướng Chính phủ ban hành Quyết định số 221/2003/QĐ-TTg đổi tên Trường Đại học Sư phạm Quy Nhơn thành Trường Đại học Quy Nhơn. Tên gọi Trường Đại học Quy Nhơn gắn với định hướng phát triển đa ngành, đa lĩnh vực thay cho mô hình đào tạo chủ yếu về sư phạm trước đó. Ngày 30 tháng 10 năm 2003 là ngày đổi tên, không phải mốc thành lập ban đầu của trường. [S1] [S2]",
-  },
-  {
-    id: "sec_h3",
-    type: "heading",
-    headingLevel: 2,
-    content: "3. Định mức thu học phí theo tín chỉ (Năm học 2026 - 2027)",
-  },
-  {
-    id: "sec_t1",
-    type: "table",
-    content:
-      "Căn cứ Nghị định số 81/2021/NĐ-CP và Nghị định số 97/2023/NĐ-CP của Chính phủ, định mức thu học phí đối với các ngành đào tạo chuẩn áp dụng theo Bảng 1:",
-    tableData: {
-      headers: ["STT", "Khối ngành đào tạo", "Định mức thu (VNĐ/tín chỉ)"],
-      rows: [
-        {
-          stt: "1",
-          major: "Khối ngành Kỹ thuật & Công nghệ thông tin",
-          tuition: "550.000 VNĐ",
-        },
-        {
-          stt: "2",
-          major: "Khối ngành Kinh tế & Quản trị kinh doanh",
-          tuition: "480.000 VNĐ",
-        },
-        {
-          stt: "3",
-          major: "Khối ngành Sư phạm & Đào tạo giáo viên",
-          tuition: "Miễn 100% (NĐ 116)",
-        },
-      ],
-    },
-  },
-];
+type EditableSection = {
+  id: string;
+  heading: string;
+  paragraphs: EditableParagraph[];
+};
+
+type EditableDraft = {
+  title: string;
+  sections: EditableSection[];
+  unknowns: string[];
+};
 
 function SourceStudioPage() {
-  const navigate = useNavigate();
+  const { sourceId } = Route.useParams();
+  const searchParams = Route.useSearch();
 
-  // Document Content & Editing State
-  const [sections, setSections] = useState<DocumentSection[]>(initialSections);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftContent, setDraftContent] = useState("");
-
-  // Left Viewer Controls
-  const [docFormat, setDocFormat] = useState<"docx" | "pdf">("docx");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [zoomLevel, setZoomLevel] = useState(100);
-
-  // Right Tabs
-  const [activeTab, setActiveTab] = useState<"text" | "markdown" | "json">(
-    "text",
+  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId);
+  const registerBackgroundTask = useBackgroundTasksStore(
+    (s) => s.registerPreparationTask,
   );
 
-  const hasUnsaved = sections.some((s) => s.isEdited);
+  // 1. Resolve collectionId
+  const { data: collectionsPage } = useCollectionsQuery(activeWorkspaceId);
+  const resolvedCollectionId = useMemo(() => {
+    if (searchParams.collectionId) return searchParams.collectionId;
+    return collectionsPage?.items?.[0]?.id || "";
+  }, [searchParams.collectionId, collectionsPage]);
 
-  const startEdit = (sec: DocumentSection) => {
-    setEditingId(sec.id);
-    setDraftContent(sec.editedContent ?? sec.content);
+  // 2. Load Source & Summary
+  const {
+    data: source,
+    isLoading: isSourceLoading,
+    isError: isSourceError,
+    error: sourceError,
+    refetch: refetchSource,
+  } = useSourceQuery(activeWorkspaceId, resolvedCollectionId, sourceId);
+
+  const { data: summary, refetch: refetchSummary } = useSourceSummaryQuery(
+    activeWorkspaceId,
+    resolvedCollectionId,
+    sourceId,
+  );
+
+  const { data: revisions } = useRevisionsQuery(
+    activeWorkspaceId,
+    resolvedCollectionId,
+    sourceId,
+  );
+
+  // 3. Monitor active preparation intent
+  const activeIntentId = summary?.preparation?.intent_id;
+  const { data: intentData } = usePreparationIntentQuery(
+    activeWorkspaceId,
+    resolvedCollectionId,
+    activeIntentId,
+    { enabled: Boolean(activeIntentId) },
+  );
+
+  const createIntentMutation = useCreatePreparationIntentMutation(
+    activeWorkspaceId,
+    resolvedCollectionId,
+  );
+  const cancelIntentMutation = useCancelPreparationIntentMutation(
+    activeWorkspaceId,
+    resolvedCollectionId,
+  );
+
+  // 4. Resolve active Compilation Run ID
+  const [activeRunIdOverride, setActiveRunIdOverride] = useState<string | null>(
+    null,
+  );
+  const compilationRunId = useMemo(() => {
+    if (activeRunIdOverride) return activeRunIdOverride;
+    if (intentData?.compilation_run_id) return intentData.compilation_run_id;
+    if (summary?.derivations && summary.derivations.length > 0) {
+      return summary.derivations[0].compilation_run_id;
+    }
+    return null;
+  }, [activeRunIdOverride, intentData, summary]);
+
+  // 5. Load Compilation Draft & Markdown
+  const {
+    data: draftData,
+    isLoading: isDraftLoading,
+    refetch: refetchDraft,
+  } = useCompilationDraftQuery(
+    activeWorkspaceId,
+    resolvedCollectionId,
+    compilationRunId,
+  );
+
+  const { data: markdownContent } = useCompilationMarkdownQuery(
+    activeWorkspaceId,
+    resolvedCollectionId,
+    compilationRunId,
+  );
+
+  // 6. Edit Context & Mutations
+  const { data: editContext, refetch: refetchEditContext } =
+    useEditContextQuery(
+      activeWorkspaceId,
+      resolvedCollectionId,
+      compilationRunId,
+    );
+
+  const createEditPreviewMutation = useCreateEditPreviewMutation(
+    activeWorkspaceId,
+    resolvedCollectionId,
+  );
+  const commitEditsMutation = useCommitEditsMutation(
+    activeWorkspaceId,
+    resolvedCollectionId,
+  );
+
+  // UI View States
+  const [isEditing, setIsEditing] = useState(false);
+  const [editableDraft, setEditableDraft] = useState<EditableDraft | null>(
+    null,
+  );
+  const [editReason, setEditReason] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<
+    "content" | "markdown" | "details"
+  >("content");
+  const [splitMode, setSplitMode] = useState<
+    "split" | "editor-only" | "preview-only"
+  >("split");
+  const [mobileTab, setMobileTab] = useState<"original" | "prepared">(
+    "prepared",
+  );
+  const [publicationOpen, setPublicationOpen] = useState(false);
+  const [jsonDialogOpen, setJsonDialogOpen] = useState(false);
+
+  const handleDownloadJson = () => {
+    const dataToDownload = draftData || summary;
+    if (!dataToDownload) {
+      toast.error("Chưa có dữ liệu JSON để tải về.");
+      return;
+    }
+    const blob = new Blob([JSON.stringify(dataToDownload, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${source?.file_name || "document"}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Đã tải tệp JSON về máy.");
   };
 
-  const saveEdit = (id: string) => {
-    setSections((prev) =>
-      prev.map((s) =>
-        s.id === id
+  // Original Document Blob URL & loading
+  const [docBlob, setDocBlob] = useState<Blob | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [blobLoading, setBlobLoading] = useState(false);
+  const [blobError, setBlobError] = useState<string | null>(null);
+
+  // Safe revision ID resolution
+  const activeRevisionId = useMemo(() => {
+    if (summary?.revision?.id) return summary.revision.id;
+    if (revisions && revisions.length > 0) return revisions[0].id;
+    return null;
+  }, [summary?.revision?.id, revisions]);
+
+  useEffect(() => {
+    let active = true;
+    let currentUrl: string | null = null;
+
+    if (
+      activeWorkspaceId &&
+      resolvedCollectionId &&
+      sourceId &&
+      activeRevisionId
+    ) {
+      setBlobLoading(true);
+      setBlobError(null);
+
+      getRevisionContentBlob(
+        activeWorkspaceId,
+        resolvedCollectionId,
+        sourceId,
+        activeRevisionId,
+      )
+        .then((res) => {
+          if (!active) return;
+          currentUrl = URL.createObjectURL(res.blob);
+          setDocBlob(res.blob);
+          setBlobUrl(currentUrl);
+          setBlobLoading(false);
+        })
+        .catch((err) => {
+          if (active) {
+            setBlobLoading(false);
+            setBlobError(
+              err instanceof Error ? err.message : "Không thể tải tệp gốc.",
+            );
+          }
+        });
+    }
+
+    return () => {
+      active = false;
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+      }
+    };
+  }, [activeWorkspaceId, resolvedCollectionId, sourceId, activeRevisionId]);
+
+  const isDocx = Boolean(source?.file_name.toLowerCase().endsWith(".docx"));
+  const isPdf = Boolean(source?.file_name.toLowerCase().endsWith(".pdf"));
+
+  const isPreparing =
+    intentData?.status === "queued" ||
+    intentData?.status === "waiting_ocr" ||
+    intentData?.status === "compiling";
+
+  const hasDraft = Boolean(draftData && draftData.sections?.length > 0);
+
+  // Current derivation matching currently viewed compilation run
+  const currentDerivation = useMemo(() => {
+    return findViewedDerivation(summary?.derivations, compilationRunId);
+  }, [summary?.derivations, compilationRunId]);
+
+  // Resolve Studio action state and user-friendly status badge
+  const actionState = useMemo(() => {
+    return resolveStudioAction({
+      source,
+      summary,
+      intentSummary:
+        summary?.preparation ||
+        (intentData
           ? {
-              ...s,
-              editedContent: draftContent,
-              isEdited: draftContent !== s.content,
+              intent_id: intentData.id,
+              status: intentData.status,
+              step: intentData.step || "",
+              error_code: intentData.error_code,
             }
-          : s,
-      ),
-    );
-    setEditingId(null);
-    toast.success("Đã ghi nhận thay đổi đoạn văn bản!");
+          : null),
+      hasDraft,
+      isEditing,
+      currentDerivation,
+    });
+  }, [source, summary, intentData, hasDraft, isEditing, currentDerivation]);
+
+  // Sequential citation mapping for clean [1], [2] badges
+  const citationIndexMap = useMemo(() => {
+    return buildCitationMap(draftData);
+  }, [draftData]);
+
+  // Handler: Trigger preparation
+  const handleStartPreparation = async () => {
+    if (!activeRevisionId) {
+      toast.error("Không tìm thấy thông tin phiên bản tệp để chuẩn bị.");
+      return;
+    }
+    try {
+      const idempotencyKey = `prep_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const res = await createIntentMutation.mutateAsync({
+        sourceId,
+        input: {
+          mode: "auto",
+          revision_id: activeRevisionId,
+        },
+        idempotencyKey,
+      });
+
+      registerBackgroundTask({
+        id: res.intent.id,
+        workspaceId: activeWorkspaceId || "",
+        collectionId: resolvedCollectionId,
+        sourceId,
+        sourceTitle: source?.title || "Tài liệu",
+        fileName: source?.file_name || "Tệp",
+      });
+
+      toast.success(
+        "Đã khởi tạo chuẩn bị nội dung! Hệ thống đang xử lý tự động trong nền.",
+      );
+      void refetchSummary();
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Không thể khởi tạo chuẩn bị";
+      toast.error(msg);
+    }
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setDraftContent("");
+  const handleCancelPreparation = async () => {
+    if (!activeIntentId) return;
+    try {
+      await cancelIntentMutation.mutateAsync(activeIntentId);
+      toast.info("Đã gửi yêu cầu dừng chuẩn bị nội dung.");
+      void refetchSummary();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể dừng xử lý";
+      toast.error(msg);
+    }
   };
 
-  const handleSaveAll = () => {
-    setSections((prev) =>
-      prev.map((s) => ({
-        ...s,
-        content: s.editedContent ?? s.content,
-        isEdited: false,
-        editedContent: undefined,
+  // Structured Editor controls
+  const handleStartEdit = () => {
+    const baseContent = editContext?.content ||
+      draftData || {
+        title: source?.title || "Bản biên soạn",
+        sections: [
+          {
+            heading: "Nội dung chính",
+            paragraphs: [{ text: "", citations: [] }],
+          },
+        ],
+        unknowns: [],
+      };
+
+    const formatted: EditableDraft = {
+      title: baseContent.title,
+      sections: baseContent.sections.map((s, sIdx) => ({
+        id: `sec_${sIdx}_${Math.random().toString(36).substring(2, 7)}`,
+        heading: s.heading,
+        paragraphs: s.paragraphs.map((p, pIdx) => ({
+          id: `p_${sIdx}_${pIdx}_${Math.random().toString(36).substring(2, 7)}`,
+          text: p.text,
+          citations: p.citations || [],
+        })),
       })),
+      unknowns: baseContent.unknowns || [],
+    };
+
+    setEditableDraft(formatted);
+    setEditReason("");
+    setIsEditing(true);
+    setActiveTab("content");
+  };
+
+  const handleSaveEdits = async () => {
+    if (!compilationRunId || !editContext || !editableDraft) return;
+
+    if (!editableDraft.title.trim()) {
+      toast.error("Tiêu đề tài liệu không được để trống.");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      const draftContent: DraftContent = {
+        title: editableDraft.title,
+        sections: editableDraft.sections.map((s) => ({
+          heading: s.heading,
+          paragraphs: s.paragraphs.map((p) => ({
+            text: p.text,
+            citations: p.citations,
+          })),
+        })),
+        unknowns: editableDraft.unknowns,
+      };
+
+      // Step 1: Create preview
+      const preview = await createEditPreviewMutation.mutateAsync({
+        runId: compilationRunId,
+        data: {
+          expected_bundle_sha256: editContext.bundle_sha256,
+          reason:
+            editReason.trim() || "Chỉnh sửa văn bản và hiệu đính số liệu.",
+          content: draftContent,
+        },
+      });
+
+      // Step 2: Commit edit with idempotency key
+      const idempotencyKey = `edit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const commitRes = await commitEditsMutation.mutateAsync({
+        runId: compilationRunId,
+        data: {
+          preview_id: preview.preview_id,
+          preview_sha256: preview.preview_sha256,
+        },
+        idempotencyKey,
+      });
+
+      // Step 3: Switch to newly created child run
+      setActiveRunIdOverride(commitRes.run.id);
+      setIsEditing(false);
+      setEditableDraft(null);
+      toast.success("Đã lưu bản hiệu đính mới thành công!");
+
+      void refetchDraft();
+      void refetchEditContext();
+      void refetchSummary();
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Không thể lưu chỉnh sửa";
+      toast.error(msg);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  if (isSourceLoading) {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="size-6 animate-spin text-primary" />
+        <span>Đang tải thông tin chi tiết tài liệu...</span>
+      </div>
     );
-    toast.success("Đã lưu tất cả các chỉnh sửa vào kho tri thức!");
-  };
+  }
 
-  const handlePublish = () => {
-    toast.success("🎉 Đã duyệt và phát hành văn bản thành công vào Trợ lý AI!");
-    navigate({ to: "/knowledge" });
-  };
-
-  // Generate markdown representation
-  const markdownContent = `# DỮ LIỆU TRI THỨC VỀ TRƯỜNG ĐẠI HỌC QUY NHƠN
-*Phiên bản dữ liệu: 15/10/2026. Nguồn ưu tiên: Cổng thông tin chính thức qnu.edu.vn.*
-
-Phạm vi dữ liệu: nhận diện, lịch sử, triết lý giáo dục, sứ mạng, tầm nhìn, lãnh đạo, cơ cấu tổ chức, đào tạo, tuyển sinh năm 2026.
-
-## 1. Thông tin nhận diện Trường Đại học Quy Nhơn
-Trường Đại học Quy Nhơn có tên tiếng Anh là Quy Nhon University, viết tắt là QNU. Trường Đại học Quy Nhơn là cơ sở giáo dục đại học công lập, trực thuộc Bộ Giáo dục và Đào tạo. Trụ sở chính: số 170 đường An Dương Vương, phường Quy Nhơn Nam, tỉnh Gia Lai.
-
-Mã cơ sở đào tạo sử dụng trong tuyển sinh đại học năm 2026 là DQN. Website: https://tuyensinh.qnu.edu.vn.
-
-## 2. Lịch sử hình thành và các mốc pháp lý
-- **21/12/1977**: Thành lập Cơ sở Đại học Sư phạm Quy Nhơn theo QĐ 1842/QĐ của Bộ Giáo dục.
-- **13/7/1981**: Thành lập Trường Đại học Sư phạm Quy Nhơn theo QĐ 02/HĐBT của Hội đồng Bộ trưởng.
-- **30/10/2003**: Đổi tên thành Trường Đại học Quy Nhơn theo QĐ 221/2003/QĐ-TTg của Thủ tướng Chính phủ.
-
-## 3. Định mức thu học phí theo tín chỉ (Năm học 2026 - 2027)
-| STT | Khối ngành đào tạo | Định mức thu (VNĐ/tín chỉ) |
-|---|---|---|
-| 1 | Khối ngành Kỹ thuật & CNTT | 550.000 VNĐ |
-| 2 | Khối ngành Kinh tế & Quản trị kinh doanh | 480.000 VNĐ |
-| 3 | Khối ngành Sư phạm & Đào tạo giáo viên | Miễn 100% (Nghị định 116) |`;
+  if (isSourceError || !source) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <EmptyState
+          title="Không tìm thấy tài liệu"
+          description={
+            sourceError instanceof Error
+              ? sourceError.message
+              : "Tài liệu không tồn tại hoặc bạn không có quyền truy cập."
+          }
+          action={{
+            label: "Quay lại Kho tri thức",
+            onClick: () => {
+              window.location.href = `/knowledge?collectionId=${resolvedCollectionId}`;
+            },
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] flex-col bg-background select-none overflow-x-hidden">
-      {/* ========================================================================= */}
-      {/* 1. MASTER HEADER: Clean, Focused, Pure 50:50 Document Studio              */}
-      {/* ========================================================================= */}
-      <header className="flex h-14 items-center justify-between border-b border-border/60 bg-card px-4 gap-4 shrink-0">
-        {/* Left: Back & Document Metadata */}
-        <div className="flex items-center gap-3 min-w-0">
+    <div className="flex h-full flex-col bg-background overflow-hidden min-h-0">
+      {/* 1. Header Toolbar */}
+      <header className="flex min-h-14 items-center justify-between border-b border-border/60 bg-card px-3 py-2 sm:py-0 gap-2 shrink-0">
+        {/* Left: Back button + Truncated Title with Tooltip + Status Badge */}
+        <div className="flex flex-1 items-center gap-2 min-w-0">
           <Button
             asChild
             variant="ghost"
             size="sm"
             className="size-8 p-0 text-muted-foreground hover:text-foreground shrink-0"
           >
-            <Link to="/knowledge" aria-label="Quay lại kho tri thức">
+            <Link
+              to="/knowledge"
+              search={{ collectionId: resolvedCollectionId }}
+              aria-label="Quay lại kho tri thức"
+            >
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
 
-          <div className="flex items-center gap-2.5 min-w-0">
-            <DocumentTypeIcon
-              fileName="Du_lieu_RAG_Truong_Dai_hoc_Quy_Nhon_2026.docx"
-              className="size-5 shrink-0"
-            />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="truncate text-xs font-semibold text-foreground max-w-[200px] sm:max-w-xs md:max-w-sm block">
-                  Dữ liệu tri thức về Trường Đại học Quy Nhơn 2026
-                </span>
-                <Badge
-                  variant="secondary"
-                  className="text-[10px] h-4 px-1.5 font-mono shrink-0"
-                >
-                  v1
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] h-4 px-1.5 hidden md:inline-flex shrink-0"
-                >
-                  Đã bóc tách
-                </Badge>
-              </div>
-              <p className="text-[10px] text-muted-foreground truncate font-mono">
-                Du_lieu_RAG_Truong_Dai_hoc_Quy_Nhon_2026.docx · 3 trang
-              </p>
-            </div>
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-0.5 min-w-0">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <h1 className="text-sm font-semibold text-foreground tracking-tight truncate max-w-[200px] sm:max-w-[320px] md:max-w-[450px] cursor-default">
+                    {displayDocumentTitle(source.title)}
+                  </h1>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start">
+                  <p className="max-w-md break-words">
+                    {displayDocumentTitle(source.title)}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <Badge
+              variant={actionState.displayStatus.variant}
+              className="text-[10px] h-4 px-1.5 font-medium shrink-0"
+              title={actionState.displayStatus.hint}
+            >
+              {actionState.displayStatus.label}
+            </Badge>
+
+            {actionState.displayStatus.servingNote && (
+              <span className="text-[10px] text-muted-foreground hidden xl:inline truncate">
+                ({actionState.displayStatus.servingNote})
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Center: Mode Indicator Badge */}
-        <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-medium shrink-0">
-          <Columns2 className="size-3.5" />
-          <span>Không gian Soát văn bản (Đối chiếu song song 50:50)</span>
-        </div>
+        {/* Right: Dynamic Primary Action + Outline Edit + Menu ⋯ + Split Switcher */}
+        <div className="flex justify-end items-center gap-2 shrink-0">
+          {/* STATE: Editing Mode */}
+          {actionState.primaryAction === "save_edits" && (
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditableDraft(null);
+                }}
+                disabled={isSavingEdit}
+                className="h-8 text-xs"
+              >
+                Hủy
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveEdits}
+                disabled={isSavingEdit}
+                className="h-8 gap-1.5 text-xs shadow-2xs"
+              >
+                {isSavingEdit ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Save className="size-3.5" />
+                )}
+                <span>Lưu thay đổi</span>
+              </Button>
+            </div>
+          )}
 
-        {/* Right: Actions & Single ⋯ Menu */}
-        <div className="flex items-center gap-2 shrink-0">
-          {hasUnsaved && (
+          {/* STATE: Preparing Active -> Cancel */}
+          {actionState.primaryAction === "cancel_prep" && (
             <Button
               variant="outline"
               size="sm"
-              onClick={handleSaveAll}
-              className="h-8 gap-1.5 text-xs font-medium border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 transition-all shadow-2xs"
+              onClick={handleCancelPreparation}
+              disabled={
+                cancelIntentMutation.isPending ||
+                summary?.actions?.can_stop !== true
+              }
+              className="h-8 text-xs text-destructive hover:bg-destructive/10 gap-1.5"
             >
-              <Save className="size-3.5" />
-              <span>Lưu thay đổi</span>
+              <StopCircle className="size-3.5" />
+              <span>Dừng xử lý</span>
             </Button>
           )}
 
-          <Button
-            size="sm"
-            onClick={handlePublish}
-            className="h-8 gap-1.5 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs cursor-pointer"
-          >
-            <CheckCircle2 className="size-3.5" />
-            <span>Duyệt & Phát hành</span>
-          </Button>
+          {/* STATE: No draft -> Prepare */}
+          {actionState.primaryAction === "prepare" && (
+            <Button
+              size="sm"
+              onClick={handleStartPreparation}
+              disabled={
+                createIntentMutation.isPending ||
+                summary?.capabilities?.can_prepare !== true
+              }
+              className="h-8 gap-1.5 text-xs shadow-2xs"
+            >
+              {createIntentMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="size-3.5" />
+              )}
+              <span>Chuẩn bị nội dung</span>
+            </Button>
+          )}
 
-          {/* Single ⋯ Menu for all secondary & file actions */}
+          {/* STATE: Draft ready for Approval */}
+          {actionState.primaryAction === "approve" && (
+            <>
+              {actionState.canEdit && summary?.capabilities?.can_prepare && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleStartEdit}
+                  className="h-8 gap-1.5 text-xs hidden sm:inline-flex"
+                >
+                  <Pencil className="size-3.5" />
+                  <span>Chỉnh sửa</span>
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={() => setPublicationOpen(true)}
+                disabled={
+                  summary?.capabilities?.can_approve !== true &&
+                  summary?.capabilities?.can_register !== true
+                }
+                className="h-8 gap-1.5 text-xs shadow-2xs"
+              >
+                <ShieldCheck className="size-3.5" />
+                <span>Duyệt</span>
+              </Button>
+            </>
+          )}
+
+          {/* STATE: Approved ready for Publication */}
+          {actionState.primaryAction === "publish" && (
+            <>
+              {actionState.canEdit && summary?.capabilities?.can_prepare && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleStartEdit}
+                  className="h-8 gap-1.5 text-xs hidden sm:inline-flex"
+                >
+                  <Pencil className="size-3.5" />
+                  <span>Chỉnh sửa</span>
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={() => setPublicationOpen(true)}
+                disabled={summary?.capabilities?.can_publish !== true}
+                className="h-8 gap-1.5 text-xs shadow-2xs"
+              >
+                <ShieldCheck className="size-3.5" />
+                <span>Phát hành</span>
+              </Button>
+            </>
+          )}
+
+          {(actionState.primaryAction === "syncing" ||
+            actionState.primaryAction === "served") &&
+            actionState.canEdit &&
+            summary?.capabilities?.can_prepare && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleStartEdit}
+                className="h-8 gap-1.5 text-xs hidden sm:inline-flex"
+              >
+                <Pencil className="size-3.5" />
+                Chỉnh sửa
+              </Button>
+            )}
+
+          {/* More Actions Menu ⋯ */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="size-8 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                className="size-8 p-0 text-muted-foreground hover:text-foreground"
+                aria-label="Thao tác phụ"
               >
-                <MoreHorizontal className="size-4" />
+                <MoreVertical className="size-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 text-xs">
+            <DropdownMenuContent align="end" className="w-52">
+              {actionState.canEdit && summary?.capabilities?.can_prepare && (
+                <DropdownMenuItem
+                  onClick={handleStartEdit}
+                  className="sm:hidden cursor-pointer"
+                >
+                  <Pencil className="size-4 text-muted-foreground" />
+                  <span>Chỉnh sửa nội dung</span>
+                </DropdownMenuItem>
+              )}
+
+              {blobUrl && (
+                <DropdownMenuItem asChild>
+                  <a
+                    href={blobUrl}
+                    download={source.file_name}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Download className="size-4 text-muted-foreground" />
+                    <span>Tải tệp gốc về máy</span>
+                  </a>
+                </DropdownMenuItem>
+              )}
+
               <DropdownMenuItem
-                onClick={() =>
-                  toast.success("Đang tải tệp Word gốc (.docx)...")
-                }
-                className="gap-2 cursor-pointer"
+                onClick={() => setActiveTab("markdown")}
+                className="cursor-pointer"
               >
-                <Download className="size-3.5" />
-                <span>Tải tệp Word gốc (.docx)</span>
+                <FileCode className="size-4 text-muted-foreground" />
+                <span>Xem bản Markdown</span>
               </DropdownMenuItem>
+
               <DropdownMenuItem
-                onClick={() =>
-                  toast.success("Đang tải bản scan PDF có dấu đỏ...")
-                }
-                className="gap-2 cursor-pointer"
+                onClick={() => setActiveTab("details")}
+                className="cursor-pointer"
               >
-                <FileDown className="size-3.5" />
-                <span>Tải bản scan PDF (.pdf)</span>
+                <History className="size-4 text-muted-foreground" />
+                <span>Lịch sử & Vòng đời</span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  toast.success("Đang tải bản Markdown chuẩn hóa (.md)...")
-                }
-                className="gap-2 cursor-pointer"
-              >
-                <FileCode className="size-3.5" />
-                <span>Tải bản Markdown (.md)</span>
-              </DropdownMenuItem>
+
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  toast.info("Đang kích hoạt quy trình quét lại OCR...");
-                }}
-                className="gap-2 cursor-pointer"
-              >
-                <RefreshCw className="size-3.5" />
-                <span>Bóc tách lại OCR</span>
+
+              <DropdownMenuItem asChild>
+                <Link
+                  to="/knowledge/$sourceId/review"
+                  params={{ sourceId }}
+                  search={{ collectionId: resolvedCollectionId }}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Sparkles className="size-4 text-amber-500" />
+                  <span>Rà soát chính tả</span>
+                </Link>
               </DropdownMenuItem>
+
               <DropdownMenuItem
-                onClick={() =>
-                  toast.info("Đang mở hộp thoại tải phiên bản mới...")
-                }
-                className="gap-2 cursor-pointer"
+                onClick={() => setJsonDialogOpen(true)}
+                className="cursor-pointer"
               >
-                <Upload className="size-3.5" />
-                <span>Tải phiên bản mới</span>
+                <FileJson className="size-4 text-muted-foreground" />
+                <span>Xem cấu trúc JSON</span>
               </DropdownMenuItem>
+
               <DropdownMenuItem
-                onClick={() =>
-                  toast.info("Đang mở chức năng đổi tên tài liệu...")
-                }
-                className="gap-2 cursor-pointer"
+                onClick={handleDownloadJson}
+                className="cursor-pointer"
               >
-                <Pencil className="size-3.5" />
-                <span>Đổi tên tài liệu</span>
+                <Download className="size-4 text-muted-foreground" />
+                <span>Tải tệp JSON</span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => toast.error("Đã hủy bỏ hành động xóa.")}
-                className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-              >
-                <Trash2 className="size-3.5" />
-                <span>Xóa vĩnh viễn tài liệu</span>
-              </DropdownMenuItem>
+
+              {summary?.serving?.served_revision_no && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleStartPreparation}
+                    disabled={
+                      createIntentMutation.isPending ||
+                      summary?.capabilities?.can_prepare !== true
+                    }
+                    className="cursor-pointer"
+                  >
+                    <RefreshCw className="size-4 text-muted-foreground" />
+                    <span>Chuẩn bị lại bản mới</span>
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* View Mode Switcher (Desktop only >= lg) */}
+          <div className="hidden lg:flex items-center border border-border/70 rounded-md p-0.5 ml-1 bg-muted/30">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSplitMode("preview-only")}
+              className={cn(
+                "size-7 p-0",
+                splitMode === "preview-only" &&
+                  "bg-background shadow-2xs font-bold",
+              )}
+              title="Chỉ xem tệp gốc"
+              aria-label="Chỉ xem tệp gốc"
+            >
+              <Eye className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSplitMode("split")}
+              className={cn(
+                "size-7 p-0",
+                splitMode === "split" && "bg-background shadow-2xs font-bold",
+              )}
+              title="Xem song song đối chiếu"
+              aria-label="Xem song song đối chiếu"
+            >
+              <Columns2 className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSplitMode("editor-only")}
+              className={cn(
+                "size-7 p-0",
+                splitMode === "editor-only" &&
+                  "bg-background shadow-2xs font-bold",
+              )}
+              title="Chỉ xem nội dung biên soạn"
+              aria-label="Chỉ xem nội dung biên soạn"
+            >
+              <FileText className="size-3.5" />
+            </Button>
+          </div>
         </div>
       </header>
 
-      {/* ========================================================================= */}
-      {/* 2. DUAL-PANE VIEWPORT: PIXEL-PERFECT 50:50 ALIGNMENT                      */}
-      {/* ========================================================================= */}
-      <div className="flex flex-1 overflow-hidden min-w-0">
-        {/* ======================================================================= */}
-        {/* LEFT PANE: BẢN GỐC NGUYÊN BẢN (PDF Dấu đỏ HOẶC Word .docx)              */}
-        {/* ======================================================================= */}
-        <div className="w-1/2 flex-1 flex flex-col border-r border-border/60 bg-muted/15 min-w-0">
-          {/* Left Toolbar: Exactly h-10 to match Right Toolbar */}
-          <div className="h-10 border-b border-border/60 bg-card px-3 flex items-center justify-between shrink-0 text-xs">
-            {/* Format toggle: Word or PDF */}
-            <div className="flex items-center gap-1 border border-border/70 rounded-md p-0.5 bg-muted/40 text-xs">
-              <button
-                type="button"
-                onClick={() => setDocFormat("docx")}
-                className={cn(
-                  "px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer",
-                  docFormat === "docx"
-                    ? "bg-background text-foreground shadow-2xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <span>📝 Bản thảo Word .docx</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDocFormat("pdf")}
-                className={cn(
-                  "px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer",
-                  docFormat === "pdf"
-                    ? "bg-background text-foreground shadow-2xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <span>📄 Bản scan PDF dấu đỏ</span>
-              </button>
-            </div>
+      {/* Mobile Tab Switcher (< lg) */}
+      <div className="flex lg:hidden items-center justify-center p-2 bg-muted/30 border-b border-border/60 shrink-0">
+        <div className="grid grid-cols-2 w-full max-w-xs p-0.5 bg-muted rounded-lg text-xs font-medium">
+          <button
+            type="button"
+            onClick={() => setMobileTab("original")}
+            className={cn(
+              "py-1 rounded-md transition-all text-center cursor-pointer",
+              mobileTab === "original"
+                ? "bg-card text-foreground shadow-2xs font-semibold"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Tệp gốc ({isDocx ? "Word" : isPdf ? "PDF" : "Tệp"})
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("prepared")}
+            className={cn(
+              "py-1 rounded-md transition-all text-center cursor-pointer",
+              mobileTab === "prepared"
+                ? "bg-card text-foreground shadow-2xs font-semibold"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Nội dung đã chuẩn bị
+          </button>
+        </div>
+      </div>
 
-            {/* Zoom & Page Controls */}
-            <div className="flex items-center gap-1.5">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-6 p-0"
-                onClick={() => setZoomLevel((z) => Math.max(60, z - 10))}
-                title="Thu nhỏ"
-              >
-                <ZoomOut className="size-3.5" />
-              </Button>
-              <span className="text-[11px] font-mono text-muted-foreground w-9 text-center">
-                {zoomLevel}%
+      {/* 2. Main Split Workspace Canvas */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* Left Pane: Tệp gốc (Original Document Preview) */}
+        <div
+          className={cn(
+            "flex flex-col border-r border-border/70 bg-muted/20 overflow-hidden min-h-0 min-w-0",
+            // Desktop visibility based on splitMode
+            splitMode === "editor-only" && "lg:hidden",
+            splitMode === "preview-only" && "lg:w-full",
+            splitMode === "split" && "lg:w-1/2",
+            // Mobile visibility (< lg) based on mobileTab
+            mobileTab === "original" ? "w-full flex" : "hidden lg:flex",
+          )}
+        >
+          {/* Header bar of Left Column */}
+          {!(isDocx && docBlob && !blobLoading && !blobError) && (
+            <div className="h-8 border-b border-border/60 px-3 bg-muted/40 flex items-center justify-between text-xs text-muted-foreground shrink-0">
+              <span className="font-semibold text-foreground flex items-center gap-1.5">
+                <FileText className="size-3.5 text-primary" />
+                <span>Tệp gốc</span>
+                <Badge
+                  variant="outline"
+                  className="text-[10px] font-mono h-4 px-1 py-0 uppercase"
+                >
+                  {isDocx ? "DOCX" : isPdf ? "PDF" : "FILE"}
+                </Badge>
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-6 p-0"
-                onClick={() => setZoomLevel((z) => Math.min(140, z + 10))}
-                title="Phóng to"
-              >
-                <ZoomIn className="size-3.5" />
-              </Button>
 
-              <div className="h-3.5 w-px bg-border/60 mx-1" />
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-6 p-0"
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                title="Trang trước"
-              >
-                <ChevronLeft className="size-3.5" />
-              </Button>
-              <span className="text-[11px] text-muted-foreground font-mono">
-                {currentPage} / 3
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-6 p-0"
-                disabled={currentPage >= 3}
-                onClick={() => setCurrentPage((p) => Math.min(3, p + 1))}
-                title="Trang tiếp"
-              >
-                <ChevronRight className="size-3.5" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Left Content Viewport: Padding exactly p-6 to match Right Pane */}
-          <div className="flex-1 overflow-y-auto p-6 flex justify-center">
-            <div
-              style={{
-                transform: `scale(${zoomLevel / 100})`,
-                transformOrigin: "top center",
-              }}
-              className="w-full max-w-2xl transition-transform duration-150"
-            >
-              {docFormat === "docx" ? (
-                /* WORD DOCX VIEW: Matches the right pane line-for-line */
-                <div className="bg-card border border-border/70 rounded-xl p-8 shadow-xs space-y-4 text-xs leading-relaxed text-foreground select-text">
-                  {/* Top Document Header */}
-                  <div className="text-center pb-4 border-b border-border/40 space-y-1">
-                    <h1 className="text-sm font-bold tracking-tight uppercase text-foreground">
-                      DỮ LIỆU TRI THỨC VỀ TRƯỜNG ĐẠI HỌC QUY NHƠN
-                    </h1>
-                    <p className="text-[11px] text-muted-foreground italic">
-                      Phiên bản dữ liệu: 15/10/2026. Nguồn ưu tiên: Cổng thông
-                      tin chính thức qnu.edu.vn.
-                    </p>
-                  </div>
-
-                  {/* Body Paragraphs matching Right Pane */}
-                  <p className="text-justify indent-4 leading-normal text-muted-foreground">
-                    Phạm vi dữ liệu: nhận diện, lịch sử, triết lý giáo dục, sứ
-                    mạng, tầm nhìn, lãnh đạo, cơ cấu tổ chức, đào tạo, tuyển
-                    sinh năm 2026, nghiên cứu khoa học, kiểm định, hoạt động
-                    sinh viên và thông tin liên hệ. Các số liệu theo năm học
-                    hoặc thời điểm công bố được nêu cụ thể; không suy diễn khi
-                    nguồn không có số liệu cố định.
-                  </p>
-
-                  <h2 className="font-bold text-xs text-foreground uppercase tracking-tight pt-2">
-                    1. Thông tin nhận diện Trường Đại học Quy Nhơn
-                  </h2>
-                  <p className="text-justify indent-4 leading-normal">
-                    Trường Đại học Quy Nhơn có tên tiếng Anh là Quy Nhon
-                    University, viết tắt là QNU. Trường Đại học Quy Nhơn là cơ
-                    sở giáo dục đại học công lập, trực thuộc Bộ Giáo dục và Đào
-                    tạo. Trụ sở chính của Trường Đại học Quy Nhơn theo công khai
-                    năm học 2026–2027 đặt tại số 170 đường An Dương Vương,
-                    phường Quy Nhơn Nam, tỉnh Gia Lai. Cổng thông tin chính thức
-                    của trường là https://www.qnu.edu.vn. [S1]
-                  </p>
-                  <p className="text-justify indent-4 leading-normal">
-                    Mã cơ sở đào tạo của Trường Đại học Quy Nhơn sử dụng trong
-                    tuyển sinh đại học năm 2026 là DQN. Website thông tin tuyển
-                    sinh của Trường Đại học Quy Nhơn là
-                    https://tuyensinh.qnu.edu.vn. Mã DQN là thông tin tuyển
-                    sinh, khác với tên viết tắt QNU dùng để nhận diện trường
-                    trong tiếng Anh và truyền thông. [S0]
-                  </p>
-
-                  <h2 className="font-bold text-xs text-foreground uppercase tracking-tight pt-2">
-                    2. Lịch sử hình thành và các mốc pháp lý
-                  </h2>
-                  <p className="text-justify indent-4 leading-normal">
-                    Ngày 21/12/1977, Bộ trưởng Bộ Giáo dục ban hành Quyết định
-                    số 1842/QĐ thành lập Cơ sở Đại học Sư phạm Quy Nhơn. Đây là
-                    mốc khởi đầu trong lịch sử hình thành Trường Đại học Quy
-                    Nhơn và là cơ sở để trường tính số năm truyền thống. Vì vậy,
-                    khi được hỏi Trường Đại học Quy Nhơn thành lập năm nào, mốc
-                    trả lời phù hợp theo lịch sử nhà trường là năm 1977, cụ thể
-                    ngày 21 tháng 12 năm 1977. [S1] [S2]
-                  </p>
-                  <p className="text-justify indent-4 leading-normal">
-                    Ngày 13/7/1981, Hội đồng Bộ trưởng ban hành Quyết định số
-                    02/HĐBT thành lập Trường Đại học Sư phạm Quy Nhơn. Mốc 13
-                    tháng 7 năm 1981 đánh dấu việc thành lập trường đại học toàn
-                    diện trên nền tảng cơ sở đã mở từ năm 1977. Hai mốc năm 1977
-                    và năm 1981 phản ánh hai sự kiện pháp lý khác nhau, không
-                    nên dùng thay thế cho nhau. [S2]
-                  </p>
-                  <p className="text-justify indent-4 leading-normal">
-                    Ngày 30/10/2003, Thủ tướng Chính phủ ban hành Quyết định số
-                    221/2003/QĐ-TTg đổi tên Trường Đại học Sư phạm Quy Nhơn
-                    thành Trường Đại học Quy Nhơn. Tên gọi Trường Đại học Quy
-                    Nhơn gắn với định hướng phát triển đa ngành, đa lĩnh vực
-                    thay cho mô hình đào tạo chủ yếu về sư phạm trước đó. [S1]
-                    [S2]
-                  </p>
-
-                  <h2 className="font-bold text-xs text-foreground uppercase tracking-tight pt-2">
-                    3. Định mức thu học phí theo tín chỉ (Năm học 2026 - 2027)
-                  </h2>
-                  <p className="text-muted-foreground leading-normal">
-                    Căn cứ Nghị định số 81/2021/NĐ-CP và Nghị định số
-                    97/2023/NĐ-CP của Chính phủ, định mức thu học phí đối với
-                    các ngành đào tạo chuẩn áp dụng theo Bảng 1:
-                  </p>
-                  <div className="rounded-md border border-border/80 overflow-hidden">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-muted/60 font-semibold text-muted-foreground border-b border-border/80">
-                        <tr>
-                          <th className="p-2 w-10 text-center">STT</th>
-                          <th className="p-2">Khối ngành đào tạo</th>
-                          <th className="p-2 text-right">
-                            Định mức thu (VNĐ/tín chỉ)
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/60">
-                        <tr>
-                          <td className="p-2 text-center font-mono">1</td>
-                          <td className="p-2 font-medium">
-                            Khối ngành Kỹ thuật & CNTT
-                          </td>
-                          <td className="p-2 text-right font-bold font-mono text-primary">
-                            550.000 VNĐ
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="p-2 text-center font-mono">2</td>
-                          <td className="p-2 font-medium">
-                            Khối ngành Kinh tế & Quản trị kinh doanh
-                          </td>
-                          <td className="p-2 text-right font-mono">
-                            480.000 VNĐ
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="p-2 text-center font-mono">3</td>
-                          <td className="p-2 font-medium">
-                            Khối ngành Sư phạm & Đào tạo giáo viên
-                          </td>
-                          <td className="p-2 text-right font-medium italic text-emerald-600">
-                            Miễn 100% (NĐ 116)
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : (
-                /* PDF SCAN VIEW: Authentic scanned decision with red seal stamp */
-                <div className="bg-white text-zinc-900 border border-zinc-300 rounded-sm shadow-md p-8 md:p-10 space-y-5 font-serif text-[11px] leading-relaxed relative select-text">
-                  <div className="flex justify-between items-start border-b border-zinc-200 pb-3">
-                    <div>
-                      <p className="font-bold uppercase text-[9.5px]">
-                        BỘ GIÁO DỤC VÀ ĐÀO TẠO
-                      </p>
-                      <p className="font-bold uppercase text-[10.5px] text-teal-900">
-                        TRƯỜNG ĐẠI HỌC QUY NHƠN
-                      </p>
-                      <p className="italic text-[9px] text-zinc-600">
-                        Số: 128/QĐ-ĐHQN
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold uppercase text-[9.5px]">
-                        CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
-                      </p>
-                      <p className="font-bold text-[9.5px]">
-                        Độc lập - Tự do - Hạnh phúc
-                      </p>
-                      <p className="italic text-[9px] text-zinc-600">
-                        Quy Nhơn, ngày 15 tháng 10 năm 2026
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-center py-2 space-y-1">
-                    <h2 className="font-bold text-xs uppercase tracking-tight font-serif text-zinc-950">
-                      QUYẾT ĐỊNH
-                    </h2>
-                    <p className="font-bold text-[10.5px] uppercase tracking-tight text-teal-950">
-                      Về việc công bố Quy định Đào tạo và Định mức học phí năm
-                      học 2026 - 2027
-                    </p>
-                  </div>
-
-                  <p className="text-justify indent-4 leading-normal">
-                    Trường Đại học Quy Nhơn (tên tiếng Anh: Quy Nhon University
-                    - QNU) là cơ sở giáo dục đại học công lập, trực thuộc Bộ
-                    Giáo dục và Đào tạo. Cơ sở thành lập theo Quyết định số
-                    1842/QĐ ngày 21/12/1977 của Bộ trưởng Bộ Giáo dục và Quyết
-                    định số 02/HĐBT ngày 13/7/1981 của Hội đồng Bộ trưởng thành
-                    lập Trường Đại học Sư phạm Quy Nhơn.
-                  </p>
-
-                  <div className="pt-2">
-                    <table className="w-full border-collapse border border-zinc-400 text-[10px] text-zinc-900 font-sans">
-                      <thead>
-                        <tr className="bg-zinc-200 font-bold">
-                          <th className="border border-zinc-400 p-1 text-center w-10">
-                            STT
-                          </th>
-                          <th className="border border-zinc-400 p-1">
-                            Khối ngành đào tạo
-                          </th>
-                          <th className="border border-zinc-400 p-1 text-right">
-                            Định mức thu (VNĐ/tín chỉ)
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="border border-zinc-400 p-1 text-center font-mono">
-                            1
-                          </td>
-                          <td className="border border-zinc-400 p-1 font-medium">
-                            Khối ngành Kỹ thuật & CNTT
-                          </td>
-                          <td className="border border-zinc-400 p-1 text-right font-mono font-bold text-teal-800">
-                            550.000 VNĐ
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-zinc-400 p-1 text-center font-mono">
-                            2
-                          </td>
-                          <td className="border border-zinc-400 p-1 font-medium">
-                            Khối ngành Kinh tế & Quản trị
-                          </td>
-                          <td className="border border-zinc-400 p-1 text-right font-mono">
-                            480.000 VNĐ
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border border-zinc-400 p-1 text-center font-mono">
-                            3
-                          </td>
-                          <td className="border border-zinc-400 p-1 font-medium">
-                            Khối ngành Sư phạm
-                          </td>
-                          <td className="border border-zinc-400 p-1 text-right text-emerald-800 italic">
-                            Miễn 100% (NĐ 116)
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Authentic Red Stamp & Signature */}
-                  <div className="pt-6 flex items-end justify-between">
-                    <div className="text-[9px] text-zinc-500 italic">
-                      <p>Nơi nhận:</p>
-                      <p>- Ban Giám hiệu;</p>
-                      <p>- Các đơn vị trực thuộc;</p>
-                      <p>- Lưu VT, ĐT.</p>
-                    </div>
-                    <div className="relative text-center pr-6">
-                      <p className="font-bold text-[9.5px] uppercase">
-                        TM. HỘI ĐỒNG TRƯỜNG / HIỆU TRƯỞNG
-                      </p>
-                      <div className="h-16 relative flex items-center justify-center">
-                        <div className="size-16 rounded-full border-2 border-red-600/90 flex flex-col items-center justify-center p-0.5 text-red-600 font-serif text-[6.5px] uppercase font-bold text-center leading-none shadow-xs rotate-[-8deg] opacity-90 select-none">
-                          <div className="size-14 rounded-full border border-dashed border-red-600/80 flex flex-col items-center justify-center p-1">
-                            <span>TRƯỜNG ĐH</span>
-                            <span className="text-[8px] font-black tracking-wider text-red-700">
-                              QUY NHƠN
-                            </span>
-                            <span className="text-[5.5px]">★ BỘ GD&ĐT ★</span>
-                          </div>
-                        </div>
-                        <span className="absolute font-serif italic text-blue-700 font-bold text-sm rotate-[-12deg] left-3">
-                          Nguyễn Quang
-                        </span>
-                      </div>
-                      <p className="font-bold text-[10px] text-zinc-800 pt-1">
-                        PGS.TS. Nguyễn Quang Ngoạn
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              {blobUrl && (
+                <a
+                  href={blobUrl}
+                  download={source.file_name}
+                  className="hover:text-primary transition-colors flex items-center gap-1 text-[11px]"
+                  title="Tải tệp gốc về máy"
+                >
+                  <Download className="size-3" />
+                  <span>Tải về</span>
+                </a>
               )}
             </div>
+          )}
+
+          {/* Left Column Content Viewport */}
+          <div className="flex-1 min-h-0 min-w-0 overflow-hidden flex justify-center items-start">
+            {blobLoading ? (
+              <div className="py-24 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="size-5 animate-spin text-primary" />
+                <span>Đang tải dữ liệu tệp gốc...</span>
+              </div>
+            ) : blobError ? (
+              <div className="p-6 rounded-xl border border-destructive/30 bg-destructive/5 text-destructive text-xs max-w-md my-8 text-center space-y-2">
+                <p className="font-semibold">Không thể tải nội dung tệp gốc:</p>
+                <p className="text-muted-foreground">{blobError}</p>
+              </div>
+            ) : isPdf && blobUrl ? (
+              <iframe
+                src={blobUrl}
+                title="Xem trước tài liệu PDF"
+                className="w-full h-full border-0 bg-white"
+              />
+            ) : isDocx && docBlob ? (
+              <DocxViewer
+                blob={docBlob}
+                fileName={source.file_name}
+                blobUrl={blobUrl}
+              />
+            ) : (
+              <div className="text-center py-20 text-xs text-muted-foreground max-w-md space-y-3">
+                <FileText className="size-10 text-muted-foreground/40 mx-auto" />
+                <p>
+                  Định dạng dữ liệu này không hỗ trợ xem trực tiếp trong trình
+                  duyệt.
+                </p>
+                {blobUrl && (
+                  <div>
+                    <a
+                      href={blobUrl}
+                      download={source.file_name}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-card border border-border/70 text-primary font-medium hover:bg-muted transition-colors text-xs shadow-2xs"
+                    >
+                      <Download className="size-3.5" />
+                      <span>Tải tệp về máy để xem</span>
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ======================================================================= */}
-        {/* RIGHT PANE: BẢN BÓC TÁCH OCR & BIÊN SOẠN (PIXEL-PERFECT ALIGNED)        */}
-        {/* ======================================================================= */}
-        <div className="w-1/2 flex-1 flex flex-col bg-background min-w-0">
-          {/* Right Toolbar: Exactly h-10 to match Left Toolbar */}
-          <div className="h-10 border-b border-border/60 bg-card px-4 flex items-center justify-between shrink-0 text-xs">
-            {/* View format tabs */}
+        {/* Right Pane: Mặt giấy hiệu đính liền mạch (Document Sheet Canvas) */}
+        <div
+          className={cn(
+            "flex flex-col bg-background overflow-hidden min-h-0 min-w-0",
+            // Desktop visibility based on splitMode
+            splitMode === "preview-only" && "lg:hidden",
+            splitMode === "editor-only" && "lg:w-full",
+            splitMode === "split" && "lg:w-1/2",
+            // Mobile visibility (< lg) based on mobileTab
+            mobileTab === "prepared" ? "w-full flex" : "hidden lg:flex",
+          )}
+        >
+          {/* Tab header bar */}
+          <div className="h-8 border-b border-border/60 px-3 bg-muted/20 flex items-center justify-between text-xs shrink-0">
             <Tabs
               value={activeTab}
-              onValueChange={(v) =>
-                setActiveTab(v as "text" | "markdown" | "json")
-              }
+              onValueChange={(v) => setActiveTab(v as typeof activeTab)}
               className="w-auto"
             >
-              <TabsList className="h-7 bg-muted/50 p-0.5">
-                <TabsTrigger value="text" className="text-xs h-6 px-3">
-                  Văn bản bóc tách
+              <TabsList className="h-7 bg-transparent p-0 gap-1">
+                <TabsTrigger
+                  value="content"
+                  className="h-6 text-xs px-2.5 data-[state=active]:bg-card"
+                >
+                  Nội dung
                 </TabsTrigger>
-                <TabsTrigger value="markdown" className="text-xs h-6 px-3">
+                <TabsTrigger
+                  value="markdown"
+                  className="h-6 text-xs px-2.5 data-[state=active]:bg-card"
+                >
                   Markdown
                 </TabsTrigger>
-                <TabsTrigger value="json" className="text-xs h-6 px-3">
-                  JSON cấu trúc
+                <TabsTrigger
+                  value="details"
+                  className="h-6 text-xs px-2.5 data-[state=active]:bg-card"
+                >
+                  Lịch sử
                 </TabsTrigger>
               </TabsList>
             </Tabs>
 
-            <span className="text-[11px] text-muted-foreground font-mono">
-              {sections.length} mục · Đã index RAG
-            </span>
+            {currentDerivation && (
+              <span className="text-[11px] text-muted-foreground">
+                Lượt #{currentDerivation.compilation_generation}
+              </span>
+            )}
           </div>
 
-          {/* Right Content Viewport: Padding exactly p-6 to match Left Pane */}
-          <div className="flex-1 overflow-y-auto p-6 flex justify-center">
-            <div className="w-full max-w-2xl">
-              {activeTab === "text" ? (
-                /* Continuous Document Sheet: Exactly matches Left Container Padding & Headers */
-                <div className="bg-card border border-border/70 rounded-xl p-8 shadow-xs space-y-4 text-xs leading-relaxed text-foreground">
-                  {/* Top Document Header: Exactly matches Left Title & Subtitle */}
-                  <div className="text-center pb-4 border-b border-border/40 space-y-1">
-                    <h1 className="text-sm font-bold tracking-tight uppercase text-foreground">
-                      DỮ LIỆU TRI THỨC VỀ TRƯỜNG ĐẠI HỌC QUY NHƠN
-                    </h1>
-                    <p className="text-[11px] text-muted-foreground italic">
-                      Phiên bản dữ liệu: 15/10/2026. Nguồn ưu tiên: Cổng thông
-                      tin chính thức qnu.edu.vn.
+          {/* Right Column Content Viewport */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 flex justify-center">
+            <div className="w-full max-w-3xl space-y-6">
+              {/* Spelling Check Status Info Banner */}
+              <SpellingStatusStrip
+                workspaceId={activeWorkspaceId}
+                collectionId={resolvedCollectionId}
+                sourceId={sourceId}
+                revisionId={activeRevisionId}
+                ocrRunId={
+                  currentDerivation?.ocr_run_id ||
+                  summary?.active_run_id ||
+                  intentData?.ocr_run_id
+                }
+                textVersion={currentDerivation?.version?.version_no ?? 0}
+              />
+
+              {/* STATE 1: Preparation is actively running */}
+              {isPreparing && (
+                <div className="p-8 rounded-xl border border-primary/30 bg-primary/5 text-center space-y-3.5">
+                  <Loader2 className="size-8 text-primary animate-spin mx-auto" />
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-sm text-foreground">
+                      {intentData?.step ||
+                        "Hệ thống đang tự động chuẩn bị nội dung..."}
+                    </h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed max-w-md mx-auto">
+                      Đang đọc hiểu văn bản, trích xuất cấu trúc và gán căn cứ
+                      truy vết. Quá trình xử lý diễn ra an toàn trong nền.
                     </p>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCancelPreparation}
+                    className="h-7 text-xs text-destructive hover:bg-destructive/10 gap-1.5"
+                  >
+                    <StopCircle className="size-3" />
+                    <span>Dừng xử lý</span>
+                  </Button>
+                </div>
+              )}
 
-                  {/* Render Sections with Inline Editing */}
-                  <div className="space-y-3">
-                    {sections
-                      .filter((s) => s.type !== "meta")
-                      .map((sec) => {
-                        const isEditing = editingId === sec.id;
-                        const displayText = sec.editedContent ?? sec.content;
+              {/* STATE 2: No draft and not running -> CTA to start preparation */}
+              {!hasDraft && !isPreparing && (
+                <div className="p-8 rounded-xl border border-dashed border-border/80 bg-card/60 text-center space-y-4 my-8">
+                  <div className="size-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                    <Sparkles className="size-6" />
+                  </div>
+                  <div className="space-y-1.5 max-w-md mx-auto">
+                    <h3 className="font-semibold text-sm text-foreground">
+                      Tài liệu sẵn sàng để chuẩn bị nội dung
+                    </h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Khởi tạo chuẩn bị để đọc hiểu nội dung có cấu trúc, trích
+                      xuất bảng biểu và gán căn cứ đối chiếu từ tệp gốc.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleStartPreparation}
+                    disabled={
+                      createIntentMutation.isPending ||
+                      summary?.capabilities?.can_prepare !== true
+                    }
+                    className="h-8 gap-1.5 text-xs shadow-2xs"
+                  >
+                    {createIntentMutation.isPending ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="size-3.5" />
+                    )}
+                    <span>Chuẩn bị nội dung ngay</span>
+                  </Button>
+                </div>
+              )}
 
-                        if (isEditing) {
-                          return (
-                            <div
-                              key={sec.id}
-                              className="rounded-lg border border-primary/50 bg-primary/5 p-3 space-y-2 shadow-2xs"
+              {/* STATE 3: Loading draft data */}
+              {isDraftLoading && (
+                <div className="py-24 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="size-5 animate-spin text-primary" />
+                  <span>Đang tải dữ liệu nội dung đã chuẩn bị...</span>
+                </div>
+              )}
+
+              {/* STATE 4: Editing Mode */}
+              {hasDraft && isEditing && editableDraft && (
+                <div className="space-y-4 bg-card border border-border/70 rounded-xl p-6 shadow-2xs">
+                  <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                    <div>
+                      <h3 className="font-semibold text-sm text-foreground">
+                        Chỉnh sửa nội dung bản biên soạn
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        Hiệu đính câu chữ, bổ sung hoặc điều chỉnh đoạn văn
+                        trước khi duyệt.
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setIsEditing(false);
+                        setEditableDraft(null);
+                      }}
+                      className="size-7 p-0"
+                      aria-label="Đóng chỉnh sửa"
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+
+                  {/* Document Title Input */}
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="doc-title"
+                      className="text-xs font-semibold text-foreground"
+                    >
+                      Tiêu đề tài liệu
+                    </label>
+                    <input
+                      id="doc-title"
+                      type="text"
+                      value={editableDraft.title}
+                      onChange={(e) =>
+                        setEditableDraft({
+                          ...editableDraft,
+                          title: e.target.value,
+                        })
+                      }
+                      className="w-full h-9 px-3 rounded-md border border-border/70 text-xs bg-background focus:ring-1 focus:ring-primary focus:outline-hidden"
+                    />
+                  </div>
+
+                  {/* Sections list */}
+                  <div className="space-y-4 pt-2">
+                    {editableDraft.sections.map((section) => (
+                      <div
+                        key={section.id}
+                        className="p-4 rounded-lg border border-border/60 bg-muted/20 space-y-3"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <input
+                            type="text"
+                            value={section.heading}
+                            onChange={(e) => {
+                              setEditableDraft({
+                                ...editableDraft,
+                                sections: editableDraft.sections.map((s) =>
+                                  s.id === section.id
+                                    ? { ...s, heading: e.target.value }
+                                    : s,
+                                ),
+                              });
+                            }}
+                            placeholder="Tiêu đề mục..."
+                            className="font-semibold text-xs text-foreground bg-transparent border-b border-border/50 pb-1 focus:outline-hidden focus:border-primary flex-1"
+                          />
+                          {editableDraft.sections.length > 1 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditableDraft({
+                                  ...editableDraft,
+                                  sections: editableDraft.sections.filter(
+                                    (s) => s.id !== section.id,
+                                  ),
+                                });
+                              }}
+                              className="size-6 p-0 text-muted-foreground hover:text-destructive"
+                              title="Xóa mục này"
+                              aria-label="Xóa mục này"
                             >
-                              <Textarea
-                                value={draftContent}
-                                onChange={(e) =>
-                                  setDraftContent(e.target.value)
-                                }
-                                className="min-h-[80px] text-xs bg-background resize-y"
-                                autoFocus
-                              />
-                              <div className="flex items-center justify-end gap-1.5 pt-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={cancelEdit}
-                                  className="h-7 px-2 text-xs text-muted-foreground"
-                                >
-                                  <X className="size-3 mr-1" />
-                                  <span>Hủy</span>
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={() => saveEdit(sec.id)}
-                                  className="h-7 px-2.5 text-xs bg-primary text-primary-foreground"
-                                >
-                                  <Check className="size-3 mr-1" />
-                                  <span>Lưu đoạn</span>
-                                </Button>
+                              <Trash2 className="size-3" />
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Paragraphs in section */}
+                        <div className="space-y-2">
+                          {section.paragraphs.map((p) => (
+                            <div key={p.id} className="space-y-1">
+                              <div className="flex items-start gap-2">
+                                <Textarea
+                                  value={p.text}
+                                  onChange={(e) => {
+                                    setEditableDraft({
+                                      ...editableDraft,
+                                      sections: editableDraft.sections.map(
+                                        (s) =>
+                                          s.id === section.id
+                                            ? {
+                                                ...s,
+                                                paragraphs: s.paragraphs.map(
+                                                  (para) =>
+                                                    para.id === p.id
+                                                      ? {
+                                                          ...para,
+                                                          text: e.target.value,
+                                                        }
+                                                      : para,
+                                                ),
+                                              }
+                                            : s,
+                                      ),
+                                    });
+                                  }}
+                                  rows={3}
+                                  className="text-xs leading-relaxed bg-background"
+                                  placeholder="Nội dung đoạn văn..."
+                                />
+                                {section.paragraphs.length > 1 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditableDraft({
+                                        ...editableDraft,
+                                        sections: editableDraft.sections.map(
+                                          (s) =>
+                                            s.id === section.id
+                                              ? {
+                                                  ...s,
+                                                  paragraphs:
+                                                    s.paragraphs.filter(
+                                                      (para) =>
+                                                        para.id !== p.id,
+                                                    ),
+                                                }
+                                              : s,
+                                        ),
+                                      });
+                                    }}
+                                    className="size-6 p-0 text-muted-foreground hover:text-destructive shrink-0 mt-1"
+                                    title="Xóa đoạn này"
+                                    aria-label="Xóa đoạn này"
+                                  >
+                                    <Trash2 className="size-3" />
+                                  </Button>
+                                )}
                               </div>
                             </div>
-                          );
-                        }
+                          ))}
 
-                        if (sec.type === "heading") {
-                          return (
-                            <div
-                              key={sec.id}
-                              className="group relative flex items-center justify-between pt-2"
-                            >
-                              <h2 className="font-bold text-xs text-foreground uppercase tracking-tight">
-                                {displayText}
-                              </h2>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => startEdit(sec)}
-                                className="size-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary cursor-pointer"
-                                title="Chỉnh sửa tiêu đề"
-                              >
-                                <Edit3 className="size-3" />
-                              </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const newPId = `p_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+                              setEditableDraft({
+                                ...editableDraft,
+                                sections: editableDraft.sections.map((s) =>
+                                  s.id === section.id
+                                    ? {
+                                        ...s,
+                                        paragraphs: [
+                                          ...s.paragraphs,
+                                          {
+                                            id: newPId,
+                                            text: "",
+                                            citations: [],
+                                          },
+                                        ],
+                                      }
+                                    : s,
+                                ),
+                              });
+                            }}
+                            className="h-6 text-[11px] gap-1 text-primary hover:bg-primary/10"
+                          >
+                            <Plus className="size-3" />
+                            <span>Thêm đoạn văn</span>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newSecId = `sec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+                        const newPId = `p_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+                        setEditableDraft({
+                          ...editableDraft,
+                          sections: [
+                            ...editableDraft.sections,
+                            {
+                              id: newSecId,
+                              heading: `Mục mới ${editableDraft.sections.length + 1}`,
+                              paragraphs: [
+                                {
+                                  id: newPId,
+                                  text: "",
+                                  citations: [],
+                                },
+                              ],
+                            },
+                          ],
+                        });
+                      }}
+                      className="h-7 text-xs gap-1.5"
+                    >
+                      <Plus className="size-3.5" />
+                      <span>Thêm mục mới</span>
+                    </Button>
+                  </div>
+
+                  {/* Edit Reason */}
+                  <div className="space-y-1 pt-2 border-t border-border/60">
+                    <label
+                      htmlFor="doc-edit-reason"
+                      className="text-[11px] font-medium text-muted-foreground"
+                    >
+                      Lý do chỉnh sửa
+                    </label>
+                    <input
+                      id="doc-edit-reason"
+                      type="text"
+                      value={editReason}
+                      onChange={(e) => setEditReason(e.target.value)}
+                      placeholder="VD: Cập nhật chỉ tiêu tuyển sinh, đính chính số liệu bảng học phí..."
+                      className="w-full h-8 px-2.5 rounded-md border border-border/70 text-xs bg-background"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* STATE 5: Active tab is Markdown */}
+              {hasDraft && !isEditing && activeTab === "markdown" && (
+                <MarkdownView
+                  content={markdownContent}
+                  isLoading={false}
+                  fileName={source?.file_name}
+                  sourceTitle={displayDocumentTitle(source?.title)}
+                />
+              )}
+
+              {/* STATE 6: Active tab is Details (Lifecycle History) */}
+              {hasDraft && !isEditing && activeTab === "details" && (
+                <div className="space-y-4 text-xs">
+                  <div className="p-4 rounded-xl border border-border/70 bg-card space-y-3">
+                    <div className="font-semibold text-foreground text-sm">
+                      Tình trạng phục vụ Trợ lý AI
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">
+                          Phiên bản đang phục vụ:
+                        </span>
+                        <div className="font-mono font-medium mt-0.5">
+                          {summary?.serving?.served_revision_no
+                            ? `v${summary.serving.served_revision_no}`
+                            : "Chưa phục vụ"}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">
+                          Phiên bản đang chuẩn bị:
+                        </span>
+                        <div className="font-mono font-medium mt-0.5">
+                          {summary?.serving?.preparing_revision_no
+                            ? `v${summary.serving.preparing_revision_no}`
+                            : "Không có"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-border/70 bg-card space-y-2">
+                    <div className="font-semibold text-foreground">
+                      Lịch sử các lượt chuẩn bị & biên soạn
+                    </div>
+                    {summary?.derivations && summary.derivations.length > 0 ? (
+                      <div className="space-y-2 pt-1">
+                        {summary.derivations.map((d, i) => (
+                          <div
+                            key={d.compilation_run_id || i}
+                            className="p-2.5 rounded-lg border border-border/60 bg-muted/20 flex items-center justify-between text-xs"
+                          >
+                            <div>
+                              <div className="font-medium">
+                                Lượt biên soạn #{d.compilation_generation}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground font-mono">
+                                Mã: {d.compilation_run_id}
+                              </div>
                             </div>
-                          );
-                        }
+                            <Badge
+                              variant={d.is_serving ? "default" : "secondary"}
+                              className="text-[10px] h-4"
+                            >
+                              {d.is_serving
+                                ? "Đang phục vụ"
+                                : d.compilation_status}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground text-xs py-2">
+                        Chưa có lượt biên soạn nào được ghi nhận.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
-                        if (sec.type === "table") {
-                          return (
-                            <div key={sec.id} className="space-y-2 pt-1">
-                              <p className="text-muted-foreground leading-normal">
-                                {displayText}
-                              </p>
-                              {sec.tableData && (
-                                <div className="rounded-md border border-border/80 overflow-hidden">
-                                  <table className="w-full text-xs text-left">
-                                    <thead className="bg-muted/60 font-semibold text-muted-foreground border-b border-border/80">
-                                      <tr>
-                                        {sec.tableData.headers.map((h) => (
-                                          <th
-                                            key={h}
-                                            className={cn(
-                                              "p-2",
-                                              h === "STT"
-                                                ? "w-10 text-center"
-                                                : h.includes("Định mức")
-                                                  ? "text-right"
-                                                  : "",
-                                            )}
+              {/* STATE 7: Standard Seamless Document Sheet Canvas */}
+              {hasDraft &&
+                !isEditing &&
+                activeTab === "content" &&
+                draftData && (
+                  <article className="bg-card border border-border/60 rounded-xl p-6 sm:p-10 shadow-xs max-w-3xl w-full mx-auto select-text space-y-6">
+                    {/* Document Title Header */}
+                    {displayDocumentTitle(draftData.title) !==
+                      displayDocumentTitle(source.title) && (
+                      <header className="border-b border-border/50 pb-4">
+                        <h2 className="text-xl font-bold tracking-tight text-foreground">
+                          {displayDocumentTitle(draftData.title)}
+                        </h2>
+                      </header>
+                    )}
+
+                    {/* Unknowns Callout if any */}
+                    {draftData.unknowns && draftData.unknowns.length > 0 && (
+                      <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-900 dark:text-amber-200 text-xs space-y-1.5">
+                        <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
+                          <AlertTriangle className="size-4" />
+                          <span>Dữ kiện cần làm rõ:</span>
+                        </div>
+                        <ul className="list-disc list-inside space-y-1 pl-1 text-[13px] text-amber-950 dark:text-amber-100">
+                          {draftData.unknowns.map((u) => (
+                            <li key={u}>{u}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Sections & Paragraphs */}
+                    <div className="space-y-6">
+                      {draftData.sections.map((section) => (
+                        <div key={section.heading} className="space-y-3">
+                          <h3 className="font-medium text-sm text-muted-foreground border-b border-border/40 pb-1.5 mt-6 first:mt-0">
+                            {section.heading}
+                          </h3>
+
+                          <div className="space-y-3">
+                            {section.paragraphs.map((para) => {
+                              const uniqueCitations = Array.from(
+                                new Set(para.citations || []),
+                              );
+
+                              return (
+                                <p
+                                  key={para.text}
+                                  className="text-[15px] leading-relaxed text-foreground/90 font-normal"
+                                >
+                                  <span>{para.text}</span>
+                                  {uniqueCitations.map((c) => {
+                                    const citInfo = citationIndexMap.get(c);
+                                    const idx = citInfo?.index ?? 1;
+                                    return (
+                                      <CitationBadge
+                                        key={c}
+                                        index={idx}
+                                        rawKey={c}
+                                        sourceFile={
+                                          citInfo?.sourceId === sourceId &&
+                                          citInfo?.revisionId ===
+                                            activeRevisionId
+                                            ? source.file_name
+                                            : undefined
+                                        }
+                                        location={citInfo?.location}
+                                      />
+                                    );
+                                  })}
+                                </p>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Source Tables with Citation Badges */}
+                    {draftData.source_tables &&
+                      draftData.source_tables.length > 0 && (
+                        <div className="space-y-4 pt-6 border-t border-border/50">
+                          <div className="flex items-center gap-2 font-semibold text-sm text-foreground">
+                            <TableIcon className="size-4 text-primary" />
+                            <span>Bảng dữ liệu trích xuất từ tệp gốc</span>
+                          </div>
+
+                          {draftData.source_tables.map((tbl) => {
+                            const citInfo = citationIndexMap.get(tbl.citation);
+                            const citIdx = citInfo?.index ?? 1;
+
+                            return (
+                              <div
+                                key={tbl.citation}
+                                className="rounded-lg border border-border/70 overflow-hidden shadow-2xs space-y-1 bg-background"
+                              >
+                                <div className="bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground border-b border-border/60 flex items-center justify-between">
+                                  <span className="font-medium text-foreground">
+                                    Bảng dữ liệu
+                                  </span>
+                                  <CitationBadge
+                                    index={citIdx}
+                                    rawKey={tbl.citation}
+                                    sourceFile={
+                                      citInfo?.sourceId === sourceId &&
+                                      citInfo?.revisionId === activeRevisionId
+                                        ? source.file_name
+                                        : undefined
+                                    }
+                                    location={citInfo?.location}
+                                  />
+                                </div>
+                                <div className="overflow-x-auto p-2">
+                                  <table className="w-full text-xs text-left border-collapse">
+                                    <tbody>
+                                      {tbl.table?.rows?.map((row) => {
+                                        const rowKey = `${tbl.citation}_${row.map((cell) => cell.text).join("::")}`;
+                                        return (
+                                          <tr
+                                            key={rowKey}
+                                            className="border-b border-border/40 last:border-0 hover:bg-muted/30"
                                           >
-                                            {h}
-                                          </th>
-                                        ))}
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border/60">
-                                      {sec.tableData.rows.map((row) => (
-                                        <tr
-                                          key={row.stt}
-                                          className="hover:bg-muted/30 transition-colors"
-                                        >
-                                          <td className="p-2 text-center font-mono">
-                                            {row.stt}
-                                          </td>
-                                          <td className="p-2 font-medium">
-                                            {row.major}
-                                          </td>
-                                          <td
-                                            className={cn(
-                                              "p-2 text-right font-mono",
-                                              row.stt === "1"
-                                                ? "font-bold text-primary"
-                                                : row.stt === "3"
-                                                  ? "font-medium italic text-emerald-600"
-                                                  : "",
-                                            )}
-                                          >
-                                            {row.tuition}
-                                          </td>
-                                        </tr>
-                                      ))}
+                                            {row.map((cell) => {
+                                              const CellTag = cell.header
+                                                ? "th"
+                                                : "td";
+                                              const cellKey = `${rowKey}_${cell.text}_${cell.row_span}_${cell.col_span}`;
+                                              return (
+                                                <CellTag
+                                                  key={cellKey}
+                                                  rowSpan={cell.row_span || 1}
+                                                  colSpan={cell.col_span || 1}
+                                                  className={cn(
+                                                    "p-2.5 border border-border/40 text-foreground/90",
+                                                    cell.header &&
+                                                      "bg-muted/50 font-semibold text-foreground",
+                                                  )}
+                                                >
+                                                  {cell.text}
+                                                </CellTag>
+                                              );
+                                            })}
+                                          </tr>
+                                        );
+                                      })}
                                     </tbody>
                                   </table>
                                 </div>
-                              )}
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div
-                            key={sec.id}
-                            className={cn(
-                              "group relative rounded-lg p-2 transition-colors",
-                              sec.isEdited
-                                ? "border-l-2 border-amber-500 bg-amber-500/5 pl-3"
-                                : "hover:bg-muted/30",
-                            )}
-                          >
-                            <p className="text-justify indent-4 leading-normal text-foreground/90">
-                              {displayText}
-                            </p>
-
-                            {/* Floating Action Badge on Hover */}
-                            <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                              {sec.isEdited && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[9px] bg-amber-500/10 text-amber-600 border-amber-500/30 font-normal"
-                                >
-                                  Đã sửa
-                                </Badge>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => startEdit(sec)}
-                                className="size-6 p-0 text-muted-foreground hover:text-primary cursor-pointer bg-card/80 shadow-2xs border border-border/50"
-                                title="Chỉnh sửa đoạn này"
-                              >
-                                <Edit3 className="size-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              ) : activeTab === "markdown" ? (
-                /* MARKDOWN VIEW */
-                <div className="bg-card border border-border/70 rounded-xl p-6 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-border/50">
-                    <span className="text-xs font-mono font-semibold text-muted-foreground">
-                      Bản Markdown định dạng chuẩn hóa (.md)
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(markdownContent);
-                        toast.success("Đã sao chép Markdown vào khay nhớ tạm!");
-                      }}
-                      className="h-7 text-xs gap-1"
-                    >
-                      <Copy className="size-3" />
-                      <span>Sao chép Markdown</span>
-                    </Button>
-                  </div>
-                  <pre className="font-mono text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap bg-muted/30 p-4 rounded-lg overflow-x-auto">
-                    {markdownContent}
-                  </pre>
-                </div>
-              ) : (
-                /* JSON DATA VIEW */
-                <div className="bg-card border border-border/70 rounded-xl p-6 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-border/50">
-                    <span className="text-xs font-mono font-semibold text-muted-foreground">
-                      Cấu trúc bóc tách JSON (Chunks & Metadata)
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(
-                          JSON.stringify(sections, null, 2),
-                        );
-                        toast.success("Đã sao chép JSON vào khay nhớ tạm!");
-                      }}
-                      className="h-7 text-xs gap-1"
-                    >
-                      <Copy className="size-3" />
-                      <span>Sao chép JSON</span>
-                    </Button>
-                  </div>
-                  <pre className="font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap bg-muted/30 p-4 rounded-lg overflow-x-auto max-h-[500px]">
-                    {JSON.stringify(sections, null, 2)}
-                  </pre>
-                </div>
-              )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                  </article>
+                )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* 3. Publication & Approval Dialog */}
+      {compilationRunId && (
+        <PublicationDialog
+          open={publicationOpen}
+          onOpenChange={setPublicationOpen}
+          workspaceId={activeWorkspaceId || ""}
+          collectionId={resolvedCollectionId}
+          sourceTitle={displayDocumentTitle(source.title)}
+          key={compilationRunId}
+          compilationRunId={compilationRunId}
+          existingVersion={currentDerivation?.version}
+          canRegister={summary?.capabilities?.can_register === true}
+          existingDocumentId={
+            currentDerivation?.version?.document_id ||
+            summary?.serving?.served_document_id
+          }
+          onSuccess={() => {
+            void refetchSource();
+            void refetchSummary();
+          }}
+        />
+      )}
+      {/* 4. JSON Structure Inspection Dialog */}
+      <JsonStructureDialog
+        open={jsonDialogOpen}
+        onOpenChange={setJsonDialogOpen}
+        title={`Cấu trúc dữ liệu JSON - ${displayDocumentTitle(source?.title || "Tài liệu")}`}
+        data={draftData || summary}
+        fileName={`${source?.file_name || "document"}.json`}
+      />
     </div>
   );
 }

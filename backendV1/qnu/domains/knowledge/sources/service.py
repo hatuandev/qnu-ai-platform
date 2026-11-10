@@ -106,7 +106,7 @@ class SourceService:
         actor: AuthActor,
         idempotency_key: str | None = None,
         source_id: str | None = None,
-        staged: bool = False,
+        staged: bool = True,
         folder_id: str | None = None,
         auto_extract: bool = True,
         job_queue: JobQueue | None = None,
@@ -487,7 +487,7 @@ class SourceService:
         ref: str,
         idempotency_key: str | None,
         request_hash: str,
-        staged: bool = False,
+        staged: bool = True,
     ) -> tuple[KBSource, KBSourceRevision]:
         source = await load_source(db, workspace_id, collection_id, source_id, for_update=True)
         revision_no = source.latest_revision_no + 1

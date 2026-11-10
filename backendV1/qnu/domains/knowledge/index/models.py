@@ -105,7 +105,7 @@ class IndexSync(Base):
         ),
         CheckConstraint("revision >= 1 AND run_revision >= 0", name="ck_index_sync_revision"),
         CheckConstraint(
-            "status IN ('pending','building','ready','failed','uncertain')",
+            "status IN ('pending','building','ready','empty','failed','uncertain')",
             name="ck_index_sync_status",
         ),
     )

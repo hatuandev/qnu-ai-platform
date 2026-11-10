@@ -4,17 +4,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.identity.background import background_actor
 from qnu.domains.knowledge.compilation.models import utcnow
-from qnu.domains.knowledge.index.models import IndexRun, IndexSync
+from qnu.domains.knowledge.index.models import IndexChunk, IndexRun, IndexSync
 from qnu.domains.knowledge.index.schemas import IndexRequest
 from qnu.domains.knowledge.index.service import dispatch, request_index
-from qnu.domains.knowledge.index.snapshots import current_snapshot, publication_identity
+from qnu.domains.knowledge.index.snapshots import (
+    current_snapshot,
+    publication_identity,
+    published_versions,
+)
 from qnu.domains.knowledge.publication.access import authorize
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.workspaces.access import actor_ref
@@ -68,6 +72,50 @@ async def wake(queue: JobQueue | None, collection_id: str) -> None:
         logger.warning("index_sync_dispatch_pending", collection_id=collection_id)
 
 
+async def _retire_empty_collection(
+    db: AsyncSession, container: Container, row: IndexSync, actor: AuthActor
+) -> None:
+    """Retire the last serving generation once every published document is withdrawn."""
+    active = await db.scalar(
+        select(IndexRun)
+        .where(
+            IndexRun.collection_id == row.collection_id,
+            IndexRun.is_active.is_(True),
+        )
+        .with_for_update()
+    )
+    if active is not None:
+        if active.config.get("vector_target_hash") != container.vector_store.target_hash:
+            raise Conflict(
+                "Vector target đã đổi; chưa dọn chỉ mục.", code="index_configuration_changed"
+            )
+        await container.vector_store.delete_collection(active.vector_collection)
+        await db.execute(
+            update(IndexChunk).where(IndexChunk.run_id == active.id).values(vector=None)
+        )
+        active.is_active, active.deactivated_at = False, utcnow()
+        active.vectors_retired_at = utcnow()
+        await record_workspace_event(
+            db,
+            workspace_id=row.workspace_id,
+            actor=actor,
+            action="index.vectors_retired",
+            detail={
+                "run_id": active.id,
+                "reason": "collection_empty",
+                "citations_retained": True,
+            },
+        )
+    row.run_id, row.run_revision, row.status, row.error_code = None, row.revision, "empty", None
+    await record_workspace_event(
+        db,
+        workspace_id=row.workspace_id,
+        actor=actor,
+        action="index.collection_empty",
+        detail={"collection_id": row.collection_id},
+    )
+
+
 async def _synchronize(
     db: AsyncSession, container: Container, row: IndexSync, actor: AuthActor
 ) -> str:
@@ -97,8 +145,11 @@ async def _synchronize(
     except AppException as exc:
         if exc.code != "index_no_published_documents":
             raise
-        # No searchable content; existing eligibility gates exclude withdrawn versions.
-        row.run_revision, row.run_id, row.status = row.revision, None, "ready"
+        # Published but temporarily unreadable content keeps the existing generation.
+        if await published_versions(db, row.workspace_id, row.collection_id):
+            row.run_revision, row.run_id, row.status = row.revision, None, "ready"
+            return row.status
+        await _retire_empty_collection(db, container, row, actor)
         return row.status
     active = await db.scalar(
         select(IndexRun).where(

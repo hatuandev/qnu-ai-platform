@@ -10,9 +10,11 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -69,6 +71,11 @@ class CompilationRun(Base):
         CheckConstraint(
             "(origin = 'model' AND parent_run_id IS NULL) OR (origin = 'user_edit' AND parent_run_id IS NOT NULL)",
             name="ck_compilation_ancestry",
+        ),
+        Index(
+            "ix_compilation_reuse_key",
+            text("(config->>'reuse_key')"),
+            postgresql_where=text("config ? 'reuse_key'"),
         ),
     )
     id: Mapped[str] = mapped_column(String(64), primary_key=True)

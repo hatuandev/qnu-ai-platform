@@ -284,6 +284,7 @@ def test_changed_source_stops_serving_but_can_still_be_withdrawn(client, compile
         compiled["collection"]["id"],
         compiled["source"]["id"],
         payload=real_pdf(["New source revision"]),
+        staged=False,
     )
     assert changed.status_code == 201, changed.text
     response = client.get(doc + "/published")
@@ -356,6 +357,7 @@ def test_new_source_between_preview_and_publish_requires_fresh_compile(client, c
             compiled["collection"]["id"],
             compiled["source"]["id"],
             payload=real_pdf(["Version two"]),
+            staged=False,
         ).status_code
         == 201
     )

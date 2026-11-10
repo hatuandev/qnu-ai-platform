@@ -220,6 +220,65 @@ def test_non_admin_cannot_manage_connection(client):
     )
 
 
+def test_delete_referenced_model_reports_reference_type_and_keeps_defaults(client):
+    c = connection(client)
+    key(client, c["id"])
+    first = model(client, c["id"], "guarded-first")
+    second = model(client, c["id"], "guarded-second")
+    wid = workspace(client, [first["id"], second["id"]])
+
+    blocked = client.delete(f"{API}/connections/{c['id']}/models/{first['id']}")
+    assert blocked.status_code == 409, blocked.text
+    body = blocked.json()
+    assert body["code"] == "model_provider_in_use"
+    assert "cấu hình mặc định của đơn vị" in body["detail"]
+    assert "quyền sử dụng model của đơn vị" in body["detail"]
+    listed = {item["id"] for item in client.get(f"{API}/connections/{c['id']}/models").json()}
+    assert listed == {first["id"], second["id"]}
+    connection_blocked = client.delete(f"{API}/connections/{c['id']}")
+    assert connection_blocked.status_code == 409
+    assert connection_blocked.json()["code"] == "model_provider_in_use"
+
+    moved = client.put(
+        f"/platform/v1alpha1/workspaces/{wid}/allowed-providers",
+        json={"provider_ids": [second["id"]], "defaults": {"chat": second["id"]}},
+    )
+    assert moved.status_code == 200, moved.text
+    assert client.delete(f"{API}/connections/{c['id']}/models/{first['id']}").status_code == 204
+    stale_default = client.put(
+        f"/platform/v1alpha1/workspaces/{wid}/model-defaults",
+        json={"defaults": {"chat": first["id"]}},
+    )
+    assert stale_default.status_code == 409, stale_default.text
+    assert stale_default.json()["code"] == "allowlist_default_not_allowed"
+    allowlist = client.get(f"/platform/v1alpha1/workspaces/{wid}/allowed-providers").json()
+    assert [item["provider_id"] for item in allowlist["providers"]] == [second["id"]]
+    assert allowlist["providers"][0]["is_default"] is True
+
+
+def test_model_usage_history_blocks_deletion_and_is_retained(client):
+    from qnu.domains.modelops.usage.service import usage_service
+    from qnu.platform.database import AsyncSessionFactory
+
+    c = connection(client)
+    key(client, c["id"])
+    m = model(client, c["id"], "guarded-history")
+    wid = workspace(client, [m["id"]])
+
+    async def reserve():
+        async with AsyncSessionFactory() as db:
+            return await usage_service.reserve(
+                db, ADMIN, wid, "chat", "history-block", "a" * 64, 1000, m["id"]
+            )
+
+    client.portal.call(reserve)
+    blocked = client.delete(f"{API}/connections/{c['id']}/models/{m['id']}")
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["code"] == "model_provider_in_use"
+    assert "lịch sử sử dụng model" in blocked.json()["detail"]
+    assert client.get(f"{API}/connections/{c['id']}/models").json()
+
+
 def test_gemini_compatibility_does_not_append_a_second_v1(client):
     import httpx
 

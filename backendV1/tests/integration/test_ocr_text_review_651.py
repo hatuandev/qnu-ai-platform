@@ -315,6 +315,85 @@ def test_change_during_model_call_rejects_stale_or_unauthorized_suggestions(clie
         assert len(model.requests) == 1
 
 
+@pytest.mark.parametrize("mode", ["success", "http_error"])
+def test_late_spelling_response_never_recreates_raw_evidence_after_purge(client, mode):
+    from sqlalchemy import select
+
+    from qnu.domains.lifecycle.purge import execute
+    from qnu.domains.ocr.review.models import SpellingRun
+    from qnu.main import app
+    from qnu.platform.database import AsyncSessionFactory
+    from tests.integration.knowledge_support import add_member
+    from tests.integration.ocr_support import FakeJobQueue, use_queue
+    from tests.integration.test_lifecycle_659 import accept, preview
+
+    started, release = threading.Event(), threading.Event()
+
+    class BlockedSpeller(FakeSpeller):
+        def _respond(self, index):
+            started.set()
+            assert release.wait(8)
+            return super()._respond(index)
+
+    data = processed_input(client, code="spelling-late-" + mode)
+    url = review_url(data)
+    current = client.get(url).json()
+    add_member(client, data["workspace"]["id"], PLATFORM.actor_id, "admin")
+    with BlockedSpeller() as model:
+        if mode == "http_error":
+            model.mode = "http_error"
+        chat_provider(client, data, model.base_url)
+        use_queue(FakeJobQueue())
+
+        async def newest_check():
+            async with AsyncSessionFactory() as db:
+                return await db.scalar(
+                    select(SpellingRun.id)
+                    .where(SpellingRun.workspace_id == data["workspace"]["id"])
+                    .order_by(SpellingRun.created_at.desc())
+                    .limit(1)
+                )
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(detect, client, data, current)
+            try:
+                assert started.wait(8)
+                check_id = client.portal.call(newest_check)
+                assert check_id
+                as_actor(PLATFORM)
+                proposal = preview(
+                    client, data["workspace"], "source", data["source"]["id"], "delete"
+                )
+                assert proposal.status_code == 200, proposal.text
+                pending = accept(
+                    client, data["workspace"], proposal, "purge-spelling-" + mode
+                )
+                assert pending.status_code == 200, pending.text
+                action_id = pending.json()["id"]
+
+                async def worker():
+                    async with AsyncSessionFactory() as db:
+                        return await execute(
+                            db,
+                            app.state.container.blob_store,
+                            app.state.container.vector_store,
+                            action_id,
+                        )
+
+                assert client.portal.call(worker) == "completed"
+            finally:
+                release.set()
+            late = future.result(timeout=15)
+        assert late.status_code in {404, 409, 502, 503}, late.text
+
+    key = f"ocr-spelling/{data['workspace']['id']}/{check_id}/raw-response"
+    assert not client.portal.call(app.state.container.blob_store.exists, key)
+    receipt = client.get(
+        f"{API}/workspaces/{data['workspace']['id']}/lifecycle/actions/{action_id}"
+    ).json()
+    assert receipt["status"] == "completed"
+
+
 def test_concurrent_saves_only_one_wins(client):
     data = processed_input(client)
     url = review_url(data)

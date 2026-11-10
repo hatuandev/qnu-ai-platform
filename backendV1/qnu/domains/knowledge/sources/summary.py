@@ -18,17 +18,26 @@ from qnu.domains.knowledge.index.readiness import document_readiness
 from qnu.domains.knowledge.index.schemas import IndexReadiness
 from qnu.domains.knowledge.policies.access import READ_ROLES, load_revision
 from qnu.domains.knowledge.policies.capabilities import summary_capabilities
+from qnu.domains.knowledge.preparation.models import (
+    ACTIVE_PREPARATION_STATUSES,
+    PreparationIntent,
+)
+from qnu.domains.knowledge.preparation.schemas import PREPARATION_STEPS
 from qnu.domains.knowledge.publication.models import CompiledDocument, CompiledVersion
 from qnu.domains.knowledge.sources.schemas import (
     RevisionResponse,
+    SourceActionPermissions,
     SourceDerivation,
+    SourcePreparationSummary,
     SourceProcessingRunSummary,
+    SourceServingState,
     SourceSummaryResponse,
     SourceTextVersionRef,
     SourceVersionRef,
 )
 from qnu.domains.knowledge.sources.service import source_service
 from qnu.domains.lifecycle.guards import visible
+from qnu.domains.lifecycle.models import LifecycleAction, ResourceState
 from qnu.domains.ocr.models import ACTIVE_RUN_STATUSES, OcrProcessingRun
 from qnu.domains.ocr.review.models import TextVersion
 from qnu.domains.ocr.schemas import ProcessingRunResponse
@@ -225,6 +234,16 @@ async def read_summary(
         db, blob, actor, workspace.id, collection_id, revision.id, derivations_limit
     )
     role = await caller_workspace_role(db, actor, workspace.id)
+    serving, actions, preparation = await _serving_and_actions(
+        db,
+        blob,
+        actor,
+        workspace.id,
+        collection_id,
+        source,
+        role,
+        revision.revision_no if active_run_id is not None else None,
+    )
 
     return SourceSummaryResponse(
         observed_at=datetime.now(UTC),
@@ -255,4 +274,137 @@ async def read_summary(
         derivations=derivations,
         derivations_truncated=derivations_truncated,
         capabilities=summary_capabilities(role),
+        serving=serving,
+        actions=actions,
+        preparation=preparation,
     )
+
+
+async def _published_version(
+    db: AsyncSession,
+    workspace_id: str,
+    collection_id: str,
+    source_id: str,
+    revision_no: int | None,
+) -> tuple[str, str, int] | None:
+    statement = (
+        select(CompiledVersion.id, CompiledDocument.id, OcrProcessingRun.revision_no)
+        .join(CompilationInput, CompilationInput.run_id == CompiledVersion.compilation_run_id)
+        .join(OcrProcessingRun, OcrProcessingRun.id == CompilationInput.ocr_run_id)
+        .join(CompiledDocument, CompiledDocument.id == CompiledVersion.document_id)
+        .where(
+            CompiledVersion.workspace_id == workspace_id,
+            CompiledVersion.collection_id == collection_id,
+            CompiledVersion.status == "published",
+            OcrProcessingRun.source_id == source_id,
+            visible("document", CompiledDocument.id),
+        )
+    )
+    if revision_no is not None:
+        statement = statement.where(OcrProcessingRun.revision_no == revision_no)
+    row = (
+        await db.execute(
+            statement.order_by(
+                OcrProcessingRun.revision_no.desc(), CompiledVersion.version_no.desc()
+            ).limit(1)
+        )
+    ).first()
+    return (row[0], row[1], row[2]) if row else None
+
+
+async def _serving_and_actions(
+    db: AsyncSession,
+    blob: BlobStore,
+    actor: AuthActor,
+    workspace_id: str,
+    collection_id: str,
+    source,
+    role: str,
+    extracting_revision_no: int | None,
+) -> tuple[SourceServingState, SourceActionPermissions, SourcePreparationSummary | None]:
+    served = await _published_version(
+        db, workspace_id, collection_id, source.id, source.serving_revision_no
+    )
+    published = await _published_version(db, workspace_id, collection_id, source.id, None)
+    served_version_id = served[0] if served is not None else None
+    served_document_id = served[1] if served is not None else None
+    if served is not None:
+        version = await db.get(CompiledVersion, served[0])
+        readiness = await document_readiness(
+            db, blob, actor, workspace_id, collection_id, served[1]
+        )
+        # A publication pointer alone never claims serving: the active manifest
+        # must contain this exact version state and bundle.
+        if (
+            version is None
+            or version.status != "published"
+            or readiness.status != "ready"
+            or readiness.version_id != version.id
+            or readiness.version_state != version.state_version
+            or readiness.bundle_sha256 != version.bundle_sha256
+        ):
+            served_version_id, served_document_id = None, None
+    intent = await db.scalar(
+        select(PreparationIntent)
+        .where(
+            PreparationIntent.workspace_id == workspace_id,
+            PreparationIntent.collection_id == collection_id,
+            PreparationIntent.source_id == source.id,
+        )
+        .order_by(PreparationIntent.created_at.desc(), PreparationIntent.id)
+        .limit(1)
+    )
+    pending_delete = await db.scalar(
+        select(LifecycleAction.id)
+        .where(
+            LifecycleAction.workspace_id == workspace_id,
+            LifecycleAction.kind == "source",
+            LifecycleAction.resource_id == source.id,
+            LifecycleAction.action == "delete",
+            # Only a confirmed deletion locks edits; an open preview or an expired
+            # preview must not narrow the user's actions.
+            LifecycleAction.status == "pending",
+        )
+        .limit(1)
+    )
+    lifecycle = await db.get(
+        ResourceState, (workspace_id, "source", source.id), populate_existing=True
+    )
+    source_active = lifecycle is None or lifecycle.status == "active"
+    is_writer = role in {"admin", "editor"}
+    is_admin = role == "admin"
+    active_intent = intent is not None and intent.status in ACTIVE_PREPARATION_STATUSES
+    preparing_revision_no = extracting_revision_no
+    if active_intent:
+        preparing_revision_no = intent.revision_no
+    elif preparing_revision_no is None:
+        if served_version_id is None and published is not None:
+            preparing_revision_no = published[2]
+        elif (
+            served_version_id is not None and source.latest_revision_no > source.serving_revision_no
+        ):
+            preparing_revision_no = source.latest_revision_no
+    serving = SourceServingState(
+        served_revision_no=(source.serving_revision_no if served_version_id is not None else None),
+        preparing_revision_no=preparing_revision_no,
+        published_revision_no=published[2] if published is not None else None,
+        served_version_id=served_version_id,
+        served_document_id=served_document_id,
+    )
+    actions = SourceActionPermissions(
+        can_stop=is_writer and (active_intent or extracting_revision_no is not None),
+        can_withdraw=is_admin and source_active and (served is not None or published is not None),
+        can_update=is_writer and source_active and pending_delete is None,
+        can_delete=is_admin and pending_delete is None,
+    )
+    preparation = (
+        SourcePreparationSummary(
+            intent_id=intent.id,
+            status=intent.status,
+            step=PREPARATION_STEPS.get(intent.status, intent.status),
+            error_code=intent.error_code,
+        )
+        if intent is not None
+        else None
+    )
+    return serving, actions, preparation

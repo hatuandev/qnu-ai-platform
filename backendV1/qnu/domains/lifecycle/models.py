@@ -58,6 +58,15 @@ class LifecycleAction(Base):
     request_hash: Mapped[str | None] = mapped_column(String(64))
     result: Mapped[dict | None] = mapped_column(JSONB)
     error_code: Mapped[str | None] = mapped_column(String(64))
+    phase: Mapped[str | None] = mapped_column(String(32))
+    progress: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    worker_id: Mapped[str | None] = mapped_column(String(120))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    confirmed_by: Mapped[str | None] = mapped_column(String(200))
+    takeover_by: Mapped[str | None] = mapped_column(String(200))
+    takeover_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
     )

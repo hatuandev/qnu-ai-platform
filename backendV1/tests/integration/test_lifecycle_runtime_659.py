@@ -350,6 +350,53 @@ def test_replacement_keeps_old_serving_until_index_completes(client, indexed, fa
     assert hits and all(h["version_id"] == active_id for h in hits)
 
 
+def test_withdrawn_old_version_while_replacement_waits_never_activates_candidate(client, indexed):
+    data = indexed
+    assert execute_index(client, data["index_run"]["id"]) == "completed"
+    version_id = staged_version(client, data)
+    document_id = data["compiled"]["document"]["id"]
+    p = preview(
+        client,
+        data["workspace"],
+        "document",
+        document_id,
+        "replace",
+        replacement_version_id=version_id,
+    )
+    accepted = accept(client, data["workspace"], p)
+    assert accepted.status_code == 200, accepted.text
+    run_id = accepted.json()["result"]["index_run_id"]
+
+    # The old publication is deliberately withdrawn while the candidate index waits.
+    as_actor(PLATFORM)
+    withdrawn = accept(
+        client,
+        data["workspace"],
+        preview(client, data["workspace"], "document", document_id, "withdraw"),
+        "withdraw-old-version",
+    )
+    assert withdrawn.status_code == 200, withdrawn.text
+    assert withdrawn.json()["status"] == "completed"
+
+    assert execute_index(client, run_id) == "failed"
+    receipt = client.get(lifecycle(data["workspace"]) + "/actions/" + accepted.json()["id"]).json()
+    assert receipt["status"] == "failed"
+    assert client.get(data["document_url"] + "/published").status_code == 404
+    assert client.get(data["version_url"]).json()["status"] == "withdrawn"
+    assert (
+        client.get(data["document_url"] + "/versions/" + version_id).json()["status"] == "approved"
+    )
+    as_actor(EDITOR)
+    search = client.post(data["base"] + "/search", json={"query": "Q"})
+    assert search.status_code == 200, search.text
+    assert search.json()["hits"] == []
+    summary = client.get(data["base"] + f"/sources/{data['source']['id']}/summary").json()
+    assert summary["serving"]["served_revision_no"] is None
+    assert summary["serving"]["served_version_id"] is None
+    assert summary["serving"]["published_revision_no"] is None
+    assert summary["serving"]["preparing_revision_no"] is None
+
+
 def test_cleanup_rejects_active_index_and_retries_only_owned_inactive_generation(
     client, indexed, monkeypatch
 ):

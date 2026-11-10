@@ -366,20 +366,43 @@ class FolderService:
     async def restore(
         self, db: AsyncSession, workspace: Workspace, collection_id: str, folder_id: str, actor: AuthActor
     ) -> FolderResponse:
+        # A deleted collection or parent folder must be restored before its children.
+        collection = await load_collection(db, workspace.id, collection_id, for_update=True)
         folder = await db.scalar(
-            select(KBFolder).where(
+            select(KBFolder)
+            .where(
                 KBFolder.id == folder_id,
                 KBFolder.workspace_id == workspace.id,
-                KBFolder.collection_id == collection_id,
+                KBFolder.collection_id == collection.id,
             )
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
         if folder is None:
             raise EntityNotFound("Không tìm thấy thư mục.", code="folder_not_found")
 
         key = (workspace.id, "folder", folder.id)
-        state = await db.get(ResourceState, key)
-        if state is not None:
-            state.status = "active"
+        state = await db.get(ResourceState, key, populate_existing=True)
+        if state is None or state.status != "deleted":
+            raise Conflict("Thư mục chưa được lưu trữ.", code="folder_not_deleted")
+        if folder.parent_id is not None:
+            parent = await self._load_folder(
+                db, workspace.id, collection.id, folder.parent_id, for_update=True
+            )
+            if parent is None:
+                raise Conflict(
+                    "Thư mục cha đang bị lưu trữ hoặc đã xóa.",
+                    code="folder_parent_unavailable",
+                )
+        await self._check_sibling_name(
+            db,
+            workspace.id,
+            collection.id,
+            folder.parent_id,
+            folder.name,
+            exclude_id=folder.id,
+        )
+        state.status = "active"
 
         await record_workspace_event(
             db,

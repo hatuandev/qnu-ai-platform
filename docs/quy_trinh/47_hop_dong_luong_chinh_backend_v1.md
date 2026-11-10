@@ -7,7 +7,8 @@ Tài liệu này chốt các API mà frontend mới dùng cho luồng người d
 Người dùng thường **không chọn** công cụ OCR, model/context/output, chunking hay thế hệ chỉ mục.
 Backend tự chọn theo loại tài liệu, cấu hình ModelOps được phép và trạng thái dữ liệu thật. Các API
 từng bước (compiler, review, index thủ công, OCR run) vẫn tồn tại cho quản trị/tích hợp nhưng không
-thuộc luồng này.
+thuộc luồng này. Vòng đời ngược — dừng xử lý, ngừng dùng cho trợ lý, cập nhật, xóa vĩnh viễn — được
+chốt ở mục 6.
 
 Mọi đường dẫn dưới đây nằm dưới `/platform/v1alpha1/workspaces/{workspace_id}/collections/{collection_id}`.
 Mọi thao tác đều kiểm quyền workspace ở server; `workspace_id`/`collection_id` trên URL chỉ là đối
@@ -170,7 +171,92 @@ Sau `publish`, chỉ báo **Sẵn sàng cho trợ lý** khi `summary.readiness.s
 - Trợ lý đọc phạm vi tri thức/binding theo cấu hình của trợ lý; không đưa ID kỹ thuật vào UI thường.
 
 
-## 6. Không thuộc luồng chính (quản trị/tích hợp)
+## 6. Vòng đời ngược: dừng, thu hồi, cập nhật, xóa
+
+Các thao tác dưới đây dùng prefix riêng `/platform/v1alpha1/workspaces/{workspace_id}/lifecycle`
+(không nằm dưới collection). Mọi preview/accept đều kiểm lại actor, quyền, trạng thái và phạm vi
+ở server; FE không tự suy quyền từ việc đã hiển thị nút.
+
+### 6.1 Đọc trạng thái nguồn
+
+`GET /sources/{source_id}/summary` trả thêm:
+
+- `serving`: `served_revision_no` (bản trợ lý thực dùng), `preparing_revision_no` (bản
+  đang xử lý, đang chờ chỉ mục sau phát hành hoặc bản mới hơn đang chờ trong khi bản cũ
+  còn phục vụ), `published_revision_no` (bản mới nhất đã phát hành, có thể
+  `null`), `served_version_id`, `served_document_id`. Ba số revision có thể khác nhau; không suy
+  giá trị này từ giá trị kia. `served_*` chỉ có khi generation đang hoạt động thực sự chứa đúng
+  version/state/bundle; riêng con trỏ publication không đủ để báo **Đang phục vụ**.
+  Khi bản cũ đã thu hồi và bản thay thế thất bại, `preparing_revision_no` là `null`
+  nếu không còn lượt chuẩn bị hoặc bóc tách nào đang chạy.
+- `actions`: `can_stop`, `can_withdraw`, `can_update`, `can_delete` — chỉ hiện nút tương ứng khi
+  `true`; server vẫn kiểm lại khi nhận lệnh.
+- `preparation`: `intent_id`, `status`, `step`, `error_code` của lượt chuẩn bị gần nhất. Hiển thị
+  `step` ("Đã nhận yêu cầu", "Đang đọc nội dung", "Đang biên soạn", "Đã chuẩn bị xong",
+  "Xử lý lỗi", "Chưa xác định kết quả", "Đã dừng xử lý").
+
+### 6.2 Bốn nút thao tác
+
+| Nút | API | Quyền/điều kiện | Hành vi |
+| :--- | :--- | :--- | :--- |
+| **Dừng xử lý** | `POST /sources/{source_id}/preparation-intents/{intent_id}/cancel` hoặc lifecycle `job/cancel` + `job_kind` | admin/editor, lượt còn hiệu lực | Dừng bền vững; kết quả muộn bị bỏ; giữ tệp gốc, phần đã xong và usage |
+| **Ngừng dùng cho trợ lý** | lifecycle `withdraw` cho `source`, `document` hoặc `collection` | admin, tài nguyên `active` | Ẩn ngay bản `published` khỏi RAG/tìm kiếm/dẫn chứng; giữ tệp và lịch sử |
+| **Cập nhật tài liệu** | `POST /sources/{source_id}/revisions` (mặc định `staged=true`) rồi publish, sau đó lifecycle `document/replace` | admin/editor tải revision; admin duyệt/phát hành/thay | Bản mới là ứng viên; chỉ chuyển serving/index khi sẵn sàng |
+| **Xóa vĩnh viễn** | lifecycle `source/delete` | admin | Một preview + một xác nhận; thu hồi bản liên quan, chặn nguồn, dọn nền |
+
+**Dừng xử lý**: sau khi nhận, FE dừng poll và hiện **Đã dừng xử lý**; không tự gửi lại lượt đã
+dừng bằng khóa cũ. Lượt OCR dùng chung hoặc chạy độc lập không bị hủy theo intent khác.
+
+**Ngừng dùng cho trợ lý**: preview/accept theo hợp đồng lifecycle. `impact` trả
+`withdraw_keeps_originals=true`, `restore_available=true`. Ở cấp kho, thu hồi áp cho mọi bản
+`published` thuộc kho, đồng bộ lại chỉ mục và giữ toàn bộ tệp nguồn. Thu hồi bản cuối làm
+`GET .../search-readiness` chuyển `empty` và backend dọn generation nền; `empty` **không** phải
+"Sẵn sàng cho trợ lý". Không dùng thao tác này thay cho xóa.
+
+**Cập nhật tài liệu**: revision tải lên mặc định `staged=true` (kể cả khi FE bỏ trường này):
+`current_revision_no` tăng nhưng `serving_revision_no` giữ nguyên, bản cũ vẫn phục vụ. Sau khi
+duyệt/phát hành bản mới, preview/accept `document/replace` với `replacement_version_id`; biên nhận
+`pending` kèm `result.index_run_id`, chỉ `completed` khi serving/index đã chuyển. Mọi lỗi trước đó
+giữ bản cũ phục vụ. Nếu bản cũ bị thu hồi trong lúc chờ, replace chuyển `failed` và `/published`
+trả `404`; FE báo lỗi và yêu cầu lượt thay thế mới, không tự chạy lại.
+
+**Xóa vĩnh viễn**: preview phải có `impact.permanent=true`; thiếu thì FE không cho xác nhận
+(runtime cũ). Accept trả `409 lifecycle_preview_stale` khi phạm vi đổi sau preview — tạo preview
+mới. Hỗ trợ nguồn `active`, `archived` hoặc `deleted`. Chỉ báo **Đã xóa** khi biên nhận
+`status=completed` và `impact.permanent=true`. Upload lại cùng nội dung chỉ được sau khi biên nhận
+hoàn tất; trong lúc chờ backend trả `source_purge_pending`/`duplicate_content_deleted`.
+
+### 6.3 Biên nhận và tiến độ
+
+Poll `GET /lifecycle/actions/{action_id}`; trạng thái nằm ở backend nên tồn tại khi chuyển trang
+hoặc mở lại app. `status` là `preview|pending|completed|failed`; `phase`/`progress.step` cho biết
+bước (khi `progress.percent` null chỉ hiện tên bước); `attempt_count`, `error_code`,
+`last_error_at`, `lease_expires_at`, `confirmed_by`, `takeover_by`, `takeover_at` chỉ hiện cho
+admin. Phase dọn: `waiting_for_workers`, `deleting_vectors` (25), `deleting_objects` (55),
+`resealing` (80), `deleting_rows` (95), `completed` (100). Lỗi giữ biên nhận `pending` để tiếp tục;
+admin xem lượt kẹt qua `GET /lifecycle/source-deletions/active` và tiếp quản qua
+`POST /lifecycle/actions/{action_id}/takeover` (audit giữ người xác nhận ban đầu và người tiếp quản).
+Chủ sở hữu luôn đọc được biên nhận của mình; admin workspace chỉ đọc thêm biên nhận
+`source/delete` đã xác nhận để tiếp quản, còn biên nhận hội thoại/tác vụ chat vẫn chỉ thuộc chủ
+sở hữu. Chỉ lượt xóa đã xác nhận còn `pending` mới khóa `can_update`/`can_delete`; preview đang
+mở, preview hết hạn hoặc biên nhận đã kết thúc không thu hẹp quyền thao tác.
+
+### 6.4 Khôi phục thư mục và xóa model
+
+- `POST .../folders/{folder_id}/restore` kiểm theo thứ tự: `404 resource_unavailable` (kho bị lưu
+  trữ/xóa), `409 folder_not_deleted`, `409 folder_parent_unavailable`, `409 folder_name_exists`.
+  Xóa thư mục chỉ nhận khi rỗng (`409 folder_not_empty`).
+- Xóa cả kho chỉ nhận khi kho không còn tài liệu và thư mục đang hoạt động (`409 collection_not_empty`);
+  bản ghi thư mục đã xóa mềm không chặn thao tác xóa kho.
+- `DELETE /platform/v1alpha1/modelops/connections/{id}` và
+  `DELETE .../connections/{id}/models/{model_id}` trả `409 model_provider_in_use` kèm `detail` nêu
+  loại tham chiếu (mặc định hệ thống/đơn vị, quyền sử dụng model, trợ lý, lịch sử lập chỉ mục/biên
+  soạn/phản biện/sử dụng model). Lịch sử được giữ; gỡ model khỏi allowlist không xóa lịch sử;
+  mặc định không được trỏ vào model đã xóa (`409 allowlist_default_not_allowed`).
+- **Lưu trữ tài liệu** không còn là thao tác chuẩn của FE; `archive` chỉ dùng cho dữ liệu cũ/khôi
+  phục.
+
+## 7. Không thuộc luồng chính (quản trị/tích hợp)
 
 Vẫn giữ hợp đồng và quyền riêng, nhưng FE thường không hiển thị mặc định:
 
@@ -182,7 +268,7 @@ Vẫn giữ hợp đồng và quyền riêng, nhưng FE thường không hiển 
 - `PUT /workspaces/{workspace_id}/quota` là shim deprecated: nhận body nhưng không áp giới hạn.
   FE mới chỉ đọc thống kê sử dụng; không dùng endpoint này để điều kiện hóa gọi model.
 
-## 7. Trạng thái và lỗi
+## 8. Trạng thái và lỗi
 
 - Lỗi trả RFC 7807 có `code`, `detail`, `correlation_id`; UI hiển thị mã và hướng xử lý, không
   biến lỗi provider/hạ tầng thành "không có dữ liệu".

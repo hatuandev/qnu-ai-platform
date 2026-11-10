@@ -122,6 +122,15 @@ async def download_markdown(
     )
 
 
+@router.get("/checks", response_model=list[DetectionResponse])
+async def list_checks(
+    run: OcrProcessingRun = Depends(scoped_run),
+    version: int | None = Query(None, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    return await detection.list_checks(db, run, version)
+
+
 @router.post("/checks", response_model=DetectionResponse)
 async def detect_text(
     body: DetectRequest,

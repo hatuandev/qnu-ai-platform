@@ -15,7 +15,7 @@ from qnu.workers.tasks.compilation import (
     manual_compiler_review_job,
 )
 from qnu.workers.tasks.indexing import index_maintenance, index_reconcile, index_run, index_sync
-from qnu.workers.tasks.ocr import ocr_process_run, ocr_reconcile_queued, shutdown, startup
+from qnu.workers.tasks.ocr import ocr_process_run, ocr_reconcile_queued, shutdown, spelling_check_job, startup
 from qnu.workers.tasks.operations import (
     evidence_backup_delete,
     evidence_backup_job,
@@ -32,6 +32,7 @@ class WorkerSettings:
     functions: list = [
         func(ocr_process_run, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         ocr_reconcile_queued,
+        spelling_check_job,
         func(compile_run, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         compilation_reconcile,
         func(compiler_review_job, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.api.dependencies import get_actor, get_blob_store, get_db, get_job_queue
 from qnu.domains.identity.actor import AuthActor
-from qnu.domains.lifecycle import service
+from qnu.domains.lifecycle import purge, service
 from qnu.domains.lifecycle.schemas import (
     AcceptRequest,
     ActionResponse,
@@ -84,6 +84,22 @@ async def resources(
 @router.get("/source-deletions", response_model=list[ActionResponse])
 async def pending_source_deletions(workspace_id: str, collection_id: str, db: DB, actor: Actor):
     return await service.pending_source_deletions(db, actor, workspace_id, collection_id)
+
+
+@router.get("/source-deletions/active", response_model=list[ActionResponse])
+async def active_source_deletions(
+    workspace_id: str,
+    db: DB,
+    actor: Actor,
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+):
+    return await service.active_source_deletions(db, actor, workspace_id, limit, offset)
+
+
+@router.post("/actions/{action_id}/takeover", response_model=ActionResponse)
+async def takeover(workspace_id: str, action_id: str, db: DB, actor: Actor):
+    return await purge.takeover(db, actor, workspace_id, action_id)
 
 
 @router.get("/source-deletions/legacy", response_model=LegacyDeletedSourcesResponse)

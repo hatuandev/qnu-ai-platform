@@ -92,7 +92,7 @@ export type V1RequestOptions = {
   signal?: AbortSignal;
   idempotencyKey?: string;
   timeoutMs?: number | null;
-  responseType?: "json" | "blob";
+  responseType?: "json" | "blob" | "text";
 };
 
 export function parseContentDispositionFileName(
@@ -150,6 +150,10 @@ export type V1Client = {
     path: string,
     options?: Omit<V1RequestOptions, "responseType">,
   ) => Promise<BlobResponse>;
+  requestText: (
+    path: string,
+    options?: Omit<V1RequestOptions, "responseType">,
+  ) => Promise<string>;
 };
 
 export type V1Fetch = (input: string, init?: RequestInit) => Promise<Response>;
@@ -358,6 +362,18 @@ export function createV1Client(options: V1ClientOptions = {}): V1Client {
       } as T;
     }
 
+    if (responseType === "text") {
+      return (await response.text()) as T;
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (
+      contentType.includes("text/markdown") ||
+      contentType.includes("text/plain")
+    ) {
+      return (await response.text()) as T;
+    }
+
     const parsed = isJsonResponse(response) ? await response.json() : undefined;
     return parsed as T;
   }
@@ -383,6 +399,12 @@ export function createV1Client(options: V1ClientOptions = {}): V1Client {
         ...requestOptions,
         method: "GET",
         responseType: "blob",
+      }),
+    requestText: (path, requestOptions) =>
+      request<string>(path, {
+        ...requestOptions,
+        method: "GET",
+        responseType: "text",
       }),
   };
 }

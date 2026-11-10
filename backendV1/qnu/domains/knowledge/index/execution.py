@@ -127,6 +127,7 @@ async def _embed_pending(db, blob, run, actor, model: EmbeddingModel, vectors: V
             {
                 "start": start,
                 "count": len(batch),
+                "chunk_ids": [chunk.id for chunk in batch],
                 "raw_key": raw_key,
                 "raw_sha256": raw_sha,
                 "usage_id": usage.id,

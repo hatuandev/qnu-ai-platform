@@ -300,10 +300,140 @@ def test_source_summary_pins_exact_runs_and_serving_version(client, composite):
     assert serving[0]["version"]["version_id"] == composite["compiled"]["version"]["id"]
     assert serving[0]["readiness"]["status"] == "ready"
     assert serving[0]["version"]["status"] == "published"
+    # Three distinct revisions, and the served ids come from the published one.
+    assert body["serving"] == {
+        "served_revision_no": 1,
+        "preparing_revision_no": None,
+        "published_revision_no": 1,
+        "served_version_id": composite["compiled"]["version"]["id"],
+        "served_document_id": composite["compiled"]["document"]["id"],
+    }
+    assert body["actions"] == {
+        "can_stop": False,
+        "can_withdraw": False,
+        "can_update": True,
+        "can_delete": False,
+    }
+    assert body["preparation"] is None
+
+    # Platform admins get the withdraw/delete affordances without a membership row.
+    as_actor(PLATFORM)
+    privileged = client.get(url, params=query).json()
+    assert privileged["actions"] == {
+        "can_stop": False,
+        "can_withdraw": True,
+        "can_update": True,
+        "can_delete": True,
+    }
+    as_actor(EDITOR)
 
     bounded = client.get(url, params={"runs_limit": 1, "derivations_limit": 1}).json()
     assert bounded["runs_truncated"] and len(bounded["processing_runs"]) == 1
     assert bounded["derivations_truncated"] and len(bounded["derivations"]) == 1
+
+
+def test_default_revision_upload_stages_candidate_without_switching_serving(client, composite):
+    as_actor(EDITOR)
+    source_url = (
+        collection_base(composite["workspace"]["id"], composite["collection"]["id"])
+        + "/sources/"
+        + composite["source_a"]["id"]
+    )
+    response = client.post(
+        source_url + "/revisions",
+        files={"file": ("candidate.pdf", real_pdf(["Candidate revision"]), "application/pdf")},
+        # ``staged`` is omitted on purpose: the default must keep revision 1 serving.
+        data={"auto_extract": "false"},
+    )
+    assert response.status_code == 201, response.text
+    uploaded = response.json()
+    assert uploaded["revision"]["revision_no"] == 2
+    assert uploaded["source"]["revision_count"] == 2
+    assert uploaded["source"]["current_revision_no"] == 2
+    assert uploaded["source"]["serving_revision_no"] == 1
+
+    url, query = source_summary_url(composite)
+    body = client.get(url, params=query).json()
+    assert body["latest_revision_no"] == 2
+    assert body["serving_revision_no"] == 1
+    assert body["revision"]["revision_no"] == 2
+    assert body["serving"]["served_revision_no"] == 1
+    assert body["serving"]["preparing_revision_no"] == 2
+    assert body["serving"]["published_revision_no"] == 1
+    assert body["serving"]["served_version_id"] == composite["compiled"]["version"]["id"]
+    assert body["serving"]["served_document_id"] == composite["compiled"]["document"]["id"]
+    assert body["actions"]["can_update"] is True
+    published = client.get(composite["document_url"] + "/published").json()
+    assert published["version"]["id"] == composite["compiled"]["version"]["id"]
+
+
+def test_source_actions_lock_only_for_confirmed_pending_delete(client, composite):
+    from datetime import timedelta
+
+    from qnu.domains.knowledge.compilation.models import utcnow
+    from qnu.domains.lifecycle.models import LifecycleAction
+    from qnu.platform.database import AsyncSessionFactory
+
+    as_actor(PLATFORM)
+    preview = client.post(
+        f"{API}/workspaces/{composite['workspace']['id']}/lifecycle/previews",
+        json={
+            "kind": "source",
+            "resource_id": composite["source_a"]["id"],
+            "action": "delete",
+            "reason": "Synthetic deletion preview.",
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    url, query = source_summary_url(composite)
+    unconfirmed = client.get(url, params=query).json()
+    # An unconfirmed preview never blocks editorial actions.
+    assert unconfirmed["actions"] == {
+        "can_stop": False,
+        "can_withdraw": True,
+        "can_update": True,
+        "can_delete": True,
+    }
+
+    async def set_receipt(status):
+        async with AsyncSessionFactory() as db:
+            row = await db.get(
+                LifecycleAction, "lca-summary-confirmed", populate_existing=True
+            )
+            if row is None:
+                db.add(
+                    LifecycleAction(
+                        id="lca-summary-confirmed",
+                        workspace_id=composite["workspace"]["id"],
+                        actor_ref=PLATFORM.actor_id,
+                        kind="source",
+                        resource_id=composite["source_a"]["id"],
+                        action="delete",
+                        reason="Synthetic confirmed deletion.",
+                        parameters={},
+                        impact={},
+                        state_sha256="0" * 64,
+                        preview_sha256="0" * 64,
+                        status=status,
+                        expires_at=utcnow() + timedelta(minutes=5),
+                        accepted_at=utcnow(),
+                    )
+                )
+            else:
+                row.status = status
+            await db.commit()
+
+    client.portal.call(set_receipt, "pending")
+    locked = client.get(url, params=query).json()
+    assert locked["actions"]["can_update"] is False
+    assert locked["actions"]["can_delete"] is False
+    assert locked["actions"]["can_withdraw"] is True
+    assert locked["actions"]["can_stop"] is False
+
+    client.portal.call(set_receipt, "completed")
+    unlocked = client.get(url, params=query).json()
+    assert unlocked["actions"]["can_update"] is True
+    assert unlocked["actions"]["can_delete"] is True
 
 
 def test_document_summary_lists_each_compiler_input_and_reused_readiness(client, composite):
@@ -383,7 +513,14 @@ def test_published_document_without_index_is_not_reported_ready(client):
     assert body["readiness"]["status"] == "not_indexed"
     assert body["serving_matches_published"] is False
     source_url, source_query = source_summary_url(data, source=data["source"])
-    derivations = client.get(source_url, params=source_query).json()["derivations"]
+    summary_body = client.get(source_url, params=source_query).json()
+    # A publication pointer alone never claims that an active index is serving it.
+    assert summary_body["serving"]["served_revision_no"] is None
+    assert summary_body["serving"]["served_version_id"] is None
+    assert summary_body["serving"]["served_document_id"] is None
+    assert summary_body["serving"]["published_revision_no"] == 1
+    assert summary_body["serving"]["preparing_revision_no"] == 1
+    derivations = summary_body["derivations"]
     assert derivations and all(item["is_serving"] is False for item in derivations)
 
 

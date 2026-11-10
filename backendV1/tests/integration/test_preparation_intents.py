@@ -7,6 +7,7 @@ pinned hashes — not the queue — decide what may run next.
 
 from sqlalchemy import func, select
 
+from qnu.domains.knowledge.compilation import service as compilation_service
 from qnu.domains.knowledge.compilation.models import CompilationInput, CompilationRun
 from qnu.domains.knowledge.preparation import service as preparation
 from qnu.domains.knowledge.preparation.models import PreparationIntent
@@ -177,6 +178,37 @@ def test_golden_path_reaches_ready_without_opening_ocr_or_compiler(client):
         )
         assert history.status_code == 200, history.text
         assert [row["id"] for row in history.json()] == [intent["id"]]
+
+
+def test_source_summary_reports_preparation_step_and_stop_action(client):
+    with FakeNemotron() as ocr_api:
+        data = prepared_workspace(client, "prep-summary", ocr_api)
+        queue = FakeJobQueue()
+        created = create_intent(client, data, key="prep-summary", queue=queue)
+        assert created.status_code == 201, created.text
+        intent_id = created.json()["intent"]["id"]
+        summary_url = (
+            f"{API}/workspaces/{data['workspace']['id']}/collections/{data['collection']['id']}"
+            f"/sources/{data['source']['id']}/summary"
+        )
+        as_actor(EDITOR)
+        body = client.get(summary_url).json()
+        assert body["preparation"] == {
+            "intent_id": intent_id,
+            "status": "queued",
+            "step": "Đã nhận yêu cầu",
+            "error_code": None,
+        }
+        assert body["serving"]["preparing_revision_no"] == created.json()["intent"]["revision_no"]
+        assert body["actions"]["can_stop"] is True
+
+        cancelled = client.post(_status_url(data, intent_id) + "/cancel")
+        assert cancelled.status_code == 200, cancelled.text
+        body = client.get(summary_url).json()
+        assert body["preparation"]["status"] == "cancelled"
+        assert body["preparation"]["step"] == "Đã dừng xử lý"
+        assert body["serving"]["preparing_revision_no"] is None
+        assert body["actions"]["can_stop"] is False
 
 
 def test_replay_keeps_one_intent_and_changed_body_is_rejected(client):
@@ -826,3 +858,154 @@ def test_cancel_during_worker_advance_is_not_overwritten(client):
         assert status["status"] == "cancelled"
         assert status["error_code"] == "preparation_cancelled"
         assert status["compilation_run_id"] is None
+
+
+def test_cancel_between_compilation_creation_and_link_releases_the_exclusive_run(
+    client, monkeypatch
+):
+    """A stop committed after the child row exists must release that exact run."""
+    with FakeNemotron() as ocr_api, FakeChat() as chat_api:
+        data = prepared_workspace(client, "prep-cancel-link", ocr_api)
+        chat_provider(client, data, chat_api.base_url, secret=None)
+        queue = FakeJobQueue()
+        intent_id = create_intent(client, data, key="prep-cancel-link", queue=queue).json()[
+            "intent"
+        ]["id"]
+        assert advance(client, intent_id, queue) == "waiting_ocr"
+        ocr_run_id = client.get(_status_url(data, intent_id)).json()["ocr_run_id"]
+        assert execute_now(client, ocr_run_id).status == "completed"
+
+        original = compilation_service.request_run
+        created_runs: list[str] = []
+
+        async def create_then_cancel(*args, **kwargs):
+            outcome = await original(*args, **kwargs)
+            created_runs.append(outcome.run.id)
+            async with AsyncSessionFactory() as cancel_db:
+                await preparation.cancel(
+                    cancel_db,
+                    EDITOR,
+                    data["workspace"]["id"],
+                    data["collection"]["id"],
+                    intent_id,
+                )
+            return outcome
+
+        monkeypatch.setattr(compilation_service, "request_run", create_then_cancel)
+        assert advance(client, intent_id, queue) == "cancelled"
+
+        status = client.get(_status_url(data, intent_id)).json()
+        assert status["status"] == "cancelled"
+        assert status["error_code"] == "preparation_cancelled"
+        assert status["compilation_run_id"] is None
+        assert len(created_runs) == 1
+
+        async def stored_run():
+            async with AsyncSessionFactory() as db:
+                row = await db.get(CompilationRun, created_runs[0])
+                ocr = await db.get(OcrProcessingRun, ocr_run_id)
+                return row.status, row.idempotency_key, ocr.status
+
+        assert client.portal.call(stored_run) == (
+            "cancelled",
+            f"prep:{intent_id}",
+            "completed",
+        )
+        assert execute_compile(client, created_runs[0]) == "not_claimed"
+
+
+def test_cancel_does_not_cancel_a_shared_compilation_linked_by_reuse(client):
+    """Stopping an intent stops waiting; it never kills a run another intent owns."""
+    with FakeNemotron() as ocr_api, FakeChat() as chat_api:
+        data = prepared_workspace(client, "prep-shared-run", ocr_api)
+        chat_provider(client, data, chat_api.base_url, secret=None)
+        queue = FakeJobQueue()
+        owner_id = create_intent(
+            client, data, key="prep-shared-a", mode="auto", queue=queue
+        ).json()["intent"]["id"]
+        assert advance(client, owner_id, queue) == "waiting_ocr"
+        ocr_run_id = client.get(_status_url(data, owner_id)).json()["ocr_run_id"]
+        assert execute_now(client, ocr_run_id).status == "completed"
+        assert advance(client, owner_id, queue) == "compiling"
+        compilation_id = client.get(_status_url(data, owner_id)).json()["compilation_run_id"]
+
+        follower_id = create_intent(
+            client, data, key="prep-shared-b", mode="auto", queue=queue
+        ).json()["intent"]["id"]
+        assert advance(client, follower_id, queue) == "compiling"
+        follower = client.get(_status_url(data, follower_id)).json()
+        assert follower["compilation_run_id"] == compilation_id
+        assert follower["reused"] is True
+
+        cancelled = client.post(_status_url(data, follower_id) + "/cancel")
+        assert cancelled.status_code == 200, cancelled.text
+
+        async def run_status() -> str:
+            async with AsyncSessionFactory() as db:
+                return await db.scalar(
+                    select(CompilationRun.status).where(CompilationRun.id == compilation_id)
+                )
+
+        assert client.portal.call(run_status) == "queued"
+        assert advance(client, owner_id, queue) == "compiling"
+        assert execute_compile(client, compilation_id) == "completed"
+        assert advance(client, owner_id, queue) == "ready"
+        assert client.get(_status_url(data, follower_id)).json()["status"] == "cancelled"
+        assert client.portal.call(run_status) == "completed"
+
+
+def test_restart_and_reconcile_do_not_revive_a_cancelled_intent(client):
+    with FakeNemotron() as ocr_api:
+        data = prepared_workspace(client, "prep-restart-stop", ocr_api)
+        created = create_intent(
+            client, data, key="prep-restart-stop", queue=FakeJobQueue(failing=True)
+        )
+        intent_id = created.json()["intent"]["id"]
+        assert created.json()["dispatched"] is False
+        assert client.post(_status_url(data, intent_id) + "/cancel").json()["status"] == (
+            "cancelled"
+        )
+
+        restarted = FakeJobQueue()
+
+        async def reconcile() -> int:
+            async with AsyncSessionFactory() as db:
+                return await preparation.reconcile(db, restarted)
+
+        assert client.portal.call(reconcile) == 0
+        assert restarted.jobs == []
+        assert advance(client, intent_id, restarted) == "not_claimed"
+        assert client.get(_status_url(data, intent_id)).json()["status"] == "cancelled"
+        assert count(client, OcrProcessingRun) == 0
+
+
+def test_interrupted_advance_is_recorded_uncertain_and_not_retried(client, monkeypatch):
+    with FakeNemotron() as ocr_api:
+        data = prepared_workspace(client, "prep-uncertain", ocr_api)
+        queue = FakeJobQueue()
+        intent_id = create_intent(client, data, key="prep-uncertain", queue=queue).json()[
+            "intent"
+        ]["id"]
+
+        original = preparation._advance
+
+        async def crash(*args, **kwargs):
+            raise RuntimeError("synthetic worker crash")
+
+        monkeypatch.setattr(preparation, "_advance", crash)
+        assert advance(client, intent_id, queue) == "uncertain"
+        monkeypatch.setattr(preparation, "_advance", original)
+
+        status = client.get(_status_url(data, intent_id)).json()
+        assert status["status"] == "uncertain"
+        assert status["error_code"] == "preparation_advance_interrupted"
+        assert status["finished_at"] is not None
+
+        async def released():
+            async with AsyncSessionFactory() as db:
+                row = await db.get(PreparationIntent, intent_id, populate_existing=True)
+                return row.worker_id, row.lease_expires_at
+
+        assert client.portal.call(released) == (None, None)
+        assert advance(client, intent_id, queue) == "not_claimed"
+        assert count(client, OcrProcessingRun) == 0

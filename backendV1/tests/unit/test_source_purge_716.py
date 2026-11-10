@@ -13,15 +13,26 @@ from qnu.api.handlers import register_exception_handlers
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.lifecycle import purge, service, targets
+from qnu.domains.lifecycle.models import LifecycleAction
 from qnu.domains.lifecycle.purge_graph import graph_plan
 from qnu.domains.lifecycle.router import router
 from qnu.domains.lifecycle.schemas import AcceptRequest, ActionResponse
 from qnu.platform.errors import Conflict, DependencyUnavailable
 
 
-def test_published_source_preview_returns_409_without_destructive_call(monkeypatch):
+def test_published_source_preview_lists_versions_without_destructive_call(monkeypatch):
     actor = AuthActor(username="synthetic-admin", actor_id="synthetic-admin")
-    db, blob = Mock(), SimpleNamespace(purge=AsyncMock(), target_hash="storage")
+
+    added = []
+
+    def add(row):
+        # Flush-time column defaults are not applied by the mocked session.
+        row.progress, row.attempt_count = {}, 0
+        if isinstance(row, LifecycleAction):
+            added.append(row)
+
+    db = SimpleNamespace(add=add, commit=AsyncMock())
+    blob = SimpleNamespace(purge=AsyncMock(), target_hash="storage")
     source = SimpleNamespace(id="source", workspace_id="w", collection_id="c", title="Synthetic")
     monkeypatch.setattr(service, "authorize", AsyncMock())
     monkeypatch.setattr(targets, "target", AsyncMock(return_value=source))
@@ -29,13 +40,19 @@ def test_published_source_preview_returns_409_without_destructive_call(monkeypat
     monkeypatch.setattr(targets, "state", AsyncMock(return_value=None))
     monkeypatch.setattr(targets, "require_operation", Mock())
     monkeypatch.setattr(targets, "snapshot", AsyncMock(return_value=({}, {})))
+    plan = {"graph_sha256": "graph", "objects": {}, "rows": {}}
     monkeypatch.setattr(
         purge,
-        "graph_for_source",
+        "inspect_source",
         AsyncMock(
-            side_effect=Conflict(
-                "Thu hồi phát hành trước khi xóa.",
-                code="source_publication_in_use",
+            return_value=(
+                plan,
+                {
+                    "permanent": True,
+                    "published_versions_to_withdraw": 1,
+                    "published_version_ids": ["version"],
+                    "restore_available": False,
+                },
             )
         ),
     )
@@ -55,9 +72,11 @@ def test_published_source_preview_returns_409_without_destructive_call(monkeypat
                 "reason": "Synthetic deletion",
             },
         )
-    assert response.status_code == 409
-    assert response.json()["code"] == "source_publication_in_use"
-    db.add.assert_not_called()
+    assert response.status_code == 200, response.text
+    assert response.json()["impact"]["published_versions_to_withdraw"] == 1
+    assert response.json()["impact"]["published_version_ids"] == ["version"]
+    assert len(added) == 1
+    assert added[0].status == "preview"
     blob.purge.assert_not_awaited()
 
 
@@ -120,15 +139,28 @@ async def test_partial_storage_failure_keeps_intent_and_same_receipt_can_resume(
         action="delete",
         status="pending",
         error_code=None,
+        phase=None,
+        progress={},
+        worker_id=None,
+        lease_expires_at=None,
+        attempt_count=0,
+        last_error_at=None,
         result={
             "permanent": True,
             "_purge_plan": plan,
             "not_before": (utcnow() - timedelta(seconds=1)).isoformat(),
         },
     )
+
+    async def scalar(statement):
+        # Apply fenced UPDATE values like the database would; the row itself is state.
+        for column, value in (getattr(statement, "_values", None) or {}).items():
+            setattr(row, column.key, getattr(value, "value", value))
+        return row
+
     db = SimpleNamespace(
         get=AsyncMock(return_value=row),
-        scalar=AsyncMock(return_value=row),
+        scalar=scalar,
         commit=AsyncMock(),
         rollback=AsyncMock(),
     )
@@ -273,9 +305,26 @@ async def test_s3_purge_removes_versions_and_markers_only_for_exact_key():
 @pytest.mark.asyncio
 async def test_worker_rechecks_actor_authority_before_any_delete(monkeypatch):
     row = SimpleNamespace(
-        kind="source", action="delete", status="pending", workspace_id="w", actor_ref="actor"
+        kind="source",
+        action="delete",
+        status="pending",
+        workspace_id="w",
+        actor_ref="actor",
+        phase=None,
+        progress={},
+        worker_id=None,
+        lease_expires_at=None,
+        attempt_count=0,
+        last_error_at=None,
+        result={},
+        error_code=None,
     )
-    db = SimpleNamespace(get=AsyncMock(return_value=row), rollback=AsyncMock(), commit=AsyncMock())
+    db = SimpleNamespace(
+        get=AsyncMock(return_value=row),
+        scalar=AsyncMock(return_value=row),
+        rollback=AsyncMock(),
+        commit=AsyncMock(),
+    )
     monkeypatch.setattr(
         purge,
         "resolve_workspace_access",
@@ -296,6 +345,7 @@ async def test_remaining_index_gets_derived_manifest_without_reembedding(monkeyp
     from qnu.domains.knowledge.index import search
 
     run = SimpleNamespace(id="i", workspace_id="w", manifest_key="old", manifest_sha256="old-sha")
+    action = SimpleNamespace(id="a", workspace_id="w", result={})
     old = {
         "inputs": [{"version_id": "removed"}, {"version_id": "kept"}],
         "chunks": [{"id": "removed-chunk"}, {"id": "kept-chunk"}],
@@ -303,14 +353,18 @@ async def test_remaining_index_gets_derived_manifest_without_reembedding(monkeyp
     }
     monkeypatch.setattr(search, "manifest", AsyncMock(return_value=old))
     db, blob = (
-        SimpleNamespace(get=AsyncMock(return_value=run)),
+        SimpleNamespace(
+            get=AsyncMock(return_value=action),
+            scalar=AsyncMock(return_value=run),
+            commit=AsyncMock(),
+        ),
         SimpleNamespace(put_bytes=AsyncMock()),
     )
     graph = {
         "kb_index_inputs": {("input",): {"run_id": "i", "version_id": "removed"}},
         "kb_index_chunks": {("chunk",): {"run_id": "i", "id": "removed-chunk"}},
     }
-    await purge._reseal_indexes(db, blob, graph, "a")
+    await purge._reseal_indexes(db, blob, graph, "a", "purge:test")
     written = json.loads(blob.put_bytes.call_args.args[1])
     assert written["inputs"] == [{"version_id": "kept"}]
     assert written["chunks"] == [{"id": "kept-chunk"}]

@@ -233,7 +233,7 @@ def test_withdrawal_while_building_keeps_newer_intent_and_never_activates_stale_
         assert client.get(source["base"] + "/search-readiness").json()["revision"] == 2
         assert sync_now(client, source) == "building"
         assert execute_index(client, run_id) == "failed"
-        assert sync_now(client, source) == "ready"
+        assert sync_now(client, source) == "empty"
         assert not fake.requests
         assert all(not r["is_active"] for r in client.get(source["base"] + "/indexing-runs").json())
 

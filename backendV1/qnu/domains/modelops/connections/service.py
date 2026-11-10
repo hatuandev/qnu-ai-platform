@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
@@ -193,11 +193,82 @@ async def save_connection(
     return (await output(db, [row]))[0]
 
 
+async def _provider_references(db: AsyncSession, ids: set[str]) -> list[str]:
+    from qnu.domains.assistants.models import Assistant
+    from qnu.domains.knowledge.compilation.models import CompilationRun
+    from qnu.domains.knowledge.compilation.review.models import CompilationReview
+    from qnu.domains.knowledge.index.models import IndexRun
+    from qnu.domains.modelops.models import (
+        ModelDefaults,
+        ModelUsageRecord,
+        WorkspaceAllowedProvider,
+        WorkspaceModelDefault,
+    )
+
+    default_columns = (
+        ModelDefaults.chat_provider_id,
+        ModelDefaults.embedding_provider_id,
+        ModelDefaults.rerank_provider_id,
+        ModelDefaults.ocr_provider_id,
+    )
+    checks = (
+        (
+            "cấu hình mặc định hệ thống",
+            select(ModelDefaults.id).where(
+                or_(*(column.in_(ids) for column in default_columns))
+            ),
+        ),
+        (
+            "cấu hình mặc định của đơn vị",
+            select(WorkspaceModelDefault.workspace_id).where(
+                WorkspaceModelDefault.provider_id.in_(ids)
+            ),
+        ),
+        (
+            "quyền sử dụng model của đơn vị",
+            select(WorkspaceAllowedProvider.workspace_id).where(
+                WorkspaceAllowedProvider.provider_id.in_(ids)
+            ),
+        ),
+        ("trợ lý", select(Assistant.id).where(Assistant.chat_provider_id.in_(ids))),
+        ("lịch sử lập chỉ mục", select(IndexRun.id).where(IndexRun.provider_id.in_(ids))),
+        (
+            "lịch sử biên soạn",
+            select(CompilationRun.id).where(CompilationRun.provider_id.in_(ids)),
+        ),
+        (
+            "lịch sử phản biện",
+            select(CompilationReview.id).where(CompilationReview.provider_id.in_(ids)),
+        ),
+        (
+            "lịch sử sử dụng model",
+            select(ModelUsageRecord.id).where(ModelUsageRecord.provider_id.in_(ids)),
+        ),
+    )
+    return [
+        label
+        for label, statement in checks
+        if await db.scalar(statement.limit(1)) is not None
+    ]
+
+
+async def _require_unreferenced(db: AsyncSession, ids: set[str]) -> None:
+    references = await _provider_references(db, ids)
+    if references:
+        raise Conflict(
+            "Không thể xóa model/nhà cung cấp đang được tham chiếu: "
+            + ", ".join(references)
+            + ". Hãy chuyển cấu hình, trợ lý và quyền sử dụng sang model khác trước.",
+            code="model_provider_in_use",
+        )
+
+
 async def delete_connection(db: AsyncSession, actor: AuthActor, connection_id: str) -> None:
     require_model_admin(actor)
     row = await get_connection(db, connection_id, lock=True)
     # Delete child models
     child_ids = list((await db.scalars(select(Provider.id).where(Provider.parent_id == connection_id))).all())
+    await _require_unreferenced(db, {connection_id, *child_ids})
     for cid in child_ids:
         child = await db.get(Provider, cid)
         if child:
@@ -328,6 +399,7 @@ async def delete_model(
     )).first()
     if model is None:
         raise EntityNotFound("Không tìm thấy model trong nhà cung cấp này.", code="model_not_found")
+    await _require_unreferenced(db, {model.id})
     await db.delete(model)
     record_event(db, actor, "model.deleted", model_id, ["deleted"])
     await db.commit()

@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.conversations.models import Conversation
@@ -13,7 +13,11 @@ from qnu.domains.lifecycle import effects, targets
 from qnu.domains.lifecycle.models import LifecycleAction, ResourceState
 from qnu.domains.lifecycle.schemas import AcceptRequest, PreviewRequest
 from qnu.domains.ocr.ids import new_id
-from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
+from qnu.domains.workspaces.access import (
+    actor_ref,
+    caller_workspace_role,
+    resolve_workspace_access,
+)
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException, Conflict, EntityNotFound
@@ -36,7 +40,7 @@ async def authorize(
     ):
         roles = (
             ("admin",)
-            if kind in {"assistant", "index"} or action in {"delete", "replace"}
+            if kind in {"assistant", "index"} or action in {"delete", "withdraw", "replace"}
             else ("admin", "editor")
         )
     await resolve_workspace_access(db, actor, workspace_id, required_roles=roles, for_update=True)
@@ -80,7 +84,40 @@ async def inspect(
             db, actor, workspace_id, required_roles=("admin",), for_update=True
         )
     targets.require_operation(kind, action, row, resource)
+    if kind == "collection" and action == "delete":
+        from qnu.domains.knowledge.models import KBFolder, KBSource
+
+        source_count = await db.scalar(
+            select(func.count()).select_from(KBSource).where(
+                KBSource.collection_id == row.id, KBSource.workspace_id == workspace_id
+            )
+        )
+        folder_count = await db.scalar(
+            select(func.count())
+            .select_from(KBFolder)
+            .where(
+                KBFolder.collection_id == row.id,
+                KBFolder.workspace_id == workspace_id,
+                KBFolder.id.not_in(
+                    select(ResourceState.resource_id).where(
+                        ResourceState.workspace_id == workspace_id,
+                        ResourceState.kind == "folder",
+                        ResourceState.status == "deleted",
+                    )
+                ),
+            )
+        )
+        if source_count or folder_count:
+            raise Conflict(
+                "Chỉ xóa kho khi kho đã trống tài liệu và thư mục.",
+                code="collection_not_empty",
+            )
+    if action == "withdraw":
+        impact_note = {"withdraw_keeps_originals": True, "restore_available": True}
+    else:
+        impact_note = {}
     current, impact = await targets.snapshot(db, workspace_id, kind, row, parameters)
+    impact.update(impact_note)
     if kind == "source" and action == "delete":
         plan, permanent_impact = await purge.inspect_source(db, row, blob)
         current["purge_graph_sha256"] = plan["graph_sha256"]
@@ -152,12 +189,24 @@ async def detail(
     db: AsyncSession, actor: AuthActor, workspace_id: str, action_id: str
 ) -> LifecycleAction:
     await resolve_workspace_access(db, actor, workspace_id, for_update=True)
+    visible = LifecycleAction.actor_ref == actor_ref(actor)
+    if await caller_workspace_role(db, actor, workspace_id) == "admin":
+        # A workspace admin can resume a confirmed permanent source deletion that
+        # outlived its confirmer. Other receipts stay bound to their owner.
+        visible = or_(
+            visible,
+            and_(
+                LifecycleAction.kind == "source",
+                LifecycleAction.action == "delete",
+                LifecycleAction.status != "preview",
+            ),
+        )
     row = await db.scalar(
         select(LifecycleAction)
         .where(
             LifecycleAction.id == action_id,
             LifecycleAction.workspace_id == workspace_id,
-            LifecycleAction.actor_ref == actor_ref(actor),
+            visible,
         )
         .with_for_update()
         .execution_options(populate_existing=True)
@@ -351,6 +400,31 @@ async def pending_source_deletions(db, actor, workspace_id, collection_id):
             )
         ).all()
     )
+
+
+async def active_source_deletions(db, actor, workspace_id, limit, offset):
+    """Admin view of pending permanent deletions, including stuck receipts."""
+    await resolve_workspace_access(
+        db, actor, workspace_id, required_roles=("admin",), for_update=True
+    )
+    rows = (
+        await db.scalars(
+            select(LifecycleAction)
+            .where(
+                LifecycleAction.workspace_id == workspace_id,
+                LifecycleAction.kind == "source",
+                LifecycleAction.action == "delete",
+                LifecycleAction.status == "pending",
+            )
+            .order_by(
+                LifecycleAction.last_error_at.desc().nulls_last(),
+                LifecycleAction.created_at,
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+    ).all()
+    return list(rows)
 
 
 async def legacy_deleted_sources(db, actor, workspace_id, collection_id, limit, offset):

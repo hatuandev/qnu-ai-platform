@@ -51,6 +51,7 @@ from qnu.ports.job_queue import JobQueue
 logger = get_logger(__name__)
 TASK_NAME = "preparation_job"
 LEASE_SECONDS = 180
+RECONCILE_GRACE_SECONDS = 60
 ADVANCING_OCR_STATUSES = ("queued", "running")
 FAILED_OCR_STATUSES = ("failed", "uncertain", "cancelled")
 @dataclass(frozen=True, slots=True)
@@ -275,23 +276,10 @@ async def cancel(
     intent.finished_at = utcnow()
     intent.lease_expires_at = None
     intent.worker_id = None
-    if intent.compilation_run_id:
-        # Conditional update: a run that already settled is never rewritten as cancelled.
-        await db.execute(
-            update(CompilationRun)
-            .where(
-                CompilationRun.id == intent.compilation_run_id,
-                CompilationRun.workspace_id == workspace_id,
-                CompilationRun.status.in_(ADVANCING_OCR_STATUSES),
-            )
-            .values(
-                status="cancelled",
-                error_code="compilation_cancelled",
-                finished_at=utcnow(),
-                lease_expires_at=None,
-                worker_id=None,
-            )
-        )
+    # Release the exclusive child reserved under this intent's idempotency key.
+    # A reused/shared run stays with its owner; a row that already settled is
+    # never rewritten.
+    await _cancel_exclusive_compilation(db, intent, workspace_id)
     await record_workspace_event(
         db,
         workspace_id=workspace_id,
@@ -302,6 +290,48 @@ async def cancel(
     await db.commit()
     await db.refresh(intent)
     return intent
+
+
+async def _cancel_exclusive_compilation(
+    db: AsyncSession, intent: PreparationIntent, workspace_id: str
+) -> None:
+    """Cancel only the run reserved under this intent's key.
+
+    A linked run may be shared through reuse; ending one intent's wait must not
+    stop work another intent still owns.
+    """
+    await db.execute(
+        update(CompilationRun)
+        .where(
+            CompilationRun.idempotency_key == f"prep:{intent.id}",
+            CompilationRun.workspace_id == workspace_id,
+            CompilationRun.status.in_(ADVANCING_OCR_STATUSES),
+        )
+        .values(
+            status="cancelled",
+            error_code="compilation_cancelled",
+            finished_at=utcnow(),
+            lease_expires_at=None,
+            worker_id=None,
+        )
+    )
+
+
+async def _link_child(
+    db: AsyncSession, intent: PreparationIntent, field: str, child_id: str
+) -> str | None:
+    """Link a child only while the intent is still active; return current status."""
+    result = await db.execute(
+        update(PreparationIntent)
+        .where(
+            PreparationIntent.id == intent.id,
+            PreparationIntent.status.in_(ACTIVE_PREPARATION_STATUSES),
+        )
+        .values({field: child_id})
+        .returning(PreparationIntent.status)
+    )
+    await db.commit()
+    return result.scalar_one_or_none()
 
 
 async def notify_for_ocr_run(db: AsyncSession, run_id: str, queue: JobQueue | None) -> bool:
@@ -393,6 +423,7 @@ async def reconcile(db: AsyncSession, queue: JobQueue | None) -> int:
     if queue is None:
         return 0
     now = utcnow()
+    grace = now - timedelta(seconds=RECONCILE_GRACE_SECONDS)
     rows = (
         await db.scalars(
             select(PreparationIntent.id)
@@ -400,6 +431,10 @@ async def reconcile(db: AsyncSession, queue: JobQueue | None) -> int:
                 PreparationIntent.status.in_(ACTIVE_PREPARATION_STATUSES),
                 PreparationIntent.lease_expires_at.is_(None)
                 | (PreparationIntent.lease_expires_at < now),
+                # Checkpoint: a delivery already dispatched inside the grace
+                # window is not re-enqueued on every reconcile pass.
+                PreparationIntent.dispatched_at.is_(None)
+                | (PreparationIntent.dispatched_at < grace),
             )
             .order_by(PreparationIntent.created_at)
             .limit(50)
@@ -576,13 +611,17 @@ async def _advance(
             waiting = await _advance_status(db, intent, "waiting_ocr")
             return waiting
         run = outcome.run
-        intent.ocr_run_id = run.id
-        await db.commit()
+        linked = await _link_child(db, intent, "ocr_run_id", run.id)
+        if linked is None:
+            # A shared OCR run is never cancelled; only this intent stops waiting.
+            return await _current_status(db, intent.id) or "cancelled"
 
     if run.status in ADVANCING_OCR_STATUSES:
         waiting = await _advance_status(db, intent, "waiting_ocr")
         if waiting != "waiting_ocr":
             return waiting
+        if await _inactive_status(db, intent.id):
+            return await _current_status(db, intent.id) or waiting
         await processing_service.dispatch(db, run, queue)
         return waiting
     if run.status in FAILED_OCR_STATUSES:
@@ -597,6 +636,8 @@ async def _advance(
             db, intent, "preparation_ocr_invalid", "Lượt đọc nội dung không dùng được."
         )
     await _verify_text_version(db, intent, run, workspace_id, collection_id)
+    if stopped := await _inactive_status(db, intent.id):
+        return stopped
 
     if intent.compilation_run_id:
         compilation = await db.get(CompilationRun, intent.compilation_run_id)
@@ -614,7 +655,9 @@ async def _advance(
             reuse_key = preparation_plan.reuse_key(intent, run)
             compilation = await preparation_plan.reusable_compilation(db, intent, reuse_key)
         if compilation is not None:
-            intent.compilation_run_id = compilation.id
+            linked = await _link_child(db, intent, "compilation_run_id", compilation.id)
+            if linked is None:
+                return await _current_status(db, intent.id) or "cancelled"
             intent.config = {**intent.config, "reused": True}
             await db.commit()
         else:
@@ -630,13 +673,21 @@ async def _advance(
                 reuse_key=reuse_key,
             )
             compilation = outcome.run
-            intent.compilation_run_id = compilation.id
-            await db.commit()
+            linked = await _link_child(db, intent, "compilation_run_id", compilation.id)
+            if linked is None:
+                # Only the run reserved under this intent's key is exclusive; a
+                # reused/shared run keeps running for the other intent.
+                if outcome.created:
+                    await _cancel_exclusive_compilation(db, intent, workspace_id)
+                    await db.commit()
+                return await _current_status(db, intent.id) or "cancelled"
 
     if compilation.status in ADVANCING_OCR_STATUSES:
         compiling = await _advance_status(db, intent, "compiling")
         if compiling != "compiling":
             return compiling
+        if await _inactive_status(db, intent.id):
+            return await _current_status(db, intent.id) or compiling
         await compilation_service.dispatch(db, compilation, queue)
         return compiling
     if compilation.status == "completed":
@@ -760,6 +811,11 @@ async def _current_status(db: AsyncSession, intent_id: str) -> str | None:
     return await db.scalar(
         select(PreparationIntent.status).where(PreparationIntent.id == intent_id)
     )
+
+
+async def _inactive_status(db: AsyncSession, intent_id: str) -> str | None:
+    status = await _current_status(db, intent_id)
+    return None if status in ACTIVE_PREPARATION_STATUSES else status
 
 
 async def _finish(

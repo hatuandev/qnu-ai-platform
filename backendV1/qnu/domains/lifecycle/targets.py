@@ -267,9 +267,9 @@ async def snapshot(
 def require_operation(kind: str, action: str, row: Base, lifecycle: ResourceState | None) -> None:
     status = lifecycle.status if lifecycle else (row.status if kind == "conversation" else "active")
     allowed = {
-        "collection": {"archive", "delete", "restore"},
-        "source": {"archive", "delete", "restore"},
-        "document": {"archive", "delete", "restore", "replace"},
+        "collection": {"archive", "withdraw", "delete", "restore"},
+        "source": {"archive", "withdraw", "delete", "restore"},
+        "document": {"archive", "withdraw", "delete", "restore", "replace"},
         "assistant": {"pause", "resume", "archive", "delete", "restore"},
         "conversation": {"archive", "delete", "restore"},
         "job": {"cancel"},
@@ -280,7 +280,7 @@ def require_operation(kind: str, action: str, row: Base, lifecycle: ResourceStat
     if action == "restore" and status == "active":
         raise Conflict("Tài nguyên chưa được lưu trữ/xóa.", code="lifecycle_transition_invalid")
     if (
-        action in {"archive", "delete", "pause", "resume", "replace"}
+        action in {"archive", "withdraw", "delete", "pause", "resume", "replace"}
         and status != "active"
         and not (action == "delete" and status == "archived")
         and not (kind == "source" and action == "delete" and status == "deleted")

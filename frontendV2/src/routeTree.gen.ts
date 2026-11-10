@@ -19,6 +19,7 @@ import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as KnowledgeIndexRouteImport } from './routes/knowledge.index'
 import { Route as KnowledgeSourceIdRouteImport } from './routes/knowledge.$sourceId'
+import { Route as KnowledgeSourceIdReviewRouteImport } from './routes/knowledge.$sourceId_.review'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -70,6 +71,11 @@ const KnowledgeSourceIdRoute = KnowledgeSourceIdRouteImport.update({
   path: '/$sourceId',
   getParentRoute: () => KnowledgeRoute,
 } as any)
+const KnowledgeSourceIdReviewRoute = KnowledgeSourceIdReviewRouteImport.update({
+  id: '/$sourceId_/review',
+  path: '/$sourceId/review',
+  getParentRoute: () => KnowledgeRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/knowledge/$sourceId': typeof KnowledgeSourceIdRoute
   '/knowledge/': typeof KnowledgeIndexRoute
+  '/knowledge/$sourceId/review': typeof KnowledgeSourceIdReviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/knowledge/$sourceId': typeof KnowledgeSourceIdRoute
   '/knowledge': typeof KnowledgeIndexRoute
+  '/knowledge/$sourceId/review': typeof KnowledgeSourceIdReviewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -106,6 +114,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/knowledge/$sourceId': typeof KnowledgeSourceIdRoute
   '/knowledge/': typeof KnowledgeIndexRoute
+  '/knowledge/$sourceId_/review': typeof KnowledgeSourceIdReviewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/knowledge/$sourceId'
     | '/knowledge/'
+    | '/knowledge/$sourceId/review'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -131,6 +141,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/knowledge/$sourceId'
     | '/knowledge'
+    | '/knowledge/$sourceId/review'
   id:
     | '__root__'
     | '/'
@@ -143,6 +154,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/knowledge/$sourceId'
     | '/knowledge/'
+    | '/knowledge/$sourceId_/review'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -228,17 +240,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KnowledgeSourceIdRouteImport
       parentRoute: typeof KnowledgeRoute
     }
+    '/knowledge/$sourceId_/review': {
+      id: '/knowledge/$sourceId_/review'
+      path: '/$sourceId/review'
+      fullPath: '/knowledge/$sourceId/review'
+      preLoaderRoute: typeof KnowledgeSourceIdReviewRouteImport
+      parentRoute: typeof KnowledgeRoute
+    }
   }
 }
 
 interface KnowledgeRouteChildren {
   KnowledgeSourceIdRoute: typeof KnowledgeSourceIdRoute
   KnowledgeIndexRoute: typeof KnowledgeIndexRoute
+  KnowledgeSourceIdReviewRoute: typeof KnowledgeSourceIdReviewRoute
 }
 
 const KnowledgeRouteChildren: KnowledgeRouteChildren = {
   KnowledgeSourceIdRoute: KnowledgeSourceIdRoute,
   KnowledgeIndexRoute: KnowledgeIndexRoute,
+  KnowledgeSourceIdReviewRoute: KnowledgeSourceIdReviewRoute,
 }
 
 const KnowledgeRouteWithChildren = KnowledgeRoute._addFileChildren(

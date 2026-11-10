@@ -145,6 +145,7 @@ def test_source_revision_changed_after_preview_blocks_accept(client):
             data["collection"]["id"],
             data["source"]["id"],
             payload=real_pdf(["New source revision"]),
+            staged=False,
         )
         assert changed.status_code == 201, changed.text
         response = accept_edit(client, data, preview)

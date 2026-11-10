@@ -14,7 +14,15 @@ ResourceKind = Literal[
     "collection", "source", "document", "assistant", "conversation", "job", "index"
 ]
 LifecycleOperation = Literal[
-    "archive", "delete", "restore", "pause", "resume", "cancel", "cleanup", "replace"
+    "archive",
+    "withdraw",
+    "delete",
+    "restore",
+    "pause",
+    "resume",
+    "cancel",
+    "cleanup",
+    "replace",
 ]
 
 
@@ -73,8 +81,16 @@ class ActionResponse(BaseModel):
     impact: dict
     preview_sha256: str
     status: str
+    phase: str | None = None
+    progress: dict = Field(default_factory=dict)
+    attempt_count: int = 0
     result: dict | None
     error_code: str | None
+    last_error_at: datetime | None = None
+    lease_expires_at: datetime | None = None
+    confirmed_by: str | None = None
+    takeover_by: str | None = None
+    takeover_at: datetime | None = None
     expires_at: datetime
     accepted_at: datetime | None
     finished_at: datetime | None

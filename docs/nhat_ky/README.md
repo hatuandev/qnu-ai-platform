@@ -1,5 +1,17 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên921 — Markdown/JSON và Rà soát chính tả FE V2](2026-11-10_phien_921_markdown_json_va_soat_chinh_ta_fe_v2.md).
+- [Phiên920 — Tách thông báo và tiến độ tác vụ nền FE V2](2026-11-10_phien_920_tac_vu_nen_va_tien_do_fe_v2.md).
+
+- [Phiên919 — Sửa bốn lỗi Studio FE V2 và thu gọn desktop/mobile](2026-11-10_phien_919_sua_studio_fe_v2.md).
+- [Phiên918 — Tối ưu giao diện Chi tiết tài liệu / Studio FE V2](2026-11-10_phien_918_toi_uu_giao_dien_studio_fe_v2.md).
+- [Phiên917 — Sửa xóa nền và trạng thái phiên bản nguồn](2026-11-09_phien_917_sua_xoa_nen_va_trang_thai.md).
+- [Phiên916 — Hoàn tất các lỗi còn lại của luồng xử lý ngược](2026-11-09_phien_916_hoan_tat_luong_nguoc.md).
+
+- [Phiên915 — Đồng bộ migration V1](2026-11-09_phien_915_dong_bo_migration_v1.md).
+
+- [Phiên914 — Quy trình xử lý ngược cho QNU V1](2026-11-09_phien_914_quy_trinh_xu_ly_nguoc.md).
+
 - [Phiên913 — Chốt mốc backend và rà vòng đời ngược](2026-11-09_phien_913_moc_backend_va_vong_doi_nguoc.md).
 
 - [Phiên912 — Hợp đồng duyệt/phát hành và policy auto khi thiếu adapter chat](2026-11-09_phien_912_hop_dong_duyet_phat_hanh.md).

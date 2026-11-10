@@ -4,13 +4,14 @@ import {
   Bot,
   ChevronLeft,
   ChevronRight,
-  Cpu,
   Inbox,
   LayoutDashboard,
   MessagesSquare,
+  Server,
   Settings,
   Workflow,
 } from "lucide-react";
+import { useInboxQuery } from "@/api/inbox/queries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/lib/ui-store";
@@ -52,8 +53,6 @@ const navigationSections: NavSection[] = [
         title: "Hộp thư duyệt",
         href: "/inbox",
         icon: Inbox,
-        badge: 2,
-        badgeVariant: "default",
       },
     ],
   },
@@ -81,9 +80,9 @@ const navigationSections: NavSection[] = [
         icon: Workflow,
       },
       {
-        title: "Mô hình AI",
+        title: "Nhà cung cấp",
         href: "/modelops",
-        icon: Cpu,
+        icon: Server,
       },
       {
         title: "Cài đặt",
@@ -94,15 +93,28 @@ const navigationSections: NavSection[] = [
   },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({
+  mobile = false,
+  onNavigate,
+}: {
+  mobile?: boolean;
+  onNavigate?: () => void;
+}) {
   const { pathname } = useLocation();
-  const { sidebarCollapsed, toggleSidebar } = useUiStore();
+  const {
+    sidebarCollapsed: desktopCollapsed,
+    toggleSidebar,
+    activeWorkspaceId,
+  } = useUiStore();
+  const sidebarCollapsed = !mobile && desktopCollapsed;
+  const { data: inboxData } = useInboxQuery(activeWorkspaceId);
+  const inboxPendingCount = inboxData?.meta?.total ?? 0;
 
   return (
     <aside
       className={cn(
-        "relative flex flex-col border-r border-border/60 bg-card transition-all duration-200 select-none",
-        sidebarCollapsed ? "w-16" : "w-64",
+        "relative flex h-full flex-col border-r border-border/60 bg-card transition-all duration-200 select-none",
+        mobile ? "w-full" : sidebarCollapsed ? "w-16" : "w-64",
       )}
     >
       {/* Sidebar Header: Workspace Switcher */}
@@ -131,6 +143,7 @@ export function AppSidebar() {
                   <Link
                     key={item.href}
                     to={item.href}
+                    onClick={onNavigate}
                     title={sidebarCollapsed ? item.title : undefined}
                     className={cn(
                       "group flex items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
@@ -152,14 +165,24 @@ export function AppSidebar() {
                     {!sidebarCollapsed && (
                       <span className="truncate flex-1">{item.title}</span>
                     )}
-                    {!sidebarCollapsed && item.badge && (
-                      <Badge
-                        variant={item.badgeVariant || "secondary"}
-                        className="ml-auto text-[10px] h-4 px-1.5"
-                      >
-                        {item.badge}
-                      </Badge>
-                    )}
+                    {!sidebarCollapsed &&
+                      (item.href === "/inbox"
+                        ? inboxPendingCount > 0 && (
+                            <Badge
+                              variant="default"
+                              className="ml-auto text-[10px] h-4 px-1.5"
+                            >
+                              {inboxPendingCount}
+                            </Badge>
+                          )
+                        : item.badge && (
+                            <Badge
+                              variant={item.badgeVariant || "secondary"}
+                              className="ml-auto text-[10px] h-4 px-1.5"
+                            >
+                              {item.badge}
+                            </Badge>
+                          ))}
                   </Link>
                 );
               })}
@@ -185,24 +208,26 @@ export function AppSidebar() {
             </div>
           </div>
         )}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={toggleSidebar}
-          className={cn(
-            "size-8 p-0 text-muted-foreground hover:text-foreground",
-            sidebarCollapsed && "mx-auto",
-          )}
-          aria-label={
-            sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"
-          }
-        >
-          {sidebarCollapsed ? (
-            <ChevronRight className="size-4" />
-          ) : (
-            <ChevronLeft className="size-4" />
-          )}
-        </Button>
+        {!mobile && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleSidebar}
+            className={cn(
+              "size-8 p-0 text-muted-foreground hover:text-foreground",
+              sidebarCollapsed && "mx-auto",
+            )}
+            aria-label={
+              sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"
+            }
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight className="size-4" />
+            ) : (
+              <ChevronLeft className="size-4" />
+            )}
+          </Button>
+        )}
       </div>
     </aside>
   );

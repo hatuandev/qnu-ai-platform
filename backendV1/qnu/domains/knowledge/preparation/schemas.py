@@ -50,6 +50,17 @@ class PreparationPolicyView(BaseModel):
     reason: str | None = None
 
 
+PREPARATION_STEPS = {
+    "queued": "Đã nhận yêu cầu",
+    "waiting_ocr": "Đang đọc nội dung",
+    "compiling": "Đang biên soạn",
+    "ready": "Đã chuẩn bị xong",
+    "failed": "Xử lý lỗi",
+    "uncertain": "Chưa xác định kết quả",
+    "cancelled": "Đã dừng xử lý",
+}
+
+
 class PreparationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -74,6 +85,7 @@ class PreparationResponse(BaseModel):
     updated_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    step: str | None = None
     policy: PreparationPolicyView | None = None
     reused: bool = False
 
@@ -86,6 +98,7 @@ def preparation_response(row) -> PreparationResponse:
         update={
             "policy": PreparationPolicyView.model_validate(policy) if policy else None,
             "reused": bool(config.get("reused")),
+            "step": PREPARATION_STEPS.get(row.status, row.status),
         }
     )
 

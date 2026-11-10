@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import type { AuthActor } from "@/api/auth";
+import type { Workspace } from "@/api/workspaces";
 
 export type Theme = "light" | "dark" | "system";
 
@@ -6,10 +8,17 @@ export type UiState = {
   theme: Theme;
   sidebarCollapsed: boolean;
   activeWorkspaceId: string | null;
+  activeWorkspace: Workspace | null;
+  isSingleUnitMode: boolean;
+  devActor: AuthActor | null;
+
   setTheme: (theme: Theme) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveWorkspaceId: (id: string | null) => void;
+  setActiveWorkspace: (ws: Workspace | null) => void;
+  setIsSingleUnitMode: (single: boolean) => void;
+  setDevActor: (actor: AuthActor | null) => void;
 };
 
 function getInitialTheme(): Theme {
@@ -25,6 +34,10 @@ export const useUiStore = create<UiState>((set) => ({
   theme: getInitialTheme(),
   sidebarCollapsed: false,
   activeWorkspaceId: null,
+  activeWorkspace: null,
+  isSingleUnitMode: false,
+  devActor: null,
+
   setTheme: (theme) => {
     localStorage.setItem("qnu-ui-theme", theme);
     if (typeof document !== "undefined") {
@@ -40,4 +53,11 @@ export const useUiStore = create<UiState>((set) => ({
     set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
   setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
   setActiveWorkspaceId: (activeWorkspaceId) => set({ activeWorkspaceId }),
+  setActiveWorkspace: (activeWorkspace) =>
+    set({
+      activeWorkspace,
+      activeWorkspaceId: activeWorkspace ? activeWorkspace.id : null,
+    }),
+  setIsSingleUnitMode: (isSingleUnitMode) => set({ isSingleUnitMode }),
+  setDevActor: (devActor) => set({ devActor }),
 }));

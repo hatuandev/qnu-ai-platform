@@ -98,6 +98,30 @@ class SourceDerivation(BaseModel):
     is_serving: bool = False
 
 
+class SourceServingState(BaseModel):
+    """Three distinct revisions: being prepared, published, actually served."""
+
+    served_revision_no: int | None = None
+    preparing_revision_no: int | None = None
+    published_revision_no: int | None = None
+    served_version_id: str | None = None
+    served_document_id: str | None = None
+
+
+class SourceActionPermissions(BaseModel):
+    can_stop: bool
+    can_withdraw: bool
+    can_update: bool
+    can_delete: bool
+
+
+class SourcePreparationSummary(BaseModel):
+    intent_id: str
+    status: str
+    step: str
+    error_code: str | None = None
+
+
 class SourceSummaryResponse(BaseModel):
     observed_at: datetime
     source_id: str
@@ -111,3 +135,6 @@ class SourceSummaryResponse(BaseModel):
     derivations: list[SourceDerivation]
     derivations_truncated: bool
     capabilities: SummaryCapabilities
+    serving: SourceServingState
+    actions: SourceActionPermissions
+    preparation: SourcePreparationSummary | None = None
