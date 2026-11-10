@@ -89,6 +89,7 @@ export type ModelProvider = {
   base_url: string;
   timeout_seconds: number;
   is_active: boolean;
+  is_connection?: boolean;
   token_limits?: TokenLimits | null;
   embedding_dimension?: number | null;
   capacity_status?: string;
@@ -145,4 +146,43 @@ export type ProviderDiagnostics = {
   provider_id: string;
   configured_active: boolean;
   checks: DiagnosticCheck[];
+};
+
+export type ModelDefaults = {
+  chat_provider_id: string | null;
+  chat_model: string | null;
+  embedding_provider_id: string | null;
+  embedding_model: string | null;
+  rerank_provider_id: string | null;
+  rerank_model: string | null;
+  ocr_provider_id: string | null;
+  ocr_model: string | null;
+  updated_by?: string | null;
+  updated_at?: string | null;
+  extra?: Record<string, unknown>;
+};
+
+export type DefaultsUpdateRequest = {
+  chat_provider_id?: string | null;
+  chat_model?: string | null;
+  embedding_provider_id?: string | null;
+  embedding_model?: string | null;
+  rerank_provider_id?: string | null;
+  rerank_model?: string | null;
+  ocr_provider_id?: string | null;
+  ocr_model?: string | null;
+};
+
+export type CatalogItem = {
+  id: string;
+  name: string;
+  model_name: string;
+  provider_type?: string | null;
+  capabilities: Capability[];
+  default_capabilities: Capability[];
+  token_limits?: Record<string, unknown> | null;
+  capacity_status?: "unknown" | "configured" | "stale";
+  capacity_basis?: "operator_configured" | "server_reported" | null;
+  embedding_dimension?: number | null;
+  embedding_dimension_status?: "unknown" | "configured" | "stale";
 };

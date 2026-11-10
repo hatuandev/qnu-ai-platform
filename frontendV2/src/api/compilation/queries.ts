@@ -6,8 +6,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   commitEdits,
   createEditPreview,
+  getCompilationArtifact,
   getCompilationDraft,
-  getCompilationMarkdown,
   getEditContext,
 } from "./requests";
 import type { EditCommitRequest, EditPreviewRequest } from "./types";
@@ -24,14 +24,13 @@ export const compilationKeys = {
       runId,
     ] as const,
 
-  markdown: (workspaceId: string, collectionId: string, runId: string) =>
-    [
-      ...compilationKeys.all,
-      "markdown",
-      workspaceId,
-      collectionId,
-      runId,
-    ] as const,
+  artifact: (
+    workspaceId: string,
+    collectionId: string,
+    runId: string,
+    kind: "markdown" | "json",
+  ) =>
+    [...compilationKeys.all, kind, workspaceId, collectionId, runId] as const,
 
   editContext: (workspaceId: string, collectionId: string, runId: string) =>
     [
@@ -62,24 +61,26 @@ export function useCompilationDraftQuery(
   });
 }
 
-export function useCompilationMarkdownQuery(
+export function useCompilationArtifactQuery(
+  kind: "markdown" | "json",
   workspaceId?: string | null,
   collectionId?: string | null,
   runId?: string | null,
+  enabled = true,
 ) {
   return useQuery({
     queryKey:
       workspaceId && collectionId && runId
-        ? compilationKeys.markdown(workspaceId, collectionId, runId)
-        : [...compilationKeys.all, "markdown", "empty"],
+        ? compilationKeys.artifact(workspaceId, collectionId, runId, kind)
+        : [...compilationKeys.all, kind, "empty"],
     queryFn: ({ signal }) => {
       if (!workspaceId || !collectionId || !runId)
         throw new Error("workspaceId, collectionId and runId are required");
-      return getCompilationMarkdown(workspaceId, collectionId, runId, {
+      return getCompilationArtifact(workspaceId, collectionId, runId, kind, {
         signal,
       });
     },
-    enabled: Boolean(workspaceId && collectionId && runId),
+    enabled: Boolean(enabled && workspaceId && collectionId && runId),
   });
 }
 

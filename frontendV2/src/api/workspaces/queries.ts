@@ -270,6 +270,9 @@ export function useSetAllowedProvidersMutation(workspaceId: string) {
       queryClient.invalidateQueries({
         queryKey: workspaceKeys.allowedProviders(workspaceId),
       });
+      queryClient.invalidateQueries({
+        queryKey: ["v1", "modelops", "catalog"],
+      });
     },
   });
 }
@@ -283,6 +286,9 @@ export function useSetWorkspaceDefaultsMutation(workspaceId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: workspaceKeys.allowedProviders(workspaceId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["v1", "modelops", "catalog"],
       });
     },
   });

@@ -110,11 +110,11 @@ export function SourceMoveDialog({
               </SelectTrigger>
               <SelectContent className="text-xs">
                 <SelectItem value="root">
-                  📁 Gốc kho tri thức (Không nằm trong thư mục)
+                  Gốc kho tri thức (Không nằm trong thư mục)
                 </SelectItem>
                 {allFolders.map((f) => (
                   <SelectItem key={f.id} value={f.id}>
-                    📁 {f.name}
+                    {f.name}
                   </SelectItem>
                 ))}
               </SelectContent>

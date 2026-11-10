@@ -1,7 +1,7 @@
 // Isolated browser regression: no application DB, model or publication writes.
 // Run from frontendV2: node --test tests/studio-browser.mjs
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { after, before, test } from "node:test";
 import { createServer } from "vite";
@@ -35,13 +35,13 @@ window.mountPublication = (props) => {
  React.createElement(PublicationDialog,{...props,open,onOpenChange:setOpen}));}
  root.render(React.createElement(QueryClientProvider,{client},React.createElement(Host)));
 };
-window.mountStudio = async () => {
+window.mountStudio = async (location = '/knowledge/src_test?collectionId=col_test') => {
  const {createRouter,createMemoryHistory,RouterProvider}=await import('@tanstack/react-router');
  const {routeTree}=await import('/src/routeTree.gen.ts');
  const {useUiStore}=await import('/src/lib/ui-store.ts');
  useUiStore.getState().setActiveWorkspace({id:'ws_test',code:'shl',name:'Đơn vị kiểm tra'});
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
- const router=createRouter({routeTree,history:createMemoryHistory({initialEntries:['/knowledge/src_test?collectionId=col_test']})});
+ const router=createRouter({routeTree,history:createMemoryHistory({initialEntries:[location]})});
  root.render(React.createElement(QueryClientProvider,{client},React.createElement(RouterProvider,{router})));
 };
 window.mountTasks = async (tasks) => {
@@ -566,6 +566,10 @@ test("Studio desktop/mobile layout has one Word toolbar, one served badge and ca
       can_approve: true,
       can_publish: true,
     };
+    const markdownBytes = Buffer.from(
+      "# Nội dung kiểm tra\r\n\r\n> Bản nháp chưa duyệt.\r\n\r\nĐoạn thử [ev_p001_b001]\r\n",
+    );
+    const jsonBytes = Buffer.from('{ "title": "Nội dung kiểm tra" }\n');
     await page.route("**/platform/v1alpha1/**", async (route) => {
       assert.equal(
         route.request().method(),
@@ -610,11 +614,17 @@ test("Studio desktop/mobile layout has one Word toolbar, one served badge and ca
       if (path.endsWith("/sources/src_test")) return send(source);
       if (path.endsWith("/revisions")) return send([revision]);
       if (path.endsWith("/draft")) return send(draft);
+      if (path.endsWith("/draft.json"))
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: jsonBytes,
+        });
       if (path.endsWith("/markdown"))
         return route.fulfill({
           status: 200,
           contentType: "text/markdown",
-          body: "# Nội dung kiểm tra",
+          body: markdownBytes,
         });
       if (path.endsWith("/edit-context"))
         return send({ content: draft, bundle_sha256: sha });
@@ -647,6 +657,30 @@ test("Studio desktop/mobile layout has one Word toolbar, one served badge and ca
       .waitFor({ state: "hidden" });
     await mkdir("../tmp/studio-919", { recursive: true });
     await page.screenshot({ path: "../tmp/studio-919/desktop.png" });
+    await page.getByRole("tab", { name: "Markdown" }).click();
+    await page.getByText("Đoạn thử", { exact: true }).waitFor();
+    assert.equal(
+      await page.getByText("Bản nháp chưa duyệt.", { exact: true }).count(),
+      0,
+    );
+    assert.equal(
+      await page.locator("article").getByText("[1]", { exact: true }).count(),
+      1,
+    );
+    const mdDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Tải .md" }).click();
+    assert.deepEqual(
+      await readFile(await (await mdDownload).path()),
+      markdownBytes,
+    );
+    await page.getByRole("button", { name: "Thao tác phụ" }).click();
+    const jsonDownload = page.waitForEvent("download");
+    await page.getByRole("menuitem", { name: "Tải tệp JSON" }).click();
+    assert.deepEqual(
+      await readFile(await (await jsonDownload).path()),
+      jsonBytes,
+    );
+    await page.getByRole("tab", { name: "Nội dung", exact: true }).click();
     await page.setViewportSize({ width: 390, height: 844 });
     await page
       .getByRole("button", { name: "Nội dung đã chuẩn bị", exact: true })
@@ -678,6 +712,144 @@ test("Studio desktop/mobile layout has one Word toolbar, one served badge and ca
     await page
       .getByRole("dialog", { name: "Điều hướng", exact: true })
       .waitFor({ state: "hidden" });
+    assert.deepEqual(errors, []);
+  } finally {
+    await page.close();
+  }
+});
+
+test("spelling review reads OCR v0, keeps the PDF URL and retries preparation without saving twice", async () => {
+  const { page, errors } = await pageForTest();
+  const preparation = [];
+  let saves = 0;
+  let checksAvailable = false;
+  const unit = {
+    evidence_id: "ev_1",
+    page: 2,
+    kind: "paragraph",
+    text: "Xin chào bạ",
+    original_text: "Xin chào bạ",
+    bbox: {},
+  };
+  const review = {
+    run_id: "ocr_test",
+    version: 0,
+    version_id: null,
+    canonical_sha256: sha,
+    original_sha256: sha,
+    units: [unit],
+  };
+  const revision = { id: "rev_test", revision_no: 1, file_name: "test.pdf" };
+  const source = {
+    id: "src_test",
+    title: "Tài liệu kiểm tra",
+    file_name: "test.pdf",
+  };
+  try {
+    await page.route("**/platform/v1alpha1/**", async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const path = url.pathname;
+      const send = (data, status = 200) =>
+        route.fulfill({ status, json: data });
+      if (path.endsWith("/sources/src_test/summary"))
+        return send({
+          revision,
+          active_run_id: "ocr_test",
+          processing_runs: [
+            { id: "ocr_test", status: "completed", revision_id: "rev_test" },
+          ],
+          derivations: [{ ocr_run_id: "ocr_test", version: { version_no: 7 } }],
+        });
+      if (path.endsWith("/sources/src_test")) return send(source);
+      if (path.endsWith("/content"))
+        return route.fulfill({
+          contentType: "application/pdf",
+          body: "%PDF-1.4\nfixture",
+        });
+      if (path.endsWith("/text-review/checks")) {
+        assert.equal(url.searchParams.get("version"), "0");
+        if (!checksAvailable)
+          return send({ detail: "Method Not Allowed" }, 405);
+        return send([
+          {
+            ...review,
+            id: "spl_test",
+            status: "completed",
+            total_evidence_count: 1,
+            checked_evidence_ids: ["ev_1"],
+            suggestions: [
+              {
+                evidence_id: "ev_1",
+                start: 9,
+                end: 11,
+                original: "bạ",
+                replacement: "bạn",
+                reason: "Thiếu chữ.",
+              },
+            ],
+          },
+        ]);
+      }
+      if (path.endsWith("/text-review") && request.method() === "GET") {
+        assert.equal(url.searchParams.get("version"), "0");
+        return send(review);
+      }
+      if (path.endsWith("/text-review")) {
+        saves++;
+        assert.equal(request.postDataJSON().changes[0].after, "Xin chào bạn");
+        return send({ ...review, version: 1, version_id: "txt_saved" });
+      }
+      if (
+        path.endsWith("/preparation-intents") &&
+        request.method() === "POST"
+      ) {
+        preparation.push({
+          key: request.headers()["idempotency-key"],
+          body: request.postDataJSON(),
+        });
+        return preparation.length === 1
+          ? send({ detail: "Queue unavailable" }, 503)
+          : send({ intent: { id: "prep_saved" } }, 201);
+      }
+      return send({ items: [], meta: { page: 1, page_size: 20, total: 0 } });
+    });
+    await page.evaluate(() =>
+      window.mountStudio("/knowledge/src_test/review?collectionId=col_test"),
+    );
+    const alert = page.getByRole("alert").filter({
+      hasText: "Không tải được kết quả soát chính tả",
+    });
+    await alert.waitFor();
+    assert.match(await alert.textContent(), /chưa hỗ trợ đọc danh sách gợi ý/);
+    assert.equal(await page.getByText("Chưa có gợi ý để hiển thị").count(), 0);
+    checksAvailable = true;
+    await page.getByRole("button", { name: "Thử tải lại" }).click();
+    await page.getByRole("button", { name: "Đối chiếu tệp gốc" }).click();
+    const pdf = page.locator('iframe[title="Bản gốc PDF"]');
+    await pdf.waitFor();
+    assert.equal(
+      await pdf.evaluate(
+        async (frame) => (await fetch(frame.src.split("#")[0])).ok,
+      ),
+      true,
+    );
+    await page.getByRole("button", { name: "Áp dụng", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Lưu thay đổi", exact: true })
+      .click();
+    await page.getByText("Bản sửa đã được lưu.", { exact: false }).waitFor();
+    await page
+      .getByRole("button", { name: "Chuẩn bị lại", exact: true })
+      .click();
+    await page.waitForFunction(
+      () => !document.querySelector('iframe[title="Bản gốc PDF"]'),
+    );
+    assert.equal(saves, 1);
+    assert.equal(preparation.length, 2);
+    assert.deepEqual(preparation[0], preparation[1]);
+    assert.equal(preparation[1].body.text_version, 1);
+    assert.equal(preparation[1].body.revision_id, "rev_test");
     assert.deepEqual(errors, []);
   } finally {
     await page.close();
@@ -807,10 +979,10 @@ test("background: measured stage progress and notifications do not overlap on de
     const state = { status: "waiting_ocr", done: 4, total: 8 };
     const calls = await mockTaskApi(page, state);
     await page.evaluate((task) => window.mountTasks([task]), backgroundTask);
-    await page.getByText("Đọc tệp: 4/8 trang").waitFor();
+    await page.getByText("Đã đọc 4/8 trang").waitFor();
     assert.equal(
       await page.getByRole("progressbar").getAttribute("aria-valuenow"),
-      "50",
+      "25",
     );
     for (const [name, width, height, dark] of [
       ["desktop", 1440, 900, false],
@@ -859,7 +1031,7 @@ test("background: measured stage progress and notifications do not overlap on de
     await page.close();
   }
 });
-test("background: unknown totals stay indeterminate; each stage has its own percent", async () => {
+test("background: unknown totals stay indeterminate and combined progress never resets", async () => {
   const { page, errors } = await pageForTest();
   try {
     const state = {
@@ -870,21 +1042,27 @@ test("background: unknown totals stay indeterminate; each stage has its own perc
     };
     await mockTaskApi(page, state);
     await page.evaluate((task) => window.mountTasks([task]), backgroundTask);
-    await page.getByText("Đang đọc nội dung").waitFor();
-    assert.equal(await page.getByRole("progressbar").count(), 0);
+    await page.getByText("Đang phân tích tệp…").waitFor();
+    assert.equal(
+      await page.getByRole("progressbar").getAttribute("aria-valuenow"),
+      null,
+    );
     state.total = 1;
     state.done = 1;
     await page.evaluate(() => window.refreshTaskReads());
-    await page.getByText("Đọc tệp: 1/1 đơn vị").waitFor();
-    await page.getByText("Đang hoàn tất bước xử lý…").waitFor();
+    await page.getByText("Đã đọc 1/1 đơn vị").waitFor();
+    assert.equal(
+      await page.getByRole("progressbar").getAttribute("aria-valuenow"),
+      "50",
+    );
     state.status = "compiling";
     state.done = 1;
     state.total = 4;
     await page.evaluate(() => window.refreshTaskReads());
-    await page.getByText("Chuẩn bị nội dung: 1/4 phần").waitFor();
+    await page.getByText("Đã chuẩn bị 1/4 phần").waitFor();
     assert.equal(
       await page.getByRole("progressbar").getAttribute("aria-valuenow"),
-      "25",
+      "61",
     );
     state.status = "ready";
     await page.evaluate(() => window.refreshTaskReads());
@@ -936,7 +1114,7 @@ test("background: dismissing keeps tracking and is different from explicit stop;
         ]),
       backgroundTask,
     );
-    await page.getByText("Chuẩn bị nội dung: 1/4 phần").waitFor();
+    await page.getByText("Đã chuẩn bị 1/4 phần").waitFor();
     await page
       .getByRole("button", { name: `Ẩn tác vụ ${backgroundTask.sourceTitle}` })
       .click();
@@ -958,7 +1136,7 @@ test("background: only an explicit stop sends the cancellation request", async (
     const state = { status: "compiling", done: 1, total: 4 };
     const calls = await mockTaskApi(page, state);
     await page.evaluate((task) => window.mountTasks([task]), backgroundTask);
-    await page.getByText("Chuẩn bị nội dung: 1/4 phần").waitFor();
+    await page.getByText("Đã chuẩn bị 1/4 phần").waitFor();
     await page
       .getByRole("button", { name: `Dừng xử lý ${backgroundTask.sourceTitle}` })
       .click();

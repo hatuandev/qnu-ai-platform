@@ -93,6 +93,7 @@ export type DetectionResponse = {
   suggestions: Suggestion[];
   withheld_suggestions?: Suggestion[];
   checked_evidence_ids: string[];
+  total_evidence_count?: number | null;
   error_code?: string | null;
   usage_id?: string | null;
   created_at: string;

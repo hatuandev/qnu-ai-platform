@@ -92,6 +92,13 @@ def test_compiler_draft_retains_tables_citations_raw_and_single_delivery(client)
         assert raw.headers["etag"] == '"' + hashlib.sha256(raw.content).hexdigest() + '"'
         assert raw.headers["cache-control"] == "private, no-store"
         assert client.get(url + "/markdown").status_code == 200
+        draft_file = client.get(url + "/draft.json")
+        assert draft_file.status_code == 200, draft_file.text
+        assert draft_file.json() == draft
+        assert (
+            draft_file.headers["etag"] == '"' + hashlib.sha256(draft_file.content).hexdigest() + '"'
+        )
+        assert draft_file.headers["cache-control"] == "private, no-store"
         listing = client.get(data["url"]).json()
         assert [r["id"] for r in listing] == [run_id]
         assert provider["id"] == status["provider_id"]

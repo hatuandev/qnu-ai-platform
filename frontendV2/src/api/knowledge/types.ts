@@ -81,6 +81,12 @@ export type FolderMoveRequest = {
 // Sources & Revisions
 // ==========================================
 
+export type SourceTextVersionRef = {
+  id: string;
+  version: number;
+  canonical_sha256: string;
+};
+
 export type ProcessingRunResponse = {
   id: string;
   source_id: string;
@@ -90,6 +96,7 @@ export type ProcessingRunResponse = {
   error_code?: string | null;
   created_at: string;
   finished_at?: string | null;
+  latest_text_version?: SourceTextVersionRef | null;
 };
 
 export type RevisionResponse = {
@@ -185,6 +192,7 @@ export type SourceDerivation = {
   origin: string;
   ocr_run_id: string;
   ocr_generation: number;
+  text_version?: SourceTextVersionRef | null;
   version?: SourceVersionRef | null;
   readiness?: {
     status: string;

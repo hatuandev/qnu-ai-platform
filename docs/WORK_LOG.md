@@ -1,5 +1,7 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context923 — Lỗi tải kết quả rà soát FE V2](nhat_ky/2026-11-10_phien_923_loi_tai_ket_qua_ra_soat_fe_v2.md).
+- [Context922 — Sửa soát chính tả và tệp xuất ở FE V2](nhat_ky/2026-11-10_phien_922_sua_soat_chinh_ta_va_tep_xuat_fe_v2.md).
 - [Context921 — Markdown/JSON và Rà soát chính tả FE V2](nhat_ky/2026-11-10_phien_921_markdown_json_va_soat_chinh_ta_fe_v2.md).
 - [Context920 — Tách thông báo và tiến độ tác vụ nền FE V2](nhat_ky/2026-11-10_phien_920_tac_vu_nen_va_tien_do_fe_v2.md).
 

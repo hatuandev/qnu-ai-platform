@@ -10,12 +10,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { downloadBlob } from "@/lib/download-blob";
 
 interface JsonStructureDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title?: string;
-  data: unknown;
+  artifact?: { blob: Blob; text: string };
+  isLoading?: boolean;
+  isError?: boolean;
   fileName?: string;
 }
 
@@ -23,20 +26,15 @@ export function JsonStructureDialog({
   open,
   onOpenChange,
   title = "Cấu trúc dữ liệu có định dạng JSON",
-  data,
+  artifact,
+  isLoading,
+  isError,
   fileName = "document-data.json",
 }: JsonStructureDialogProps) {
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const formattedJson = useMemo(() => {
-    if (!data) return "{}";
-    try {
-      return JSON.stringify(data, null, 2);
-    } catch {
-      return String(data);
-    }
-  }, [data]);
+  const formattedJson = artifact?.text ?? "";
 
   const handleCopy = async () => {
     try {
@@ -50,18 +48,7 @@ export function JsonStructureDialog({
   };
 
   const handleDownload = () => {
-    const blob = new Blob([formattedJson], {
-      type: "application/json;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName.endsWith(".json") ? fileName : `${fileName}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success("Đã tải tệp JSON về máy.");
+    if (artifact) downloadBlob(artifact.blob, fileName);
   };
 
   // Filter json lines if searchQuery is present
@@ -105,6 +92,7 @@ export function JsonStructureDialog({
               variant="outline"
               size="sm"
               onClick={handleCopy}
+              disabled={!artifact}
               className="h-8 text-xs gap-1.5"
             >
               {copied ? (
@@ -119,6 +107,7 @@ export function JsonStructureDialog({
               variant="default"
               size="sm"
               onClick={handleDownload}
+              disabled={!artifact}
               className="h-8 text-xs gap-1.5 shadow-2xs"
             >
               <Download className="size-3.5" />
@@ -129,7 +118,11 @@ export function JsonStructureDialog({
 
         {/* JSON Content Canvas */}
         <div className="flex-1 min-h-[300px] overflow-y-auto rounded-xl border border-border/70 bg-muted/30 p-4 text-xs font-mono select-text leading-relaxed">
-          {searchQuery && displayLines.length === 0 ? (
+          {isLoading || isError || !artifact ? (
+            <p role={isError ? "alert" : "status"}>
+              {isLoading ? "Đang tải tệp JSON…" : "Không tải được tệp JSON."}
+            </p>
+          ) : searchQuery && displayLines.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               Không tìm thấy dòng nào khớp với từ khóa "{searchQuery}"
             </div>

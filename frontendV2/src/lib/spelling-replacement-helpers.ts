@@ -20,6 +20,19 @@ export interface AppliedResult {
   errors: string[];
 }
 
+export function splitTextAtSuggestion(
+  text: string,
+  start: number,
+  end: number,
+) {
+  const chars = Array.from(text);
+  return {
+    before: chars.slice(0, start).join(""),
+    original: chars.slice(start, end).join(""),
+    after: chars.slice(end).join(""),
+  };
+}
+
 /**
  * Apply multiple text replacements on a single original string from right to left.
  */
@@ -33,21 +46,21 @@ export function applySuggestionsToText(
   }>,
 ): AppliedResult {
   const errors: string[] = [];
-  let currentText = originalText;
+  let chars = Array.from(originalText);
   let appliedCount = 0;
 
   // Sort descending by start offset to prevent character drift
   const sorted = [...replacements].sort((a, b) => b.start - a.start);
 
   for (const rep of sorted) {
-    if (rep.start < 0 || rep.end > currentText.length || rep.start > rep.end) {
+    if (rep.start < 0 || rep.end > chars.length || rep.start >= rep.end) {
       errors.push(
-        `Vị trí [${rep.start}, ${rep.end}] vượt ngoài độ dài chuỗi (${currentText.length}).`,
+        `Vị trí [${rep.start}, ${rep.end}] vượt ngoài độ dài chuỗi (${chars.length}).`,
       );
       continue;
     }
 
-    const actualOriginal = currentText.slice(rep.start, rep.end);
+    const actualOriginal = chars.slice(rep.start, rep.end).join("");
     if (actualOriginal !== rep.original) {
       errors.push(
         `Nguyên văn không khớp tại [${rep.start}, ${rep.end}]: mong đợi "${rep.original}", thực tế "${actualOriginal}".`,
@@ -55,15 +68,16 @@ export function applySuggestionsToText(
       continue;
     }
 
-    currentText =
-      currentText.slice(0, rep.start) +
-      rep.replacement +
-      currentText.slice(rep.end);
+    chars = [
+      ...chars.slice(0, rep.start),
+      ...rep.replacement,
+      ...chars.slice(rep.end),
+    ];
     appliedCount++;
   }
 
   return {
-    resultText: currentText,
+    resultText: chars.join(""),
     appliedCount,
     errors,
   };

@@ -26,16 +26,22 @@ export async function getCompilationDraft(
   );
 }
 
-export async function getCompilationMarkdown(
+export async function getCompilationArtifact(
   workspaceId: string,
   collectionId: string,
   runId: string,
+  kind: "markdown" | "json",
   options?: { signal?: AbortSignal },
-): Promise<string> {
-  return v1Client.requestText(
-    compilationPaths.markdown(workspaceId, collectionId, runId),
+) {
+  const path =
+    kind === "markdown"
+      ? compilationPaths.markdown
+      : compilationPaths.draftFile;
+  const { blob } = await v1Client.requestBlob(
+    path(workspaceId, collectionId, runId),
     options,
   );
+  return { blob, text: await blob.text() };
 }
 
 export async function getEditContext(

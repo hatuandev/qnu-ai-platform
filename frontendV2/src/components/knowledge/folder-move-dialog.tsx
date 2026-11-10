@@ -113,11 +113,11 @@ export function FolderMoveDialog({
               </SelectTrigger>
               <SelectContent className="text-xs">
                 <SelectItem value="root">
-                  📁 Gốc kho tri thức (Cấp cao nhất)
+                  Gốc kho tri thức (Cấp cao nhất)
                 </SelectItem>
                 {availableParents.map((f) => (
                   <SelectItem key={f.id} value={f.id}>
-                    📁 {f.name}
+                    {f.name}
                   </SelectItem>
                 ))}
               </SelectContent>

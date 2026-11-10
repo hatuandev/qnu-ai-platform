@@ -67,6 +67,15 @@ test("applySuggestionsToText: detects mismatch if original snippet was changed",
   assert.equal(result.errors.length, 1);
 });
 
+test("spelling offsets count Unicode code points like the backend", () => {
+  const result = applySuggestionsToText("📌 bạ", [
+    { start: 2, end: 4, original: "bạ", replacement: "bạn" },
+  ]);
+  assert.equal(result.resultText, "📌 bạn");
+  assert.equal(result.appliedCount, 1);
+  assert.deepEqual(result.errors, []);
+});
+
 test("buildTextChanges: converts user decisions into durable TextChange array", () => {
   const units: TextUnit[] = [
     {

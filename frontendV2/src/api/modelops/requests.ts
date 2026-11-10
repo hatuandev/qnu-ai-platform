@@ -6,14 +6,17 @@ import { v1Client } from "../v1-client";
 import { modelopsPaths } from "./endpoints";
 import type {
   Capability,
+  CatalogItem,
   Connection,
   ConnectionInput,
   ConnectionModelCreateInput,
   ConnectionTestRequest,
   ConnectionTestResult,
   ConnectionUpdateInput,
+  DefaultsUpdateRequest,
   DiagnosticCheck,
   KeyCreateRequest,
+  ModelDefaults,
   ModelProvider,
   ProviderKey,
 } from "./types";
@@ -160,5 +163,37 @@ export async function probeModel(
     modelopsPaths.probe(providerId),
     { capability },
     { timeoutMs: 70_000 },
+  );
+}
+
+export async function listProviders(options?: {
+  signal?: AbortSignal;
+}): Promise<ModelProvider[]> {
+  return v1Client.get<ModelProvider[]>(modelopsPaths.providers, options);
+}
+
+export async function getModelDefaults(options?: {
+  signal?: AbortSignal;
+}): Promise<ModelDefaults> {
+  return v1Client.get<ModelDefaults>(modelopsPaths.defaults, options);
+}
+
+export async function updateModelDefaults(
+  body: DefaultsUpdateRequest,
+  options?: { signal?: AbortSignal },
+): Promise<ModelDefaults> {
+  return v1Client.put<ModelDefaults>(modelopsPaths.defaults, body, options);
+}
+
+export async function getCatalog(
+  params?: { workspaceId?: string | null },
+  options?: { signal?: AbortSignal },
+): Promise<CatalogItem[]> {
+  const query = params?.workspaceId
+    ? `?workspace_id=${encodeURIComponent(params.workspaceId)}`
+    : "";
+  return v1Client.get<CatalogItem[]>(
+    `${modelopsPaths.catalog}${query}`,
+    options,
   );
 }

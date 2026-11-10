@@ -10,13 +10,17 @@ import {
   deleteConnection,
   deleteConnectionKey,
   deleteConnectionModel,
+  getCatalog,
   getConnection,
+  getModelDefaults,
   listConnectionKeys,
   listConnectionModels,
   listConnections,
+  listProviders,
   probeModel,
   testConnection,
   updateConnection,
+  updateModelDefaults,
 } from "./requests";
 import type {
   Capability,
@@ -24,6 +28,7 @@ import type {
   ConnectionModelCreateInput,
   ConnectionTestRequest,
   ConnectionUpdateInput,
+  DefaultsUpdateRequest,
   KeyCreateRequest,
 } from "./types";
 
@@ -35,6 +40,10 @@ export const modelopsKeys = {
     [...modelopsKeys.connection(id), "models"] as const,
   connectionKeys: (id: string) =>
     [...modelopsKeys.connection(id), "keys"] as const,
+  defaults: () => [...modelopsKeys.all, "defaults"] as const,
+  providers: () => [...modelopsKeys.all, "providers"] as const,
+  catalog: (workspaceId?: string | null) =>
+    [...modelopsKeys.all, "catalog", workspaceId ?? "global"] as const,
 };
 
 export function useConnectionsQuery(enabled = true) {
@@ -216,5 +225,47 @@ export function useProbeModelMutation() {
         queryKey: modelopsKeys.connections(),
       });
     },
+  });
+}
+
+export function useProvidersQuery(enabled = true) {
+  return useQuery({
+    queryKey: modelopsKeys.providers(),
+    queryFn: ({ signal }) => listProviders({ signal }),
+    enabled,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useModelDefaultsQuery(enabled = true) {
+  return useQuery({
+    queryKey: modelopsKeys.defaults(),
+    queryFn: ({ signal }) => getModelDefaults({ signal }),
+    enabled,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useUpdateModelDefaultsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: DefaultsUpdateRequest) => updateModelDefaults(body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.defaults(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [...modelopsKeys.all, "catalog"],
+      });
+    },
+  });
+}
+
+export function useCatalogQuery(workspaceId?: string | null, enabled = true) {
+  return useQuery({
+    queryKey: modelopsKeys.catalog(workspaceId),
+    queryFn: ({ signal }) => getCatalog({ workspaceId }, { signal }),
+    enabled,
+    staleTime: 30 * 1000,
   });
 }

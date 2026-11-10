@@ -22,10 +22,12 @@ async def choose_target(
     if provider_id is not None:
         return provider_id, ()
     capability = TASK_CAPABILITIES[task]
-    primary = (await catalog_service.workspace_defaults(db, workspace_id)).get(capability)
+    system_default = await catalog_service.system_default_for(db, capability)
+    primary = system_default or (await catalog_service.workspace_defaults(db, workspace_id)).get(capability)
     if primary is None:
         return None, ()  # Preserve the existing model_not_configured contract.
-    if await db.get(WorkspaceAllowedProvider, (workspace_id, primary)) is None:
+    is_system_primary = (primary == system_default)
+    if not is_system_primary and await db.get(WorkspaceAllowedProvider, (workspace_id, primary)) is None:
         raise EntityNotFound("Model chưa được cấp cho workspace.", code="provider_not_found")
     provider = await db.get(Provider, primary)
     if provider is None:
@@ -36,7 +38,8 @@ async def choose_target(
     trace = []
     for pid in [primary, *candidates]:
         # Policies never grant permission. Do not disclose an ungranted candidate's ID.
-        if await db.get(WorkspaceAllowedProvider, (workspace_id, pid)) is None:
+        is_granted = (pid == system_default) or (await db.get(WorkspaceAllowedProvider, (workspace_id, pid)) is not None)
+        if not is_granted:
             trace.append({"provider_id": None, "code": "candidate_not_granted"})
             continue
         row = await db.get(Provider, pid)

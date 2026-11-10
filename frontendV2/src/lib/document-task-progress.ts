@@ -166,7 +166,7 @@ export function resolveDocumentTaskProgress(
     if (
       compTotal !== null &&
       Number.isInteger(compTotal) &&
-      compTotal > 1 &&
+      compTotal > 0 &&
       compDone <= compTotal
     ) {
       // Segmented / multi-part compilation
@@ -236,9 +236,6 @@ export function resolveDocumentTaskProgress(
         Math.round((readingPhase.percent / 100) * 50),
       );
       isIndeterminate = false;
-    } else if (readingPhase.completed > 0) {
-      unifiedPercent = Math.min(45, readingPhase.completed * 10);
-      isIndeterminate = false;
     } else {
       unifiedPercent = null;
       isIndeterminate = true;
@@ -249,9 +246,6 @@ export function resolveDocumentTaskProgress(
     if (compilingPhase.percent !== null) {
       unifiedPercent =
         50 + Math.min(45, Math.round((compilingPhase.percent / 100) * 45));
-      isIndeterminate = false;
-    } else if (compilingPhase.completed > 0) {
-      unifiedPercent = 85;
       isIndeterminate = false;
     } else {
       unifiedPercent = 50; // Smooth entry into compilation without regression

@@ -13,8 +13,7 @@ from qnu.domains.identity.background import background_actor
 from qnu.domains.knowledge.preparation import service as preparation
 from qnu.domains.ocr.execution import execute_run, job_id_for
 from qnu.domains.ocr.models import OcrProcessingRun, utcnow
-from qnu.domains.ocr.review import detection, service as review_service
-from qnu.domains.ocr.review.schemas import DetectRequest
+from qnu.domains.ocr.review.automatic import review_document
 from qnu.platform.config import get_settings
 from qnu.platform.database import AsyncSessionFactory
 from qnu.platform.logging import get_logger
@@ -73,29 +72,16 @@ async def spelling_check_job(ctx: dict, run_id: str, version: int = 0) -> str:
         run = await db.get(OcrProcessingRun, run_id)
         if run is None or run.status != "completed":
             return "run_not_ready"
-        actor = background_actor(run.created_by or "system")
-        key = f"auto:spl:{run.id}:{version}"
+        actor = background_actor(run.requested_by)
         try:
-            current = await review_service.read_review(db, container.blob_store, run, version)
-            if not current.units:
-                return "no_units"
-            evidence_ids = [u.evidence_id for u in current.units[:100]]
-            req = DetectRequest(
-                source_version=version,
-                expected_version=current.version,
-                expected_sha256=current.canonical_sha256,
-                evidence_ids=evidence_ids,
+            return await review_document(
+                db, container.blob_store, container.chat_model, actor, run, version
             )
-            result = await detection.inspect(
-                db, container.blob_store, container.chat_model, actor, run, req, key
-            )
-            return result.status
-        except Exception as exc:
+        except Exception:
             logger.warning(
                 "auto_spelling_job_failed",
                 run_id=run_id,
                 version=version,
-                error=str(exc),
             )
             return "failed"
 

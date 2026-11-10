@@ -30,6 +30,13 @@ class CatalogService:
     async def get_defaults(self, db: AsyncSession) -> ModelDefaults | None:
         return await db.get(ModelDefaults, DEFAULT_ROW_ID)
 
+    async def system_default_for(self, db: AsyncSession, capability: str) -> str | None:
+        row = await self.get_defaults(db)
+        if row is None:
+            return None
+        field = f"{capability}_provider_id"
+        return getattr(row, field, None)
+
     async def update_defaults(
         self, db: AsyncSession, req: DefaultsUpdateRequest, actor: AuthActor
     ) -> ModelDefaults:
@@ -219,15 +226,18 @@ class CatalogService:
         """
         if capability not in CAPABILITIES:
             raise AppException("Capability không hợp lệ.", code="capability_invalid")
+        system_default = await self.system_default_for(db, capability)
         if provider_id is None:
-            provider_id = (await self.workspace_defaults(db, workspace_id)).get(capability)
+            provider_id = system_default or (await self.workspace_defaults(db, workspace_id)).get(capability)
         if not provider_id:
             raise Conflict(
                 "Chưa chọn model mặc định cho chức năng này.", code="model_not_configured"
             )
-        granted = await db.get(WorkspaceAllowedProvider, (workspace_id, provider_id))
-        if granted is None:
-            raise EntityNotFound("Model chưa được cấp cho workspace.", code="provider_not_found")
+        is_system_default = (provider_id == system_default)
+        if not is_system_default:
+            granted = await db.get(WorkspaceAllowedProvider, (workspace_id, provider_id))
+            if granted is None:
+                raise EntityNotFound("Model chưa được cấp cho workspace.", code="provider_not_found")
         return await provider_service.require_capability(db, provider_id, capability)
 
 

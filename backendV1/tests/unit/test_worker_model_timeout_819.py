@@ -12,6 +12,7 @@ def test_model_jobs_use_configured_long_deadline_and_keep_single_attempt():
     functions = {f.name: f for f in WorkerSettings.functions if isinstance(f, Function)}
     assert set(functions) == {
         "ocr_process_run",
+        "spelling_check_job",
         "compile_run",
         "compiler_review_job",
         "manual_compiler_review_job",
@@ -24,6 +25,11 @@ def test_model_jobs_use_configured_long_deadline_and_keep_single_attempt():
 
 
 def test_model_deadline_can_be_configured_without_using_zero_as_infinity():
-    assert Settings(_env_file=None, WORKER_MODEL_JOB_TIMEOUT_SECONDS=172800).WORKER_MODEL_JOB_TIMEOUT_SECONDS == 172800
+    assert (
+        Settings(
+            _env_file=None, WORKER_MODEL_JOB_TIMEOUT_SECONDS=172800
+        ).WORKER_MODEL_JOB_TIMEOUT_SECONDS
+        == 172800
+    )
     with pytest.raises(ValidationError):
         Settings(_env_file=None, WORKER_MODEL_JOB_TIMEOUT_SECONDS=0)

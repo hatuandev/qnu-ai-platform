@@ -101,6 +101,7 @@ class DetectionResponse(BaseModel):
     suggestions: list[Suggestion]
     withheld_suggestions: list[Suggestion] = Field(default_factory=list)
     checked_evidence_ids: list[str]
+    total_evidence_count: int | None = None
     error_code: str | None
     usage_id: str | None
     created_at: datetime

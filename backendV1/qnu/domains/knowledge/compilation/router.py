@@ -205,6 +205,18 @@ async def compilation_markdown(
     return await _raw_response(db, blob, actor, workspace_id, collection_id, run_id, "markdown")
 
 
+@router.get("/{run_id}/draft.json")
+async def compilation_draft_file(
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+    blob: BlobStore = Depends(get_blob_store),
+) -> Response:
+    return await _raw_response(db, blob, actor, workspace_id, collection_id, run_id, "draft_json")
+
+
 @router.get("/{run_id}/raw")
 async def compilation_raw(
     workspace_id: str,

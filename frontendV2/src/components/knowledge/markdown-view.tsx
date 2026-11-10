@@ -2,13 +2,19 @@ import { Check, Code2, Copy, Download, Eye, FileText } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { downloadBlob } from "@/lib/download-blob";
+import type { CitationInfo } from "@/lib/knowledge-studio-helpers";
 import { cn } from "@/lib/utils";
 
 interface MarkdownViewProps {
   content: string | null | undefined;
   isLoading?: boolean;
+  isError?: boolean;
+  artifact?: Blob;
   fileName?: string;
   sourceTitle?: string;
+  lifecycleStatus?: string;
+  citations: ReadonlyMap<string, CitationInfo>;
 }
 
 interface MarkdownBlock {
@@ -35,8 +41,12 @@ interface MarkdownBlock {
 export function MarkdownView({
   content,
   isLoading,
+  isError,
+  artifact,
   fileName = "document.md",
   sourceTitle,
+  lifecycleStatus,
+  citations,
 }: MarkdownViewProps) {
   const [subMode, setSubMode] = useState<"preview" | "raw">("preview");
   const [copied, setCopied] = useState(false);
@@ -54,17 +64,11 @@ export function MarkdownView({
   };
 
   const handleDownload = () => {
-    if (!content) return;
-    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName.endsWith(".md") ? fileName : `${fileName}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success("Đã tải tệp Markdown về máy.");
+    if (artifact)
+      downloadBlob(
+        artifact,
+        fileName.endsWith(".md") ? fileName : `${fileName}.md`,
+      );
   };
 
   // Render markdown lines into formatted blocks for preview
@@ -72,6 +76,9 @@ export function MarkdownView({
     if (!content) return null;
 
     const lines = content.split("\n");
+    const preamble = lines.findIndex(
+      (line, index) => index > 0 && line.trim().length > 0,
+    );
     const blocks: MarkdownBlock[] = [];
 
     let currentList: {
@@ -138,6 +145,7 @@ export function MarkdownView({
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trimEnd();
       const trimmed = line.trim();
+      if (i === preamble && trimmed === "> Bản nháp chưa duyệt.") continue;
 
       // Check table row
       if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
@@ -247,15 +255,15 @@ export function MarkdownView({
     return parts.map((part) => {
       counter++;
       const tokenKey = `${prefix}_tok_${counter}`;
-      if (part.startsWith("[") && part.endsWith("]") && part.length > 2) {
-        const rawKey = part.slice(1, -1);
+      const citation = citations.get(part.slice(1, -1));
+      if (part.startsWith("[") && part.endsWith("]") && citation) {
         return (
           <span
             key={tokenKey}
             className="inline-flex items-center px-1.5 py-0.2 mx-0.5 text-[10px] font-mono font-medium rounded bg-primary/10 text-primary border border-primary/20 align-baseline cursor-default"
-            title={`Căn cứ truy vết: ${rawKey}`}
+            title={citation.location ?? "Dẫn chứng trong tài liệu"}
           >
-            {rawKey}
+            [{citation.index}]
           </span>
         );
       }
@@ -272,12 +280,16 @@ export function MarkdownView({
     );
   }
 
-  if (!content) {
+  if (isError || !content) {
     return (
       <div className="py-20 text-center text-xs text-muted-foreground space-y-2 border border-dashed rounded-xl bg-card/40">
         <FileText className="size-8 mx-auto text-muted-foreground/40" />
-        <p className="font-medium text-foreground">Chưa có bản Markdown</p>
-        <p>Bản Markdown sẽ được tự động kết xuất sau khi chuẩn bị nội dung.</p>
+        <p
+          className="font-medium text-foreground"
+          role={isError ? "alert" : "status"}
+        >
+          {isError ? "Không tải được bản Markdown" : "Chưa có bản Markdown"}
+        </p>
       </div>
     );
   }
@@ -335,6 +347,7 @@ export function MarkdownView({
             variant="outline"
             size="sm"
             onClick={handleDownload}
+            disabled={!artifact}
             className="h-7 text-xs gap-1.5"
             title="Tải tệp .md về máy"
           >
@@ -347,6 +360,9 @@ export function MarkdownView({
       {/* Viewport: Preview vs Raw */}
       {subMode === "preview" ? (
         <article className="prose prose-sm dark:prose-invert max-w-none space-y-4 p-5 sm:p-7 rounded-xl border border-border/70 bg-card text-foreground leading-relaxed shadow-2xs">
+          {lifecycleStatus && (
+            <p className="text-xs text-muted-foreground">{lifecycleStatus}</p>
+          )}
           {sourceTitle && (
             <div className="pb-3 border-b border-border/60 mb-4">
               <span className="text-[11px] font-semibold tracking-wider uppercase text-muted-foreground">

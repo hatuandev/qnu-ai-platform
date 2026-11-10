@@ -27,8 +27,8 @@ import { toast } from "sonner";
 import { z } from "zod";
 import {
   useCommitEditsMutation,
+  useCompilationArtifactQuery,
   useCompilationDraftQuery,
-  useCompilationMarkdownQuery,
   useCreateEditPreviewMutation,
   useEditContextQuery,
 } from "@/api/compilation/queries";
@@ -70,12 +70,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
+import { downloadBlob } from "@/lib/download-blob";
 import {
   buildCitationMap,
   displayDocumentTitle,
   findViewedDerivation,
   resolveStudioAction,
 } from "@/lib/knowledge-studio-helpers";
+import { spellingScope } from "@/lib/spelling-review";
 import { useUiStore } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
 
@@ -185,12 +187,6 @@ function SourceStudioPage() {
     compilationRunId,
   );
 
-  const { data: markdownContent } = useCompilationMarkdownQuery(
-    activeWorkspaceId,
-    resolvedCollectionId,
-    compilationRunId,
-  );
-
   // 6. Edit Context & Mutations
   const { data: editContext, refetch: refetchEditContext } =
     useEditContextQuery(
@@ -227,25 +223,26 @@ function SourceStudioPage() {
   );
   const [publicationOpen, setPublicationOpen] = useState(false);
   const [jsonDialogOpen, setJsonDialogOpen] = useState(false);
+  const markdown = useCompilationArtifactQuery(
+    "markdown",
+    activeWorkspaceId,
+    resolvedCollectionId,
+    compilationRunId,
+    activeTab === "markdown" && Boolean(draftData),
+  );
+  const json = useCompilationArtifactQuery(
+    "json",
+    activeWorkspaceId,
+    resolvedCollectionId,
+    compilationRunId,
+    jsonDialogOpen && Boolean(draftData),
+  );
+  const exportName = (source?.file_name || "document").replace(/\.[^.]+$/, "");
 
-  const handleDownloadJson = () => {
-    const dataToDownload = draftData || summary;
-    if (!dataToDownload) {
-      toast.error("Chưa có dữ liệu JSON để tải về.");
-      return;
-    }
-    const blob = new Blob([JSON.stringify(dataToDownload, null, 2)], {
-      type: "application/json;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${source?.file_name || "document"}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success("Đã tải tệp JSON về máy.");
+  const handleDownloadJson = async () => {
+    const result = await json.refetch();
+    if (result.isSuccess) downloadBlob(result.data.blob, `${exportName}.json`);
+    else toast.error("Không tải được tệp JSON.");
   };
 
   // Original Document Blob URL & loading
@@ -319,6 +316,10 @@ function SourceStudioPage() {
   const currentDerivation = useMemo(() => {
     return findViewedDerivation(summary?.derivations, compilationRunId);
   }, [summary?.derivations, compilationRunId]);
+  const reviewScope = spellingScope(
+    summary,
+    currentDerivation?.ocr_run_id ?? intentData?.ocr_run_id,
+  );
 
   // Resolve Studio action state and user-friendly status badge
   const actionState = useMemo(() => {
@@ -359,6 +360,13 @@ function SourceStudioPage() {
         input: {
           mode: "auto",
           revision_id: activeRevisionId,
+          ...(reviewScope?.revisionId === activeRevisionId &&
+          reviewScope.textVersion > 0
+            ? {
+                ocr_run_id: reviewScope.runId,
+                text_version: reviewScope.textVersion,
+              }
+            : {}),
         },
         idempotencyKey,
       });
@@ -768,20 +776,26 @@ function SourceStudioPage() {
 
               <DropdownMenuSeparator />
 
-              <DropdownMenuItem asChild>
-                <Link
-                  to="/knowledge/$sourceId/review"
-                  params={{ sourceId }}
-                  search={{ collectionId: resolvedCollectionId }}
-                  className="flex items-center gap-2 cursor-pointer"
-                >
-                  <Sparkles className="size-4 text-amber-500" />
-                  <span>Rà soát chính tả</span>
-                </Link>
-              </DropdownMenuItem>
+              {reviewScope && (
+                <DropdownMenuItem asChild>
+                  <Link
+                    to="/knowledge/$sourceId/review"
+                    params={{ sourceId }}
+                    search={{
+                      collectionId: resolvedCollectionId,
+                      ...reviewScope,
+                    }}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Sparkles className="size-4 text-amber-500" />
+                    <span>Rà soát chính tả</span>
+                  </Link>
+                </DropdownMenuItem>
+              )}
 
               <DropdownMenuItem
                 onClick={() => setJsonDialogOpen(true)}
+                disabled={!hasDraft}
                 className="cursor-pointer"
               >
                 <FileJson className="size-4 text-muted-foreground" />
@@ -790,6 +804,7 @@ function SourceStudioPage() {
 
               <DropdownMenuItem
                 onClick={handleDownloadJson}
+                disabled={!hasDraft || json.isFetching}
                 className="cursor-pointer"
               >
                 <Download className="size-4 text-muted-foreground" />
@@ -1034,18 +1049,14 @@ function SourceStudioPage() {
           <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 flex justify-center">
             <div className="w-full max-w-3xl space-y-6">
               {/* Spelling Check Status Info Banner */}
-              <SpellingStatusStrip
-                workspaceId={activeWorkspaceId}
-                collectionId={resolvedCollectionId}
-                sourceId={sourceId}
-                revisionId={activeRevisionId}
-                ocrRunId={
-                  currentDerivation?.ocr_run_id ||
-                  summary?.active_run_id ||
-                  intentData?.ocr_run_id
-                }
-                textVersion={currentDerivation?.version?.version_no ?? 0}
-              />
+              {reviewScope && (
+                <SpellingStatusStrip
+                  workspaceId={activeWorkspaceId}
+                  collectionId={resolvedCollectionId}
+                  sourceId={sourceId}
+                  {...reviewScope}
+                />
+              )}
 
               {/* STATE 1: Preparation is actively running */}
               {isPreparing && (
@@ -1362,10 +1373,14 @@ function SourceStudioPage() {
               {/* STATE 5: Active tab is Markdown */}
               {hasDraft && !isEditing && activeTab === "markdown" && (
                 <MarkdownView
-                  content={markdownContent}
-                  isLoading={false}
-                  fileName={source?.file_name}
+                  content={markdown.data?.text}
+                  artifact={markdown.data?.blob}
+                  isLoading={markdown.isLoading}
+                  isError={markdown.isError}
+                  fileName={`${exportName}.md`}
                   sourceTitle={displayDocumentTitle(source?.title)}
+                  lifecycleStatus={actionState.displayStatus.label}
+                  citations={citationIndexMap}
                 />
               )}
 
@@ -1626,8 +1641,10 @@ function SourceStudioPage() {
         open={jsonDialogOpen}
         onOpenChange={setJsonDialogOpen}
         title={`Cấu trúc dữ liệu JSON - ${displayDocumentTitle(source?.title || "Tài liệu")}`}
-        data={draftData || summary}
-        fileName={`${source?.file_name || "document"}.json`}
+        artifact={json.data}
+        isLoading={json.isLoading}
+        isError={json.isError}
+        fileName={`${exportName}.json`}
       />
     </div>
   );

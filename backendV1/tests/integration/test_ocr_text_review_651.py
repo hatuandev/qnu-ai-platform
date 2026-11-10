@@ -217,6 +217,49 @@ def detect(client, data, current, key="check-one"):
     )
 
 
+def test_automatic_review_splits_and_covers_every_unit_once(client, monkeypatch):
+    from qnu.domains.ocr.review import automatic
+    from qnu.main import app
+    from qnu.workers.tasks.ocr import spelling_check_job
+
+    class EmptySpeller(FakeChat):
+        def _respond(self, index):
+            request = self.requests[index]["body"]["messages"][-1]["content"]
+            units = json.loads(request)["units"]
+            payload = {
+                "choices": [
+                    {
+                        "message": {"content": '{"suggestions":[]}'},
+                        "finish_reason": "length" if index == 0 and len(units) > 1 else "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 100, "completion_tokens": 30, "total_tokens": 130},
+            }
+            return 200, json.dumps(payload).encode()
+
+    monkeypatch.setattr(automatic, "BATCH_SIZE", 2)
+    data = processed_input(client, code="automatic-spelling-batches")
+    url = review_url(data)
+    original = client.get(url).json()
+    with EmptySpeller() as model:
+        chat_provider(client, data, model.base_url)
+        context = {"container": app.state.container}
+        assert client.portal.call(spelling_check_job, context, data["ocr_run_id"]) == "completed"
+        checks = client.get(url + "/checks?version=0").json()
+        assert len(checks) == 1
+        (check,) = checks
+        expected = [unit["evidence_id"] for unit in original["units"]]
+        assert len(expected) > 2
+        assert check["checked_evidence_ids"] == expected
+        assert check["total_evidence_count"] == len(expected)
+        assert check["status"] == "completed"
+        assert len(model.requests) == (len(expected) + 1) // 2 + 2
+        sent = len(model.requests)
+        assert client.portal.call(spelling_check_job, context, data["ocr_run_id"]) == "completed"
+        assert len(model.requests) == sent
+    assert client.get(url).json() == original
+
+
 def test_suggestions_are_exact_readable_and_only_applied_on_save(client):
     data = processed_input(client)
     url = review_url(data)
@@ -365,9 +408,7 @@ def test_late_spelling_response_never_recreates_raw_evidence_after_purge(client,
                     client, data["workspace"], "source", data["source"]["id"], "delete"
                 )
                 assert proposal.status_code == 200, proposal.text
-                pending = accept(
-                    client, data["workspace"], proposal, "purge-spelling-" + mode
-                )
+                pending = accept(client, data["workspace"], proposal, "purge-spelling-" + mode)
                 assert pending.status_code == 200, pending.text
                 action_id = pending.json()["id"]
 

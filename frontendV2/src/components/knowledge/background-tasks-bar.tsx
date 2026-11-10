@@ -272,7 +272,7 @@ export function BackgroundTasksBar() {
     <section
       hidden={visibleTasks.length === 0}
       aria-label="Tác vụ xử lý tài liệu"
-      className="fixed bottom-4 right-4 z-40 w-96 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-card text-foreground shadow-xl overflow-hidden transition-all duration-200"
+      className="fixed bottom-4 right-4 z-40 w-96 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-card text-foreground shadow-xl overflow-hidden"
     >
       <div className="flex items-center justify-between px-3.5 py-2 border-b border-border/70 bg-card select-none">
         <button

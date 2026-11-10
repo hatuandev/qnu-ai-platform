@@ -7,6 +7,8 @@ export const compilationPaths = {
     `/workspaces/${workspaceId}/collections/${collectionId}/compilation-runs/${runId}`,
   draft: (workspaceId: string, collectionId: string, runId: string) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/compilation-runs/${runId}/draft`,
+  draftFile: (workspaceId: string, collectionId: string, runId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/compilation-runs/${runId}/draft.json`,
   markdown: (workspaceId: string, collectionId: string, runId: string) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/compilation-runs/${runId}/markdown`,
   raw: (workspaceId: string, collectionId: string, runId: string) =>

@@ -1,4 +1,10 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  createFileRoute,
+  Link,
+  useBlocker,
+  useNavigate,
+} from "@tanstack/react-router";
 import {
   ArrowLeft,
   Check,
@@ -14,11 +20,13 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { ApiProblemError } from "@/api/client";
 import {
   getRevisionContentBlob,
+  knowledgeKeys,
   useCollectionsQuery,
   useSourceQuery,
   useSourceSummaryQuery,
@@ -28,22 +36,32 @@ import {
   useTextReviewChecksQuery,
   useTextReviewQuery,
 } from "@/api/ocr/queries";
-import type { Suggestion } from "@/api/ocr/requests";
+import type { ReviewDocument, Suggestion } from "@/api/ocr/requests";
 import { useCreatePreparationIntentMutation } from "@/api/preparation/queries";
 import { DocxViewer } from "@/components/knowledge/docx-viewer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
 import { displayDocumentTitle } from "@/lib/knowledge-studio-helpers";
 import {
   buildTextChanges,
   type SuggestionDecision,
+  splitTextAtSuggestion,
 } from "@/lib/spelling-replacement-helpers";
+import {
+  preferredSpellingCheck,
+  spellingCoverage,
+  spellingScope,
+} from "@/lib/spelling-review";
 import { useUiStore } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
 
 const reviewSearchSchema = z.object({
   collectionId: z.string().optional(),
+  revisionId: z.string().optional(),
+  runId: z.string().optional(),
+  textVersion: z.number().int().nonnegative().optional(),
 });
 
 export const Route = createFileRoute("/knowledge/$sourceId_/review")({
@@ -53,8 +71,30 @@ export const Route = createFileRoute("/knowledge/$sourceId_/review")({
 
 function SpellingReviewPage() {
   const { sourceId } = Route.useParams();
+  const { collectionId, revisionId, runId, textVersion } = Route.useSearch();
+  const workspaceId = useUiStore((s) => s.activeWorkspaceId);
+  return (
+    <SpellingReviewWorkspace
+      key={JSON.stringify([
+        workspaceId,
+        collectionId,
+        sourceId,
+        revisionId,
+        runId,
+        textVersion,
+      ])}
+    />
+  );
+}
+
+function SpellingReviewWorkspace() {
+  const { sourceId } = Route.useParams();
   const search = Route.useSearch();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const registerBackgroundTask = useBackgroundTasksStore(
+    (s) => s.registerPreparationTask,
+  );
   const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId);
 
   // 1. Resolve collection & source
@@ -79,30 +119,19 @@ function SpellingReviewPage() {
     sourceId,
   );
 
-  // Pinned active revision ID
-  const activeRevisionId = useMemo(() => {
-    if (summary?.revision?.id) return summary.revision.id;
-    return null;
-  }, [summary?.revision?.id]);
-
-  // Pinned OCR Run ID & Text Version
-  const ocrRunId = useMemo(() => {
-    if (summary?.derivations && summary.derivations.length > 0) {
-      return summary.derivations[0].ocr_run_id;
-    }
-    if (summary?.active_run_id) return summary.active_run_id;
-    return null;
-  }, [summary]);
-
-  const latestTextVersion = useMemo(() => {
-    if (summary?.derivations && summary.derivations.length > 0) {
-      return summary.derivations[0].version?.version_no ?? 0;
-    }
-    return 0;
-  }, [summary]);
+  const scope = spellingScope(summary, search.runId);
+  const activeRevisionId = search.revisionId ?? scope?.revisionId;
+  const ocrRunId = search.runId ?? scope?.runId;
+  const latestTextVersion = search.textVersion ?? scope?.textVersion;
 
   // 2. Load Review Document & Checks
-  const { data: reviewDoc, isLoading: isReviewDocLoading } = useTextReviewQuery(
+  const {
+    data: reviewDoc,
+    isLoading: isReviewDocLoading,
+    isFetching: isReviewFetching,
+    isError: hasReviewError,
+    refetch: refetchReview,
+  } = useTextReviewQuery(
     activeWorkspaceId,
     resolvedCollectionId,
     sourceId,
@@ -111,19 +140,33 @@ function SpellingReviewPage() {
     latestTextVersion,
   );
 
-  const { data: checks, isLoading: isChecksLoading } = useTextReviewChecksQuery(
+  const {
+    data: checks,
+    isLoading: isChecksLoading,
+    isFetching: isChecksFetching,
+    error: checksError,
+    refetch: refetchChecks,
+  } = useTextReviewChecksQuery(
     activeWorkspaceId,
     resolvedCollectionId,
     sourceId,
     activeRevisionId,
     ocrRunId,
     latestTextVersion,
+    { refetchInterval: 5000 },
   );
 
-  const latestCheck = useMemo(() => {
-    if (!checks || checks.length === 0) return null;
-    return checks[0];
-  }, [checks]);
+  const hasLoadError = hasReviewError || Boolean(checksError);
+  const isLoadingReview = isReviewDocLoading || isChecksLoading;
+  const isChecksUnsupported =
+    checksError instanceof ApiProblemError && checksError.status === 405;
+
+  const selectedCheck = preferredSpellingCheck(checks);
+  const latestCheck =
+    selectedCheck?.canonical_sha256 === reviewDoc?.canonical_sha256
+      ? selectedCheck
+      : undefined;
+  const coverage = latestCheck ? spellingCoverage(latestCheck) : null;
 
   // All suggestions from the check
   const allSuggestions: Suggestion[] = useMemo(() => {
@@ -154,12 +197,43 @@ function SpellingReviewPage() {
 
   // Saving state
   const [isSaving, setIsSaving] = useState(false);
+  const [savedReview, setSavedReview] = useState<ReviewDocument | null>(null);
+  const [preparationError, setPreparationError] = useState(false);
+  const saveAttempt = useRef<{ signature: string; key: string } | null>(null);
 
   // Original document preview (toggleable panel)
   const [showOriginalFile, setShowOriginalFile] = useState(false);
-  const [docBlob, setDocBlob] = useState<Blob | null>(null);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [blobLoading, setBlobLoading] = useState(false);
+  const [preview, setPreview] = useState<{ blob: Blob; url: string } | null>(
+    null,
+  );
+  const { data: originalFile, isLoading: blobLoading } = useQuery({
+    queryKey: [
+      "revision-content",
+      activeWorkspaceId,
+      resolvedCollectionId,
+      sourceId,
+      activeRevisionId,
+    ],
+    queryFn: ({ signal }) => {
+      if (!activeWorkspaceId || !activeRevisionId)
+        throw new Error("Thiếu phiên bản tệp.");
+      return getRevisionContentBlob(
+        activeWorkspaceId,
+        resolvedCollectionId,
+        sourceId,
+        activeRevisionId,
+        { signal },
+      );
+    },
+    enabled: Boolean(
+      showOriginalFile &&
+        activeWorkspaceId &&
+        resolvedCollectionId &&
+        activeRevisionId,
+    ),
+  });
+  const docBlob = originalFile?.blob;
+  const blobUrl = preview?.blob === docBlob ? preview?.url : undefined;
 
   // Mutations
   const saveReviewMutation = useSaveTextReviewMutation(
@@ -175,50 +249,12 @@ function SpellingReviewPage() {
     resolvedCollectionId,
   );
 
-  // Load document blob for cross-referencing
   useEffect(() => {
-    let active = true;
-    let currentUrl: string | null = null;
-
-    if (
-      showOriginalFile &&
-      activeWorkspaceId &&
-      resolvedCollectionId &&
-      sourceId &&
-      activeRevisionId &&
-      !docBlob
-    ) {
-      setBlobLoading(true);
-      getRevisionContentBlob(
-        activeWorkspaceId,
-        resolvedCollectionId,
-        sourceId,
-        activeRevisionId,
-      )
-        .then((res) => {
-          if (!active) return;
-          currentUrl = URL.createObjectURL(res.blob);
-          setDocBlob(res.blob);
-          setBlobUrl(currentUrl);
-          setBlobLoading(false);
-        })
-        .catch(() => {
-          if (active) setBlobLoading(false);
-        });
-    }
-
-    return () => {
-      active = false;
-      if (currentUrl) URL.revokeObjectURL(currentUrl);
-    };
-  }, [
-    showOriginalFile,
-    activeWorkspaceId,
-    resolvedCollectionId,
-    sourceId,
-    activeRevisionId,
-    docBlob,
-  ]);
+    if (!docBlob) return;
+    const url = URL.createObjectURL(docBlob);
+    setPreview({ blob: docBlob, url });
+    return () => URL.revokeObjectURL(url);
+  }, [docBlob]);
 
   // Filtered list of suggestions
   const filteredSuggestions = useMemo(() => {
@@ -285,11 +321,14 @@ function SpellingReviewPage() {
       setIsEditingManually(false);
 
       // Auto-advance to next item if available
-      if (selectedIndex < filteredSuggestions.length - 1) {
+      if (
+        filter !== "pending" &&
+        selectedIndex < filteredSuggestions.length - 1
+      ) {
         setSelectedIndex((idx) => idx + 1);
       }
     },
-    [selectedIndex, filteredSuggestions.length],
+    [filter, selectedIndex, filteredSuggestions.length],
   );
 
   const handleApply = useCallback(() => {
@@ -337,34 +376,70 @@ function SpellingReviewPage() {
 
   // Unsaved changes check
   const hasUnsavedChanges = useMemo(() => {
+    if (savedReview) return false;
     for (const d of decisions.values()) {
       if (d.status === "applied" || d.status === "custom") return true;
     }
     return false;
-  }, [decisions]);
+  }, [decisions, savedReview]);
 
-  // Window beforeunload protection
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges && !isSaving) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasUnsavedChanges, isSaving]);
+  useBlocker({
+    shouldBlockFn: () =>
+      hasUnsavedChanges &&
+      !isSaving &&
+      !window.confirm("Bạn có thay đổi chính tả chưa lưu. Rời trang?"),
+    enableBeforeUnload: hasUnsavedChanges && !isSaving,
+  });
 
-  // Atomic Save Handler
+  const prepareSavedReview = async (saved: ReviewDocument) => {
+    if (!activeWorkspaceId || !activeRevisionId || !saved.version_id) return;
+    try {
+      const { intent } = await createIntentMutation.mutateAsync({
+        sourceId,
+        input: {
+          revision_id: activeRevisionId,
+          ocr_run_id: saved.run_id,
+          text_version: saved.version,
+          mode: "auto",
+        },
+        idempotencyKey: `prepare:spelling:${saved.version_id}`,
+      });
+      registerBackgroundTask({
+        id: intent.id,
+        workspaceId: activeWorkspaceId,
+        collectionId: resolvedCollectionId,
+        sourceId,
+        sourceTitle: source?.title || "Tài liệu",
+        fileName: source?.file_name || "Tệp",
+      });
+      void queryClient.invalidateQueries({
+        queryKey: knowledgeKeys.sourceSummary(
+          activeWorkspaceId,
+          resolvedCollectionId,
+          sourceId,
+        ),
+      });
+      toast.success("Đã lưu bản sửa và gửi yêu cầu chuẩn bị lại.");
+      await navigate({
+        to: "/knowledge/$sourceId",
+        params: { sourceId },
+        search: { collectionId: resolvedCollectionId },
+        ignoreBlocker: true,
+      });
+    } catch {
+      setPreparationError(true);
+    }
+  };
+
   const handleSaveAll = async () => {
     if (!reviewDoc || !ocrRunId) {
       toast.error("Không tìm thấy thông tin bản đọc văn bản.");
       return;
     }
 
-    const { changes, totalApplied, errors } = buildTextChanges(
+    const { changes, errors } = buildTextChanges(
       reviewDoc.units,
-      allSuggestions,
+      [...allSuggestions, ...withheldSuggestions],
       decisions,
     );
 
@@ -380,38 +455,24 @@ function SpellingReviewPage() {
 
     try {
       setIsSaving(true);
-      const idempotencyKey = `save:rev:${ocrRunId}:${Date.now()}`;
-
-      // 1. Save new TextVersion
+      const body = {
+        expected_version: reviewDoc.version,
+        expected_sha256: reviewDoc.canonical_sha256,
+        changes,
+      };
+      const signature = JSON.stringify([ocrRunId, body]);
+      if (saveAttempt.current?.signature !== signature) {
+        saveAttempt.current = {
+          signature,
+          key: `save:spelling:${crypto.randomUUID()}`,
+        };
+      }
       const savedDoc = await saveReviewMutation.mutateAsync({
-        body: {
-          expected_version: reviewDoc.version,
-          expected_sha256: reviewDoc.canonical_sha256,
-          changes,
-        },
-        idempotencyKey,
+        body,
+        idempotencyKey: saveAttempt.current.key,
       });
-
-      // 2. Trigger new PreparationIntent with the newly saved text_version
-      await createIntentMutation.mutateAsync({
-        sourceId,
-        input: {
-          ocr_run_id: ocrRunId,
-          text_version: savedDoc.version,
-          mode: "auto",
-        },
-      });
-
-      toast.success(
-        `Đã lưu bản sửa đổi #${savedDoc.version} (${totalApplied} điểm sửa) và tự động chuẩn bị lại nội dung.`,
-      );
-
-      // 3. Navigate back to Studio
-      navigate({
-        to: "/knowledge/$sourceId",
-        params: { sourceId },
-        search: { collectionId: resolvedCollectionId },
-      });
+      setSavedReview(savedDoc);
+      await prepareSavedReview(savedDoc);
     } catch (err) {
       toast.error(
         err instanceof Error
@@ -425,6 +486,14 @@ function SpellingReviewPage() {
 
   const isDocx = Boolean(source?.file_name.toLowerCase().endsWith(".docx"));
   const isPdf = Boolean(source?.file_name.toLowerCase().endsWith(".pdf"));
+  const activeText =
+    activeUnit && activeSuggestion
+      ? splitTextAtSuggestion(
+          activeUnit.text,
+          activeSuggestion.start,
+          activeSuggestion.end,
+        )
+      : null;
 
   return (
     <div className="flex h-full flex-col bg-background overflow-hidden min-h-0">
@@ -473,19 +542,28 @@ function SpellingReviewPage() {
             variant={showOriginalFile ? "secondary" : "outline"}
             size="sm"
             onClick={() => setShowOriginalFile(!showOriginalFile)}
-            className="h-8 text-xs gap-1.5 hidden md:inline-flex"
+            className="h-8 text-xs gap-1.5"
             title="Mở tệp gốc để đối chiếu"
+            aria-label={showOriginalFile ? "Đóng tệp gốc" : "Đối chiếu tệp gốc"}
           >
             <Eye className="size-3.5" />
-            <span>
+            <span className="hidden md:inline">
               {showOriginalFile ? "Đóng tệp gốc" : "Đối chiếu tệp gốc"}
             </span>
           </Button>
 
           <Button
             size="sm"
-            onClick={handleSaveAll}
-            disabled={!hasUnsavedChanges || isSaving}
+            onClick={() =>
+              savedReview
+                ? void prepareSavedReview(savedReview)
+                : void handleSaveAll()
+            }
+            disabled={
+              isSaving ||
+              createIntentMutation.isPending ||
+              (!savedReview && !hasUnsavedChanges)
+            }
             className="h-8 gap-1.5 text-xs shadow-2xs"
           >
             {isSaving ? (
@@ -493,15 +571,41 @@ function SpellingReviewPage() {
             ) : (
               <Save className="size-3.5" />
             )}
-            <span>Lưu thay đổi</span>
+            <span>{savedReview ? "Chuẩn bị lại" : "Lưu thay đổi"}</span>
           </Button>
         </div>
       </header>
+      {preparationError && (
+        <p
+          className="border-b border-border px-4 py-2 text-sm text-destructive"
+          role="alert"
+        >
+          Bản sửa đã được lưu. Chọn “Chuẩn bị lại” để gửi lại yêu cầu.
+        </p>
+      )}
+      {coverage && !coverage.complete && (
+        <p
+          className="border-b border-border px-4 py-2 text-xs text-muted-foreground"
+          role="status"
+        >
+          {latestCheck?.status === "running"
+            ? "Đang soát chính tả"
+            : "Chưa soát xong toàn bộ văn bản"}
+          {" · "}
+          {coverage.checked}
+          {coverage.total === null ? "" : `/${coverage.total}`} đoạn đã soát.
+        </p>
+      )}
 
       {/* 2. Main Workspace Layout */}
-      <div className="flex-1 min-h-0 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col sm:flex-row overflow-hidden">
         {/* Left Column: Filter Tabs + Suggestions List */}
-        <div className="w-full sm:w-80 md:w-96 border-r border-border/70 bg-card/60 flex flex-col min-h-0 shrink-0">
+        <div
+          className={cn(
+            "w-full max-h-[32%] sm:max-h-none sm:w-80 md:w-96 border-r border-border/70 bg-card/60 flex flex-col min-h-0 shrink-0",
+            (hasLoadError || isLoadingReview) && "hidden",
+          )}
+        >
           {/* Filter Bar */}
           <div className="p-2.5 border-b border-border/60 bg-muted/20 shrink-0">
             <div className="grid grid-cols-4 gap-1 p-0.5 bg-muted rounded-lg text-xs font-medium text-center">
@@ -559,18 +663,15 @@ function SpellingReviewPage() {
 
           {/* Suggestions List Viewport */}
           <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-border/50">
-            {isChecksLoading || isReviewDocLoading ? (
-              <div className="py-20 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="size-5 animate-spin text-primary" />
-                <span>Đang nạp danh sách gợi ý...</span>
-              </div>
-            ) : filteredSuggestions.length === 0 ? (
+            {filteredSuggestions.length === 0 ? (
               <div className="py-20 text-center text-xs text-muted-foreground px-4 space-y-2">
                 <CheckCircle2 className="size-8 mx-auto text-muted-foreground/40" />
                 <p className="font-medium text-foreground">
-                  {filter === "pending"
-                    ? "Tất cả gợi ý đã được xử lý xong!"
-                    : "Không có mục nào trong danh sách này."}
+                  {!latestCheck
+                    ? "Chưa có kết quả cho bản văn bản này."
+                    : filter === "pending" && coverage?.complete
+                      ? "Tất cả gợi ý đã được xử lý xong!"
+                      : "Không có mục nào trong danh sách này."}
                 </p>
                 {filter === "pending" && counts.applied > 0 && (
                   <p className="text-[11px]">
@@ -651,7 +752,42 @@ function SpellingReviewPage() {
 
         {/* Center/Right Column: Detail Card & Context */}
         <div className="flex-1 min-h-0 flex flex-col bg-background overflow-hidden">
-          {activeSuggestion ? (
+          {hasLoadError ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+              <div role="alert" className="space-y-1">
+                <p className="text-sm font-semibold text-destructive">
+                  {hasReviewError
+                    ? "Không tải được văn bản để rà soát"
+                    : "Không tải được kết quả soát chính tả"}
+                </p>
+                {isChecksUnsupported && (
+                  <p className="text-xs text-muted-foreground">
+                    Máy chủ đang chạy chưa hỗ trợ đọc danh sách gợi ý. Hãy cập
+                    nhật dịch vụ rồi thử lại.
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isReviewFetching || isChecksFetching}
+                onClick={() => {
+                  if (hasReviewError) void refetchReview();
+                  if (checksError) void refetchChecks();
+                }}
+              >
+                Thử tải lại
+              </Button>
+            </div>
+          ) : isLoadingReview ? (
+            <div
+              role="status"
+              className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-xs text-muted-foreground"
+            >
+              <Loader2 className="size-5 animate-spin text-primary" />
+              Đang tải kết quả soát chính tả…
+            </div>
+          ) : activeSuggestion ? (
             <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8 flex justify-center">
               <div className="w-full max-w-2xl space-y-6">
                 {/* Navigation Pills */}
@@ -700,28 +836,17 @@ function SpellingReviewPage() {
                         Đề xuất chỉnh sửa chính tả
                       </span>
                     </div>
-
-                    <span className="text-[11px] font-mono text-muted-foreground">
-                      Vị trí [{activeSuggestion.start} - {activeSuggestion.end}]
-                    </span>
                   </div>
 
                   {/* Context sentence with highlighted word */}
                   <div className="p-4 rounded-lg bg-muted/30 border border-border/60 text-sm leading-relaxed text-foreground">
-                    {activeUnit ? (
+                    {activeText ? (
                       <>
-                        <span>
-                          {activeUnit.text.slice(0, activeSuggestion.start)}
-                        </span>
+                        <span>{activeText.before}</span>
                         <mark className="bg-amber-400/30 text-amber-900 dark:text-amber-200 font-bold px-1 py-0.5 rounded border border-amber-500/40">
-                          {activeUnit.text.slice(
-                            activeSuggestion.start,
-                            activeSuggestion.end,
-                          )}
+                          {activeText.original}
                         </mark>
-                        <span>
-                          {activeUnit.text.slice(activeSuggestion.end)}
-                        </span>
+                        <span>{activeText.after}</span>
                       </>
                     ) : (
                       <span>{activeSuggestion.context_before}</span>
@@ -785,6 +910,7 @@ function SpellingReviewPage() {
                         <Button
                           size="sm"
                           onClick={handleCustomSubmit}
+                          disabled={isSaving || Boolean(savedReview)}
                           className="h-8 text-xs"
                         >
                           Lưu sửa tay
@@ -797,6 +923,11 @@ function SpellingReviewPage() {
                         <Button
                           size="sm"
                           onClick={handleApply}
+                          disabled={
+                            filter === "withheld" ||
+                            isSaving ||
+                            Boolean(savedReview)
+                          }
                           className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
                         >
                           <Check className="size-3.5" />
@@ -807,6 +938,7 @@ function SpellingReviewPage() {
                           variant="outline"
                           size="sm"
                           onClick={handleIgnore}
+                          disabled={isSaving || Boolean(savedReview)}
                           className="h-8 gap-1.5 text-xs"
                         >
                           <X className="size-3.5" />
@@ -816,8 +948,13 @@ function SpellingReviewPage() {
                         <Button
                           variant="outline"
                           size="sm"
+                          disabled={isSaving || Boolean(savedReview)}
                           onClick={() => {
-                            setManualEditText(activeSuggestion.replacement);
+                            setManualEditText(
+                              filter === "withheld"
+                                ? activeSuggestion.original
+                                : activeSuggestion.replacement,
+                            );
                             setIsEditingManually(true);
                           }}
                           className="h-8 gap-1.5 text-xs"
@@ -834,6 +971,7 @@ function SpellingReviewPage() {
                           variant="ghost"
                           size="sm"
                           onClick={handleUndo}
+                          disabled={isSaving || Boolean(savedReview)}
                           className="h-8 text-xs text-muted-foreground gap-1.5"
                         >
                           <RotateCcw className="size-3.5" />
@@ -850,13 +988,13 @@ function SpellingReviewPage() {
               <div className="space-y-2 max-w-sm">
                 <CheckCircle2 className="size-10 mx-auto text-muted-foreground/30" />
                 <p className="font-semibold text-foreground text-sm">
-                  Đã duyệt toàn bộ các gợi ý
+                  {coverage?.complete
+                    ? "Không còn gợi ý ở mục này"
+                    : "Chưa có gợi ý để hiển thị"}
                 </p>
-                <p>
-                  Vui lòng kiểm tra lại các mục đã nhận rồi nhấn nút{" "}
-                  <strong>Lưu thay đổi</strong> ở thanh công cụ để lưu phiên bản
-                  mới.
-                </p>
+                {hasUnsavedChanges && (
+                  <p>Chọn “Lưu thay đổi” để ghi nhận các gợi ý đã áp dụng.</p>
+                )}
               </div>
             </div>
           )}
@@ -886,7 +1024,11 @@ function SpellingReviewPage() {
                   </div>
                 ) : isPdf && blobUrl ? (
                   <iframe
-                    src={blobUrl}
+                    src={
+                      activeUnit
+                        ? `${blobUrl}#page=${activeUnit.page}`
+                        : blobUrl
+                    }
                     title="Bản gốc PDF"
                     className="w-full h-full border-0 bg-white"
                   />

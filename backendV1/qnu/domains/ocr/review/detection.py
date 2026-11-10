@@ -89,6 +89,9 @@ async def inspect(
     run: OcrProcessingRun,
     req: DetectRequest,
     key: str,
+    *,
+    automatic_parent: str | None = None,
+    configuration_hash: str | None = None,
 ) -> DetectionResponse:
     await authorize(db, actor, run, write=True, lock=True)
     # Preserve replay hashes of pre-existing requests that did not select a snapshot.
@@ -138,6 +141,11 @@ async def inspect(
         max_output_tokens=req.max_output_tokens,
         output_schema=schema,
     )
+    if (
+        configuration_hash is not None
+        and runtime.inference_configuration_hash("ocr_review") != configuration_hash
+    ):
+        raise Conflict("Model đã thay đổi.", code="chat_provider_changed")
     check_id = new_id("spl")
     row = SpellingRun(
         id=check_id,
@@ -163,6 +171,7 @@ async def inspect(
             "model_name": runtime.model_name,
             "configuration_hash": runtime.configuration_hash,
             "routing": list(runtime.routing_trace),
+            **({"automatic_parent": automatic_parent} if automatic_parent else {}),
         },
         expires_at=utcnow() + timedelta(seconds=runtime.timeout_seconds + 60),
     )
@@ -186,7 +195,7 @@ async def inspect(
         # Reserve is durable; recheck authorization/provider before releasing locks for HTTP.
         try:
             await authorize(db, actor, run, write=True, lock=True)
-            await check_running(db, row)
+            await check_running(db, check_id)
             latest = await resolve_chat_runtime(db, run.workspace_id, runtime.provider_id)
             if latest.configuration_hash != runtime.configuration_hash:
                 raise Conflict("Model đã thay đổi.", code="chat_provider_changed")
@@ -201,7 +210,7 @@ async def inspect(
             try:
                 # Best effort only: a run cancelled or purged mid-call must not
                 # regain raw evidence on the error path either.
-                await check_running(db, row)
+                await check_running(db, check_id)
                 await retain_raw(blob, row, exc.raw_body)
             except (Exception, asyncio.CancelledError):
                 await db.rollback()
@@ -211,7 +220,7 @@ async def inspect(
             raise
         await usage_service.settle(db, usage.id, total_tokens=result.total_tokens)
         await authorize(db, actor, run, write=True, lock=True)
-        await check_running(db, row)
+        await check_running(db, check_id)
         require_version(
             await read_review(db, blob, run, req.source_version),
             req.expected_version,
@@ -245,10 +254,10 @@ async def inspect(
         raise
 
 
-async def check_running(db: AsyncSession, row: SpellingRun) -> None:
+async def check_running(db: AsyncSession, check_id: str) -> SpellingRun:
     current = await db.scalar(
         select(SpellingRun)
-        .where(SpellingRun.id == row.id)
+        .where(SpellingRun.id == check_id)
         .with_for_update()
         .execution_options(populate_existing=True)
     )
@@ -257,6 +266,7 @@ async def check_running(db: AsyncSession, row: SpellingRun) -> None:
             "Lượt kiểm tra đã hết thời gian chờ; không nhận kết quả muộn.",
             code="ocr_spelling_expired",
         )
+    return current
 
 
 async def retain_raw(blob: BlobStore, row: SpellingRun, payload: bytes) -> None:
@@ -278,9 +288,10 @@ async def readable_check(db: AsyncSession, row: SpellingRun) -> DetectionRespons
 def detection_response(row: SpellingRun) -> DetectionResponse:
     return DetectionResponse.model_validate(row).model_copy(
         update={
+            "total_evidence_count": row.trace.get("total_evidence_count"),
             "withheld_suggestions": [
                 Suggestion.model_validate(s) for s in row.trace.get("withheld_suggestions", [])
-            ]
+            ],
         }
     )
 
@@ -305,5 +316,4 @@ async def list_checks(
     if version is not None:
         query = query.where(SpellingRun.version == version)
     rows = (await db.scalars(query)).all()
-    return [await readable_check(db, r) for r in rows]
-
+    return [await readable_check(db, row) for row in rows if "automatic_parent" not in row.trace]

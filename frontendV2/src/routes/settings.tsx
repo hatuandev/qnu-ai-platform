@@ -1,7 +1,34 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Moon, Sun } from "lucide-react";
-import { Field, FieldLabel } from "@/components/admin/field";
-import { PageHeader } from "@/components/admin/page-header";
+import { createFileRoute, useBlocker } from "@tanstack/react-router";
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  Cpu,
+  Loader2,
+  Moon,
+  Palette,
+  RotateCw,
+  Save,
+  ShieldAlert,
+  Sun,
+  User,
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useMeQuery } from "@/api/auth/queries";
+import {
+  useConnectionsQuery,
+  useModelDefaultsQuery,
+  useProvidersQuery,
+  useUpdateModelDefaultsMutation,
+} from "@/api/modelops/queries";
+import type {
+  Capability,
+  DefaultsUpdateRequest,
+  ModelProvider,
+} from "@/api/modelops/types";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,91 +37,711 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  buildSystemDefaultsPayload,
+  CAPABILITIES_LIST,
+  formatModelLabel,
+  NONE_VALUE,
+} from "@/lib/default-models";
+import { isModelAdmin } from "@/lib/permissions";
 import { useUiStore } from "@/lib/ui-store";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
+type SettingsTab = "appearance" | "models" | "account";
+
+const NAV_ITEMS: {
+  id: SettingsTab;
+  title: string;
+  icon: typeof Palette;
+}[] = [
+  {
+    id: "appearance",
+    title: "Giao diện",
+    icon: Palette,
+  },
+  {
+    id: "models",
+    title: "Mô hình mặc định",
+    icon: Cpu,
+  },
+  {
+    id: "account",
+    title: "Tài khoản",
+    icon: User,
+  },
+];
+
 function SettingsPage() {
   const { theme, setTheme } = useUiStore();
 
+  // Tab state inside this single page
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
+    if (typeof window !== "undefined" && window.location.search) {
+      if (window.location.search.includes("models")) return "models";
+      if (window.location.search.includes("account")) return "account";
+    }
+    return "appearance";
+  });
+
+  const { data: authData } = useMeQuery();
+  const actor = authData?.actor;
+  const canManageSystem = isModelAdmin(actor);
+
+  const {
+    data: defaults,
+    isLoading: loadingDefaults,
+    isError: errorDefaults,
+    refetch: refetchDefaults,
+    isFetching: fetchingDefaults,
+  } = useModelDefaultsQuery();
+
+  const {
+    data: providers = [],
+    isLoading: loadingProviders,
+    refetch: refetchProviders,
+    isFetching: fetchingProviders,
+  } = useProvidersQuery(canManageSystem);
+
+  const {
+    data: connections = [],
+    isLoading: loadingConnections,
+    refetch: refetchConnections,
+    isFetching: fetchingConnections,
+  } = useConnectionsQuery(canManageSystem);
+
+  const updateMutation = useUpdateModelDefaultsMutation();
+
+  // Track user edits: capability -> providerId or null (null means clear to None)
+  const [userEdits, setUserEdits] = useState<
+    Partial<Record<Capability, string | null>>
+  >({});
+
+  // Map of connection status
+  const connectionActiveMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const conn of connections) {
+      map.set(conn.id, Boolean(conn.is_active));
+    }
+    return map;
+  }, [connections]);
+
+  // Providers map by ID for lookup
+  const providersMap = useMemo(() => {
+    const map = new Map<string, ModelProvider>();
+    for (const p of providers) {
+      map.set(p.id, p);
+    }
+    return map;
+  }, [providers]);
+
+  // Filter selectable models per capability
+  const availableModelsForCapability = useMemo(() => {
+    const map = new Map<Capability, ModelProvider[]>();
+    for (const item of CAPABILITIES_LIST) {
+      const cap = item.key;
+      const list = providers.filter((p) => {
+        if (p.is_connection) return false;
+        if (!p.is_active) return false;
+        if (p.parent_id && connectionActiveMap.has(p.parent_id)) {
+          if (!connectionActiveMap.get(p.parent_id)) return false;
+        }
+        const caps = (p.capabilities as string[]) || [];
+        return caps.includes(cap);
+      });
+      map.set(cap, list);
+    }
+    return map;
+  }, [providers, connectionActiveMap]);
+
+  // Server configured baseline values
+  const serverValues: Record<Capability, string | null> = useMemo(() => {
+    return {
+      chat: defaults?.chat_provider_id ?? null,
+      embedding: defaults?.embedding_provider_id ?? null,
+      rerank: defaults?.rerank_provider_id ?? null,
+      ocr: defaults?.ocr_provider_id ?? null,
+    };
+  }, [defaults]);
+
+  // Effective values = server values overlaid with user edits
+  const effectiveValues: Record<Capability, string | null> = useMemo(() => {
+    const result: Record<Capability, string | null> = { ...serverValues };
+    for (const cap of CAPABILITIES_LIST.map((c) => c.key)) {
+      if (cap in userEdits) {
+        result[cap] = userEdits[cap] ?? null;
+      }
+    }
+    return result;
+  }, [serverValues, userEdits]);
+
+  // Has unsaved edits
+  const isDirty = useMemo(() => {
+    for (const cap of CAPABILITIES_LIST.map((c) => c.key)) {
+      if (cap in userEdits) {
+        const edited = userEdits[cap];
+        const server = serverValues[cap];
+        if (edited !== server) return true;
+      }
+    }
+    return false;
+  }, [userEdits, serverValues]);
+
+  // Warn on navigation if dirty
+  const blocker = useBlocker({
+    shouldBlockFn: () => isDirty,
+    enableBeforeUnload: () => isDirty,
+    withResolver: true,
+  });
+  const isBlocked = blocker.status === "blocked";
+
+  const handleModelChange = (capability: Capability, value: string) => {
+    const resolvedValue = value === NONE_VALUE ? null : value;
+    setUserEdits((prev) => {
+      if (resolvedValue === serverValues[capability]) {
+        const next = { ...prev };
+        delete next[capability];
+        return next;
+      }
+      return {
+        ...prev,
+        [capability]: resolvedValue,
+      };
+    });
+  };
+
+  const handleRefresh = async () => {
+    await Promise.all([
+      refetchDefaults(),
+      canManageSystem ? refetchProviders() : Promise.resolve(),
+      canManageSystem ? refetchConnections() : Promise.resolve(),
+    ]);
+    toast.success("Đã làm mới dữ liệu từ máy chủ.");
+  };
+
+  const handleSave = async () => {
+    if (!isDirty || !canManageSystem) return;
+
+    const payload = buildSystemDefaultsPayload(
+      userEdits,
+      serverValues,
+    ) as DefaultsUpdateRequest;
+
+    try {
+      await updateMutation.mutateAsync(payload);
+      setUserEdits({});
+      toast.success("Đã lưu mô hình mặc định hệ thống thành công!");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Có lỗi xảy ra khi lưu cấu hình mặc định";
+      toast.error(msg);
+    }
+  };
+
+  const isLoading =
+    loadingDefaults ||
+    (canManageSystem && (loadingProviders || loadingConnections));
+  const isRefreshing =
+    fetchingDefaults || fetchingProviders || fetchingConnections;
+
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <PageHeader
-        eyebrow="Tùy chỉnh hệ thống"
-        title="Cài đặt cấu hình"
-        description="Quản lý giao diện, khóa API nhà cung cấp và thông tin phiên làm việc hiện tại."
-      />
-
-      <div className="space-y-4">
-        {/* Theme Settings */}
-        <Card className="shadow-2xs">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">
-              Giao diện người dùng
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Chọn chủ đề sáng hoặc tối theo sở thích thị giác.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-center gap-3">
-            <Button
-              variant={theme === "light" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setTheme("light")}
-              className="gap-2 text-xs"
-            >
-              <Sun className="size-3.5" />
-              <span>Chế độ Sáng</span>
-            </Button>
-            <Button
-              variant={theme === "dark" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setTheme("dark")}
-              className="gap-2 text-xs"
-            >
-              <Moon className="size-3.5" />
-              <span>Chế độ Tối</span>
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Backend & Environment */}
-        <Card className="shadow-2xs">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold">
-                Chế độ xem trước Giao diện (Standalone UI)
-              </CardTitle>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-medium">
-                Đã ngắt API
-              </span>
-            </div>
-            <CardDescription className="text-xs">
-              Toàn bộ dữ liệu hiển thị là dữ liệu mẫu mô phỏng (Mock Data),
-              không gửi bất kỳ yêu cầu mạng nào đến máy chủ.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Field className="gap-2">
-              <FieldLabel
-                htmlFor="api-endpoint"
-                className="text-xs font-semibold text-foreground"
-              >
-                Trạng thái API
-              </FieldLabel>
-              <Input
-                id="api-endpoint"
-                readOnly
-                value="Tắt kết nối API (Chỉ chạy giao diện với Mock Data nội bộ)"
-                className="h-9 text-xs font-mono bg-muted/40 text-emerald-600 font-medium"
-              />
-            </Field>
-          </CardContent>
-        </Card>
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+      {/* Top Header */}
+      <div className="space-y-0.5">
+        <h2 className="text-xl font-bold tracking-tight text-foreground">
+          Cài đặt
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Quản lý giao diện hiển thị, cấu hình mô hình AI mặc định và thông tin
+          tài khoản.
+        </p>
       </div>
+
+      <Separator />
+
+      {/* Main 2-column layout */}
+      <div className="flex flex-col space-y-6 md:flex-row md:space-x-8 md:space-y-0">
+        {/* Left Sub-nav */}
+        <aside className="md:w-48 lg:w-56 shrink-0">
+          <nav className="flex space-x-1 md:flex-col md:space-x-0 md:space-y-1">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveTab(item.id)}
+                  className={cn(
+                    "flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors w-full text-left",
+                    isActive
+                      ? "bg-muted font-semibold text-foreground shadow-2xs"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                  )}
+                >
+                  <Icon className="size-4 shrink-0 text-muted-foreground" />
+                  <span>{item.title}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        {/* Right Content Panel */}
+        <div className="flex-1 min-w-0 max-w-3xl">
+          {/* TAB 1: GIAO DIỆN (APPEARANCE) */}
+          {activeTab === "appearance" && (
+            <div className="space-y-6">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-semibold text-foreground">
+                  Giao diện
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Tùy chỉnh chủ đề sáng hoặc tối cho giao diện người dùng.
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div>
+                  <span className="text-xs font-semibold text-foreground block mb-2.5">
+                    Chủ đề hiển thị
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
+                    {/* Light Mode Card */}
+                    <button
+                      type="button"
+                      onClick={() => setTheme("light")}
+                      className={cn(
+                        "group cursor-pointer rounded-xl border-2 p-1.5 transition-all text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/40 select-none w-full",
+                        theme === "light"
+                          ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                          : "border-border/70 hover:border-primary/50 bg-card",
+                      )}
+                    >
+                      <div className="space-y-2 rounded-lg bg-[#f4f5f7] p-2.5 border border-border/40">
+                        <div className="space-y-1.5 rounded-md bg-white p-2 shadow-2xs border border-border/30">
+                          <div className="h-2 w-16 rounded bg-[#e2e4e8]" />
+                          <div className="h-2 w-24 rounded bg-[#e2e4e8]" />
+                        </div>
+                        <div className="flex items-center gap-2 rounded-md bg-white p-2 shadow-2xs border border-border/30">
+                          <div className="size-3.5 rounded-full bg-primary/20" />
+                          <div className="h-2 w-20 rounded bg-[#e2e4e8]" />
+                        </div>
+                      </div>
+                      <div className="pt-2 pb-1 px-1 flex items-center justify-between text-xs font-medium text-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <Sun className="size-3.5 text-amber-500" />
+                          <span>Chế độ Sáng</span>
+                        </span>
+                        {theme === "light" && (
+                          <Check className="size-3.5 text-primary" />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Dark Mode Card */}
+                    <button
+                      type="button"
+                      onClick={() => setTheme("dark")}
+                      className={cn(
+                        "group cursor-pointer rounded-xl border-2 p-1.5 transition-all text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/40 select-none w-full",
+                        theme === "dark"
+                          ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                          : "border-border/70 hover:border-primary/50 bg-card",
+                      )}
+                    >
+                      <div className="space-y-2 rounded-lg bg-zinc-950 p-2.5 border border-zinc-800">
+                        <div className="space-y-1.5 rounded-md bg-zinc-900 p-2 shadow-2xs border border-zinc-800">
+                          <div className="h-2 w-16 rounded bg-zinc-700" />
+                          <div className="h-2 w-24 rounded bg-zinc-700" />
+                        </div>
+                        <div className="flex items-center gap-2 rounded-md bg-zinc-900 p-2 shadow-2xs border border-zinc-800">
+                          <div className="size-3.5 rounded-full bg-primary/40" />
+                          <div className="h-2 w-20 rounded bg-zinc-700" />
+                        </div>
+                      </div>
+                      <div className="pt-2 pb-1 px-1 flex items-center justify-between text-xs font-medium text-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <Moon className="size-3.5 text-blue-400" />
+                          <span>Chế độ Tối</span>
+                        </span>
+                        {theme === "dark" && (
+                          <Check className="size-3.5 text-primary" />
+                        )}
+                      </div>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-2.5">
+                    Chọn chủ đề hiển thị phù hợp với điều kiện làm việc của bạn.
+                    Cài đặt được lưu tự động trên trình duyệt.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: MÔ HÌNH MẶC ĐỊNH (MODELS) */}
+          {activeTab === "models" && (
+            <div className="space-y-6">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-semibold text-foreground">
+                  Mô hình mặc định
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Thiết lập mô hình mặc định cho bốn chức năng cốt lõi. Cấu hình
+                  này áp dụng cho tất cả đơn vị.
+                </p>
+              </div>
+
+              <Separator />
+
+              {!canManageSystem && (
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 text-xs text-foreground">
+                  <ShieldAlert className="size-4 text-amber-600 shrink-0" />
+                  <span>
+                    Bạn đang xem cấu hình ở chế độ chỉ đọc. Chỉ tài khoản có
+                    quyền quản trị mô hình (<code>ai.models.manage</code>) mới
+                    có thể chỉnh sửa cấu hình hệ thống.
+                  </span>
+                </div>
+              )}
+
+              {errorDefaults && (
+                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive space-y-2">
+                  <div className="font-semibold flex items-center gap-2">
+                    <AlertTriangle className="size-4" />
+                    <span>
+                      Không thể tải cấu hình mô hình mặc định từ máy chủ.
+                    </span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refetchDefaults()}
+                    className="h-7 text-xs"
+                  >
+                    Thử lại
+                  </Button>
+                </div>
+              )}
+
+              <Card className="shadow-2xs">
+                <CardHeader className="pb-4 border-b border-border/60">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <Cpu className="size-4 text-primary" />
+                      <CardTitle className="text-sm font-semibold">
+                        Mô hình mặc định toàn hệ thống
+                      </CardTitle>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRefresh}
+                      disabled={isLoading || isRefreshing}
+                      className="h-8 text-xs gap-1.5"
+                    >
+                      <RotateCw
+                        className={cn(
+                          "size-3.5",
+                          isRefreshing && "animate-spin",
+                        )}
+                      />
+                      <span>Làm mới</span>
+                    </Button>
+                  </div>
+                  <CardDescription className="text-xs mt-1">
+                    Thiết lập mô hình mặc định cho bốn chức năng cốt lõi. Mọi
+                    tác vụ ở tất cả các đơn vị sẽ tự động sử dụng cấu hình này.
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="p-0 divide-y divide-border/60">
+                  {isLoading ? (
+                    <div className="p-6 space-y-4">
+                      <Skeleton className="h-14 w-full" />
+                      <Skeleton className="h-14 w-full" />
+                      <Skeleton className="h-14 w-full" />
+                      <Skeleton className="h-14 w-full" />
+                    </div>
+                  ) : (
+                    CAPABILITIES_LIST.map((item) => {
+                      const cap = item.key;
+                      const currentValue = effectiveValues[cap];
+                      const availableModels =
+                        availableModelsForCapability.get(cap) || [];
+                      const selectedProvider = currentValue
+                        ? providersMap.get(currentValue)
+                        : null;
+
+                      const isAssignedUnavailable =
+                        currentValue &&
+                        (!selectedProvider?.is_active ||
+                          (selectedProvider.parent_id &&
+                            connectionActiveMap.get(
+                              selectedProvider.parent_id,
+                            ) === false));
+
+                      const isChanged =
+                        cap in userEdits &&
+                        userEdits[cap] !== serverValues[cap];
+
+                      return (
+                        <div
+                          key={cap}
+                          className={cn(
+                            "p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6 transition-colors",
+                            isChanged && "bg-primary/5",
+                          )}
+                        >
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-foreground">
+                                {item.name}
+                              </span>
+                              {currentValue ? (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] h-4.5 px-1.5 font-normal bg-primary/10 text-primary border-primary/20"
+                                >
+                                  Đã đặt
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] h-4.5 px-1.5 font-normal text-muted-foreground"
+                                >
+                                  Chưa cấu hình
+                                </Badge>
+                              )}
+                              {isChanged && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] h-4.5 px-1.5 font-normal text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/40"
+                                >
+                                  Chưa lưu
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                              {item.description}
+                            </p>
+                            {isAssignedUnavailable && (
+                              <div className="flex items-center gap-1.5 text-[11px] text-amber-600 mt-1">
+                                <AlertTriangle className="size-3.5 shrink-0" />
+                                <span>
+                                  Mô hình đã gán trước đây hiện không khả dụng
+                                  hoặc bị ngắt kết nối.
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="w-full sm:w-80 shrink-0">
+                            <Select
+                              value={currentValue ?? NONE_VALUE}
+                              onValueChange={(val) =>
+                                handleModelChange(cap, val)
+                              }
+                              disabled={
+                                !canManageSystem || updateMutation.isPending
+                              }
+                            >
+                              <SelectTrigger className="h-9 text-xs w-full bg-background">
+                                <SelectValue placeholder="Chọn mô hình mặc định..." />
+                              </SelectTrigger>
+                              <SelectContent className="text-xs max-h-72">
+                                <SelectItem
+                                  value={NONE_VALUE}
+                                  className="text-muted-foreground italic"
+                                >
+                                  (Chưa đặt - không dùng mặc định)
+                                </SelectItem>
+                                {isAssignedUnavailable && selectedProvider && (
+                                  <SelectItem
+                                    value={selectedProvider.id}
+                                    className="text-destructive font-mono text-xs"
+                                  >
+                                    ⚠️ {formatModelLabel(selectedProvider)}{" "}
+                                    (Không khả dụng)
+                                  </SelectItem>
+                                )}
+                                {availableModels.map((m) => (
+                                  <SelectItem key={m.id} value={m.id}>
+                                    {formatModelLabel(m)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Action Footer */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
+                <div className="flex items-center gap-2 text-xs">
+                  {isDirty ? (
+                    <span className="text-amber-600 font-medium flex items-center gap-1.5">
+                      <AlertTriangle className="size-3.5" />
+                      Có thay đổi chưa lưu
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      <CheckCircle2 className="size-3.5 text-primary" />
+                      Đã đồng bộ với cấu hình hệ thống
+                    </span>
+                  )}
+                </div>
+
+                {canManageSystem && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSave}
+                    disabled={!isDirty || updateMutation.isPending || isLoading}
+                    className="h-8 text-xs gap-1.5"
+                  >
+                    {updateMutation.isPending ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Save className="size-3.5" />
+                    )}
+                    <span>
+                      {updateMutation.isPending
+                        ? "Đang lưu..."
+                        : "Lưu thay đổi"}
+                    </span>
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: TÀI KHOẢN (ACCOUNT) */}
+          {activeTab === "account" && (
+            <div className="space-y-6">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-semibold text-foreground">
+                  Tài khoản
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Thông tin phiên làm việc và quyền hạn tài khoản hiện tại.
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="p-5 rounded-xl border border-border/70 bg-card space-y-4 shadow-2xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="text-muted-foreground block text-[11px] mb-1">
+                        Tên hiển thị
+                      </span>
+                      <span className="font-semibold text-foreground text-sm">
+                        {actor?.display_name || "Quản trị viên"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[11px] mb-1">
+                        Tên đăng nhập
+                      </span>
+                      <span className="font-mono text-foreground">
+                        {actor?.username || "dev@qnu.edu.vn"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[11px] mb-1">
+                        Loại người dùng
+                      </span>
+                      <span className="font-medium text-foreground capitalize">
+                        {actor?.user_type || "Cán bộ / Quản trị"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[11px] mb-1">
+                        Trạng thái phiên
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className="bg-primary/10 text-primary border-primary/20 text-[10px] h-5 px-1.5"
+                      >
+                        Đã đăng nhập
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <span className="text-muted-foreground block text-[11px] mb-2 font-medium">
+                      Quyền hạn hệ thống
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(actor?.permissions || []).length > 0 ? (
+                        actor?.permissions.map((perm) => (
+                          <Badge
+                            key={perm}
+                            variant="outline"
+                            className="font-mono text-[10px] h-5 px-1.5 bg-muted/40 text-foreground"
+                          >
+                            {perm}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground text-xs italic">
+                          Quyền tài khoản cơ bản
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Confirm Discard Modal */}
+      <ConfirmDialog
+        open={isBlocked}
+        onOpenChange={(open) => {
+          if (!open && blocker.status === "blocked") {
+            blocker.reset();
+          }
+        }}
+        title="Bỏ các thay đổi chưa lưu?"
+        description="Bạn đã chỉnh sửa mô hình mặc định nhưng chưa nhấn Lưu thay đổi. Nếu rời khỏi trang, các lựa chọn này sẽ bị mất."
+        confirmLabel="Rời đi"
+        confirmVariant="destructive"
+        onConfirm={() => {
+          setUserEdits({});
+          if (blocker.status === "blocked") {
+            blocker.proceed();
+          }
+        }}
+      />
     </div>
   );
 }
