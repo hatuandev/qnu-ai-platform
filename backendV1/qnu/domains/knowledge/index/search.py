@@ -105,7 +105,9 @@ async def _eligible(db, blob, actor, run, document_ids) -> tuple[list[IndexInput
 
 
 async def _query_vector(db, actor, run, query, model: EmbeddingModel):
-    runtime = await resolve_embedding_runtime(db, run.workspace_id, run.provider_id)
+    runtime = await resolve_embedding_runtime(
+        db, run.workspace_id, run.provider_id, index_run_id=run.id
+    )
     if runtime.configuration_hash != run.config["provider"]["configuration_hash"]:
         raise Conflict(
             "Embedding model/config không tương thích index.", code="index_configuration_changed"
@@ -119,6 +121,7 @@ async def _query_vector(db, actor, run, query, model: EmbeddingModel):
         digest({"query": query, "config": runtime.configuration_hash}),
         runtime.budget([query]),
         runtime.provider_id,
+        index_run_id=run.id,
     )
     try:
         result = await model.embed([query], bind_usage(runtime.request(), usage.id))
@@ -228,6 +231,7 @@ async def search(
     req: SearchRequest,
     *,
     reranker: Reranker | None = None,
+    verify: bool = True,
 ) -> SearchResponse:
     # All publication writers acquire workspace before document/source locks.
     await resolve_workspace_access(db, actor, workspace_id, for_update=True)
@@ -298,7 +302,9 @@ async def search(
     )
     if active != run.id:
         raise Conflict("Index đã đổi trong khi tìm kiếm.", code="index_changed")
-    runtime = await resolve_embedding_runtime(db, workspace_id, run.provider_id)
+    runtime = await resolve_embedding_runtime(
+        db, workspace_id, run.provider_id, index_run_id=run.id
+    )
     if runtime.configuration_hash != run.config["provider"]["configuration_hash"]:
         raise Conflict("Model đã đổi trong khi tìm kiếm.", code="index_configuration_changed")
     allowed, skipped = await _eligible(db, blob, actor, run, req.document_ids)
@@ -380,7 +386,19 @@ async def search(
             {"chunk_id": h.chunk_id, "score": h.score} for h in sparse_hits
         ]
         trace["score_kinds"]["lexical"] = "postgres_ts_rank_cd"
-        hits = hybrid.fuse(hits, sparse_hits, req.candidate_k, req.rrf_k)
+        # Adjacent-phrase recall is a separate ranking: OR over a long question
+        # lets document-title words drown the short answer-bearing unit.
+        phrase_started = time.monotonic()
+        phrase = await hybrid.lexical(
+            db, run, allowed, req.query, req.candidate_k, chunk_ids, phrases=True
+        )
+        phrase_hits = await _hits(db, run, allowed, phrase, sealed) if phrase else []
+        trace["lexical_phrases_ms"] = round((time.monotonic() - phrase_started) * 1000, 3)
+        trace["ranking"]["lexical_phrases"] = [
+            {"chunk_id": h.chunk_id, "score": h.score} for h in phrase_hits
+        ]
+        trace["score_kinds"]["lexical_phrases"] = "postgres_ts_rank_cd_phrase"
+        hits = hybrid.fuse([hits, sparse_hits, phrase_hits], req.candidate_k, req.rrf_k)
         trace["ranking"]["fusion"] = [{"chunk_id": h.chunk_id, "score": h.score} for h in hits]
         trace["score_kinds"]["fusion"] = "rrf"
         trace.update(
@@ -388,8 +406,12 @@ async def search(
                 "lexical": "postgres_simple_fts",
                 "lexical_count": len(sparse_hits),
                 "lexical_ranked_ids": [h.chunk_id for h in sparse_hits],
+                "lexical_phrases": "postgres_simple_fts_phrases",
+                "lexical_phrases_count": len(phrase_hits),
+                "lexical_phrases_ranked_ids": [h.chunk_id for h in phrase_hits],
                 "fusion_ranked_ids": [h.chunk_id for h in hits],
                 "fusion": "rrf",
+                "fusion_branches": ["dense", "lexical", "lexical_phrases"],
                 "candidate_k": req.candidate_k,
                 "rrf_k": req.rrf_k,
             }
@@ -420,11 +442,17 @@ async def search(
                     req.document_ids,
                 )
 
-            hits = await hybrid.rerank(
-                db, actor, workspace_id, req, hits, reranker, trace, checkpoint
-            )
-            trace["ranking"]["rerank"] = [{"chunk_id": h.chunk_id, "score": h.score} for h in hits]
-            trace["score_kinds"]["rerank"] = "model_relevance"
+            try:
+                hits = await hybrid.rerank(
+                    db, actor, workspace_id, req, hits, reranker, trace, checkpoint
+                )
+            except Conflict as exc:
+                # Only "no rerank model configured" degrades to hybrid fusion;
+                # credential, capacity and provider failures must surface.
+                if exc.code != "model_not_configured":
+                    raise
+                trace["rerank_skipped"] = "model_not_configured"
+                hits = hits[: req.top_k]
         else:
             hits = hits[: req.top_k]
     logger.info(
@@ -443,7 +471,8 @@ async def search(
         skipped_documents=skipped,
         trace={**trace, "retrieval_ms": round((time.monotonic() - started) * 1000, 3)},
     )
-    if req.mode == "hybrid_rerank" and hits:
+    # Answer requests revalidate the merged evidence right before dispatch.
+    if verify and req.mode == "hybrid_rerank" and hits:
         from qnu.domains.knowledge.index.validation import validate_results
 
         await validate_results(

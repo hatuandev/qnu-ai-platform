@@ -1,6 +1,6 @@
 # Hướng dẫn chạy QNU AI Platform V1
 
-Áp dụng cho `backendV1/` và `frontendV1/` trên Windows/PowerShell. Từ **02/11/2026**, các lệnh ngắn `dev`, `be`, `worker`, `fe`, `check`, `build` cũng chạy V1; tên `v1-*` được giữ tương đương. Thư mục dự án trong các lệnh dưới đây là `D:\DuAnPhanMem\qnu-ai-platform`; thay đường dẫn nếu đặt ở nơi khác.
+Hướng dẫn các lệnh `v1-*` cho Backend V1 và Frontend V1 trên Windows. `dev` và `dev2` chạy Backend V1, worker V1 và Frontend V2 ở cổng 3002. Dùng `dev1` hoặc `v1-dev` cho Frontend V1 ở cổng 3001. Thư mục dự án trong các lệnh dưới đây là `D:\DuAnPhanMem\qnu-ai-platform`.
 
 ## 1. Chạy nhanh hằng ngày
 
@@ -97,9 +97,7 @@ Các lệnh thiết lập và kiểm tra bổ sung:
 | `make v1-lint` | Ruff BE rồi Biome FE, dừng nếu có lỗi, không tự sửa |
 | `make v1-typecheck` / `make v1-build` | TypeScript / build FE; clone mới cần dev/build để sinh route tree trước khi typecheck riêng |
 
-PowerShell thay `make` bằng `.\make.ps1` cho mọi lệnh trên. Lệnh không có tiền tố
-`v1-` đã chuyển sang V1; `make dev` chạy cùng kế hoạch với `make v1-dev`. Các lệnh
-legacy `seed/reset-db/reseed/reconcile/reindex` bị từ chối, không gọi backend cũ.
+PowerShell thay `make` bằng `.\make.ps1` cho mọi lệnh trên. `check` và `db-ready` kiểm Vite trong `frontendV2`. Nếu chưa có thư viện FE V2, chạy `npm ci` trong thư mục `frontendV2`. `fe2` chạy riêng Frontend V2. Các lệnh legacy `seed/reset-db/reseed/reconcile/reindex` đã ngừng hỗ trợ.
 
 Để thử lại app V1 trên dữ liệu trắng, dừng `dev` bằng Ctrl+C rồi chạy:
 
@@ -108,10 +106,10 @@ legacy `seed/reset-db/reseed/reconcile/reindex` bị từ chối, không gọi b
 .\make.ps1 infra-up
 .\make.ps1 migrate
 .\make.ps1 seed-modelops
-.\make.ps1 dev
+.\make.ps1 v1-dev
 ```
 
-Dừng nếu có lệnh báo lỗi. Mở <http://127.0.0.1:3001/> sau khi `dev` khởi động.
+Dừng nếu có lệnh báo lỗi. Mở <http://127.0.0.1:3001/> sau khi `v1-dev` khởi động.
 `clear` xóa volume PostgreSQL, Redis, Qdrant và MinIO của Docker local. Workspace,
 ModelOps và tài liệu lưu trong các volume này cần được tạo lại. Dữ liệu trên
 dịch vụ ngoài Docker hoặc thư mục lưu trữ riêng nằm ngoài phạm vi reset. Giữ cùng

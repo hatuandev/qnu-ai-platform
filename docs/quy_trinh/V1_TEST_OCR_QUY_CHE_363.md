@@ -76,20 +76,27 @@ và canonical gốc; bản sửa là JSON/Markdown dẫn xuất có version riê
 riêng, không thay nhãn tham chiếu để đạt PASS.
 
 Kiểm tra chính tả dùng JSON Schema và giới hạn evidence ID trong các đoạn đã chọn
-(`qnu.ocr.spelling/v4`; lượt cũ v3 giữ nguyên lịch sử). Máy chủ kiểm vị trí bằng chuỗi gốc khớp chính xác; chỉ căn
+(`qnu.ocr.spelling/v5`; lượt v3/v4 giữ nguyên lịch sử). Máy chủ kiểm vị trí bằng chuỗi gốc khớp chính xác; chỉ căn
 lại vị trí khi chuỗi xuất hiện duy nhất, hoặc mọi lần xuất hiện đều được đề xuất một
 lần với cùng bản sửa. Chuỗi mơ hồ, khác số, chồng lấn hoặc không thuộc đoạn nguồn
 vẫn bị chặn. Không có fuzzy match hoặc từ điển sửa theo câu test.
 
-V4 gửi nguyên văn các đoạn/ô được chọn, kèm tiêu đề gần nhất, đoạn lân cận và
+Prompt v5 gửi nguyên văn các đoạn/ô được chọn, kèm tiêu đề gần nhất, đoạn lân cận và
 header/hàng thuộc đúng bảng của cùng bản nguồn. Ngữ cảnh chỉ đọc được giới hạn
 8.000 ký tự tổng, 1.500 ký tự/mục; nếu bị rút gọn có cờ rõ ràng, không cắt văn bản
 được sửa. Đoạn ở ranh giới trang chỉ là ngữ cảnh ứng viên, không mặc định nối câu
 hoặc ô bảng. Toàn bộ request vẫn qua kiểm ngân sách ModelOps.
 
 Mỗi gợi ý mới phải có `context_before` trích nguyên văn từ đoạn được sửa và
-`context_after` chỉ chứa đúng thay thế đó. Trích dẫn không khớp, đổi thêm dữ kiện,
-khác số, sai phạm vi hoặc chồng lấn làm lượt kiểm tra thất bại; không tự gửi lại.
+`context_after` chỉ chứa đúng thay thế đó. Gợi ý sai được xử lý riêng lẻ thay vì làm
+hỏng cả lượt kiểm tra: máy chủ phân loại từng gợi ý thành áp dụng được
+(`suggestions`), giữ lại (`withheld_suggestions`) hoặc loại bỏ (`rejected_suggestions`)
+kèm lý do. Gợi ý chồng lấn, khác số, trích dẫn sai phạm vi hoặc đổi thêm dữ kiện bị
+loại; không tự gửi lại. Chuỗi gốc duy nhất nhưng ngữ cảnh không chứng minh được vị trí
+bị giữ lại với `context_unverified`; chuỗi lặp lại mà ngữ cảnh mâu thuẫn hoặc không
+phân biệt được lần xuất hiện thì bị loại. Chỉ output không phân tích được hoặc sai
+schema mới làm batch thất bại; batch lỗi không chặn các batch khác, và phiên cha chỉ
+hoàn tất khi mọi đơn vị đã được kiểm tra.
 Gợi ý thay đổi chữ cơ sở, dấu câu hoặc ranh giới từ được giữ trong
 `withheld_suggestions` để đối chiếu ảnh; không xuất hiện trong danh sách áp dụng.
 Các thay đổi dấu/viết hoa còn lại vẫn chỉ là đề xuất, không phải xác nhận đúng nghĩa.
@@ -97,10 +104,17 @@ Các thay đổi dấu/viết hoa còn lại vẫn chỉ là đề xuất, khôn
 
 Model chat hiện chỉ nhận văn bản; chưa có inference đối chiếu ảnh tự động. Người
 dùng xem ảnh bằng luồng đọc nguồn hiện có, sửa nháp và Lưu để tạo phiên bản mới.
-Không tự thay nhà cung cấp hoặc giả cờ `source_image_verified`. V4 không làm tăng
-số lượt gọi model cho một lần kiểm tra; chưa có benchmark model thật chứng minh
+Không tự thay nhà cung cấp hoặc giả cờ `source_image_verified`. Prompt v5 không làm
+tăng số lượt gọi model cho một lần kiểm tra; chưa có benchmark model thật chứng minh
 tỷ lệ cải thiện. Muốn dùng mã mới cần khởi động lại serve sau khi các tác vụ đang
 chạy hoàn tất; không đổi phiên bản đầu vào của compiler đã được tạo.
+
+Đo chẩn đoán ngày 2026-11-10 trên cùng nguồn thử, không phải nghiệm thu: phát lại
+17 batch v4 đã lưu qua bộ kiểm mới cho 17/17 phân tích được, 9 gợi ý → 6 áp dụng,
+3 giữ lại, 0 loại. Chạy v5 trên toàn bộ 24 batch: 24/24 phân tích được, phủ
+600/600 đơn vị, 42 gợi ý → 36 áp dụng, 6 giữ lại, 0 loại. Chênh lệch giữa các lần
+chạy v4/v5 trên 7 batch từng lỗi chưa chứng minh cải thiện chất lượng; không có
+kết luận CER/WER từ cohort này.
 
 ModelOps hỗ trợ cấu hình reasoning riêng cho tác vụ `ocr_review`; thêm khả năng này
 không tự tắt reasoning cho provider. Lượt test797 tạm dùng chính sách đã khai báo

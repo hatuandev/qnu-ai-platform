@@ -59,6 +59,7 @@ from qnu.domains.ocr.layout import parse_page
 from qnu.domains.ocr.lease import LeaseLost, assert_claim, commit_owned, heartbeat
 from qnu.domains.ocr.models import OcrProcessingRun, OcrRunArtifact, OcrRunPage, utcnow
 from qnu.domains.ocr.telemetry import observe_stage
+from qnu.domains.ocr.warnings import normalize_failures
 from qnu.domains.workspaces.access import resolve_workspace_access
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException, DependencyUnavailable
@@ -380,7 +381,12 @@ async def execute_run(
                 run = await db.get(OcrProcessingRun, run_id, populate_existing=True)
                 if run is None or run.worker_id != token:
                     raise LeaseLost() from exc
-                logger.warning("ocr_run_crashed", run_id=run_id, error_type=type(exc).__name__)
+                logger.warning(
+                    "ocr_run_crashed",
+                    run_id=run_id,
+                    error_type=type(exc).__name__,
+                    error=redact(str(exc))[:500],
+                )
                 return await _fail(
                     db, run, "processing_failed", type(exc).__name__, job_queue=job_queue
                 )
@@ -787,16 +793,21 @@ async def _assemble_result(
         row = rows[page.page_number]
         layout = None
         native = None
+        image_failures: list[dict] = []
         if row.status == "completed" and row.raw_key:
             _, raw = await read_artifact_bytes(
                 db, blob_store, run, "raw_response", page.page_number
+            )
+            payload = json.loads(raw)
+            image_failures = normalize_failures(
+                payload.get("image_ocr_failures"), page.page_number
             )
             if runtime and runtime.provider_type == "mineru":
                 import asyncio
 
                 from qnu.domains.ocr.mineru_layout import parse_mineru_page
 
-                layout = await asyncio.to_thread(parse_mineru_page, json.loads(raw))
+                layout = await asyncio.to_thread(parse_mineru_page, payload)
             else:
                 layout = parse_page(
                     _raw_text(raw), table_layout_version=config.table_layout_version
@@ -834,6 +845,7 @@ async def _assemble_result(
                 else "native"
                 if native
                 else None,
+                image_ocr_failures=tuple(image_failures),
             )
         )
 
@@ -940,6 +952,10 @@ async def _assemble_result(
         run.status = "failed"
         run.error_code = report.errors[0].code
         run.error_detail = report.errors[0].detail[:500]
+    elif canonical.get("image_ocr_failures"):
+        run.status = "completed_with_warnings"
+        run.error_code = None
+        run.error_detail = None
     else:
         run.status = "completed"
         run.error_code = None

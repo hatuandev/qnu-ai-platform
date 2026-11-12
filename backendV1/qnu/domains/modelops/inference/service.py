@@ -17,6 +17,8 @@ from qnu.domains.workspaces.access import resolve_workspace_access
 from qnu.platform.errors import Conflict
 from qnu.ports.chat_model import ChatMessage, ChatRequest
 
+DOCUMENT_CHAT_TASKS: frozenset[Task] = frozenset({"compiler", "compiler_review", "ocr_review"})
+
 
 def input_token_upper_bound(messages: list[ChatMessage]) -> int:
     """UTF-8 bytes plus 64 framing tokens/message and 128 request framing tokens.
@@ -137,7 +139,7 @@ async def prepare_chat_request(
             automatic_output_budget=max_output_tokens is None,
             budget_identity=current,
             timeout_seconds=runtime.timeout_seconds,
-            wait_for_completion=runtime.wait_for_completion,
+            wait_for_completion=runtime.wait_for_completion and task in DOCUMENT_CHAT_TASKS,
             api_key=runtime.api_key,
             output_schema=output_schema,
             execution=runtime.execution_scope,

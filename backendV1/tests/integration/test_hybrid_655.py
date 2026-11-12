@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from qnu.domains.knowledge.index.hybrid import RERANK_RRF_K
 from tests.integration.index_support import execute_index
 from tests.integration.knowledge_support import API, EDITOR, PLATFORM, as_actor
 from tests.integration.ocr_support import FakeNemotron
@@ -86,6 +87,8 @@ def test_hybrid_uses_same_index_and_scoped_lexical_candidates(client, indexed):
     assert (
         result["trace"]["fusion"] == "rrf" and result["trace"]["lexical"] == "postgres_simple_fts"
     )
+    assert result["trace"]["fusion_branches"] == ["dense", "lexical", "lexical_phrases"]
+    assert "lexical_phrases_count" in result["trace"]
     assert all(h["version_id"] == indexed["compiled"]["version"]["id"] for h in result["hits"])
     assert len({h["chunk_id"] for h in result["hits"]}) == len(result["hits"])
     response = client.post(
@@ -159,6 +162,12 @@ def test_rerank_protocol_is_strict_and_citations_stay_server_bound(client, index
             body = response.json()
             assert body["trace"]["rerank_tokens"] == 57
             assert body["trace"]["rerank_presentation"] == "qnu.evidence-reading/v1"
+            assert fake.requests[0]["body"]["top_n"] == len(
+                fake.requests[0]["body"]["documents"]
+            )
+            assert body["trace"]["rerank_count"] == body["trace"]["rerank_candidate_count"]
+            assert body["trace"]["rerank_fused_ids"]
+            assert body["trace"]["rerank_rrf_k"] == RERANK_RRF_K
             assert all("\n" not in text for text in fake.requests[0]["body"]["documents"])
             assert all(h["citations"] for h in body["hits"])
             assert fake.requests[0]["path"].endswith("/v1/rerank")

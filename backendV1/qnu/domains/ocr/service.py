@@ -38,8 +38,14 @@ from qnu.domains.ocr.models import (
     OcrProcessingRun,
     OcrRunArtifact,
     OcrRunPage,
+    utcnow,
 )
 from qnu.domains.ocr.telemetry import observe_stage, run_identity
+from qnu.domains.ocr.warnings import (
+    acknowledged,
+    image_failures_fingerprint,
+    normalize_failures,
+)
 from qnu.domains.workspaces.access import actor_ref
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.config import get_settings
@@ -360,10 +366,71 @@ class ProcessingService:
             "evidence": canonical["evidence"],
         }
 
+    async def acknowledge_warnings(
+        self,
+        db: AsyncSession,
+        blob_store: BlobStore,
+        actor: AuthActor,
+        run: OcrProcessingRun,
+        *,
+        reason: str,
+    ) -> tuple[dict, bool]:
+        """Admin acknowledgement of unreadable images; bound to the exact failure list."""
+        run = await db.get(
+            OcrProcessingRun, run.id, populate_existing=True, with_for_update=True
+        )
+        if run is None:
+            raise EntityNotFound("Không tìm thấy lượt xử lý.", code="processing_run_not_found")
+        if run.status != "completed_with_warnings":
+            raise Conflict(
+                "Lượt xử lý không có cảnh báo ảnh cần xác nhận.",
+                code="run_warnings_absent",
+            )
+        _, payload = await self.read_document(db, blob_store, run)
+        canonical = json.loads(payload)
+        failures: list[dict] = []
+        for page in canonical.get("pages") or []:
+            failures.extend(
+                normalize_failures(page.get("image_ocr_failures"), int(page.get("page_number") or 0))
+            )
+        if not failures:
+            raise Conflict(
+                "Lượt xử lý không có cảnh báo ảnh cần xác nhận.",
+                code="run_warnings_absent",
+            )
+        existing = acknowledged(run.config, failures)
+        if existing is not None:
+            return existing, False
+        ack = {
+            "fingerprint": image_failures_fingerprint(failures),
+            "by": actor_ref(actor),
+            "at": utcnow().isoformat(),
+            "reason": reason,
+            "images_failed": len(failures),
+        }
+        run.config = {**(run.config or {}), "image_ocr_ack": ack}
+        await record_workspace_event(
+            db,
+            workspace_id=run.workspace_id,
+            actor=actor,
+            action="source.ocr_warnings_acknowledged",
+            detail={
+                "collection_id": run.collection_id,
+                "source_id": run.source_id,
+                "revision_id": run.revision_id,
+                "run_id": run.id,
+                "fingerprint": ack["fingerprint"],
+                "images_failed": len(failures),
+            },
+        )
+        await db.commit()
+        await db.refresh(run)
+        return ack, True
+
     # ------------------------------------------------------------------ internals
     def _require_completed(self, run: OcrProcessingRun) -> None:
         """A failed or uncertain run has evidence but no usable result to serve."""
-        if run.status != "completed":
+        if run.status not in ("completed", "completed_with_warnings"):
             raise Conflict(
                 f"Lượt xử lý chưa hoàn tất (trạng thái: {run.status}).",
                 code="run_not_completed",

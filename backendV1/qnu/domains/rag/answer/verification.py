@@ -98,6 +98,7 @@ def parse_report(
             "Model trả báo cáo kiểm chứng không hợp lệ.",
             code="answer_verification_invalid",
             status_code=502,
+            title="Báo cáo kiểm chứng không hợp lệ",
         ) from exc
 
 

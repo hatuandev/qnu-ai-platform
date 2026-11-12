@@ -1,6 +1,6 @@
 # QNU AI Platform — V1
 
-Mã và các lệnh chạy dùng **backendV1/** (FastAPI/Python3.12) và **frontendV1/** (React/TypeScript/Vite). Hai thư mục backend/frontend cũ đã được gỡ khỏi checkout; mã đã commit còn trong lịch sử Git, dữ liệu ignored được lưu riêng trước khi gỡ.
+Môi trường dev mặc định dùng **backendV1/** (FastAPI/Python 3.12) và **frontendV2/** (React/TypeScript/Vite). Frontend V1 vẫn có lệnh chạy riêng. Hai thư mục backend/frontend cũ đã được gỡ khỏi checkout; mã đã commit còn trong lịch sử Git, dữ liệu ignored được lưu riêng trước khi gỡ.
 
 ## Chạy trên laptop
 
@@ -12,20 +12,21 @@ Cần Python3.12, uv, Node.js22.12+ và Docker Desktop. Bản đã có dữ li�
 .\make.ps1 dev
 ```
 
-`dev` chạy API8002, worker V1 và giao diện3001 ở foreground. Ctrl+C dừng riêng các tiến trình của phiên này. Lệnh kiểm hạ tầng/schema trước, không tự migration hoặc seed. Nếu cổng đang bận, dừng đúng phiên cũ trước.
+`dev` chạy API V1 ở cổng 8002, worker V1 và [Frontend V2 ở cổng 3002](http://127.0.0.1:3002/). Lệnh kiểm tra hạ tầng và schema trước khi chạy. Ctrl+C dừng các tiến trình của phiên này. Nếu cổng đang bận, dừng đúng phiên cũ trước.
 
-Máy mới xem [hướng dẫn V1](docs/quy_trinh/38_huong_dan_chay_qnu_v1.md): tạo cấu hình riêng từ `.env.example`, cài `install-be`/`install-fe`, khởi động `infra-up`, chủ động `migrate` sau khi xác nhận database, rồi `check` và `dev`.
+Máy mới cài backend bằng `.make.ps1 install-be` và chạy `npm ci` trong `frontendV2`. Thiết lập hạ tầng và schema theo [hướng dẫn chạy local](docs/quy_trinh/38_huong_dan_chay_qnu_v1.md).
 
 | Tác vụ | Lệnh |
 | --- | --- |
-| API / worker / giao diện riêng | `.\make.ps1 be` / `worker` / `fe` |
+| API / worker / Frontend V2 riêng | `.\make.ps1 be` / `worker` / `fe2` |
+| Chạy với Frontend V1 | `.\make.ps1 dev1` |
 | Hạ tầng local | `.\make.ps1 infra-up` / `infra-status` / `infra-down` |
 | Xem revision / nâng schema V1 | `.\make.ps1 db-check` / `migrate` |
 | Test BE cô lập / test FE | `.\make.ps1 test-be` / `test-fe` |
 | Kiểm mã / TypeScript / build FE | `.\make.ps1 lint` / `typecheck` / `build` |
 | E2E từng chặng | `.	est-v1-e2e.ps1 help` |
 
-CMD dùng `make.bat`, Bash dùng `./make`, GNU Make dùng `make`. Tên `v1-*` vẫn tương đương. `--dry-run` chỉ in kế hoạch, ví dụ `.\make.ps1 dev --dry-run`. GNU Make dùng `make dev ARGS=--dry-run`.
+CMD dùng `make.bat`, Bash dùng `./make`, GNU Make dùng `make`. Xem kế hoạch bằng `.\make.ps1 dev --dry-run` hoặc `make dev ARGS=--dry-run`.
 
 `seed`, `reset-db`, `reseed`, `reconcile`, `reindex` legacy không còn được chạy từ root runner. Việc thay tài liệu, lập chỉ mục và quản trị model dùng các thao tác có quyền trong UI V1.
 
@@ -42,6 +43,7 @@ MinerU là giao thức OCR task PDF trong ModelOps; cấu hình URL/key/model, q
 - `backendV1/qnu/`: API, domain/service, adapter và worker.
 - `backendV1/alembic/`: chuỗi migration riêng `alembic_version_backendv1`.
 - `frontendV1/`: giao diện và client V1.
+- `frontendV2/`: giao diện mặc định khi chạy dev.
 - `scripts/run_v1.py`: runner dùng chung; `scripts/v1_e2e_*`: E2E cô lập.
 - `docker-compose.infra.yml`: PostgreSQL/Redis/Qdrant/MinIO/Gotenberg local, giữ named volumes hiện có.
 - `docs/`: quy trình, nhật ký và bằng chứng. Nhật ký cũ có thể mô tả runtime legacy.

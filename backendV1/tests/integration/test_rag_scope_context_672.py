@@ -32,7 +32,9 @@ def test_registration_rejects_untraceable_or_overbroad_metadata(client, case):
         annotations[0]["target"] = "document"
     result = register(client, data, annotations, key=f"invalid-{case}")
     assert result.status_code == 422, result.text
-    expected_code = "validation_error" if case == "global_data_year" else "retrieval_metadata_invalid"
+    expected_code = (
+        "validation_error" if case == "global_data_year" else "retrieval_metadata_invalid"
+    )
     assert result.json()["code"] == expected_code
     # The invalid request must not create a document or poison idempotency state.
     valid = register(client, data)
@@ -111,7 +113,8 @@ def test_scope_is_applied_before_topk_in_all_modes_on_same_snapshot(
         assert len(rerank.requests[-1]["body"]["documents"]) == 2
     requests = len(data["embedding"].requests)
     result = client.post(
-        data["base"] + "/search", json={"query": "Nguồn", "metadata_filter": {"data_year": 2030}}
+        data["base"] + "/search",
+        json={"query": "Nguồn", "metadata_filter": {"data_year": 2030}, "mode": "dense"},
     )
     assert result.status_code == 200 and result.json()["hits"] == []
     assert len(data["embedding"].requests) == requests
@@ -165,7 +168,9 @@ def test_context_stays_in_same_section_publication_and_metadata_scope(client, me
                 EDITOR,
                 data["workspace"]["id"],
                 data["collection"]["id"],
-                SearchRequest(query="Nguồn", top_k=1, metadata_filter=req.metadata_filter),
+                SearchRequest(
+                    query="Nguồn", top_k=1, metadata_filter=req.metadata_filter, mode="dense"
+                ),
             )
             expanded, trace = await expand_context(
                 db,
@@ -236,11 +241,14 @@ def test_version_metadata_tampering_invalidates_published_receipt(client, metada
             await db.commit()
 
     client.portal.call(tamper)
-    result = client.post(data["base"] + "/search", json={"query": "Nguồn"})
+    result = client.post(data["base"] + "/search", json={"query": "Nguồn", "mode": "dense"})
     assert result.status_code in {409, 422}, result.text
     assert result.json()["code"] in {"publication_bundle_changed", "retrieval_metadata_invalid"}
     as_actor(OUTSIDER)
-    assert client.post(data["base"] + "/search", json={"query": "Nguồn"}).status_code == 404
+    assert (
+        client.post(data["base"] + "/search", json={"query": "Nguồn", "mode": "dense"}).status_code
+        == 404
+    )
 
 
 def test_metadata_requires_explicit_human_acknowledgement_of_its_hash(client):

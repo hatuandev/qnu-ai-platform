@@ -35,6 +35,12 @@ window.mountPublication = (props) => {
  React.createElement(PublicationDialog,{...props,open,onOpenChange:setOpen}));}
  root.render(React.createElement(QueryClientProvider,{client},React.createElement(Host)));
 };
+window.mountDelete = async () => {
+ const {LifecycleDeleteDialog}=await import('/src/components/knowledge/lifecycle-delete-dialog.tsx');
+ const client=new QueryClient({defaultOptions:{mutations:{retry:false}}});
+ function Host(){const [open,setOpen]=React.useState(true);return React.createElement(LifecycleDeleteDialog,{open,onOpenChange:setOpen,workspaceId:'ws_test',sourceId:'src_test',sourceTitle:'Tài liệu kiểm tra'});}
+ root.render(React.createElement(QueryClientProvider,{client},React.createElement(Host)));
+};
 window.mountStudio = async (location = '/knowledge/src_test?collectionId=col_test') => {
  const {createRouter,createMemoryHistory,RouterProvider}=await import('@tanstack/react-router');
  const {routeTree}=await import('/src/routeTree.gen.ts');
@@ -100,6 +106,165 @@ async function pageForTest() {
 }
 const sha = "a".repeat(64),
   metaSha = "b".repeat(64);
+
+test("source deletion confirms once using the preview ID returned by the API", async () => {
+  const { page, errors } = await pageForTest();
+  const requests = [];
+  const preview = {
+    id: "lca_test",
+    kind: "source",
+    resource_id: "src_test",
+    action: "delete",
+    status: "preview",
+    preview_sha256: sha,
+    impact: { permanent: true },
+    expires_at: "2026-11-11T00:00:00Z",
+  };
+  try {
+    await page.route("**/workspaces/ws_test/lifecycle/*", async (route) => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname;
+      requests.push({
+        path: path.split("/").at(-1),
+        key: request.headers()["idempotency-key"],
+        body: request.postDataJSON(),
+      });
+      await route.fulfill({
+        json: path.endsWith("/previews")
+          ? preview
+          : { ...preview, status: "pending" },
+      });
+    });
+    await page.evaluate(() => window.mountDelete());
+    await page
+      .getByRole("button", { name: "Xóa tài liệu", exact: true })
+      .click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    assert.deepEqual(
+      requests.map(({ path }) => path),
+      ["previews", "actions"],
+    );
+    assert.equal(requests[1].key, "lifecycle:lca_test");
+    assert.deepEqual(requests[1].body, {
+      preview_id: "lca_test",
+      preview_sha256: sha,
+    });
+    assert.deepEqual(errors, []);
+  } finally {
+    await page.close();
+  }
+});
+
+test("settings does not show model configuration or a session when access cannot be verified", async () => {
+  for (const authStatus of [200, 503]) {
+    const { page, errors } = await pageForTest();
+    const modelRequests = [];
+    try {
+      await page.route("**/platform/v1alpha1/**", async (route) => {
+        const path = new URL(route.request().url()).pathname;
+        if (path.includes("/modelops/")) modelRequests.push(path);
+        if (path.endsWith("/auth/me")) {
+          return route.fulfill({
+            status: authStatus,
+            json: {
+              actor: { authenticated: true, permissions: [], roles: [] },
+            },
+          });
+        }
+        return route.fulfill({ json: { items: [] } });
+      });
+      await page.evaluate(() => window.mountStudio("/settings"));
+      await page
+        .getByRole("button", { name: "Mô hình mặc định", exact: true })
+        .click();
+      await page
+        .getByText(
+          authStatus === 200
+            ? "Bạn không có quyền xem cấu hình mô hình hệ thống."
+            : "Không thể tải thông tin tài khoản.",
+          { exact: true },
+        )
+        .waitFor();
+      assert.equal(await page.getByRole("combobox").count(), 0);
+      assert.equal(
+        await page.getByText("Đã đồng bộ với cấu hình hệ thống").count(),
+        0,
+      );
+      assert.deepEqual(modelRequests, []);
+      if (authStatus === 503) {
+        await page
+          .getByRole("button", { name: "Tài khoản", exact: true })
+          .click();
+        await page
+          .getByRole("alert")
+          .filter({ hasText: "Không thể tải thông tin tài khoản." })
+          .waitFor();
+        const settings = page.getByRole("main");
+        assert.equal(
+          await settings.getByText("Đã đăng nhập", { exact: true }).count(),
+          0,
+        );
+        assert.equal(
+          await settings.getByText("dev@qnu.edu.vn", { exact: true }).count(),
+          0,
+        );
+      }
+      assert.deepEqual(errors, []);
+    } finally {
+      await page.close();
+    }
+  }
+});
+
+test("settings only reports synchronization after all model data loads", async () => {
+  const { page, errors } = await pageForTest();
+  let connectionStatus = 503;
+  try {
+    await page.route("**/platform/v1alpha1/**", async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.endsWith("/auth/me")) {
+        return route.fulfill({
+          json: {
+            actor: {
+              authenticated: true,
+              permissions: ["ai.models.manage"],
+              roles: [],
+            },
+          },
+        });
+      }
+      if (path.endsWith("/modelops/defaults"))
+        return route.fulfill({ json: {} });
+      if (path.endsWith("/modelops/providers"))
+        return route.fulfill({ json: [] });
+      if (path.endsWith("/modelops/connections")) {
+        return route.fulfill({ status: connectionStatus, json: [] });
+      }
+      return route.fulfill({ json: { items: [] } });
+    });
+    await page.evaluate(() => window.mountStudio("/settings"));
+    await page
+      .getByRole("button", { name: "Mô hình mặc định", exact: true })
+      .click();
+    const error = page
+      .getByRole("alert")
+      .filter({ hasText: "Không thể tải cấu hình" });
+    await error.waitFor();
+    assert.equal(await page.getByRole("combobox").count(), 0);
+    assert.equal(
+      await page.getByText("Đã đồng bộ với cấu hình hệ thống").count(),
+      0,
+    );
+    connectionStatus = 200;
+    await page.getByRole("button", { name: "Thử lại", exact: true }).click();
+    await page.getByText("Đã đồng bộ với cấu hình hệ thống").waitFor();
+    assert.equal(await page.getByRole("combobox").count(), 4);
+    assert.equal(await error.count(), 0);
+    assert.deepEqual(errors, []);
+  } finally {
+    await page.close();
+  }
+});
 const props = {
   canRegister: true,
   workspaceId: "ws_test",
@@ -718,7 +883,7 @@ test("Studio desktop/mobile layout has one Word toolbar, one served badge and ca
   }
 });
 
-test("spelling review reads OCR v0, keeps the PDF URL and retries preparation without saving twice", async () => {
+test("spelling review keeps the PDF URL and prepares the saved version with exact edits", async () => {
   const { page, errors } = await pageForTest();
   const preparation = [];
   let saves = 0;
@@ -768,7 +933,7 @@ test("spelling review reads OCR v0, keeps the PDF URL and retries preparation wi
           body: "%PDF-1.4\nfixture",
         });
       if (path.endsWith("/text-review/checks")) {
-        assert.equal(url.searchParams.get("version"), "0");
+        assert.equal(url.searchParams.has("version"), false);
         if (!checksAvailable)
           return send({ detail: "Method Not Allowed" }, 405);
         return send([
@@ -792,12 +957,15 @@ test("spelling review reads OCR v0, keeps the PDF URL and retries preparation wi
         ]);
       }
       if (path.endsWith("/text-review") && request.method() === "GET") {
-        assert.equal(url.searchParams.get("version"), "0");
+        assert.equal(url.searchParams.has("version"), false);
         return send(review);
       }
       if (path.endsWith("/text-review")) {
         saves++;
         assert.equal(request.postDataJSON().changes[0].after, "Xin chào bạn");
+        assert.deepEqual(request.postDataJSON().changes[0].spelling_edits, [
+          { start: 9, end: 11, replacement: "bạn" },
+        ]);
         return send({ ...review, version: 1, version_id: "txt_saved" });
       }
       if (
@@ -808,9 +976,7 @@ test("spelling review reads OCR v0, keeps the PDF URL and retries preparation wi
           key: request.headers()["idempotency-key"],
           body: request.postDataJSON(),
         });
-        return preparation.length === 1
-          ? send({ detail: "Queue unavailable" }, 503)
-          : send({ intent: { id: "prep_saved" } }, 201);
+        return send({ intent: { id: "prep_saved" } }, 201);
       }
       return send({ items: [], meta: { page: 1, page_size: 20, total: 0 } });
     });
@@ -835,21 +1001,19 @@ test("spelling review reads OCR v0, keeps the PDF URL and retries preparation wi
       true,
     );
     await page.getByRole("button", { name: "Áp dụng", exact: true }).click();
+    await page.getByTitle("Hoàn tất duyệt chính tả (S)").click();
     await page
-      .getByRole("button", { name: "Lưu thay đổi", exact: true })
-      .click();
-    await page.getByText("Bản sửa đã được lưu.", { exact: false }).waitFor();
-    await page
-      .getByRole("button", { name: "Chuẩn bị lại", exact: true })
+      .getByRole("dialog", { name: "Hoàn tất duyệt chính tả" })
+      .getByRole("button", { name: "Hoàn tất duyệt", exact: true })
       .click();
     await page.waitForFunction(
       () => !document.querySelector('iframe[title="Bản gốc PDF"]'),
     );
     assert.equal(saves, 1);
-    assert.equal(preparation.length, 2);
-    assert.deepEqual(preparation[0], preparation[1]);
-    assert.equal(preparation[1].body.text_version, 1);
-    assert.equal(preparation[1].body.revision_id, "rev_test");
+    assert.equal(preparation.length, 1);
+    assert.ok(preparation[0].key);
+    assert.equal(preparation[0].body.text_version, 1);
+    assert.equal(preparation[0].body.revision_id, "rev_test");
     assert.deepEqual(errors, []);
   } finally {
     await page.close();

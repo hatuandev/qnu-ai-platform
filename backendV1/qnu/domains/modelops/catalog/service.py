@@ -207,9 +207,13 @@ class CatalogService:
         workspace_id: str,
         capability: str,
         provider_id: str | None = None,
+        *,
+        index_run_id: str | None = None,
     ) -> Provider:
         await resolve_workspace_access(db, actor, workspace_id)
-        return await self.resolve_workspace_provider(db, workspace_id, capability, provider_id)
+        return await self.resolve_workspace_provider(
+            db, workspace_id, capability, provider_id, index_run_id=index_run_id
+        )
 
     async def resolve_workspace_provider(
         self,
@@ -217,6 +221,8 @@ class CatalogService:
         workspace_id: str,
         capability: str,
         provider_id: str | None = None,
+        *,
+        index_run_id: str | None = None,
     ) -> Provider:
         """Resolve a granted, active provider for a capability without an HTTP actor.
 
@@ -224,21 +230,64 @@ class CatalogService:
         access; the allowlist, default and capability rules stay identical to the
         interactive path.
         """
+        provider, _ = await self.resolve_workspace_target(
+            db, workspace_id, capability, provider_id, index_run_id=index_run_id
+        )
+        return provider
+
+    async def resolve_workspace_target(
+        self,
+        db: AsyncSession,
+        workspace_id: str,
+        capability: str,
+        provider_id: str | None = None,
+        *,
+        index_run_id: str | None = None,
+    ) -> tuple[Provider, bool]:
+        """Return the authorized provider and whether the system default grants access."""
         if capability not in CAPABILITIES:
             raise AppException("Capability không hợp lệ.", code="capability_invalid")
         system_default = await self.system_default_for(db, capability)
         if provider_id is None:
-            provider_id = system_default or (await self.workspace_defaults(db, workspace_id)).get(capability)
+            provider_id = system_default or (await self.workspace_defaults(db, workspace_id)).get(
+                capability
+            )
         if not provider_id:
             raise Conflict(
                 "Chưa chọn model mặc định cho chức năng này.", code="model_not_configured"
             )
-        is_system_default = (provider_id == system_default)
+        is_system_default = provider_id == system_default
         if not is_system_default:
             granted = await db.get(WorkspaceAllowedProvider, (workspace_id, provider_id))
-            if granted is None:
-                raise EntityNotFound("Model chưa được cấp cho workspace.", code="provider_not_found")
-        return await provider_service.require_capability(db, provider_id, capability)
+            if granted is None and not (
+                capability == "embedding"
+                and index_run_id
+                and await _has_pinned_embedding_grant(db, workspace_id, provider_id, index_run_id)
+            ):
+                raise EntityNotFound(
+                    "Model chưa được cấp cho workspace.", code="provider_not_found"
+                )
+        provider = await provider_service.require_capability(db, provider_id, capability)
+        return provider, is_system_default
+
+
+async def _has_pinned_embedding_grant(
+    db: AsyncSession, workspace_id: str, provider_id: str, run_id: str
+) -> bool:
+    from qnu.domains.knowledge.index.models import IndexRun
+
+    return (
+        await db.scalar(
+            select(IndexRun.id).where(
+                IndexRun.id == run_id,
+                IndexRun.workspace_id == workspace_id,
+                IndexRun.provider_id == provider_id,
+                IndexRun.system_default_authorized.is_(True),
+                IndexRun.is_active.is_(True) | IndexRun.status.in_(("queued", "running")),
+            )
+        )
+        is not None
+    )
 
 
 catalog_service = CatalogService()

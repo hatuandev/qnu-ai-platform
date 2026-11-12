@@ -5,6 +5,8 @@ from __future__ import annotations
 from arq import cron, func
 from arq.connections import RedisSettings
 
+# Register review dependencies for the purge graph when ARQ starts without the API.
+from qnu.domains.knowledge.review import models as _review_models  # noqa: F401
 from qnu.domains.lifecycle.purge import source_purge_job
 from qnu.platform.config import get_settings
 from qnu.workers.tasks.compilation import (
@@ -20,6 +22,7 @@ from qnu.workers.tasks.ocr import (
     ocr_reconcile_queued,
     shutdown,
     spelling_check_job,
+    spelling_reconcile,
     startup,
 )
 from qnu.workers.tasks.operations import (
@@ -39,6 +42,7 @@ class WorkerSettings:
         func(ocr_process_run, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         ocr_reconcile_queued,
         func(spelling_check_job, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
+        spelling_reconcile,
         func(compile_run, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
         compilation_reconcile,
         func(compiler_review_job, timeout=settings.WORKER_MODEL_JOB_TIMEOUT_SECONDS),
@@ -60,6 +64,7 @@ class WorkerSettings:
     cron_jobs: list = (
         [
             cron(ocr_reconcile_queued, minute=set(range(0, 60, 5))),
+            cron(spelling_reconcile, minute=set(range(0, 60, 5))),
             cron(compilation_reconcile, minute=set(range(0, 60, 5))),
             cron(compiler_review_reconcile, minute=set(range(0, 60, 5))),
             cron(preparation_reconcile, minute=set(range(0, 60, 5))),

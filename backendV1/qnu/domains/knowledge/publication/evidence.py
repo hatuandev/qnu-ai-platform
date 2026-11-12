@@ -19,6 +19,8 @@ from qnu.domains.knowledge.compilation.models import CompilationInput, Compilati
 from qnu.domains.knowledge.models import KBSource
 from qnu.domains.knowledge.public_api import read_revision_bytes, resolve_revision_scope
 from qnu.domains.knowledge.publication.models import CompiledVersion
+from qnu.domains.ocr.models import OcrProcessingRun
+from qnu.domains.ocr.warnings import acknowledged
 from qnu.platform.errors import Conflict, EntityNotFound
 from qnu.ports.blob_store import BlobStore
 
@@ -49,6 +51,7 @@ async def load_bundle(
     require_current: bool = False,
     allow_staged: bool = False,
     serving: bool = False,
+    require_warning_ack: bool = False,
 ) -> VersionBundle:
     """Trusted caller must resolve workspace/collection access before this lookup."""
     run = await db.scalar(
@@ -76,6 +79,8 @@ async def load_bundle(
     documents = await load_bound_documents(db, blob, workspace_id, collection_id, bindings)
     if not documents:
         raise Conflict("Bản biên soạn thiếu nguồn.", code="publication_evidence_missing")
+    if require_warning_ack:
+        await _require_warning_ack(db, documents)
     for doc in documents:
         identity = doc["identity"]
         scope = await resolve_revision_scope(
@@ -161,6 +166,30 @@ async def load_bundle(
         markdown,
         documents,
     )
+
+
+async def _require_warning_ack(db: AsyncSession, documents: list[dict]) -> None:
+    """A partial OCR document needs a current admin acknowledgement before publication."""
+    failing = {
+        doc["ocr_run_id"]: doc["image_ocr_failures"]
+        for doc in documents
+        if doc.get("image_ocr_failures")
+    }
+    if not failing:
+        return
+    runs = (
+        await db.scalars(
+            select(OcrProcessingRun).where(OcrProcessingRun.id.in_(list(failing)))
+        )
+    ).all()
+    acknowledged_runs = {run.id: run for run in runs}
+    for run_id, failures in failing.items():
+        run = acknowledged_runs.get(run_id)
+        if run is None or acknowledged(run.config, failures) is None:
+            raise Conflict(
+                "Bằng chứng còn ảnh chưa đọc được; cần đọc lại hoặc quản trị viên xác nhận.",
+                code="publication_evidence_incomplete",
+            )
 
 
 async def assert_current_sources(

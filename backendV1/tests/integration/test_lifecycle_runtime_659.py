@@ -43,7 +43,7 @@ def test_archive_excludes_evidence_and_restore_preserves_original_index(client, 
         client, data["workspace"], preview(client, data["workspace"], kind, resource_id, "archive")
     )
     assert result.status_code == 200, result.text
-    response = client.post(data["base"] + "/search", json={"query": "Q"})
+    response = client.post(data["base"] + "/search", json={"query": "Q", "mode": "dense"})
     assert response.status_code == 200, response.text
     assert not response.json()["hits"]
     assert len(data["embedding"].requests) == before
@@ -58,7 +58,9 @@ def test_archive_excludes_evidence_and_restore_preserves_original_index(client, 
         "restore",
     )
     assert restored.status_code == 200, restored.text
-    assert client.post(data["base"] + "/search", json={"query": "Q"}).json()["hits"]
+    assert client.post(data["base"] + "/search", json={"query": "Q", "mode": "dense"}).json()[
+        "hits"
+    ]
 
 
 def test_pause_resume_and_delete_assistant_keep_owned_conversations(client, chat_session):
@@ -301,7 +303,9 @@ def test_replacement_keeps_old_serving_until_index_completes(client, indexed, fa
     version_id = staged_version(client, data)
     old_id = data["compiled"]["version"]["id"]
     assert client.get(data["document_url"] + "/published").json()["version"]["id"] == old_id
-    assert client.post(data["base"] + "/search", json={"query": "Q"}).json()["hits"]
+    assert client.post(data["base"] + "/search", json={"query": "Q", "mode": "dense"}).json()[
+        "hits"
+    ]
     p = preview(
         client,
         data["workspace"],
@@ -346,7 +350,9 @@ def test_replacement_keeps_old_serving_until_index_completes(client, indexed, fa
         assert summary["prepared_version"] is None
     as_actor(EDITOR)
     data["embedding"].mode = "ok"
-    hits = client.post(data["base"] + "/search", json={"query": "Q"}).json()["hits"]
+    hits = client.post(data["base"] + "/search", json={"query": "Q", "mode": "dense"}).json()[
+        "hits"
+    ]
     assert hits and all(h["version_id"] == active_id for h in hits)
 
 
@@ -387,7 +393,7 @@ def test_withdrawn_old_version_while_replacement_waits_never_activates_candidate
         client.get(data["document_url"] + "/versions/" + version_id).json()["status"] == "approved"
     )
     as_actor(EDITOR)
-    search = client.post(data["base"] + "/search", json={"query": "Q"})
+    search = client.post(data["base"] + "/search", json={"query": "Q", "mode": "dense"})
     assert search.status_code == 200, search.text
     assert search.json()["hits"] == []
     summary = client.get(data["base"] + f"/sources/{data['source']['id']}/summary").json()
@@ -429,7 +435,9 @@ def test_cleanup_rejects_active_index_and_retries_only_owned_inactive_generation
     response = accept(client, data["workspace"], p)
     assert response.status_code == 200 and response.json()["status"] == "completed", response.text
     assert (
-        client.post(data["base"] + "/search", json={"query": "Q"}).json()["index_run_id"]
+        client.post(data["base"] + "/search", json={"query": "Q", "mode": "dense"}).json()[
+            "index_run_id"
+        ]
         == second["id"]
     )
 
@@ -553,7 +561,9 @@ def test_last_source_can_retire_and_clean_index_but_restore_needs_reindex(client
     )
     assert response.status_code == 201, response.text
     assert execute_index(client, response.json()["run"]["id"]) == "completed"
-    assert client.post(data["base"] + "/search", json={"query": "Q"}).json()["hits"]
+    assert client.post(data["base"] + "/search", json={"query": "Q", "mode": "dense"}).json()[
+        "hits"
+    ]
 
 
 def test_replacement_rolls_back_publication_on_manifest_failure_and_reuses_embeddings(

@@ -95,7 +95,7 @@ def test_bad_lexical_guess_is_visible_but_never_in_apply_list_or_saved_automatic
     assert client.get(url).json()["version"] == current["version"]
 
 
-def test_context_does_not_certify_an_unrelated_full_sentence_rewrite(client):
+def test_context_never_certifies_an_unrelated_full_sentence_rewrite(client):
     class RewritingSpeller(FakeSpeller):
         def _respond(self, index):
             status, payload = super()._respond(index)
@@ -110,8 +110,13 @@ def test_context_does_not_certify_an_unrelated_full_sentence_rewrite(client):
     with RewritingSpeller() as model:
         chat_provider(client, data, model.base_url)
         response = detect(client, data, current)
-        assert response.status_code == 502
-        assert response.json()["code"] == "ocr_spelling_invalid"
-        assert detect(client, data, current).json()["status"] == "failed"
+        assert response.status_code == 200, response.text
+        result = response.json()
+        assert result["status"] == "completed"
+        assert result["suggestions"] == []
+        assert result["rejected_suggestions"] == []
+        assert result["withheld_suggestions"][0]["review_reason"] == "context_unverified"
+        replay = detect(client, data, current)
+        assert replay.json()["id"] == result["id"]
         assert len(model.requests) == 1
     assert client.get(review_url(data)).json()["version"] == 0

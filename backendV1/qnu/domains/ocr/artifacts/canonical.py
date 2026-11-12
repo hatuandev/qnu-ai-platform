@@ -37,6 +37,7 @@ class PageDocument:
     error_code: str | None = None
     usage_tokens: int | None = None
     method: str | None = None
+    image_ocr_failures: tuple[dict[str, Any], ...] = ()
 
 
 def evidence_id(page: int, block_order: int, cell: tuple[int, int] | None = None) -> str:
@@ -85,11 +86,14 @@ def build_canonical(
     """Assemble the canonical document; no value is inferred beyond what was measured."""
     page_payloads: list[dict[str, Any]] = []
     evidence: dict[str, dict[str, Any]] = {}
+    failed_images: list[dict[str, Any]] = []
 
     for document in pages:
         page_index = document.page_number - 1
         blocks: list[dict[str, Any]] = []
         warnings: list[str] = []
+        failures = [dict(item) for item in document.image_ocr_failures]
+        warnings.extend(f"image_ocr_failed:{item['image_asset_no']}" for item in failures)
         if document.layout is not None:
             warnings.extend(document.layout.warnings)
             for block in document.layout.blocks:
@@ -162,26 +166,28 @@ def build_canonical(
                                 }
                 blocks.append(payload)
 
-        page_payloads.append(
-            {
-                "page_number": document.page_number,
-                "status": document.status,
-                "image": {
-                    "sha256": document.image_sha256,
-                    "width": document.image_width,
-                    "height": document.image_height,
-                    "ink_ratio": document.ink_ratio,
-                },
-                "blocks": blocks,
-                "warnings": warnings,
-                "error": document.error_code,
-                "usage_tokens": document.usage_tokens,
-            }
-        )
+        page_payload: dict[str, Any] = {
+            "page_number": document.page_number,
+            "status": document.status,
+            "image": {
+                "sha256": document.image_sha256,
+                "width": document.image_width,
+                "height": document.image_height,
+                "ink_ratio": document.ink_ratio,
+            },
+            "blocks": blocks,
+            "warnings": warnings,
+            "error": document.error_code,
+            "usage_tokens": document.usage_tokens,
+        }
+        if failures:
+            page_payload["image_ocr_failures"] = failures
+            failed_images.extend(failures)
+        page_payloads.append(page_payload)
         if document.method:
             page_payloads[-1]["extraction_method"] = document.method
 
-    return {
+    canonical: dict[str, Any] = {
         "schema_version": CANONICAL_SCHEMA,
         "identity": identity,
         "processing": processing,
@@ -204,6 +210,9 @@ def build_canonical(
             else []
         ),
     }
+    if failed_images:
+        canonical["image_ocr_failures"] = failed_images
+    return canonical
 
 
 def _table_html(table: dict[str, Any]) -> str:
@@ -244,6 +253,13 @@ def render_markdown(canonical: dict[str, Any]) -> str:
             lines.append("<!-- page_status: blank -->")
             lines.append("")
             continue
+        for failure in page.get("image_ocr_failures", ()):
+            bbox = failure.get("bbox")
+            box = f" bbox={bbox}" if bbox is not None else ""
+            lines.append(
+                f"<!-- image_ocr_failed: asset={failure['image_asset_no']}{box}"
+                f" error={failure['error_code']} -->"
+            )
         for block in page["blocks"]:
             if image := block.get("image"):
                 lines.append(f"![Ảnh trong tài liệu]({image['filename']})")
@@ -282,6 +298,7 @@ def build_manifest(
             "pages_blank": sum(1 for page in pages if page["status"] == "blank"),
             "pages_failed": sum(1 for page in pages if page["status"] == "failed"),
             "pages_uncertain": sum(1 for page in pages if page["status"] == "uncertain"),
+            "images_failed": sum(len(page.get("image_ocr_failures", ())) for page in pages),
             "page_image_sha256": {
                 str(page["page_number"]): page["image"]["sha256"] for page in pages
             },

@@ -1143,7 +1143,7 @@ export function AssistantFormDialog({
                                       onChange={(e) =>
                                         field.handleChange(
                                           e.target.value === ""
-                                            ? 16000
+                                            ? 32000
                                             : Number(e.target.value),
                                         )
                                       }

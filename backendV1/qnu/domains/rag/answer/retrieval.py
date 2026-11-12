@@ -51,12 +51,21 @@ def interleave(results, limit):
 
 
 async def search(
-    db, blob, model, vectors, actor, workspace_id, collection_id, req, *, reranker=None
+    db, blob, model, vectors, actor, workspace_id, collection_id, req, *, reranker=None, verify=True
 ):
     facets = question_facets(req.query)
     if len(facets) == 1 or req.top_k < len(facets):
         return await search_single(
-            db, blob, model, vectors, actor, workspace_id, collection_id, req, reranker=reranker
+            db,
+            blob,
+            model,
+            vectors,
+            actor,
+            workspace_id,
+            collection_id,
+            req,
+            reranker=reranker,
+            verify=verify,
         )
     results = []
     for query in facets:
@@ -70,6 +79,7 @@ async def search(
             collection_id,
             req.model_copy(update={"query": query}),
             reranker=reranker,
+            verify=verify,
         )
         if results and (result.index_run_id, result.generation) != (
             results[0].index_run_id,
@@ -82,7 +92,9 @@ async def search(
         ):
             raise Conflict("Cấu hình tìm kiếm đổi giữa các ý hỏi.", code="answer_evidence_changed")
         results.append(result)
-    hits = interleave(results, req.top_k)
+    # Each clause keeps its own retrieved top_k; the shared context budget,
+    # not a global cap, bounds what reaches the prompt.
+    hits = interleave(results, req.top_k * len(results))
     trace = {
         **results[0].trace,
         "query_plan": "explicit_interrogative_clauses/v2",

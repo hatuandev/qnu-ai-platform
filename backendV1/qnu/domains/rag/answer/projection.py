@@ -3,7 +3,7 @@
 from qnu.domains.knowledge.index.presentation import reading_text, table_prefix
 from qnu.domains.knowledge.index.schemas import SearchHit
 
-PAYLOAD_VERSION = "qnu.answer-payload/v2"
+PAYLOAD_VERSION = "qnu.answer-payload/v3"
 
 
 def source_code(source: SearchHit, codes: dict) -> str:

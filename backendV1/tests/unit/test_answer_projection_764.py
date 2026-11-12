@@ -54,9 +54,7 @@ def test_merged_cells_keep_values_and_server_geometry_without_duplicate_json():
             cell["evidence_id"] = f"t-{i}-{j}"
             citations[f"ocr:t-{i}-{j}"] = {"page": 1}
     raw = "Title\n" + json.dumps(structure, ensure_ascii=False, sort_keys=True)
-    item = source(
-        raw, {**structure, "context": {"parent": "table:ocr:table"}}, citations
-    )
+    item = source(raw, {**structure, "context": {"parent": "table:ocr:table"}}, citations)
     original = copy.deepcopy(item)
     sent = compact_evidence_item(item)
     assert sent["id"] == item.evidence_id
@@ -83,4 +81,43 @@ def test_arbitrary_json_in_table_text_is_not_removed():
 
 
 def test_new_answer_contract_has_a_distinct_prompt_version():
-    assert PROMPT_VERSION == "qnu.rag.answer/v20"
+    assert PROMPT_VERSION == "qnu.rag.answer/v28"
+
+
+def test_prompt_requires_partial_answers_when_any_requirement_is_grounded():
+    from qnu.domains.rag.answer.drafting import SYSTEM_PROMPT
+
+    assert "Chỉ cần MỘT yêu cầu có căn cứ" in SYSTEM_PROMPT
+    assert "Không được trả insufficient_evidence khi evidence đã chứa dữ kiện" in SYSTEM_PROMPT
+    assert "Một phần có căn cứ, phần còn lại thiếu (vẫn bắt buộc answered)" in SYSTEM_PROMPT
+
+
+def test_prompt_allows_verbatim_prose_only_for_unselectable_tables():
+    from qnu.domains.rag.answer.drafting import SYSTEM_PROMPT
+
+    assert "Bảng trong unselectable không có ô để chọn" in SYSTEM_PROMPT
+    assert "chép nguyên văn giá trị nhìn thấy trong text" in SYSTEM_PROMPT
+    assert "Số của bảng trong tables chỉ đi qua lookups" in SYSTEM_PROMPT
+
+
+def test_prompt_requires_co_citing_sibling_fragments_and_verbatim_enumeration():
+    from qnu.domains.rag.answer.drafting import SYSTEM_PROMPT
+
+    assert (
+        "Mỗi số trong statement phải hiện trong text của ít nhất một id được dẫn" in SYSTEM_PROMPT
+    )
+    assert "phải dẫn kèm id của mảnh đó" in SYSTEM_PROMPT
+    assert "không trả lookups cho bảng unselectable" in SYSTEM_PROMPT
+    assert "không abstain chỉ vì phải liệt kê nhiều tên" in SYSTEM_PROMPT
+    assert "12,5 không viết 12.5" in SYSTEM_PROMPT
+
+
+def test_prompt_answers_symbol_definitions_from_narrative_and_all_grounded_parts():
+    from qnu.domains.rag.answer.drafting import SYSTEM_PROMPT
+
+    assert (
+        "bảng không chọn được ô không phải lý do abstain khi văn bản đã có căn cứ" in SYSTEM_PROMPT
+    )
+    assert "điều, khoản hoặc chú thích văn bản đã định nghĩa rõ" in SYSTEM_PROMPT
+    assert "trả lời đủ từng ý có căn cứ, kể cả ý nằm ở bảng hoặc chú thích khác" in SYSTEM_PROMPT
+    assert "không bỏ ý đã có nguồn chỉ vì tập trung vào ý chính" in SYSTEM_PROMPT

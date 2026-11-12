@@ -1,11 +1,11 @@
-import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   useCommitLifecycleActionMutation,
   useCreateLifecyclePreviewMutation,
 } from "@/api/lifecycle/queries";
-import type { LifecyclePreviewResponse } from "@/api/lifecycle/types";
+import type { LifecycleActionReceipt } from "@/api/lifecycle/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,7 +35,7 @@ export function LifecycleDeleteDialog({
   const commitActionMutation = useCommitLifecycleActionMutation(workspaceId);
   const mutatePreview = createPreviewMutation.mutateAsync;
 
-  const [preview, setPreview] = useState<LifecyclePreviewResponse | null>(null);
+  const [preview, setPreview] = useState<LifecycleActionReceipt | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,13 +75,13 @@ export function LifecycleDeleteDialog({
   }, [open, sourceId, sourceTitle, mutatePreview]);
 
   const handleConfirmDelete = async () => {
-    if (!preview) return;
+    if (!preview || !canConfirmDelete) return;
 
     try {
-      const idempotencyKey = `del_${preview.preview_id}`;
+      const idempotencyKey = `lifecycle:${preview.id}`;
       await commitActionMutation.mutateAsync({
         data: {
-          preview_id: preview.preview_id,
+          preview_id: preview.id,
           preview_sha256: preview.preview_sha256,
         },
         idempotencyKey,
@@ -96,30 +96,39 @@ export function LifecycleDeleteDialog({
       const msg =
         err instanceof Error ? err.message : "Có lỗi xảy ra khi xác nhận xóa";
       setError(msg);
-      toast.error(msg);
     }
   };
 
   const isDeleting = commitActionMutation.isPending;
+  const canConfirmDelete =
+    preview?.resource_id === sourceId &&
+    preview?.kind === "source" &&
+    preview.action === "delete" &&
+    preview.status === "preview" &&
+    !isLoadingPreview &&
+    !isDeleting &&
+    !error;
 
   return (
     <Dialog open={open} onOpenChange={isDeleting ? undefined : onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base text-destructive">
-            <Trash2 className="size-4" />
-            <span>Xác nhận xóa tài liệu</span>
+        <DialogHeader className="gap-1.5 text-left">
+          <DialogTitle className="text-base font-semibold text-foreground">
+            Xóa tài liệu?
           </DialogTitle>
-          <DialogDescription className="text-xs">
-            Hành động này sẽ xóa vĩnh viễn tài liệu và toàn bộ bản bóc tách liên
-            quan.
+          <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
+            Bạn có chắc chắn muốn xóa vĩnh viễn tài liệu{" "}
+            <span className="font-semibold text-foreground break-words">
+              "{sourceTitle}"
+            </span>
+            ? Hành động này không thể hoàn tác.
           </DialogDescription>
         </DialogHeader>
 
         {isLoadingPreview ? (
-          <div className="py-6 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="size-5 animate-spin text-primary" />
-            <span>Đang kiểm tra phụ thuộc và tác động xóa...</span>
+          <div className="py-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="size-4 animate-spin text-primary" />
+            <span>Đang kiểm tra tác động dữ liệu...</span>
           </div>
         ) : error ? (
           <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive space-y-1">
@@ -130,23 +139,13 @@ export function LifecycleDeleteDialog({
             <p>{error}</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="p-3 rounded-lg bg-muted/40 border border-border/70 text-xs space-y-2">
-              <div className="text-foreground">
-                Bạn có chắc chắn muốn xóa tài liệu:
-              </div>
-              <div className="font-semibold text-foreground px-2 py-1 bg-background rounded border border-border/60 truncate">
-                {sourceTitle}
-              </div>
-              <div className="text-[11px] text-muted-foreground leading-relaxed">
-                Tệp gốc trong kho lưu trữ, các đoạn văn bản trích xuất và chỉ
-                mục liên quan sẽ được dọn dẹp an toàn trên hệ thống.
-              </div>
-            </div>
+          <div className="p-3 rounded-lg bg-muted/40 border border-border/50 text-xs text-muted-foreground leading-relaxed">
+            Tệp gốc trong kho, các đoạn văn bản trích xuất và chỉ mục tìm kiếm
+            liên quan sẽ được dọn dẹp an toàn khỏi hệ thống.
           </div>
         )}
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="gap-2 sm:gap-2 pt-2">
           <Button
             type="button"
             variant="outline"
@@ -162,17 +161,11 @@ export function LifecycleDeleteDialog({
             variant="destructive"
             size="sm"
             onClick={handleConfirmDelete}
-            disabled={
-              !preview || isLoadingPreview || isDeleting || Boolean(error)
-            }
+            disabled={!canConfirmDelete}
             className="h-8 text-xs gap-1.5 shadow-2xs"
           >
-            {isDeleting ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="size-3.5" />
-            )}
-            <span>Xác nhận xóa</span>
+            {isDeleting && <Loader2 className="size-3.5 animate-spin" />}
+            <span>{isDeleting ? "Đang xóa..." : "Xóa tài liệu"}</span>
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -81,6 +81,7 @@ class ModelAnswer(BaseModel):
 class EvidenceSource(SearchHit):
     evidence_id: str
     source_passages: list[dict[str, str]] = Field(default_factory=list)
+    source_title: str | None = Field(default=None, exclude=True)
 
 
 class AnswerTrace(BaseModel):

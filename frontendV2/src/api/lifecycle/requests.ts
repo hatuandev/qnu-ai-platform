@@ -8,15 +8,14 @@ import type {
   LifecycleActionReceipt,
   LifecycleActionRequest,
   LifecyclePreviewRequest,
-  LifecyclePreviewResponse,
 } from "./types";
 
 export async function createLifecyclePreview(
   workspaceId: string,
   data: LifecyclePreviewRequest,
   options?: { signal?: AbortSignal },
-): Promise<LifecyclePreviewResponse> {
-  return v1Client.post<LifecyclePreviewResponse>(
+): Promise<LifecycleActionReceipt> {
+  return v1Client.post<LifecycleActionReceipt>(
     lifecyclePaths.previews(workspaceId),
     data,
     options,

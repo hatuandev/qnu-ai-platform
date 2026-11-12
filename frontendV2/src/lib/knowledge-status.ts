@@ -153,6 +153,16 @@ export function resolveSourceDisplayStatus(
       }
     }
 
+    if (processing?.status === "completed_with_warnings") {
+      return {
+        label: "Có cảnh báo ảnh",
+        variant: "outline",
+        hint: "Một số ảnh trong tệp chưa đọc được; phần văn bản còn lại vẫn dùng được. Cần đọc lại hoặc quản trị viên xác nhận trước khi xuất bản.",
+        isReadyForAssistant: false,
+        servingNote,
+      };
+    }
+
     if (
       latestDerivation.compilation_status === "completed" ||
       prep?.status === "ready"
@@ -168,6 +178,16 @@ export function resolveSourceDisplayStatus(
   }
 
   // 5. Fallback when no derivations exist yet
+  if (processing?.status === "completed_with_warnings") {
+    return {
+      label: "Đã bóc tách, có cảnh báo",
+      variant: "outline",
+      hint: "Đã bóc tách nội dung thô nhưng còn ảnh chưa đọc được. Cần đọc lại hoặc quản trị viên xác nhận trước khi xuất bản.",
+      isReadyForAssistant: false,
+      servingNote,
+    };
+  }
+
   if (processing?.status === "completed") {
     return {
       label: "Đã bóc tách",

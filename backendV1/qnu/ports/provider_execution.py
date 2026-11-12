@@ -11,6 +11,7 @@ class ProviderExecution:
     provider_id: str
     usage_id: str | None = None
     sessions: Callable[[], Any] | None = field(default=None, repr=False, compare=False)
+    index_run_id: str | None = None
 
 
 def bind_usage(request, usage_id: str):

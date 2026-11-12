@@ -70,7 +70,9 @@ lại. Khi caller chọn `mode="ai"` hoặc `provider_id` tường minh, lỗi c
 - `GET /compilation-runs/{run_id}/markdown` và `GET /compilation-runs/{run_id}/draft.json` — tệp đã lưu nguyên byte, kèm `ETag` là SHA-256. Dùng các đường dẫn này để tải tệp.
 - `GET /compilation-runs/{run_id}/progress` — trạng thái từng phần và token quan sát được.
 - Khi lượt đọc tệp hoàn tất, worker xếp hàng soát chính tả trên phiên bản văn bản gốc. Kết quả theo lượt đọc và phiên bản văn bản tại `GET /sources/{source_id}/revisions/{revision_id}/processing-runs/{ocr_run_id}/text-review/checks?version={version}`. Chỉ báo soát xong toàn bộ khi lượt hoàn tất và số đoạn đã soát khớp `total_evidence_count`. Lượt cũ có thể thiếu trường tổng này.
-- Người dùng xác nhận sửa qua `POST .../text-review` theo phiên bản và SHA-256 đã xem. Sau khi lưu, gửi yêu cầu chuẩn bị lại với đúng lượt đọc và phiên bản văn bản vừa lưu. Nếu bước chuẩn bị gặp lỗi mạng, dùng lại khóa của bước đó.
+- Nếu phản hồi của một nhóm không qua kiểm tra gợi ý (`ocr_spelling_invalid`), worker tiếp tục các nhóm chưa gửi. Nhóm lỗi không được tính vào số đoạn đã soát và lượt chung báo chưa hoàn tất. Các lỗi quyền, phiên bản, cấu hình, quota hoặc lỗi hạ tầng vẫn dừng lượt.
+- Khi người dùng bấm soát lại sau lỗi, worker giữ kết quả các nhóm đã xong nếu phiên bản, SHA-256, model, cấu hình và prompt vẫn khớp. Model chỉ nhận các đoạn chưa có kết quả.
+- Người dùng xác nhận sửa qua `POST .../text-review` theo phiên bản và SHA-256 đã xem. Khi duyệt chính tả, API đối chiếu từng vị trí trong `spelling_edits` với gợi ý và văn bản đã gửi. Sau khi lưu bản sửa mới, gửi yêu cầu chuẩn bị lại với đúng lượt đọc và phiên bản văn bản vừa lưu. Nếu bước chuẩn bị gặp lỗi mạng, dùng lại khóa của bước đó.
 - Chỉnh sửa có kiểm soát:
   1. `GET /compilation-runs/{run_id}/edit-context` — nội dung hiện tại, citations, nguồn, bảng và
      `bundle_sha256`.

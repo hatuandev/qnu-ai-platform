@@ -14,6 +14,13 @@ qua thao tác migration chủ động; không stamp head, không sửa generatio
 API/worker/recovery dùng `qnu.platform.schema.SCHEMA_HEAD`; worker phải khớp cả
 schema DB và phiên bản code trong heartbeat.
 
+Khi tạo chỉ mục bằng model Embedding mặc định hệ thống, backend ghi quyền dùng
+model đó cùng generation. Đổi mặc định áp dụng cho lần tạo chỉ mục mới. Lượt
+đang chờ, đang chạy và chỉ mục đang phục vụ tiếp tục dùng đúng model đã ghi.
+Backend vẫn kiểm tra quyền truy cập kho, trạng thái model, khóa và cấu hình
+Embedding của generation. Migration `0021_index_system_embedding` ghi nhận quyền
+cho các lượt hiện có đang dùng đúng model mặc định tại thời điểm nâng cấp.
+
 `POST/PUT .../workspaces/{workspace_id}/assistants` nhận thêm `rag_policy`:
 
 ```json
@@ -164,6 +171,14 @@ metadata scope, số ứng viên, thời gian embedding/dense/FTS/rerank, contex
 ngân sách. Score khác thang không cộng trực tiếp và không là xác suất câu trả lời
 đúng. trace.total_tokens hiện là generation; usage/total_tokens judge nằm trong
 trace.verification, không gọi số generation là tổng toàn pipeline.
+
+FTS dùng GIN expression index `ix_kb_index_chunks_fts` trên
+`to_tsvector('simple'::regconfig, text)` (migration `0025_index_fts_gin`); câu SQL
+phải giữ regconfig literal để planner khớp index. Qdrant bảo đảm keyword payload
+index cho `run_id`, `workspace_id`, `collection_id`, `version_id`, `chunk_id` ở cả
+collection mới và collection hiện có; phản hồi không xác nhận `completed` là lỗi
+`vector_unavailable`, không bỏ qua. Index không thay đổi scope, provenance hay thứ
+hạng và không phải bằng chứng chất lượng; số đo nháp nằm trong `hybrid-evaluation.md`.
 
 Bài học tham khảo Meilisearch là trường lọc và giải thích xếp hạng; không sao chép
 semanticRatio sang RRF, không thêm dịch vụ Meilisearch hoặc fuzzy matching số/năm.

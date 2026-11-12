@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     # Independent parts may overlap, but the provider is shared with every other
     # caller: keep this small and below the server's own concurrency.
     COMPILER_SEGMENT_CONCURRENCY: int = Field(default=2, ge=1, le=4)
+    # Spelling batches and embedded-image OCR are independent units; keep both small
+    # because they share the same provider and the chat admission queue.
+    SPELLING_BATCH_CONCURRENCY: int = Field(default=3, ge=1, le=8)
+    OCR_IMAGE_CONCURRENCY: int = Field(default=3, ge=1, le=8)
     # Shared Redis admission for all managed chat calls to the same endpoint/model.
     # Operational policy, not a claim about discovered server max_num_seqs.
     MODEL_CHAT_CONCURRENCY: int = Field(default=4, ge=1, le=64)

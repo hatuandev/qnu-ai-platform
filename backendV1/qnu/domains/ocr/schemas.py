@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from qnu.domains.ocr.models import ACTIVE_RUN_STATUSES, OcrProcessingRun
 
@@ -87,8 +87,36 @@ class ProcessingRunResponse(BaseModel):
             pagination="document"
             if (run.config or {}).get("extraction", {}).get("docx")
             else "page",
-            results_ready=run.status == "completed",
+            results_ready=run.status in ("completed", "completed_with_warnings"),
         )
+
+
+class ProcessingWarningsAckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(min_length=5, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 5:
+            raise ValueError("Lý do xác nhận phải có ít nhất 5 ký tự.")
+        return value
+
+
+class WarningsAcknowledgement(BaseModel):
+    fingerprint: str
+    by: str
+    at: datetime
+    reason: str
+    images_failed: int
+
+
+class ProcessingWarningsAckResponse(BaseModel):
+    run: ProcessingRunResponse
+    acknowledged: WarningsAcknowledgement
+    created: bool
 
 
 class ProcessingRunCreatedResponse(BaseModel):

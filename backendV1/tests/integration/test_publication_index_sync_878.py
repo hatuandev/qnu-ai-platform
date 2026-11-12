@@ -298,3 +298,54 @@ def test_maintenance_recovers_committed_publication_without_browser(client, sour
         assert client.portal.call(index_run, ctx, *run["args"]) == "completed"
         assert client.portal.call(index_sync, ctx, *job["args"]) == "ready"
         assert len(fake.requests) == 1
+
+
+class FlakyUpsert:
+    """A transient vector outage on the first write, then the real target."""
+
+    def __init__(self, inner, failures=1):
+        self._inner = inner
+        self.failures = failures
+        self.attempts = 0
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+    async def upsert(self, collection, points):
+        from qnu.platform.errors import DependencyUnavailable
+
+        self.attempts += 1
+        if self.failures:
+            self.failures -= 1
+            raise DependencyUnavailable(
+                "Qdrant tạm thời không nhận vector.", code="vector_unavailable"
+            )
+        await self._inner.upsert(collection, points)
+
+
+def test_transient_vector_failure_is_redispatched_without_waiting_for_reconcile(
+    client, source, monkeypatch
+):
+    from qnu.main import app
+    from qnu.workers.tasks.indexing import index_run
+
+    with FakeEmbedding() as fake:
+        queue = FakeJobQueue()
+        monkeypatch.setattr(app.state.container, "job_queue", queue)
+        embedding_provider(client, source, fake.base_url)
+        assert sync_now(client, source) == "building"
+        run_id = client.get(source["base"] + "/indexing-runs").json()[0]["id"]
+        flaky = FlakyUpsert(app.state.container.vector_store)
+        monkeypatch.setattr(app.state.container, "vector_store", flaky)
+        ctx = {"container": app.state.container, "worker_id": "retry-test"}
+
+        assert client.portal.call(index_run, ctx, run_id) == "queued"
+        rows = client.get(source["base"] + "/indexing-runs").json()
+        assert rows[0]["status"] == "queued" and rows[0]["dispatched_at"] is not None
+        deliveries = [
+            job for job in queue.jobs if job["function"] == "index_run" and job["args"] == (run_id,)
+        ]
+        assert deliveries[-1]["job_id"] == f"qnu:v1:index:{run_id}:2"
+        assert client.portal.call(index_run, ctx, run_id) == "completed"
+        assert flaky.attempts == 2
+        assert len(fake.requests) == 1

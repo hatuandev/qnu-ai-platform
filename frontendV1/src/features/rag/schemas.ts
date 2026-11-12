@@ -162,7 +162,7 @@ export function toRagPolicyForm(
     rrf_k: source.rrf_k ?? 60,
     rerank_provider_id: source.rerank_provider_id ?? null,
     context_window: source.context_window ?? 0,
-    context_max_bytes: source.context_max_bytes ?? 16000,
+    context_max_bytes: source.context_max_bytes ?? 32000,
     verification_mode: source.verification_mode ?? "off",
     verification_provider_id: source.verification_provider_id ?? null,
     verification_max_output_tokens:

@@ -87,6 +87,7 @@ async def create_preview(
             require_current=True,
             allow_staged=req.action == "approve",
             serving=True,
+            require_warning_ack=True,
         )
         assert_pinned(target, bundle)
     active = await active_version(db, doc)
@@ -187,6 +188,7 @@ async def commit_decision(
             require_current=True,
             allow_staged=preview.action == "approve",
             serving=True,
+            require_warning_ack=True,
         )
         assert_pinned(target, bundle)
     return await _apply(db, actor, doc, target, preview, key, request_hash)

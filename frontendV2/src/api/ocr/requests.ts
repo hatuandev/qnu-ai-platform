@@ -29,6 +29,42 @@ export function getProcessingProgress(
   );
 }
 
+export type WarningsAcknowledgement = {
+  fingerprint: string;
+  by: string;
+  at: string;
+  reason: string;
+  images_failed: number;
+};
+
+export type WarningsAckResponse = {
+  run: ProcessingProgressResponse;
+  acknowledged: WarningsAcknowledgement;
+  created: boolean;
+};
+
+export function acknowledgeOcrWarnings(
+  workspaceId: string,
+  collectionId: string,
+  sourceId: string,
+  revisionId: string,
+  runId: string,
+  body: { reason: string },
+  options?: { signal?: AbortSignal },
+) {
+  return v1Client.post<WarningsAckResponse>(
+    ocrPaths.acknowledgeWarnings(
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      runId,
+    ),
+    body,
+    options,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Text Review / Spelling Contracts
 // ---------------------------------------------------------------------------
@@ -44,6 +80,14 @@ export type TextUnit = {
   column?: number | null;
 };
 
+export type ImageOcrFailure = {
+  image_asset_no: number;
+  page: number;
+  bbox: number[] | null;
+  error_code: string;
+  attempts: number;
+};
+
 export type ReviewDocument = {
   run_id: string;
   version: number;
@@ -53,18 +97,22 @@ export type ReviewDocument = {
   markdown_sha256: string;
   units: TextUnit[];
   saved_at?: string | null;
+  image_ocr_failures: ImageOcrFailure[];
+  image_ocr_acknowledged: boolean;
 };
 
 export type TextChange = {
   evidence_id: string;
   before: string;
   after: string;
+  spelling_edits?: { start: number; end: number; replacement: string }[];
 };
 
 export type SaveReview = {
   expected_version: number;
   expected_sha256: string;
   changes: TextChange[];
+  review_check_id?: string | null;
 };
 
 export type Suggestion = {
@@ -77,6 +125,28 @@ export type Suggestion = {
   context_before?: string | null;
   context_after?: string | null;
   review_reason?: string | null;
+};
+
+export type IgnoredSuggestion = {
+  evidence_id: string;
+  start: number;
+  end: number;
+};
+
+export type SpellingDisposition = IgnoredSuggestion & {
+  ignored: boolean;
+};
+
+export type SpellingDispositionBatch = {
+  suggestions: IgnoredSuggestion[];
+};
+
+export type TextVersionSummary = {
+  version: number;
+  version_id: string | null;
+  saved_at: string | null;
+  change_count: number;
+  is_current: boolean;
 };
 
 export type DetectionResponse = {
@@ -92,11 +162,16 @@ export type DetectionResponse = {
   canonical_sha256: string;
   suggestions: Suggestion[];
   withheld_suggestions?: Suggestion[];
+  ignored_suggestions?: IgnoredSuggestion[];
   checked_evidence_ids: string[];
   total_evidence_count?: number | null;
   error_code?: string | null;
   usage_id?: string | null;
   created_at: string;
+  reviewed_at?: string | null;
+  reviewed_version?: number | null;
+  reviewed_sha256?: string | null;
+  reviewed_by?: string | null;
 };
 
 export type DetectRequest = {
@@ -106,6 +181,17 @@ export type DetectRequest = {
   evidence_ids: string[];
   provider_id?: string | null;
   max_output_tokens?: number | null;
+};
+
+export type RerunReviewRequest = {
+  version: number;
+  retry?: boolean;
+};
+
+export type RerunReviewResponse = {
+  run_id: string;
+  version: number;
+  status: string;
 };
 
 export function getTextReview(
@@ -212,6 +298,96 @@ export function getTextReviewCheck(
       runId,
       checkId,
     ),
+    options,
+  );
+}
+
+export function listTextReviewVersions(
+  workspaceId: string,
+  collectionId: string,
+  sourceId: string,
+  revisionId: string,
+  runId: string,
+  options?: { signal?: AbortSignal },
+) {
+  return v1Client.get<TextVersionSummary[]>(
+    ocrPaths.textReviewVersions(
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      runId,
+    ),
+    options,
+  );
+}
+
+export function setTextReviewDisposition(
+  workspaceId: string,
+  collectionId: string,
+  sourceId: string,
+  revisionId: string,
+  runId: string,
+  checkId: string,
+  body: SpellingDisposition,
+  options?: { signal?: AbortSignal },
+) {
+  return v1Client.post<DetectionResponse>(
+    ocrPaths.textReviewCheckDispositions(
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      runId,
+      checkId,
+    ),
+    body,
+    options,
+  );
+}
+
+export function bulkIgnoreTextReviewSuggestions(
+  workspaceId: string,
+  collectionId: string,
+  sourceId: string,
+  revisionId: string,
+  runId: string,
+  checkId: string,
+  body: SpellingDispositionBatch,
+  options?: { signal?: AbortSignal },
+) {
+  return v1Client.post<DetectionResponse>(
+    ocrPaths.textReviewCheckDispositionsBulk(
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      runId,
+      checkId,
+    ),
+    body,
+    options,
+  );
+}
+
+export function rerunTextReview(
+  workspaceId: string,
+  collectionId: string,
+  sourceId: string,
+  revisionId: string,
+  runId: string,
+  body: RerunReviewRequest,
+  options?: { signal?: AbortSignal },
+) {
+  return v1Client.post<RerunReviewResponse>(
+    ocrPaths.textReviewChecksRerun(
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      runId,
+    ),
+    body,
     options,
   );
 }

@@ -1,7 +1,10 @@
 """Derived native table boundaries; never change canonical evidence."""
 
+from qnu.domains.knowledge.index.table_layout import layout
+
 BASIS = "native_numbered_table_boundary/v1"
 TYPED_BASIS = "native_typed_columns/v1"
+MULTITIER_BASIS = "native_multitier_header/v1"
 
 
 def typed_header(table: dict) -> bool:
@@ -36,6 +39,65 @@ def typed_header(table: dict) -> bool:
         )
         for col in range(columns)
     )
+
+
+def multitier_header(table: dict) -> list[int] | None:
+    """Header tiers proven by a merged identity label above numeric columns.
+
+    One complete native block whose top-left label spans several rows and the
+    identity columns; every other header cell is a label or a merged numeric
+    group (e.g. a year), and at least one data column is purely numeric.
+    Geometry and type contrast only — no vocabulary, no cross-page join.
+    """
+    rows, columns = table["rows"], table["column_count"]
+    if len(rows) < 4 or columns < 2 or not rows[0]:
+        return None
+    first = rows[0][0]
+    height, identity_width = first.get("row_span"), first.get("col_span")
+    if (
+        type(height) is not int
+        or type(identity_width) is not int
+        or height < 2
+        or identity_width < 1
+        or identity_width >= columns
+        or len(rows) - height < 2
+    ):
+        return None
+    if not first["text"].strip() or not any(ch.isalpha() for ch in first["text"]):
+        return None
+    positions, errors = layout(
+        {
+            "rows": rows,
+            "row_indices": list(range(len(rows))),
+            "original_row_count": len(rows),
+            "original_column_count": columns,
+        }
+    )
+    if errors:
+        return None
+    for p in positions:
+        if p.row >= height or p.column < identity_width:
+            continue
+        text = p.cell["text"]
+        label = any(ch.isalpha() for ch in text)
+        group = any(ch.isdigit() for ch in text) and p.cell["col_span"] > 1
+        if not text.strip() or not (label or group):
+            return None
+    for col in range(identity_width, columns):
+        data = [
+            p
+            for p in positions
+            if p.row >= height and p.column <= col < p.column + p.cell["col_span"]
+        ]
+        if data and all(
+            p.cell["col_span"] == 1
+            and p.cell["row_span"] == 1
+            and any(ch.isdigit() for ch in p.cell["text"])
+            and not any(ch.isalpha() for ch in p.cell["text"])
+            for p in data
+        ):
+            return list(range(height))
+    return None
 
 
 def sequence(table: dict) -> list[int] | None:
@@ -108,6 +170,17 @@ def dependencies(document: dict) -> dict[str, dict]:
                     "header": ref,
                     "chain": [ref],
                     "previous": None,
+                }
+                previous, header, chain = None, None, []
+                continue
+            tiers = multitier_header(table)
+            if tiers is not None:
+                result[ref] = {
+                    "basis": MULTITIER_BASIS,
+                    "header": ref,
+                    "chain": [ref],
+                    "previous": None,
+                    "header_rows": tiers,
                 }
                 previous, header, chain = None, None, []
                 continue

@@ -2,8 +2,16 @@
  * TanStack Query hooks for OCR & Text Review domain.
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  type QueryClient,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+  acknowledgeOcrWarnings,
+  bulkIgnoreTextReviewSuggestions,
+  type DetectionResponse,
   type DetectRequest,
   detectTextReview,
   getTextReview,
@@ -11,8 +19,14 @@ import {
   getTextReviewJson,
   getTextReviewMarkdown,
   listTextReviewChecks,
+  listTextReviewVersions,
+  type RerunReviewRequest,
+  rerunTextReview,
   type SaveReview,
+  type SpellingDisposition,
+  type SpellingDispositionBatch,
   saveTextReview,
+  setTextReviewDisposition,
 } from "./requests";
 
 export const ocrReviewKeys = {
@@ -111,6 +125,57 @@ export const ocrReviewKeys = {
       revisionId,
       runId,
       checkId,
+    ] as const,
+
+  checksAll: (
+    workspaceId: string,
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    runId: string,
+  ) =>
+    [
+      ...ocrReviewKeys.all,
+      "checks",
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      runId,
+    ] as const,
+
+  checkAll: (
+    workspaceId: string,
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    runId: string,
+  ) =>
+    [
+      ...ocrReviewKeys.all,
+      "check",
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      runId,
+    ] as const,
+
+  versions: (
+    workspaceId: string,
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    runId: string,
+  ) =>
+    [
+      ...ocrReviewKeys.all,
+      "versions",
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      runId,
     ] as const,
 };
 
@@ -328,6 +393,44 @@ export function useTextReviewCheckQuery(
   });
 }
 
+export function useTextReviewVersionsQuery(
+  workspaceId?: string | null,
+  collectionId?: string | null,
+  sourceId?: string | null,
+  revisionId?: string | null,
+  runId?: string | null,
+) {
+  const enabled = Boolean(
+    workspaceId && collectionId && sourceId && revisionId && runId,
+  );
+  return useQuery({
+    queryKey: enabled
+      ? ocrReviewKeys.versions(
+          workspaceId as string,
+          collectionId as string,
+          sourceId as string,
+          revisionId as string,
+          runId as string,
+        )
+      : [...ocrReviewKeys.all, "versions", "empty"],
+    queryFn: ({ signal }) => {
+      if (!workspaceId || !collectionId || !sourceId || !revisionId || !runId) {
+        throw new Error("Missing required parameters for text review versions");
+      }
+      return listTextReviewVersions(
+        workspaceId,
+        collectionId,
+        sourceId,
+        revisionId,
+        runId,
+        { signal },
+      );
+    },
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
 export function useSaveTextReviewMutation(
   workspaceId?: string | null,
   collectionId?: string | null,
@@ -390,6 +493,192 @@ export function useDetectTextReviewMutation(
         runId,
         body,
         idempotencyKey,
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ocrReviewKeys.all });
+    },
+  });
+}
+
+export function useRerunTextReviewMutation(
+  workspaceId?: string | null,
+  collectionId?: string | null,
+  sourceId?: string | null,
+  revisionId?: string | null,
+  runId?: string | null,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: RerunReviewRequest) => {
+      if (!workspaceId || !collectionId || !sourceId || !revisionId || !runId) {
+        throw new Error("Missing required parameters to rerun text review");
+      }
+      return rerunTextReview(
+        workspaceId,
+        collectionId,
+        sourceId,
+        revisionId,
+        runId,
+        body,
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ocrReviewKeys.all });
+    },
+  });
+}
+
+function storeUpdatedCheck(
+  queryClient: QueryClient,
+  scope: {
+    workspaceId: string;
+    collectionId: string;
+    sourceId: string;
+    revisionId: string;
+    runId: string;
+  },
+  updated: DetectionResponse,
+) {
+  queryClient.setQueryData(
+    ocrReviewKeys.check(
+      scope.workspaceId,
+      scope.collectionId,
+      scope.sourceId,
+      scope.revisionId,
+      scope.runId,
+      updated.id,
+    ),
+    updated,
+  );
+  const replaceCheck = (
+    checks: DetectionResponse[] | undefined,
+  ): DetectionResponse[] | undefined =>
+    checks?.map((check) => (check.id === updated.id ? updated : check));
+  queryClient.setQueriesData<DetectionResponse[]>(
+    {
+      queryKey: ocrReviewKeys.checksAll(
+        scope.workspaceId,
+        scope.collectionId,
+        scope.sourceId,
+        scope.revisionId,
+        scope.runId,
+      ),
+    },
+    replaceCheck,
+  );
+}
+
+export function useSetTextReviewDispositionMutation(
+  workspaceId?: string | null,
+  collectionId?: string | null,
+  sourceId?: string | null,
+  revisionId?: string | null,
+  runId?: string | null,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      checkId,
+      body,
+    }: {
+      checkId: string;
+      body: SpellingDisposition;
+    }) => {
+      if (!workspaceId || !collectionId || !sourceId || !revisionId || !runId) {
+        throw new Error(
+          "Missing required parameters to set a spelling disposition",
+        );
+      }
+      return setTextReviewDisposition(
+        workspaceId,
+        collectionId,
+        sourceId,
+        revisionId,
+        runId,
+        checkId,
+        body,
+      );
+    },
+    onSuccess: (updated) => {
+      if (!workspaceId || !collectionId || !sourceId || !revisionId || !runId) {
+        return;
+      }
+      storeUpdatedCheck(
+        queryClient,
+        { workspaceId, collectionId, sourceId, revisionId, runId },
+        updated,
+      );
+    },
+  });
+}
+
+export function useBulkIgnoreTextReviewSuggestionsMutation(
+  workspaceId?: string | null,
+  collectionId?: string | null,
+  sourceId?: string | null,
+  revisionId?: string | null,
+  runId?: string | null,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      checkId,
+      body,
+    }: {
+      checkId: string;
+      body: SpellingDispositionBatch;
+    }) => {
+      if (!workspaceId || !collectionId || !sourceId || !revisionId || !runId) {
+        throw new Error(
+          "Missing required parameters to ignore spelling suggestions",
+        );
+      }
+      return bulkIgnoreTextReviewSuggestions(
+        workspaceId,
+        collectionId,
+        sourceId,
+        revisionId,
+        runId,
+        checkId,
+        body,
+      );
+    },
+    onSuccess: (updated) => {
+      if (!workspaceId || !collectionId || !sourceId || !revisionId || !runId) {
+        return;
+      }
+      storeUpdatedCheck(
+        queryClient,
+        { workspaceId, collectionId, sourceId, revisionId, runId },
+        updated,
+      );
+    },
+  });
+}
+
+export function useAcknowledgeOcrWarningsMutation(
+  workspaceId?: string | null,
+  collectionId?: string | null,
+  sourceId?: string | null,
+  revisionId?: string | null,
+  runId?: string | null,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { reason: string }) => {
+      if (!workspaceId || !collectionId || !sourceId || !revisionId || !runId) {
+        throw new Error(
+          "Missing required parameters to acknowledge OCR warnings",
+        );
+      }
+      return acknowledgeOcrWarnings(
+        workspaceId,
+        collectionId,
+        sourceId,
+        revisionId,
+        runId,
+        body,
       );
     },
     onSuccess: () => {

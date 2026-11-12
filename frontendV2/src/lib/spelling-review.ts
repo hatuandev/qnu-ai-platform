@@ -1,16 +1,21 @@
 import type { SourceSummaryResponse } from "@/api/knowledge/types";
 import type { DetectionResponse } from "@/api/ocr/requests";
 
+const USABLE_RUN_STATUSES = new Set(["completed", "completed_with_warnings"]);
+
 export function spellingScope(
   summary: SourceSummaryResponse | undefined,
   preferredRunId?: string | null,
 ) {
+  const runs = summary?.processing_runs ?? [];
   const runId =
     preferredRunId ??
     summary?.active_run_id ??
     summary?.derivations[0]?.ocr_run_id;
-  const run = summary?.processing_runs.find((item) => item.id === runId);
-  if (run?.status !== "completed") return null;
+  const run = runId
+    ? runs.find((item) => item.id === runId)
+    : runs.find((item) => USABLE_RUN_STATUSES.has(item.status));
+  if (!run || !USABLE_RUN_STATUSES.has(run.status)) return null;
   return {
     runId: run.id,
     revisionId: run.revision_id,
@@ -18,12 +23,42 @@ export function spellingScope(
   };
 }
 
-export function preferredSpellingCheck(
+export function currentSpellingCheck(
   checks: DetectionResponse[] | undefined,
+  version: number | undefined,
 ) {
-  return (
-    checks?.find((check) => check.total_evidence_count != null) ?? checks?.[0]
+  if (!checks || version === undefined) return undefined;
+  const relevant = checks.filter(
+    (check) => check.version === version || check.reviewed_version === version,
   );
+  return (
+    relevant.find((check) => check.reviewed_at) ??
+    relevant.find((check) => check.status === "completed") ??
+    relevant.find((check) => check.status === "running") ??
+    relevant[0]
+  );
+}
+
+export function formatSpellingMoment(value: string) {
+  const moment = new Date(value);
+  if (Number.isNaN(moment.getTime())) return "";
+  return moment.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
+export function spellingPendingCount(check: DetectionResponse) {
+  const total =
+    (check.suggestions?.length ?? 0) +
+    (check.withheld_suggestions?.length ?? 0);
+  return Math.max(0, total - (check.ignored_suggestions?.length ?? 0));
+}
+
+export function spellingIgnoredCount(check: DetectionResponse | undefined) {
+  return check?.ignored_suggestions?.length ?? 0;
 }
 
 export function spellingCoverage(check: DetectionResponse) {
@@ -35,4 +70,9 @@ export function spellingCoverage(check: DetectionResponse) {
     complete:
       check.status === "completed" && total !== null && checked === total,
   };
+}
+
+export function spellingPercent(checked: number, total: number | null) {
+  if (!total || total <= 0) return null;
+  return Math.min(100, Math.floor((checked / total) * 100));
 }

@@ -54,6 +54,14 @@ export const ocrPaths = {
     runId: string,
   ) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/evidence`,
+  acknowledgeWarnings: (
+    workspaceId: string,
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    runId: string,
+  ) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/warnings/acknowledge`,
   pageRaw: (
     workspaceId: string,
     collectionId: string,
@@ -104,6 +112,14 @@ export const ocrPaths = {
     runId: string,
   ) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/text-review/markdown`,
+  textReviewVersions: (
+    workspaceId: string,
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    runId: string,
+  ) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/text-review/versions`,
   textReviewChecks: (
     workspaceId: string,
     collectionId: string,
@@ -112,6 +128,14 @@ export const ocrPaths = {
     runId: string,
   ) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/text-review/checks`,
+  textReviewChecksRerun: (
+    workspaceId: string,
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    runId: string,
+  ) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/text-review/checks/rerun`,
   textReviewCheck: (
     workspaceId: string,
     collectionId: string,
@@ -121,6 +145,24 @@ export const ocrPaths = {
     checkId: string,
   ) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/text-review/checks/${checkId}`,
+  textReviewCheckDispositions: (
+    workspaceId: string,
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    runId: string,
+    checkId: string,
+  ) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/text-review/checks/${checkId}/dispositions`,
+  textReviewCheckDispositionsBulk: (
+    workspaceId: string,
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    runId: string,
+    checkId: string,
+  ) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/processing-runs/${runId}/text-review/checks/${checkId}/dispositions/bulk`,
   bundle: (
     workspaceId: string,
     collectionId: string,

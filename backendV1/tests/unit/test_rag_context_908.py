@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from qnu.domains.knowledge.index.schemas import SearchResponse
+from qnu.domains.knowledge.index.schemas import SearchHit, SearchResponse
 from qnu.domains.rag.answer import context
 from qnu.domains.rag.answer.cells import materialize
 from qnu.domains.rag.answer.coverage import assess
@@ -133,7 +133,7 @@ def test_fragment_family_filters_only_with_a_shared_source_table():
     assert values(messages) == {"12", "18"}
 
 
-def test_required_structure_is_not_removed_as_optional_when_packing():
+def test_required_clause_is_not_removed_as_optional_when_packing():
     evidence = sources(corpus()[0][:2])
     evidence[0].text += " Source-bound context." * 20
     _, _, _, size, _ = _pack_messages(
@@ -143,9 +143,132 @@ def test_required_structure_is_not_removed_as_optional_when_packing():
         _pack_messages(
             AnswerRequest(question="Article 4", context_max_bytes=size),
             evidence,
-            {"added": [{"chunk_id": evidence[1].chunk_id, "kind": "structure"}]},
+            {"added": [{"chunk_id": evidence[1].chunk_id, "kind": "clause"}]},
         )
     assert caught.value.code == "answer_context_budget_exceeded"
+
+
+def test_expansion_reading_is_trimmed_before_a_required_clause():
+    primary, clause, bullet = sources(corpus()[0][:3])
+    req = AnswerRequest(question="Article 4", context_max_bytes=100000)
+    trace = {"added": [{"chunk_id": clause.chunk_id, "kind": "clause"}]}
+    _, _, _, size, _ = _pack_messages(req, [primary, clause], trace)
+    trace["added"].append({"chunk_id": bullet.chunk_id, "kind": "bullet_list"})
+    messages, _, _, used, skipped = _pack_messages(
+        req.model_copy(update={"context_max_bytes": size}),
+        [primary, clause, bullet],
+        trace,
+    )
+    assert skipped == [bullet.chunk_id]
+    assert used == size
+    assert [item["id"] for item in json.loads(messages[-1].content)["evidence"]] == [
+        primary.evidence_id,
+        clause.evidence_id,
+    ]
+
+
+def test_budget_trim_drops_the_lowest_ranked_anchor_first():
+    primary, other, high, low = sources(corpus()[0][:4])
+    high.text += " Relevant detail." * 2
+    low.text += " Weak detail." * 12
+    req = AnswerRequest(question="Article 4", context_max_bytes=100000)
+    trace = {
+        "primary_ids": [primary.chunk_id, other.chunk_id],
+        "added": [
+            {
+                "chunk_id": low.chunk_id,
+                "primary_chunk_id": other.chunk_id,
+                "kind": "bullet_list",
+            },
+            {
+                "chunk_id": high.chunk_id,
+                "primary_chunk_id": primary.chunk_id,
+                "kind": "bullet_list",
+            },
+        ],
+    }
+    _, _, _, size, _ = _pack_messages(req, [primary, other, high], trace)
+    messages, _, _, used, skipped = _pack_messages(
+        req.model_copy(update={"context_max_bytes": size}),
+        [primary, other, low, high],
+        trace,
+    )
+    assert skipped == [low.chunk_id]
+    assert [item["id"] for item in json.loads(messages[-1].content)["evidence"]] == [
+        primary.evidence_id,
+        other.evidence_id,
+        high.evidence_id,
+    ]
+    assert used == size
+
+
+@pytest.mark.asyncio
+async def test_budget_claim_order_follows_primary_rank(monkeypatch):
+    rows = [
+        chunk(0, "High primary.", 1),
+        chunk(1, "Low primary.", 1),
+        chunk(2, "High detail " + "h" * 80, 1),
+        chunk(3, "Low detail " + "l" * 400, 1),
+    ]
+    for row in rows:
+        row.point_id, row.text_sha256 = row.id, row.id
+    primaries = sources(rows[:2])
+    result = SearchResponse(
+        index_run_id="run", generation=1, status="results", hits=primaries, eligible_documents=1
+    )
+    run = SimpleNamespace(
+        id="run", status="completed", is_active=True, workspace_id="ws", collection_id="col"
+    )
+    db = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: rows)),
+    )
+    high_group = {
+        "kind": "article",
+        "primary_chunk_id": "0",
+        "required_ids": ["0", "2"],
+        "units": [{"ref": "run:2", "chunk_ids": ["2"]}],
+    }
+    low_group = {
+        "kind": "article",
+        "primary_chunk_id": "1",
+        "required_ids": ["1", "3"],
+        "units": [{"ref": "run:3", "chunk_ids": ["3"]}],
+    }
+    monkeypatch.setattr("qnu.domains.knowledge.publication.access.authorize", AsyncMock())
+    monkeypatch.setattr(
+        context, "_eligible", AsyncMock(return_value=([SimpleNamespace(id="published")], []))
+    )
+    monkeypatch.setattr(context, "manifest", AsyncMock(return_value={}))
+    monkeypatch.setattr(context, "pinned_bundles", AsyncMock(return_value={}))
+    monkeypatch.setattr(context, "select_groups", lambda *args: [low_group, high_group])
+    monkeypatch.setattr(context, "continuation_groups", lambda *args: [])
+    by_id = {row.id: row for row in rows}
+
+    async def hits(db, run, allowed, candidates, sealed):
+        return sources([by_id[hit.payload["chunk_id"]] for hit in candidates])
+
+    monkeypatch.setattr(context, "_hits", hits)
+    high, low = sources([rows[2]])[0], sources([rows[3]])[0]
+    base = 2 + sum(context.evidence_size(hit) for hit in primaries)
+    budget = base + context.evidence_size(low) + 1
+    assert context.evidence_size(high) < context.evidence_size(low)
+    expanded, trace = await context.expand_context(
+        db,
+        None,
+        None,
+        "ws",
+        "col",
+        result,
+        AnswerRequest(
+            question="What conditions apply in Article 4?",
+            context_max_bytes=budget,
+            context_window=0,
+        ),
+    )
+    assert [hit.chunk_id for hit in expanded.hits] == ["0", "1", "2"]
+    assert trace["expansion"]["skipped_budget"] == 1
+    assert [item["chunk_id"] for item in trace["added"]] == ["2"]
 
 
 @pytest.mark.asyncio
@@ -195,6 +318,92 @@ async def test_whole_article_exceeds_top_k_count_and_uses_resolved_question(monk
     assert select.call_args.args[-1] == "What are the conditions in Article 6?"
     assert len(expanded.hits) == 25
     assert not trace.get("skipped_budget")
+
+
+@pytest.mark.asyncio
+async def test_one_document_cannot_spend_the_whole_expansion_budget(monkeypatch):
+    texts = [
+        "Target primary one.",
+        "Target primary two.",
+        "Target primary three.",
+        "Target primary four.",
+        "Target detail " + "x" * 400,
+        "Target detail " + "y" * 400,
+        "Noise primary.",
+        "noise " * 900,
+        "noise " * 900,
+    ]
+    rows = [chunk(i, text, 1) for i, text in enumerate(texts)]
+    for row in rows:
+        row.point_id, row.text_sha256 = row.id, row.id
+    primaries = sources([rows[0], rows[1], rows[2], rows[3], rows[6]])
+    for hit in primaries[:4]:
+        hit.document_id = "target"
+    primaries[4].document_id = "noise"
+    result = SearchResponse(
+        index_run_id="run", generation=1, status="results", hits=primaries, eligible_documents=2
+    )
+    run = SimpleNamespace(
+        id="run", status="completed", is_active=True, workspace_id="ws", collection_id="col"
+    )
+    db = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: rows)),
+    )
+    target_group = {
+        "kind": "article",
+        "reference": "4",
+        "label": "Article 4",
+        "primary_chunk_id": "0",
+        "required_ids": ["0", "1", "2", "3", "4", "5"],
+        "units": [{"ref": f"run:{i}", "chunk_ids": [str(i)]} for i in (4, 5)],
+    }
+    noise_group = {
+        "kind": "continuation",
+        "primary_chunk_id": "6",
+        "required_ids": ["6", "7", "8"],
+        "units": [{"ref": f"run:{i}", "chunk_ids": [str(i)]} for i in (7, 8)],
+    }
+    monkeypatch.setattr("qnu.domains.knowledge.publication.access.authorize", AsyncMock())
+    monkeypatch.setattr(
+        context, "_eligible", AsyncMock(return_value=([SimpleNamespace(id="published")], []))
+    )
+    monkeypatch.setattr(context, "manifest", AsyncMock(return_value={}))
+    monkeypatch.setattr(context, "pinned_bundles", AsyncMock(return_value={}))
+    monkeypatch.setattr(context, "select_groups", lambda *args: [target_group])
+    monkeypatch.setattr(context, "continuation_groups", lambda *args: [noise_group])
+    by_id = {row.id: row for row in rows}
+
+    async def hits(db, run, allowed, candidates, sealed):
+        return sources([by_id[hit.payload["chunk_id"]] for hit in candidates])
+
+    monkeypatch.setattr(context, "_hits", hits)
+    budget = 32000
+    expanded, trace = await context.expand_context(
+        db,
+        None,
+        None,
+        "ws",
+        "col",
+        result,
+        AnswerRequest(
+            question="What conditions apply in Article 4?",
+            context_max_bytes=budget,
+            context_window=0,
+        ),
+    )
+    remaining = budget - 2 - sum(context.evidence_size(hit) for hit in primaries)
+    noise_share = max(context.MIN_DOCUMENT_SHARE, remaining // 5)
+    noise = sources([rows[7], rows[8]])
+    assert sum(context.evidence_size(hit) for hit in noise) > noise_share
+    assert trace["expansion"]["per_document_bytes"]["noise"] == noise_share
+    assert trace["expansion"]["skipped_share_count"] == 1
+    assert trace["expansion"]["skipped_share"][0]["primary_chunk_id"] == "6"
+    assert "noise" not in trace["expansion"]["used"]
+    assert trace["expansion"]["used"]["target"] == sum(
+        context.evidence_size(hit) for hit in sources([rows[4], rows[5]])
+    )
+    assert {hit.chunk_id for hit in expanded.hits} == {"0", "1", "2", "3", "4", "5", "6"}
 
 
 @pytest.mark.asyncio
@@ -248,7 +457,7 @@ async def test_sentence_continuations_do_not_disable_existing_clause_dependencie
         AnswerRequest(question="Explain", context_max_bytes=100000),
     )
     assert {hit.chunk_id for hit in expanded.hits} == {row.id for row in rows}
-    assert [item["kind"] for item in trace["added"]] == ["structure", "clause", "clause"]
+    assert [item["kind"] for item in trace["added"]] == ["continuation", "clause", "clause"]
 
 
 def test_named_article_records_continuation_fragments_as_required_units():
@@ -300,3 +509,355 @@ def test_continuation_keeps_uppercase_names_and_an_unindexed_piece_across_pages(
     assert group["required_ids"] == ["0", "1"]
     assert group["unindexed_refs"] == ["run:2"]
     assert [u["ref"] for u in group["units"]] == ["run:0", "run:1", "run:2"]
+
+
+def test_long_unpunctuated_chain_is_bounded_and_optional():
+    _, bundles = corpus()
+    texts = [f"line {i} continues" for i in range(30)]
+    texts.append("The sentence ends here.")
+    rows = [chunk(i, text, 1) for i, text in enumerate(texts)]
+    bundles["version"].documents[0]["pages"] = [
+        {
+            "page_number": 1,
+            "blocks": [{"evidence_id": str(i), "text": text} for i, text in enumerate(texts)],
+        }
+    ]
+    group = continuation_groups(rows, sources(rows[15:16]), bundles)[0]
+    assert group["optional"] is True
+    assert group["truncated"] is True
+    assert "15" in group["required_ids"]
+    assert len(group["required_ids"]) <= 7
+
+
+@pytest.mark.asyncio
+async def test_window_zero_joins_split_paragraph_parts(monkeypatch):
+    rows = [chunk(i, f"Part {i} of one paragraph.", 1) for i in range(2)]
+    for index, row in enumerate(rows):
+        row.point_id, row.text_sha256 = row.id, row.id
+        row.structure["context"].update(parent="section:1", position=7, part=index)
+    result = SearchResponse(
+        index_run_id="run",
+        generation=2,
+        status="results",
+        eligible_documents=1,
+        hits=sources(rows[:1]),
+    )
+    run = SimpleNamespace(
+        id="run", status="completed", is_active=True, workspace_id="ws", collection_id="col"
+    )
+    db = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: rows)),
+    )
+    monkeypatch.setattr("qnu.domains.knowledge.publication.access.authorize", AsyncMock())
+    monkeypatch.setattr(
+        context, "_eligible", AsyncMock(return_value=([SimpleNamespace(id="published")], []))
+    )
+    monkeypatch.setattr(context, "manifest", AsyncMock(return_value={}))
+    monkeypatch.setattr(context, "pinned_bundles", AsyncMock(return_value={}))
+    by_id = {row.id: row for row in rows}
+
+    async def hits(db, run, allowed, candidates, sealed):
+        return sources([by_id[hit.payload["chunk_id"]] for hit in candidates])
+
+    monkeypatch.setattr(context, "_hits", hits)
+    expanded, trace = await context.expand_context(
+        db,
+        None,
+        None,
+        "ws",
+        "col",
+        result,
+        AnswerRequest(question="Explain", context_window=0),
+    )
+    assert [hit.chunk_id for hit in expanded.hits] == ["0", "1"]
+    assert [item["kind"] for item in trace["added"]] == ["part"]
+    assert trace["parts_joined"] == 1
+
+
+@pytest.mark.asyncio
+async def test_table_primary_defers_budget_to_the_packed_envelope():
+    table = SearchHit(
+        chunk_id="table",
+        document_id="doc",
+        version_id="version",
+        publication_decision_id="published",
+        score=1,
+        kind="table",
+        text="x" * 20000,
+        citations={},
+        structure=None,
+    )
+    original = SearchResponse(
+        index_run_id="run", generation=1, status="results", hits=[table], eligible_documents=1
+    )
+    expanded, trace = await context.expand_context(
+        None,
+        None,
+        None,
+        "ws",
+        "col",
+        original,
+        AnswerRequest(question="Question", context_max_bytes=256, context_window=0),
+    )
+    assert expanded is original
+    assert trace["status"] == "disabled"
+
+
+@pytest.mark.asyncio
+async def test_clause_over_budget_is_dropped_without_failing_the_request(monkeypatch):
+    rows = [
+        chunk(0, "2. Conditions:", 1),
+        chunk(1, "a) First condition;", 1),
+        chunk(2, "b) Second condition;", 2),
+        chunk(3, "c) Third condition.", 2),
+    ]
+    for row in rows:
+        row.point_id, row.text_sha256 = row.id, row.id
+    rows[1].text += " detail" * 40
+    result = SearchResponse(
+        index_run_id="run",
+        generation=1,
+        status="results",
+        hits=sources(rows[1:2]),
+        eligible_documents=1,
+    )
+    run = SimpleNamespace(
+        id="run", status="completed", is_active=True, workspace_id="ws", collection_id="col"
+    )
+    db = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: rows)),
+    )
+    monkeypatch.setattr("qnu.domains.knowledge.publication.access.authorize", AsyncMock())
+    monkeypatch.setattr(
+        context, "_eligible", AsyncMock(return_value=([SimpleNamespace(id="published")], []))
+    )
+    monkeypatch.setattr(context, "manifest", AsyncMock(return_value={}))
+    monkeypatch.setattr(
+        context,
+        "pinned_bundles",
+        AsyncMock(return_value={"version": SimpleNamespace(documents=[])}),
+    )
+    by_id = {row.id: row for row in rows}
+
+    async def hits(db, run, allowed, candidates, sealed):
+        return sources([by_id[hit.payload["chunk_id"]] for hit in candidates])
+
+    monkeypatch.setattr(context, "_hits", hits)
+    budget = 2 + context.evidence_size(result.hits[0])
+    expanded, trace = await context.expand_context(
+        db,
+        None,
+        None,
+        "ws",
+        "col",
+        result,
+        AnswerRequest(question="Conditions?", context_max_bytes=budget, context_window=0),
+    )
+    assert [hit.chunk_id for hit in expanded.hits] == ["1"]
+    assert trace["clause_skipped_budget"] == 1
+
+
+def _article_bundle(texts, blocks):
+    rows, bundles = corpus()
+    rows = [chunk(i, text, 1) for i, text in enumerate(texts)]
+    bundles["version"].documents[0]["pages"] = blocks
+    return rows, bundles
+
+
+ARTICLE_TEXTS = [
+    "Article 4. Eligibility",
+    "First condition.",
+    "Second condition.",
+    "Third condition.",
+    "Article 5. Other",
+    "Unrelated.",
+]
+
+
+def _article_pages(header_type=None):
+    header = {"evidence_id": "9", "text": "QNU Academic Affairs"}
+    other = {"evidence_id": "10", "text": "QNU Academic Affairs"}
+    if header_type:
+        header["type"] = other["type"] = header_type
+    return [
+        {
+            "page_number": 1,
+            "blocks": [
+                {"evidence_id": "0", "text": ARTICLE_TEXTS[0]},
+                {"evidence_id": "1", "text": ARTICLE_TEXTS[1]},
+                header,
+            ],
+        },
+        {
+            "page_number": 2,
+            "blocks": [
+                other,
+                {"evidence_id": "2", "text": ARTICLE_TEXTS[2]},
+                {"evidence_id": "3", "text": ARTICLE_TEXTS[3]},
+                {"evidence_id": "4", "text": ARTICLE_TEXTS[4]},
+                {"evidence_id": "5", "text": ARTICLE_TEXTS[5]},
+            ],
+        },
+    ]
+
+
+def test_repeated_page_header_compresses_to_the_first_copy():
+    rows, bundles = _article_bundle(ARTICLE_TEXTS, _article_pages("header"))
+    rows += [chunk(9, "QNU Academic Affairs", 1), chunk(10, "QNU Academic Affairs", 1)]
+    group = select_groups(rows, sources(rows[:1]), bundles, "Article 4 conditions")[0]
+    assert group["required_ids"] == ["0", "1", "9", "2", "3"]
+    assert group["compressed_refs"] == [{"ref": "run:10", "same_as": "run:9"}]
+
+
+def test_repeated_header_that_was_retrieved_stays_in_its_group():
+    rows, bundles = _article_bundle(ARTICLE_TEXTS, _article_pages("header"))
+    rows += [chunk(9, "QNU Academic Affairs", 1), chunk(10, "QNU Academic Affairs", 1)]
+    group = select_groups(rows, sources(rows[7:8]), bundles, "Article 4 conditions")[0]
+    assert "10" in group["required_ids"]
+    assert group["compressed_refs"] == []
+
+
+def test_repeated_content_text_is_not_compressed_without_furniture_metadata():
+    rows, bundles = _article_bundle(ARTICLE_TEXTS, _article_pages())
+    rows += [chunk(9, "QNU Academic Affairs", 1), chunk(10, "QNU Academic Affairs", 1)]
+    group = select_groups(rows, sources(rows[:1]), bundles, "Article 4 conditions")[0]
+    assert {"9", "10"} <= set(group["required_ids"])
+    assert group["compressed_refs"] == []
+
+
+def test_single_value_bounds_a_named_scope_and_drops_a_bullet_catalog():
+    groups = [
+        {
+            "kind": "article",
+            "required_ids": ["0", "1", "2", "3", "4"],
+            "units": [{"chunk_ids": ["1"]}],
+            "primary_chunk_id": "2",
+        },
+        {"kind": "bullet_list", "required_ids": ["0", "5", "6"], "units": []},
+    ]
+    bounded = context._bounded_single_value(groups, {"2"})
+    assert [group["kind"] for group in bounded] == ["article"]
+    assert bounded[0]["required_ids"] == ["1", "2", "3"]
+    assert bounded[0]["units"] == []
+    assert bounded[0]["bounded"] is True
+
+
+@pytest.mark.asyncio
+async def test_single_value_question_bounds_a_referenced_article(monkeypatch):
+    texts = [
+        "Article 4. Fees",
+        "The fee is 500 VND.",
+        "Certified candidates pay 500.",
+        "Others pay 800.",
+        "Article 5. Other",
+        "Unrelated rule.",
+    ]
+    rows, bundles = corpus()
+    rows = [chunk(i, text, 1) for i, text in enumerate(texts)]
+    bundles["version"].documents[0]["pages"] = [
+        {
+            "page_number": 1,
+            "blocks": [{"evidence_id": str(i), "text": text} for i, text in enumerate(texts)],
+        }
+    ]
+    for row in rows:
+        row.point_id, row.text_sha256 = row.id, row.id
+    result = SearchResponse(
+        index_run_id="run",
+        generation=1,
+        status="results",
+        hits=sources(rows[2:3]),
+        eligible_documents=1,
+    )
+    run = SimpleNamespace(
+        id="run", status="completed", is_active=True, workspace_id="ws", collection_id="col"
+    )
+    db = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: rows)),
+    )
+    monkeypatch.setattr("qnu.domains.knowledge.publication.access.authorize", AsyncMock())
+    monkeypatch.setattr(
+        context, "_eligible", AsyncMock(return_value=([SimpleNamespace(id="published")], []))
+    )
+    monkeypatch.setattr(context, "manifest", AsyncMock(return_value={}))
+    monkeypatch.setattr(context, "pinned_bundles", AsyncMock(return_value=bundles))
+    by_id = {row.id: row for row in rows}
+
+    async def hits(db, run, allowed, candidates, sealed):
+        return sources([by_id[hit.payload["chunk_id"]] for hit in candidates])
+
+    monkeypatch.setattr(context, "_hits", hits)
+    expanded, trace = await context.expand_context(
+        db,
+        None,
+        None,
+        "ws",
+        "col",
+        result,
+        AnswerRequest(question="Điều 4 quy định mức phí là bao nhiêu?", context_max_bytes=100000),
+    )
+    assert trace["question_kind"] == "single_value"
+    assert trace["effective_window"] == 1
+    assert trace["structure"]["groups"][0]["bounded"] is True
+    assert {hit.chunk_id for hit in expanded.hits} == {"1", "2", "3"}
+
+
+@pytest.mark.asyncio
+async def test_single_value_question_reads_one_neighbour_when_window_is_zero(monkeypatch):
+    rows = [chunk(i, f"Fee line {i}.", 1) for i in range(4)]
+    for index, row in enumerate(rows):
+        row.point_id, row.text_sha256 = row.id, row.id
+        row.structure["context"].update(parent="section:1", position=index)
+    result = SearchResponse(
+        index_run_id="run",
+        generation=1,
+        status="results",
+        hits=sources(rows[1:2]),
+        eligible_documents=1,
+    )
+    run = SimpleNamespace(
+        id="run", status="completed", is_active=True, workspace_id="ws", collection_id="col"
+    )
+    db = SimpleNamespace(
+        get=AsyncMock(return_value=run),
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: rows)),
+    )
+    monkeypatch.setattr("qnu.domains.knowledge.publication.access.authorize", AsyncMock())
+    monkeypatch.setattr(
+        context, "_eligible", AsyncMock(return_value=([SimpleNamespace(id="published")], []))
+    )
+    monkeypatch.setattr(context, "manifest", AsyncMock(return_value={}))
+    monkeypatch.setattr(context, "pinned_bundles", AsyncMock(return_value={}))
+    by_id = {row.id: row for row in rows}
+
+    async def hits(db, run, allowed, candidates, sealed):
+        return sources([by_id[hit.payload["chunk_id"]] for hit in candidates])
+
+    monkeypatch.setattr(context, "_hits", hits)
+    expanded, trace = await context.expand_context(
+        db,
+        None,
+        None,
+        "ws",
+        "col",
+        result,
+        AnswerRequest(question="Học phí là bao nhiêu?", context_window=0),
+    )
+    assert trace["question_kind"] == "single_value"
+    assert trace["effective_window"] == 1
+    assert {hit.chunk_id for hit in expanded.hits} == {"0", "1", "2"}
+
+    expanded, trace = await context.expand_context(
+        db,
+        None,
+        None,
+        "ws",
+        "col",
+        result,
+        AnswerRequest(question="Explain the fee", context_window=0),
+    )
+    assert trace["effective_window"] == 0
+    assert {hit.chunk_id for hit in expanded.hits} == {"1"}

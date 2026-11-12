@@ -85,7 +85,7 @@ export const DEFAULT_RAG_POLICY: RagPolicy = {
   rerank_provider_id: null,
   metadata_filter: {},
   context_window: 0,
-  context_max_bytes: 16000,
+  context_max_bytes: 32000,
   verification_mode: "off",
   verification_provider_id: null,
   verification_max_output_tokens: null,

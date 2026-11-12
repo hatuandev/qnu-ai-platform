@@ -101,7 +101,7 @@ async def evaluate(
             for strategy, ranked in (("dense", dense_ids), ("hybrid", hybrid_ids)):
                 records.append(record(query, strategy, ranked, req.top_k, common))
             if req.include_rerank:
-                trace = {}
+                trace = {"ranking": {}, "score_kinds": {}}
 
                 checkpoint = partial(
                     validate_results,

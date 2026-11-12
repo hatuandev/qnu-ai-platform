@@ -17,6 +17,8 @@ TABLES = frozenset(
         "ocr_run_artifacts",
         "ocr_text_versions",
         "ocr_spelling_runs",
+        "ocr_spelling_dispositions",
+        "ocr_spelling_reviews",
         "kb_compilation_runs",
         "kb_compilation_inputs",
         "kb_compilation_artifacts",

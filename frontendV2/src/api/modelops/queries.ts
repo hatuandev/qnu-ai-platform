@@ -250,7 +250,8 @@ export function useUpdateModelDefaultsMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: DefaultsUpdateRequest) => updateModelDefaults(body),
-    onSuccess: () => {
+    onSuccess: (defaults) => {
+      queryClient.setQueryData(modelopsKeys.defaults(), defaults);
       void queryClient.invalidateQueries({
         queryKey: modelopsKeys.defaults(),
       });

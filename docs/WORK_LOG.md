@@ -1,5 +1,23 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context942 — Thời hạn hội thoại và tác vụ tài liệu](nhat_ky/2026-11-12_phien_942_thoi_han_hoi_thoai_va_tac_vu_tai_lieu.md).
+- [Context941 — Tiếp tục và duyệt chính tả theo từng vị trí](nhat_ky/2026-11-12_phien_941_tiep_tuc_va_duyet_chinh_ta.md).
+- [Context940 — Clear DB, upload tệp kiểm thử phức tạp, 30 câu RAG và xác minh bge-reranker-v2-m3](nhat_ky/2026-11-12_phien_940_clear_upload_30_cau_va_reranker.md).
+- [Context939 — Prompt v24 chống abstain sai, link bảng liền kề cho Q9 và đo lặp 3×10 câu](nhat_ky/2026-11-12_phien_939_prompt_v24_va_link_bang_lien_ke.md).
+- [Context938 — RAG P1–P5: recall, grounding bảng, lỗi, trace và tách text embedding](nhat_ky/2026-11-11_phien_938_rag_p1_p5_khac_phuc.md).
+- [Context937 — P0 ngân sách ngữ cảnh và chạy lại 10 câu RAG phiên 935](nhat_ky/2026-11-11_phien_937_ngan_sach_context_p0_va_chay_lai_10_cau.md).
+- [Context936 — Bền vững soát chính tả tự động và tự chạy lại index sau lỗi tạm thời](nhat_ky/2026-11-11_phien_936_ben_vung_soat_chinh_ta_va_index.md).
+- [Context934 — Chỉ mục FTS GIN, payload index Qdrant và đo A/B retrieval](nhat_ky/2026-11-11_phien_934_toi_uu_rag_index_va_do_luong.md).
+- [Context933 — Clear DB, up tệp scan thật, duyệt sửa chính tả, xuất bản và nạp vector RAG](nhat_ky/2026-11-11_phien_933_clear_db_upload_duyet_va_rag.md).
+- [Context932 — Duyệt chính tả một lần sau upload, ẩn phiên bản khỏi giao diện](nhat_ky/2026-11-11_phien_932_duyet_chinh_ta_mot_lan.md).
+- [Context931 — Lưu bền vững "Bỏ qua", lịch sử phiên bản và phím tắt rà soát](nhat_ky/2026-11-11_phien_931_luu_bo_qua_lich_su_phien_ban_va_phim_tat.md).
+- [Context930 — Sửa ngõ cụt trang rà soát sau khi lưu và thêm soát lại theo phiên bản](nhat_ky/2026-11-11_phien_930_sua_ng_cut_ra_soat_va_soat_lai.md).
+- [Context929 — Hoàn tất luồng xử lý ngược, migration 0022, khởi động lại dev và E2E upload tệp scan thật](nhat_ky/2026-11-11_phien_929_hoan_tat_luong_nguoc.md).
+- [Context928 — Neo ngữ cảnh và prompt v5 soát chính tả](nhat_ky/2026-11-10_phien_928_neo_ngu_canh_va_prompt_v5.md).
+- [Context927 — Tiếp tục soát chính tả sau nhóm lỗi](nhat_ky/2026-11-10_phien_927_soat_chinh_ta_sau_nhom_loi.md).
+- [Context926 — Chạy Frontend V2 bằng make dev](nhat_ky/2026-11-10_phien_926_make_dev_frontend_v2.md).
+- [Context925 — Worker chạy riêng xử lý xóa tài liệu](nhat_ky/2026-11-10_phien_925_worker_xoa_nguon.md).
+- [Context924 — Sửa xóa tài liệu, Cài đặt và model của chỉ mục](nhat_ky/2026-11-10_phien_924_sua_xoa_va_mac_dinh_model.md).
 - [Context923 — Lỗi tải kết quả rà soát FE V2](nhat_ky/2026-11-10_phien_923_loi_tai_ket_qua_ra_soat_fe_v2.md).
 - [Context922 — Sửa soát chính tả và tệp xuất ở FE V2](nhat_ky/2026-11-10_phien_922_sua_soat_chinh_ta_va_tep_xuat_fe_v2.md).
 - [Context921 — Markdown/JSON và Rà soát chính tả FE V2](nhat_ky/2026-11-10_phien_921_markdown_json_va_soat_chinh_ta_fe_v2.md).

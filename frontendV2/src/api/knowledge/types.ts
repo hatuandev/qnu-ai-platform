@@ -91,7 +91,12 @@ export type ProcessingRunResponse = {
   id: string;
   source_id: string;
   revision_id: string;
-  status: "queued" | "running" | "completed" | "failed";
+  status:
+    | "queued"
+    | "running"
+    | "completed"
+    | "completed_with_warnings"
+    | "failed";
   progress?: number | null;
   error_code?: string | null;
   created_at: string;

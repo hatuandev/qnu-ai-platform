@@ -157,6 +157,11 @@ export function buildTextChanges(
         evidence_id: evidenceId,
         before: unit.text,
         after: resultText,
+        spelling_edits: repList.map(({ start, end, replacement }) => ({
+          start,
+          end,
+          replacement,
+        })),
       });
     }
   }

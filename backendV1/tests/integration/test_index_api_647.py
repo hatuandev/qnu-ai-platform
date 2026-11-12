@@ -102,7 +102,7 @@ def test_real_qdrant_index_and_search_return_pinned_sources(client, indexed):
     assert manifest.status_code == 200
     assert manifest.json()["config"]["provider"]["model_name"] == "test-embedding"
     response = client.post(
-        data["base"] + "/search", json={"query": "Chỉ tiêu tuyển sinh", "top_k": 5}
+        data["base"] + "/search", json={"query": "Chỉ tiêu tuyển sinh", "top_k": 5, "mode": "dense"}
     )
     assert response.status_code == 200, response.text
     body = response.json()
@@ -115,6 +115,63 @@ def test_real_qdrant_index_and_search_return_pinned_sources(client, indexed):
             ref["revision_id"] == data["revision"]["id"] for ref in hit["citations"].values()
         )
     assert len(data["embedding"].requests) == before + 1
+
+
+def test_rotating_system_embedding_keeps_pinned_index_without_grant(client, indexed):
+    data = indexed
+    first = data["embedding_provider"]["id"]
+    assert execute_index(client, data["index_run"]["id"]) == "completed"
+    as_actor(PLATFORM)
+    assert client.put(f"{API}/modelops/defaults", json={"embedding_provider_id": first}).is_success
+    assert client.put(
+        f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
+        json={"provider_ids": [data["ocr_provider"]["id"]]},
+    ).is_success
+    second = client.post(
+        f"{API}/modelops/providers",
+        json={
+            "name": "embedding-second",
+            "provider_type": "openai_compatible",
+            "base_url": data["embedding"].base_url,
+            "model_name": "test-embedding-second",
+            "capabilities": ["embedding"],
+            "embedding_dimension": 4,
+            "token_limits": {"max_input_tokens": 32768},
+        },
+    )
+    assert second.status_code == 201, second.text
+    second_id = second.json()["id"]
+    assert client.post(
+        f"{API}/modelops/providers/{second_id}/keys",
+        json={"name": "test", "secret": "embedding-test-secret"},
+    ).is_success
+    as_actor(EDITOR)
+    url = data["base"] + "/indexing-runs"
+    queued = client.post(url, headers={"Idempotency-Key": "pinned-global"}, json={})
+    assert queued.status_code == 201, queued.text
+    pinned_run = queued.json()["run"]["id"]
+
+    as_actor(PLATFORM)
+    assert client.put(
+        f"{API}/modelops/defaults", json={"embedding_provider_id": second_id}
+    ).is_success
+    as_actor(EDITOR)
+    status = execute_index(client, pinned_run)
+    assert status == "completed", client.get(f"{url}/{pinned_run}").json()
+    search = client.post(
+        data["base"] + "/search", json={"query": "Chỉ tiêu tuyển sinh", "mode": "dense"}
+    )
+    assert search.status_code == 200, search.text
+    assert search.json()["index_run_id"] == pinned_run
+    assert search.json()["hits"]
+    assert data["embedding"].requests[-1]["body"]["model"] == "test-embedding"
+    forbidden = client.post(
+        url, headers={"Idempotency-Key": "ungranted-override"}, json={"provider_id": first}
+    )
+    assert forbidden.status_code == 404, forbidden.text
+    fresh = client.post(url, headers={"Idempotency-Key": "new-default"}, json={})
+    assert fresh.status_code == 201, fresh.text
+    assert fresh.json()["run"]["provider_id"] == second_id
 
 
 def withdraw(client, data):
@@ -138,7 +195,7 @@ def test_withdrawn_content_is_excluded_before_query_embedding(client, indexed):
     assert execute_index(client, indexed["index_run"]["id"]) == "completed"
     before = len(indexed["embedding"].requests)
     withdraw(client, indexed)
-    response = client.post(indexed["base"] + "/search", json={"query": "Chỉ tiêu"})
+    response = client.post(indexed["base"] + "/search", json={"query": "Chỉ tiêu", "mode": "dense"})
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "no_eligible_content" and not response.json()["hits"]
     assert len(indexed["embedding"].requests) == before
@@ -157,7 +214,10 @@ def test_bad_embedding_cannot_activate_generation(client, indexed, mode, code):
     assert execute_index(client, indexed["index_run"]["id"]) == "failed"
     status = client.get(indexed["base"] + "/indexing-runs/" + indexed["index_run"]["id"]).json()
     assert status["error_code"] == code and not status["is_active"]
-    assert client.post(indexed["base"] + "/search", json={"query": "x"}).status_code == 409
+    assert (
+        client.post(indexed["base"] + "/search", json={"query": "x", "mode": "dense"}).status_code
+        == 409
+    )
 
 
 def test_index_and_search_require_server_membership_and_roles(client, indexed):
@@ -171,11 +231,20 @@ def test_index_and_search_require_server_membership_and_roles(client, indexed):
         ).status_code
         == 403
     )
-    assert client.post(indexed["base"] + "/search", json={"query": "x"}).status_code == 200
+    assert (
+        client.post(indexed["base"] + "/search", json={"query": "x", "mode": "dense"}).status_code
+        == 200
+    )
     as_actor(OUTSIDER)
-    assert client.post(indexed["base"] + "/search", json={"query": "x"}).status_code == 404
+    assert (
+        client.post(indexed["base"] + "/search", json={"query": "x", "mode": "dense"}).status_code
+        == 404
+    )
     as_actor(None)
-    assert client.post(indexed["base"] + "/search", json={"query": "x"}).status_code == 401
+    assert (
+        client.post(indexed["base"] + "/search", json={"query": "x", "mode": "dense"}).status_code
+        == 401
+    )
 
 
 def test_model_identity_change_stops_old_generation(client, indexed):
@@ -189,7 +258,7 @@ def test_model_identity_change_stops_old_generation(client, indexed):
         == 200
     )
     as_actor(EDITOR)
-    response = client.post(indexed["base"] + "/search", json={"query": "x"})
+    response = client.post(indexed["base"] + "/search", json={"query": "x", "mode": "dense"})
     assert response.status_code == 409
     assert response.json()["code"] == "embedding_dimension_stale"
 
@@ -209,7 +278,7 @@ def test_source_revision_change_excludes_content_without_model_call(client, inde
         staged=False,
     )
     assert result.status_code == 201, result.text
-    response = client.post(indexed["base"] + "/search", json={"query": "x"})
+    response = client.post(indexed["base"] + "/search", json={"query": "x", "mode": "dense"})
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "no_eligible_content"
     assert response.json()["skipped_documents"][0]["reason"] == "publication_source_stale"
@@ -219,7 +288,8 @@ def test_source_revision_change_excludes_content_without_model_call(client, inde
 def test_out_of_scope_document_filter_is_not_widened(client, indexed):
     assert execute_index(client, indexed["index_run"]["id"]) == "completed"
     response = client.post(
-        indexed["base"] + "/search", json={"query": "x", "document_ids": ["other-document"]}
+        indexed["base"] + "/search",
+        json={"query": "x", "document_ids": ["other-document"], "mode": "dense"},
     )
     assert response.status_code == 404
 
@@ -227,7 +297,7 @@ def test_out_of_scope_document_filter_is_not_widened(client, indexed):
 def test_provider_error_during_query_is_not_no_match(client, indexed):
     assert execute_index(client, indexed["index_run"]["id"]) == "completed"
     indexed["embedding"].mode = "http_error"
-    response = client.post(indexed["base"] + "/search", json={"query": "x"})
+    response = client.post(indexed["base"] + "/search", json={"query": "x", "mode": "dense"})
     assert response.status_code == 503
     assert response.json()["code"] == "embedding_unavailable"
 
@@ -294,7 +364,7 @@ def test_cross_scope_vector_payload_is_error_and_filter_precedes_topk(client, in
         return hits
 
     monkeypatch.setattr(store, "search", inject)
-    response = client.post(indexed["base"] + "/search", json={"query": "x"})
+    response = client.post(indexed["base"] + "/search", json={"query": "x", "mode": "dense"})
     assert response.status_code == 503
     assert response.json()["code"] == "vector_response_invalid"
 
@@ -311,7 +381,9 @@ def test_failed_replacement_generation_keeps_previous_active(client, indexed):
     assert client.get(indexed["base"] + "/indexing-runs/" + first).json()["is_active"]
     indexed["embedding"].mode = "ok"
     assert (
-        client.post(indexed["base"] + "/search", json={"query": "x"}).json()["index_run_id"]
+        client.post(indexed["base"] + "/search", json={"query": "x", "mode": "dense"}).json()[
+            "index_run_id"
+        ]
         == first
     )
 
@@ -353,7 +425,7 @@ def test_withdrawal_during_query_embedding_is_rechecked(client, indexed, monkeyp
             return result
 
     monkeypatch.setattr(app.state.container, "embedding_model", WithdrawDuringEmbedding())
-    response = client.post(indexed["base"] + "/search", json={"query": "x"})
+    response = client.post(indexed["base"] + "/search", json={"query": "x", "mode": "dense"})
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "no_eligible_content" and not response.json()["hits"]
 
@@ -376,7 +448,7 @@ def test_provider_disabled_during_embedding_is_rechecked(client, indexed, monkey
             return result
 
     monkeypatch.setattr(app.state.container, "embedding_model", DisableDuringEmbedding())
-    response = client.post(indexed["base"] + "/search", json={"query": "x"})
+    response = client.post(indexed["base"] + "/search", json={"query": "x", "mode": "dense"})
     assert response.status_code == 409, response.text
     assert response.json()["code"] == "provider_inactive"
 
@@ -396,6 +468,8 @@ def test_table_structure_tampering_is_rejected(client, indexed):
             await db.commit()
 
     client.portal.call(tamper)
-    response = client.post(indexed["base"] + "/search", json={"query": "x", "top_k": 50})
+    response = client.post(
+        indexed["base"] + "/search", json={"query": "x", "top_k": 50, "mode": "dense"}
+    )
     assert response.status_code == 503, response.text
     assert response.json()["code"] == "vector_response_invalid"

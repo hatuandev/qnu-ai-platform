@@ -130,7 +130,10 @@ def test_backup_includes_both_saved_post_ocr_artifacts(client):
 
 @pytest.mark.parametrize(
     "body",
-    [{"retrieval_mode": "hybrid", "candidate_k": 1, "top_k": 5}, {"rerank_provider_id": "unused"}],
+    [
+        {"retrieval_mode": "hybrid", "candidate_k": 1, "top_k": 5},
+        {"retrieval_mode": "dense", "rerank_provider_id": "unused"},
+    ],
 )
 def test_answer_retrieval_options_fail_as_request_validation(client, body):
     data = operations(client)

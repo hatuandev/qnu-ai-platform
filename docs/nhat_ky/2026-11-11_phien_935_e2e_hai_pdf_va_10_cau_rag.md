@@ -1,0 +1,53 @@
+# Context935 — E2E hai PDF tuyển sinh: upload, duyệt chính tả, xuất bản, index và 10 câu hỏi RAG
+
+- Yêu cầu: người dùng cung cấp hai PDF `NQ57.2024_ Phương hướng tuyển sinh 2025.pdf` và `Thông tin TSĐH cập nhật.pdf`, cho phép upload, tự duyệt/sửa chính tả, đặt 10 câu hỏi, lên kịch bản hỏi thử, publish/index và báo cáo kết quả. Không commit/push/deploy; không chạy test trên DB ứng dụng; không retry câu hỏi model để làm xanh kết quả; `NOT RUN` không phải `PASS`.
+- Phạm vi: API 8002 + worker ARQ + PostgreSQL Docker; workspace `ws_686011c2a0af`; collection mới `col_da0fa3ca3177` để không trộn nguồn 2026 có sẵn. Không sửa mã, không đổi mặc định RAG, không cài dependency, không chạy full suite.
+- Quy trình đã chạy:
+  1. Upload hai PDF với `auto_extract=true`, tạo collection riêng.
+  2. OCR: NQ57 `ocr_95b4009d9bce` 9 trang; TSDH `ocr_c55be7dd7f05` 14 trang.
+  3. Soát chính tả tự động: NQ57 `spl_6cd849069efe` 6 gợi ý; TSDH `spl_73be8b69cb55` 0 gợi ý.
+  4. Duyệt chính tả NQ57: áp dụng đủ 6 sửa (`tuyến → tuyển` ×3, `đầm → đảm`, `Nhon → Nhơn`, `Tiêu → Tiểu`), lưu text version 1 lúc `2026-11-11T11:29:33.125978Z`; TSDH giữ version 0 và đánh dấu lượt soát đã duyệt.
+  5. Chuẩn bị source-first (không gọi chat model): `cmp_ec4637ebfc62` và `cmp_017a19c5ae13`.
+  6. Đăng ký, duyệt, xuất bản: NQ57 `cdoc_664ab5e08f33`/`cver_406a19823f74`, bundle `a2d4b51b...d4caa`, approve `pdec_ed61143d6f31`, publish `pdec_551240d016fd`; TSDH `cdoc_8dac3e4644ab`/`cver_728571634aff`, bundle `7f08ae1f...8148e1`, approve `pdec_34579d4bd825`, publish `pdec_bced7a827999`.
+  7. Index: generation 1 `idx_a3c56465ec8f` failed `index_publication_changed` do publish thứ hai xen giữa; generation 2 `idx_f8d44c0ec319` completed 301 chunk, active, manifest `ebc234edf80005223ae06f24109ba72b437e385c13d901c99c2b8d2bcb546391`; readiness `ready` revision 2.
+  8. Chạy kịch bản 10 câu một lượt, lưu toàn bộ phản hồi và trace.
+- Kết quả 10 câu (hybrid_rerank, top_k=5, candidate_k=30, rrf_k=60, rerank `prv_adff3afa1648`, verification off):
+  - Đạt theo bộ kiểm tra token: Q1, Q2, Q4, Q8 (4/10). Q8 có lỗi phụ "kỹ sư 4 năm" thay vì 4,5 năm.
+  - Q3: HTTP 502 sau 13,81 giây ở tầng soạn/kiểm tra câu trả lời; không xác định mã gốc vì runner không lưu body `problem+json`. Lượt gọi lại **chỉ để chẩn đoán** trả 200 và nêu đúng 51 ngành + 01 CLC + hai ngành dự kiến mở, nhưng thêm đoạn 16 chỉ tiêu/04 ngành của mục tiến sĩ. Kết quả chính thức giữ FAIL.
+  - Q5: `insufficient_evidence`/`model_abstained` dù chunk "730/24/02 đợt" đã nằm trong primary evidence; structure group "continuation" kéo 110 chunk bắt buộc, chọn 55 chunk/12.671 byte. False abstention + phình context.
+  - Q6: `model_abstained`; top-10 câu hỏi tự nhiên không chứa chunk "5.173" (`ev_p002_b020`), trong khi truy vấn đúng chữ thấy chunk ở hạng 2 hybrid / hạng 1 dense. Retrieval/rerank miss.
+  - Q7: `model_abstained`; top-10 không có chunk "2. Phương thức tuyển sinh" (không hit `402A`/`Phương thức 1`). Retrieval miss.
+  - Q9: HTTP 422 `answer_context_budget_exceeded`; 5 chunk bảng 6.824–7.988 byte, tổng 31.751 byte > 16.000. Chẩn đoán budget 65.536: 200 nhưng vẫn abstain; 8 bảng/250 ô khả dụng, chọn 0 ô.
+  - Q10: HTTP 422 `answer_context_budget_exceeded`; top-5 bảng tổng 37.472 byte. Chẩn đoán budget 65.536: abstain và **không nêu 15.00**, đúng hướng an toàn nhưng kịch bản chính thức FAIL vì không có câu trả lời.
+  - Thời gian 10 lượt: trung bình 11,11 giây, trung vị 11,93, cao nhất 14,98 (chỉ các lượt HTTP 200). Model `qwen3.8-27b-q4`/`prv_76af5b1d51eb`.
+- Phát hiện chất lượng dữ liệu: NQ57 đã xuất bản vẫn còn lỗi OCR chưa được gợi ý (`QUYÊT NGHỊ`, `TUYỄN SINH`, `Quy Nho'n`, `HQC`, `VÙA LÀM VÙA HỌC`, `SAỦ ĐẠI HỌC`...). PDF "Thông tin TSĐH cập nhật" là thông tin tuyển sinh **2026**, không phải 2025.
+- Kết luận: chuỗi upload → OCR → soát/duyệt chính tả → chuẩn bị → duyệt nội dung → xuất bản → index hoạt động thật; RAG trả lời đúng và có citation khi evidence là đoạn văn/chunk vừa phải. Ba nhóm lỗi riêng cần xử lý sau: rerank bỏ sót chunk đúng (Q6/Q7), structure group kéo cả tài liệu (Q5), bảng lớn vượt budget + model không chọn ô (Q9/Q10). Không sửa mã hay reindex trong phiên này.
+- Giới hạn: full Pytest cô lập **NOT RUN**; baseline lịch sử **FAIL 4/1627** phiên 928 giữ riêng; F13 vẫn mở; 10 câu là chẩn đoán một lượt, không phải benchmark; chưa commit/push.
+- Bằng chứng tạm ngoài repo: `%TEMP%/qnu_e2e_935_state.json`, `qnu_e2e_935_text_nq57.txt`, `qnu_e2e_935_text_tsdh.txt`, `qnu_e2e_935_rag_results.json`, `qnu_e2e_935_rag_diag.json`, `qnu_e2e_935_rag_errors.json`, `qnu_e2e_935_rag_budget_diag.json`.
+
+## Lượt chạy lại theo yêu cầu (cùng ngày, sau khi dừng full suite)
+
+- Lý do: người dùng yêu cầu chạy lại E2E đúng hai PDF thay cho bộ pytest chọn lọc; giữ nguyên tham số RAG, không retry câu hỏi, không sửa mã.
+- Collection mới `col_b7f90da4422d`; collection `col_da0fa3ca3177` của lượt trước giữ nguyên.
+- OCR: NQ57 `ocr_fd89faffe048` 9 trang; TSDH `ocr_567b8734cc06` 14 trang. Soát chính tả: NQ57 `spl_d0b5c7b5c843` 4 gợi ý, áp dụng đủ (`tuyến → tuyển` ×2, `TUYÊN → TUYỂN`, `TUYỄN → TUYỂN`), text version 1 sha256 `0d4bf379a1fc...`; TSDH `spl_952e934a2691` 0 gợi ý, version 0.
+- Chuẩn bị source-first: `cmp_f748536cfb74`, `cmp_1e38a4b1554e`. Xuất bản: NQ57 `cdoc_64c8af8cdbec`/`cver_2b4a50b156c7` (approve `pdec_68946cdf77c8`, publish `pdec_6a5f73aca16d`); TSDH `cdoc_1b95db2a115c`/`cver_0225eea0525c` (approve `pdec_afa7395cea09`, publish `pdec_b0ed29d789aa`).
+- Index: generation 1 `idx_b648a4241f5b` failed `index_publication_changed` do publish thứ hai xen giữa; generation 2 `idx_2e81fd0d3c82` completed 301 chunk, active; readiness `ready` revision 2.
+- Kết quả 10 câu: **1/10** đạt (chỉ Q2).
+  - Q1, Q3, Q4: HTTP 502 `answer_response_invalid`; audit `answer.validation_failed` ghi `issues=[{"path":[],"type":"value_error"}]` — model trả `status`/`statements` không khớp root validator nên bị từ chối an toàn, không retry. Q1/Q4 từng đạt ở lượt trước; khác biệt đến từ đầu ra model, không phải thay đổi mã.
+  - Q5, Q6, Q7: `insufficient_evidence`/`model_abstained`, 0 nguồn trích dẫn; cùng nhóm lỗi retrieval/structure như lượt trước.
+  - Q8: `model_abstained` dù evidence có 7 nguồn TSDH; lượt trước đạt kèm lỗi phụ "4 năm".
+  - Q9, Q10: HTTP 422 `answer_context_budget_exceeded` với budget mặc định 16.000 byte; cùng nguyên nhân bảng lớn như lượt trước.
+  - Thời gian 10 lượt (gồm cả lượt lỗi): trung bình 10,46 giây, trung vị 10,99, cao nhất 14,0.
+- Không commit/push, không đổi mặc định, không reindex ngoài collection mới. Bằng chứng tạm: `%TEMP%/qnu_e2e_2pdf_state.json`, `qnu_e2e_2pdf_rag_results.json`.
+
+## Chẩn đoán tín hiệu lỗi và đối chiếu văn bản đã duyệt với PDF (cùng ngày)
+
+- Phạm vi: chỉ đọc audit, chạy `POST .../search` (không gọi sinh câu trả lời), đọc `GET .../compiled-documents/{document_id}/versions/{version_id}/draft`, đọc bảng `kb_index_chunks` của generation `idx_2e81fd0d3c82` và so khớp token; không retry câu hỏi, không sửa mã, không đổi mặc định.
+- **502 `answer_response_invalid` (Q1, Q3, Q4):** audit `answer.validation_failed` có `issues=[{"path":[],"type":"value_error"}]`, `finish_reason=stop`, completion 67/71/86 token, `max_output_tokens=32768`, prompt v20, reasoning off. Đây là root validator `ModelAnswer.consistent_status`: model trả `status` không khớp với `statements`/`lookups` (ví dụ `answered` nhưng không có statements) nên bị từ chối đúng hợp đồng, không bịa câu trả lời. Đầu ra model ngắn, không phải cắt token.
+- **422 `answer_context_budget_exceeded` (Q9, Q10):** top-5 `hybrid_rerank` (candidate_k=30, rerank `prv_adff3afa1648`) có `evidence_size` 7.581 byte (Q9) và 9.206 byte (Q10) — qua được kiểm tra evidence chính — nhưng 4/5 (Q9) và 5/5 (Q10) hit là chunk bảng lớn; sau `attach_table_support` và catalog ô bảng, envelope bắt buộc trong `packing.py` vượt 16.000 byte, không còn neighbor tùy chọn để bỏ nên trả 422. Toàn index có 32 chunk bảng, trung bình 5.813 byte, lớn nhất 8.117 byte, so với 269 chunk đoạn trung bình 437 byte. Q9 có đúng bảng IELTS/VSTEP ở hạng 1 (1.774 byte) nhưng 4 bảng không liên quan chiếm chỗ; Q10 không có chunk chứa `15.00`/`15,0` nên đúng ra phải abstain, nhưng 422 chặn trước khi model có cơ hội trả `insufficient_evidence`.
+- **Abstain 200 (Q5–Q8):** model trả `insufficient_evidence`/`model_abstained`, 0 nguồn trích dẫn. Q5 có chunk chứa `730`/`24` ở hạng 2–3; Q8 có đủ `83`/`97`/`112,3`/`1,5` ở hạng 1–3 nhưng model vẫn abstain — lỗi generation/grounding, không phải thiếu bằng chứng. Q6: chunk duy nhất chứa `5.173` (paragraph 447 byte) không vào top-5; rerank xếp bảng NQ57 lên trên. Q7: các đoạn `402A` (487 byte), `402B` (483 byte), `405` (483 byte) tồn tại nhưng không vào top-5; top-5 bị bảng lớn của mục 4 chiếm. Q5–Q7 là lỗi xếp hạng/abstention, Q8 là lỗi model bỏ bằng chứng ngay trước mặt.
+- **Đối chiếu TSDH (PDF số):** markdown đã duyệt trùng khít text layer của PDF ở mức từ và số: 3.473 từ = 3.473 từ, coverage 1,0000 hai chiều, 0 từ/số thiếu hoặc thừa (gồm cả 13 bảng). Không có gợi ý chính tả nên v0 = v1.
+- **Đối chiếu NQ57 (PDF scan):** PDF không có text layer (9 trang, 189 ký tự text, 9 ảnh) nên không diff tự động được; đã render đủ 9 trang và đối chiếu bằng mắt: nội dung/số liệu cốt lõi khớp (5.800; 1.600; PT1–PT4; 51 ngành + 01 CLC Kế toán; 730 chỉ tiêu/24 ngành/02 đợt; ngưỡng 18,0; tổng phụ lục 25/730/402/351/409). Tuy nhiên markdown đã duyệt vẫn còn lỗi OCR chưa được gợi ý: `QUYÊT NGHỊ` (PDF `QUYẾT NGHỊ`), `TUYỄN SINH` ×4, `VÙA LÀM VÙA HỌC` ×2, `SAỦ ĐẠI HỌC`, `đầm bảo`, `Quy Nho'n`, `Giáo dục Tiêu học`, `Nguyễn Quang Ngoại`; thêm nhiễu con dấu trong thân văn bản (`PÁID I`, `E TRUÖNG DAIHQC`, `YRUY NHONANZOHIACE NGANI DAIHQC`, `Luru`, `Dixion`). 4 sửa chính tả đã duyệt đúng là toàn bộ khác biệt raw → approved; chúng không phủ hết lỗi OCR.
+- **Bản đã xuất bản giữ nguyên nội dung đã duyệt:** mọi từ và số của markdown đã duyệt đều có trong compiled draft (coverage 1,0000, 0 token thiếu, cho cả NQ57 và TSDH). Compiled draft có thêm bản sao nội dung bảng: bảng xuất hiện cả trong paragraph dạng text và trong `source_tables` (TSDH: 22.866 ký tự paragraph + 11.922 ký tự ô bảng; `Toán` 251 lần ở mỗi nguồn). Index generation 2 không nhân đôi toàn bộ (chỉ 2 nhóm `text_sha256` trùng), nhưng đây là nguồn phình dữ liệu bảng cần xem khi xử lý budget.
+- Metadata rule sinh `data_year=1800` cho TSDH từ số điện thoại `1800.55.88.49` — nhiễu metadata, không ảnh hưởng truy vấn lần này nhưng cần kiểm khi lọc theo năm.
+- Giới hạn giữ nguyên: không retry/không sửa mã; full Pytest cô lập **NOT RUN**; baseline **FAIL 4/1627** phiên 928 giữ riêng; F13 vẫn mở; chưa commit/push. Bằng chứng tạm: `%TEMP%/qnu_search_diag.json`, `qnu_e2e_nq57_compiled_draft.json`, `qnu_e2e_tsdh_compiled_draft.json`.

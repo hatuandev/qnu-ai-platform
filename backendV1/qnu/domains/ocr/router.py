@@ -23,6 +23,9 @@ from qnu.domains.ocr.schemas import (
     ProcessingRunDetailResponse,
     ProcessingRunRequest,
     ProcessingRunResponse,
+    ProcessingWarningsAckRequest,
+    ProcessingWarningsAckResponse,
+    WarningsAcknowledgement,
 )
 from qnu.domains.ocr.service import processing_service
 from qnu.domains.workspaces.access import resolve_workspace_access
@@ -230,6 +233,36 @@ async def dispatch_processing_run(
     run = await processing_service.get_run(db, scope.workspace_id, scope.revision_id, run_id)
     await processing_service.dispatch(db, run, job_queue)
     return ProcessingRunResponse.from_run(run)
+
+
+@router.post(
+    "/{run_id}/warnings/acknowledge",
+    response_model=ProcessingWarningsAckResponse,
+    summary="Quản trị viên xác nhận cảnh báo ảnh OCR để mở khóa xuất bản (admin)",
+)
+async def acknowledge_warnings(
+    workspace_id: str,
+    collection_id: str,
+    source_id: str,
+    revision_id: str,
+    run_id: str,
+    body: ProcessingWarningsAckRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+    blob_store: BlobStore = Depends(get_blob_store),
+) -> ProcessingWarningsAckResponse:
+    scope = await _scope(
+        db, actor, workspace_id, collection_id, source_id, revision_id, ("admin",)
+    )
+    run = await processing_service.get_run(db, scope.workspace_id, scope.revision_id, run_id)
+    ack, created = await processing_service.acknowledge_warnings(
+        db, blob_store, actor, run, reason=body.reason
+    )
+    return ProcessingWarningsAckResponse(
+        run=ProcessingRunResponse.from_run(run),
+        acknowledged=WarningsAcknowledgement.model_validate(ack),
+        created=created,
+    )
 
 
 @router.get(

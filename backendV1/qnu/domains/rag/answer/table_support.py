@@ -89,6 +89,66 @@ def supports(primary, rows, relationships, metadata_filter, scopes=None):
     return selected, list(links.values())
 
 
+MAX_SECTION_SIBLINGS = 2
+
+
+def section_siblings(primary, rows, relationships, scopes, excluded):
+    """Complete self-describing tables under the anchor's verified section heading.
+
+    Weaker than a continuation proof: a sibling is optional reading evidence,
+    never a header dependency, and stays bounded per request.
+    """
+    by_id = {r.id: r for r in rows}
+    selected, links = {}, []
+    for hit in primary:
+        anchor = by_id.get(hit.chunk_id)
+        if anchor is None or anchor.kind != "table":
+            continue
+        structure = anchor.structure or {}
+        heading = (structure.get("context") or {}).get("source_heading_citation")
+        citation = structure.get("source_table_citation")
+        if not heading or not citation:
+            continue
+        shared = [scope for scope in scopes if matches_metadata(structure, scope)]
+        if not shared:
+            continue
+        candidates = []
+        for row in rows:
+            if row.kind != "table" or row.input_id != anchor.input_id:
+                continue
+            if row.id in excluded or row.id in selected:
+                continue
+            sibling = row.structure or {}
+            ref = sibling.get("source_table_citation")
+            if not ref or ref == citation:
+                continue
+            if (sibling.get("context") or {}).get("source_heading_citation") != heading:
+                continue
+            if sibling.get("row_indices") != list(range(sibling.get("original_row_count", 0))):
+                continue
+            link = relationships.get((row.input_id, ref))
+            if not link or link["header"] != ref:
+                continue
+            if not any(matches_metadata(sibling, scope) for scope in shared):
+                continue
+            candidates.append(row)
+        candidates.sort(key=lambda r: (abs(r.ordinal - anchor.ordinal), r.ordinal))
+        for row in candidates:
+            if len(selected) >= MAX_SECTION_SIBLINGS:
+                return selected, links
+            selected[row.id] = row
+            links.append(
+                {
+                    **relationships[(row.input_id, row.structure["source_table_citation"])],
+                    "chunk_id": row.id,
+                    "support_ids": [row.id],
+                    "sibling_of": anchor.id,
+                    "heading_citation": heading,
+                }
+            )
+    return selected, links
+
+
 async def attach_table_support(db, blob, actor, workspace_id, collection_id, result, req):
     if not any((h.structure or {}).get("source_table_citation") for h in result.hits):
         return result, {}
@@ -105,13 +165,8 @@ async def attach_table_support(db, blob, actor, workspace_id, collection_id, res
         )
     )
     relationships = await bound_dependencies(db, blob, allowed, rows)
-    needed, links = supports(
-        result.hits,
-        rows,
-        relationships,
-        req.metadata_filter,
-        result_scopes(result, req.metadata_filter),
-    )
+    scopes = result_scopes(result, req.metadata_filter)
+    needed, links = supports(result.hits, rows, relationships, req.metadata_filter, scopes)
     known = {h.chunk_id for h in result.hits}
     # Do not silently discard a primary result to make dependencies fit.
     # Four additional dependencies are a separate, bounded allowance. Top-k
@@ -130,7 +185,11 @@ async def attach_table_support(db, blob, actor, workspace_id, collection_id, res
             continue
         selected.update({key: needed[key] for key in extra})
         resolved.append(link)
-    additions = list(selected.values())
+    siblings, sibling_links = section_siblings(
+        result.hits, rows, relationships, scopes, excluded=set(known) | set(needed)
+    )
+    resolved.extend(sibling_links)
+    additions = list(selected.values()) + list(siblings.values())
     raw = [
         VectorHit(
             r.point_id,
@@ -147,9 +206,22 @@ async def attach_table_support(db, blob, actor, workspace_id, collection_id, res
         for r in additions
     ]
     added = await _hits(db, run, allowed, raw, await manifest(db, blob, run)) if raw else []
-    return result.model_copy(update={"hits": [*result.hits, *added]}), {
+    trace = {
         "table_support": "partial" if unresolved else "resolved",
         "unresolved_support_ids": list(dict.fromkeys(unresolved)),
         "table_links": resolved,
         "support_ids": [r.id for r in additions],
     }
+    if sibling_links:
+        trace["section_siblings"] = [link["chunk_id"] for link in sibling_links]
+        # Unlike header dependencies, a sibling is expendable reading evidence:
+        # packing may trim it when the envelope exceeds the byte budget.
+        trace["added"] = [
+            {
+                "chunk_id": link["chunk_id"],
+                "primary_chunk_id": link["sibling_of"],
+                "kind": "sibling_table",
+            }
+            for link in sibling_links
+        ]
+    return result.model_copy(update={"hits": [*result.hits, *added]}), trace

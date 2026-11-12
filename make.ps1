@@ -1,4 +1,4 @@
-# QNU task runner. All default commands select V1.
+# QNU task runner. Default dev uses Backend V1 with Frontend V2.
 param(
     [Parameter(Position = 0)][string]$Command = "help",
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$RunnerArguments

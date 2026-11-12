@@ -1,4 +1,4 @@
-"""Default QNU task runner: V1 only, foreground services, explicit data operations."""
+"""QNU task runner for Backend V1 and the local frontend workflows."""
 
 from __future__ import annotations
 
@@ -14,7 +14,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COMMANDS = {
-    "v1-dev": "API 8002 + worker + FE 3001; Ctrl+C stops this session",
+    "v2-dev": "Default dev: API V1 8002 + worker V1 + FE V2 3002",
+    "v2-fe": "Frontend V2 only, foreground, port 3002",
+    "v2-check": "Default check: read-only dependencies, V1 schema and FE V2",
+    "v1-dev": "API V1 8002 + worker V1 + FE V1 3001",
     "v1-be": "API only, foreground, port 8002",
     "v1-worker": "ARQ worker only, foreground, V1 queue",
     "v1-fe": "Frontend only, foreground, port from frontendV1/.env.local",
@@ -37,12 +40,21 @@ COMMANDS = {
     "v1-lint-fix": "Explicit Ruff/Biome fixes, V1 source only",
     "v1-typecheck": "Frontend TypeScript; run dev/build first on a fresh clone",
     "v1-build": "Frontend build including TypeScript",
-    "v1-help": "Show V1 commands",
+    "v1-help": "Show QNU runner commands",
 }
 
-ALIASES = {name.removeprefix("v1-"): name for name in COMMANDS}
+ALIASES = {
+    name.removeprefix("v1-"): name for name in COMMANDS if name.startswith("v1-")
+}
 ALIASES.update(
-    {"dev1": "v1-dev", "dev2": "v1-dev", "fe2": "v1-fe", "db-ready": "v1-check"}
+    {
+        "dev": "v2-dev",
+        "dev1": "v1-dev",
+        "dev2": "v2-dev",
+        "fe2": "v2-fe",
+        "check": "v2-check",
+        "db-ready": "v2-check",
+    }
 )
 REMOVED_COMMANDS = {"seed", "reset-db", "reseed", "reconcile", "reindex"}
 
@@ -52,6 +64,7 @@ def command_plan(
 ) -> list[tuple[Path, list[str]]]:
     backend = root / "backendV1"
     frontend = root / "frontendV1"
+    frontend_v2 = root / "frontendV2"
     runtime = root if env_dir == "root" else backend
     uv = ["uv", "run", "--project", str(backend), "--frozen", "--extra", "dev"]
     service_uv = [*uv, "--no-sync"]
@@ -70,7 +83,18 @@ def command_plan(
     worker = (runtime, [*service_uv, "arq", "qnu.workers.settings.WorkerSettings"])
     # Avoid npm.cmd's interactive "Terminate batch job?" during Ctrl+C on Windows.
     fe = (frontend, ["node", str(frontend / "node_modules/vite/bin/vite.js")])
+    fe_v2 = (
+        frontend_v2,
+        [
+            "node",
+            str(frontend_v2 / "node_modules/vite/bin/vite.js"),
+            "--port",
+            "3002",
+            "--strictPort",
+        ],
+    )
     check = (runtime, [*uv, "python", str(root / "scripts/check_v1_runtime.py")])
+    check_v2 = (runtime, [*check[1], "--frontend", frontend_v2.name])
     # Alembic paths are relative to backendV1; explicitly load root env for mode A.
     migration = [
         *uv,
@@ -86,6 +110,9 @@ def command_plan(
         str(runtime / ".env"),
     ]
     plans = {
+        "v2-dev": [check_v2, api, worker, fe_v2],
+        "v2-check": [check_v2],
+        "v2-fe": [fe_v2],
         "v1-dev": [check, api, worker, fe],
         "v1-check": [check],
         "v1-infra-down": [(root, [*infra, "down"])],
@@ -268,7 +295,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("QNU_V1_ENV_DIR must be root or backend")
     if args.command == "v1-help":
         print(
-            "QNU V1 is the default: make dev/check/build; v1-* aliases remain available."
+            "make dev (or dev2) starts Backend V1, its worker and Frontend V2. "
+            "Use dev1 for Frontend V1."
         )
         for name, description in COMMANDS.items():
             print(f"  make {name:<16} {description}")
@@ -288,6 +316,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "v1-clear" and not args.confirm_local_reset:
         parser.error("clear deletes local data volumes; pass --confirm-local-reset")
     if args.command in {
+        "v2-dev",
+        "v2-check",
         "v1-dev",
         "v1-check",
         "v1-be",
@@ -334,14 +364,16 @@ def main(argv: list[str] | None = None) -> int:
             if not endpoint.startswith(("unix:///", "npipe:////./pipe/")):
                 print("clear requires a local Docker socket or pipe.", file=sys.stderr)
                 return 1
-        if args.command == "v1-dev":
-            print("Checking V1 dependencies before starting services...", flush=True)
+        if args.command in {"v1-dev", "v2-dev"}:
+            frontend_name = plan[-1][0].name
+            print(f"Checking Backend V1 and {frontend_name} dependencies...", flush=True)
             cwd, check = plan[0]
             code = subprocess.run(check, cwd=cwd, check=False).returncode
             if code:
                 return code
             print(
-                "Starting V1 API/worker/FE in foreground. Ctrl+C stops only this session.",
+                f"Starting V1 API/worker and {frontend_name} in foreground. "
+                "Ctrl+C stops only this session.",
                 flush=True,
             )
             return run_services(plan[1:])

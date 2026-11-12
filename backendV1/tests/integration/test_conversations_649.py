@@ -23,6 +23,7 @@ def create_assistant(client, data):
             "persona": "Giải thích ngắn gọn bằng tiếng Việt.",
             "collection_id": data["collection"]["id"],
             "chat_provider_id": data["chat_provider"]["id"],
+            "rag_policy": {"retrieval_mode": "dense"},
         },
     )
     assert response.status_code == 201, response.text

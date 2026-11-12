@@ -42,7 +42,8 @@ def test_partial_answer_contract_and_foreign_coverage_rejection(
 
     monkeypatch.setattr(chat, "_respond", respond)
     result = client.post(
-        ready["answer_url"], json={"question": "Nguồn nói gì?", "context_max_bytes": 32000}
+        ready["answer_url"],
+        json={"question": "Nguồn nói gì?", "context_max_bytes": 32000, "retrieval_mode": "dense"},
     )
     assert len(chat.requests) == 1
     if foreign:
@@ -88,7 +89,8 @@ def test_unused_coverage_witness_stays_in_the_revalidated_response(
 
     monkeypatch.setattr(chat, "_respond", respond)
     result = client.post(
-        ready["answer_url"], json={"question": "Nguồn nói gì?", "context_max_bytes": 32000}
+        ready["answer_url"],
+        json={"question": "Nguồn nói gì?", "context_max_bytes": 32000, "retrieval_mode": "dense"},
     )
     assert result.status_code == 200, result.text
     body = result.json()

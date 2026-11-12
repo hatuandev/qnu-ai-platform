@@ -49,6 +49,15 @@ class CheckTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(ok)
         self.assertIn("v1-db-check", detail)
 
+    async def test_schema_mismatch_reports_both_revisions(self):
+        engine, _ = self.database_engine([True, "0022_new"])
+        with patch.object(checker, "create_async_engine", return_value=engine):
+            ok, detail = await checker.check_database("test-url", "0021_old")
+        self.assertFalse(ok)
+        self.assertIn("0022_new", detail)
+        self.assertIn("0021_old", detail)
+        self.assertIn("SCHEMA_HEAD", detail)
+
     async def test_connection_error_is_sanitized(self):
         engine, _ = self.database_engine([])
         engine.connect.return_value.__aenter__ = AsyncMock(
@@ -107,10 +116,21 @@ class CheckTests(unittest.IsolatedAsyncioTestCase):
                 create=True,
             ),
         ):
-            result = await checker.inspect(settings, Path(directory), "head")
+            root = Path(directory)
+            result = await checker.inspect(settings, root, "head")
+            vite_v1 = root / "frontendV1/node_modules/vite/bin/vite.js"
+            vite_v1.parent.mkdir(parents=True)
+            vite_v1.touch()
+            v2_missing = await checker.inspect(settings, root, "head", "frontendV2")
+            vite_v2 = root / "frontendV2/node_modules/vite/bin/vite.js"
+            vite_v2.parent.mkdir(parents=True)
+            vite_v2.touch()
+            v2_ready = await checker.inspect(settings, root, "head", "frontendV2")
         self.assertFalse(result["frontend"][0])
         self.assertIn("v1-install-fe", result["frontend"][1])
         self.assertFalse(result["storage"][0])
+        self.assertEqual(v2_missing["frontend"], (False, "Run npm ci in frontendV2 first"))
+        self.assertEqual(v2_ready["frontend"], (True, "Vite installed in frontendV2"))
 
 
 class CheckOutputTests(unittest.TestCase):

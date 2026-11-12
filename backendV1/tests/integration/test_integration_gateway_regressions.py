@@ -43,6 +43,7 @@ def healthy_redis():
 
 
 def setup_case(client, **policy):
+    policy.setdefault("retrieval_mode", "dense")
     ws, _ = _setup_test_workspaces(client)
     _as(PLATFORM)
     r = client.post(

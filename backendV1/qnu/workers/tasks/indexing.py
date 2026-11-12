@@ -8,6 +8,7 @@ from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.index.execution import execute_run
 from qnu.domains.knowledge.index.models import IndexRun, IndexSync
 from qnu.domains.knowledge.index.retirement import retire_vectors, retirement_candidates
+from qnu.domains.knowledge.index.service import dispatch
 from qnu.domains.knowledge.index.sync import synchronize, wake
 from qnu.platform.config import get_settings
 from qnu.platform.database import AsyncSessionFactory
@@ -29,6 +30,10 @@ async def index_run(ctx: dict, run_id: str) -> str:
         )
         run = await db.get(IndexRun, run_id)
         if run:
+            if run.status == "queued" and run.dispatched_at is None:
+                # A transient vector/storage failure is retried by this worker, not the
+                # five-minute reconcile cron.
+                await dispatch(db, run, container.job_queue)
             await wake(container.job_queue, run.collection_id)
     return status
 

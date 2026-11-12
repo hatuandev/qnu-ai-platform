@@ -177,7 +177,7 @@ def test_full_recovery_into_new_targets_keeps_originals_credentials_and_search(
                     EDITOR,
                     data["workspace"]["id"],
                     data["collection"]["id"],
-                    SearchRequest(query="Chỉ tiêu năm 2024"),
+                    SearchRequest(query="Chỉ tiêu năm 2024", mode="dense"),
                 )
                 assert found.hits and all(hit.citations for hit in found.hits)
             with pytest.raises(Conflict):

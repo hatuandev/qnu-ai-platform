@@ -91,9 +91,15 @@ async def save_assistant(
                 ) from exc
     await assert_provider_allowed(db, actor, workspace_id, "chat", req.chat_provider_id)
     if req.rag_policy.retrieval_mode == "hybrid_rerank":
-        await assert_provider_allowed(
-            db, actor, workspace_id, "rerank", req.rag_policy.rerank_provider_id
-        )
+        try:
+            await assert_provider_allowed(
+                db, actor, workspace_id, "rerank", req.rag_policy.rerank_provider_id
+            )
+        except Conflict as exc:
+            # No rerank model configured: retrieval degrades to hybrid with a
+            # trace at query time; a pinned or ungranted provider still fails.
+            if exc.code != "model_not_configured":
+                raise
     if req.rag_policy.verification_mode != "off":
         await assert_provider_allowed(
             db,

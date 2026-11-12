@@ -56,7 +56,7 @@ class SearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=8000)
     top_k: int = Field(5, strict=True, ge=1, le=50)
     document_ids: list[str] | None = Field(None, min_length=1, max_length=100)
-    mode: Literal["dense", "hybrid", "hybrid_rerank"] = "dense"
+    mode: Literal["dense", "hybrid", "hybrid_rerank"] = "hybrid_rerank"
     candidate_k: int = Field(30, strict=True, ge=1, le=100)
     rrf_k: int = Field(60, strict=True, ge=1, le=1000)
     rerank_provider_id: str | None = Field(None, min_length=1, max_length=64)

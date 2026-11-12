@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import sys
 from pathlib import Path
@@ -58,7 +59,11 @@ async def check_database(url: str, head: str) -> tuple[bool, str]:
         if current != head:
             return (
                 False,
-                "V1 schema is not current; check v1-db-check before explicitly running v1-migrate",
+                (
+                    f"V1 schema revision {current} differs from this build's {head}; "
+                    "check v1-db-check, then run v1-migrate if the database is behind "
+                    "or update SCHEMA_HEAD if the database is ahead"
+                ),
             )
         return True, "PostgreSQL connected and V1 schema current"
     except (SQLAlchemyError, OSError, TimeoutError):
@@ -72,7 +77,7 @@ async def check_database(url: str, head: str) -> tuple[bool, str]:
 
 async def check_qdrant(url: str) -> tuple[bool, str]:
     try:
-        async with httpx.AsyncClient(timeout=2) as client:
+        async with httpx.AsyncClient(timeout=2, trust_env=False) as client:
             response = await client.get(url.rstrip("/") + "/collections")
         return response.status_code == 200, "Qdrant GET /collections"
     except (httpx.HTTPError, httpx.InvalidURL, OSError, ValueError):
@@ -83,7 +88,7 @@ async def check_qdrant(url: str) -> tuple[bool, str]:
 
 
 async def inspect(
-    settings: Settings, root: Path, head: str
+    settings: Settings, root: Path, head: str, frontend: str = "frontendV1"
 ) -> dict[str, tuple[bool, str]]:
     checks = await asyncio.gather(
         check_redis(settings.REDIS_URL),
@@ -94,20 +99,23 @@ async def inspect(
     results = dict(
         zip(("redis", "postgresql", "qdrant", "storage"), checks, strict=True)
     )
-    vite_present = (root / "frontendV1/node_modules/vite/bin/vite.js").is_file()
+    vite_present = (root / frontend / "node_modules/vite/bin/vite.js").is_file()
+    install = (
+        "make v1-install-fe" if frontend == "frontendV1" else "npm ci in frontendV2"
+    )
     results["frontend"] = (
         vite_present,
-        "Vite installed" if vite_present else "Run make v1-install-fe first",
+        f"Vite installed in {frontend}" if vite_present else f"Run {install} first",
     )
     return results
 
 
-def main() -> int:
+def main(frontend: str = "frontendV1") -> int:
     try:
         from qnu.domains.operations.recovery.service import HEAD
         from qnu.platform.config import get_settings
 
-        results = asyncio.run(inspect(get_settings(), ROOT, HEAD))
+        results = asyncio.run(inspect(get_settings(), ROOT, HEAD, frontend))
     except (
         SQLAlchemyError,
         RedisError,
@@ -145,4 +153,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--frontend", choices=("frontendV1", "frontendV2"), default="frontendV1"
+    )
+    raise SystemExit(main(parser.parse_args().frontend))

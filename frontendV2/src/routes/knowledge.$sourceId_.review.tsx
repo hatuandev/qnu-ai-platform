@@ -6,7 +6,9 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   ArrowLeft,
+  BadgeCheck,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -16,13 +18,14 @@ import {
   Loader2,
   Pencil,
   RotateCcw,
-  Save,
+  ShieldAlert,
   Sparkles,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { useMeQuery } from "@/api/auth/queries";
 import { ApiProblemError } from "@/api/client";
 import {
   getRevisionContentBlob,
@@ -32,26 +35,44 @@ import {
   useSourceSummaryQuery,
 } from "@/api/knowledge";
 import {
+  useAcknowledgeOcrWarningsMutation,
+  useBulkIgnoreTextReviewSuggestionsMutation,
+  useRerunTextReviewMutation,
   useSaveTextReviewMutation,
+  useSetTextReviewDispositionMutation,
   useTextReviewChecksQuery,
   useTextReviewQuery,
 } from "@/api/ocr/queries";
 import type { ReviewDocument, Suggestion } from "@/api/ocr/requests";
 import { useCreatePreparationIntentMutation } from "@/api/preparation/queries";
+import { useWorkspaceMembersQuery } from "@/api/workspaces/queries";
 import { DocxViewer } from "@/components/knowledge/docx-viewer";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
 import { displayDocumentTitle } from "@/lib/knowledge-studio-helpers";
+import { isPlatformAdmin } from "@/lib/permissions";
 import {
   buildTextChanges,
   type SuggestionDecision,
   splitTextAtSuggestion,
 } from "@/lib/spelling-replacement-helpers";
 import {
-  preferredSpellingCheck,
+  currentSpellingCheck,
+  formatSpellingMoment,
   spellingCoverage,
+  spellingPercent,
   spellingScope,
 } from "@/lib/spelling-review";
 import { useUiStore } from "@/lib/ui-store";
@@ -61,7 +82,6 @@ const reviewSearchSchema = z.object({
   collectionId: z.string().optional(),
   revisionId: z.string().optional(),
   runId: z.string().optional(),
-  textVersion: z.number().int().nonnegative().optional(),
 });
 
 export const Route = createFileRoute("/knowledge/$sourceId_/review")({
@@ -71,7 +91,7 @@ export const Route = createFileRoute("/knowledge/$sourceId_/review")({
 
 function SpellingReviewPage() {
   const { sourceId } = Route.useParams();
-  const { collectionId, revisionId, runId, textVersion } = Route.useSearch();
+  const { collectionId, revisionId, runId } = Route.useSearch();
   const workspaceId = useUiStore((s) => s.activeWorkspaceId);
   return (
     <SpellingReviewWorkspace
@@ -81,7 +101,6 @@ function SpellingReviewPage() {
         sourceId,
         revisionId,
         runId,
-        textVersion,
       ])}
     />
   );
@@ -122,9 +141,8 @@ function SpellingReviewWorkspace() {
   const scope = spellingScope(summary, search.runId);
   const activeRevisionId = search.revisionId ?? scope?.revisionId;
   const ocrRunId = search.runId ?? scope?.runId;
-  const latestTextVersion = search.textVersion ?? scope?.textVersion;
 
-  // 2. Load Review Document & Checks
+  // 2. One working text per source: always the latest saved text.
   const {
     data: reviewDoc,
     isLoading: isReviewDocLoading,
@@ -137,7 +155,6 @@ function SpellingReviewWorkspace() {
     sourceId,
     activeRevisionId,
     ocrRunId,
-    latestTextVersion,
   );
 
   const {
@@ -152,7 +169,7 @@ function SpellingReviewWorkspace() {
     sourceId,
     activeRevisionId,
     ocrRunId,
-    latestTextVersion,
+    undefined,
     { refetchInterval: 5000 },
   );
 
@@ -161,12 +178,15 @@ function SpellingReviewWorkspace() {
   const isChecksUnsupported =
     checksError instanceof ApiProblemError && checksError.status === 405;
 
-  const selectedCheck = preferredSpellingCheck(checks);
-  const latestCheck =
-    selectedCheck?.canonical_sha256 === reviewDoc?.canonical_sha256
-      ? selectedCheck
-      : undefined;
+  const latestCheck = useMemo(
+    () => currentSpellingCheck(checks, reviewDoc?.version),
+    [checks, reviewDoc?.version],
+  );
+  const isReviewed = latestCheck?.reviewed_at != null;
   const coverage = latestCheck ? spellingCoverage(latestCheck) : null;
+  const percent = coverage
+    ? spellingPercent(coverage.checked, coverage.total)
+    : null;
 
   // All suggestions from the check
   const allSuggestions: Suggestion[] = useMemo(() => {
@@ -195,10 +215,28 @@ function SpellingReviewWorkspace() {
   const [isEditingManually, setIsEditingManually] = useState(false);
   const [manualEditText, setManualEditText] = useState("");
 
-  // Saving state
+  // Server-persisted "Bỏ qua" is restored whenever the shown check changes.
+  const seededCheckIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!latestCheck) return;
+    if (seededCheckIdRef.current === latestCheck.id) return;
+    seededCheckIdRef.current = latestCheck.id;
+    const restored = new Map<string, SuggestionDecision>();
+    for (const ignored of latestCheck.ignored_suggestions ?? []) {
+      restored.set(`${ignored.evidence_id}:${ignored.start}:${ignored.end}`, {
+        status: "ignored",
+      });
+    }
+    setDecisions(restored);
+    setSelectedIndex(0);
+    setIsEditingManually(false);
+  }, [latestCheck]);
+
+  // Completion state
   const [isSaving, setIsSaving] = useState(false);
-  const [savedReview, setSavedReview] = useState<ReviewDocument | null>(null);
-  const [preparationError, setPreparationError] = useState(false);
+  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [recheckRetry, setRecheckRetry] = useState<boolean | null>(null);
+  const [isRecheckPending, setIsRecheckPending] = useState(false);
   const saveAttempt = useRef<{ signature: string; key: string } | null>(null);
 
   // Original document preview (toggleable panel)
@@ -244,10 +282,111 @@ function SpellingReviewWorkspace() {
     ocrRunId,
   );
 
+  const rerunReviewMutation = useRerunTextReviewMutation(
+    activeWorkspaceId,
+    resolvedCollectionId,
+    sourceId,
+    activeRevisionId,
+    ocrRunId,
+  );
+
+  const dispositionMutation = useSetTextReviewDispositionMutation(
+    activeWorkspaceId,
+    resolvedCollectionId,
+    sourceId,
+    activeRevisionId,
+    ocrRunId,
+  );
+
+  const bulkIgnoreMutation = useBulkIgnoreTextReviewSuggestionsMutation(
+    activeWorkspaceId,
+    resolvedCollectionId,
+    sourceId,
+    activeRevisionId,
+    ocrRunId,
+  );
+
   const createIntentMutation = useCreatePreparationIntentMutation(
     activeWorkspaceId,
     resolvedCollectionId,
   );
+
+  const ackWarningsMutation = useAcknowledgeOcrWarningsMutation(
+    activeWorkspaceId,
+    resolvedCollectionId,
+    sourceId,
+    activeRevisionId,
+    ocrRunId,
+  );
+  const meQuery = useMeQuery();
+  const membersQuery = useWorkspaceMembersQuery(activeWorkspaceId);
+  const [isAckDialogOpen, setIsAckDialogOpen] = useState(false);
+  const [ackReason, setAckReason] = useState("");
+
+  const imageFailures = useMemo(
+    () => reviewDoc?.image_ocr_failures ?? [],
+    [reviewDoc],
+  );
+  const failedPages = useMemo(
+    () =>
+      [...new Set(imageFailures.map((failure) => failure.page))].sort(
+        (a, b) => a - b,
+      ),
+    [imageFailures],
+  );
+  const canAcknowledgeWarnings = useMemo(() => {
+    const actor = meQuery.data?.actor;
+    if (isPlatformAdmin(actor)) return true;
+    if (!actor) return false;
+    const members = membersQuery.data?.items ?? [];
+    return members.some(
+      (member) =>
+        member.actor_ref === actor.actor_id &&
+        member.role === "admin" &&
+        member.status === "active",
+    );
+  }, [meQuery.data, membersQuery.data]);
+
+  const handleAcknowledgeWarnings = async () => {
+    if (!activeWorkspaceId) return;
+    const reason = ackReason.trim();
+    if (reason.length < 5) {
+      toast.error("Vui lòng nhập lý do ít nhất 5 ký tự.");
+      return;
+    }
+    try {
+      const result = await ackWarningsMutation.mutateAsync({ reason });
+      toast.success(
+        result.created
+          ? "Đã ghi nhận xác nhận cảnh báo."
+          : "Cảnh báo này đã được xác nhận trước đó.",
+      );
+      setIsAckDialogOpen(false);
+      setAckReason("");
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: knowledgeKeys.sourceSummary(
+            activeWorkspaceId,
+            resolvedCollectionId,
+            sourceId,
+          ),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: knowledgeKeys.source(
+            activeWorkspaceId,
+            resolvedCollectionId,
+            sourceId,
+          ),
+        }),
+      ]);
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Không thể xác nhận cảnh báo ảnh OCR.",
+      );
+    }
+  };
 
   useEffect(() => {
     if (!docBlob) return;
@@ -256,24 +395,51 @@ function SpellingReviewWorkspace() {
     return () => URL.revokeObjectURL(url);
   }, [docBlob]);
 
+  // After approval every remaining suggestion was applied or ignored; show it
+  // as handled instead of pretending it is still waiting for a decision.
+  const viewDecisions = useMemo(() => {
+    if (!isReviewed) return decisions;
+    const next = new Map(decisions);
+    for (const s of [...allSuggestions, ...withheldSuggestions]) {
+      const key = `${s.evidence_id}:${s.start}:${s.end}`;
+      if (!next.has(key)) next.set(key, { status: "applied" });
+    }
+    return next;
+  }, [allSuggestions, decisions, isReviewed, withheldSuggestions]);
+
   // Filtered list of suggestions
   const filteredSuggestions = useMemo(() => {
     if (filter === "withheld") {
-      return withheldSuggestions;
+      return withheldSuggestions.filter(
+        (s) =>
+          viewDecisions.get(`${s.evidence_id}:${s.start}:${s.end}`)?.status !==
+          "ignored",
+      );
+    }
+
+    if (filter === "ignored") {
+      const seen = new Set<string>();
+      const result: Suggestion[] = [];
+      for (const s of [...withheldSuggestions, ...allSuggestions]) {
+        const key = `${s.evidence_id}:${s.start}:${s.end}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (viewDecisions.get(key)?.status === "ignored") result.push(s);
+      }
+      return result;
     }
 
     return allSuggestions.filter((s) => {
       const key = `${s.evidence_id}:${s.start}:${s.end}`;
-      const d = decisions.get(key);
+      const d = viewDecisions.get(key);
       const status = d?.status || "pending";
 
       if (filter === "pending") return status === "pending";
       if (filter === "applied")
         return status === "applied" || status === "custom";
-      if (filter === "ignored") return status === "ignored";
       return true; // "all"
     });
-  }, [allSuggestions, withheldSuggestions, decisions, filter]);
+  }, [allSuggestions, withheldSuggestions, viewDecisions, filter]);
 
   // Clamp selected index when list changes
   useEffect(() => {
@@ -289,25 +455,60 @@ function SpellingReviewWorkspace() {
   const counts = useMemo(() => {
     let pending = 0;
     let applied = 0;
-    let ignored = 0;
 
     for (const s of allSuggestions) {
       const key = `${s.evidence_id}:${s.start}:${s.end}`;
-      const d = decisions.get(key);
+      const d = viewDecisions.get(key);
       const status = d?.status || "pending";
       if (status === "pending") pending++;
       else if (status === "applied" || status === "custom") applied++;
-      else if (status === "ignored") ignored++;
+    }
+
+    const ignoredKeys = new Set<string>();
+    for (const s of [...allSuggestions, ...withheldSuggestions]) {
+      const key = `${s.evidence_id}:${s.start}:${s.end}`;
+      if (viewDecisions.get(key)?.status === "ignored") ignoredKeys.add(key);
     }
 
     return {
       pending,
       applied,
-      ignored,
-      withheld: withheldSuggestions.length,
+      ignored: ignoredKeys.size,
+      withheld: withheldSuggestions.filter(
+        (s) =>
+          viewDecisions.get(`${s.evidence_id}:${s.start}:${s.end}`)?.status !==
+          "ignored",
+      ).length,
       total: allSuggestions.length,
     };
+  }, [allSuggestions, withheldSuggestions, viewDecisions]);
+
+  // Every suggestion must be applied, hand-edited or ignored before approval.
+  const openSuggestions = useMemo(() => {
+    const seen = new Set<string>();
+    const result: Suggestion[] = [];
+    for (const s of [...allSuggestions, ...withheldSuggestions]) {
+      const key = `${s.evidence_id}:${s.start}:${s.end}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!decisions.has(key)) result.push(s);
+    }
+    return result;
   }, [allSuggestions, withheldSuggestions, decisions]);
+
+  const remaining = openSuggestions.length;
+  const isCheckComplete =
+    latestCheck?.status === "completed" && coverage?.complete === true;
+  const canComplete =
+    Boolean(latestCheck) && !isReviewed && isCheckComplete && remaining === 0;
+
+  // Unsaved changes check
+  const hasUnsavedChanges = useMemo(() => {
+    for (const d of decisions.values()) {
+      if (d.status === "applied" || d.status === "custom") return true;
+    }
+    return false;
+  }, [decisions]);
 
   // Decision actions
   const makeDecision = useCallback(
@@ -338,31 +539,220 @@ function SpellingReviewWorkspace() {
   }, [activeSuggestion, makeDecision]);
 
   const handleIgnore = useCallback(() => {
-    if (!activeSuggestion) return;
-    makeDecision(activeSuggestion, { status: "ignored" });
-    toast.info("Đã bỏ qua gợi ý.");
-  }, [activeSuggestion, makeDecision]);
+    if (!activeSuggestion || !latestCheck) return;
+    const suggestion = activeSuggestion;
+    const key = `${suggestion.evidence_id}:${suggestion.start}:${suggestion.end}`;
+    const previous = decisions.get(key);
+    makeDecision(suggestion, { status: "ignored" });
+    dispositionMutation.mutate(
+      {
+        checkId: latestCheck.id,
+        body: {
+          evidence_id: suggestion.evidence_id,
+          start: suggestion.start,
+          end: suggestion.end,
+          ignored: true,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.info("Đã bỏ qua gợi ý và lưu trạng thái cho lượt soát này.");
+        },
+        onError: (err) => {
+          setDecisions((prev) => {
+            const next = new Map(prev);
+            if (previous) next.set(key, previous);
+            else next.delete(key);
+            return next;
+          });
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : "Không lưu được trạng thái bỏ qua.",
+          );
+        },
+      },
+    );
+  }, [
+    activeSuggestion,
+    decisions,
+    dispositionMutation,
+    latestCheck,
+    makeDecision,
+  ]);
 
   const handleCustomSubmit = useCallback(() => {
-    if (!activeSuggestion || !manualEditText.trim()) return;
+    const replacement = manualEditText.trim();
+    if (!activeSuggestion || !replacement) return;
+    if (replacement === activeSuggestion.original) {
+      toast.info("Chọn Bỏ qua để giữ nguyên văn.");
+      return;
+    }
     makeDecision(activeSuggestion, {
       status: "custom",
-      customReplacement: manualEditText.trim(),
+      customReplacement: replacement,
     });
-    toast.success(`Đã cập nhật sửa tay: "${manualEditText.trim()}"`);
+    toast.success("Đã ghi nhận sửa tay.");
   }, [activeSuggestion, manualEditText, makeDecision]);
 
   const handleUndo = useCallback(() => {
     if (!activeSuggestion) return;
-    const key = `${activeSuggestion.evidence_id}:${activeSuggestion.start}:${activeSuggestion.end}`;
+    const suggestion = activeSuggestion;
+    const key = `${suggestion.evidence_id}:${suggestion.start}:${suggestion.end}`;
+    const previous = decisions.get(key);
     setDecisions((prev) => {
       const next = new Map(prev);
       next.delete(key);
       return next;
     });
     setIsEditingManually(false);
-    toast.info("Đã hoàn tác quyết định.");
-  }, [activeSuggestion]);
+    if (previous?.status !== "ignored" || !latestCheck) {
+      toast.info("Đã hoàn tác quyết định.");
+      return;
+    }
+    dispositionMutation.mutate(
+      {
+        checkId: latestCheck.id,
+        body: {
+          evidence_id: suggestion.evidence_id,
+          start: suggestion.start,
+          end: suggestion.end,
+          ignored: false,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.info("Đã hoàn tác bỏ qua gợi ý.");
+        },
+        onError: (err) => {
+          setDecisions((prev) => {
+            const next = new Map(prev);
+            next.set(key, previous);
+            return next;
+          });
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : "Không hoàn tác được trạng thái bỏ qua.",
+          );
+        },
+      },
+    );
+  }, [activeSuggestion, decisions, dispositionMutation, latestCheck]);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable='true'], [role='dialog'], [role='listbox'], [role='menu'], [role='combobox']",
+        )
+      ) {
+        return;
+      }
+      if (isEditingManually) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setIsEditingManually(false);
+        }
+        return;
+      }
+      switch (event.key.toLowerCase()) {
+        case "j":
+        case "arrowright":
+          if (filteredSuggestions.length === 0) return;
+          event.preventDefault();
+          setSelectedIndex((index) =>
+            Math.min(filteredSuggestions.length - 1, index + 1),
+          );
+          break;
+        case "k":
+        case "arrowleft":
+          if (filteredSuggestions.length === 0) return;
+          event.preventDefault();
+          setSelectedIndex((index) => Math.max(0, index - 1));
+          break;
+        case "a":
+          if (
+            !activeSuggestion ||
+            filter === "withheld" ||
+            isSaving ||
+            isReviewed
+          ) {
+            return;
+          }
+          event.preventDefault();
+          handleApply();
+          break;
+        case "x":
+          if (
+            !activeSuggestion ||
+            isReviewed ||
+            dispositionMutation.isPending
+          ) {
+            return;
+          }
+          event.preventDefault();
+          handleIgnore();
+          break;
+        case "e":
+          if (!activeSuggestion || isSaving || isReviewed) return;
+          event.preventDefault();
+          setManualEditText(
+            filter === "withheld"
+              ? activeSuggestion.original
+              : activeSuggestion.replacement,
+          );
+          setIsEditingManually(true);
+          break;
+        case "u":
+          if (
+            !activeSuggestion ||
+            !decisions.has(
+              `${activeSuggestion.evidence_id}:${activeSuggestion.start}:${activeSuggestion.end}`,
+            ) ||
+            isSaving ||
+            isReviewed ||
+            dispositionMutation.isPending
+          ) {
+            return;
+          }
+          event.preventDefault();
+          handleUndo();
+          break;
+        case "s":
+          if (!canComplete || isSaving) return;
+          event.preventDefault();
+          setIsCompleteDialogOpen(true);
+          break;
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [
+    activeSuggestion,
+    canComplete,
+    decisions,
+    dispositionMutation.isPending,
+    filter,
+    filteredSuggestions.length,
+    handleApply,
+    handleIgnore,
+    handleUndo,
+    isEditingManually,
+    isReviewed,
+    isSaving,
+  ]);
 
   // Unit lookup for displaying full sentence context
   const activeUnit = useMemo(() => {
@@ -374,14 +764,13 @@ function SpellingReviewWorkspace() {
     );
   }, [activeSuggestion, reviewDoc]);
 
-  // Unsaved changes check
-  const hasUnsavedChanges = useMemo(() => {
-    if (savedReview) return false;
-    for (const d of decisions.values()) {
-      if (d.status === "applied" || d.status === "custom") return true;
+  const unitPageById = useMemo(() => {
+    const pages = new Map<string, number>();
+    for (const unit of reviewDoc?.units ?? []) {
+      pages.set(unit.evidence_id, unit.page);
     }
-    return false;
-  }, [decisions, savedReview]);
+    return pages;
+  }, [reviewDoc]);
 
   useBlocker({
     shouldBlockFn: () =>
@@ -391,8 +780,19 @@ function SpellingReviewWorkspace() {
     enableBeforeUnload: hasUnsavedChanges && !isSaving,
   });
 
-  const prepareSavedReview = async (saved: ReviewDocument) => {
-    if (!activeWorkspaceId || !activeRevisionId || !saved.version_id) return;
+  useEffect(() => {
+    if (
+      latestCheck?.status === "running" ||
+      latestCheck?.status === "completed"
+    ) {
+      setIsRecheckPending(false);
+    }
+  }, [latestCheck?.status]);
+
+  const prepareAfterSave = async (saved: ReviewDocument) => {
+    if (!activeWorkspaceId || !activeRevisionId || !saved.version_id) {
+      return true;
+    }
     try {
       const { intent } = await createIntentMutation.mutateAsync({
         sourceId,
@@ -419,65 +819,150 @@ function SpellingReviewWorkspace() {
           sourceId,
         ),
       });
-      toast.success("Đã lưu bản sửa và gửi yêu cầu chuẩn bị lại.");
-      await navigate({
-        to: "/knowledge/$sourceId",
-        params: { sourceId },
-        search: { collectionId: resolvedCollectionId },
-        ignoreBlocker: true,
-      });
+      return true;
     } catch {
-      setPreparationError(true);
+      return false;
     }
   };
 
-  const handleSaveAll = async () => {
-    if (!reviewDoc || !ocrRunId) {
+  const openRecheckDialog = (retry: boolean) => {
+    setRecheckRetry(retry);
+  };
+
+  const handleConfirmRecheck = async () => {
+    if (recheckRetry === null || !reviewDoc) return;
+    try {
+      setIsRecheckPending(true);
+      const result = await rerunReviewMutation.mutateAsync({
+        version: reviewDoc.version,
+        retry: recheckRetry,
+      });
+      setRecheckRetry(null);
+      if (result.status === "queued") {
+        toast.success("Đã gửi yêu cầu soát chính tả.");
+      } else if (result.status === "running") {
+        toast.info("Lượt soát đang chạy.");
+      } else if (result.status === "completed") {
+        toast.info("Văn bản này đã có kết quả soát.");
+      } else {
+        toast.info(`Trạng thái lượt soát: ${result.status}.`);
+      }
+      await refetchChecks();
+    } catch (err) {
+      setIsRecheckPending(false);
+      toast.error(
+        err instanceof Error ? err.message : "Không gửi được yêu cầu soát lại.",
+      );
+    }
+  };
+
+  const openCompleteDialog = () => {
+    if (!latestCheck) {
+      toast.info("Chưa có kết quả soát chính tả để duyệt.");
+      return;
+    }
+    if (isReviewed) {
+      toast.info("Văn bản này đã được duyệt chính tả.");
+      return;
+    }
+    if (!isCheckComplete) {
+      toast.info("Cần soát xong toàn bộ văn bản trước khi duyệt.");
+      return;
+    }
+    if (remaining > 0) {
+      toast.info(`Còn ${remaining} vị trí chưa xử lý.`);
+      return;
+    }
+    setIsCompleteDialogOpen(true);
+  };
+
+  const handleIgnoreAll = async () => {
+    if (!latestCheck || openSuggestions.length === 0) return;
+    const batch = openSuggestions.map((item) => ({
+      evidence_id: item.evidence_id,
+      start: item.start,
+      end: item.end,
+    }));
+    try {
+      await bulkIgnoreMutation.mutateAsync({
+        checkId: latestCheck.id,
+        body: { suggestions: batch },
+      });
+      setDecisions((prev) => {
+        const next = new Map(prev);
+        for (const item of batch) {
+          next.set(`${item.evidence_id}:${item.start}:${item.end}`, {
+            status: "ignored",
+          });
+        }
+        return next;
+      });
+      toast.info(`Đã bỏ qua ${batch.length} vị trí còn lại.`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Không lưu được trạng thái bỏ qua.",
+      );
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!reviewDoc || !ocrRunId || !latestCheck) {
       toast.error("Không tìm thấy thông tin bản đọc văn bản.");
       return;
     }
-
     const { changes, errors } = buildTextChanges(
       reviewDoc.units,
       [...allSuggestions, ...withheldSuggestions],
       decisions,
     );
-
     if (errors.length > 0) {
       toast.error(`Có lỗi định vị: ${errors[0]}`);
       return;
     }
-
-    if (changes.length === 0) {
-      toast.info("Chưa có thay đổi nào được chọn để lưu.");
-      return;
-    }
-
     try {
       setIsSaving(true);
       const body = {
         expected_version: reviewDoc.version,
         expected_sha256: reviewDoc.canonical_sha256,
         changes,
+        review_check_id: latestCheck.id,
       };
       const signature = JSON.stringify([ocrRunId, body]);
       if (saveAttempt.current?.signature !== signature) {
         saveAttempt.current = {
           signature,
-          key: `save:spelling:${crypto.randomUUID()}`,
+          key: `review:spelling:${crypto.randomUUID()}`,
         };
       }
       const savedDoc = await saveReviewMutation.mutateAsync({
         body,
         idempotencyKey: saveAttempt.current.key,
       });
-      setSavedReview(savedDoc);
-      await prepareSavedReview(savedDoc);
+      const needsPreparation = savedDoc.version_id != null;
+      const prepared = await prepareAfterSave(savedDoc);
+      setIsCompleteDialogOpen(false);
+      if (!needsPreparation) {
+        toast.success("Đã duyệt chính tả cho văn bản.");
+      } else if (prepared) {
+        toast.success("Đã duyệt chính tả và gửi yêu cầu chuẩn bị nội dung.");
+      } else {
+        toast.warning(
+          "Đã duyệt chính tả nhưng chưa gửi được yêu cầu chuẩn bị nội dung; hãy thử lại ở trang tài liệu.",
+        );
+      }
+      await navigate({
+        to: "/knowledge/$sourceId",
+        params: { sourceId },
+        search: { collectionId: resolvedCollectionId },
+        ignoreBlocker: true,
+      });
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : "Không thể lưu các thay đổi chính tả.",
+          : "Không thể hoàn tất duyệt chính tả.",
       );
     } finally {
       setIsSaving(false);
@@ -494,6 +979,8 @@ function SpellingReviewWorkspace() {
           activeSuggestion.end,
         )
       : null;
+  const isFailed =
+    latestCheck?.status === "failed" || latestCheck?.status === "uncertain";
 
   return (
     <div className="flex h-full flex-col bg-background overflow-hidden min-h-0">
@@ -525,18 +1012,27 @@ function SpellingReviewWorkspace() {
               Rà soát chính tả
             </Badge>
 
-            {counts.pending > 0 && (
+            {isReviewed && (
+              <Badge
+                variant="outline"
+                className="text-xs h-5 px-2 font-medium border-success/40 bg-success/10 text-success"
+              >
+                Đã duyệt chính tả
+              </Badge>
+            )}
+
+            {remaining > 0 && !isReviewed && (
               <Badge
                 variant="secondary"
                 className="text-xs h-5 px-2 bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
               >
-                {counts.pending} vị trí chưa duyệt
+                {remaining} vị trí chưa xử lý
               </Badge>
             )}
           </div>
         </div>
 
-        {/* Right: Toggle Original Preview + Save Button */}
+        {/* Right: Toggle Original Preview + Complete Button */}
         <div className="flex items-center gap-2 shrink-0">
           <Button
             variant={showOriginalFile ? "secondary" : "outline"}
@@ -552,49 +1048,140 @@ function SpellingReviewWorkspace() {
             </span>
           </Button>
 
-          <Button
-            size="sm"
-            onClick={() =>
-              savedReview
-                ? void prepareSavedReview(savedReview)
-                : void handleSaveAll()
-            }
-            disabled={
-              isSaving ||
-              createIntentMutation.isPending ||
-              (!savedReview && !hasUnsavedChanges)
-            }
-            className="h-8 gap-1.5 text-xs shadow-2xs"
-          >
-            {isSaving ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Save className="size-3.5" />
-            )}
-            <span>{savedReview ? "Chuẩn bị lại" : "Lưu thay đổi"}</span>
-          </Button>
+          {isReviewed ? (
+            <Badge
+              variant="outline"
+              className="h-8 gap-1.5 border-success/40 bg-success/10 px-2.5 text-xs font-medium text-success"
+            >
+              <BadgeCheck className="size-3.5" />
+              Đã duyệt
+            </Badge>
+          ) : (
+            <Button
+              size="sm"
+              onClick={openCompleteDialog}
+              disabled={!canComplete || isSaving}
+              className="h-8 gap-1.5 text-xs shadow-2xs"
+              title={
+                canComplete
+                  ? "Hoàn tất duyệt chính tả (S)"
+                  : "Cần soát xong và xử lý hết gợi ý trước khi duyệt"
+              }
+              aria-keyshortcuts="S"
+            >
+              {isSaving ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <BadgeCheck className="size-3.5" />
+              )}
+              <span>Hoàn tất duyệt</span>
+            </Button>
+          )}
         </div>
       </header>
-      {preparationError && (
-        <p
-          className="border-b border-border px-4 py-2 text-sm text-destructive"
-          role="alert"
-        >
-          Bản sửa đã được lưu. Chọn “Chuẩn bị lại” để gửi lại yêu cầu.
-        </p>
+      {isReviewed && latestCheck?.reviewed_at && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-success/30 bg-success/5 px-4 py-2">
+          <p
+            className="flex items-center gap-1.5 text-xs text-foreground/80"
+            role="status"
+          >
+            <BadgeCheck className="size-3.5 text-success" />
+            <span>
+              Đã duyệt chính tả lúc{" "}
+              {formatSpellingMoment(latestCheck.reviewed_at)}.
+            </span>
+          </p>
+          <Button asChild variant="outline" size="sm" className="h-7 text-xs">
+            <Link
+              to="/knowledge/$sourceId"
+              params={{ sourceId }}
+              search={{ collectionId: resolvedCollectionId }}
+            >
+              Về trang tài liệu
+            </Link>
+          </Button>
+        </div>
+      )}
+      {imageFailures.length > 0 && (
+        <div className="border-b border-border/60 bg-warning/5 px-4 py-2.5">
+          <Alert
+            variant="warning"
+            className="border-0 bg-transparent px-0 py-0 [&>svg]:top-0.5"
+          >
+            <ShieldAlert />
+            <AlertTitle className="text-sm">
+              Một số ảnh trong tệp chưa đọc được
+            </AlertTitle>
+            <AlertDescription className="space-y-2 text-xs text-foreground/80">
+              <p>
+                {failedPages.length > 0
+                  ? `Ảnh trên trang ${failedPages.join(", ")} chưa đọc được. `
+                  : "Một số ảnh chưa đọc được. "}
+                Phần văn bản còn lại vẫn được giữ để rà soát; nội dung trong ảnh
+                lỗi không được dùng làm bằng chứng trả lời.
+              </p>
+              {reviewDoc?.image_ocr_acknowledged ? (
+                <p className="flex items-center gap-1.5 font-medium text-success">
+                  <CheckCircle2 className="size-3.5" />
+                  Quản trị viên đã xác nhận cảnh báo này.
+                </p>
+              ) : canAcknowledgeWarnings ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => setIsAckDialogOpen(true)}
+                  >
+                    <ShieldAlert className="size-3.5" />
+                    <span>Xác nhận cảnh báo</span>
+                  </Button>
+                  <span className="text-[11px] text-muted-foreground">
+                    Cần thiết để mở khóa xuất bản khi chấp nhận thiếu nội dung
+                    ảnh.
+                  </span>
+                </div>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  Quản trị viên của đơn vị cần xác nhận trước khi xuất bản, hoặc
+                  đọc lại tệp để bổ sung nội dung ảnh.
+                </p>
+              )}
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
       {coverage && !coverage.complete && (
-        <p
-          className="border-b border-border px-4 py-2 text-xs text-muted-foreground"
+        <div
+          className="border-b border-border px-4 py-2 space-y-1.5"
           role="status"
         >
-          {latestCheck?.status === "running"
-            ? "Đang soát chính tả"
-            : "Chưa soát xong toàn bộ văn bản"}
-          {" · "}
-          {coverage.checked}
-          {coverage.total === null ? "" : `/${coverage.total}`} đoạn đã soát.
-        </p>
+          <p className="text-xs text-muted-foreground">
+            {latestCheck?.status === "running"
+              ? "Đang soát chính tả"
+              : latestCheck?.status === "failed"
+                ? "Soát chính tả gặp lỗi"
+                : latestCheck?.status === "uncertain"
+                  ? "Soát chính tả bị gián đoạn"
+                  : "Chưa soát xong toàn bộ văn bản"}
+            {percent !== null
+              ? ` · ${percent}% (${coverage.checked}/${coverage.total} đoạn)`
+              : ` · ${coverage.checked} đoạn đã soát`}
+            .
+          </p>
+          {percent !== null && (
+            <Progress
+              value={percent}
+              className={
+                latestCheck?.status === "failed" ||
+                latestCheck?.status === "uncertain"
+                  ? "h-1 max-w-sm bg-destructive/15 [&>[data-slot=progress-indicator]]:bg-destructive"
+                  : "h-1 max-w-sm"
+              }
+              aria-label={`Tiến độ soát chính tả ${percent}%`}
+            />
+          )}
+        </div>
       )}
 
       {/* 2. Main Workspace Layout */}
@@ -659,6 +1246,22 @@ function SpellingReviewWorkspace() {
                 Cần dò ({counts.withheld})
               </button>
             </div>
+            {remaining > 0 && !isReviewed && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void handleIgnoreAll()}
+                disabled={bulkIgnoreMutation.isPending}
+                className="mt-1.5 h-7 w-full gap-1.5 text-xs text-muted-foreground"
+              >
+                {bulkIgnoreMutation.isPending ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <X className="size-3.5" />
+                )}
+                <span>Bỏ qua tất cả còn lại ({remaining})</span>
+              </Button>
+            )}
           </div>
 
           {/* Suggestions List Viewport */}
@@ -668,16 +1271,24 @@ function SpellingReviewWorkspace() {
                 <CheckCircle2 className="size-8 mx-auto text-muted-foreground/40" />
                 <p className="font-medium text-foreground">
                   {!latestCheck
-                    ? "Chưa có kết quả cho bản văn bản này."
-                    : filter === "pending" && coverage?.complete
+                    ? "Văn bản này chưa có kết quả soát."
+                    : filter === "pending" && counts.pending === 0
                       ? "Tất cả gợi ý đã được xử lý xong!"
                       : "Không có mục nào trong danh sách này."}
                 </p>
-                {filter === "pending" && counts.applied > 0 && (
+                {!latestCheck ? (
                   <p className="text-[11px]">
-                    Hãy nhấn nút <strong>Lưu thay đổi</strong> ở góc phải để ghi
-                    nhận các điểm đã sửa.
+                    Dùng nút “Soát chính tả” ở khung bên phải để bắt đầu.
                   </p>
+                ) : (
+                  filter === "pending" &&
+                  counts.pending === 0 &&
+                  !isReviewed && (
+                    <p className="text-[11px]">
+                      Nhấn <strong>Hoàn tất duyệt</strong> ở góc phải để ghi
+                      nhận kết quả.
+                    </p>
+                  )
                 )}
               </div>
             ) : (
@@ -699,8 +1310,11 @@ function SpellingReviewWorkspace() {
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-[10px] text-muted-foreground">
-                        #{idx + 1} • Đoạn {s.evidence_id}
+                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                        #{idx + 1}
+                        {unitPageById.has(s.evidence_id)
+                          ? ` · Trang ${unitPageById.get(s.evidence_id)}`
+                          : ""}
                       </span>
                       {decision?.status === "applied" && (
                         <Badge
@@ -797,6 +1411,10 @@ function SpellingReviewWorkspace() {
                     <strong>{filteredSuggestions.length}</strong>
                   </span>
 
+                  <span className="hidden md:inline text-[11px] text-muted-foreground/80">
+                    J/K chuyển · A áp dụng · X bỏ qua · E sửa tay · U hoàn tác
+                  </span>
+
                   <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
@@ -806,7 +1424,8 @@ function SpellingReviewWorkspace() {
                       }
                       disabled={selectedIndex === 0}
                       className="size-7 p-0"
-                      title="Gợi ý trước"
+                      title="Gợi ý trước (K)"
+                      aria-keyshortcuts="K ArrowLeft"
                     >
                       <ChevronLeft className="size-4" />
                     </Button>
@@ -820,7 +1439,8 @@ function SpellingReviewWorkspace() {
                       }
                       disabled={selectedIndex >= filteredSuggestions.length - 1}
                       className="size-7 p-0"
-                      title="Gợi ý sau"
+                      title="Gợi ý sau (J)"
+                      aria-keyshortcuts="J ArrowRight"
                     >
                       <ChevronRight className="size-4" />
                     </Button>
@@ -910,7 +1530,7 @@ function SpellingReviewWorkspace() {
                         <Button
                           size="sm"
                           onClick={handleCustomSubmit}
-                          disabled={isSaving || Boolean(savedReview)}
+                          disabled={isSaving || isReviewed}
                           className="h-8 text-xs"
                         >
                           Lưu sửa tay
@@ -919,16 +1539,22 @@ function SpellingReviewWorkspace() {
                     </div>
                   ) : (
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/60">
+                      {isReviewed && (
+                        <p className="flex basis-full items-center gap-1.5 text-xs text-muted-foreground">
+                          <BadgeCheck className="size-3.5 text-success" />
+                          Lượt soát này đã được duyệt; không thể sửa thêm.
+                        </p>
+                      )}
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"
                           onClick={handleApply}
                           disabled={
-                            filter === "withheld" ||
-                            isSaving ||
-                            Boolean(savedReview)
+                            filter === "withheld" || isSaving || isReviewed
                           }
                           className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
+                          title="Áp dụng (A)"
+                          aria-keyshortcuts="A"
                         >
                           <Check className="size-3.5" />
                           <span>Áp dụng</span>
@@ -938,8 +1564,14 @@ function SpellingReviewWorkspace() {
                           variant="outline"
                           size="sm"
                           onClick={handleIgnore}
-                          disabled={isSaving || Boolean(savedReview)}
+                          disabled={
+                            isSaving ||
+                            isReviewed ||
+                            dispositionMutation.isPending
+                          }
                           className="h-8 gap-1.5 text-xs"
+                          title="Bỏ qua (X)"
+                          aria-keyshortcuts="X"
                         >
                           <X className="size-3.5" />
                           <span>Bỏ qua</span>
@@ -948,7 +1580,7 @@ function SpellingReviewWorkspace() {
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={isSaving || Boolean(savedReview)}
+                          disabled={isSaving || isReviewed}
                           onClick={() => {
                             setManualEditText(
                               filter === "withheld"
@@ -958,6 +1590,8 @@ function SpellingReviewWorkspace() {
                             setIsEditingManually(true);
                           }}
                           className="h-8 gap-1.5 text-xs"
+                          title="Sửa tay (E)"
+                          aria-keyshortcuts="E"
                         >
                           <Pencil className="size-3.5" />
                           <span>Sửa tay</span>
@@ -971,8 +1605,14 @@ function SpellingReviewWorkspace() {
                           variant="ghost"
                           size="sm"
                           onClick={handleUndo}
-                          disabled={isSaving || Boolean(savedReview)}
+                          disabled={
+                            isSaving ||
+                            isReviewed ||
+                            dispositionMutation.isPending
+                          }
                           className="h-8 text-xs text-muted-foreground gap-1.5"
+                          title="Hoàn tác (U)"
+                          aria-keyshortcuts="U"
                         >
                           <RotateCcw className="size-3.5" />
                           <span>Hoàn tác</span>
@@ -983,18 +1623,108 @@ function SpellingReviewWorkspace() {
                 </div>
               </div>
             </div>
+          ) : !latestCheck ? (
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="w-full max-w-md space-y-4 text-center text-xs text-muted-foreground">
+                <Sparkles className="size-10 mx-auto text-muted-foreground/30" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-foreground text-sm">
+                    Chưa có kết quả soát chính tả
+                  </p>
+                  <p>
+                    Hệ thống sẽ soát toàn bộ {reviewDoc?.units.length ?? 0} đoạn
+                    văn của văn bản này. Kết quả xuất hiện khi worker hoàn tất;
+                    trang tự cập nhật.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Button
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs"
+                    disabled={isRecheckPending || rerunReviewMutation.isPending}
+                    onClick={() => openRecheckDialog(false)}
+                  >
+                    {isRecheckPending ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="size-3.5" />
+                    )}
+                    <span>Soát chính tả</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center p-8 text-center text-xs text-muted-foreground">
-              <div className="space-y-2 max-w-sm">
-                <CheckCircle2 className="size-10 mx-auto text-muted-foreground/30" />
-                <p className="font-semibold text-foreground text-sm">
-                  {coverage?.complete
-                    ? "Không còn gợi ý ở mục này"
-                    : "Chưa có gợi ý để hiển thị"}
-                </p>
-                {hasUnsavedChanges && (
-                  <p>Chọn “Lưu thay đổi” để ghi nhận các gợi ý đã áp dụng.</p>
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="w-full max-w-md space-y-4 text-center text-xs text-muted-foreground">
+                {isFailed ? (
+                  <AlertTriangle className="size-10 mx-auto text-destructive/50" />
+                ) : latestCheck.status === "running" ? (
+                  <Loader2 className="size-10 mx-auto animate-spin text-primary/60" />
+                ) : isReviewed ? (
+                  <BadgeCheck className="size-10 mx-auto text-success/60" />
+                ) : (
+                  <CheckCircle2 className="size-10 mx-auto text-muted-foreground/30" />
                 )}
+                <div className="space-y-1">
+                  <p className="font-semibold text-foreground text-sm">
+                    {latestCheck.status === "failed"
+                      ? "Lần soát gặp lỗi"
+                      : latestCheck.status === "uncertain"
+                        ? "Lần soát bị gián đoạn"
+                        : latestCheck.status === "running"
+                          ? "Đang soát văn bản"
+                          : isReviewed
+                            ? "Văn bản đã được duyệt chính tả"
+                            : filter === "pending" && remaining === 0
+                              ? counts.total === 0
+                                ? "Không phát hiện lỗi chính tả"
+                                : "Đã xử lý hết gợi ý"
+                              : "Không có mục nào trong danh sách này."}
+                  </p>
+                  <p>
+                    {latestCheck.status === "running"
+                      ? "Kết quả sẽ xuất hiện khi model hoàn tất."
+                      : isFailed
+                        ? "Có thể soát tiếp các đoạn còn thiếu."
+                        : isReviewed
+                          ? "Mọi thay đổi tiếp theo cần một lượt soát mới."
+                          : remaining > 0
+                            ? `Còn ${remaining} vị trí chưa xử lý.`
+                            : canComplete
+                              ? "Chọn “Hoàn tất duyệt” để ghi nhận kết quả."
+                              : "Chuyển bộ lọc để xem các mục khác."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {isFailed && !isReviewed && (
+                    <Button
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs"
+                      disabled={
+                        isRecheckPending || rerunReviewMutation.isPending
+                      }
+                      onClick={() => openRecheckDialog(true)}
+                    >
+                      {isRecheckPending ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <RotateCcw className="size-3.5" />
+                      )}
+                      <span>Soát lại</span>
+                    </Button>
+                  )}
+                  {canComplete && (
+                    <Button
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs"
+                      onClick={openCompleteDialog}
+                    >
+                      <BadgeCheck className="size-3.5" />
+                      <span>Hoàn tất duyệt</span>
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -1048,6 +1778,152 @@ function SpellingReviewWorkspace() {
           )}
         </div>
       </div>
+
+      <Dialog
+        open={isCompleteDialogOpen}
+        onOpenChange={setIsCompleteDialogOpen}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Hoàn tất duyệt chính tả</DialogTitle>
+            <DialogDescription>
+              {counts.applied > 0
+                ? `${counts.applied} vị trí đã áp dụng sẽ được ghi vào văn bản. `
+                : "Nội dung văn bản được giữ nguyên. "}
+              {counts.ignored > 0
+                ? `${counts.ignored} vị trí đã bỏ qua không thay đổi văn bản. `
+                : ""}
+              Lượt soát này sẽ được đánh dấu đã duyệt.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
+            <p>Toàn bộ gợi ý của lượt soát đã được xử lý.</p>
+            {counts.applied > 0 && (
+              <p>
+                Sau khi duyệt, hệ thống chuẩn bị nội dung từ văn bản đã sửa để
+                dùng cho trả lời.
+              </p>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setIsCompleteDialogOpen(false)}
+              disabled={isSaving}
+            >
+              Tiếp tục xem
+            </Button>
+            <Button onClick={() => void handleComplete()} disabled={isSaving}>
+              {isSaving ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <BadgeCheck className="size-3.5" />
+              )}
+              Hoàn tất duyệt
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={recheckRetry !== null}
+        onOpenChange={(open) => {
+          if (!open) setRecheckRetry(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {recheckRetry ? "Soát lại chính tả" : "Soát chính tả"}
+            </DialogTitle>
+            <DialogDescription>
+              {recheckRetry
+                ? "Hệ thống sẽ soát các đoạn còn thiếu. Nếu cấu hình soát đã đổi, hệ thống sẽ kiểm tra lại toàn bộ."
+                : `Hệ thống sẽ soát toàn bộ ${reviewDoc?.units.length ?? 0} đoạn văn.`}
+            </DialogDescription>
+          </DialogHeader>
+          {recheckRetry && (
+            <p className="text-xs text-muted-foreground">
+              Lần soát lỗi trước được giữ lại trong lịch sử; kết quả mới sẽ hiển
+              thị khi hoàn tất.
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRecheckRetry(null)}
+              disabled={rerunReviewMutation.isPending}
+            >
+              Hủy
+            </Button>
+            <Button
+              onClick={() => void handleConfirmRecheck()}
+              disabled={rerunReviewMutation.isPending}
+            >
+              {rerunReviewMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="size-3.5" />
+              )}
+              Bắt đầu soát
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAckDialogOpen} onOpenChange={setIsAckDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xác nhận cảnh báo ảnh OCR</DialogTitle>
+            <DialogDescription>
+              Xác nhận cho phép xuất bản tài liệu dù còn ảnh chưa đọc được. Hành
+              động này được ghi nhật ký cùng lý do.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <label
+              htmlFor="ocr-warning-ack-reason"
+              className="text-xs font-medium text-foreground"
+            >
+              Lý do xác nhận
+            </label>
+            <Textarea
+              id="ocr-warning-ack-reason"
+              value={ackReason}
+              onChange={(event) => setAckReason(event.target.value)}
+              placeholder="Ví dụ: Ảnh lỗi chỉ là logo hoặc trang trí, không chứa nội dung cần trả lời."
+              rows={3}
+              maxLength={500}
+              className="text-xs"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Tối thiểu 5 ký tự.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={ackWarningsMutation.isPending}
+              onClick={() => setIsAckDialogOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button
+              disabled={
+                ackWarningsMutation.isPending || ackReason.trim().length < 5
+              }
+              onClick={() => void handleAcknowledgeWarnings()}
+            >
+              {ackWarningsMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <ShieldAlert className="size-3.5" />
+              )}
+              Xác nhận
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,23 +1,30 @@
 """Readable OCR review, explicit save and synchronized derivative downloads."""
 
-from fastapi import APIRouter, Depends, Header, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from qnu.api.dependencies import get_actor, get_blob_store, get_db
+from qnu.api.dependencies import get_actor, get_blob_store, get_db, get_job_queue
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.policies.access import READ_ROLES
 from qnu.domains.ocr.models import OcrProcessingRun
-from qnu.domains.ocr.review import detection, service
+from qnu.domains.ocr.review import detection, dispositions, service
 from qnu.domains.ocr.review.schemas import (
     DetectionResponse,
     DetectRequest,
+    RerunReviewRequest,
+    RerunReviewResponse,
     ReviewDocument,
     SaveReview,
+    SpellingDispositionBatch,
+    SpellingDispositionRequest,
+    TextVersionSummary,
 )
 from qnu.domains.ocr.router import _scope
 from qnu.domains.ocr.service import processing_service
+from qnu.platform.errors import AppException
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.chat_model import ChatModel
+from qnu.ports.job_queue import JobQueue
 
 
 def no_store(response: Response):
@@ -122,6 +129,14 @@ async def download_markdown(
     )
 
 
+@router.get("/versions", response_model=list[TextVersionSummary])
+async def list_versions(
+    run: OcrProcessingRun = Depends(scoped_run),
+    db: AsyncSession = Depends(get_db),
+):
+    return await service.versions(db, run)
+
+
 @router.get("/checks", response_model=list[DetectionResponse])
 async def list_checks(
     run: OcrProcessingRun = Depends(scoped_run),
@@ -144,8 +159,72 @@ async def detect_text(
     return await detection.inspect(db, blob, chat, actor, run, body, idempotency_key)
 
 
+@router.post(
+    "/checks/rerun",
+    response_model=RerunReviewResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def rerun_checks(
+    body: RerunReviewRequest,
+    run: OcrProcessingRun = Depends(scoped_run),
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+    job_queue: JobQueue | None = Depends(get_job_queue),
+):
+    await service.authorize(db, actor, run, write=True)
+    await service.version_row(db, run.id, body.version)
+    existing = (await detection.list_checks(db, run, body.version))[:1]
+    if existing:
+        current = existing[0]
+        if current.status in {"running", "completed", "cancelled"} or not body.retry:
+            return RerunReviewResponse(run_id=run.id, version=body.version, status=current.status)
+    if job_queue is None:
+        raise AppException(
+            "Hàng đợi xử lý chưa sẵn sàng; chưa thể soát lại.",
+            code="spelling_queue_unavailable",
+            status_code=503,
+        )
+    retry_of = existing[0].id if existing else None
+    job_id = f"qnu:v1:spelling:{run.id}:{body.version}"
+    if retry_of:
+        job_id += f":retry:{retry_of}"
+    try:
+        await job_queue.enqueue(
+            "spelling_check_job", run.id, body.version, retry_of is not None, job_id=job_id
+        )
+    except Exception as exc:
+        raise AppException(
+            "Chưa gửi được yêu cầu soát lại; hãy thử lại.",
+            code="spelling_rerun_failed",
+            status_code=503,
+        ) from exc
+    return RerunReviewResponse(run_id=run.id, version=body.version, status="queued")
+
+
 @router.get("/checks/{check_id}", response_model=DetectionResponse)
 async def read_check(
     check_id: str, run: OcrProcessingRun = Depends(scoped_run), db: AsyncSession = Depends(get_db)
 ):
     return await detection.get_check(db, run, check_id)
+
+
+@router.post("/checks/{check_id}/dispositions/bulk", response_model=DetectionResponse)
+async def set_dispositions_bulk(
+    body: SpellingDispositionBatch,
+    check_id: str,
+    run: OcrProcessingRun = Depends(scoped_run),
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+):
+    return await dispositions.ignore_all(db, actor, run, check_id, body)
+
+
+@router.post("/checks/{check_id}/dispositions", response_model=DetectionResponse)
+async def set_disposition(
+    body: SpellingDispositionRequest,
+    check_id: str,
+    run: OcrProcessingRun = Depends(scoped_run),
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+):
+    return await dispositions.set_ignored(db, actor, run, check_id, body)

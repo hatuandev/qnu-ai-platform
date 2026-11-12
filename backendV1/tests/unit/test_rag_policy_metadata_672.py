@@ -29,13 +29,24 @@ def annotation(target="paragraph:0:0", year=2024):
     }
 
 
-def test_old_policy_is_compatible_and_new_policy_is_explicit():
+def test_default_evidence_budget_covers_measured_multi_table_context():
+    policy = RagPolicy.model_validate({})
+    assert policy.context_max_bytes == 32000
+    assert RagPolicy(context_max_bytes=128000).context_max_bytes == 128000
+    with pytest.raises(ValidationError):
+        RagPolicy(context_max_bytes=128001)
+
+
+def test_default_policy_runs_hybrid_rerank_and_old_options_stay_explicit():
     old = RagPolicy.model_validate({})
     assert old.verification_max_output_tokens is None
     assert RagPolicy(verification_max_output_tokens=32768).verification_max_output_tokens == 32768
     assert (
-        old.retrieval_mode == "dense" and old.context_window == 0 and old.verification_mode == "off"
+        old.retrieval_mode == "hybrid_rerank"
+        and old.context_window == 0
+        and old.verification_mode == "off"
     )
+    assert RagPolicy(retrieval_mode="dense").retrieval_mode == "dense"
     config = AssistantCreate(
         name="Test",
         collection_id="collection",
@@ -48,7 +59,7 @@ def test_old_policy_is_compatible_and_new_policy_is_explicit():
 @pytest.mark.parametrize(
     "policy",
     [
-        {"rerank_provider_id": "p"},
+        {"retrieval_mode": "dense", "rerank_provider_id": "p"},
         {"verification_provider_id": "p"},
         {"context_window": 6},
         {"candidate_k": 0},

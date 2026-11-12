@@ -85,6 +85,7 @@ def _requirements(answer: "ModelAnswer", sources: list["EvidenceSource"]) -> lis
                 "Căn cứ đánh giá phạm vi không hợp lệ.",
                 code="answer_coverage_invalid",
                 status_code=502,
+                title="Phản hồi mô hình không hợp lệ",
             )
         if item.status == "covered" and (
             not item.evidence_ids or not set(item.evidence_ids) <= used

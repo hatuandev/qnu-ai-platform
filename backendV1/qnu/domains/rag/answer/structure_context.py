@@ -12,7 +12,10 @@ from qnu.domains.knowledge.index.schemas import SearchHit
 from qnu.domains.knowledge.publication.evidence import VersionBundle
 from qnu.domains.knowledge.source_sections import source_sections
 
-VERSION = "qnu.rag.structure/v3"
+VERSION = "qnu.rag.structure/v4"
+FURNITURE_TYPES = {"header", "footer"}
+FURNITURE_LABELS = {"header", "page-header", "page_header", "footer", "page-footer", "page_footer"}
+FURNITURE_MAX_CHARS = 240
 _ARTICLE = re.compile(r"^(?:điều|article|section)\s+(\d+[a-zđ]?)\s*[.:]\s*\S", re.IGNORECASE)
 _CHAPTER = re.compile(
     r"^(?:chương|chapter|phần|part|phụ\s+lục|appendix|annex)\s+(?:[IVXLCDM]+|\d+|[A-Z])\b",
@@ -114,6 +117,10 @@ def _records(document: dict, owners: dict) -> list[dict]:
             is_table = bool(block.get("table")) or block.get("type") in {"table", "figure"}
             if not is_table and (not text or text.isdecimal()):
                 continue
+            furniture = not is_table and (
+                (block.get("type") or "").casefold() in FURNITURE_TYPES
+                or (block.get("label") or "").casefold() in FURNITURE_LABELS
+            )
             records.append(
                 {
                     "text": text,
@@ -121,9 +128,41 @@ def _records(document: dict, owners: dict) -> list[dict]:
                     "ids": owners.get(ref, []),
                     "section": sections[ref].citation,
                     "is_table": is_table,
+                    "page": page["page_number"],
+                    "furniture": furniture,
                 }
             )
+    _mark_repeats(records)
     return records
+
+
+def _record_key(text: str) -> str:
+    return " ".join(unicodedata.normalize("NFC", text).split()).casefold()
+
+
+def _mark_repeats(records: list[dict]) -> None:
+    """Map an exact repeated page header/footer to its first copy; content text never merges."""
+    first: dict[str, dict] = {}
+    for record in records:
+        if not record["furniture"] or len(record["text"]) > FURNITURE_MAX_CHARS:
+            continue
+        key = _record_key(record["text"])
+        seen = first.get(key)
+        if seen is None:
+            first[key] = record
+        elif seen["page"] != record["page"]:
+            record["repeat_of"] = seen["ref"]
+
+
+def _kept_records(records: list[dict], anchors: set[str]) -> tuple[list[dict], list[dict]]:
+    """Drop repeated page furniture, but never the copy that carries a retrieved anchor."""
+    kept, compressed = [], []
+    for record in records:
+        if record.get("repeat_of") and not set(record["ids"]) & anchors:
+            compressed.append({"ref": record["ref"], "same_as": record["repeat_of"]})
+            continue
+        kept.append(record)
+    return kept, compressed
 
 
 def _bullet_group(records: list[dict], start: int) -> list[dict]:
@@ -179,15 +218,17 @@ def _groups(records: list[dict]) -> list[tuple[str, list[dict]]]:
 
 
 def _candidate(kind, group, input_id, hit, primary, references, question):
-    ids = list(dict.fromkeys(key for record in group for key in record["ids"]))
+    all_ids = list(dict.fromkeys(key for record in group for key in record["ids"]))
     title = group[0]["text"]
     article = _ARTICLE.match(title)
     explicit = bool(article and article[1].casefold() in references)
-    anchors = primary.keys() & set(ids)
+    anchors = primary.keys() & set(all_ids)
     if not anchors and not explicit:
         return None
     if explicit and not anchors:
         anchors = {hit.chunk_id}
+    kept, compressed = _kept_records(group, anchors)
+    ids = list(dict.fromkeys(key for record in kept for key in record["ids"]))
     terms = content_terms(question)
     title_terms = content_terms(title)
     overlap = len(terms & title_terms)
@@ -224,10 +265,11 @@ def _candidate(kind, group, input_id, hit, primary, references, question):
         "required_ids": ids,
         "units": [
             {"ref": r["ref"], "chunk_ids": r["ids"]}
-            for r in group[1:]
+            for r in kept[1:]
             if kind == "bullet_list" or asks_list
         ],
-        "unindexed_refs": [r["ref"] for r in group if not r["ids"]],
+        "unindexed_refs": [r["ref"] for r in kept if not r["ids"]],
+        "compressed_refs": compressed,
     }
 
 
@@ -289,11 +331,43 @@ def _continues(left: dict, right: dict) -> bool:
     return following[0].isalpha() or following[0].isdigit()
 
 
-def continuation_groups(rows: list[IndexChunk], hits: list[SearchHit], bundles: dict) -> list[dict]:
-    """Complete clipped sentences by canonical source order, including page breaks.
+CONTINUATION_RECORDS = 6
+CONTINUATION_CHARS = 6000
 
-    This adds source dependencies, not a claim of exhaustive topic coverage.
-    Unindexed pieces remain missing; no text or citation is manufactured.
+
+def _anchor_positions(records: list[dict], anchor_ids: set[str]) -> list[int]:
+    return [index for index, record in enumerate(records) if set(record["ids"]) & anchor_ids]
+
+
+def _continuation_window(records: list[dict], positions: list[int]) -> tuple[int, int] | None:
+    first, last = positions[0], positions[-1]
+    starts = first > 0 and _continues(records[first - 1], records[first])
+    ends = last + 1 < len(records) and _continues(records[last], records[last + 1])
+    if not starts and not ends:
+        return None
+    lo, hi = first, last
+    chars = sum(len(record["text"]) for record in records[lo : hi + 1])
+    backward = 3 if starts else 0
+    forward = 3 if ends else 0
+    while backward and lo > 0 and hi - lo + 1 < CONTINUATION_RECORDS:
+        size = len(records[lo - 1]["text"])
+        if chars + size > CONTINUATION_CHARS:
+            break
+        lo, chars, backward = lo - 1, chars + size, backward - 1
+    while forward and hi + 1 < len(records) and hi - lo + 1 < CONTINUATION_RECORDS:
+        size = len(records[hi + 1]["text"])
+        if chars + size > CONTINUATION_CHARS:
+            break
+        hi, chars, forward = hi + 1, chars + size, forward - 1
+    return lo, hi
+
+
+def continuation_groups(rows: list[IndexChunk], hits: list[SearchHit], bundles: dict) -> list[dict]:
+    """Complete only the clipped edge of an anchored sentence.
+
+    A retrieved fragment inside a long unpunctuated OCR chain must not turn the
+    whole chain into required evidence. The group is optional and bounded so
+    packing can drop it instead of failing the request.
     """
     by_id = {row.id: row for row in rows}
     anchors = {hit.chunk_id: rank for rank, hit in enumerate(hits)}
@@ -304,6 +378,7 @@ def continuation_groups(rows: list[IndexChunk], hits: list[SearchHit], bundles: 
         if identity in visited or bundle is None:
             continue
         visited.add(identity)
+        anchor_ids = {key for key in anchors if by_id[key].input_id == identity[0]}
         for document in bundle.documents:
             records = _records(document, _owners(rows, identity[0], document))
             start = 0
@@ -311,19 +386,34 @@ def continuation_groups(rows: list[IndexChunk], hits: list[SearchHit], bundles: 
                 stop = start + 1
                 while stop < len(records) and _continues(records[stop - 1], records[stop]):
                     stop += 1
-                group = records[start:stop]
-                ids = list(dict.fromkeys(key for record in group for key in record["ids"]))
-                primary = anchors.keys() & set(ids)
-                if len(group) > 1 and primary:
+                chain = records[start:stop]
+                positions = _anchor_positions(chain, anchor_ids)
+                window = _continuation_window(chain, positions) if positions else None
+                if window is None:
+                    start = stop
+                    continue
+                lo, hi = window
+                fragment = chain[lo : hi + 1]
+                fragment_ids = list(
+                    dict.fromkeys(key for record in fragment for key in record["ids"])
+                )
+                primary = anchors.keys() & set(fragment_ids)
+                kept, compressed = _kept_records(fragment, primary)
+                ids = list(dict.fromkeys(key for record in kept for key in record["ids"]))
+                if len(fragment) > 1 and primary:
                     groups.append(
                         {
                             "kind": "continuation",
-                            "label": group[0]["text"],
+                            "label": fragment[0]["text"],
                             "input_id": identity[0],
                             "primary_chunk_id": min(primary, key=anchors.get),
                             "required_ids": ids,
-                            "units": [{"ref": r["ref"], "chunk_ids": r["ids"]} for r in group],
-                            "unindexed_refs": [r["ref"] for r in group if not r["ids"]],
+                            "units": [{"ref": r["ref"], "chunk_ids": r["ids"]} for r in kept],
+                            "unindexed_refs": [r["ref"] for r in kept if not r["ids"]],
+                            "compressed_refs": compressed,
+                            "optional": True,
+                            "chain_records": len(chain),
+                            "truncated": len(fragment) < len(chain),
                         }
                     )
                 start = stop

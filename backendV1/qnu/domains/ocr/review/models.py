@@ -1,4 +1,4 @@
-"""Append-only saved edits and durable single-call spelling inspections."""
+"""Append-only saved edits, spelling inspections and reviewer dispositions."""
 
 from datetime import datetime
 
@@ -91,3 +91,82 @@ class SpellingRun(Base):
         DateTime(timezone=True), nullable=False, default=utcnow
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class SpellingReview(Base):
+    """One durable approval of a completed check and the text it produced."""
+
+    __tablename__ = "ocr_spelling_reviews"
+    __table_args__ = (
+        scope_constraint("fk_ocr_spelling_review_run"),
+        ForeignKeyConstraint(
+            ["check_id"],
+            ["ocr_spelling_runs.id"],
+            ondelete="RESTRICT",
+            name="fk_ocr_spelling_review_check",
+        ),
+        ForeignKeyConstraint(
+            ["reviewed_version_id"],
+            ["ocr_text_versions.id"],
+            ondelete="RESTRICT",
+            name="fk_ocr_spelling_review_version",
+        ),
+        UniqueConstraint("check_id", name="uq_ocr_spelling_review_check"),
+        UniqueConstraint(
+            "workspace_id", "reviewed_by", "idempotency_key", name="uq_ocr_spelling_review_request"
+        ),
+        CheckConstraint("reviewed_version >= 0", name="ck_ocr_spelling_review_version"),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    collection_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    check_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    reviewed_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    reviewed_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    reviewed_version_id: Mapped[str | None] = mapped_column(String(64))
+    change_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    reviewed_by: Mapped[str] = mapped_column(String(200), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    reviewed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+
+
+class SpellingDisposition(Base):
+    """A reviewer's persisted "ignore" for one exact suggestion of one check."""
+
+    __tablename__ = "ocr_spelling_dispositions"
+    __table_args__ = (
+        scope_constraint("fk_ocr_spelling_disposition_run"),
+        ForeignKeyConstraint(
+            ["check_id"],
+            ["ocr_spelling_runs.id"],
+            ondelete="RESTRICT",
+            name="fk_ocr_spelling_disposition_check",
+        ),
+        UniqueConstraint(
+            "check_id",
+            "evidence_id",
+            "span_start",
+            "span_end",
+            name="uq_ocr_spelling_disposition",
+        ),
+        CheckConstraint(
+            "span_start >= 0 AND span_end > span_start",
+            name="ck_ocr_spelling_disposition_span",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    workspace_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    collection_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    check_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    evidence_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    span_start: Mapped[int] = mapped_column(Integer, nullable=False)
+    span_end: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_by: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )

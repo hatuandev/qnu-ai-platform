@@ -13,6 +13,8 @@ from qnu.platform.errors import AppException, DependencyUnavailable
 from qnu.platform.network_policy import assert_allowed_endpoint
 from qnu.ports.vector_store import VectorHit
 
+PAYLOAD_INDEX_FIELDS = ("run_id", "workspace_id", "collection_id", "version_id", "chunk_id")
+
 
 class QdrantVectorStore:
     async def delete_points(self, collection: str, point_ids: list[str]) -> None:
@@ -106,16 +108,38 @@ class QdrantVectorStore:
                 raise DependencyUnavailable(
                     "Không tạo được vector collection.", code="vector_unavailable"
                 )
-            return
-        try:
-            vectors = response.json()["result"]["config"]["params"]["vectors"]
-            if vectors["size"] != size or vectors["distance"] != distance:
-                raise ValueError()
-        except (ValueError, KeyError, TypeError) as exc:
-            raise DependencyUnavailable(
-                "Vector collection không khớp dimension/distance.",
-                code="vector_configuration_mismatch",
-            ) from exc
+        else:
+            try:
+                vectors = response.json()["result"]["config"]["params"]["vectors"]
+                if vectors["size"] != size or vectors["distance"] != distance:
+                    raise ValueError()
+            except (ValueError, KeyError, TypeError) as exc:
+                raise DependencyUnavailable(
+                    "Vector collection không khớp dimension/distance.",
+                    code="vector_configuration_mismatch",
+                ) from exc
+        await self._ensure_payload_indexes(collection)
+
+    async def _ensure_payload_indexes(self, collection: str) -> None:
+        # Idempotent in Qdrant; creating an existing keyword index is a no-op.
+        for field in PAYLOAD_INDEX_FIELDS:
+            response = await self._request(
+                "PUT",
+                f"/collections/{collection}/index?wait=true",
+                body={"field_name": field, "field_schema": "keyword"},
+            )
+            if response.status_code != 200:
+                raise DependencyUnavailable(
+                    "Không tạo được payload index cho vector collection.",
+                    code="vector_unavailable",
+                )
+            try:
+                if response.json()["result"]["status"] != "completed":
+                    raise ValueError()
+            except (ValueError, KeyError, TypeError) as exc:
+                raise DependencyUnavailable(
+                    "Qdrant chưa xác nhận payload index.", code="vector_unavailable"
+                ) from exc
 
     async def upsert(self, collection: str, points: list[dict]) -> None:
         self._name(collection)

@@ -67,6 +67,9 @@ class IndexRun(Base):
     provider_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("providers.id", ondelete="RESTRICT"), nullable=False
     )
+    system_default_authorized: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default=text("false")
+    )
     dimension: Mapped[int] = mapped_column(Integer, nullable=False)
     vector_collection: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     config: Mapped[dict] = mapped_column(JSONB, nullable=False)
@@ -185,6 +188,11 @@ class IndexChunk(Base):
         UniqueConstraint("run_id", "ordinal", name="uq_index_chunk_ordinal"),
         UniqueConstraint("point_id", name="uq_index_chunk_point"),
         CheckConstraint("ordinal >= 0", name="ck_index_chunk_ordinal"),
+        Index(
+            "ix_kb_index_chunks_fts",
+            text("to_tsvector('simple'::regconfig, text)"),
+            postgresql_using="gin",
+        ),
     )
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     input_id: Mapped[str] = mapped_column(String(64), nullable=False)

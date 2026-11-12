@@ -6,7 +6,7 @@ import os
 import socket
 from datetime import timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import exists, select, update
 
 from qnu.api.wiring import build_container, close_container
 from qnu.domains.identity.background import background_actor
@@ -14,6 +14,7 @@ from qnu.domains.knowledge.preparation import service as preparation
 from qnu.domains.ocr.execution import execute_run, job_id_for
 from qnu.domains.ocr.models import OcrProcessingRun, utcnow
 from qnu.domains.ocr.review.automatic import review_document
+from qnu.domains.ocr.review.models import SpellingRun
 from qnu.platform.config import get_settings
 from qnu.platform.database import AsyncSessionFactory
 from qnu.platform.logging import get_logger
@@ -22,6 +23,9 @@ from qnu.workers import heartbeat
 logger = get_logger(__name__)
 
 RECONCILE_BATCH = 50
+SPELLING_RECOVERY_BATCH = 20
+SPELLING_RECOVERY_GRACE = timedelta(minutes=10)
+SPELLING_RECOVERY_WINDOW = timedelta(hours=24)
 
 
 async def startup(ctx: dict) -> None:
@@ -50,9 +54,15 @@ async def ocr_process_run(ctx: dict, run_id: str) -> str:
             engine=container.ocr_engine,
             job_queue=container.job_queue,
         )
-        if outcome.status in {"completed", "failed", "uncertain", "cancelled"}:
+        if outcome.status in {
+            "completed",
+            "completed_with_warnings",
+            "failed",
+            "uncertain",
+            "cancelled",
+        }:
             await preparation.notify_for_ocr_run(db, run_id, container.job_queue)
-        if outcome.status == "completed" and container.job_queue:
+        if outcome.status in {"completed", "completed_with_warnings"} and container.job_queue:
             try:
                 await container.job_queue.enqueue(
                     "spelling_check_job",
@@ -65,25 +75,83 @@ async def ocr_process_run(ctx: dict, run_id: str) -> str:
     return outcome.status
 
 
-async def spelling_check_job(ctx: dict, run_id: str, version: int = 0) -> str:
+async def spelling_check_job(ctx: dict, run_id: str, version: int = 0, retry: bool = False) -> str:
     """Automatic background spelling review after successful OCR text extraction."""
     container = ctx["container"]
     async with AsyncSessionFactory() as db:
         run = await db.get(OcrProcessingRun, run_id)
-        if run is None or run.status != "completed":
+        if run is None or run.status not in {"completed", "completed_with_warnings"}:
             return "run_not_ready"
         actor = background_actor(run.requested_by)
         try:
             return await review_document(
-                db, container.blob_store, container.chat_model, actor, run, version
+                db,
+                container.blob_store,
+                container.chat_model,
+                actor,
+                run,
+                version,
+                retry=retry,
             )
-        except Exception:
+        except Exception as exc:
             logger.warning(
                 "auto_spelling_job_failed",
                 run_id=run_id,
                 version=version,
+                error=type(exc).__name__,
             )
             return "failed"
+
+
+async def spelling_reconcile(ctx: dict) -> int:
+    """Re-deliver an automatic check whose first delivery never created one.
+
+    The completion enqueue is one-shot. A lost delivery or a worker that died before
+    the parent row existed leaves a completed run with no check at all, so recover it
+    from the run row instead of relying on the user to notice.
+    """
+    container = ctx["container"]
+    now = utcnow()
+    async with AsyncSessionFactory() as db:
+        has_check = exists(
+            select(SpellingRun.id).where(
+                SpellingRun.run_id == OcrProcessingRun.id,
+                SpellingRun.version == 0,
+                SpellingRun.idempotency_key.startswith("auto:spl:document:"),
+            )
+        )
+        rows = (
+            await db.scalars(
+                select(OcrProcessingRun.id)
+                .where(
+                    OcrProcessingRun.status.in_(("completed", "completed_with_warnings")),
+                    OcrProcessingRun.finished_at.is_not(None),
+                    OcrProcessingRun.finished_at < now - SPELLING_RECOVERY_GRACE,
+                    OcrProcessingRun.finished_at > now - SPELLING_RECOVERY_WINDOW,
+                    ~has_check,
+                )
+                .order_by(OcrProcessingRun.finished_at)
+                .limit(SPELLING_RECOVERY_BATCH)
+            )
+        ).all()
+    bucket = int(now.timestamp()) // 300
+    requeued = 0
+    for run_id in rows:
+        try:
+            queued = await container.job_queue.enqueue(
+                "spelling_check_job",
+                run_id,
+                0,
+                job_id=f"qnu:v1:spelling:{run_id}:0:recover:{bucket}",
+            )
+        except Exception:
+            logger.warning("spelling_reconcile_enqueue_failed", run_id=run_id)
+            continue
+        if queued:
+            requeued += 1
+    if requeued:
+        logger.info("spelling_reconcile_requeued", count=requeued)
+    return requeued
 
 
 async def ocr_reconcile_queued(ctx: dict) -> int:

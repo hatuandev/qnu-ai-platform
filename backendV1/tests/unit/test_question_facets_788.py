@@ -69,6 +69,19 @@ async def test_facets_preserve_scope_filter_and_cap_context(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_answer_retrieval_forwards_skipped_final_validation(monkeypatch):
+    mock = AsyncMock(
+        return_value=SearchResponse(
+            index_run_id="idx", generation=1, status="no_match", eligible_documents=1, hits=[]
+        )
+    )
+    monkeypatch.setattr(retrieval, "search_single", mock)
+    req = SearchRequest(query="What is the quota?", top_k=2)
+    await retrieval.search(None, None, None, None, None, "ws", "col", req, verify=False)
+    assert mock.await_args.kwargs["verify"] is False
+
+
+@pytest.mark.asyncio
 async def test_generation_change_between_facets_blocks(monkeypatch):
     monkeypatch.setattr(
         retrieval,

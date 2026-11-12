@@ -84,7 +84,8 @@ def test_corrected_source_survives_review_edit_publish_index_and_citations(clien
             try:
                 assert execute_index(client, run_id) == "completed"
                 response = client.post(
-                    base + "/search", json={"query": "Chỉ tiêu tuyển sinh đại học", "top_k": 10}
+                    base + "/search",
+                    json={"query": "Chỉ tiêu tuyển sinh đại học", "top_k": 10, "mode": "dense"},
                 )
                 assert response.status_code == 200, response.text
                 hits = response.json()["hits"]

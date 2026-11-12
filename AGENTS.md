@@ -2,7 +2,7 @@
 
 ## Phạm vi và ngữ cảnh
 
-- Luồng chạy hiện hành là `backendV1/` và `frontendV1/`; root Docker/Make/run dùng V1. `backend/` và `frontend/` đã được gỡ khỏi checkout sau khi lưu riêng bản legacy. Các nhắc đến chúng trong lịch sử/ADR mô tả bản cũ, không phải đường dẫn chạy hiện tại. Phiên bản Python theo `backendV1/pyproject.toml` và `uv.lock`.
+- Backend hiện hành là `backendV1/`. `make dev` và `dev2` chạy Backend V1, worker V1 và `frontendV2/`; `dev1`, `v1-dev` và Docker triển khai dùng `frontendV1/`. `backend/` và `frontend/` đã được gỡ khỏi checkout sau khi lưu riêng bản legacy. Các nhắc đến chúng trong lịch sử/ADR mô tả bản cũ, không phải đường dẫn chạy hiện tại. Phiên bản Python theo `backendV1/pyproject.toml` và `uv.lock`.
 
 - Áp dụng cho repo này; đọc thêm AGENTS.md ở thư mục con trước khi sửa phần tương ứng.
 - Đọc [PROJECT_CONTEXT](docs/memory/PROJECT_CONTEXT.md), kiểm tra Git/diff và file thực tế trước khi kết luận hiện trạng. Memory và báo cáo cũ là ngữ cảnh, không thay thế bằng chứng mã/test hiện tại.

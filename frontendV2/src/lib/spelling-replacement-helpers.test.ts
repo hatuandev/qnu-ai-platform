@@ -141,4 +141,8 @@ test("buildTextChanges: converts user decisions into durable TextChange array", 
   assert.equal(changes[0].evidence_id, "ev_1");
   assert.equal(changes[0].before, "Đai hoc Quy Nhon là cơ sở công lập.");
   assert.equal(changes[0].after, "Đại học Quy Nhơn là cơ sở công lập.");
+  assert.deepEqual(changes[0].spelling_edits, [
+    { start: 0, end: 7, replacement: "Đại học" },
+    { start: 8, end: 16, replacement: "Quy Nhơn" },
+  ]);
 });

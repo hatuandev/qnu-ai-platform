@@ -4,6 +4,7 @@ import re
 
 from pydantic import ValidationError
 
+from qnu.domains.knowledge.index.presentation import reading_text
 from qnu.domains.knowledge.index.table_layout import header_rows, layout
 from qnu.domains.rag.answer.narrative import complete_citations
 from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer, Statement
@@ -59,13 +60,17 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
             if candidates:
                 header_source = candidates[0]
                 header_positions, errors = layout(header_source.structure)
-                # Legacy native dependency proof verifies a single unmarked header row.
-                headers = header_rows(header_source.structure) or (
-                    [0]
-                    if header_link.get("basis")
-                    in {"native_numbered_table_boundary/v1", "native_typed_columns/v1"}
-                    else []
-                )
+                # A proven dependency supplies the header rows the source lacks.
+                headers = header_rows(header_source.structure)
+                if not headers:
+                    basis = header_link.get("basis")
+                    if basis == "native_multitier_header/v1":
+                        headers = list(header_link.get("header_rows") or [])
+                    elif basis in {
+                        "native_numbered_table_boundary/v1",
+                        "native_typed_columns/v1",
+                    }:
+                        headers = [0]
                 if (
                     errors
                     or structure["original_column_count"]
@@ -133,9 +138,18 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
             # than collapsing every child of a row-spanned group to one subject.
             subjects = []
             for candidate in identity[identity.index(label) :]:
-                if not candidate.cell["text"].strip() or not any(
-                    ch.isalpha() for ch in candidate.cell["text"]
-                ):
+                if not candidate.cell["text"].strip():
+                    break
+                if not any(ch.isalpha() for ch in candidate.cell["text"]):
+                    # A numeric identity code under the same header as the leading
+                    # label is part of the subject path, not a value; skip it so the
+                    # following name is kept (e.g. group / code / program name).
+                    if (
+                        candidate is not label
+                        and fields.get("0")
+                        and fields.get(str(candidate.column)) == fields["0"]
+                    ):
+                        continue
                     break
                 if not _ref(origin, candidate):
                     break
@@ -195,31 +209,87 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
     return {"version": VERSION, "tables": tables, "issues": issues}
 
 
+def _numbers(text: str) -> set[str]:
+    return set(re.findall(r"\d+(?:[.,]\d+)*", text))
+
+
+def _visible_text(source: EvidenceSource) -> str:
+    """Exactly what the prompt packed for this source; no re-derivation."""
+    if source.kind == "table":
+        return reading_text(source)
+    passages = source.source_passages
+    return "\n".join(p["text"] for p in passages) if passages else reading_text(source)
+
+
 def materialize(answer: ModelAnswer, sources: list[EvidenceSource], cells: dict) -> ModelAnswer:
     allowed = {
         cell["cell_id"]: (table, cell) for table in cells["tables"] for cell in table["cells"]
     }
     selected = [item.cell_id for item in answer.lookups]
-    if len(set(selected)) != len(selected) or any(key not in allowed for key in selected):
-        raise AppException(
-            "Ô được chọn không thuộc bằng chứng.", code="answer_cell_invalid", status_code=502
+    seen = set()
+    issues = []
+    for index, key in enumerate(selected):
+        if key in seen:
+            issue_type = "duplicate"
+        elif key not in allowed:
+            issue_type = "not_in_catalog"
+        else:
+            issue_type = None
+        seen.add(key)
+        if issue_type:
+            issues.append({"path": ["lookups", index, "cell_id"], "type": issue_type})
+    if issues:
+        error = AppException(
+            "Ô được chọn không thuộc bằng chứng.",
+            code="answer_cell_invalid",
+            status_code=502,
+            title="Ô bảng mô hình chọn không hợp lệ",
         )
+        error.validation_issues = issues[:20]
+        raise error
     structured = {s.evidence_id for s in sources if s.kind == "table"}
-    # Table values remain extractive. Paragraph prose retains the same citation
-    # contract as narrative-only answers; table prose is never another authority.
+    selectable = {t["evidence_id"] for t in cells["tables"] if t["cells"]}
+    # Selectable tables keep the cell-selection contract. Unselectable tables have
+    # no catalog cells, so their values may only be copied verbatim into prose.
     if not selected and any(
-        re.search(r"\d", s.text) and structured.intersection(s.evidence_ids)
+        re.search(r"\d", s.text) and selectable.intersection(s.evidence_ids)
         for s in answer.statements
     ):
-        raise AppException(
+        error = AppException(
             "Dữ kiện số trong bảng phải chọn bằng định danh ô.",
             code="answer_cell_selection_required",
             status_code=502,
+            title="Ô bảng mô hình chọn không hợp lệ",
         )
+        error.validation_issues = [{"path": ["lookups"], "type": "table_value_requires_cell"}]
+        raise error
+    unselectable = structured - selectable
+    if unselectable:
+        by_id = {s.evidence_id: s for s in sources}
+        for index, statement in enumerate(answer.statements):
+            if not unselectable.intersection(statement.evidence_ids):
+                continue
+            numbers = _numbers(statement.text)
+            if not numbers:
+                continue
+            cited = set()
+            for eid in statement.evidence_ids:
+                cited |= _numbers(_visible_text(by_id[eid]))
+            if numbers - cited:
+                error = AppException(
+                    "Số trong câu trả lời không có trong nguồn được dẫn.",
+                    code="answer_table_value_not_extractive",
+                    status_code=502,
+                    title="Giá trị bảng không trích từ nguồn",
+                )
+                error.validation_issues = [
+                    {"path": ["statements", index, "text"], "type": "number_not_in_cited_source"}
+                ]
+                raise error
     statements = [
         s.model_copy(deep=True)
         for s in answer.statements
-        if not selected or not structured.intersection(s.evidence_ids)
+        if not selected or not selectable.intersection(s.evidence_ids)
     ]
     complete_citations(statements, sources)
     for key in selected:
@@ -233,22 +303,32 @@ def materialize(answer: ModelAnswer, sources: list[EvidenceSource], cells: dict)
                 )
             )
         except ValidationError as exc:
-            raise AppException(
+            error = AppException(
                 "Ô nguồn không thể hiển thị dưới dạng text thuần.",
                 code="answer_source_text_invalid",
                 status_code=502,
-            ) from exc
+                title="Ô bảng mô hình chọn không hợp lệ",
+            )
+            error.validation_issues = [{"path": ["lookups"], "type": "source_cell_not_displayable"}]
+            raise error from exc
     if len(statements) > 20:
-        raise AppException(
-            "Quá nhiều ý trong câu trả lời.", code="answer_response_invalid", status_code=502
+        error = AppException(
+            "Quá nhiều ý trong câu trả lời.",
+            code="answer_response_invalid",
+            status_code=502,
+            title="Phản hồi mô hình không hợp lệ",
         )
+        error.validation_issues = [{"path": ["statements"], "type": "too_many_statements"}]
+        raise error
     return ModelAnswer(status=answer.status, statements=statements, assessment=answer.assessment)
 
 
 def prompt_catalog(cells: dict) -> dict:
-    """One presentation per value: header path, subject, value and full cell ID.
+    """One presentation per value: header path, subject, value and compact cell key.
 
-    Geometry, spans, source cells and citation refs stay in the server catalog.
+    The table ID plus row and column keys compose the full server cell ID; the
+    repeated ID prefix is not sent per cell. Geometry, spans, source cells and
+    citation refs stay in the server catalog.
     """
     tables, unselectable = [], []
     omitted = set(cells.get("selection", {}).get("omitted_tables", []))
@@ -259,22 +339,24 @@ def prompt_catalog(cells: dict) -> dict:
             continue
         rows, order = {}, []
         for cell in table["cells"]:
-            row = cell["cell_id"].split(":")[1]
+            _, row, column = cell["cell_id"].rsplit(":", 2)
             if row not in rows:
-                rows[row] = {"subject": cell["subject"], "cells": {}}
+                rows[row] = {"row": row, "subject": cell["subject"], "cells": {}}
                 order.append(row)
             elif len(cell["subject"]) > len(rows[row]["subject"]):
                 rows[row]["subject"] = cell["subject"]
-            rows[row]["cells"][cell["cell_id"]] = cell["value"]
-        columns = {
-            f"k{column}": " / ".join(path) for column, path in table["fields"].items()
-        }
+            rows[row]["cells"][column] = cell["value"]
+        columns = {f"k{column}": " / ".join(path) for column, path in table["fields"].items()}
         tables.append(
             {
                 "id": table["evidence_id"],
                 "columns": columns,
                 "rows": [
-                    {"subject": rows[row]["subject"], "cells": rows[row]["cells"]}
+                    {
+                        "row": rows[row]["row"],
+                        "subject": rows[row]["subject"],
+                        "cells": rows[row]["cells"],
+                    }
                     for row in order
                 ],
             }

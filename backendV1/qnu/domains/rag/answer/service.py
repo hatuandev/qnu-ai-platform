@@ -70,7 +70,7 @@ async def answer(
         prompt_version=PROMPT_VERSION,
         verification={"mode": req.verification_mode, "status": "not_run"},
     )
-    started = time.monotonic()
+    request_started = time.monotonic()
     retrieval = await search(
         db,
         blob,
@@ -91,8 +91,9 @@ async def answer(
             rrf_k=req.rrf_k,
         ),
         reranker=reranker,
+        verify=False,
     )
-    trace.stage_ms["retrieval"] = round((time.monotonic() - started) * 1000, 3)
+    trace.stage_ms["retrieval"] = round((time.monotonic() - request_started) * 1000, 3)
     trace.retrieval = retrieval.trace
     response = AnswerResponse(
         id=answer_id,
@@ -118,6 +119,7 @@ async def answer(
     if not retrieval.hits:
         response.reason = retrieval.status
         trace.verification["skip_reason"] = "no_evidence"
+        trace.stage_ms["total"] = round((time.monotonic() - request_started) * 1000, 3)
         return response
     selected_hits, selection = select_hits(
         retrieval.hits,
@@ -136,6 +138,7 @@ async def answer(
         retrieval = retrieval.model_copy(update={"hits": selected_hits})
     sources = sources_for(retrieval)
     await attach_source_text(db, blob, workspace_id, collection_id, sources, bundles=bundles)
+    packing_started = time.monotonic()
     messages, cells, envelope, evidence_bytes, skipped = _pack_messages(
         req,
         sources,
@@ -153,6 +156,7 @@ async def answer(
             else req.metadata_filter.model_dump(mode="json", exclude_none=True)
         ),
     )
+    trace.stage_ms["packing"] = round((time.monotonic() - packing_started) * 1000, 3)
     if skipped:
         retrieval = retrieval.model_copy(update={"hits": retrieval.hits[: len(sources)]})
         trace.context["added"] = [
@@ -181,11 +185,14 @@ async def answer(
         "unresolved_tables": len(cells["issues"]),
         "catalog_sha256": digest(cells),
     }
+    proof_started = time.monotonic()
     proof = await validate_results(
         db, blob, vectors, actor, workspace_id, collection_id, retrieval, req.document_ids
     )
-    answer_schema = output_schema(sources)
+    trace.stage_ms["proof"] = round((time.monotonic() - proof_started) * 1000, 3)
+    answer_schema = output_schema(sources, cells=cells)
     trace.context["packing"] = payload_metrics(messages, answer_schema, evidence_bytes)
+    prepare_started = time.monotonic()
     runtime, request, budget = await prepare_chat_request(
         db,
         actor,
@@ -197,6 +204,7 @@ async def answer(
         max_output_tokens=req.max_output_tokens,
         output_schema=answer_schema,
     )
+    trace.stage_ms["model_prepare"] = round((time.monotonic() - prepare_started) * 1000, 3)
     inference_hash = runtime.inference_configuration_hash("answer")
     trace.inference_configuration_hash = inference_hash
     trace.reasoning = runtime.reasoning_trace("answer")
@@ -354,6 +362,7 @@ async def answer(
     else:
         response.reason = "model_abstained"
         trace.verification["skip_reason"] = "model_abstained"
+    trace.stage_ms["total"] = round((time.monotonic() - request_started) * 1000, 3)
     logger.info(
         "rag_answer_completed",
         answer_id=answer_id,

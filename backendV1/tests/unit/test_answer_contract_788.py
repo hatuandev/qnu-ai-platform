@@ -83,8 +83,71 @@ def test_invalid_output_diagnostics_do_not_copy_input_or_untrusted_keys():
     with pytest.raises(AppException) as exc:
         parse_answer('{"private-source-key":"private-source-value"}', [])
     detail = str(exc.value.validation_issues)
+    assert exc.value.code == "answer_response_invalid"
+    assert exc.value.title == "Phản hồi mô hình không hợp lệ"
     assert "private-source" not in detail
     assert "<extra>" in detail and "missing" in detail
+
+
+def test_empty_answered_output_is_a_contract_error_not_an_abstain():
+    from qnu.platform.errors import AppException
+
+    with pytest.raises(AppException) as exc:
+        parse_answer('{"status":"answered","statements":[],"lookups":[],"assessment":[]}', [])
+    assert exc.value.code == "answer_response_invalid"
+    assert exc.value.title == "Phản hồi mô hình không hợp lệ"
+    assert exc.value.validation_issues == [{"path": [], "type": "value_error"}]
+
+
+def test_malformed_cell_id_is_a_contract_error_with_safe_path():
+    import json
+
+    from qnu.platform.errors import AppException
+
+    with pytest.raises(AppException) as exc:
+        parse_answer(
+            json.dumps(
+                {
+                    "status": "answered",
+                    "statements": [],
+                    "lookups": [{"cell_id": "E1:r1"}],
+                    "assessment": [],
+                }
+            ),
+            [],
+        )
+    assert exc.value.code == "answer_response_invalid"
+    assert exc.value.validation_issues == [
+        {"path": ["lookups", 0, "cell_id"], "type": "string_pattern_mismatch"}
+    ]
+
+
+def test_citation_failures_record_indexed_safe_paths():
+    import json
+
+    from qnu.platform.errors import AppException
+
+    s = source([["Name", "Value"], ["A", "10"]])
+    with pytest.raises(AppException) as exc:
+        parse_answer(
+            json.dumps(
+                {
+                    "status": "answered",
+                    "statements": [
+                        {"text": "Ngoài phạm vi.", "evidence_ids": ["E9"]},
+                        {"text": "Trùng nguồn.", "evidence_ids": ["E1", "E1"]},
+                    ],
+                    "lookups": [],
+                    "assessment": [],
+                }
+            ),
+            [s],
+        )
+    assert exc.value.code == "answer_citation_invalid"
+    assert exc.value.validation_issues == [
+        {"path": ["statements", 0, "evidence_ids"], "type": "not_allowed"},
+        {"path": ["statements", 1, "evidence_ids"], "type": "duplicate"},
+    ]
 
 
 def test_original_cited_passage_restores_conditions_without_rewriting_chunk():

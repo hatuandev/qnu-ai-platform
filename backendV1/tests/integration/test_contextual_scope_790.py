@@ -85,6 +85,7 @@ def test_new_recipe_preserves_body_and_scope_before_topk(client, metadata_index)
         json={
             "query": "Nguồn năm 2099",
             "scope_resolution": "catalog",
+            "mode": "dense",
         },
     )
     assert unknown.status_code == 200 and unknown.json()["hits"] == []
@@ -95,6 +96,7 @@ def test_new_recipe_preserves_body_and_scope_before_topk(client, metadata_index)
         json={
             "query": "Nguồn dữ liệu?",
             "scope_resolution": "catalog",
+            "mode": "dense",
         },
     )
     assert ambiguous.status_code == 409
@@ -122,6 +124,7 @@ def test_new_recipe_preserves_body_and_scope_before_topk(client, metadata_index)
         json={
             "query": "Nguồn năm 2024",
             "scope_resolution": "catalog",
+            "mode": "dense",
         },
     )
     assert denied.status_code in (403, 404)
@@ -136,6 +139,7 @@ def test_glossary_uses_canonical_source_and_disappears_after_withdrawal(client, 
         json={
             "query": "HDH năm 2024",
             "scope_resolution": "catalog",
+            "mode": "dense",
             "top_k": 1,
         },
     )
@@ -169,6 +173,7 @@ def test_glossary_uses_canonical_source_and_disappears_after_withdrawal(client, 
         json={
             "query": "HDH năm 2024",
             "scope_resolution": "catalog",
+            "mode": "dense",
         },
     )
     assert empty.status_code == 200, empty.text
@@ -199,6 +204,7 @@ def test_catalog_checks_manifest_before_planning_or_embedding(client, metadata_i
         json={
             "query": "Nguồn năm 2099",
             "scope_resolution": "catalog",
+            "mode": "dense",
         },
     )
     assert result.status_code == 409, result.text

@@ -2,7 +2,7 @@
 
 Chạy tại `D:\DuAnPhanMem\qnu-ai-platform`. **Muốn test lại từ đầu, làm mục B theo đúng thứ tự.** Mục A chỉ dành cho tiếp tục phiên cũ sau khi bật máy. Tắt máy không bắt buộc xóa phiên thử.
 
-Profile QNU/9router bật `wait_for_completion` cho model chat khi chạy `provider-setup`: thời gian chờ phản hồi model không còn bị cắt ở 300 giây. Trường `timeout_seconds` vẫn dùng cho kết nối/gửi dữ liệu; không đặt thành 0. Trong ModelOps → model → chính sách vận hành, bật **Chờ model xử lý xong** cho provider khác nếu cần. Thay đổi áp dụng cho lượt mới; không gửi lại lượt `uncertain` tự động. Worker hiện còn giới hạn tác vụ riêng 30 phút; đây không phải timeout phản hồi model và chưa được bỏ trong thay đổi cấu hình này.
+Profile QNU/9router bật `wait_for_completion` cho model chat khi chạy `provider-setup`. Chính sách này áp dụng khi biên soạn, rà soát bản biên soạn hoặc soát chính tả. Hội thoại dùng `timeout_seconds` đã cấu hình của model. Giới hạn kết nối và gửi dữ liệu áp dụng cho mọi lượt gọi. Trong ModelOps → model → chính sách vận hành, có thể bật **Chờ model xử lý xong** cho model xử lý tài liệu khác. Worker vẫn có giới hạn tổng thời gian riêng qua `WORKER_MODEL_JOB_TIMEOUT_SECONDS` (mặc định 86.400 giây). Lượt `uncertain` cần kiểm tra trước khi tạo yêu cầu mới.
 
 Nếu muốn kiểm riêng PDF thật “TB điểm sàn 26” và hỏi đáp sau xuất bản, dùng [hướng dẫn riêng](V1_TEST_TB_DIEM_SAN_26.md); không dùng các fixture mặc định của mục B để thay file thật.
 

@@ -80,6 +80,7 @@ class FakeNemotron:
         self.delay_seconds = 0.0
         self.responses: list[str] = []
         self.requests: list[dict[str, Any]] = []
+        self._lock = threading.Lock()
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self._server.daemon_threads = True
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
@@ -141,17 +142,21 @@ class FakeNemotron:
                     body = json.loads(raw)
                 except ValueError:
                     body = {}
-                owner.requests.append(
-                    {
-                        "path": self.path,
-                        "authorization": self.headers.get("Authorization"),
-                        "content_type": self.headers.get("Content-Type"),
-                        "body": body,
-                    }
-                )
+                # Concurrent callers may overlap: pin this request's index while
+                # appending so `_respond(index)` always reads its own body.
+                with owner._lock:
+                    owner.requests.append(
+                        {
+                            "path": self.path,
+                            "authorization": self.headers.get("Authorization"),
+                            "content_type": self.headers.get("Content-Type"),
+                            "body": body,
+                        }
+                    )
+                    index = len(owner.requests) - 1
                 if owner.delay_seconds:
                     time.sleep(owner.delay_seconds)
-                status, payload = owner._respond(len(owner.requests) - 1)
+                status, payload = owner._respond(index)
                 try:
                     self.send_response(status)
                     self.send_header("Content-Type", "application/json")

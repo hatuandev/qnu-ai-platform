@@ -70,6 +70,7 @@ async def load_documents(
                 },
             }
             sha = checked.canonical_sha256
+        failures = canonical.get("image_ocr_failures") or []
         documents.append(
             {
                 "ocr_run_id": run.id,
@@ -79,6 +80,7 @@ async def load_documents(
                 "pages": canonical["pages"],
                 "evidence": canonical["evidence"],
                 **metadata,
+                **({"image_ocr_failures": failures} if failures else {}),
             }
         )
     return documents

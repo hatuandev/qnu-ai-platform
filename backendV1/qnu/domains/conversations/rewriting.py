@@ -123,6 +123,7 @@ async def resolve_turn(
             "Model trả kết quả điều phối hội thoại không hợp lệ.",
             code="conversation_route_invalid",
             status_code=502,
+            title="Phản hồi mô hình không hợp lệ",
         ) from exc
     turn.rewrite_trace = {
         **turn.rewrite_trace,

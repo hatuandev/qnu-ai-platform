@@ -26,18 +26,6 @@ export type LifecyclePreviewRequest = {
   reason: string;
 };
 
-export type LifecyclePreviewResponse = {
-  preview_id: string;
-  preview_sha256: string;
-  impact: {
-    permanent?: boolean;
-    originals_retained?: boolean;
-    restore_available?: boolean;
-    [key: string]: unknown;
-  };
-  expires_at: string;
-};
-
 export type LifecycleActionRequest = {
   preview_id: string;
   preview_sha256: string;
@@ -63,7 +51,9 @@ export type LifecycleActionReceipt = {
     restore_available?: boolean;
     [key: string]: unknown;
   } | null;
-  created_at: string;
+  preview_sha256: string;
+  impact: Record<string, unknown>;
+  expires_at: string;
   finished_at?: string | null;
 };
 

@@ -1,10 +1,21 @@
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  BadgeCheck,
+  CheckCircle2,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 import { useTextReviewChecksQuery } from "@/api/ocr/queries";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import {
-  preferredSpellingCheck,
+  currentSpellingCheck,
+  formatSpellingMoment,
   spellingCoverage,
+  spellingIgnoredCount,
+  spellingPendingCount,
+  spellingPercent,
 } from "@/lib/spelling-review";
 
 interface SpellingStatusStripProps {
@@ -30,39 +41,66 @@ export function SpellingStatusStrip({
     sourceId,
     revisionId,
     runId,
-    textVersion,
+    undefined,
     { refetchInterval: 5000 },
   );
-  const check = preferredSpellingCheck(data);
+  const check = currentSpellingCheck(data, textVersion);
   const coverage = check ? spellingCoverage(check) : null;
-  const count =
-    (check?.suggestions.length ?? 0) +
-    (check?.withheld_suggestions?.length ?? 0);
-  const running = check?.status === "running";
+  const percent = coverage
+    ? spellingPercent(coverage.checked, coverage.total)
+    : null;
+  const pending = check ? spellingPendingCount(check) : 0;
+  const ignored = spellingIgnoredCount(check);
   const complete = coverage?.complete === true;
+  const reviewed = check?.reviewed_at != null;
+  const running = check?.status === "running";
+  const failed = check?.status === "failed";
+  const interrupted = check?.status === "uncertain";
+
   const label = isError
     ? "Không tải được kết quả soát chính tả"
     : isLoading
       ? "Đang tải kết quả soát chính tả…"
-      : running
-        ? "Đang soát chính tả…"
-        : complete
-          ? count
-            ? `Có ${count} vị trí cần xem`
-            : coverage?.total === 0
-              ? "Không có đoạn văn để soát"
-              : "Chưa phát hiện lỗi chính tả"
-          : check
-            ? "Chưa soát xong toàn bộ văn bản"
-            : "Chưa có kết quả soát chính tả";
+      : !check
+        ? "Chưa có kết quả soát chính tả"
+        : running
+          ? "Đang soát chính tả…"
+          : failed
+            ? "Soát chính tả gặp lỗi"
+            : interrupted
+              ? "Soát chính tả bị gián đoạn"
+              : reviewed
+                ? `Đã duyệt chính tả${ignored > 0 ? ` · ${ignored} vị trí bỏ qua` : ""}`
+                : !complete
+                  ? "Chưa soát xong toàn bộ văn bản"
+                  : pending > 0
+                    ? `Có ${pending} vị trí cần xem${ignored > 0 ? ` · ${ignored} đã bỏ qua` : ""}`
+                    : coverage?.total === 0
+                      ? "Không có đoạn văn để soát"
+                      : ignored > 0
+                        ? `Đã bỏ qua ${ignored} vị trí · cần hoàn tất duyệt`
+                        : "Chưa phát hiện lỗi chính tả";
+
   const Icon =
     isLoading || running
       ? Loader2
-      : complete && !count
-        ? CheckCircle2
-        : isError || (check && !complete)
-          ? AlertTriangle
-          : Sparkles;
+      : reviewed
+        ? BadgeCheck
+        : complete && pending === 0
+          ? CheckCircle2
+          : isError || (check && !complete)
+            ? AlertTriangle
+            : Sparkles;
+
+  const action = reviewed
+    ? "Xem kết quả"
+    : pending > 0
+      ? "Xem gợi ý"
+      : !check
+        ? "Mở rà soát"
+        : complete
+          ? "Duyệt chính tả"
+          : "Xem chi tiết";
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
@@ -71,22 +109,43 @@ export function SpellingStatusStrip({
           className={isLoading || running ? "size-4 animate-spin" : "size-4"}
         />
         <span>{label}</span>
-        {coverage && coverage.checked > 0 && !complete && (
+        {coverage && !complete && percent !== null && (
+          <span className="flex items-center gap-1.5">
+            <Progress
+              value={percent}
+              className={
+                failed || interrupted
+                  ? "h-1.5 w-16 bg-destructive/15 sm:w-24 [&>[data-slot=progress-indicator]]:bg-destructive"
+                  : "h-1.5 w-16 sm:w-24"
+              }
+              aria-label={`Tiến độ soát chính tả ${percent}%`}
+            />
+            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+              {percent}%
+            </span>
+          </span>
+        )}
+        {coverage && !complete && (
           <span className="text-muted-foreground">
             {coverage.total === null
               ? `${coverage.checked} đoạn đã soát`
               : `${coverage.checked}/${coverage.total} đoạn đã soát`}
           </span>
         )}
+        {reviewed && check?.reviewed_at && (
+          <span className="text-muted-foreground">
+            lúc {formatSpellingMoment(check.reviewed_at)}
+          </span>
+        )}
       </div>
-      {check && (count > 0 || !complete) && (
+      {isError ? null : (
         <Button asChild variant="outline" size="sm" className="h-7 text-xs">
           <Link
             to="/knowledge/$sourceId/review"
             params={{ sourceId }}
-            search={{ collectionId, revisionId, runId, textVersion }}
+            search={{ collectionId, revisionId, runId }}
           >
-            {count ? "Xem gợi ý" : "Xem chi tiết"}
+            {action}
           </Link>
         </Button>
       )}

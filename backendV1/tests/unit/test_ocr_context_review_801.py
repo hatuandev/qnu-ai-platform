@@ -33,8 +33,8 @@ def response(text, replacement="bản", **updates):
 
 def test_accent_correction_carries_exact_phrase_and_changes_nothing_else():
     target = unit()
-    accepted, withheld = contextual_suggestions(response(target.text), {"target": target})
-    assert not withheld
+    accepted, withheld, rejected = contextual_suggestions(response(target.text), {"target": target})
+    assert not withheld and not rejected
     assert accepted[0].replacement == "bản"
     assert accepted[0].context_after == "bệnh viện cấp cơ bản trở lên"
     assert target.text.endswith("cơ bán trở lên.")
@@ -42,23 +42,37 @@ def test_accent_correction_carries_exact_phrase_and_changes_nothing_else():
 
 def test_lexical_guess_is_withheld_even_when_model_gives_matching_offsets_and_reason():
     target = unit()
-    accepted, withheld = contextual_suggestions(response(target.text, "huyên"), {"target": target})
-    assert not accepted
+    accepted, withheld, rejected = contextual_suggestions(
+        response(target.text, "huyên"), {"target": target}
+    )
+    assert not accepted and not rejected
     assert withheld[0].replacement == "huyên"
     assert withheld[0].review_reason == "source_image_required"
 
 
-@pytest.mark.parametrize("replacement", ["huyện", "xã", "bản 2026", "bản!", "b ản"])
-def test_other_letters_numbers_punctuation_or_word_boundaries_cannot_be_auto_offered(replacement):
+@pytest.mark.parametrize(
+    "replacement,reason",
+    [
+        ("huyện", None),
+        ("xã", None),
+        ("bản 2026", "numeric_change"),
+        ("bản!", None),
+        ("b ản", None),
+    ],
+)
+def test_other_letters_numbers_punctuation_or_word_boundaries_cannot_be_auto_offered(
+    replacement, reason
+):
     target = unit()
-    if "2026" in replacement:
-        with pytest.raises(AppException):
-            contextual_suggestions(response(target.text, replacement), {"target": target})
+    accepted, withheld, rejected = contextual_suggestions(
+        response(target.text, replacement), {"target": target}
+    )
+    assert not accepted
+    if reason:
+        assert not withheld
+        assert [item.reason for item in rejected] == [reason]
     else:
-        accepted, withheld = contextual_suggestions(
-            response(target.text, replacement), {"target": target}
-        )
-        assert not accepted and len(withheld) == 1
+        assert len(withheld) == 1 and not rejected
 
 
 @pytest.mark.parametrize(
@@ -67,14 +81,49 @@ def test_other_letters_numbers_punctuation_or_word_boundaries_cannot_be_auto_off
         {"context_before": "bệnh viện cấp huyện", "context_after": "bệnh viện cấp bản"},
         {"context_after": "bệnh viện huyện trở lên"},
         {"context_before": "bán", "context_after": "bản"},
-        {"evidence_id": "read-only-neighbor"},
-        {"context_before": ""},
     ],
 )
-def test_fabricated_context_unrelated_rewrite_or_read_only_target_rejected(fields):
+def test_unproven_context_on_a_unique_anchor_is_withheld_for_manual_review(fields):
+    target = unit()
+    accepted, withheld, rejected = contextual_suggestions(
+        response(target.text, **fields), {"target": target}
+    )
+    assert not accepted and not rejected
+    assert withheld[0].review_reason == "context_unverified"
+
+
+def test_read_only_target_is_rejected_not_withheld():
+    target = unit()
+    accepted, withheld, rejected = contextual_suggestions(
+        response(target.text, evidence_id="read-only-neighbor"), {"target": target}
+    )
+    assert not accepted and not withheld
+    assert [item.reason for item in rejected] == ["unknown_evidence"]
+
+
+def test_contradictory_context_on_a_repeated_literal_is_rejected():
+    target = unit("tôi và tôi")
+    item = {
+        "evidence_id": "target",
+        "start": 7,
+        "end": 10,
+        "original": "tôi",
+        "replacement": "tối",
+        "reason": "Đối chiếu cụm trong câu.",
+        "context_before": "tôi và tôi",
+        "context_after": "tối và tôi",
+    }
+    accepted, withheld, rejected = contextual_suggestions(
+        json.dumps({"suggestions": [item]}, ensure_ascii=False), {"target": target}
+    )
+    assert not accepted and not withheld
+    assert [entry.reason for entry in rejected] == ["context_unverified"]
+
+
+def test_empty_quoted_context_fails_the_response_contract():
     target = unit()
     with pytest.raises(AppException):
-        contextual_suggestions(response(target.text, **fields), {"target": target})
+        contextual_suggestions(response(target.text, context_before=""), {"target": target})
 
 
 def test_missing_context_contract_fails_instead_of_silently_using_legacy_response():

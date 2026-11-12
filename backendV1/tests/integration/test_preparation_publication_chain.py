@@ -252,7 +252,9 @@ def test_prepared_draft_runs_the_full_publication_lifecycle(client):
             assert execute_index(client, runs[0]["id"]) == "completed"
             assert sync_now(client, data["collection"]["id"]) == "ready"
 
-            search = client.post(collection_base + "/search", json={"query": "PHỤ LỤC"})
+            search = client.post(
+                collection_base + "/search", json={"query": "PHỤ LỤC", "mode": "dense"}
+            )
             assert search.status_code == 200, search.text
             body = search.json()
             assert body["status"] == "results" and body["hits"]
@@ -269,7 +271,9 @@ def test_prepared_draft_runs_the_full_publication_lifecycle(client):
             assert client.get(doc_url + "/published").status_code == 404
             assert client.get(collection_base + "/search-readiness").json()["status"] != "ready"
 
-            after = client.post(collection_base + "/search", json={"query": "PHỤ LỤC"})
+            after = client.post(
+                collection_base + "/search", json={"query": "PHỤ LỤC", "mode": "dense"}
+            )
             assert after.status_code == 200, after.text
             assert after.json()["status"] == "no_eligible_content"
             assert after.json()["hits"] == []

@@ -2,12 +2,14 @@
 
 import copy
 import json
+from types import SimpleNamespace
 
 import pytest
 
 from qnu.domains.knowledge.index.table_layout import layout, quality
 from qnu.domains.rag.answer.cells import catalog, materialize
 from qnu.domains.rag.answer.drafting import messages_for, parse_answer
+from qnu.domains.rag.answer.packing import pack_messages
 from qnu.domains.rag.answer.schemas import EvidenceSource
 from qnu.platform.errors import AppException
 
@@ -140,12 +142,18 @@ def test_numeric_prose_cannot_bypass_table_cell_selection():
 
 def test_forged_or_duplicate_selection_is_rejected():
     s = source([["Name", "Price"], ["Alpha", "18"]])
-    with pytest.raises(AppException):
+    with pytest.raises(AppException) as exc:
         materialize(parse_answer(selected("E999:r1:k1"), [s]), [s], catalog([s]))
+    assert exc.value.code == "answer_cell_invalid"
+    assert exc.value.title == "Ô bảng mô hình chọn không hợp lệ"
+    assert exc.value.validation_issues == [
+        {"path": ["lookups", 0, "cell_id"], "type": "not_in_catalog"}
+    ]
     value = json.loads(selected("E1:r1:k1"))
     value["lookups"] *= 2
-    with pytest.raises(AppException):
+    with pytest.raises(AppException) as exc:
         materialize(parse_answer(json.dumps(value), [s]), [s], catalog([s]))
+    assert exc.value.validation_issues == [{"path": ["lookups", 1, "cell_id"], "type": "duplicate"}]
 
 
 def test_borrowed_header_and_carried_subject_require_same_published_identity():
@@ -197,9 +205,49 @@ def test_layout_quality_and_compact_prompt_keep_server_catalog():
     table = payload["tables"][0]
     assert table["id"] == "E1"
     assert table["columns"] == {"k0": "Name", "k1": "Price"}
-    assert table["rows"] == [{"subject": "Alpha", "cells": {"E1:r1:k1": "18"}}]
+    assert table["rows"] == [{"row": "r1", "subject": "Alpha", "cells": {"k1": "18"}}]
     server = catalog([s])["tables"][0]["cells"][0]
     assert server["cell_id"] == "E1:r1:k1" and server["source_cells"]
+
+
+def test_compact_prompt_rows_still_materialize_from_full_server_cell_ids():
+    rows = [["Name", "Price"]] + [[f"Item {i}", str(100 + i)] for i in range(12)]
+    sources = [source(rows, key=f"E{i}", table=f"ocr:t{i}") for i in range(1, 6)]
+    cells = catalog(sources)
+    payload = json.loads(messages_for("Price?", sources)[-1].content)
+    assert [table["rows"][0] for table in payload["tables"]] == [
+        {"row": "r1", "subject": "Item 0", "cells": {"k1": "100"}}
+    ] * 5
+    assert all(set(row["cells"]) <= {"k1"} for table in payload["tables"] for row in table["rows"])
+    answer = materialize(
+        parse_answer(selected("E3:r1:k1"), sources),
+        sources,
+        cells,
+    )
+    assert answer.statements[0].text == "Item 0 — Price: 100"
+    assert answer.statements[0].evidence_ids == ["E3"]
+
+
+def test_large_table_family_fits_catalog_budget_without_dropping_sources():
+    rows = [["H1", "H2", "H3", "H4", "H5", "H6"]] + [
+        [f"Program {i}", "10", "20", "30", "40", "50"] for i in range(12)
+    ]
+    sources = [source(rows, key=f"ich_{i:012x}", table=f"ocr:ev{i:04d}") for i in range(5)]
+    req = SimpleNamespace(
+        question="Ngưỡng 15.00 áp dụng cho những trường hợp nào?", context_max_bytes=8000
+    )
+    messages, cells, _evidence, size, skipped = pack_messages(req, sources, {})
+    assert skipped == []
+    assert size <= 8000
+    assert {table["evidence_id"] for table in cells["tables"]} == {
+        source.chunk_id for source in sources
+    }
+    payload = json.loads(messages[-1].content)
+    assert payload["tables"][0]["rows"][0] == {
+        "row": "r1",
+        "subject": "Program 0",
+        "cells": {"k1": "10", "k2": "20", "k3": "30", "k4": "40", "k5": "50"},
+    }
 
 
 @pytest.mark.asyncio
@@ -223,6 +271,7 @@ async def test_catalog_envelope_budget_is_checked_before_provider_dispatch(monke
     monkeypatch.setattr(service, "expand_context", AsyncMock(return_value=(result, {})))
     prepare = AsyncMock()
     monkeypatch.setattr(service, "prepare_chat_request", prepare)
+    monkeypatch.setattr(service, "attach_source_text", AsyncMock())
     with pytest.raises(AppException) as exc:
         await service.answer(
             None,
@@ -261,7 +310,7 @@ def test_unparsed_table_does_not_allow_fabricated_numeric_prose():
     value = {"status": "answered", "statements": [{"text": "Alpha: 999", "evidence_ids": ["E1"]}]}
     with pytest.raises(AppException) as exc:
         materialize(parse_answer(json.dumps(value), [s]), [s], catalog([s]))
-    assert exc.value.code == "answer_cell_selection_required"
+    assert exc.value.code == "answer_table_value_not_extractive"
 
 
 def test_rowspan_values_and_new_cells_never_share_a_lookup_id():

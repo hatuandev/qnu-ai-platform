@@ -198,6 +198,7 @@ async def test_added_reading_context_is_included_in_budget_before_dispatch(monke
             AnswerRequest(question="Conditions?", context_max_bytes=old_size - 1),
         )
     assert exc.value.code == "answer_context_budget_exceeded"
+    assert service.search.await_args.kwargs["verify"] is False
     prepare.assert_not_called()
 
 

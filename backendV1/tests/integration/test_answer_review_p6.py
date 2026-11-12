@@ -24,6 +24,7 @@ def create_assistant(client, data, *, collection_id=None):
             "name": "Trợ lý kiểm thử",
             "collection_id": collection_id or data["collection"]["id"],
             "chat_provider_id": data["chat_provider"]["id"],
+            "rag_policy": {"retrieval_mode": "dense"},
         },
     )
     assert response.status_code == 201, response.text
@@ -93,9 +94,7 @@ def test_review_runs_on_published_sources_and_stores_human_labels(client, ready)
     )
 
     as_actor(MEMBER)
-    denied = client.put(
-        url + f"/{body['id']}/items/{first['id']}", json={"label": "correct"}
-    )
+    denied = client.put(url + f"/{body['id']}/items/{first['id']}", json={"label": "correct"})
     assert denied.status_code == 403, denied.text
     assert denied.json()["code"] == "workspace_forbidden"
 
@@ -182,9 +181,7 @@ def test_review_records_provider_failure_per_item(client, ready):  # noqa: F811
     assert item["status"] == "failed"
     assert item["error_code"] == "chat_provider_unavailable"
     assert item["result"] is None
-    denied = client.put(
-        url + f"/{body['id']}/items/{item['id']}", json={"label": "correct"}
-    )
+    denied = client.put(url + f"/{body['id']}/items/{item['id']}", json={"label": "correct"})
     assert denied.status_code == 409
     assert denied.json()["code"] == "answer_review_item_not_ready"
 

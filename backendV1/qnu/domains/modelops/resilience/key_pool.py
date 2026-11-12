@@ -64,6 +64,7 @@ async def acquire(
         scope.workspace_id,
         capability,
         scope.provider_id,
+        index_run_id=scope.index_run_id,
     )
     if allowed is not provider or (provider.base_url.rstrip("/"), provider.model_name) != (
         endpoint.rstrip("/"),

@@ -5,8 +5,13 @@ import unicodedata
 
 from pydantic import ValidationError
 
-from qnu.domains.ocr.review.anchors import anchor_suggestions
-from qnu.domains.ocr.review.schemas import ContextSuggestedText, Suggestion, TextUnit
+from qnu.domains.ocr.review.anchors import anchor_suggestions, context_supports, reject
+from qnu.domains.ocr.review.schemas import (
+    ContextSuggestedText,
+    RejectedSuggestion,
+    Suggestion,
+    TextUnit,
+)
 from qnu.platform.errors import AppException
 
 CONTEXT_VERSION = "qnu.ocr.spelling-context/v1"
@@ -92,54 +97,48 @@ def _letter_shape(text: str) -> str:
     return "".join(c for c in text if not unicodedata.combining(c))
 
 
-def _check_phrase(item: Suggestion, text: str) -> None:
-    before, after = item.context_before, item.context_after
-    if not before or not after:
-        raise ValueError("missing context")
-    # Prove that the quoted phrase surrounds this exact occurrence, not another one.
-    positions = [m.start() for m in re.finditer(re.escape(before), text)]
-    for offset in positions:
-        start, end = item.start - offset, item.end - offset
-        if (
-            0 <= start < end <= len(before)
-            and before[:start] + item.replacement + before[end:] == after
-        ):
-            if before != text and len(re.findall(r"\w+", before)) < 2:
-                break
-            return
-    raise ValueError("fabricated context or unrelated rewrite")
-
-
-def contextual_suggestions(content: str, units: dict[str, TextUnit]):
-    """Lexical/punctuation changes require image review, never a guessed auto edit."""
+def contextual_suggestions(
+    content: str, units: dict[str, TextUnit]
+) -> tuple[list[Suggestion], list[Suggestion], list[RejectedSuggestion]]:
+    """Quarantine proposals one by one; only edits proven against the source survive."""
     try:
         parsed = ContextSuggestedText.model_validate_json(content)
-        items = anchor_suggestions(parsed.suggestions, units)
-        accepted, withheld, occupied = [], [], {}
-        for item in items:
-            text = units[item.evidence_id].text
-            if text[item.start : item.end] != item.original or item.original == item.replacement:
-                raise ValueError("span or unchanged")
-            if not item.replacement.strip():
-                raise ValueError("empty replacement")
-            if re.findall(r"\d+", item.original) != re.findall(r"\d+", item.replacement):
-                raise ValueError("numeric change")
-            spans = occupied.setdefault(item.evidence_id, [])
-            if any(item.start < end and item.end > start for start, end in spans):
-                raise ValueError("overlap")
-            spans.append((item.start, item.end))
-            _check_phrase(item, text)
-            result = Suggestion.model_validate({**item.model_dump(), "review_reason": None})
-            if _letter_shape(item.original) != _letter_shape(item.replacement):
-                withheld.append(
-                    result.model_copy(update={"review_reason": "source_image_required"})
-                )
-            else:
-                accepted.append(result)
-        return accepted, withheld
-    except (ValidationError, ValueError, KeyError, TypeError) as exc:
+    except ValidationError as exc:
         raise AppException(
             "Gợi ý hoặc ngữ cảnh sửa không khớp nguồn; chưa áp dụng thay đổi nào.",
             code="ocr_spelling_invalid",
             status_code=502,
         ) from exc
+    anchored, rejected = anchor_suggestions(parsed.suggestions, units)
+    accepted, withheld, occupied = [], [], {}
+    for item in anchored:
+        text = units[item.evidence_id].text
+        if item.original == item.replacement:
+            rejected.append(reject(item, "no_change"))
+            continue
+        if not item.replacement.strip():
+            rejected.append(reject(item, "empty_replacement"))
+            continue
+        if re.findall(r"\d+", item.original) != re.findall(r"\d+", item.replacement):
+            rejected.append(reject(item, "numeric_change"))
+            continue
+        spans = occupied.setdefault(item.evidence_id, [])
+        if any(item.start < end and item.end > start for start, end in spans):
+            rejected.append(reject(item, "overlap"))
+            continue
+        result = Suggestion.model_validate({**item.model_dump(), "review_reason": None})
+        if not context_supports(item, text, item.start):
+            # A definite anchor is kept for manual review; an ambiguous literal
+            # with a contradictory quote is not a trustworthy target at all.
+            if len(re.findall(re.escape(item.original), text)) != 1:
+                rejected.append(reject(item, "context_unverified"))
+                continue
+            spans.append((item.start, item.end))
+            withheld.append(result.model_copy(update={"review_reason": "context_unverified"}))
+            continue
+        spans.append((item.start, item.end))
+        if _letter_shape(item.original) != _letter_shape(item.replacement):
+            withheld.append(result.model_copy(update={"review_reason": "source_image_required"}))
+        else:
+            accepted.append(result)
+    return accepted, withheld, rejected

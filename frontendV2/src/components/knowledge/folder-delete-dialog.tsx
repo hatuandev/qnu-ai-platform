@@ -1,4 +1,4 @@
-import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useDeleteFolderMutation } from "@/api/knowledge/queries";
@@ -62,14 +62,16 @@ export function FolderDeleteDialog({
       onOpenChange={deleteMutation.isPending ? undefined : onOpenChange}
     >
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base text-destructive">
-            <Trash2 className="size-4" />
-            <span>Xác nhận xóa thư mục</span>
+        <DialogHeader className="gap-1.5 text-left">
+          <DialogTitle className="text-base font-semibold text-foreground">
+            Xóa thư mục?
           </DialogTitle>
-          <DialogDescription className="text-xs">
-            Hành động này sẽ xóa thư mục <strong>{folder.name}</strong> khỏi kho
-            tri thức.
+          <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
+            Bạn có chắc chắn muốn xóa thư mục{" "}
+            <span className="font-semibold text-foreground break-words">
+              "{folder.name}"
+            </span>
+            ? Hành động này không thể hoàn tác.
           </DialogDescription>
         </DialogHeader>
 
@@ -80,24 +82,19 @@ export function FolderDeleteDialog({
           </div>
         )}
 
-        <div className="p-3 rounded-lg bg-muted/40 border border-border/70 text-xs space-y-2">
-          <div>
-            Thư mục: <strong>{folder.name}</strong>
-          </div>
-          <div className="text-[11px] text-muted-foreground">
-            {isNotEmpty ? (
-              <span className="text-destructive font-medium">
-                Cảnh báo: Thư mục có {folder.source_count} tài liệu và{" "}
-                {folder.subfolder_count} thư mục con. Máy chủ chỉ cho phép xóa
-                thư mục rỗng.
-              </span>
-            ) : (
-              "Thư mục hiện đang rỗng và có thể xóa an toàn."
-            )}
-          </div>
+        <div className="p-3 rounded-lg bg-muted/40 border border-border/50 text-xs text-muted-foreground leading-relaxed">
+          {isNotEmpty ? (
+            <span className="text-destructive font-medium">
+              Cảnh báo: Thư mục có {folder.source_count} tài liệu và{" "}
+              {folder.subfolder_count} thư mục con. Hệ thống chỉ cho phép xóa
+              thư mục rỗng.
+            </span>
+          ) : (
+            "Thư mục hiện đang rỗng và có thể xóa an toàn khỏi kho tri thức."
+          )}
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="gap-2 sm:gap-2 pt-2">
           <Button
             type="button"
             variant="outline"
@@ -114,14 +111,14 @@ export function FolderDeleteDialog({
             size="sm"
             onClick={handleDelete}
             disabled={deleteMutation.isPending || isNotEmpty}
-            className="h-8 text-xs gap-1.5"
+            className="h-8 text-xs gap-1.5 shadow-2xs"
           >
-            {deleteMutation.isPending ? (
+            {deleteMutation.isPending && (
               <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="size-3.5" />
             )}
-            <span>Xác nhận xóa</span>
+            <span>
+              {deleteMutation.isPending ? "Đang xóa..." : "Xóa thư mục"}
+            </span>
           </Button>
         </DialogFooter>
       </DialogContent>

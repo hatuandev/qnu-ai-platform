@@ -8,7 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from tests.integration.compiler_support import FakeChat, chat_provider, processed_input
-from tests.integration.knowledge_support import API, EDITOR, PLATFORM, as_actor
+from tests.integration.knowledge_support import API, EDITOR, PLATFORM, add_member, as_actor
+from tests.integration.ocr_support import FakeJobQueue, use_queue
 
 
 def review_url(data):
@@ -217,46 +218,187 @@ def detect(client, data, current, key="check-one"):
     )
 
 
-def test_automatic_review_splits_and_covers_every_unit_once(client, monkeypatch):
+@pytest.mark.parametrize("first_error", ["output_limit", "quarantined_suggestion"])
+def test_automatic_review_preserves_coverage_after_batch_error(client, monkeypatch, first_error):
     from qnu.domains.ocr.review import automatic
     from qnu.main import app
     from qnu.workers.tasks.ocr import spelling_check_job
 
-    class EmptySpeller(FakeChat):
+    batch_size = 2 if first_error == "output_limit" else 1
+    monkeypatch.setattr(automatic, "BATCH_SIZE", batch_size)
+    data = processed_input(client, code="automatic-spelling-batches")
+    url = review_url(data)
+    original = client.get(url).json()
+    expected = [unit["evidence_id"] for unit in original["units"]]
+    poisoned = False
+
+    class BatchSpeller(FakeChat):
         def _respond(self, index):
+            nonlocal poisoned
             request = self.requests[index]["body"]["messages"][-1]["content"]
             units = json.loads(request)["units"]
+            ids = [unit["evidence_id"] for unit in units]
+            suggestions = []
+            truncated = False
+            if first_error == "output_limit":
+                # Batches run concurrently: poison the batch that owns the first
+                # unit, never whichever request happens to arrive first.
+                if not poisoned and expected[0] in ids:
+                    poisoned = truncated = len(units) > 1
+            elif expected[1] in ids:
+                unit = units[0]
+                suggestions.append(
+                    {
+                        "evidence_id": unit["evidence_id"],
+                        "start": 0,
+                        "end": 1,
+                        "original": unit["text"][0],
+                        "replacement": "1234",
+                        "reason": "Invalid numeric change",
+                        "context_before": unit["text"],
+                        "context_after": "1234" + unit["text"][1:],
+                    }
+                )
             payload = {
                 "choices": [
                     {
-                        "message": {"content": '{"suggestions":[]}'},
-                        "finish_reason": "length" if index == 0 and len(units) > 1 else "stop",
+                        "message": {"content": json.dumps({"suggestions": suggestions})},
+                        "finish_reason": "length" if truncated else "stop",
                     }
                 ],
                 "usage": {"prompt_tokens": 100, "completion_tokens": 30, "total_tokens": 130},
             }
             return 200, json.dumps(payload).encode()
 
-    monkeypatch.setattr(automatic, "BATCH_SIZE", 2)
-    data = processed_input(client, code="automatic-spelling-batches")
-    url = review_url(data)
-    original = client.get(url).json()
-    with EmptySpeller() as model:
+    with BatchSpeller() as model:
         chat_provider(client, data, model.base_url)
         context = {"container": app.state.container}
         assert client.portal.call(spelling_check_job, context, data["ocr_run_id"]) == "completed"
         checks = client.get(url + "/checks?version=0").json()
         assert len(checks) == 1
         (check,) = checks
-        expected = [unit["evidence_id"] for unit in original["units"]]
         assert len(expected) > 2
-        assert check["checked_evidence_ids"] == expected
         assert check["total_evidence_count"] == len(expected)
         assert check["status"] == "completed"
-        assert len(model.requests) == (len(expected) + 1) // 2 + 2
+        if first_error == "output_limit":
+            assert check["checked_evidence_ids"] == expected
+            assert len(model.requests) == (len(expected) + 1) // 2 + 2
+        else:
+            assert check["error_code"] is None
+            assert check["checked_evidence_ids"] == expected
+            assert check["suggestions"] == []
+            assert check["rejected_suggestions"] == [
+                {"evidence_id": expected[1], "reason": "numeric_change", "start": 0, "end": 1}
+            ]
+            assert len(model.requests) == len(expected)
         sent = len(model.requests)
         assert client.portal.call(spelling_check_job, context, data["ocr_run_id"]) == "completed"
         assert len(model.requests) == sent
+    assert client.get(url).json() == original
+
+
+@pytest.mark.parametrize(
+    ("switch_model", "missing_aggregate"), [(False, False), (False, True), (True, False)]
+)
+def test_automatic_retry_reuses_only_compatible_progress(
+    client, monkeypatch, switch_model, missing_aggregate
+):
+    from qnu.domains.ocr.review import automatic
+    from qnu.domains.ocr.review.models import SpellingRun
+    from qnu.main import app
+    from qnu.platform.database import AsyncSessionFactory
+    from qnu.workers.tasks.ocr import spelling_check_job
+
+    monkeypatch.setattr(automatic, "BATCH_SIZE", 1)
+    data = processed_input(client, code="spelling-retry-progress")
+    url = review_url(data)
+    original = client.get(url).json()
+    expected = [unit["evidence_id"] for unit in original["units"]]
+    target = expected[0]
+
+    async def lose_parent_aggregate(check_id):
+        async with AsyncSessionFactory() as db:
+            row = await db.get(SpellingRun, check_id)
+            row.checked_evidence_ids = []
+            row.suggestions = []
+            await db.commit()
+
+    class PartialSpeller(FakeSpeller):
+        def _respond(self, index):
+            request = self.requests[index]["body"]["messages"][-1]["content"]
+            unit = json.loads(request)["units"][0]
+            payload = {"suggestions": []}
+            if unit["evidence_id"] == target:
+                if not self.recover:
+                    payload = {"unexpected": []}
+            elif unit["evidence_id"] == expected[1]:
+                text = unit["text"]
+                payload["suggestions"].append(
+                    {
+                        "evidence_id": unit["evidence_id"],
+                        "start": 0,
+                        "end": 1,
+                        "original": text[0],
+                        "replacement": text[0].swapcase(),
+                        "reason": "Kiểm tra chữ hoa thường",
+                        "context_before": text,
+                        "context_after": text[0].swapcase() + text[1:],
+                    }
+                )
+            return 200, json.dumps(
+                {
+                    "choices": [
+                        {
+                            "message": {"content": json.dumps(payload)},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {"prompt_tokens": 100, "completion_tokens": 30, "total_tokens": 130},
+                }
+            ).encode()
+
+    with PartialSpeller() as model:
+        model.recover = False
+        provider = chat_provider(client, data, model.base_url)
+        context = {"container": app.state.container}
+        assert client.portal.call(spelling_check_job, context, data["ocr_run_id"]) == "failed"
+        (failed,) = client.get(url + "/checks?version=0").json()
+        assert failed["checked_evidence_ids"] == expected[1:]
+        assert len(failed["suggestions"]) == 1
+        if missing_aggregate:
+            client.portal.call(lose_parent_aggregate, failed["id"])
+        (prior_snapshot,) = client.get(url + "/checks?version=0").json()
+        previous_request_count = len(model.requests)
+        model.recover = True
+        if switch_model:
+            as_actor(PLATFORM)
+            updated = client.patch(
+                f"{API}/modelops/providers/{provider['id']}",
+                json={
+                    "model_name": "other-chat",
+                    "token_limits": {"context_window_tokens": 131072, "max_output_tokens": 8192},
+                },
+            )
+            assert updated.status_code == 200, updated.text
+            as_actor(EDITOR)
+        assert (
+            client.portal.call(spelling_check_job, context, data["ocr_run_id"], 0, True)
+            == "completed"
+        )
+        retried, previous = client.get(url + "/checks?version=0").json()
+        retried_ids = [
+            json.loads(req["body"]["messages"][-1]["content"])["units"][0]["evidence_id"]
+            for req in model.requests[previous_request_count:]
+        ]
+        assert sorted(retried_ids) == sorted(expected if switch_model else [target])
+        assert retried["checked_evidence_ids"] == expected
+        assert retried["suggestions"] == failed["suggestions"]
+        assert previous == prior_snapshot
+        assert (
+            client.portal.call(spelling_check_job, context, data["ocr_run_id"], 0, True)
+            == "completed"
+        )
+        assert len(model.requests) == previous_request_count + len(retried_ids)
     assert client.get(url).json() == original
 
 
@@ -285,13 +427,42 @@ def test_suggestions_are_exact_readable_and_only_applied_on_save(client):
         assert client.get(url + "/checks/" + result["id"]).json()["usage_id"] == result["usage_id"]
 
 
-@pytest.mark.parametrize("mode", ["foreign", "span", "number", "overlap", "http_error"])
-def test_bad_suggestions_and_provider_errors_never_change_files_or_resend(client, mode):
+@pytest.mark.parametrize(
+    "mode,reason,kept",
+    [
+        ("foreign", "unknown_evidence", 0),
+        ("span", "source_text_missing", 0),
+        ("number", "numeric_change", 0),
+        ("overlap", "overlap", 1),
+    ],
+)
+def test_bad_suggestions_are_quarantined_without_changing_files_or_resend(
+    client, mode, reason, kept
+):
     data = processed_input(client)
     url = review_url(data)
     current = client.get(url).json()
     with FakeSpeller() as model:
         model.mode = mode
+        chat_provider(client, data, model.base_url)
+        response = detect(client, data, current)
+        assert response.status_code == 200, response.text
+        result = response.json()
+        assert result["status"] == "completed"
+        assert len(result["suggestions"]) == kept
+        assert [item["reason"] for item in result["rejected_suggestions"]] == [reason]
+        assert client.get(url).json()["version"] == 0
+        replay = detect(client, data, current)
+        assert replay.status_code == 200 and replay.json()["id"] == result["id"]
+        assert len(model.requests) == 1
+
+
+def test_provider_errors_never_change_files_or_resend(client):
+    data = processed_input(client)
+    url = review_url(data)
+    current = client.get(url).json()
+    with FakeSpeller() as model:
+        model.mode = "http_error"
         chat_provider(client, data, model.base_url)
         response = detect(client, data, current)
         assert response.status_code in {502, 503}, response.text
@@ -455,6 +626,265 @@ def test_concurrent_saves_only_one_wins(client):
     assert client.get(url).json()["version"] == 1
 
 
+def rerun_url(data):
+    return review_url(data) + "/checks/rerun"
+
+
+def test_rerun_queues_unique_spelling_job_for_version(client):
+    data = processed_input(client, code="spelling-rerun")
+    queue = FakeJobQueue()
+    use_queue(queue)
+    response = client.post(rerun_url(data), json={"version": 0})
+    assert response.status_code == 202, response.text
+    assert response.json() == {"run_id": data["ocr_run_id"], "version": 0, "status": "queued"}
+    assert queue.jobs == [
+        {
+            "function": "spelling_check_job",
+            "args": (data["ocr_run_id"], 0, False),
+            "job_id": f"qnu:v1:spelling:{data['ocr_run_id']}:0",
+        }
+    ]
+    replay = client.post(rerun_url(data), json={"version": 0})
+    assert replay.status_code == 202, replay.text
+    assert len(queue.jobs) == 1
+
+
+def test_rerun_completed_check_is_terminal(client):
+    data = processed_input(client, code="spelling-rerun-completed")
+    current = client.get(review_url(data)).json()
+    with FakeSpeller() as model:
+        chat_provider(client, data, model.base_url)
+        assert detect(client, data, current).json()["status"] == "completed"
+        queue = FakeJobQueue()
+        use_queue(queue)
+        for retry in (False, True):
+            response = client.post(rerun_url(data), json={"version": 0, "retry": retry})
+            assert response.status_code == 202, response.text
+            assert response.json()["status"] == "completed"
+        assert queue.jobs == []
+
+
+def test_rerun_retries_failed_check_with_retry_job(client):
+    data = processed_input(client, code="spelling-rerun-retry")
+    current = client.get(review_url(data)).json()
+    with FakeSpeller() as model:
+        model.mode = "http_error"
+        chat_provider(client, data, model.base_url)
+        failed = detect(client, data, current)
+        assert failed.status_code in {502, 503}, failed.text
+        checks = client.get(review_url(data) + "/checks?version=0").json()
+        assert [item["status"] for item in checks] == ["failed"]
+        queue = FakeJobQueue()
+        use_queue(queue)
+        response = client.post(rerun_url(data), json={"version": 0, "retry": True})
+        assert response.status_code == 202, response.text
+        assert response.json()["status"] == "queued"
+        assert queue.jobs == [
+            {
+                "function": "spelling_check_job",
+                "args": (data["ocr_run_id"], 0, True),
+                "job_id": f"qnu:v1:spelling:{data['ocr_run_id']}:0:retry:{checks[0]['id']}",
+            }
+        ]
+        replay = client.post(rerun_url(data), json={"version": 0, "retry": True})
+        assert replay.status_code == 202, replay.text
+        assert len(queue.jobs) == 1
+
+
+def test_rerun_requires_write_role_and_existing_version(client):
+    from qnu.domains.identity.actor import AuthActor
+
+    data = processed_input(client, code="spelling-rerun-auth")
+    queue = FakeJobQueue()
+    use_queue(queue)
+    missing = client.post(rerun_url(data), json={"version": 5})
+    assert missing.status_code == 404, missing.text
+    add_member(client, data["workspace"]["id"], "reader-rerun", "member")
+    as_actor(AuthActor(username="reader-rerun", actor_id="reader-rerun", roles=[], permissions=[]))
+    forbidden = client.post(rerun_url(data), json={"version": 0})
+    assert forbidden.status_code == 403, forbidden.text
+    assert queue.jobs == []
+
+
+def test_rerun_reports_unavailable_queue(client):
+    data = processed_input(client, code="spelling-rerun-queue")
+    use_queue(None)
+    unavailable = client.post(rerun_url(data), json={"version": 0})
+    assert unavailable.status_code == 503, unavailable.text
+    assert unavailable.json()["code"] == "spelling_queue_unavailable"
+    use_queue(FakeJobQueue(failing=True))
+    failed = client.post(rerun_url(data), json={"version": 0})
+    assert failed.status_code == 503, failed.text
+    assert failed.json()["code"] == "spelling_rerun_failed"
+
+
+def disposition(client, data, check_id, suggestion, ignored=True):
+    return client.post(
+        review_url(data) + f"/checks/{check_id}/dispositions",
+        json={
+            "evidence_id": suggestion["evidence_id"],
+            "start": suggestion["start"],
+            "end": suggestion["end"],
+            "ignored": ignored,
+        },
+    )
+
+
+def test_ignored_suggestions_persist_per_check_without_touching_text(client):
+    data = processed_input(client, code="spelling-dispositions")
+    url = review_url(data)
+    current = client.get(url).json()
+    with FakeSpeller() as model:
+        chat_provider(client, data, model.base_url)
+        check = detect(client, data, current).json()
+    (suggestion,) = check["suggestions"]
+    ignored = {
+        "evidence_id": suggestion["evidence_id"],
+        "start": suggestion["start"],
+        "end": suggestion["end"],
+    }
+    response = disposition(client, data, check["id"], suggestion)
+    assert response.status_code == 200, response.text
+    assert response.json()["ignored_suggestions"] == [ignored]
+    assert client.get(url + "/checks?version=0").json()[0]["ignored_suggestions"] == [ignored]
+    assert client.get(url + "/checks/" + check["id"]).json()["ignored_suggestions"] == [ignored]
+    assert disposition(client, data, check["id"], suggestion).status_code == 200
+    assert client.get(url).json()["version"] == 0
+    undone = disposition(client, data, check["id"], suggestion, ignored=False)
+    assert undone.status_code == 200, undone.text
+    assert undone.json()["ignored_suggestions"] == []
+    assert client.get(url + "/checks/" + check["id"]).json()["ignored_suggestions"] == []
+
+
+def test_disposition_rejects_unknown_spans_checks_and_unfinished_runs(client):
+    from sqlalchemy import select
+
+    from qnu.domains.ocr.review.models import SpellingRun
+    from qnu.platform.database import AsyncSessionFactory
+
+    data = processed_input(client, code="spelling-dispositions-reject")
+    other = processed_input(client, code="spelling-dispositions-other")
+    url = review_url(data)
+    current = client.get(url).json()
+    with FakeSpeller() as model:
+        chat_provider(client, data, model.base_url)
+        check = detect(client, data, current).json()
+    (suggestion,) = check["suggestions"]
+    wrong_span = {**suggestion, "end": suggestion["end"] + 1}
+    missing = disposition(client, data, check["id"], wrong_span)
+    assert missing.status_code == 404, missing.text
+    assert missing.json()["code"] == "ocr_spelling_suggestion_not_found"
+    cross = disposition(client, other, check["id"], suggestion)
+    assert cross.status_code == 404, cross.text
+
+    async def mark(mode):
+        async with AsyncSessionFactory() as db:
+            row = await db.scalar(select(SpellingRun).where(SpellingRun.id == check["id"]))
+            if mode == "failed":
+                row.status = "failed"
+            else:
+                row.trace = {**row.trace, "automatic_parent": "spl_parent"}
+            await db.commit()
+
+    client.portal.call(mark, "failed")
+    not_ready = disposition(client, data, check["id"], suggestion)
+    assert not_ready.status_code == 409, not_ready.text
+    assert not_ready.json()["code"] == "ocr_spelling_check_not_ready"
+    client.portal.call(mark, "child")
+    hidden = disposition(client, data, check["id"], suggestion)
+    assert hidden.status_code == 409, hidden.text
+    assert hidden.json()["code"] == "ocr_spelling_check_not_reviewable"
+
+
+def test_dispositions_require_write_role(client):
+    from qnu.domains.identity.actor import AuthActor
+
+    data = processed_input(client, code="spelling-dispositions-role")
+    url = review_url(data)
+    current = client.get(url).json()
+    with FakeSpeller() as model:
+        chat_provider(client, data, model.base_url)
+        check = detect(client, data, current).json()
+    (suggestion,) = check["suggestions"]
+    add_member(client, data["workspace"]["id"], "reader-ignore", "member")
+    as_actor(
+        AuthActor(username="reader-ignore", actor_id="reader-ignore", roles=[], permissions=[])
+    )
+    forbidden = disposition(client, data, check["id"], suggestion)
+    assert forbidden.status_code == 403, forbidden.text
+    as_actor(EDITOR)
+    assert client.get(url + "/checks/" + check["id"]).json()["ignored_suggestions"] == []
+
+
+def test_versions_report_saved_history_and_current_draft(client):
+    data = processed_input(client, code="spelling-versions")
+    url = review_url(data)
+    versions_url = url + "/versions"
+    assert client.get(versions_url).json() == [
+        {
+            "version": 0,
+            "version_id": None,
+            "saved_at": None,
+            "change_count": 0,
+            "is_current": True,
+        }
+    ]
+    current = client.get(url).json()
+    first = save(client, url, edit_body(current, current["units"][0], "Bản sửa một"), "v-one")
+    assert first.status_code == 200, first.text
+    saved = first.json()
+    second = save(client, url, edit_body(saved, saved["units"][0], "Bản sửa hai"), "v-two")
+    assert second.status_code == 200, second.text
+    history = client.get(versions_url).json()
+    assert [(row["version"], row["change_count"], row["is_current"]) for row in history] == [
+        (2, 1, True),
+        (1, 1, False),
+        (0, 0, False),
+    ]
+    assert history[0]["version_id"] == second.json()["version_id"]
+    assert history[1]["version_id"] == saved["version_id"]
+
+
+def test_purge_source_with_disposition_completes(client):
+    from qnu.domains.lifecycle.purge import execute
+    from qnu.main import app
+    from qnu.platform.database import AsyncSessionFactory
+    from tests.integration.test_lifecycle_659 import accept, preview
+
+    data = processed_input(client, code="spelling-disposition-purge")
+    url = review_url(data)
+    current = client.get(url).json()
+    with FakeSpeller() as model:
+        chat_provider(client, data, model.base_url)
+        check = detect(client, data, current).json()
+    (suggestion,) = check["suggestions"]
+    assert disposition(client, data, check["id"], suggestion).status_code == 200
+    reviewed = save(
+        client, url, complete_body(current, [], check["id"]), "review-disposition-purge"
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    use_queue(FakeJobQueue())
+    add_member(client, data["workspace"]["id"], PLATFORM.actor_id, "admin")
+    as_actor(PLATFORM)
+    proposal = preview(client, data["workspace"], "source", data["source"]["id"], "delete")
+    assert proposal.status_code == 200, proposal.text
+    pending = accept(client, data["workspace"], proposal, "purge-disposition")
+    assert pending.status_code == 200, pending.text
+    action_id = pending.json()["id"]
+
+    async def worker():
+        async with AsyncSessionFactory() as db:
+            return await execute(
+                db,
+                app.state.container.blob_store,
+                app.state.container.vector_store,
+                action_id,
+            )
+
+    assert client.portal.call(worker) == "completed"
+    assert client.get(url).status_code == 404
+
+
 def test_concurrent_checks_share_one_durable_request_and_quota(client, monkeypatch):
     from qnu.domains.modelops.usage.service import usage_service
 
@@ -489,3 +919,289 @@ def test_concurrent_checks_share_one_durable_request_and_quota(client, monkeypat
         assert first_response.json()["id"] == second.json()["id"]
         assert len(model.requests) == 1
         assert calls == 1
+
+
+def complete_body(current, changes, check_id):
+    return {
+        "expected_version": current["version"],
+        "expected_sha256": current["canonical_sha256"],
+        "changes": changes,
+        "review_check_id": check_id,
+    }
+
+
+def apply_suggestion(unit, suggestion):
+    return (
+        unit["text"][: suggestion["start"]]
+        + suggestion["replacement"]
+        + unit["text"][suggestion["end"] :]
+    )
+
+
+def test_completing_review_records_approval_and_replays(client):
+    data = processed_input(client, code="spelling-review-complete")
+    url = review_url(data)
+    current = client.get(url).json()
+    with FakeSpeller() as model:
+        chat_provider(client, data, model.base_url)
+        check = detect(client, data, current).json()
+    (suggestion,) = check["suggestions"]
+    unit = current["units"][0]
+    changes = [
+        {
+            "evidence_id": unit["evidence_id"],
+            "before": unit["text"],
+            "after": apply_suggestion(unit, suggestion),
+        }
+    ]
+    body = complete_body(current, changes, check["id"])
+    response = save(client, url, body, "complete-one")
+    assert response.status_code == 200, response.text
+    saved = response.json()
+    assert saved["version"] == 1
+    reviewed = client.get(url + "/checks/" + check["id"]).json()
+    assert reviewed["reviewed_version"] == 1
+    assert reviewed["reviewed_sha256"] == saved["canonical_sha256"]
+    assert reviewed["reviewed_by"] == EDITOR.actor_id
+    assert reviewed["reviewed_at"]
+    assert client.get(url + "/checks?version=0").json()[0]["reviewed_version"] == 1
+    replay = save(client, url, body, "complete-one")
+    assert replay.status_code == 200
+    assert replay.json()["version_id"] == saved["version_id"]
+    assert client.get(url + "/versions").json()[0]["version"] == 1
+    repeated = save(
+        client,
+        url,
+        {
+            **body,
+            "expected_version": saved["version"],
+            "expected_sha256": saved["canonical_sha256"],
+        },
+        "complete-two",
+    )
+    assert repeated.status_code == 409, repeated.text
+    assert repeated.json()["code"] == "ocr_spelling_review_exists"
+
+
+def test_completing_review_with_every_suggestion_ignored_keeps_text(client):
+    data = processed_input(client, code="spelling-review-ignored")
+    url = review_url(data)
+    current = client.get(url).json()
+    with FakeSpeller() as model:
+        chat_provider(client, data, model.base_url)
+        check = detect(client, data, current).json()
+    (suggestion,) = check["suggestions"]
+    assert disposition(client, data, check["id"], suggestion).status_code == 200
+    body = complete_body(current, [], check["id"])
+    response = save(client, url, body, "complete-ignored")
+    assert response.status_code == 200, response.text
+    document = response.json()
+    assert document["version"] == 0 and document["version_id"] is None
+    reviewed = client.get(url + "/checks/" + check["id"]).json()
+    assert reviewed["reviewed_version"] == 0
+    assert reviewed["reviewed_sha256"] == current["canonical_sha256"]
+    assert client.get(url + "/versions").json() == [
+        {
+            "version": 0,
+            "version_id": None,
+            "saved_at": None,
+            "change_count": 0,
+            "is_current": True,
+        }
+    ]
+    replay = save(client, url, body, "complete-ignored")
+    assert replay.status_code == 200
+    assert replay.json()["canonical_sha256"] == current["canonical_sha256"]
+
+
+def test_completing_review_requires_pending_suggestions_and_current_check(client):
+    data = processed_input(client, code="spelling-review-pending")
+    url = review_url(data)
+    current = client.get(url).json()
+    with FakeSpeller() as model:
+        chat_provider(client, data, model.base_url)
+        check = detect(client, data, current).json()
+    pending = save(client, url, complete_body(current, [], check["id"]), "complete-pending")
+    assert pending.status_code == 409, pending.text
+    assert pending.json()["code"] == "ocr_spelling_suggestions_pending"
+    assert client.get(url).json()["version"] == 0
+    saved = save(
+        client,
+        url,
+        edit_body(current, current["units"][0], "Bản sửa trước khi duyệt"),
+        "pre-review-save",
+    )
+    assert saved.status_code == 200, saved.text
+    stale = save(client, url, complete_body(saved.json(), [], check["id"]), "complete-stale")
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["code"] == "ocr_spelling_check_stale"
+
+
+def test_completing_review_requires_each_span_in_the_same_unit(client):
+    data = processed_input(client, code="spelling-review-two-spans")
+    url = review_url(data)
+    current = client.get(url).json()
+    unit = current["units"][0]
+    text = unit["text"]
+
+    class TwoSpanSpeller(FakeSpeller):
+        def _respond(self, index):
+            suggestions = [
+                {
+                    "evidence_id": unit["evidence_id"],
+                    "start": start,
+                    "end": start + 1,
+                    "original": text[start],
+                    "replacement": text[start].swapcase(),
+                    "reason": "Kiểm tra chữ hoa thường",
+                    "context_before": text,
+                    "context_after": text[:start] + text[start].swapcase() + text[start + 1 :],
+                }
+                for start in (0, 4)
+            ]
+            return 200, json.dumps(
+                {
+                    "choices": [
+                        {
+                            "message": {"content": json.dumps({"suggestions": suggestions})},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {"prompt_tokens": 100, "completion_tokens": 30, "total_tokens": 130},
+                }
+            ).encode()
+
+    with TwoSpanSpeller() as model:
+        chat_provider(client, data, model.base_url)
+        detected = detect(client, data, current)
+    assert detected.status_code == 200, detected.text
+    check = detected.json()
+    first, second = sorted(check["suggestions"], key=lambda item: item["start"])
+    partial = edit_body(current, unit, apply_suggestion(unit, first))
+    partial["review_check_id"] = check["id"]
+    pending = save(client, url, partial, "complete-partial")
+    assert pending.status_code == 409, pending.text
+    assert pending.json()["code"] == "ocr_spelling_suggestions_pending"
+    assert client.get(url).json()["version"] == 0
+
+    partial["changes"][0]["spelling_edits"] = [
+        {"start": first["start"], "end": first["end"], "replacement": "Ph"},
+        {"start": second["start"], "end": second["end"], "replacement": "Lạ"},
+    ]
+    invalid = save(client, url, partial, "complete-mismatched-spans")
+    assert invalid.status_code == 409, invalid.text
+    assert invalid.json()["code"] == "ocr_spelling_edit_invalid"
+    after = "Ph" + text[1:4] + "Lạ" + text[5:]
+    partial["changes"][0]["after"] = after
+    saved = save(client, url, partial, "complete-both")
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["units"][0]["text"] == after
+    assert client.get(url + "/checks/" + check["id"]).json()["reviewed_version"] == 1
+
+
+def test_completing_review_rejects_foreign_or_unfinished_checks(client):
+    from sqlalchemy import select
+
+    from qnu.domains.ocr.review.models import SpellingRun
+    from qnu.platform.database import AsyncSessionFactory
+
+    data = processed_input(client, code="spelling-review-invalid")
+    url = review_url(data)
+    current = client.get(url).json()
+    with FakeSpeller() as model:
+        chat_provider(client, data, model.base_url)
+        check = detect(client, data, current).json()
+
+    missing = save(client, url, complete_body(current, [], "spl_missing"), "complete-missing")
+    assert missing.status_code == 404, missing.text
+
+    async def mark(mode):
+        async with AsyncSessionFactory() as db:
+            row = await db.scalar(select(SpellingRun).where(SpellingRun.id == check["id"]))
+            if mode == "failed":
+                row.status = "failed"
+            else:
+                row.trace = {**row.trace, "automatic_parent": "spl_parent"}
+            await db.commit()
+
+    client.portal.call(mark, "failed")
+    not_ready = save(client, url, complete_body(current, [], check["id"]), "complete-not-ready")
+    assert not_ready.status_code == 409, not_ready.text
+    assert not_ready.json()["code"] == "ocr_spelling_check_not_ready"
+    client.portal.call(mark, "child")
+    hidden = save(client, url, complete_body(current, [], check["id"]), "complete-child")
+    assert hidden.status_code == 409, hidden.text
+    assert hidden.json()["code"] == "ocr_spelling_check_not_reviewable"
+
+
+class TwoUnitSpeller(FakeChat):
+    def _respond(self, index):
+        incoming = json.loads(self.requests[index]["body"]["messages"][-1]["content"])
+        suggestions = []
+        for unit in incoming["units"]:
+            text = unit["text"]
+            position = next(i for i, char in enumerate(text) if char.isalpha())
+            original = text[position]
+            replacement = original.lower() if original.isupper() else original.upper()
+            suggestions.append(
+                {
+                    "evidence_id": unit["evidence_id"],
+                    "start": position,
+                    "end": position + 1,
+                    "original": original,
+                    "replacement": replacement,
+                    "reason": "Gợi ý kiểm tra chữ",
+                    "context_before": text,
+                    "context_after": text[:position] + replacement + text[position + 1 :],
+                }
+            )
+        body = {
+            "choices": [
+                {
+                    "message": {"content": json.dumps({"suggestions": suggestions})},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 100, "completion_tokens": 30, "total_tokens": 130},
+        }
+        return 200, json.dumps(body).encode()
+
+
+def test_bulk_ignore_persists_all_remaining_suggestions(client):
+    data = processed_input(client, code="spelling-review-bulk")
+    url = review_url(data)
+    current = client.get(url).json()
+    units = [unit for unit in current["units"] if any(char.isalpha() for char in unit["text"])][:2]
+    assert len(units) == 2
+    with TwoUnitSpeller() as model:
+        chat_provider(client, data, model.base_url)
+        response = client.post(
+            url + "/checks",
+            headers={"Idempotency-Key": "check-two"},
+            json={
+                "expected_version": current["version"],
+                "expected_sha256": current["canonical_sha256"],
+                "evidence_ids": [unit["evidence_id"] for unit in units],
+            },
+        )
+        assert response.status_code == 200, response.text
+        check = response.json()
+    assert len(check["suggestions"]) == 2
+    spans = [
+        {"evidence_id": item["evidence_id"], "start": item["start"], "end": item["end"]}
+        for item in check["suggestions"]
+    ]
+    unknown = client.post(
+        url + f"/checks/{check['id']}/dispositions/bulk",
+        json={"suggestions": [{**spans[0], "end": 99}]},
+    )
+    assert unknown.status_code == 404, unknown.text
+    bulk = client.post(
+        url + f"/checks/{check['id']}/dispositions/bulk", json={"suggestions": spans}
+    )
+    assert bulk.status_code == 200, bulk.text
+    assert len(bulk.json()["ignored_suggestions"]) == 2
+    done = save(client, url, complete_body(current, [], check["id"]), "complete-bulk")
+    assert done.status_code == 200, done.text
+    assert done.json()["version"] == 0
+    assert client.get(url + "/checks/" + check["id"]).json()["reviewed_version"] == 0

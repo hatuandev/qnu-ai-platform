@@ -41,7 +41,9 @@ logger = get_logger(__name__)
 
 async def validate_target(db: AsyncSession, run: IndexRun, actor: AuthActor, vectors: VectorStore):
     await authorize(db, actor, run.workspace_id, run.collection_id, write=True)
-    runtime = await resolve_embedding_runtime(db, run.workspace_id, run.provider_id)
+    runtime = await resolve_embedding_runtime(
+        db, run.workspace_id, run.provider_id, index_run_id=run.id
+    )
     if (
         runtime.configuration_hash != run.config["provider"]["configuration_hash"]
         or vectors.target_hash != run.config["vector_target_hash"]
@@ -89,6 +91,7 @@ async def _embed_pending(db, blob, run, actor, model: EmbeddingModel, vectors: V
             request_hash,
             budget,
             run.provider_id,
+            index_run_id=run.id,
         )
         await assert_claim(db, run)
         run.pending_batch = {

@@ -928,7 +928,7 @@ def test_shared_index_generation_survives_purge_of_one_document(client):
         assert execute_index(client, index_run_id) == "completed"
 
         before_hits = client.post(
-            collection_base + "/search", json={"query": "PHỤ LỤC", "top_k": 50}
+            collection_base + "/search", json={"query": "PHỤ LỤC", "top_k": 50, "mode": "dense"}
         ).json()["hits"]
         assert {hit["version_id"] for hit in before_hits} == {
             data["compiled"]["version"]["id"],
@@ -945,7 +945,7 @@ def test_shared_index_generation_survives_purge_of_one_document(client):
         # Withdrawal reaches the read path before the background cleanup starts.
         as_actor(EDITOR)
         immediate = client.post(
-            collection_base + "/search", json={"query": "PHỤ LỤC", "top_k": 50}
+            collection_base + "/search", json={"query": "PHỤ LỤC", "top_k": 50, "mode": "dense"}
         ).json()["hits"]
         assert immediate and {hit["version_id"] for hit in immediate} == {second_version["id"]}
 
@@ -993,7 +993,7 @@ def test_shared_index_generation_survives_purge_of_one_document(client):
 
         # The unrelated document keeps serving from the same active generation.
         after_hits = client.post(
-            collection_base + "/search", json={"query": "PHỤ LỤC", "top_k": 50}
+            collection_base + "/search", json={"query": "PHỤ LỤC", "top_k": 50, "mode": "dense"}
         ).json()["hits"]
         assert after_hits and {hit["version_id"] for hit in after_hits} == {second_version["id"]}
         assert client.get(collection_base + "/sources/" + body["source"]["id"]).status_code == 200
@@ -1173,6 +1173,6 @@ def test_shared_index_batch_files_keep_only_surviving_chunks(client, monkeypatch
         assert {row["version_id"] for row in sealed["inputs"]} == {second_version["id"]}
         assert sealed["purge"]["action_id"] == action_id
         hits = client.post(
-            collection_base + "/search", json={"query": "PHỤ LỤC", "top_k": 50}
+            collection_base + "/search", json={"query": "PHỤ LỤC", "top_k": 50, "mode": "dense"}
         ).json()["hits"]
         assert hits and {hit["version_id"] for hit in hits} == {second_version["id"]}

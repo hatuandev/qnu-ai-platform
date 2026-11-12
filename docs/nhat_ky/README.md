@@ -1,5 +1,23 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên942 — Thời hạn hội thoại và tác vụ tài liệu](2026-11-12_phien_942_thoi_han_hoi_thoai_va_tac_vu_tai_lieu.md).
+- [Phiên941 — Tiếp tục và duyệt chính tả theo từng vị trí](2026-11-12_phien_941_tiep_tuc_va_duyet_chinh_ta.md).
+- [Phiên940 — Clear DB, upload tệp kiểm thử phức tạp, 30 câu RAG và xác minh bge-reranker-v2-m3](2026-11-12_phien_940_clear_upload_30_cau_va_reranker.md).
+- [Phiên939 — Prompt v24 chống abstain sai, link bảng liền kề cho Q9 và đo lặp 3×10 câu](2026-11-12_phien_939_prompt_v24_va_link_bang_lien_ke.md).
+- [Phiên938 — RAG P1–P5: recall, grounding bảng, lỗi, trace và tách text embedding](2026-11-11_phien_938_rag_p1_p5_khac_phuc.md).
+- [Phiên937 — P0 ngân sách ngữ cảnh và chạy lại 10 câu RAG phiên 935](2026-11-11_phien_937_ngan_sach_context_p0_va_chay_lai_10_cau.md).
+- [Phiên936 — Bền vững soát chính tả tự động và tự chạy lại index sau lỗi tạm thời](2026-11-11_phien_936_ben_vung_soat_chinh_ta_va_index.md).
+- [Phiên934 — Chỉ mục FTS GIN, payload index Qdrant và đo A/B retrieval](2026-11-11_phien_934_toi_uu_rag_index_va_do_luong.md).
+- [Phiên933 — Clear DB, up tệp scan thật, duyệt sửa chính tả, xuất bản và nạp vector RAG](2026-11-11_phien_933_clear_db_upload_duyet_va_rag.md).
+- [Phiên932 — Duyệt chính tả một lần sau upload, ẩn phiên bản khỏi giao diện](2026-11-11_phien_932_duyet_chinh_ta_mot_lan.md).
+- [Phiên931 — Lưu bền vững "Bỏ qua", lịch sử phiên bản và phím tắt rà soát](2026-11-11_phien_931_luu_bo_qua_lich_su_phien_ban_va_phim_tat.md).
+- [Phiên930 — Sửa ngõ cụt trang rà soát sau khi lưu và thêm soát lại theo phiên bản](2026-11-11_phien_930_sua_ng_cut_ra_soat_va_soat_lai.md).
+- [Phiên929 — Hoàn tất luồng xử lý ngược, migration 0022, khởi động lại dev và E2E upload tệp scan thật](2026-11-11_phien_929_hoan_tat_luong_nguoc.md).
+- [Phiên928 — Neo ngữ cảnh và prompt v5 soát chính tả](2026-11-10_phien_928_neo_ngu_canh_va_prompt_v5.md).
+- [Phiên927 — Tiếp tục soát chính tả sau nhóm lỗi](2026-11-10_phien_927_soat_chinh_ta_sau_nhom_loi.md).
+- [Phiên926 — Chạy Frontend V2 bằng make dev](2026-11-10_phien_926_make_dev_frontend_v2.md).
+- [Phiên925 — Worker chạy riêng xử lý xóa tài liệu](2026-11-10_phien_925_worker_xoa_nguon.md).
+- [Phiên924 — Sửa xóa tài liệu, Cài đặt và model của chỉ mục](2026-11-10_phien_924_sua_xoa_va_mac_dinh_model.md).
 - [Phiên923 — Lỗi tải kết quả rà soát FE V2](2026-11-10_phien_923_loi_tai_ket_qua_ra_soat_fe_v2.md).
 - [Phiên922 — Sửa soát chính tả và tệp xuất ở FE V2](2026-11-10_phien_922_sua_soat_chinh_ta_va_tep_xuat_fe_v2.md).
 - [Phiên921 — Markdown/JSON và Rà soát chính tả FE V2](2026-11-10_phien_921_markdown_json_va_soat_chinh_ta_fe_v2.md).

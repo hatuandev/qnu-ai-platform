@@ -26,11 +26,11 @@ def api_url(endpoint: str) -> str:
     return base if base.endswith("/v1") else base + "/v1"
 
 
-def error(code: str, *, uncertain: bool = False) -> AppException:
+def error(code: str, *, uncertain: bool = False, status_code: int | None = None) -> AppException:
     return AppException(
         "Tác vụ MinerU chưa có kết quả hợp lệ; giữ mã tác vụ, không tự gửi lại PDF.",
         code="ocr_provider_timeout" if uncertain else code,
-        status_code=504 if uncertain else 502,
+        status_code=504 if uncertain else (status_code or 502),
     )
 
 
@@ -190,6 +190,8 @@ class MineruOcrEngine:
     async def _read(client, method, url, *, limit=MAX_CONTROL_BYTES, expected=200, **kwargs):
         async with client.stream(method, url, **kwargs) as response:
             if response.status_code != expected:
+                if response.status_code == 422:
+                    raise error("ocr_provider_rejected", status_code=422)
                 code = (
                     "ocr_provider_auth_failed"
                     if response.status_code in (401, 403)

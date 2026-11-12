@@ -16,6 +16,7 @@ import {
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useMeQuery } from "@/api/auth/queries";
+import { ApiProblemError } from "@/api/client";
 import {
   useConnectionsQuery,
   useModelDefaultsQuery,
@@ -96,9 +97,16 @@ function SettingsPage() {
     return "appearance";
   });
 
-  const { data: authData } = useMeQuery();
+  const authQuery = useMeQuery();
+  const authData = authQuery.data;
   const actor = authData?.actor;
-  const canManageSystem = isModelAdmin(actor);
+  const isSignedIn = !authQuery.isError && actor?.authenticated === true;
+  const canManageSystem = isSignedIn && isModelAdmin(actor);
+  const shouldLoadModels = activeTab === "models" && canManageSystem;
+  const accountError =
+    authQuery.error instanceof ApiProblemError && authQuery.error.isUnauthorized
+      ? "Bạn chưa đăng nhập."
+      : "Không thể tải thông tin tài khoản.";
 
   const {
     data: defaults,
@@ -106,21 +114,24 @@ function SettingsPage() {
     isError: errorDefaults,
     refetch: refetchDefaults,
     isFetching: fetchingDefaults,
-  } = useModelDefaultsQuery();
+  } = useModelDefaultsQuery(shouldLoadModels);
 
   const {
     data: providers = [],
     isLoading: loadingProviders,
+    isError: errorProviders,
     refetch: refetchProviders,
     isFetching: fetchingProviders,
-  } = useProvidersQuery(canManageSystem);
+  } = useProvidersQuery(shouldLoadModels);
 
   const {
     data: connections = [],
     isLoading: loadingConnections,
+    isError: errorConnections,
     refetch: refetchConnections,
     isFetching: fetchingConnections,
-  } = useConnectionsQuery(canManageSystem);
+  } = useConnectionsQuery(shouldLoadModels);
+  const hasModelLoadError = errorDefaults || errorProviders || errorConnections;
 
   const updateMutation = useUpdateModelDefaultsMutation();
 
@@ -155,9 +166,7 @@ function SettingsPage() {
       const list = providers.filter((p) => {
         if (p.is_connection) return false;
         if (!p.is_active) return false;
-        if (p.parent_id && connectionActiveMap.has(p.parent_id)) {
-          if (!connectionActiveMap.get(p.parent_id)) return false;
-        }
+        if (p.parent_id && !connectionActiveMap.get(p.parent_id)) return false;
         const caps = (p.capabilities as string[]) || [];
         return caps.includes(cap);
       });
@@ -223,16 +232,18 @@ function SettingsPage() {
   };
 
   const handleRefresh = async () => {
-    await Promise.all([
+    const results = await Promise.all([
       refetchDefaults(),
-      canManageSystem ? refetchProviders() : Promise.resolve(),
-      canManageSystem ? refetchConnections() : Promise.resolve(),
+      refetchProviders(),
+      refetchConnections(),
     ]);
-    toast.success("Đã làm mới dữ liệu từ máy chủ.");
+    if (results.every((result) => result.isSuccess)) {
+      toast.success("Đã làm mới dữ liệu từ máy chủ.");
+    }
   };
 
   const handleSave = async () => {
-    if (!isDirty || !canManageSystem) return;
+    if (!isDirty || !canManageSystem || hasModelLoadError) return;
 
     const payload = buildSystemDefaultsPayload(
       userEdits,
@@ -412,229 +423,233 @@ function SettingsPage() {
 
               <Separator />
 
-              {!canManageSystem && (
+              {authQuery.isPending ? (
+                <Skeleton className="h-12 w-full" />
+              ) : !canManageSystem ? (
                 <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 text-xs text-foreground">
                   <ShieldAlert className="size-4 text-amber-600 shrink-0" />
                   <span>
-                    Bạn đang xem cấu hình ở chế độ chỉ đọc. Chỉ tài khoản có
-                    quyền quản trị mô hình (<code>ai.models.manage</code>) mới
-                    có thể chỉnh sửa cấu hình hệ thống.
+                    {authQuery.isError
+                      ? accountError
+                      : isSignedIn
+                        ? "Bạn không có quyền xem cấu hình mô hình hệ thống."
+                        : "Bạn cần đăng nhập để xem cấu hình mô hình."}
                   </span>
                 </div>
-              )}
-
-              {errorDefaults && (
-                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive space-y-2">
-                  <div className="font-semibold flex items-center gap-2">
-                    <AlertTriangle className="size-4" />
-                    <span>
-                      Không thể tải cấu hình mô hình mặc định từ máy chủ.
-                    </span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => refetchDefaults()}
-                    className="h-7 text-xs"
-                  >
-                    Thử lại
-                  </Button>
-                </div>
-              )}
-
-              <Card className="shadow-2xs">
-                <CardHeader className="pb-4 border-b border-border/60">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <Cpu className="size-4 text-primary" />
-                      <CardTitle className="text-sm font-semibold">
-                        Mô hình mặc định toàn hệ thống
-                      </CardTitle>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleRefresh}
-                      disabled={isLoading || isRefreshing}
-                      className="h-8 text-xs gap-1.5"
-                    >
-                      <RotateCw
-                        className={cn(
-                          "size-3.5",
-                          isRefreshing && "animate-spin",
-                        )}
-                      />
-                      <span>Làm mới</span>
-                    </Button>
-                  </div>
-                  <CardDescription className="text-xs mt-1">
-                    Thiết lập mô hình mặc định cho bốn chức năng cốt lõi. Mọi
-                    tác vụ ở tất cả các đơn vị sẽ tự động sử dụng cấu hình này.
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent className="p-0 divide-y divide-border/60">
-                  {isLoading ? (
-                    <div className="p-6 space-y-4">
-                      <Skeleton className="h-14 w-full" />
-                      <Skeleton className="h-14 w-full" />
-                      <Skeleton className="h-14 w-full" />
-                      <Skeleton className="h-14 w-full" />
-                    </div>
-                  ) : (
-                    CAPABILITIES_LIST.map((item) => {
-                      const cap = item.key;
-                      const currentValue = effectiveValues[cap];
-                      const availableModels =
-                        availableModelsForCapability.get(cap) || [];
-                      const selectedProvider = currentValue
-                        ? providersMap.get(currentValue)
-                        : null;
-
-                      const isAssignedUnavailable =
-                        currentValue &&
-                        (!selectedProvider?.is_active ||
-                          (selectedProvider.parent_id &&
-                            connectionActiveMap.get(
-                              selectedProvider.parent_id,
-                            ) === false));
-
-                      const isChanged =
-                        cap in userEdits &&
-                        userEdits[cap] !== serverValues[cap];
-
-                      return (
-                        <div
-                          key={cap}
-                          className={cn(
-                            "p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6 transition-colors",
-                            isChanged && "bg-primary/5",
-                          )}
-                        >
-                          <div className="space-y-1 min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-foreground">
-                                {item.name}
-                              </span>
-                              {currentValue ? (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-[10px] h-4.5 px-1.5 font-normal bg-primary/10 text-primary border-primary/20"
-                                >
-                                  Đã đặt
-                                </Badge>
-                              ) : (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] h-4.5 px-1.5 font-normal text-muted-foreground"
-                                >
-                                  Chưa cấu hình
-                                </Badge>
-                              )}
-                              {isChanged && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] h-4.5 px-1.5 font-normal text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/40"
-                                >
-                                  Chưa lưu
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-muted-foreground leading-relaxed">
-                              {item.description}
-                            </p>
-                            {isAssignedUnavailable && (
-                              <div className="flex items-center gap-1.5 text-[11px] text-amber-600 mt-1">
-                                <AlertTriangle className="size-3.5 shrink-0" />
-                                <span>
-                                  Mô hình đã gán trước đây hiện không khả dụng
-                                  hoặc bị ngắt kết nối.
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="w-full sm:w-80 shrink-0">
-                            <Select
-                              value={currentValue ?? NONE_VALUE}
-                              onValueChange={(val) =>
-                                handleModelChange(cap, val)
-                              }
-                              disabled={
-                                !canManageSystem || updateMutation.isPending
-                              }
-                            >
-                              <SelectTrigger className="h-9 text-xs w-full bg-background">
-                                <SelectValue placeholder="Chọn mô hình mặc định..." />
-                              </SelectTrigger>
-                              <SelectContent className="text-xs max-h-72">
-                                <SelectItem
-                                  value={NONE_VALUE}
-                                  className="text-muted-foreground italic"
-                                >
-                                  (Chưa đặt - không dùng mặc định)
-                                </SelectItem>
-                                {isAssignedUnavailable && selectedProvider && (
-                                  <SelectItem
-                                    value={selectedProvider.id}
-                                    className="text-destructive font-mono text-xs"
-                                  >
-                                    ⚠️ {formatModelLabel(selectedProvider)}{" "}
-                                    (Không khả dụng)
-                                  </SelectItem>
-                                )}
-                                {availableModels.map((m) => (
-                                  <SelectItem key={m.id} value={m.id}>
-                                    {formatModelLabel(m)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+              ) : (
+                <>
+                  <Card className="shadow-2xs">
+                    <CardHeader className="pb-4 border-b border-border/60">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <Cpu className="size-4 text-primary" />
+                          <CardTitle className="text-sm font-semibold">
+                            Mô hình mặc định toàn hệ thống
+                          </CardTitle>
                         </div>
-                      );
-                    })
-                  )}
-                </CardContent>
-              </Card>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRefresh}
+                          disabled={
+                            isLoading ||
+                            isRefreshing ||
+                            updateMutation.isPending
+                          }
+                          className="h-8 text-xs gap-1.5"
+                        >
+                          <RotateCw
+                            className={cn(
+                              "size-3.5",
+                              isRefreshing && "animate-spin",
+                            )}
+                          />
+                          <span>
+                            {hasModelLoadError ? "Thử lại" : "Làm mới"}
+                          </span>
+                        </Button>
+                      </div>
+                      <CardDescription className="text-xs mt-1">
+                        Áp dụng cho tác vụ mới sử dụng mô hình mặc định.
+                      </CardDescription>
+                    </CardHeader>
 
-              {/* Action Footer */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
-                <div className="flex items-center gap-2 text-xs">
-                  {isDirty ? (
-                    <span className="text-amber-600 font-medium flex items-center gap-1.5">
-                      <AlertTriangle className="size-3.5" />
-                      Có thay đổi chưa lưu
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground flex items-center gap-1.5">
-                      <CheckCircle2 className="size-3.5 text-primary" />
-                      Đã đồng bộ với cấu hình hệ thống
-                    </span>
-                  )}
-                </div>
+                    <CardContent className="p-0 divide-y divide-border/60">
+                      {hasModelLoadError ? (
+                        <p
+                          role="alert"
+                          className="p-5 flex items-center gap-2 text-xs text-destructive"
+                        >
+                          <AlertTriangle className="size-4 shrink-0" />
+                          Không thể tải cấu hình hoặc danh sách mô hình từ máy
+                          chủ.
+                        </p>
+                      ) : isLoading ? (
+                        <div className="p-6 space-y-4">
+                          <Skeleton className="h-14 w-full" />
+                          <Skeleton className="h-14 w-full" />
+                          <Skeleton className="h-14 w-full" />
+                          <Skeleton className="h-14 w-full" />
+                        </div>
+                      ) : (
+                        CAPABILITIES_LIST.map((item) => {
+                          const cap = item.key;
+                          const currentValue = effectiveValues[cap];
+                          const availableModels =
+                            availableModelsForCapability.get(cap) || [];
+                          const selectedProvider = currentValue
+                            ? providersMap.get(currentValue)
+                            : null;
 
-                {canManageSystem && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleSave}
-                    disabled={!isDirty || updateMutation.isPending || isLoading}
-                    className="h-8 text-xs gap-1.5"
-                  >
-                    {updateMutation.isPending ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Save className="size-3.5" />
-                    )}
-                    <span>
-                      {updateMutation.isPending
-                        ? "Đang lưu..."
-                        : "Lưu thay đổi"}
-                    </span>
-                  </Button>
-                )}
-              </div>
+                          const isAssignedUnavailable =
+                            currentValue &&
+                            !availableModels.some(
+                              (model) => model.id === currentValue,
+                            );
+
+                          const isChanged =
+                            cap in userEdits &&
+                            userEdits[cap] !== serverValues[cap];
+
+                          return (
+                            <div
+                              key={cap}
+                              className={cn(
+                                "p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6 transition-colors",
+                                isChanged && "bg-primary/5",
+                              )}
+                            >
+                              <div className="space-y-1 min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-semibold text-foreground">
+                                    {item.name}
+                                  </span>
+                                  {currentValue ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-[10px] h-4.5 px-1.5 font-normal bg-primary/10 text-primary border-primary/20"
+                                    >
+                                      Đã đặt
+                                    </Badge>
+                                  ) : (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] h-4.5 px-1.5 font-normal text-muted-foreground"
+                                    >
+                                      Chưa cấu hình
+                                    </Badge>
+                                  )}
+                                  {isChanged && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] h-4.5 px-1.5 font-normal text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/40"
+                                    >
+                                      Chưa lưu
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                  {item.description}
+                                </p>
+                                {isAssignedUnavailable && (
+                                  <div className="flex items-center gap-1.5 text-[11px] text-amber-600 mt-1">
+                                    <AlertTriangle className="size-3.5 shrink-0" />
+                                    <span>
+                                      Mô hình đã gán trước đây hiện không khả
+                                      dụng hoặc bị ngắt kết nối.
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="w-full sm:w-80 shrink-0">
+                                <Select
+                                  value={currentValue ?? NONE_VALUE}
+                                  onValueChange={(val) =>
+                                    handleModelChange(cap, val)
+                                  }
+                                  disabled={
+                                    !canManageSystem || updateMutation.isPending
+                                  }
+                                >
+                                  <SelectTrigger className="h-9 text-xs w-full bg-background">
+                                    <SelectValue placeholder="Chọn mô hình mặc định..." />
+                                  </SelectTrigger>
+                                  <SelectContent className="text-xs max-h-72">
+                                    <SelectItem
+                                      value={NONE_VALUE}
+                                      className="text-muted-foreground italic"
+                                    >
+                                      Chưa đặt mặc định hệ thống
+                                    </SelectItem>
+                                    {isAssignedUnavailable && (
+                                      <SelectItem
+                                        value={currentValue}
+                                        disabled
+                                        className="text-destructive font-mono text-xs"
+                                      >
+                                        {selectedProvider
+                                          ? `${formatModelLabel(selectedProvider)} (Không khả dụng)`
+                                          : "Mô hình không khả dụng"}
+                                      </SelectItem>
+                                    )}
+                                    {availableModels.map((m) => (
+                                      <SelectItem key={m.id} value={m.id}>
+                                        {formatModelLabel(m)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {!isLoading && !hasModelLoadError && defaults && (
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
+                      <div className="flex items-center gap-2 text-xs">
+                        {isDirty ? (
+                          <span className="text-amber-600 font-medium flex items-center gap-1.5">
+                            <AlertTriangle className="size-3.5" />
+                            Có thay đổi chưa lưu
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground flex items-center gap-1.5">
+                            <CheckCircle2 className="size-3.5 text-primary" />
+                            Đã đồng bộ với cấu hình hệ thống
+                          </span>
+                        )}
+                      </div>
+
+                      {canManageSystem && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleSave}
+                          disabled={
+                            !isDirty || updateMutation.isPending || isLoading
+                          }
+                          className="h-8 text-xs gap-1.5"
+                        >
+                          {updateMutation.isPending ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Save className="size-3.5" />
+                          )}
+                          <span>
+                            {updateMutation.isPending
+                              ? "Đang lưu..."
+                              : "Lưu thay đổi"}
+                          </span>
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -652,72 +667,97 @@ function SettingsPage() {
 
               <Separator />
 
-              <div className="space-y-4">
-                <div className="p-5 rounded-xl border border-border/70 bg-card space-y-4 shadow-2xs">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                    <div>
-                      <span className="text-muted-foreground block text-[11px] mb-1">
-                        Tên hiển thị
-                      </span>
-                      <span className="font-semibold text-foreground text-sm">
-                        {actor?.display_name || "Quản trị viên"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block text-[11px] mb-1">
-                        Tên đăng nhập
-                      </span>
-                      <span className="font-mono text-foreground">
-                        {actor?.username || "dev@qnu.edu.vn"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block text-[11px] mb-1">
-                        Loại người dùng
-                      </span>
-                      <span className="font-medium text-foreground capitalize">
-                        {actor?.user_type || "Cán bộ / Quản trị"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block text-[11px] mb-1">
-                        Trạng thái phiên
-                      </span>
-                      <Badge
-                        variant="secondary"
-                        className="bg-primary/10 text-primary border-primary/20 text-[10px] h-5 px-1.5"
-                      >
-                        Đã đăng nhập
-                      </Badge>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div>
-                    <span className="text-muted-foreground block text-[11px] mb-2 font-medium">
-                      Quyền hạn hệ thống
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(actor?.permissions || []).length > 0 ? (
-                        actor?.permissions.map((perm) => (
-                          <Badge
-                            key={perm}
-                            variant="outline"
-                            className="font-mono text-[10px] h-5 px-1.5 bg-muted/40 text-foreground"
-                          >
-                            {perm}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground text-xs italic">
-                          Quyền tài khoản cơ bản
+              {authQuery.isPending ? (
+                <Skeleton className="h-32 w-full" />
+              ) : authQuery.isError ? (
+                <div
+                  role="alert"
+                  className="flex items-center justify-between gap-3 text-sm text-destructive"
+                >
+                  <span>{accountError}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void authQuery.refetch()}
+                    disabled={authQuery.isFetching}
+                  >
+                    Thử lại
+                  </Button>
+                </div>
+              ) : !actor?.authenticated ? (
+                <p className="text-sm text-muted-foreground">
+                  Bạn chưa đăng nhập.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-5 rounded-xl border border-border/70 bg-card space-y-4 shadow-2xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <span className="text-muted-foreground block text-[11px] mb-1">
+                          Tên hiển thị
                         </span>
-                      )}
+                        <span className="font-semibold text-foreground text-sm">
+                          {actor.display_name ||
+                            actor.username ||
+                            "Chưa có tên hiển thị"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[11px] mb-1">
+                          Tên đăng nhập
+                        </span>
+                        <span className="font-mono text-foreground">
+                          {actor.username || "Chưa có thông tin"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[11px] mb-1">
+                          Loại người dùng
+                        </span>
+                        <span className="font-medium text-foreground capitalize">
+                          {actor.user_type || "Chưa có thông tin"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[11px] mb-1">
+                          Trạng thái phiên
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className="bg-primary/10 text-primary border-primary/20 text-[10px] h-5 px-1.5"
+                        >
+                          Đã đăng nhập
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <span className="text-muted-foreground block text-[11px] mb-2 font-medium">
+                        Quyền hạn hệ thống
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {actor.permissions.length > 0 ? (
+                          actor.permissions.map((perm) => (
+                            <Badge
+                              key={perm}
+                              variant="outline"
+                              className="font-mono text-[10px] h-5 px-1.5 bg-muted/40 text-foreground"
+                            >
+                              {perm}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground text-xs italic">
+                            Quyền tài khoản cơ bản
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>

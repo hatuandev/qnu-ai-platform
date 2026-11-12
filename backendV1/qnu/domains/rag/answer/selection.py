@@ -63,6 +63,8 @@ def _required(context: dict) -> set[str]:
         required.add(link["chunk_id"])
         required.update(link.get("support_ids") or [])
     for group in context.get("structure", {}).get("groups") or []:
+        if group.get("optional"):
+            continue
         required.update(group.get("required_ids") or [])
     return required
 

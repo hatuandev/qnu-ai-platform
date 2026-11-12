@@ -73,6 +73,7 @@ def test_dynamic_filters_before_dense_and_fts_topk_and_facets_after_withdrawal(
         data["base"] + "/search",
         json={
             "query": "Tổng quan",
+            "mode": "dense",
             "metadata_filter": {"attributes": {"PHỤ LỤC": "99"}},
         },
     )
@@ -82,6 +83,7 @@ def test_dynamic_filters_before_dense_and_fts_topk_and_facets_after_withdrawal(
         data["base"] + "/search",
         json={
             "query": "PHỤ LỤC: 99",
+            "mode": "dense",
             "scope_resolution": "catalog",
             "metadata_filter": {"attributes": {"PHỤ LỤC": "01"}},
         },

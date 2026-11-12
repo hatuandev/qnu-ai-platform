@@ -30,7 +30,15 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from qnu.platform.database import Base
 
-RUN_STATUSES = ("queued", "running", "completed", "failed", "uncertain", "cancelled")
+RUN_STATUSES = (
+    "queued",
+    "running",
+    "completed",
+    "completed_with_warnings",
+    "failed",
+    "uncertain",
+    "cancelled",
+)
 ACTIVE_RUN_STATUSES = ("queued", "running")
 PAGE_STATUSES = ("pending", "in_flight", "completed", "blank", "failed", "uncertain")
 ARTIFACT_KINDS = (
@@ -76,7 +84,9 @@ class OcrProcessingRun(Base):
         ),
         Index("ix_ocr_runs_workspace_status", "workspace_id", "status"),
         CheckConstraint(
-            "status IN ('queued','running','completed','failed','uncertain','cancelled')",
+            "status IN "
+            "('queued','running','completed','completed_with_warnings',"
+            "'failed','uncertain','cancelled')",
             name="ck_ocr_run_status",
         ),
         CheckConstraint("generation >= 1", name="ck_ocr_run_generation"),
@@ -95,7 +105,7 @@ class OcrProcessingRun(Base):
     revision_no: Mapped[int] = mapped_column(Integer, nullable=False)
     source_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     generation: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued", index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued", index=True)
     config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     config_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     provider_id: Mapped[str | None] = mapped_column(String(64), nullable=True)

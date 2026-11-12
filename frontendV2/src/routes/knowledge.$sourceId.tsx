@@ -783,7 +783,8 @@ function SourceStudioPage() {
                     params={{ sourceId }}
                     search={{
                       collectionId: resolvedCollectionId,
-                      ...reviewScope,
+                      revisionId: reviewScope.revisionId,
+                      runId: reviewScope.runId,
                     }}
                     className="flex items-center gap-2 cursor-pointer"
                   >

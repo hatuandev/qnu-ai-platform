@@ -54,6 +54,7 @@ LEASE_SECONDS = 180
 RECONCILE_GRACE_SECONDS = 60
 ADVANCING_OCR_STATUSES = ("queued", "running")
 FAILED_OCR_STATUSES = ("failed", "uncertain", "cancelled")
+USABLE_OCR_STATUSES = ("completed", "completed_with_warnings")
 @dataclass(frozen=True, slots=True)
 class PreparationOutcome:
     intent: PreparationIntent
@@ -516,7 +517,7 @@ async def _check_pinned_run(
             "Lượt đọc nội dung đã chọn không có kết quả dùng được.",
             code="preparation_ocr_run_unusable",
         )
-    if req.text_version > 0 and run.status != "completed":
+    if req.text_version > 0 and run.status not in USABLE_OCR_STATUSES:
         raise Conflict(
             "Bản văn bản chỉ dùng được khi lượt đọc đã hoàn tất.",
             code="preparation_text_version_not_ready",
@@ -631,7 +632,7 @@ async def _advance(
             f"preparation_ocr_{run.status}",
             "Đọc nội dung không hoàn tất; chỉnh cấu hình đọc rồi thử lại.",
         )
-    if run.status != "completed":
+    if run.status not in USABLE_OCR_STATUSES:
         return await _fail(
             db, intent, "preparation_ocr_invalid", "Lượt đọc nội dung không dùng được."
         )

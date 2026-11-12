@@ -192,3 +192,42 @@ def test_capacity_change_creates_new_generation_instead_of_reusing_old_result(cl
         ).json()
         assert second["created"] and second["run"]["generation"] == 2
         assert len(fake.requests) == 1
+
+
+def test_spelling_reconcile_restores_a_completed_run_with_no_check(client):
+    from qnu.workers.tasks.ocr import spelling_check_job, spelling_reconcile
+    from tests.integration.compiler_support import chat_provider, processed_input
+    from tests.integration.test_ocr_text_review_651 import FakeSpeller, review_url
+
+    data = processed_input(client, code="spelling-reconcile")
+    url = review_url(data)
+    container = app.state.container
+    old_queue = container.job_queue
+    queue = FakeJobQueue()
+    container.job_queue = queue
+    ctx = {"container": container, "worker_id": "spelling-reconcile-test"}
+    try:
+        with FakeSpeller() as model:
+            chat_provider(client, data, model.base_url)
+
+            async def age():
+                async with AsyncSessionFactory() as db:
+                    await db.execute(
+                        update(OcrProcessingRun)
+                        .where(OcrProcessingRun.id == data["ocr_run_id"])
+                        .values(finished_at=utcnow() - timedelta(hours=1))
+                    )
+                    await db.commit()
+
+            client.portal.call(age)
+            assert client.portal.call(spelling_reconcile, ctx) == 1
+            job = next(j for j in queue.jobs if j["function"] == "spelling_check_job")
+            assert job["args"] == (data["ocr_run_id"], 0)
+            assert job["job_id"].startswith(f"qnu:v1:spelling:{data['ocr_run_id']}:0:recover:")
+            assert client.portal.call(spelling_check_job, ctx, *job["args"]) == "completed"
+            checks = client.get(url + "/checks?version=0").json()
+            assert len(checks) == 1 and checks[0]["status"] == "completed"
+            retry_ctx = {"container": SimpleNamespace(job_queue=FakeJobQueue())}
+            assert client.portal.call(spelling_reconcile, retry_ctx) == 0
+    finally:
+        container.job_queue = old_queue

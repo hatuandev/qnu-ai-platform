@@ -1,5 +1,7 @@
 """Permanent deletion boundaries. Synthetic data only; no network or application DB."""
 
+import subprocess
+import sys
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -18,6 +20,25 @@ from qnu.domains.lifecycle.purge_graph import graph_plan
 from qnu.domains.lifecycle.router import router
 from qnu.domains.lifecycle.schemas import AcceptRequest, ActionResponse
 from qnu.platform.errors import Conflict, DependencyUnavailable
+
+
+def test_standalone_worker_registers_source_purge_models():
+    program = """
+from qnu.workers.settings import WorkerSettings
+from qnu.domains.lifecycle.purge_graph import TABLES
+from qnu.platform.database import Base
+
+assert any(job.__name__ == 'source_purge_job' for job in WorkerSettings.functions if callable(job))
+missing = TABLES - Base.metadata.tables.keys()
+assert not missing, sorted(missing)
+"""
+    result = subprocess.run(
+        [sys.executable, "-X", "utf8", "-c", program],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_published_source_preview_lists_versions_without_destructive_call(monkeypatch):

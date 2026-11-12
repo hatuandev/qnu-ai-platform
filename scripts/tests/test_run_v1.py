@@ -120,9 +120,29 @@ class RunnerTests(unittest.TestCase):
             root = Path(directory)
             (root / ".env").touch()
             with patch.object(runner, "ROOT", root):
-                self.assertEqual(runner.main(["v1-dev", "--env-dir", "root"]), 0)
+                self.assertEqual(runner.main(["dev", "--env-dir", "root"]), 0)
             check.assert_called_once()
-            self.assertEqual(len(services.call_args.args[0]), 3)
+            self.assertEqual(check.call_args.args[0][-2:], ["--frontend", "frontendV2"])
+            [api, worker, frontend] = services.call_args.args[0]
+            self.assertIn("qnu.main:app", api[1])
+            self.assertIn("qnu.workers.settings.WorkerSettings", worker[1])
+            self.assertEqual(frontend[0], root / "frontendV2")
+            self.assertEqual(frontend[1][-3:], ["--port", "3002", "--strictPort"])
+
+    def test_frontend_aliases_match_their_dev_workflows(self):
+        for alias, directory, command in (
+            ("dev1", "frontendV1", "v1-dev"),
+            ("dev2", "frontendV2", "v2-dev"),
+            ("fe2", "frontendV2", "v2-fe"),
+        ):
+            with (
+                self.subTest(alias=alias),
+                contextlib.redirect_stdout(io.StringIO()) as output,
+            ):
+                self.assertEqual(runner.main([alias, "--dry-run"]), 0)
+                plan = json.loads(output.getvalue())
+                self.assertEqual(Path(plan[-1]["cwd"]).name, directory)
+                self.assertEqual(runner.ALIASES[alias], command)
 
     def test_uv_env_file_uses_windows_safe_forward_slashes(self):
         _, command = runner.command_plan("v1-migrate", runner.ROOT, "root")[0]
@@ -240,13 +260,13 @@ class RunnerTests(unittest.TestCase):
             with (
                 patch.object(runner, "ROOT", root),
                 patch.object(
-                    runner.shutil, "which", side_effect=["uv", "uv", "uv", None]
+                    runner, "resolve_executable", side_effect=["uv", "uv", "uv", None]
                 ),
                 patch.object(runner.subprocess, "Popen") as popen,
                 contextlib.redirect_stderr(io.StringIO()),
             ):
                 with self.assertRaises(SystemExit):
-                    runner.main(["v1-dev", "--env-dir", "root"])
+                    runner.main(["dev", "--env-dir", "root"])
                 popen.assert_not_called()
 
     def test_lint_failure_propagates_and_skips_second_command(self):

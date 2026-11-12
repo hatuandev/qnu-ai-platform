@@ -23,7 +23,7 @@ from tests.integration.test_modelops_resilience_695 import (
 )
 
 
-def test_admin_policy_prepares_and_executes_chat_without_response_deadline(client):
+def test_admin_policy_keeps_chat_bounded_and_lets_document_tasks_wait(client):
     ws, providers, _ = setup(client)
     url = API + f"/modelops/providers/{providers[0]}/resilience"
     policy = ResiliencePolicy(key_pool_enabled=True, max_key_attempts=2, wait_for_completion=True)
@@ -39,8 +39,22 @@ def test_admin_policy_prepares_and_executes_chat_without_response_deadline(clien
 
     async def run():
         async with AsyncSessionFactory() as db:
+            for task in ("chat", "answer", "followup"):
+                _, request, _ = await prepare_chat_request(
+                    db, ADMIN, ws, MESSAGES, provider_id=providers[0], max_output_tokens=100,
+                    task=task,
+                )
+                assert not request.wait_for_completion, task
+                assert request.timeout_seconds == 30
+            for task in ("compiler", "ocr_review"):
+                _, request, _ = await prepare_chat_request(
+                    db, ADMIN, ws, MESSAGES, provider_id=providers[0], max_output_tokens=100,
+                    task=task,
+                )
+                assert request.wait_for_completion, task
             runtime, prepared, _ = await prepare_chat_request(
                 db, ADMIN, ws, MESSAGES, provider_id=providers[0], max_output_tokens=100,
+                task="compiler_review",
             )
             assert runtime.wait_for_completion and prepared.wait_for_completion
         model = ManagedChatModel(OpenAICompatibleChatModel(transport=httpx.MockTransport(upstream)))
