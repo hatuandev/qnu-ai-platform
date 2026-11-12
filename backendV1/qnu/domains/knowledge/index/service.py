@@ -13,6 +13,7 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.artifacts import read
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.compilation.service import get_run as get_compilation_run
+from qnu.domains.knowledge.index import abbreviations
 from qnu.domains.knowledge.index.chunking import CHUNKER_VERSION, build_chunks
 from qnu.domains.knowledge.index.contextual import VERSION, contextual_size, enrich
 from qnu.domains.knowledge.index.models import IndexChunk, IndexInput, IndexRun
@@ -162,6 +163,7 @@ async def request_index(
             "replacement_plan_sha256": replacement_plan_sha256,
         }
     await db.flush()
+    catalogs = []
     for publication in published:
         binding = IndexInput(
             id=new_id("iin"),
@@ -177,6 +179,7 @@ async def request_index(
         )
         _, payload = await read(db, blob, compilation, "input_snapshot")
         documents = json.loads(payload)["documents"]
+        catalogs.append(abbreviations.mine(publication.content, documents))
         sizing = (
             {"size": contextual_size(publication.content, documents)}
             if req.contextual_search
@@ -238,6 +241,7 @@ async def request_index(
             run.chunks_total += 1
             if run.chunks_total > settings.INDEX_MAX_CHUNKS:
                 raise Conflict("Generation vượt số chunk cho phép.", code="index_too_many_chunks")
+    run.config = {**run.config, "abbreviations": abbreviations.merge(catalogs)}
     await record_workspace_event(
         db,
         workspace_id=workspace_id,

@@ -335,6 +335,7 @@ def build_chunks(
                 for r in structure.get("row_indices", [])
                 for c in range(table["table"]["column_count"])
             )
+            targets.update(f"{parent}:column:{c}" for c in range(table["table"]["column_count"]))
             structure["context"] = {
                 "parent": parent,
                 "position": part,

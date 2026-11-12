@@ -12,7 +12,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.schemas import SegmentDraftContent
+from qnu.domains.knowledge.compilation.table_year import header_year_scopes
 from qnu.domains.knowledge.compilation.units import Unit, build_units
+from qnu.domains.knowledge.index.table_layout import layout, table_structure
 from qnu.domains.knowledge.metadata import RetrievalAnnotation, _invalid, attribute_in_quote
 from qnu.domains.knowledge.source_sections import source_sections
 
@@ -215,6 +217,15 @@ def _targets(draft: dict) -> dict[str, list[str]]:
     for entry in draft["source_tables"]:
         citation = entry["citation"]
         prefix = citation.split(":", 1)[0]
+        shape = table_structure(entry["table"])
+        positions, errors = layout(shape)
+        if not errors:
+            for position in positions:
+                targets[f"{prefix}:{position.cell['evidence_id']}"].append(
+                    f"table:{citation}:row:{position.row}:column:{position.column}"
+                )
+            continue
+        # Broken geometry keeps the historical row-local coordinates.
         for row_no, row in enumerate(entry["table"]["rows"]):
             for column_no, cell in enumerate(row):
                 targets[f"{prefix}:{cell['evidence_id']}"].append(
@@ -223,8 +234,17 @@ def _targets(draft: dict) -> dict[str, list[str]]:
     return targets
 
 
-def _proposal_values(candidate: MetadataCandidate, boundary: bool) -> dict:
+def _proposal_values(
+    candidate: MetadataCandidate, boundary: bool, *, structural: bool = False
+) -> dict:
     field, value = candidate.field, candidate.value
+    if structural:
+        # The header cell itself is the proof; it is not a prose data-year mention.
+        if field != "data_year" or not re.search(
+            r"(?<!\d)" + str(value) + r"(?!\d)", candidate.quote
+        ):
+            return {}
+        return {field: value}
     if field in {"issued_year", "data_year", *EFFECTIVE} and not any(
         rule.field == field and rule.value == value
         for rule in _rules(candidate.citation, candidate.quote, boundary)
@@ -332,41 +352,59 @@ def _proposal_entries(
     draft: dict, documents: list[dict], parts: list[tuple[int, dict]]
 ) -> list[dict]:
     texts, targets = _source_texts(documents), _targets(draft)
-    candidates = [
-        (candidate, None)
-        for citation, (text, boundary) in texts.items()
-        for candidate in _rules(citation, text, boundary)
-    ] + [
-        (MetadataCandidate.model_validate(candidate), index)
-        for index, part in parts
-        for candidate in part.get("metadata", [])
-    ]
+    candidates = (
+        [
+            (candidate, None, None)
+            for citation, (text, boundary) in texts.items()
+            for candidate in _rules(citation, text, boundary)
+        ]
+        + [
+            (MetadataCandidate.model_validate(candidate), index, None)
+            for index, part in parts
+            for candidate in part.get("metadata", [])
+        ]
+        + [
+            (
+                MetadataCandidate(
+                    field="data_year",
+                    value=scope["year"],
+                    citation=scope["evidence_citation"],
+                    quote=scope["evidence_quote"],
+                ),
+                None,
+                [f"table:{scope['table']}:column:{scope['column']}"],
+            )
+            for scope in header_year_scopes(draft)
+        ]
+    )
     outline = source_sections(documents)
     entries = {}
-    for candidate, index in candidates:
+    for candidate, index, scoped_override in candidates:
         text, boundary = texts.get(candidate.citation, ("", False))
         if candidate.quote not in text or candidate.citation not in draft["citations"]:
             continue
-        values = _proposal_values(candidate, boundary)
+        values = _proposal_values(candidate, boundary, structural=scoped_override is not None)
         if not values:
             continue
-        scoped = targets.get(candidate.citation, [])
-        if (
-            candidate.scope == "document"
-            and len(documents) == 1
-            and boundary
-            and candidate.field in {"issued_year", *EFFECTIVE}
-        ):
-            scoped = ["document"]
-        elif candidate.scope == "section":
-            section = outline.get(candidate.citation)
-            scoped = (
-                [f"section:{candidate.citation}"]
-                if section and section.citation == candidate.citation
-                else []
-            )
-        elif candidate.scope == "row":
-            scoped = [t.rsplit(":column:", 1)[0] for t in scoped if t.startswith("table:")]
+        scoped = scoped_override
+        if scoped is None:
+            scoped = targets.get(candidate.citation, [])
+            if (
+                candidate.scope == "document"
+                and len(documents) == 1
+                and boundary
+                and candidate.field in {"issued_year", *EFFECTIVE}
+            ):
+                scoped = ["document"]
+            elif candidate.scope == "section":
+                section = outline.get(candidate.citation)
+                scoped = (
+                    [f"section:{candidate.citation}"]
+                    if section and section.citation == candidate.citation
+                    else []
+                )
+            elif candidate.scope == "row":
+                scoped = [t.rsplit(":column:", 1)[0] for t in scoped if t.startswith("table:")]
         for target in scoped:
             item = _annotation(candidate, target, values)
             if item:

@@ -279,6 +279,29 @@ def test_model_usage_history_blocks_deletion_and_is_retained(client):
     assert client.get(f"{API}/connections/{c['id']}/models").json()
 
 
+@pytest.mark.parametrize(
+    ("api_type", "model_name"),
+    [("ollama", "gpt-oss:120b"), ("llamacpp", "qwen3.8-27b-q4")],
+)
+def test_declared_local_runtimes_keep_their_chat_provider_type(client, api_type, model_name):
+    app.dependency_overrides[get_actor] = lambda: ADMIN
+    created = client.post(
+        f"{API}/connections",
+        json={
+            "name": f"{api_type} dev",
+            "family": "custom",
+            "base_url": "http://127.0.0.1:18080/v1",
+            "api_type": api_type,
+        },
+    )
+    assert created.status_code == 201, created.text
+    cid = created.json()["id"]
+    key(client, cid)
+    child = model(client, cid, name=model_name)
+    assert child["provider_type"] == api_type
+    assert child["capabilities"] == ["chat"]
+
+
 def test_gemini_compatibility_does_not_append_a_second_v1(client):
     import httpx
 

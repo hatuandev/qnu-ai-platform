@@ -1,4 +1,4 @@
-import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { createRootRoute, Outlet, useLocation } from "@tanstack/react-router";
 import { AppShell } from "@/layouts/app-shell";
 
 export const Route = createRootRoute({
@@ -6,6 +6,16 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  const location = useLocation();
+  const isPublicPortal =
+    location.pathname.startsWith("/p/") ||
+    location.pathname.startsWith("/public") ||
+    location.pathname === "/p";
+
+  if (isPublicPortal) {
+    return <Outlet />;
+  }
+
   return (
     <AppShell>
       <Outlet />

@@ -53,12 +53,12 @@ test("ProviderCardGrid groups providers by real registry family", () => {
       last_probe_error: null,
     },
     {
-      id: "prov_nemotron_01",
-      name: "Nemotron OCR Production",
-      provider_type: "nemotron",
-      base_url: "http://127.0.0.1:8000/ocr",
-      model_name: "nemotron-4-340b",
-      capabilities: ["ocr"],
+      id: "prov_ollama_01",
+      name: "Ollama gpt-oss 120B",
+      provider_type: "ollama",
+      base_url: "http://127.0.0.1:11434/v1",
+      model_name: "gpt-oss:120b",
+      capabilities: ["chat"],
       is_active: true,
       priority: 2,
       timeout_seconds: 60,
@@ -81,11 +81,15 @@ test("ProviderCardGrid groups providers by real registry family", () => {
 
   // Check section headers
   expect(screen.getByText("OpenAI Compatible")).toBeDefined();
-  expect(screen.getByText("NVIDIA Nemotron OCR")).toBeDefined();
+  expect(
+    screen.getByText(
+      "Runtime nội bộ phục vụ model chat qua API tương thích OpenAI",
+    ),
+  ).toBeDefined();
 
   // Check card content
   expect(screen.getByText("Qwen 2.5 7B")).toBeDefined();
-  expect(screen.getByText("Nemotron OCR Production")).toBeDefined();
+  expect(screen.getByText("Ollama gpt-oss 120B")).toBeDefined();
 
   // Check keys and probe status
   expect(screen.getByText(/2 khóa/)).toBeDefined();

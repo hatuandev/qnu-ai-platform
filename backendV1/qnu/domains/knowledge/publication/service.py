@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.supplement import confirm
+from qnu.domains.knowledge.metadata import validate_annotations
 from qnu.domains.knowledge.publication import automatic_metadata
 from qnu.domains.knowledge.publication.access import authorize, document
 from qnu.domains.knowledge.publication.evidence import digest, load_bundle, registered_bundle_hash
@@ -190,6 +191,9 @@ async def _register(
                 code="registration_metadata_conflict",
             )
         annotations = automatic["annotations"]
+    # New registrations must prove a column data_year from its governing header.
+    # Reading stored versions keeps the legacy structural check in registered_bundle_hash.
+    validate_annotations(annotations, bundle.content, bundle.documents, strict_roles=True)
     bundle_hash = registered_bundle_hash(bundle, annotations)
     if await db.scalar(
         select(CompiledVersion.id).where(CompiledVersion.compilation_run_id == run_id)

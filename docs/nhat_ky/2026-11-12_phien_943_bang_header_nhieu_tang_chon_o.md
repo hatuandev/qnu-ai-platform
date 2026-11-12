@@ -1,0 +1,35 @@
+# Phiên 943 — Bảng header nhiều tầng: chọn ô lúc trả lời, không re-index
+
+- **Yêu cầu / giả định.** Người dùng duyệt "làm cả 4 phase" sửa gốc nhóm 502 extractive-guard (Q05/Q07/Q09) trên corpus phức tạp phiên 940. Nguyên nhân: Bảng 1 (`ev_p006_b002`, trang 6, 16 hàng × 12 cột) có header 3 tầng gộp ô — ô danh tính góc trái `row_span=3 col_span=3`, các nhóm năm 2025/2026/2027 `col_span=3` — nên mọi proof header đơn tầng cũ thất bại. Chunk dữ liệu không resolve được header → `header_unresolved` → **unselectable** (không có ô chọn được). Khi model trích số từ bảng unselectable rồi gán nhầm nguồn, guard trích-xuất trả 502. Ràng buộc đã duyệt: **không re-index**, **guard `materialize` giữ nguyên**, không nới assertion, không retry để làm xanh.
+- **Phương pháp (4 phase, chạy ở tầng trả lời trên canonical bundle nên không cần re-index).**
+  - Phase 1 — detector `multitier_header(table)` trong `table_dependencies.py`: chứng minh header nhiều tầng bằng hình học + tương phản kiểu (ô danh tính góc trái span nhiều hàng/cột và có chữ; ô header nhóm số được gộp; ≥1 cột dữ liệu thuần số; `layout()` không lỗi; ≥4 hàng, ≥2 cột). Phát basis `native_multitier_header/v1` (`MULTITIER_BASIS`) kèm `header_rows`. Vẫn chỉ chạy trên block native sạch (không OCR lỗi, không `requires_review`).
+  - Phase 2 — catalog (`cells.py`): chunk dữ liệu thiếu header thì mượn header từ fragment header đã chứng minh qua link (cùng input, cùng `source_table_citation`, chứa hàng 0); với basis multitier lấy `header_rows` từ link. Subject path giữ nhãn chữ dẫn đầu (nhóm + tên chương trình), bỏ qua mã số chương trình nằm cùng header danh tính để không mất tên. Mảnh chỉ-header vẫn **unselectable** (không có ô giá trị riêng).
+  - Phase 3 — support: detector phát `header_rows`/basis; `supports()` sẵn có chuyển tiếp nguyên link dict nên fragment header được gắn và `header_rows` lan tới catalog — **không cần sửa `supports()`**. Kiểm chứng bằng test mới.
+  - Phase 4 — kiểm chứng offline + đo live + full suite + tài liệu.
+- **File sửa (production).** `backendV1/qnu/domains/knowledge/index/table_dependencies.py` (+73: detector + `MULTITIER_BASIS` + phát `header_rows`) và `backendV1/qnu/domains/rag/answer/cells.py` (+144/−40: mượn header multitier + subject path; **guard `materialize` không đổi**). Test mới `backendV1/tests/unit/test_multitier_table_941.py` (16 ca từ 8 hàm, 2 hàm parametrized) còn **untracked**.
+- **Trạng thái Git (trung thực).** Hai sửa đổi production đã nằm trong commit quét rộng **đồng thời** `7c71267c` (HEAD hiện tại; cha là `8bd5e423` đầu phiên) — commit này **không do tôi tạo** và gom cả việc phiên khác (ví dụ `section_siblings` của phiên 939 trong `table_support.py`, OCR phiên 941). Tôi không nhận vơ các phần đó và **không hoàn tác** commit chung. `git diff HEAD` cho hai tệp của tôi rỗng (đã commit); chỉ file test mới là `??`. Chưa commit/push thêm.
+- **Guard không đổi.** `_numbers` và nhánh kiểm tra unselectable trong `materialize` giữ nguyên. Q05 vòng 2 bị 502 là guard **đúng** khi từ chối model gán `93,3` cho mảnh chỉ-header (mảnh này không chứa `93,3`), không phải guard bị nới.
+
+## Đo live (2 vòng, prompt `qnu.rag.answer/v28`, model `qwen3.8-27b-q4` thinking off)
+
+- Hạ tầng: dev stack API 8002 đã restart nạp mã mới; WS `ws_39c202a81045`, COL `col_0daa6e0ed137`, index `idx_bfd36fae5a30` generation 1 (465 chunk, **không re-index**); OCR `ocr_ae8951d2e380`, nguồn `src_50f6ed92a4e8`/`rev_e15b0b6456cd`, `cdoc_a954f08966c9`/`cver_a7b7eb6b9553`, publish `pdec_8629e6ad3577`. Embedding bge-m3, rerank bge-reranker-v2-m3, `hybrid_rerank` top_k 5 / candidate_k 30.
+- **Retrieval xác định.** `rerank_fused_ids` giống hệt từng byte giữa hai vòng cho mọi câu trả 200 cả hai (Q07/Q09/Q10/Q12/Q18/Q19/Q20/Q24). Query expansion + dense + FTS + cross-encoder rerank đều xác định; **chỉ câu chữ model cuối là ngẫu nhiên**.
+- **Q07 ĐẠT 2/2** (answered + token): backend tự chép "TỔNG CỘNG (12 chương trình) — 2026 / Quy mô / Chỉ tiêu (SV): **1233**" và "... Ghi nhận / Số lượng (SV): **1149**"; cited `ich_76e3ea6dac2f` + `ich_f49c90073fbe`; basis `native_multitier_header/v1`.
+- **Q09 ĐẠT 2/2**: đủ 6 chương trình nhóm A (Kỹ thuật phần mềm, Công nghệ thông tin ứng dụng, Khoa học dữ liệu, Quản trị dữ liệu số, An toàn thông tin, Thiết kế truyền thông số), không lẫn nhóm B; multitier attached.
+- **Q05 1/2**: vòng 1 đúng "An toàn thông tin — 2026 / Mức đạt / Tỷ lệ (%): **93,3**" (ô `ev_p006_b002_c07_07`); vòng 2 HTTP 502 `answer_table_value_not_extractive` — retrieval giống vòng 1, model gán `93,3` cho mảnh chỉ-header nên guard đúng từ chối. **Không retry.** Đây là đánh đổi độ bền của hợp đồng chọn-ô dưới sampling, cần người dùng quyết; không tự sửa (sửa prompt/guard là thay đổi ngoài kế hoạch 4 phase đã duyệt).
+- **Nhóm hồi quy — lỗi đã biết từ trước, không mới do multitier:** Q12 1/2 answered (vòng 1 abstain, vòng 2 thiếu "Hợp tác doanh nghiệp"/"Cần bổ sung hồ sơ"); Q18 2/2 answered nhưng thiếu nhãn AM/TN-02 và ngữ nghĩa "số 0"; Q20 1/2 token (vòng 1 "P.ĐT" thiếu "Đào tạo", vòng 2 đủ); Q24 2/2 answered nhưng "05 ngày" thiếu "ngày làm việc"; Q27 1/2 (vòng 1 502, vòng 2 answered, basis `native_typed_columns/v1` — bảng anh em/fusion khác, không phải Bảng 1). Q10/Q19 đạt.
+- Chấm điểm là **tín hiệu token**, không phải nội dung đúng tuyệt đối; nhãn 30 câu vẫn `draft_needs_human_check`, chưa người duyệt.
+
+## Kiểm chứng
+
+- **Offline unit cô lập** (harness `scripts/run_isolated_tests.py`, DB `qnu_v1_test_aa97fdbb9547446b` đã xóa, sentinel giữ): 5 tệp `tests/unit/test_multitier_table_941.py` + `test_rag_table_siblings_935` + `test_table_context_769` + `test_table_grounding_770` + `test_unselectable_prose_941` → **75 passed**, 0 fail/error/skip, 1,79 giây.
+- **Ruff** check + format --check trên `cells.py`, `table_dependencies.py`, `test_multitier_table_941.py`: All checks passed / 3 files already formatted.
+- **Full Pytest cô lập: ĐANG CHẠY** (nền, DB `qnu_v1_test_d6c2ecc0ed1c4064`, ~2.5–3h). Baseline lịch sử **FAIL 4/1627** (phiên 928: 2× `test_integration_gateway_pipeline`, 1× `test_legacy_source_deletion_718`, 1× `test_rag_verification_policy_672`) giữ riêng; sẽ nối kết quả thật + ID khi hoàn tất. **NOT RUN ≠ PASS.**
+- Lưu ý phân biệt: lượt "25 passed" (`qnu_v1_test_da5f706cf9634a82`, 15:47) là của **phiên đồng thời 942** (chat_wait/review_queue), không phải kiểm chứng multitier của phiên này.
+
+## Rủi ro / bước sau
+
+- Q05 vòng 2: độ bền hợp đồng chọn-ô dưới sampling model — chờ người dùng quyết hướng (không tự đổi prompt/guard).
+- Chưa commit/push; không re-index; không đổi mặc định retrieval; guard nguyên. File test mới untracked.
+- G3 còn Q12/Q18 abstain/thiếu ý, Q20/Q24 nhãn; G4 (502 hạ tầng Q04/Q06) chưa chạy; Q08 recall thượng nguồn chưa sửa; F13 chất lượng vẫn mở.
+- Full suite chưa xong → chưa chốt PASS/FAIL cuối; không tuyên bố điểm tổng.

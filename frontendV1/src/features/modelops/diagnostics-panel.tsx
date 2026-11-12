@@ -247,6 +247,41 @@ function DiagnosticsContent({ provider }: { provider: Provider }) {
               )}
             </div>
           )}
+        {query.data && query.data.observed_output_limits.length > 0 && (
+          <div className="space-y-2 rounded-lg border p-3">
+            <p className="text-sm font-medium">Trần đầu ra quan sát được</p>
+            <p className="text-xs text-muted-foreground">
+              Giá trị provider từ chối vượt ngưỡng ở lượt chạy thật. Đây là bằng
+              chứng quan sát, không thay đổi capacity đã khai báo.
+            </p>
+            {query.data.observed_output_limits.map((row) => (
+              <div
+                key={`${row.endpoint}:${row.model_name}:${row.observed_at}`}
+                className="flex flex-wrap items-center justify-between gap-2 text-xs"
+              >
+                <span className="break-all font-mono">{row.model_name}</span>
+                <span>
+                  {row.max_output_tokens.toLocaleString("vi-VN")} token
+                </span>
+                <Badge
+                  variant={
+                    row.configuration_status === "current"
+                      ? "success"
+                      : "warning"
+                  }
+                >
+                  {row.configuration_status === "current"
+                    ? "Đang áp dụng"
+                    : "Hết hiệu lực"}
+                </Badge>
+                <span className="text-muted-foreground">
+                  Quan sát {formatDateTimeValue(row.observed_at)} · hết hạn{" "}
+                  {formatDateTimeValue(row.expires_at)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="grid gap-3 lg:grid-cols-2">
           {checks.slice(0, 6).map((check) => (
             <Result key={check.id} check={check} />

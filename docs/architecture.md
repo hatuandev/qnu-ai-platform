@@ -98,10 +98,13 @@ backup bằng chứng, dọn dữ liệu dẫn xuất; API tích hợp cho ứng
 chia sẻ chatbot công khai; xuất Word Nghị định 30 / Excel Bloom; Structured Fact Layer, wiki,
 glossary; benchmark/quality gate tự động cho RAG của V1.
 
-**Không còn dùng:** `provider_type` `gemini` và `paddleocr` chỉ tồn tại để tương thích dữ liệu
-cũ; registry đánh dấu “chưa có adapter” và runtime từ chối bằng mã
-`*_provider_type_unsupported`. Hai module stub chỉ ném `NotImplementedError` đã được xóa ngày
-2026-11-09. OCR hiện hành là MinerU/native.
+**Provider runtime:** `provider_type` `ollama` và `llamacpp` đại diện cho runtime chat nội bộ
+tương thích OpenAI; discovery của admin đọc `/api/tags` + `/api/show` (Ollama) và `/props`
+(llama.cpp) để lấy cửa sổ ngữ cảnh do server công bố. `nemotron` và `paddleocr` đã bị loại khỏi
+`ck_provider_type`; OCR vẫn dùng giao thức `nemotron_chat_completions` qua provider
+`openai_compatible`/`local`. `gemini` chỉ tồn tại để tương thích dữ liệu cũ; registry đánh dấu
+“chưa có adapter” và runtime từ chối bằng mã `*_provider_type_unsupported`. Hai module stub chỉ
+ném `NotImplementedError` đã được xóa ngày 2026-11-09. OCR hiện hành là MinerU/native.
 
 ## 6. Công nghệ
 

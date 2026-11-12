@@ -272,7 +272,8 @@ async def answer(
     }
     try:
         proposed = parse_answer(result.content, sources)
-        draft = materialize(proposed, sources, cells)
+        materialization = {}
+        draft = materialize(proposed, sources, cells, report=materialization)
         coverage = assess(draft, sources, trace.context)
     except AppException as exc:
         await record_workspace_event(
@@ -320,6 +321,8 @@ async def answer(
         for cell in table["cells"]
         if cell["cell_id"] in trace.grounding["selected_cells"]
     ]
+    if materialization:
+        trace.grounding["materialization"] = materialization
     started = time.monotonic()
 
     async def safety_check():

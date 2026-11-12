@@ -220,7 +220,7 @@ def setup_ocr_provider(
         f"{API}/modelops/providers",
         json={
             "name": f"nemotron-{abs(hash((workspace_id, base_url))) % 100000}",
-            "provider_type": "nemotron",
+            "provider_type": "openai_compatible",
             "base_url": base_url,
             "model_name": model_name,
             "capabilities": list(capabilities),

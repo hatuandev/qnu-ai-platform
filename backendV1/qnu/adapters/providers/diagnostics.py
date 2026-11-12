@@ -9,6 +9,7 @@ import asyncio
 import time
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -41,6 +42,12 @@ from qnu.ports.provider_diagnostics import (
 
 # Gateways aggregate many providers; bound the snapshot without truncating it.
 MAX_DISCOVERED_MODELS = 5000
+# Native context probes stay opt-in, small, and bounded inside the discovery deadline.
+MAX_NATIVE_CONTEXT_MODELS = 32
+NATIVE_PROBE_SECONDS = 5.0
+MAX_CONTEXT_TOKENS = 2147483647
+# Types that normally expose a direct OpenAI-compatible host; a runtime is still confirmed by probe.
+NATIVE_DISCOVERY_TYPES = ("local", "openai_compatible", "ollama", "llamacpp")
 
 
 def models_url(endpoint: str) -> str:
@@ -50,6 +57,34 @@ def models_url(endpoint: str) -> str:
             base = base[: -len(suffix)]
             break
     return base + ("/models" if base.endswith(("/v1", "/openai")) else "/v1/models")
+
+
+def native_root(endpoint: str) -> str | None:
+    """Only a direct host path can host a local runtime; a gateway path is not guessed."""
+    base = endpoint.strip().rstrip("/")
+    for suffix in (
+        "/chat/completions",
+        "/embeddings",
+        "/rerank",
+        "/models",
+        "/api/tags",
+        "/api/show",
+        "/api/chat",
+    ):
+        if base.endswith(suffix):
+            base = base[: -len(suffix)].rstrip("/")
+    for suffix in ("/v1", "/api"):
+        if base.endswith(suffix):
+            base = base[: -len(suffix)].rstrip("/")
+    return base if base and urlsplit(base).path in ("", "/") else None
+
+
+def auth_headers(target: DiagnosticTarget) -> dict[str, str]:
+    if not target.api_key:
+        return {}
+    if target.auth_scheme == "anthropic":
+        return {"x-api-key": target.api_key, "anthropic-version": "2023-06-01"}
+    return {"Authorization": "Bearer " + target.api_key}
 
 
 def sample_page() -> bytes:
@@ -198,6 +233,179 @@ def validate(
     return result
 
 
+def tag_names(data: object) -> dict[str, str]:
+    """Map installed tags to the exact name and, as a fallback, the untagged name."""
+    models = data.get("models") if isinstance(data, dict) else None
+    if not isinstance(models, list):
+        raise TypeError("Invalid tags")
+    names: dict[str, str] = {}
+    for row in models:
+        name = row.get("name") if isinstance(row, dict) else None
+        if not isinstance(name, str) or not 0 < len(name) <= 200 or not name.isprintable():
+            continue
+        names.setdefault(name, name)
+        if ":" in name:
+            names.setdefault(name.split(":", 1)[0], name)
+    return names
+
+
+def server_context(data: object) -> int | None:
+    """Accept one strict positive integer declared under ``*.context_length``; never invent."""
+    info = data.get("model_info") if isinstance(data, dict) else None
+    if not isinstance(info, dict):
+        return None
+    arch = info.get("general.architecture")
+    if isinstance(arch, str) and arch:
+        value = info.get(f"{arch}.context_length")
+    else:
+        declared = [
+            item
+            for key, item in info.items()
+            if isinstance(key, str) and key.endswith(".context_length")
+        ]
+        value = declared[0] if len(declared) == 1 else None
+    return value if type(value) is int and 0 < value <= MAX_CONTEXT_TOKENS else None
+
+
+def generation_context(data: object) -> int | None:
+    """llama.cpp declares one per-slot runtime context; slots never multiply it."""
+    settings = data.get("default_generation_settings") if isinstance(data, dict) else None
+    if not isinstance(settings, dict):
+        return None
+    value = settings.get("n_ctx")
+    return value if type(value) is int and 0 < value <= MAX_CONTEXT_TOKENS else None
+
+
+def loaded_identity(data: object) -> tuple[str, ...]:
+    """Ordered exact identities for the loaded GGUF: path, file name, then stem."""
+    path = data.get("model_path") if isinstance(data, dict) else None
+    if not isinstance(path, str) or not 0 < len(path) <= 4096 or not path.isprintable():
+        return ()
+    name = path.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+    stem = name[:-5] if name.lower().endswith(".gguf") else name
+    return tuple(dict.fromkeys((path, name, stem)))
+
+
+def context_detail(enriched: int) -> str:
+    return (
+        f"Đã lấy danh sách; {enriched} model có cửa sổ ngữ cảnh do server công bố; "
+        "các model chưa được kiểm tra inference."
+    )
+
+
+async def apply_ollama_context(
+    client: httpx.AsyncClient,
+    target: DiagnosticTarget,
+    result: DiagnosticResult,
+    root: str,
+) -> bool:
+    """Recognize an Ollama host and record its declared per-model context."""
+    tags = await client.get(root + "/api/tags", headers=auth_headers(target))
+    if tags.status_code != 200:
+        return False
+    try:
+        names = tag_names(tags.json())
+    except (ValueError, TypeError):
+        return False
+    enriched = 0
+    for index, row in enumerate(result.model_metadata):
+        if row.context_window_tokens is not None:
+            continue
+        name = names.get(row.id) or names.get(row.id.split(":", 1)[0])
+        if name is None:
+            continue
+        shown = await client.post(
+            root + "/api/show", headers=auth_headers(target), json={"name": name}
+        )
+        if shown.status_code != 200:
+            continue
+        try:
+            limit = server_context(shown.json())
+        except ValueError:
+            continue
+        if limit is None:
+            continue
+        result.model_metadata[index] = row.model_copy(update={"context_window_tokens": limit})
+        enriched += 1
+    if enriched:
+        result.detail = context_detail(enriched)
+    return True
+
+
+async def apply_llamacpp_context(
+    client: httpx.AsyncClient,
+    target: DiagnosticTarget,
+    result: DiagnosticResult,
+    root: str,
+) -> bool:
+    """Recognize a llama.cpp host and record ``/props`` context for the loaded model."""
+    props = await client.get(root + "/props", headers=auth_headers(target))
+    if props.status_code != 200:
+        return False
+    try:
+        data = props.json()
+    except ValueError:
+        return False
+    if not isinstance(data, dict) or not isinstance(data.get("default_generation_settings"), dict):
+        return False
+    limit = generation_context(data)
+    if limit is None:
+        return True
+    unknowns = [
+        index
+        for index, row in enumerate(result.model_metadata)
+        if row.context_window_tokens is None
+    ]
+    matched: list[int] = []
+    for candidate in loaded_identity(data):
+        matched = [index for index in unknowns if result.model_metadata[index].id == candidate]
+        if matched:
+            break
+    if not matched and len(result.model_metadata) == 1:
+        # A llama.cpp host serves exactly one model, so the only row is the loaded one.
+        matched = unknowns
+    for index in matched:
+        result.model_metadata[index] = result.model_metadata[index].model_copy(
+            update={"context_window_tokens": limit}
+        )
+    if matched:
+        result.detail = context_detail(len(matched))
+    return True
+
+
+async def enrich_native_context(
+    client: httpx.AsyncClient,
+    target: DiagnosticTarget,
+    result: DiagnosticResult,
+    *,
+    deadline: float,
+) -> None:
+    """Best-effort native context; failures keep the OpenAI-compatible snapshot."""
+    root = native_root(target.endpoint)
+    if (
+        root is None
+        or not result.model_metadata
+        or len(result.model_metadata) > MAX_NATIVE_CONTEXT_MODELS
+        or all(row.context_window_tokens is not None for row in result.model_metadata)
+    ):
+        return
+    budget = min(NATIVE_PROBE_SECONDS, deadline - asyncio.get_running_loop().time() - 0.25)
+    if budget <= 0.05:
+        return
+    try:
+        async with asyncio.timeout(budget):
+            probes = (
+                (apply_llamacpp_context, apply_ollama_context)
+                if target.provider_type == "llamacpp"
+                else (apply_ollama_context, apply_llamacpp_context)
+            )
+            for probe in probes:
+                if await probe(client, target, result, root):
+                    break
+    except (TimeoutError, httpx.HTTPError, ValueError, TypeError, KeyError, AttributeError):
+        return
+
+
 class HttpProviderDiagnosticClient:
     def __init__(self, *, transport: httpx.AsyncBaseTransport | None = None):
         self.transport = transport
@@ -220,6 +428,7 @@ class HttpProviderDiagnosticClient:
 
             return await check_mineru(target, self.transport)
         started = time.monotonic()
+        deadline = started + target.timeout_seconds
         sent = False
         try:
             # Validate before building an OCR image or attaching any credential header.
@@ -237,16 +446,16 @@ class HttpProviderDiagnosticClient:
                     response = await client.request(
                         "GET" if kind == "discovery" else "POST",
                         url,
-                        headers=(
-                            {"x-api-key": target.api_key, "anthropic-version": "2023-06-01"}
-                            if target.auth_scheme == "anthropic"
-                            else {"Authorization": "Bearer " + target.api_key}
-                        )
-                        if target.api_key
-                        else {},
+                        headers=auth_headers(target),
                         json=body,
                     )
-            result = self.decode(kind, target, response)
+                    result = self.decode(kind, target, response)
+                    if (
+                        kind == "discovery"
+                        and result.outcome == "ok"
+                        and target.provider_type in NATIVE_DISCOVERY_TYPES
+                    ):
+                        await enrich_native_context(client, target, result, deadline=deadline)
         except AppException:
             result = failed("endpoint_blocked", "Endpoint bị chặn bởi chính sách mạng.")
         except httpx.InvalidURL:

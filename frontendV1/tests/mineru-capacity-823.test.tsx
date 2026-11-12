@@ -26,7 +26,9 @@ test("MinerU catalog does not require an image-token bound", () => {
   expect(screen.getByText(/không áp dụng token LLM/)).toBeDefined();
   expect(screen.queryByText(/Cần bổ sung thông tin/)).toBeNull();
   expect(
-    resolveCapabilityBudgetState({ ...model, provider_type: "nemotron" }, "ocr")
-      .isBlocked,
+    resolveCapabilityBudgetState(
+      { ...model, provider_type: "openai_compatible" },
+      "ocr",
+    ).isBlocked,
   ).toBe(true);
 });

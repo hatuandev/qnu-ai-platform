@@ -12,7 +12,7 @@ from qnu.domains.knowledge.index.schemas import SearchHit
 from qnu.domains.knowledge.publication.evidence import VersionBundle
 from qnu.domains.knowledge.source_sections import source_sections
 
-VERSION = "qnu.rag.structure/v4"
+VERSION = "qnu.rag.structure/v5"
 FURNITURE_TYPES = {"header", "footer"}
 FURNITURE_LABELS = {"header", "page-header", "page_header", "footer", "page-footer", "page_footer"}
 FURNITURE_MAX_CHARS = 240
@@ -28,6 +28,7 @@ _ENUMERATION = re.compile(
 )
 _REFERENCE = re.compile(r"\b(?:điều|article|section)\s+(\d+[a-zđ]?)\b", re.IGNORECASE)
 _POINT = re.compile(r"^(?:[a-zđ]\)|\d+[.)])\s+\S", re.IGNORECASE)
+_NUMBERED = re.compile(r"^(\d{1,2})[.)]\s+\S")
 _BULLET = re.compile(r"^[+•●▪–—-]\s+\S")
 _TOPIC_REQUEST = re.compile(
     r"^(?:(?:xin|vui lòng)\s+)?(?:cho\s+(?:(?:tôi|em|mình)\s+)?biết|tra cứu|tìm hiểu)\s+",
@@ -417,4 +418,116 @@ def continuation_groups(rows: list[IndexChunk], hits: list[SearchHit], bundles: 
                         }
                     )
                 start = stop
+    return groups
+
+
+NUMBERED_RECORDS = 10
+NUMBERED_CHARS = 6000
+
+
+def _numbered_runs(records: list[dict]) -> list[list[dict]]:
+    """Maximal runs of strictly consecutive numbered items and their continuation lines."""
+    runs, index = [], 0
+    while index < len(records):
+        item = None if records[index]["is_table"] else _NUMBERED.match(records[index]["text"])
+        if item is None:
+            index += 1
+            continue
+        expected, stop = int(item[1]) + 1, index + 1
+        while stop < len(records):
+            record = records[stop]
+            number = None if record["is_table"] else _NUMBERED.match(record["text"])
+            if number is not None:
+                if int(number[1]) != expected:
+                    break
+                expected, stop = expected + 1, stop + 1
+                continue
+            if (
+                record["is_table"]
+                or record["ref"] == record["section"]
+                or _ARTICLE.match(record["text"])
+                or _CHAPTER.match(record["text"])
+                or _BULLET.match(record["text"])
+                or not _continues(records[stop - 1], record)
+            ):
+                break
+            stop += 1
+        runs.append(records[index:stop])
+        index = stop
+    return runs
+
+
+def numbered_groups(rows: list[IndexChunk], hits: list[SearchHit], bundles: dict) -> list[dict]:
+    """Read an anchored numbered list whole, item by item.
+
+    Only source-numbered items that increment by one belong to the run, so an
+    unrelated paragraph cannot be pulled in as an item. The group is optional
+    and bounded so packing can drop it instead of failing the request.
+    """
+    by_id = {row.id: row for row in rows}
+    anchors = {hit.chunk_id: rank for rank, hit in enumerate(hits)}
+    visited, groups = set(), []
+    for hit in hits:
+        identity = (by_id[hit.chunk_id].input_id, hit.version_id)
+        bundle = bundles.get(hit.version_id)
+        if identity in visited or bundle is None:
+            continue
+        visited.add(identity)
+        anchor_ids = {key for key in anchors if by_id[key].input_id == identity[0]}
+        for document in bundle.documents:
+            records = _records(document, _owners(rows, identity[0], document))
+            for run in _numbered_runs(records):
+                if sum(_NUMBERED.match(record["text"]) is not None for record in run) < 2:
+                    continue
+                positions = _anchor_positions(run, anchor_ids)
+                if not positions:
+                    continue
+                primary = anchor_ids & {key for record in run for key in record["ids"]}
+                if not primary:
+                    continue
+                lo, hi = positions[0], positions[-1]
+                chars = sum(len(record["text"]) for record in run[lo : hi + 1])
+                while lo > 0 and hi - lo + 1 < NUMBERED_RECORDS:
+                    size = len(run[lo - 1]["text"])
+                    if chars + size > NUMBERED_CHARS:
+                        break
+                    lo, chars = lo - 1, chars + size
+                while hi + 1 < len(run) and hi - lo + 1 < NUMBERED_RECORDS:
+                    size = len(run[hi + 1]["text"])
+                    if chars + size > NUMBERED_CHARS:
+                        break
+                    hi, chars = hi + 1, chars + size
+                kept, compressed = _kept_records(run[lo : hi + 1], primary)
+                units, current = [], []
+                for record in kept:
+                    if current and _NUMBERED.match(record["text"]):
+                        units.append(current)
+                        current = []
+                    current.append(record)
+                if current:
+                    units.append(current)
+                groups.append(
+                    {
+                        "kind": "continuation",
+                        "basis": "numbered_list",
+                        "label": run[0]["text"],
+                        "input_id": identity[0],
+                        "primary_chunk_id": min(primary, key=anchors.get),
+                        "required_ids": list(
+                            dict.fromkeys(key for record in kept for key in record["ids"])
+                        ),
+                        "units": [
+                            {
+                                "ref": unit[0]["ref"],
+                                "chunk_ids": [key for record in unit for key in record["ids"]],
+                            }
+                            for unit in units
+                        ],
+                        "unindexed_refs": [r["ref"] for r in kept if not r["ids"]],
+                        "compressed_refs": compressed,
+                        "optional": True,
+                        "list_items": len(units),
+                        "truncated": len(kept) < len(run) or lo > 0 or hi + 1 < len(run),
+                    }
+                )
     return groups

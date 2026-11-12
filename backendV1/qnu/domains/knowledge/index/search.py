@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.knowledge.index.abbreviations import expand as expand_abbreviations
 from qnu.domains.knowledge.index.models import IndexChunk, IndexInput, IndexRun
 from qnu.domains.knowledge.index.query_scope import catalog_attributes, plan, verified_structures
 from qnu.domains.knowledge.index.schemas import SearchHit, SearchRequest, SearchResponse
@@ -398,11 +399,49 @@ async def search(
             {"chunk_id": h.chunk_id, "score": h.score} for h in phrase_hits
         ]
         trace["score_kinds"]["lexical_phrases"] = "postgres_ts_rank_cd_phrase"
-        hits = hybrid.fuse([hits, sparse_hits, phrase_hits], req.candidate_k, req.rrf_k)
+        # Alias expansion is an extra lexical branch: the dense query, rerank query,
+        # prompt and metadata scope all keep the caller's original wording.
+        branches, names = [hits, sparse_hits, phrase_hits], ["dense", "lexical", "lexical_phrases"]
+        expanded_query, expansion_trace = expand_abbreviations(
+            req.query, (sealed.get("config") or {}).get("abbreviations")
+        )
+        if expansion_trace.get("applied"):
+            expanded_started = time.monotonic()
+            expanded_raw = await hybrid.lexical(
+                db, run, allowed, expanded_query, req.candidate_k, chunk_ids
+            )
+            expanded_hits = (
+                await _hits(db, run, allowed, expanded_raw, sealed) if expanded_raw else []
+            )
+            trace["lexical_expanded_ms"] = round((time.monotonic() - expanded_started) * 1000, 3)
+            trace["ranking"]["lexical_expanded"] = [
+                {"chunk_id": h.chunk_id, "score": h.score} for h in expanded_hits
+            ]
+            trace["score_kinds"]["lexical_expanded"] = "postgres_ts_rank_cd_alias"
+            trace["lexical_expanded_count"] = len(expanded_hits)
+            trace["lexical_expanded_ranked_ids"] = [h.chunk_id for h in expanded_hits]
+            branches.append(expanded_hits)
+            names.append("lexical_expanded")
+        trace["glossary_expansions"] = expansion_trace.get("applied", [])
+        if expansion_trace.get("ambiguous"):
+            trace["glossary_expansions_ambiguous"] = expansion_trace["ambiguous"]
+        if expansion_trace.get("truncated"):
+            trace["glossary_expansions_truncated"] = True
+        anchors = hybrid.exact_anchors(req.query)
+        hits = hybrid.fuse(
+            branches,
+            req.candidate_k,
+            req.rrf_k,
+            anchors=anchors,
+        )
         trace["ranking"]["fusion"] = [{"chunk_id": h.chunk_id, "score": h.score} for h in hits]
         trace["score_kinds"]["fusion"] = "rrf"
         trace.update(
             {
+                "fusion_anchor_count": len(anchors),
+                "fusion_anchor_ids": [
+                    h.chunk_id for h in hits if hybrid.anchor_match(h, tuple(anchors))
+                ],
                 "lexical": "postgres_simple_fts",
                 "lexical_count": len(sparse_hits),
                 "lexical_ranked_ids": [h.chunk_id for h in sparse_hits],
@@ -411,7 +450,7 @@ async def search(
                 "lexical_phrases_ranked_ids": [h.chunk_id for h in phrase_hits],
                 "fusion_ranked_ids": [h.chunk_id for h in hits],
                 "fusion": "rrf",
-                "fusion_branches": ["dense", "lexical", "lexical_phrases"],
+                "fusion_branches": names,
                 "candidate_k": req.candidate_k,
                 "rrf_k": req.rrf_k,
             }

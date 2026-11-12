@@ -4,7 +4,6 @@ import json
 
 import pytest
 
-from qnu.domains.knowledge.index.hybrid import RERANK_RRF_K
 from tests.integration.index_support import execute_index
 from tests.integration.knowledge_support import API, EDITOR, PLATFORM, as_actor
 from tests.integration.ocr_support import FakeNemotron
@@ -167,7 +166,7 @@ def test_rerank_protocol_is_strict_and_citations_stay_server_bound(client, index
             )
             assert body["trace"]["rerank_count"] == body["trace"]["rerank_candidate_count"]
             assert body["trace"]["rerank_fused_ids"]
-            assert body["trace"]["rerank_rrf_k"] == RERANK_RRF_K
+            assert body["trace"]["score_kinds"]["rerank_selection"] == "model_relevance"
             assert all("\n" not in text for text in fake.requests[0]["body"]["documents"])
             assert all(h["citations"] for h in body["hits"])
             assert fake.requests[0]["path"].endswith("/v1/rerank")

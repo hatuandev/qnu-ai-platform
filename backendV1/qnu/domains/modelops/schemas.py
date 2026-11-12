@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from qnu.domains.modelops.capacity.schemas import ModelTokenLimits, OperationalBudget
 from qnu.domains.modelops.reasoning import ReasoningPolicy
 
-ProviderType = Literal["openai_compatible", "gemini", "local", "nemotron", "paddleocr", "mineru"]
+ProviderType = Literal["openai_compatible", "gemini", "local", "ollama", "llamacpp", "mineru"]
 Capability = Literal["chat", "embedding", "rerank", "ocr"]
 
 

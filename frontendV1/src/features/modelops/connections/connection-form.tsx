@@ -171,6 +171,8 @@ export function ConnectionForm({
                 <SelectItem value="openai_compatible">
                   OpenAI compatible
                 </SelectItem>
+                <SelectItem value="ollama">Ollama</SelectItem>
+                <SelectItem value="llamacpp">llama.cpp</SelectItem>
                 <SelectItem value="mineru">MinerU PDF OCR</SelectItem>
                 {apiType === "anthropic" && (
                   <SelectItem value="anthropic">Anthropic</SelectItem>
@@ -181,6 +183,12 @@ export function ConnectionForm({
               <p className="text-[11px] text-muted-foreground">
                 Nhập URL kết thúc bằng /mineru; thêm model có chức năng OCR.
                 Không cần ngân sách token LLM.
+              </p>
+            )}
+            {(apiType === "ollama" || apiType === "llamacpp") && (
+              <p className="text-[11px] text-muted-foreground">
+                Runtime chat tương thích OpenAI; thêm model chat sau khi lưu và
+                dùng Kiểm tra để lấy cửa sổ ngữ cảnh do server công bố.
               </p>
             )}
           </div>

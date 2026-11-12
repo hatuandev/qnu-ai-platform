@@ -19,6 +19,7 @@ import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as KnowledgeIndexRouteImport } from './routes/knowledge.index'
 import { Route as KnowledgeSourceIdRouteImport } from './routes/knowledge.$sourceId'
+import { Route as PSlugRouteImport } from './routes/p.$slug'
 import { Route as KnowledgeSourceIdReviewRouteImport } from './routes/knowledge.$sourceId_.review'
 
 const IndexRoute = IndexRouteImport.update({
@@ -71,6 +72,11 @@ const KnowledgeSourceIdRoute = KnowledgeSourceIdRouteImport.update({
   path: '/$sourceId',
   getParentRoute: () => KnowledgeRoute,
 } as any)
+const PSlugRoute = PSlugRouteImport.update({
+  id: '/p/$slug',
+  path: '/p/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KnowledgeSourceIdReviewRoute = KnowledgeSourceIdReviewRouteImport.update({
   id: '/$sourceId_/review',
   path: '/$sourceId/review',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/operations': typeof OperationsRoute
   '/settings': typeof SettingsRoute
   '/knowledge/$sourceId': typeof KnowledgeSourceIdRoute
+  '/p/$slug': typeof PSlugRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/knowledge/$sourceId/review': typeof KnowledgeSourceIdReviewRoute
 }
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/operations': typeof OperationsRoute
   '/settings': typeof SettingsRoute
   '/knowledge/$sourceId': typeof KnowledgeSourceIdRoute
+  '/p/$slug': typeof PSlugRoute
   '/knowledge': typeof KnowledgeIndexRoute
   '/knowledge/$sourceId/review': typeof KnowledgeSourceIdReviewRoute
 }
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/operations': typeof OperationsRoute
   '/settings': typeof SettingsRoute
   '/knowledge/$sourceId': typeof KnowledgeSourceIdRoute
+  '/p/$slug': typeof PSlugRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/knowledge/$sourceId_/review': typeof KnowledgeSourceIdReviewRoute
 }
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/operations'
     | '/settings'
     | '/knowledge/$sourceId'
+    | '/p/$slug'
     | '/knowledge/'
     | '/knowledge/$sourceId/review'
   fileRoutesByTo: FileRoutesByTo
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/operations'
     | '/settings'
     | '/knowledge/$sourceId'
+    | '/p/$slug'
     | '/knowledge'
     | '/knowledge/$sourceId/review'
   id:
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/operations'
     | '/settings'
     | '/knowledge/$sourceId'
+    | '/p/$slug'
     | '/knowledge/'
     | '/knowledge/$sourceId_/review'
   fileRoutesById: FileRoutesById
@@ -166,6 +178,7 @@ export interface RootRouteChildren {
   ModelopsRoute: typeof ModelopsRoute
   OperationsRoute: typeof OperationsRoute
   SettingsRoute: typeof SettingsRoute
+  PSlugRoute: typeof PSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -240,6 +253,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KnowledgeSourceIdRouteImport
       parentRoute: typeof KnowledgeRoute
     }
+    '/p/$slug': {
+      id: '/p/$slug'
+      path: '/p/$slug'
+      fullPath: '/p/$slug'
+      preLoaderRoute: typeof PSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/knowledge/$sourceId_/review': {
       id: '/knowledge/$sourceId_/review'
       path: '/$sourceId/review'
@@ -275,6 +295,7 @@ const rootRouteChildren: RootRouteChildren = {
   ModelopsRoute: ModelopsRoute,
   OperationsRoute: OperationsRoute,
   SettingsRoute: SettingsRoute,
+  PSlugRoute: PSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

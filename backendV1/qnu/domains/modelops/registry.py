@@ -54,20 +54,19 @@ TRANSPORTS = (
         structured_output="request_supported_provider_unverified",
     ),
     ProviderTransport(
-        provider_type="nemotron",
-        label="Nemotron",
-        protocols={"ocr": "nemotron_chat_completions"},
+        provider_type="ollama",
+        label="Ollama",
+        protocols={"chat": "chat_completions"},
         discovery=True,
-        image_input=["ocr_png"],
+    ),
+    ProviderTransport(
+        provider_type="llamacpp",
+        label="llama.cpp",
+        protocols={"chat": "chat_completions"},
+        discovery=True,
     ),
     ProviderTransport(
         provider_type="gemini", label="Gemini (chưa có adapter)", protocols={}, discovery=False
-    ),
-    ProviderTransport(
-        provider_type="paddleocr",
-        label="PaddleOCR (chưa có adapter)",
-        protocols={},
-        discovery=False,
     ),
 )
 

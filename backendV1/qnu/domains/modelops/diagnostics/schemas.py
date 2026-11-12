@@ -31,7 +31,20 @@ class DiagnosticCheck(BaseModel):
     model_metadata: list[DiscoveredModel] = Field(default_factory=list)
 
 
+class ObservedOutputLimit(BaseModel):
+    """Runtime evidence for one exact target; never a declared capacity."""
+
+    endpoint: str
+    model_name: str
+    max_output_tokens: int
+    observed_at: datetime
+    expires_at: datetime
+    source: Literal["observed"] = "observed"
+    configuration_status: Literal["current", "stale"] = "current"
+
+
 class ProviderDiagnostics(BaseModel):
     provider_id: str
     configured_active: bool
     checks: list[DiagnosticCheck] = Field(default_factory=list)
+    observed_output_limits: list[ObservedOutputLimit] = Field(default_factory=list)

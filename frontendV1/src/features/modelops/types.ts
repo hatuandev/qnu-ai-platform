@@ -4,9 +4,9 @@ export type ProviderType =
   | "openai_compatible"
   | "gemini"
   | "local"
-  | "nemotron"
-  | "mineru"
-  | "paddleocr";
+  | "ollama"
+  | "llamacpp"
+  | "mineru";
 
 export type Capability = "chat" | "embedding" | "rerank" | "ocr";
 
@@ -28,9 +28,9 @@ export const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
   openai_compatible: "OpenAI compatible",
   gemini: "Gemini",
   local: "Local",
-  nemotron: "Nemotron",
+  ollama: "Ollama",
+  llamacpp: "llama.cpp",
   mineru: "MinerU PDF OCR",
-  paddleocr: "PaddleOCR",
 };
 
 /** `unknown` means "chưa khai báo"; `stale` means the endpoint/model changed. */

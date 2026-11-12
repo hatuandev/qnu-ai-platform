@@ -31,10 +31,20 @@ export type DiagnosticCheck = {
   models: string[];
   model_metadata?: DiscoveredModel[];
 };
+export type ObservedOutputLimit = {
+  endpoint: string;
+  model_name: string;
+  max_output_tokens: number;
+  observed_at: string;
+  expires_at: string;
+  source: "observed";
+  configuration_status: "current" | "stale";
+};
 export type ProviderDiagnostics = {
   provider_id: string;
   configured_active: boolean;
   checks: DiagnosticCheck[];
+  observed_output_limits: ObservedOutputLimit[];
 };
 
 export const diagnosticsKey = (providerId: string, sessionId: number) =>

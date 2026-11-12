@@ -1,5 +1,15 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên953 — B2: đo kích thước đầu vào rerank, thêm trace `rerank_input`, xác nhận live 15 ứng viên/2.512 token/610 ms — quyết định không cắt](2026-11-13_phien_953_rerank_b2_do_va_xac_nhan_live.md).
+- [Phiên952 — Đo lại cohort G3; Phase 1 guard số cấu trúc/phủ định (Q18/Q27), Phase 2 đọc trọn danh sách số (Q12), Phase 3 sửa nhãn Q24 và chấm lại, đo live Q24, Phase 4 guard mã định danh (Q27 đóng), Phase 5 thử prompt v29 và hoàn nguyên, Phase 6 guard Q10 (cells v10) + thử prompt Q24, chốt (b): Q10/Q12/Q18/Q27 đóng, Q24 token PASS/thiếu điều kiện](2026-11-12_phien_952_g3_cohort_do_lai.md).
+- [Phiên951 — Đo lại cohort F13 và đóng hạng mục F13-940 (5 câu abstain sai)](2026-11-12_phien_951_f13_cohort_do_lai.md).
+- [Phiên950 — Gộp evidence_id lặp trong `parse_answer`, giữ guard ID ngoài tập](2026-11-12_phien_950_dedupe_evidence_id.md).
+- [Phiên949 — Duyệt lại đường năm của bảng DOCX/PDF: ô hợp lệ, ô số lượng và tiêu đề con nhiều năm](2026-11-12_phien_949_metadata_nam_o_va_tieu_de_nhieu_nam.md).
+- [Phiên948 — Lệch cột khi header gộp dọc và xác thực vai trò ô dẫn chứng năm](2026-11-12_phien_948_gop_doc_va_vai_tro_o_dan_chung.md).
+- [Phiên947 — Năm dữ liệu theo cột header bảng DOCX: từ metadata phát hành đến dẫn chứng hội thoại](2026-11-12_phien_947_nam_du_lieu_bang_docx.md).
+- [Phiên946 — Khóa từng số theo nhãn trong mệnh đề và chứng minh hội thoại dùng bản văn đã sửa](2026-11-12_phien_946_khoa_tung_so_theo_nhan_va_chung_minh_hoi_thoai.md).
+- [Phiên945 — RAG trả lời đúng nguồn đã xuất bản: xác minh số theo hàng, neo fusion và E2E ba tài liệu mới](2026-11-12_phien_945_rag_dung_nguon_va_e2e_tai_lieu_moi.md).
+- [Phiên943 — Bảng header nhiều tầng: chọn ô lúc trả lời, không re-index](2026-11-12_phien_943_bang_header_nhieu_tang_chon_o.md).
 - [Phiên942 — Thời hạn hội thoại và tác vụ tài liệu](2026-11-12_phien_942_thoi_han_hoi_thoai_va_tac_vu_tai_lieu.md).
 - [Phiên941 — Tiếp tục và duyệt chính tả theo từng vị trí](2026-11-12_phien_941_tiep_tuc_va_duyet_chinh_ta.md).
 - [Phiên940 — Clear DB, upload tệp kiểm thử phức tạp, 30 câu RAG và xác minh bge-reranker-v2-m3](2026-11-12_phien_940_clear_upload_30_cau_va_reranker.md).

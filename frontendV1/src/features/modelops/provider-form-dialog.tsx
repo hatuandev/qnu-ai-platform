@@ -303,7 +303,7 @@ export function ProviderFormDialog({
                       <Input
                         id="provider-name"
                         className="text-xs"
-                        placeholder="Nemotron local"
+                        placeholder="Ollama local"
                         value={field.state.value}
                         disabled={isSubmitting}
                         onBlur={field.handleBlur}
@@ -409,7 +409,7 @@ export function ProviderFormDialog({
                     <Input
                       id="provider-model-name"
                       className="text-xs font-mono"
-                      placeholder="nvidia/nemotron-3-nano"
+                      placeholder="gpt-oss:120b"
                       value={field.state.value}
                       disabled={isSubmitting}
                       onBlur={field.handleBlur}

@@ -6,6 +6,13 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
+from qnu.domains.knowledge.compilation.table_year import (
+    column_year,
+    data_year,
+    labelled_years,
+    year_mentions,
+)
+from qnu.domains.knowledge.index.table_layout import header_rows, layout, table_structure
 from qnu.domains.knowledge.source_sections import source_sections
 from qnu.platform.errors import AppException
 
@@ -107,6 +114,86 @@ def _invalid(message: str) -> AppException:
     return AppException(message, code="retrieval_metadata_invalid", status_code=422)
 
 
+def _table_entry(content: dict, citation: str) -> dict | None:
+    return next((t for t in content["source_tables"] if t["citation"] == citation), None)
+
+
+def _grid(entry: dict) -> tuple[dict, list | None]:
+    """Physical column grid, or None when the source table geometry is broken."""
+    shape = table_structure(entry["table"])
+    positions, errors = layout(shape)
+    return shape, None if errors else positions
+
+
+def _refs(entry: dict, cells: list[dict]) -> set[str]:
+    run = entry["citation"].split(":", 1)[0]
+    return {entry["citation"], *[run + ":" + cell["evidence_id"] for cell in cells]}
+
+
+def _row_refs(entry: dict, row: int, column: int | None) -> set[str]:
+    """Cells covering the physical row, plus row-local list coordinates for old proofs."""
+    refs = set()
+    shape, positions = _grid(entry)
+    if positions is not None and 0 <= row < shape["original_row_count"]:
+        covering = [
+            position
+            for position in positions
+            if position.row <= row < position.row + position.cell["row_span"]
+            and (
+                column is None
+                or position.column <= column < position.column + position.cell["col_span"]
+            )
+        ]
+        if covering:
+            refs |= _refs(entry, [position.cell for position in covering])
+    try:
+        cells = entry["table"]["rows"][row]
+        if column is not None:
+            cells = [cells[column]]
+        if not cells:
+            raise IndexError
+    except IndexError:
+        return refs
+    return refs | _refs(entry, cells)
+
+
+def _column_refs(entry: dict, index: int) -> set[str]:
+    """Cells covering the physical column, plus row-local coordinates for old proofs."""
+    refs = {entry["citation"]}
+    _, positions = _grid(entry)
+    if positions is not None:
+        covering = [
+            position
+            for position in positions
+            if position.column <= index < position.column + position.cell["col_span"]
+        ]
+        refs |= _refs(entry, [position.cell for position in covering])
+    for row in entry["table"]["rows"]:
+        start = 0
+        for cell in row:
+            span = cell.get("col_span") or 1
+            if start <= index < start + span:
+                refs.add(entry["citation"].split(":", 1)[0] + ":" + cell["evidence_id"])
+                break
+            start += span
+    return refs
+
+
+def _header_refs(entry: dict, index: int) -> set[str]:
+    """Header cells governing the physical column of a cell target."""
+    shape, positions = _grid(entry)
+    if positions is None:
+        return set()
+    headers = set(header_rows(shape))
+    run = entry["citation"].split(":", 1)[0]
+    return {
+        run + ":" + position.cell["evidence_id"]
+        for position in positions
+        if position.row in headers
+        and position.column <= index < position.column + position.cell["col_span"]
+    }
+
+
 def target_refs(content: dict, target: str, outline: dict | None = None) -> set[str]:
     if target == "document":
         return set(content["citations"])
@@ -126,18 +213,25 @@ def target_refs(content: dict, target: str, outline: dict | None = None) -> set[
     table = re.fullmatch(r"table:(.+):row:(\d+)(?::column:(\d+))?", target)
     if table:
         citation, row, column = table.groups()
-        entry = next((t for t in content["source_tables"] if t["citation"] == citation), None)
-        try:
-            cells = entry["table"]["rows"][int(row)] if entry else []
-            if column is not None:
-                cells = [cells[int(column)]]
-            if not cells:
-                raise IndexError
-        except IndexError:
-            raise _invalid("Annotation trỏ đến hàng/ô không tồn tại.") from None
-        return {citation, *[citation.split(":", 1)[0] + ":" + c["evidence_id"] for c in cells]}
+        entry = _table_entry(content, citation)
+        if entry is None:
+            raise _invalid("Annotation trỏ đến hàng/ô không tồn tại.")
+        refs = _row_refs(entry, int(row), int(column) if column is not None else None)
+        if not refs:
+            raise _invalid("Annotation trỏ đến hàng/ô không tồn tại.")
+        if column is not None:
+            refs |= _header_refs(entry, int(column))
+        return refs
+    column = re.fullmatch(r"table:(.+):column:(\d+)", target)
+    if column:
+        citation, index = column.group(1), int(column.group(2))
+        entry = _table_entry(content, citation)
+        if entry is None or index >= (entry["table"].get("column_count") or 0):
+            raise _invalid("Annotation trỏ đến cột không tồn tại.")
+        return _column_refs(entry, index)
     raise _invalid(
-        "Target phải là document, section:citation, paragraph:s:p hoặc table:citation:row:r[:column:c]."
+        "Target phải là document, section:citation, paragraph:s:p hoặc "
+        "table:citation:row:r[:column:c] / table:citation:column:c."
     )
 
 
@@ -151,7 +245,110 @@ def attribute_in_quote(label: str, value: str | float | bool, quote: str) -> boo
     return re.search(r"(?<!\w)" + literal + r"(?!\w)", folded) is not None
 
 
-def validate_annotations(annotations: list[dict], content: dict, documents: list[dict]) -> None:
+def _mentions_year(text: str, year: int) -> bool:
+    return re.search(r"(?<!\d)" + str(year) + r"(?!\d)", text) is not None
+
+
+def _proved_by_evidence(item: RetrievalAnnotation, refs: set[str], year: int) -> bool:
+    return any(
+        evidence.citation in refs and _mentions_year(evidence.quote, year)
+        for evidence in item.evidence
+    )
+
+
+def _require_row_year_proof(
+    item: RetrievalAnnotation, entry: dict, row: int, year: int
+) -> None:
+    """A row data_year is proven by a labelled year cell inside that same row."""
+    _, positions = _grid(entry)
+    cells = (
+        [position.cell for position in positions if position.row <= row < position.row + position.cell["row_span"]]
+        if positions is not None
+        else []
+    )
+    try:
+        cells = [*cells, *entry["table"]["rows"][row]]
+    except IndexError:
+        raise _invalid("Annotation trỏ đến hàng không tồn tại.") from None
+    run = entry["citation"].split(":", 1)[0]
+    proofs = {
+        run + ":" + cell["evidence_id"]
+        for cell in cells
+        if labelled_years(cell.get("text", "")) == {year}
+        and year_mentions(cell.get("text", "")) == {year}
+    }
+    if not _proved_by_evidence(item, proofs, year):
+        raise _invalid("Năm dữ liệu của hàng cần dẫn chứng từ ô nêu năm trong hàng.")
+
+
+def _require_table_year_proof(item: RetrievalAnnotation, content: dict) -> None:
+    """A table data_year is proven by its governing header, read in full."""
+    year = item.values.data_year
+    if year is None:
+        return
+    cell = re.fullmatch(r"table:(.+):row:(\d+):column:(\d+)", item.target)
+    column = re.fullmatch(r"table:(.+):column:(\d+)", item.target)
+    row = None if cell else re.fullmatch(r"table:(.+):row:(\d+)", item.target)
+    match = cell or column or row
+    if match is None:
+        return
+    entry = _table_entry(content, match.group(1))
+    if entry is None:
+        raise _invalid("Annotation trỏ đến bảng không tồn tại.")
+    if row is not None:
+        _require_row_year_proof(item, entry, int(row.group(2)), year)
+        return
+    index = int(cell.group(3)) if cell else int(column.group(2))
+    shape, positions = _grid(entry)
+    if positions is None:
+        raise _invalid("Không đọc được cấu trúc bảng để xác định tiêu đề cột.")
+    headers = set(header_rows(shape))
+    governing = [
+        position
+        for position in positions
+        if position.row in headers
+        and position.column <= index < position.column + position.cell["col_span"]
+    ]
+    # The whole governing header text is inspected: a short quote must not hide
+    # a role, and a multi-year child header must not inherit one parent year.
+    proven = column_year([position.cell for position in governing])
+    run = entry["citation"].split(":", 1)[0]
+    proofs = {
+        run + ":" + position.cell["evidence_id"]
+        for position in governing
+        if data_year(position.cell.get("text", "")) == year
+    }
+    known = {proven} if proven is not None else set()
+    if cell is not None:
+        target_cell = next(
+            (
+                position.cell
+                for position in positions
+                if position.row == int(cell.group(2)) and position.column == int(cell.group(3))
+            ),
+            None,
+        )
+        if target_cell is not None:
+            text = target_cell.get("text", "")
+            own = labelled_years(text)
+            if not own or year_mentions(text) != own:
+                own = set()
+            known |= own
+            if own == {year}:
+                proofs.add(run + ":" + target_cell["evidence_id"])
+    if known != {year}:
+        raise _invalid("Năm dữ liệu của ô/cột không xác định đúng một năm.")
+    if not _proved_by_evidence(item, proofs, year):
+        raise _invalid("Năm dữ liệu cần dẫn chứng từ ô tiêu đề chi phối hoặc chính ô nêu năm.")
+
+
+def validate_annotations(
+    annotations: list[dict],
+    content: dict,
+    documents: list[dict],
+    *,
+    strict_roles: bool = False,
+) -> None:
     texts = {}
     for document in documents:
         prefix = document["ocr_run_id"] + ":"
@@ -179,7 +376,9 @@ def validate_annotations(annotations: list[dict], content: dict, documents: list
         # A proof in the same OCR run is not necessarily a proof for this unit.
         # For parsed table rows/cells the table-wide text is also too broad.
         local_texts = texts
-        table = re.fullmatch(r"table:(.+):row:(\d+)(?::column:(\d+))?", item.target)
+        table = re.fullmatch(
+            r"table:(.+):row:(\d+)(?::column:(\d+))?", item.target
+        ) or re.fullmatch(r"table:(.+):column:(\d+)", item.target)
         if table:
             table_ref = table.group(1)
             local_texts = {
@@ -224,9 +423,11 @@ def validate_annotations(annotations: list[dict], content: dict, documents: list
                 ]
             found = any(v.casefold() in quotes for v in alternatives)
             if key.endswith("_year"):
-                found = re.search(r"(?<!\d)" + str(value) + r"(?!\d)", quotes) is not None
+                found = _mentions_year(quotes, value)
             if not found:
                 raise _invalid("Giá trị metadata cần xuất hiện trong trích đoạn nguồn.")
+        if strict_roles:
+            _require_table_year_proof(item, content)
 
 
 def chunk_metadata(annotations: list[dict], targets: set[str]) -> list[dict]:

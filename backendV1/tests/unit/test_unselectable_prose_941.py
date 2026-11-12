@@ -12,7 +12,13 @@ from tests.unit.test_table_grounding_770 import source
 
 
 def unselectable(text, *, key="E1", table="ocr:t"):
-    s = source([["Name", "Price"], ["Alpha", "18"]], key=key, table=table)
+    """Keep the visible text and the canonical cells describing the same table."""
+    rows = [
+        [part.strip() for part in line.split("]:", 1)[1].split("|")]
+        for line in text.splitlines()
+        if line.startswith("row[") and "]:" in line
+    ]
+    s = source(rows or [["Name", "Price"], ["Alpha", "18"]], key=key, table=table)
     for row in s.structure["rows"]:
         for cell in row:
             cell["header"] = False

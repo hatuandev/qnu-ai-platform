@@ -22,6 +22,7 @@ from qnu.domains.rag.answer.structure_context import (
     continuation_groups,
     enumeration_requested,
     needs_structure,
+    numbered_groups,
     select_groups,
     unresolved_references,
 )
@@ -181,6 +182,8 @@ async def expand_context(
     if needs["kind"] == "single_value":
         structural = _bounded_single_value(structural, set(anchors))
     structural.extend(continuation_groups(rows, result.hits, bundles))
+    if needs["kind"] == "condition":
+        structural.extend(numbered_groups(rows, result.hits, bundles))
     if structural or needs_structure(question):
         trace["structure"] = {
             "version": VERSION,

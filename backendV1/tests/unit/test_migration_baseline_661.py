@@ -77,6 +77,10 @@ def test_initial_schema_offline_sql_creates_v1_without_touching_legacy():
     assert "CREATE TABLE kb_index_sync" in sql
     assert "ADD COLUMN vectors_retired_at" in sql
     assert "'mineru'" in sql and "'provider_document'" in sql
+    assert (
+        "provider_type IN ('openai_compatible','gemini','local','mineru','ollama','llamacpp')"
+        in sql
+    )
     assert "reserved_tokens >= 0" in sql
     assert "ADD COLUMN parent_segment_id" in sql
     assert "fk_compiler_parent" in sql

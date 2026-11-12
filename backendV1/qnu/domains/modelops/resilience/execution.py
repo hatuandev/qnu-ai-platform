@@ -11,6 +11,11 @@ import time
 import uuid
 from dataclasses import replace
 
+from qnu.domains.modelops.diagnostics.observations import (
+    NEGATIVE_CACHE_SECONDS,
+    load_limit,
+    remember_limit,
+)
 from qnu.domains.modelops.resilience.admission import chat_slot
 from qnu.domains.modelops.resilience.heartbeat import maintain_lease
 from qnu.domains.modelops.resilience.key_pool import acquire, finish
@@ -210,21 +215,47 @@ class CredentialExecutor:
 
 
 class ManagedChatModel:
+    OBSERVATION_TTL_SECONDS = 600
+
     def __init__(self, adapter, executor=None):
         self.adapter, self.executor = adapter, executor or CredentialExecutor()
-        self._output_limits: dict[tuple[str, str, str, str | None], tuple[float, int]] = {}
+        self._output_limits: dict[tuple[str, str, str, str | None], tuple[float, int | None]] = {}
+
+    def _store_limit(self, key, ttl: float, limit: int | None) -> None:
+        if len(self._output_limits) >= 256:
+            self._output_limits.pop(next(iter(self._output_limits)))
+        self._output_limits[key] = (time.monotonic() + ttl, limit)
 
     async def complete(self, messages, request):
         recovered = False
+        limit_source = "capacity"
 
         async def invoke(req):
-            nonlocal recovered
+            nonlocal recovered, limit_source
             if not getattr(req, "automatic_output_budget", False) or req.execution is None:
                 return await self.adapter.complete(messages, req)
             key = (req.execution.provider_id, req.endpoint, req.model, req.budget_identity)
             cached = self._output_limits.get(key)
-            if cached and cached[0] > time.monotonic():
-                req = replace(req, max_output_tokens=min(req.max_output_tokens, cached[1]))
+            if cached is not None and cached[0] > time.monotonic():
+                if cached[1] is not None:
+                    req = replace(req, max_output_tokens=min(req.max_output_tokens, cached[1]))
+                    limit_source = "observed_runtime"
+            else:
+                observed = await load_limit(
+                    req.execution.sessions,
+                    provider_id=req.execution.provider_id,
+                    endpoint=req.endpoint,
+                    model_name=req.model,
+                    budget_identity=req.budget_identity,
+                )
+                if observed is None:
+                    self._store_limit(key, NEGATIVE_CACHE_SECONDS, None)
+                else:
+                    self._store_limit(
+                        key, min(self.OBSERVATION_TTL_SECONDS, observed[1]), observed[0]
+                    )
+                    req = replace(req, max_output_tokens=min(req.max_output_tokens, observed[0]))
+                    limit_source = "observed_diagnostics"
             try:
                 result = await self.adapter.complete(messages, req)
             except ChatResponseError as exc:
@@ -232,10 +263,17 @@ class ManagedChatModel:
                 if limit is None or recovered:
                     raise
                 recovered = True
-                if len(self._output_limits) >= 256:
-                    self._output_limits.pop(next(iter(self._output_limits)))
-                self._output_limits[key] = (time.monotonic() + 600, limit)
+                self._store_limit(key, self.OBSERVATION_TTL_SECONDS, limit)
+                limit_source = "observed_runtime"
                 logger.info("chat_output_limit_observed", provider_id=key[0], limit=limit)
+                await remember_limit(
+                    req.execution.sessions,
+                    provider_id=req.execution.provider_id,
+                    endpoint=req.endpoint,
+                    model_name=req.model,
+                    budget_identity=req.budget_identity,
+                    limit=limit,
+                )
                 req = replace(req, max_output_tokens=limit)
                 result = await self.adapter.complete(messages, req)
             return replace(
@@ -244,6 +282,7 @@ class ManagedChatModel:
                     "mode": "automatic",
                     "reserved_output_tokens": request.max_output_tokens,
                     "sent_output_tokens": req.max_output_tokens,
+                    "output_limit_source": limit_source,
                     "observed_output_limit": req.max_output_tokens
                     if req.max_output_tokens < request.max_output_tokens
                     else None,

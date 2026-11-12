@@ -4,6 +4,10 @@ export function connectionProtocol(connection: Pick<Connection, "api_type">) {
   switch (connection.api_type) {
     case "mineru":
       return "Dịch vụ OCR PDF";
+    case "ollama":
+      return "Ollama";
+    case "llamacpp":
+      return "llama.cpp";
     case "anthropic":
       return "Anthropic";
     case "gemini":

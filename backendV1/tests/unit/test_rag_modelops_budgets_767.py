@@ -228,3 +228,48 @@ def test_legacy_review_uses_conservative_lifetime_instead_of_zero(monkeypatch):
     resumed = refinement.resume_execution_trace(review)
     assert resumed["execution_elapsed_seconds"] == 100
     assert resumed["execution_budget_basis"] == "legacy_wall_clock_upper_bound/v1"
+
+
+@pytest.mark.asyncio
+async def test_rerank_trace_measures_sent_bytes_and_capacity_headroom(monkeypatch):
+    from qnu.ports.reranker import RerankHit, RerankResult
+
+    target = runtime()
+    monkeypatch.setattr(hybrid.runtime_service, "resolve", AsyncMock(return_value=target))
+    monkeypatch.setattr(
+        hybrid.usage_service, "reserve", AsyncMock(return_value=SimpleNamespace(id="usage"))
+    )
+    monkeypatch.setattr(hybrid.usage_service, "settle", AsyncMock())
+    trace = {"ranking": {}, "score_kinds": {}}
+    await hybrid.rerank(
+        SimpleNamespace(commit=AsyncMock()),
+        None,
+        "workspace",
+        SimpleNamespace(query="Q", rerank_provider_id="provider", top_k=1),
+        [hit("A" * 100), hit("B" * 300)],
+        SimpleNamespace(
+            rerank=AsyncMock(return_value=RerankResult([RerankHit(1, 0.9), RerankHit(0, 0.1)], 42))
+        ),
+        trace,
+        AsyncMock(return_value="proof"),
+    )
+    assert trace["rerank_input"] == {
+        "documents": 2,
+        "query_bytes": 1,
+        "doc_bytes_total": 400,
+        "doc_bytes_max": 300,
+        "guard_bytes_total": 530,
+        "guard_bytes_max": 365,
+        "capacity_tokens": 8192,
+        "capacity_status": "configured",
+        "over_capacity_documents": 0,
+    }
+    tight = replace(target, token_limits=ModelTokenLimits(context_window_tokens=256))
+    metrics = hybrid.runtime_service.measure(tight, "Q", ["B" * 300])
+    assert metrics["over_capacity_documents"] == 1
+    with pytest.raises(AppException) as caught:
+        hybrid.runtime_service.budget(tight, "Q", ["B" * 300])
+    assert caught.value.code == "rerank_input_limit_exceeded"
+    with pytest.raises(AppException) as caught:
+        hybrid.runtime_service.budget(replace(target, token_limits=None), "Q", ["B" * 300])
+    assert caught.value.code == "rerank_capacity_required"

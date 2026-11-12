@@ -13,6 +13,17 @@ class CellPosition:
     cell: dict
 
 
+def table_structure(table: dict) -> dict:
+    """Canonical layout input for one complete source table; rows stay untouched."""
+    rows = table.get("rows") or []
+    return {
+        "rows": rows,
+        "row_indices": list(range(len(rows))),
+        "original_row_count": table.get("row_count") or len(rows),
+        "original_column_count": table.get("column_count") or 0,
+    }
+
+
 def layout(structure: dict) -> tuple[list[CellPosition], list[str]]:
     rows, indices = structure.get("rows"), structure.get("row_indices")
     columns, count = structure.get("original_column_count"), structure.get("original_row_count")

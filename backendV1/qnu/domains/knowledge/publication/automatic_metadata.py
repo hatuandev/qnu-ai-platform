@@ -47,12 +47,12 @@ def preview(bundle: VersionBundle) -> dict:
             item = RetrievalAnnotation.model_validate(item).model_dump(
                 mode="json", exclude_none=True
             )
-            validate_annotations([item], bundle.content, bundle.documents)
+            validate_annotations([item], bundle.content, bundle.documents, strict_roles=True)
         except (ValidationError, AppException):
             # Do not block registration or turn uncertain extracted values into facts.
             continue
         annotations.append(item)
-    validate_annotations(annotations, bundle.content, bundle.documents)
+    validate_annotations(annotations, bundle.content, bundle.documents, strict_roles=True)
     return {
         "rules_version": RULE_VERSION,
         "annotations": annotations,

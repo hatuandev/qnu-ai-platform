@@ -1,15 +1,15 @@
-"""P1 retrieval: phrase lexical recall and weighted fusion over every branch."""
+"""P1 retrieval: phrase lexical recall, anchor coverage and rerank-order selection."""
 
 from qnu.domains.knowledge.index.hybrid import (
-    RERANK_RRF_K,
-    RERANK_WEIGHT,
+    exact_anchors,
     fuse,
     lexical_expression,
+    select_reranked,
 )
 from qnu.domains.knowledge.index.schemas import SearchHit
 
 
-def hit(chunk_id: str) -> SearchHit:
+def hit(chunk_id: str, text: str | None = None) -> SearchHit:
     return SearchHit(
         chunk_id=chunk_id,
         document_id="doc",
@@ -17,7 +17,7 @@ def hit(chunk_id: str) -> SearchHit:
         publication_decision_id="pub",
         score=0.0,
         kind="paragraph",
-        text=chunk_id,
+        text=text if text is not None else chunk_id,
         citations={},
         structure=None,
     )
@@ -41,21 +41,49 @@ def test_weighted_fuse_keeps_candidates_from_every_branch():
     assert first.score == 0.0
 
 
-def test_rerank_fusion_surfaces_strong_cross_encoder_candidate():
-    # Q27 regression: the cross-encoder ranks the answer chunk #2 but base fusion
-    # ranks it #16. Reusing the base RRF k=60 let a #6/#6 competitor win on the
-    # rank-only prior; RERANK_RRF_K sharpens the reranker so the chunk surfaces.
-    fusion = [hit(f"c{i:02d}") for i in range(1, 31)]
-    rerank = [
-        hit(c)
-        for c in (
-            "c02", "c16", "c07", "c01", "c04", "c06", "c19", "c03", "c26", "c24",
-            "c17", "c10", "c05", "c22", "c09", "c20", "c12", "c21", "c11", "c25",
-            "c08", "c15", "c13", "c14", "c29", "c28", "c18", "c23", "c27", "c30",
-        )
+def test_exact_anchors_keep_identifier_and_leading_zero_code_only():
+    assert exact_anchors("chương trình Kế toán số mã AM-0029 năm 2027") == ["am-0029"]
+    assert exact_anchors("ngành 0120 và 2027") == ["0120"]
+    assert exact_anchors("năm 2027") == []
+
+
+def test_anchor_candidate_survives_the_fusion_cut():
+    dense = [hit(f"d{rank:02d}") for rank in range(1, 11)]
+    lexical = [hit(f"l{rank:02d}") for rank in range(1, 26)]
+    target = hit("target", "row[12]: AM-0029 | Kế toán số | 2027 | 127")
+    lexical.append(target)
+    fused = fuse(
+        [dense, lexical],
+        10,
+        60,
+        anchors=exact_anchors("mã AM-0029 năm 2027"),
+    )
+    assert len(fused) == 10
+    assert fused[-1].chunk_id == "target"
+
+
+def test_anchor_reservation_never_duplicates_a_selected_candidate():
+    dense = [hit("target", "AM-0029"), *[hit(f"d{rank:02d}") for rank in range(2, 11)]]
+    lexical = [hit(f"l{rank:02d}") for rank in range(1, 26)]
+    fused = fuse([dense, lexical], 10, 60, anchors=["am-0029"])
+    assert [h.chunk_id for h in fused].count("target") == 1
+
+
+def test_rerank_order_is_authoritative_over_the_base_prior():
+    # Q13 regression: the formula chunk is cross-encoder rank 2 but base fusion
+    # rank 9. A second weighted RRF put it outside top 5; the reranker order wins.
+    fusion = [hit(f"c{rank:02d}") for rank in range(1, 11)]
+    reranked = [
+        hit("c06"),
+        hit("c09"),
+        hit("c01"),
+        hit("c02"),
+        hit("c03"),
+        hit("c04"),
+        hit("c05"),
+        hit("c07"),
+        hit("c08"),
+        hit("c10"),
     ]
-    target = "c16"
-    old = fuse([fusion, rerank], 5, 60, weights=[1.0, RERANK_WEIGHT])
-    assert target not in [h.chunk_id for h in old]
-    new = fuse([fusion, rerank], 5, RERANK_RRF_K, weights=[1.0, RERANK_WEIGHT])
-    assert target in [h.chunk_id for h in new]
+    selected = select_reranked(fusion, reranked, 5)
+    assert [h.chunk_id for h in selected] == ["c06", "c09", "c01", "c02", "c03"]

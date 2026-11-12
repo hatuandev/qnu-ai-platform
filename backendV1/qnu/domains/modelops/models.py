@@ -29,7 +29,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from qnu.platform.database import Base
 
-PROVIDER_TYPES = ("openai_compatible", "gemini", "local", "nemotron", "paddleocr", "mineru")
+PROVIDER_TYPES = ("openai_compatible", "gemini", "local", "ollama", "llamacpp", "mineru")
 CAPABILITIES = ("chat", "embedding", "rerank", "ocr")
 KEY_STATUSES = ("active", "revoked")
 DEFAULT_ROW_ID = "system"
@@ -45,7 +45,7 @@ class Provider(Base):
     __tablename__ = "providers"
     __table_args__ = (
         CheckConstraint(
-            "provider_type IN ('openai_compatible','gemini','local','nemotron','paddleocr','mineru')",
+            "provider_type IN ('openai_compatible','gemini','local','ollama','llamacpp','mineru')",
             name="ck_provider_type",
         ),
     )

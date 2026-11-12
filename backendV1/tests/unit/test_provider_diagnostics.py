@@ -142,7 +142,7 @@ async def test_ocr_requires_located_layout_and_uses_a_generated_page():
                 }
             ]
         },
-        target=replace(TARGET, provider_type="nemotron"),
+        target=replace(TARGET, provider_type="openai_compatible"),
     )
     assert result.outcome == "ok"
     message = json.loads(requests[0].content)["messages"][0]["content"]

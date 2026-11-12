@@ -13290,8 +13290,9 @@
               "openai_compatible",
               "gemini",
               "local",
-              "nemotron",
-              "paddleocr"
+              "ollama",
+              "llamacpp",
+              "mineru"
             ],
             "title": "Provider Type"
           },

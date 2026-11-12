@@ -17,8 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.modelops.access import require_model_admin
 from qnu.domains.modelops.audit import record_event
+from qnu.domains.modelops.capacity.automatic import capacity_identity, operational_budget
 from qnu.domains.modelops.capacity.service import read_capacity
-from qnu.domains.modelops.diagnostics.schemas import DiagnosticCheck, ProviderDiagnostics
+from qnu.domains.modelops.diagnostics.observations import MAX_OBSERVATIONS, stored_observations
+from qnu.domains.modelops.diagnostics.schemas import (
+    DiagnosticCheck,
+    ObservedOutputLimit,
+    ProviderDiagnostics,
+)
 from qnu.domains.modelops.embedding.configuration import read_dimension
 from qnu.domains.modelops.keys.scope import key_scope
 from qnu.domains.modelops.models import Provider, ProviderKey
@@ -33,6 +39,42 @@ from qnu.ports.provider_diagnostics import (
 )
 
 HISTORY_KEY = "diagnostic_checks_v1"
+
+
+def _observed_limits(provider: Provider) -> list[ObservedOutputLimit]:
+    rows = stored_observations(provider)
+    if not rows:
+        return []
+    effective = operational_budget(read_capacity(provider), "chat")
+    current = capacity_identity(
+        provider.id,
+        provider.base_url,
+        provider.model_name,
+        effective.token_limits,
+        effective,
+    )
+    now = datetime.now(UTC)
+    limits = []
+    for row in rows[:MAX_OBSERVATIONS]:
+        try:
+            limit = ObservedOutputLimit.model_validate(
+                {
+                    field: row.get(field)
+                    for field in (
+                        "endpoint",
+                        "model_name",
+                        "max_output_tokens",
+                        "observed_at",
+                        "expires_at",
+                    )
+                }
+            )
+        except (ValueError, TypeError):
+            continue
+        if row.get("budget_identity") != current or limit.expires_at <= now:
+            limit.configuration_status = "stale"
+        limits.append(limit)
+    return limits
 
 
 async def identity(db: AsyncSession, provider: Provider) -> str:
@@ -103,7 +145,10 @@ async def read_diagnostics(
         check.configuration_status = "current" if history_current(provider, row, keys) else "stale"
         checks.append(check)
     return ProviderDiagnostics(
-        provider_id=provider.id, configured_active=provider.is_active, checks=checks
+        provider_id=provider.id,
+        configured_active=provider.is_active,
+        checks=checks,
+        observed_output_limits=_observed_limits(provider),
     )
 
 

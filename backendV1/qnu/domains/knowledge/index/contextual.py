@@ -9,8 +9,8 @@ import re
 from collections.abc import Callable
 from dataclasses import replace
 
+from qnu.domains.knowledge.index.abbreviations import parenthetical
 from qnu.domains.knowledge.index.chunking import Chunk
-from qnu.domains.knowledge.publication.evidence import digest
 from qnu.platform.errors import AppException
 
 VERSION = "qnu.search-context/v1"
@@ -18,33 +18,7 @@ MAX_DEFINITIONS = 32
 
 
 def glossary(content: dict, documents: list[dict]) -> list[dict]:
-    definitions = {}
-    # Definitions must themselves be reachable through the pinned citation map.
-    pattern = re.compile(r"([^\n.;:!?()]{3,160})\s*\(([A-ZÀ-ỴĐ][A-ZÀ-ỴĐ0-9-]{1,15})\)")
-    for document in documents:
-        for page in document["pages"]:
-            for block in page["blocks"]:
-                citation = document["ocr_run_id"] + ":" + block["evidence_id"]
-                if citation not in content["citations"]:
-                    continue
-                for match in pattern.finditer(block["text"]):
-                    expansion, alias = match.groups()
-                    expansion = expansion.strip()
-                    words = expansion.split()[-len(alias) :]
-                    expansion = " ".join(words)
-                    # Match initials exactly; never interpret a cohort code/year or
-                    # consume a whole preceding sentence as an invented definition.
-                    initials = "".join(w[0] for w in words).casefold()
-                    if not alias.isupper() or initials != alias.casefold() or not 2 <= len(words) <= 12:
-                        continue
-                    entry = {
-                        "alias": alias,
-                        "expansion": expansion,
-                        "citation": citation,
-                        "quote": match.group(0)[match.group(0).find(words[0]) :],
-                    }
-                    definitions[digest(entry)] = entry
-    result = [definitions[key] for key in sorted(definitions)]
+    result = parenthetical(content, documents)
     if len(result) > MAX_DEFINITIONS:
         raise AppException(
             "Danh mục định nghĩa vượt ngân sách ngữ cảnh.",

@@ -26,6 +26,9 @@ from qnu.platform.errors import Conflict, EntityNotFound
 from qnu.platform.network_policy import assert_allowed_endpoint
 from qnu.ports.provider_diagnostics import ProviderDiagnosticClient
 
+# Protocols stored as their own provider type; every other API is OpenAI-compatible.
+DIRECT_PROVIDER_TYPES = ("mineru", "ollama", "llamacpp")
+
 
 async def get_connection(db: AsyncSession, connection_id: str, *, lock: bool = False) -> Provider:
     stmt = select(Provider).where(Provider.id == connection_id, Provider.is_connection.is_(True))
@@ -158,7 +161,7 @@ async def save_connection(
     current_extra = dict(row.extra_config or {})
     if req.api_type is not None:
         api_type = req.api_type.strip()
-        target_type = "mineru" if api_type == "mineru" else "openai_compatible"
+        target_type = api_type if api_type in DIRECT_PROVIDER_TYPES else "openai_compatible"
         if target_type != row.provider_type and connection_id:
             child = await db.scalar(
                 select(Provider.id).where(Provider.parent_id == row.id).limit(1)
@@ -373,7 +376,7 @@ async def add_model(
             name=f"{parent.name} · {req.model_name}",
             base_url=parent.base_url,
             provider_type=parent.provider_type
-            if parent.provider_type == "mineru"
+            if parent.provider_type in DIRECT_PROVIDER_TYPES
             else "openai_compatible",
             model_name=req.model_name,
             capabilities=req.capabilities,

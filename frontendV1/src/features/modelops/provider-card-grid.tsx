@@ -34,32 +34,32 @@ interface ProviderCardGridProps {
 const PROVIDER_FAMILY_ORDER: ProviderType[] = [
   "openai_compatible",
   "local",
-  "nemotron",
+  "ollama",
+  "llamacpp",
   "mineru",
-  "paddleocr",
   "gemini",
 ];
 
 const FAMILY_HEADERS: Record<ProviderType, { title: string; desc: string }> = {
   openai_compatible: {
     title: "OpenAI Compatible",
-    desc: "Cổng giao tiếp chuẩn HTTP OpenAI (vLLM, Ollama, API Gateway, Cloud Endpoints)",
+    desc: "Cổng giao tiếp chuẩn HTTP OpenAI (vLLM, API Gateway, Cloud Endpoints)",
   },
   local: {
     title: "Local Models",
     desc: "Mô hình triển khai nội bộ trường hoặc máy chủ on-premise",
   },
-  nemotron: {
-    title: "NVIDIA Nemotron OCR",
-    desc: "Công cụ trích xuất tài liệu và nhận dạng cấu trúc bảng",
+  ollama: {
+    title: "Ollama",
+    desc: "Runtime nội bộ phục vụ model chat qua API tương thích OpenAI",
+  },
+  llamacpp: {
+    title: "llama.cpp",
+    desc: "Runtime GGUF nội bộ phục vụ model chat qua API tương thích OpenAI",
   },
   mineru: {
     title: "MinerU PDF OCR",
     desc: "Nhận dạng cả PDF theo tác vụ, giữ trang, bảng và bằng chứng gốc",
-  },
-  paddleocr: {
-    title: "PaddleOCR Engine",
-    desc: "Trích xuất văn bản nhanh đa ngôn ngữ",
   },
   gemini: {
     title: "Gemini",

@@ -422,7 +422,7 @@ def test_mixed_lookup_returns_only_original_cells_with_projection_trace(client, 
     assert "999" not in body["answer"] and "phí" not in body["answer"]
     assert len(body["statements"]) == 1
     assert body["trace"]["grounding"]["projection"] == {
-        "version": "qnu.answer-projection/v4",
+        "version": "qnu.answer-projection/v7",
         "mode": "selected_cells",
         "omitted_model_statements": 1,
     }
@@ -443,7 +443,7 @@ def test_mixed_paragraph_and_selected_cell_survive_one_provider_call(client, rea
     }
     assert "150" in body["statements"][1]["text"]
     assert body["trace"]["grounding"]["projection"] == {
-        "version": "qnu.answer-projection/v4",
+        "version": "qnu.answer-projection/v7",
         "mode": "mixed",
         "omitted_model_statements": 0,
     }

@@ -135,7 +135,6 @@ def test_citation_failures_record_indexed_safe_paths():
                     "status": "answered",
                     "statements": [
                         {"text": "Ngoài phạm vi.", "evidence_ids": ["E9"]},
-                        {"text": "Trùng nguồn.", "evidence_ids": ["E1", "E1"]},
                     ],
                     "lookups": [],
                     "assessment": [],
@@ -146,7 +145,6 @@ def test_citation_failures_record_indexed_safe_paths():
     assert exc.value.code == "answer_citation_invalid"
     assert exc.value.validation_issues == [
         {"path": ["statements", 0, "evidence_ids"], "type": "not_allowed"},
-        {"path": ["statements", 1, "evidence_ids"], "type": "duplicate"},
     ]
 
 

@@ -80,21 +80,79 @@ async def lexical(
     ]
 
 
-RERANK_WEIGHT = 2.0
-# Smaller k than base fusion so the cross-encoder outweighs the rank-only prior.
-RERANK_RRF_K = 30
+ANCHOR_SLOTS = 2
+_ANCHOR_TOKEN = re.compile(r"[^\s,;:!?()\[\]{}\"'\u201c\u201d\u2018\u2019]+")
 
 
-def fuse(branches, count: int, k: int, weights: list[float] | None = None):
-    """Weighted RRF; every branch keeps its candidates instead of replacing them."""
-    scores, hits = defaultdict(float), {}
+def exact_anchors(query: str) -> list[str]:
+    """Alphanumeric identifiers and leading-zero codes are exact, low-ambiguity keys.
+
+    A year alone is not an anchor: it is shared column scope. The rule is
+    query-derived, not a vocabulary or a per-document special case.
+    """
+    anchors = []
+    for token in _ANCHOR_TOKEN.findall(query):
+        term = token.strip(".").casefold()
+        identifier = bool(re.search(r"[^\W\d_]", term)) and bool(re.search(r"\d", term))
+        if identifier or re.fullmatch(r"0\d{3,}", term):
+            anchors.append(term)
+    return list(dict.fromkeys(anchors))
+
+
+def anchor_match(hit, anchors: tuple[str, ...]) -> bool:
+    text = hit.text.casefold()
+    return any(
+        re.search(r"(?<!\w)" + re.escape(anchor) + r"(?!\w)", text) for anchor in anchors
+    )
+
+
+def fuse(
+    branches,
+    count: int,
+    k: int,
+    weights: list[float] | None = None,
+    anchors: tuple[str, ...] | list[str] = (),
+):
+    """Weighted RRF with a bounded guarantee for exact-identifier candidates.
+
+    Fusion is a candidate selector, not the final answer ranking. A candidate
+    proven by an identifier in the question may sit just below the RRF cut while
+    three-branch prose occupies every slot. Reserve a small tail so the reranker
+    can still judge it; never raise candidate_k or duplicate a selected hit.
+    """
+    scores, hits, best = defaultdict(float), {}, {}
     weights = weights or [1.0] * len(branches)
     for weight, branch in zip(weights, branches):
         for rank, hit in enumerate(branch, 1):
             scores[hit.chunk_id] += weight / (k + rank)
             hits.setdefault(hit.chunk_id, hit)
+            best.setdefault(hit.chunk_id, rank)
     ranked = sorted(hits, key=lambda key: (-scores[key], key))[:count]
+    if anchors and len(hits) > len(ranked):
+        chosen = set(ranked)
+        extra = sorted(
+            (best[key], key)
+            for key, hit in hits.items()
+            if key not in chosen and anchor_match(hit, tuple(anchors))
+        )
+        if extra:
+            slots = min(ANCHOR_SLOTS, count, len(extra))
+            ranked = ranked[: count - slots] + [key for _, key in extra[:slots]]
     return [hits[key].model_copy(update={"score": scores[key]}) for key in ranked]
+
+
+def select_reranked(hits, reranked, count: int):
+    """Cross-encoder order is authoritative; base fusion only built the pool."""
+    known = {hit.chunk_id for hit in hits}
+    selected, seen = [], set()
+    for hit in reranked:
+        if hit.chunk_id in seen or hit.chunk_id not in known:
+            continue
+        seen.add(hit.chunk_id)
+        selected.append(hit)
+        if len(selected) == count:
+            break
+    return selected
 
 
 async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint):
@@ -102,6 +160,7 @@ async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint):
     proof = await checkpoint()
     documents = [rerank_text(h) for h in hits]
     trace["rerank_presentation"] = PRESENTATION_VERSION
+    trace["rerank_input"] = runtime_service.measure(runtime, req.query, documents)
     reserved = runtime_service.budget(runtime, req.query, documents)
     usage = await usage_service.reserve(
         db,
@@ -148,26 +207,19 @@ async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint):
     if current.configuration_hash != runtime.configuration_hash:
         raise Conflict("Provider rerank đã thay đổi.", code="rerank_configuration_changed")
     reranked = [hits[h.index].model_copy(update={"score": h.score}) for h in result.hits]
-    fused = fuse(
-        [hits, reranked],
-        req.top_k,
-        RERANK_RRF_K,
-        weights=[1.0, RERANK_WEIGHT],
-    )
+    selected = select_reranked(hits, reranked, req.top_k)
     trace["ranking"]["rerank"] = [
         {"chunk_id": h.chunk_id, "score": h.score} for h in reranked
     ]
     trace["score_kinds"]["rerank"] = "model_relevance"
-    trace["ranking"]["rerank_fused"] = [
-        {"chunk_id": h.chunk_id, "score": h.score} for h in fused
+    trace["ranking"]["rerank_selected"] = [
+        {"chunk_id": h.chunk_id, "score": h.score} for h in selected
     ]
-    trace["score_kinds"]["rerank_fusion"] = "weighted_rrf"
+    trace["score_kinds"]["rerank_selection"] = "model_relevance"
     trace["rerank_ranked_ids"] = [h.chunk_id for h in reranked]
-    trace["rerank_fused_ids"] = [h.chunk_id for h in fused]
+    trace["rerank_fused_ids"] = [h.chunk_id for h in selected]
     trace["rerank_candidate_count"] = len(hits)
     trace["rerank_count"] = len(reranked)
-    trace["rerank_weight"] = RERANK_WEIGHT
-    trace["rerank_rrf_k"] = RERANK_RRF_K
     trace.update(
         {
             "rerank_provider": runtime.public_dict(),
@@ -176,4 +228,4 @@ async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint):
             "rerank_ms": round((time.monotonic() - started) * 1000, 3),
         }
     )
-    return fused
+    return selected

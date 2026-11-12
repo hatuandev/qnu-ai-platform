@@ -308,9 +308,9 @@ def parse_answer(content: str, sources: list[EvidenceSource]) -> ModelAnswer:
     allowed = {s.evidence_id for s in sources}
     issues = []
     for index, statement in enumerate(result.statements):
-        evidence_ids = statement.evidence_ids
-        if len(set(evidence_ids)) != len(evidence_ids):
-            issues.append({"path": ["statements", index, "evidence_ids"], "type": "duplicate"})
+        # Repeating an allowed alias adds no evidence; keep first order and judge only membership.
+        evidence_ids = list(dict.fromkeys(statement.evidence_ids))
+        statement.evidence_ids = evidence_ids
         if not set(evidence_ids) <= allowed:
             issues.append({"path": ["statements", index, "evidence_ids"], "type": "not_allowed"})
     if issues:

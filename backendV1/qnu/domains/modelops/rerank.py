@@ -45,17 +45,52 @@ async def resolve(
     )
 
 
-def budget(runtime: OcrRuntime, query: str, documents: list[str]) -> int:
+def capacity(runtime: OcrRuntime) -> int | None:
     limits = runtime.token_limits
-    bounds = [len(query.encode()) + len(d.encode()) + 64 for d in documents]
     available = (
-        [v for v in (limits.max_input_tokens, limits.context_window_tokens) if v is not None]
+        [
+            value
+            for value in (limits.max_input_tokens, limits.context_window_tokens)
+            if value is not None
+        ]
         if limits
         else []
     )
-    if runtime.capacity_status not in ("configured", "provisional") or not available:
+    return min(available) if available else None
+
+
+def parts(query: str, documents: list[str]) -> tuple[int, list[int], list[int]]:
+    """Byte sizes and per-document guard bounds; the guard compares bytes, not tokens."""
+    query_bytes = len(query.encode())
+    sizes = [len(document.encode()) for document in documents]
+    return query_bytes, sizes, [query_bytes + size + 64 for size in sizes]
+
+
+def measure(runtime: OcrRuntime, query: str, documents: list[str]) -> dict:
+    """Sizing facts for trace: what is sent, the byte guard and the token capacity."""
+    query_bytes, sizes, bounds = parts(query, documents)
+    limit = capacity(runtime)
+    return {
+        "documents": len(documents),
+        "query_bytes": query_bytes,
+        "doc_bytes_total": sum(sizes),
+        "doc_bytes_max": max(sizes, default=0),
+        "guard_bytes_total": sum(bounds),
+        "guard_bytes_max": max(bounds, default=0),
+        "capacity_tokens": limit,
+        "capacity_status": runtime.capacity_status,
+        "over_capacity_documents": sum(
+            1 for bound in bounds if limit is not None and bound > limit
+        ),
+    }
+
+
+def budget(runtime: OcrRuntime, query: str, documents: list[str]) -> int:
+    limit = capacity(runtime)
+    if runtime.capacity_status not in ("configured", "provisional") or limit is None:
         raise Conflict("Cần cấu hình capacity rerank.", code="rerank_capacity_required")
-    if any(n > min(available) for n in bounds):
+    _, _, bounds = parts(query, documents)
+    if any(bound > limit for bound in bounds):
         raise Conflict("Ứng viên vượt capacity rerank.", code="rerank_input_limit_exceeded")
     return max(1, sum(bounds))
 
