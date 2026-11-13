@@ -104,8 +104,12 @@ def test_selective_compilation_keeps_source_draft_and_reports_model_outcome(clie
             assert supplement["state"] == "completed"
             sections = supplement["sections"][0]["sections"]
             assert [section["heading"] for section in sections] == ["Định danh văn bản"]
-            assert [item["annotation"]["values"] for item in supplement["metadata"]] == [
-                {"attributes": {"Số hiệu": "07/AB"}}
+            metadata = supplement["metadata"]
+            assert [item["origin"] for item in metadata] == ["model", "rules", "rules"]
+            assert [item["annotation"]["values"] for item in metadata] == [
+                {"attributes": {"Số hiệu": "07/AB"}},
+                {"data_year": 2023},
+                {"data_year": 2024},
             ]
         else:
             assert supplement["state"] == "incomplete"
@@ -148,6 +152,11 @@ def test_selective_compilation_keeps_completed_children_once(client):
         draft = client.get(f"{data['url']}/{run_id}/draft").json()
         assert draft["supplement"]["state"] == "incomplete"
         assert len(draft["supplement"]["sections"]) == 1
-        assert len(draft["supplement"]["metadata"]) == 1
+        metadata = draft["supplement"]["metadata"]
+        assert [item["origin"] for item in metadata] == ["model", "rules", "rules"]
+        assert [item["annotation"]["values"] for item in metadata[1:]] == [
+            {"data_year": 2023},
+            {"data_year": 2024},
+        ]
         assert draft["source_tables"]
         assert [node["index"] for node in draft["compilation_nodes"]] == [2]

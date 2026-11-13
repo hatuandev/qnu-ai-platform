@@ -370,7 +370,6 @@ async def answer(
             "status": "hit",
             "key": cache_key,
             "saved_tokens": cached.total_tokens,
-            "origin_usage_id": cached.usage_id,
         }
         trace.contract = dict(cached.contract)
         trace.stage_ms["generation"] = 0.0
@@ -457,7 +456,6 @@ async def answer(
                 version=answer_cache.VERSION,
                 content=result.content,
                 contract=trace.contract,
-                usage_id=usage.id,
                 total_tokens=result.total_tokens,
             ),
             cache_ttl,
@@ -476,7 +474,7 @@ async def answer(
         sources=len(response.sources),
         provider_id=runtime.provider_id,
         total_tokens=trace.total_tokens,
-        cache=trace.cache.get("status", "miss"),
+        cache=trace.cache.get("status") or ("disabled" if cache_key is None else "miss"),
         stage_ms=trace.stage_ms,
     )
     return response

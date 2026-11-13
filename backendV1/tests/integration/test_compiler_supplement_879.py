@@ -62,7 +62,11 @@ def test_source_draft_plus_ai_and_confirmed_json_through_api(client):
         assert draft["supplement"]["input_sha256"] == created.json()["run"]["input_sha256"]
         assert draft["supplement"]["sections"]
         proposals = draft["supplement"]["metadata"]
-        assert len(proposals) == 1, proposals
+        assert [item["origin"] for item in proposals] == ["model", "rules", "rules"], proposals
+        assert [item["annotation"]["values"] for item in proposals[1:]] == [
+            {"data_year": 2023},
+            {"data_year": 2024},
+        ]
         proposal = proposals[0]
         assert proposal["origin"] == "model"
         assert proposal["source"]["page"] == 1

@@ -1,5 +1,7 @@
 """Saved-key diagnostics with real persistence, HTTP authorization and upstream contracts."""
 
+from urllib.parse import urlsplit
+
 import httpx
 import pytest
 
@@ -10,6 +12,8 @@ from qnu.domains.modelops.diagnostics.router import get_diagnostic_client
 from qnu.main import app
 
 API = "/platform/v1alpha1/modelops"
+# OpenAI-compatible hosts also receive best-effort native context probes after discovery.
+DISCOVERY_ROUTES = [("GET", "/v1/models"), ("GET", "/api/tags"), ("GET", "/props")]
 
 
 @pytest.fixture
@@ -34,10 +38,11 @@ def setup(client):
         )
         assert response.status_code == 201, response.text
         keys.append(response.json()["id"])
-    state = {"seen": [], "status": 200, "action": None}
+    state = {"seen": [], "routes": [], "status": 200, "action": None}
 
     async def upstream(request):
         state["seen"].append(request.headers.get("authorization"))
+        state["routes"].append((request.method, urlsplit(str(request.url)).path))
         if state["action"]:
             await state["action"]()
         return httpx.Response(state["status"], json={"data": [{"id": "test-model"}]})
@@ -56,7 +61,8 @@ def test_exact_second_key_history_and_refresh(client, setup):
         assert result.status_code == 200, result.text
         assert result.json()["key_id"] == key_id
         assert result.json()["ok"] is True
-    assert state["seen"] == ["Bearer synthetic-first", "Bearer synthetic-second"]
+    assert state["seen"] == ["Bearer synthetic-first"] * 3 + ["Bearer synthetic-second"] * 3
+    assert state["routes"] == DISCOVERY_ROUTES * 2
     checks = client.get(f"{API}/providers/{cid}/diagnostics").json()["checks"]
     assert [check["key_id"] for check in checks] == list(reversed(keys))
     assert all(check["configuration_status"] == "current" for check in checks)
@@ -94,7 +100,8 @@ def test_temporary_key_does_not_mark_saved_keys_verified(client, setup):
     response = client.post(f"{API}/connections/{cid}/test", json={"api_key": "temporary-test-key"})
     assert response.status_code == 200 and response.json()["ok"]
     assert response.json()["check_id"] is None
-    assert state["seen"] == ["Bearer temporary-test-key"]
+    assert state["seen"] == ["Bearer temporary-test-key"] * 3
+    assert state["routes"] == DISCOVERY_ROUTES
     assert client.get(f"{API}/providers/{cid}/diagnostics").json()["checks"] == []
 
 

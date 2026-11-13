@@ -1,5 +1,6 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên955 — Cổng kiểm chứng 4 chặng (A 1167, B 333, C 254, D 191), sửa 6 tệp test cũ theo hành vi mới và chốt kết quả gate trung thực](2026-11-13_phien_955_cong_kiem_chung_4_chang_va_sua_test_cu.md).
 - [Phiên954 — B1 mở rộng họ bảng cho câu liệt kê/đếm, C1-lite khoảng hiệu lực mở hai đầu, C2 cache câu trả lời chính xác; C1-full đóng theo cổng dữ liệu Phase 0](2026-11-13_phien_954_b1_c1lite_c2_va_cong_du_lieu_c1full.md).
 - [Phiên953 — B2: đo kích thước đầu vào rerank, thêm trace `rerank_input`, xác nhận live 15 ứng viên/2.512 token/610 ms — quyết định không cắt](2026-11-13_phien_953_rerank_b2_do_va_xac_nhan_live.md).
 - [Phiên952 — Đo lại cohort G3; Phase 1 guard số cấu trúc/phủ định (Q18/Q27), Phase 2 đọc trọn danh sách số (Q12), Phase 3 sửa nhãn Q24 và chấm lại, đo live Q24, Phase 4 guard mã định danh (Q27 đóng), Phase 5 thử prompt v29 và hoàn nguyên, Phase 6 guard Q10 (cells v10) + thử prompt Q24, chốt (b): Q10/Q12/Q18/Q27 đóng, Q24 token PASS/thiếu điều kiện](2026-11-12_phien_952_g3_cohort_do_lai.md).

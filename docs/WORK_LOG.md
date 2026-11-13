@@ -1,5 +1,6 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context955 — Cổng kiểm chứng 4 chặng: A 1167/1167; B 330/333 → chạy lại 333/333; C 251/254 → 254/254; D 189/191 → chạy lại chia 2 lô 96+95 = 191/191 (không single-run); sửa 6 tệp test cũ theo hành vi mới, không đổi luồng nghiệp vụ; 8 tệp mã/test + 5 tệp tài liệu chờ duyệt commit](nhat_ky/2026-11-13_phien_955_cong_kiem_chung_4_chang_va_sua_test_cu.md).
 - [Context954 — B1 mở rộng họ bảng cho câu liệt kê/đếm (structure v6), C1-lite khoảng hiệu lực mở hai đầu, C2 cache câu trả lời chính xác mặc định tắt; C1-full đóng theo cổng dữ liệu Phase 0 (0 văn bản sửa đổi/thay thế chéo)](nhat_ky/2026-11-13_phien_954_b1_c1lite_c2_va_cong_du_lieu_c1full.md).
 - [Context953 — B2: đo kích thước đầu vào rerank, thêm trace `rerank_input` và xác nhận live 15 ứng viên/2.512 token/610 ms; quyết định không cắt](nhat_ky/2026-11-13_phien_953_rerank_b2_do_va_xac_nhan_live.md).
 - [Context952 — Đo lại cohort G3; Phase 1 guard số cấu trúc/phủ định (Q18/Q27), Phase 2 đọc trọn danh sách số (Q12), Phase 3 sửa nhãn Q24 và chấm lại, đo live Q24, Phase 4 guard mã định danh (Q27 đóng), Phase 5 thử prompt v29 và hoàn nguyên, Phase 6 guard Q10 (cells v10) + thử prompt Q24, chốt (b): Q10/Q12/Q18/Q27 đóng, Q24 token PASS/thiếu điều kiện](nhat_ky/2026-11-12_phien_952_g3_cohort_do_lai.md).

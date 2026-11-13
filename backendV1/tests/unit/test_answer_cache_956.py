@@ -203,6 +203,7 @@ async def test_identical_request_reuses_the_cached_generation(monkeypatch):
     assert second.id != first.id
     assert second.trace.cache["status"] == "hit"
     assert second.trace.cache["key"] == key
+    assert "origin_usage_id" not in second.trace.cache
     assert second.trace.usage_id is None
     assert second.trace.prompt_tokens is None
     assert second.trace.evidence_sha256 == "proof-1"

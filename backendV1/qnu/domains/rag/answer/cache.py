@@ -23,7 +23,6 @@ class Entry(BaseModel):
     version: str
     content: str = Field(min_length=1)
     contract: dict = Field(default_factory=dict)
-    usage_id: str | None = None
     total_tokens: int | None = None
 
 

@@ -57,7 +57,7 @@ def test_external_key_calls_real_rag_and_preserves_assistant_config(client, read
             json={
                 "model": ast,
                 "messages": [
-                    {"role": "user", "content": "Chỉ tiêu tuyển sinh năm 2024 là bao nhiêu?"}
+                    {"role": "user", "content": "Chỉ tiêu trúng tuyển năm 2024 là bao nhiêu?"}
                 ],
             },
         )
@@ -72,11 +72,8 @@ def test_external_key_calls_real_rag_and_preserves_assistant_config(client, read
             assert sent["max_tokens"] > 128
         else:
             assert sent["max_tokens"] == output_budget
-        # Persona is deliberately data in assistant_style, never promoted to system policy.
-        assert (
-            json.loads(sent["messages"][-1]["content"])["assistant_style"]
-            == "Synthetic gateway persona"
-        )
+        # Persona is deliberately data in the payload style field, never promoted to system policy.
+        assert json.loads(sent["messages"][-1]["content"])["style"] == "Synthetic gateway persona"
         assert sent["model"] == "test-chat"
     finally:
         app.dependency_overrides.pop(get_redis_client, None)
