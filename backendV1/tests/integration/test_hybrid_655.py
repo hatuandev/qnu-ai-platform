@@ -54,21 +54,7 @@ def setup_rerank(client, data, endpoint):
         ).status_code
         == 201
     )
-    result = client.put(
-        f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
-        json={
-            "provider_ids": [
-                data["ocr_provider"]["id"],
-                data["embedding_provider"]["id"],
-                provider,
-            ],
-            "defaults": {
-                "ocr": data["ocr_provider"]["id"],
-                "embedding": data["embedding_provider"]["id"],
-                "rerank": provider,
-            },
-        },
-    )
+    result = client.put(f"{API}/modelops/defaults", json={"rerank_provider_id": provider})
     assert result.status_code == 200, result.text
     as_actor(EDITOR)
     return provider

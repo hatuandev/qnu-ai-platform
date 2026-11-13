@@ -1,6 +1,6 @@
 # ModelOps V1 — nhà cung cấp, khóa và model
 
-Áp dụng cho `backendV1/` và `frontendV1/`, Context702 ngày 28/10/2026.
+Áp dụng cho `backendV1/` và giao diện frontendV1 (đã gỡ ngày 2026-11-13; giao diện hiện hành là `frontendV2/`), Context702 ngày 28/10/2026.
 
 Cập nhật BE Context791: giới hạn token khi thêm model là tùy chọn; runtime text có ngân sách dự phòng được ghi rõ provisional. Xem [ngân sách tự động](V1_MODELOPS_NGAN_SACH_TU_DONG.md) và [prompt hoàn thiện FE](../ke_hoach/PROMPT_FE_MODELOPS_TU_DONG_791.md). Ngân sách tạm không phải thông số model đã đo; OCR ảnh/dimension vẫn có điều kiện riêng. Phần luồng UI dưới đây mô tả phiên702/733, chưa phải kết quả nghiệm thu FE791.
 

@@ -118,18 +118,13 @@ class CheckTests(unittest.IsolatedAsyncioTestCase):
         ):
             root = Path(directory)
             result = await checker.inspect(settings, root, "head")
-            vite_v1 = root / "frontendV1/node_modules/vite/bin/vite.js"
-            vite_v1.parent.mkdir(parents=True)
-            vite_v1.touch()
-            v2_missing = await checker.inspect(settings, root, "head", "frontendV2")
             vite_v2 = root / "frontendV2/node_modules/vite/bin/vite.js"
             vite_v2.parent.mkdir(parents=True)
             vite_v2.touch()
-            v2_ready = await checker.inspect(settings, root, "head", "frontendV2")
+            v2_ready = await checker.inspect(settings, root, "head")
         self.assertFalse(result["frontend"][0])
-        self.assertIn("v1-install-fe", result["frontend"][1])
+        self.assertIn("v2-install-fe", result["frontend"][1])
         self.assertFalse(result["storage"][0])
-        self.assertEqual(v2_missing["frontend"], (False, "Run npm ci in frontendV2 first"))
         self.assertEqual(v2_ready["frontend"], (True, "Vite installed in frontendV2"))
 
 

@@ -121,17 +121,10 @@ def ready(client, indexed):  # noqa: F811 - shared pytest fixture
         )
         assert (
             client.put(
-                f"{API}/workspaces/{indexed['workspace']['id']}/allowed-providers",
+                f"{API}/modelops/defaults",
                 json={
-                    "provider_ids": [
-                        indexed["ocr_provider"]["id"],
-                        indexed["embedding_provider"]["id"],
-                        provider["id"],
-                    ],
-                    "defaults": {
-                        "embedding": indexed["embedding_provider"]["id"],
-                        "chat": provider["id"],
-                    },
+                    "embedding_provider_id": indexed["embedding_provider"]["id"],
+                    "chat_provider_id": provider["id"],
                 },
             ).status_code
             == 200
@@ -590,20 +583,8 @@ def test_bare_requests_default_to_hybrid_rerank_with_workspace_default_provider(
         )
         assert (
             client.put(
-                f"{API}/workspaces/{ready['workspace']['id']}/allowed-providers",
-                json={
-                    "provider_ids": [
-                        ready["ocr_provider"]["id"],
-                        ready["embedding_provider"]["id"],
-                        ready["chat_provider"]["id"],
-                        provider_id,
-                    ],
-                    "defaults": {
-                        "embedding": ready["embedding_provider"]["id"],
-                        "chat": ready["chat_provider"]["id"],
-                        "rerank": provider_id,
-                    },
-                },
+                f"{API}/modelops/defaults",
+                json={"rerank_provider_id": provider_id},
             ).status_code
             == 200
         )

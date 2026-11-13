@@ -1,5 +1,7 @@
 # 34 — Quản lý vòng đời, thay tài liệu và vận hành trên frontendV1
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** `frontendV1` đã được gỡ khỏi repo; giao diện duy nhất hiện hành là `frontendV2`. Nội dung dưới đây mô tả màn hình cũ, không dùng để kết luận hiện trạng.
+
 Áp dụng frontendV1 kết nối backendV1. Workspace là biên giới quyền; backend
 kiểm tra người gọi ở mọi thao tác. Màn KTX vẫn là mẫu, không mở kết nối nghiệp vụ.
 

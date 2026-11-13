@@ -147,10 +147,10 @@ def chat_provider(client, data, base_url, *, secret="compiler-test-secret", mode
         )
         assert response.status_code == 201, response.text
     response = client.put(
-        f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
+        f"{API}/modelops/defaults",
         json={
-            "provider_ids": [data["ocr_provider"]["id"], provider["id"]],
-            "defaults": {"ocr": data["ocr_provider"]["id"], "chat": provider["id"]},
+            "ocr_provider_id": data["ocr_provider"]["id"],
+            "chat_provider_id": provider["id"],
         },
     )
     assert response.status_code == 200, response.text

@@ -95,26 +95,6 @@ export type PageParams = {
   pageSize: number;
 };
 
-import type { Capability } from "../modelops/types";
-
-export type AllowedProviderItem = {
-  provider_id: string;
-  name: string;
-  capabilities: string[];
-  is_active: boolean;
-  is_default: boolean;
-  default_capabilities: Capability[];
-};
-
-export type AllowlistResponse = {
-  workspace_id: string;
-  providers: AllowedProviderItem[];
-};
-
-export type AllowlistUpdateInput = {
-  provider_ids: string[];
-};
-
 export type QuotaResponse = {
   workspace_id: string;
   month_period: string;

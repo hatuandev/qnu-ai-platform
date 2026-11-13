@@ -31,7 +31,7 @@ including a persisted assistant or durable run target, is always pinned.
 
 Policies are bound to endpoint/model/type. Changing that identity marks a
 saved policy stale; its behavior is disabled until an administrator reviews
-and saves it again. Existing defaults, grants, capacity, dimension and quotas
+and saves it again. Existing defaults, capacity, dimension and quotas
 are not changed by saving a policy.
 
 ## Runtime behavior
@@ -39,14 +39,15 @@ are not changed by saving a policy.
 1. Authorize the actor/workspace using the existing domain checkpoint.
 2. If the caller did not pin a provider, inspect the primary's task chain.
    A disabled primary or one without a ready credential can be skipped.
-   A candidate must have a current workspace grant, active state, capability
-   and supported transport. Ungranted candidate IDs are not disclosed in
-   workspace traces. Missing capacity/context/schema budget fails before HTTP;
+   A candidate must be active, hold the required capability and a supported
+   transport. The system default supplies the primary; workspace access is
+   authorized before any candidate is disclosed in traces. Missing
+   capacity/context/schema budget fails before HTTP;
    routing never uses another model to evade that error.
 3. Pin the selected target, plan its actual capacity and reserve its quota.
    OCR selects once before recording the target. Compiler stores the target
    at run creation. Subsequent execution cannot change the recorded model.
-4. Immediately before HTTP, recheck the grant, active state, endpoint/model
+4. Immediately before HTTP, recheck workspace access, active state, endpoint/model
    and committed usage reservation. The internal execution scope carries the
    caller's session factory, so recovery against a different DB does not read
    credentials, leases or usage from the application's original DB.

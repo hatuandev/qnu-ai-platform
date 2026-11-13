@@ -81,16 +81,6 @@ def test_readiness_is_independent_of_monthly_usage_configuration(
     monkeypatch.setattr(app.state.container.job_queue, "health", worker_healthy)
     as_actor(PLATFORM)
     base = f"{API}/workspaces/{ready['workspace']['id']}"
-    providers = {
-        "ocr": ready["ocr_provider"]["id"],
-        "chat": ready["chat_provider"]["id"],
-        "embedding": ready["embedding_provider"]["id"],
-    }
-    granted = client.put(
-        base + "/allowed-providers",
-        json={"provider_ids": list(providers.values()), "defaults": providers},
-    )
-    assert granted.status_code == 200, granted.text
     url = base + "/operations/readiness"
     before = client.get(url)
     assert before.status_code == 200 and before.json()["ready"], before.text

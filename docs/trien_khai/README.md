@@ -5,9 +5,10 @@
 
 > **Phạm vi V1:** quy trình triển khai hiện hành là
 > [02_quy_trinh_trien_khai_dokploy.md](./02_quy_trinh_trien_khai_dokploy.md) — root
-> `docker-compose.yml` build từ `backendV1/` + `frontendV1/`, backend nội bộ cổng **8002**,
-> frontend Nginx cổng 80. Bảng công nghệ dưới đây mô tả hạ tầng chung; các cổng đã cập nhật
-> theo V1. Tài liệu lịch sử dùng cổng 8001 không còn áp dụng.
+> `docker-compose.yml` build từ `backendV1/`, backend nội bộ cổng **8002**; chưa có service
+> frontend trong Compose vì `frontendV2` chưa có SSO production. Bảng công nghệ dưới đây mô
+> tả hạ tầng chung; các cổng đã cập nhật theo V1. Tài liệu lịch sử dùng cổng 8001 không còn
+> áp dụng.
 
 ---
 

@@ -220,11 +220,8 @@ def provider(client, workspace):
     )
     assert (
         client.put(
-            f"{API}/workspaces/{workspace}/allowed-providers",
-            json={
-                "provider_ids": [identity],
-                "defaults": {"ocr": identity},
-            },
+            f"{API}/modelops/defaults",
+            json={"ocr_provider_id": identity},
         ).status_code
         == 200
     )

@@ -119,14 +119,6 @@ def small_provider(client, data, base_url, *, context_window, max_output, model=
         json={"name": "chat-key", "secret": "compiler-test-secret"},
     )
     assert response.status_code == 201, response.text
-    response = client.put(
-        f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
-        json={
-            "provider_ids": [data["ocr_provider"]["id"], data["provider"]["id"], provider["id"]],
-            "defaults": {"ocr": data["ocr_provider"]["id"], "chat": data["provider"]["id"]},
-        },
-    )
-    assert response.status_code == 200, response.text
     as_actor(EDITOR)
     return provider
 

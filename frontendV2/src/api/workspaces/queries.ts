@@ -6,7 +6,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addMember,
   createWorkspace,
-  getAllowedProviders,
   getWorkspace,
   getWorkspaceQuota,
   listMembers,
@@ -15,13 +14,10 @@ import {
   listWorkspaceUsage,
   resolveWorkspaceRoute,
   revokeMember,
-  setAllowedProviders,
-  setWorkspaceDefaults,
   updateMember,
   updateWorkspace,
 } from "./requests";
 import type {
-  AllowlistUpdateInput,
   MemberCreateInput,
   MemberUpdateInput,
   PageParams,
@@ -46,8 +42,6 @@ export const workspaceKeys = {
   quota: (workspaceId: string) => [...ROOT, "quota", workspaceId] as const,
   usage: (workspaceId: string, params: PageParams) =>
     [...ROOT, "usage", workspaceId, params.page, params.pageSize] as const,
-  allowedProviders: (workspaceId: string) =>
-    [...ROOT, "allowedProviders", workspaceId] as const,
 };
 
 export function useWorkspacesQuery(params?: Partial<PageParams>) {
@@ -244,52 +238,5 @@ export function useWorkspaceUsageQuery(
       return listWorkspaceUsage(workspaceId, pageParams, { signal });
     },
     enabled: Boolean(workspaceId),
-  });
-}
-
-export function useAllowedProvidersQuery(workspaceId?: string | null) {
-  return useQuery({
-    queryKey: workspaceId
-      ? workspaceKeys.allowedProviders(workspaceId)
-      : [...ROOT, "allowedProviders", "empty"],
-    queryFn: ({ signal }) => {
-      if (!workspaceId) throw new Error("workspaceId is required");
-      return getAllowedProviders(workspaceId, { signal });
-    },
-    enabled: Boolean(workspaceId),
-  });
-}
-
-export function useSetAllowedProvidersMutation(workspaceId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (input: AllowlistUpdateInput) =>
-      setAllowedProviders(workspaceId, input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: workspaceKeys.allowedProviders(workspaceId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["v1", "modelops", "catalog"],
-      });
-    },
-  });
-}
-
-export function useSetWorkspaceDefaultsMutation(workspaceId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (defaults: Record<string, string>) =>
-      setWorkspaceDefaults(workspaceId, defaults),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: workspaceKeys.allowedProviders(workspaceId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["v1", "modelops", "catalog"],
-      });
-    },
   });
 }

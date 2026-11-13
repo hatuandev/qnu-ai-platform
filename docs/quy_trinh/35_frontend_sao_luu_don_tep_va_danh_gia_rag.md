@@ -1,5 +1,7 @@
 # Frontend: sao lưu, dọn tệp và đánh giá RAG
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** `frontendV1` đã được gỡ khỏi repo; giao diện duy nhất hiện hành là `frontendV2`. Nội dung dưới đây mô tả màn hình cũ, không dùng để kết luận hiện trạng.
+
 Phạm vi: `frontendV1` nối các API `backendV1` hiện hữu. Workspace tiếp tục là
 biên quyền membership/role của v1; quyền và điều kiện cuối cùng do server kiểm.
 Giao diện không tạo API phục hồi toàn hệ thống hoặc lịch sử đánh giá chưa có ở BE.

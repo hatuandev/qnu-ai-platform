@@ -1,4 +1,4 @@
-"""QNU task runner for Backend V1 and the local frontend workflows."""
+"""QNU task runner for Backend V1 and the local Frontend V2 workflows."""
 
 from __future__ import annotations
 
@@ -17,10 +17,12 @@ COMMANDS = {
     "v2-dev": "Default dev: API V1 8002 + worker V1 + FE V2 3002",
     "v2-fe": "Frontend V2 only, foreground, port 3002",
     "v2-check": "Default check: read-only dependencies, V1 schema and FE V2",
-    "v1-dev": "API V1 8002 + worker V1 + FE V1 3001",
+    "v2-install-fe": "Install Frontend V2 dependencies from package-lock.json",
+    "v2-typecheck": "Frontend V2 TypeScript; run dev/build first on a fresh clone",
+    "v2-build": "Frontend V2 build including TypeScript",
+    "v1-dev": "API V1 8002 + worker V1; backend only, no frontend",
     "v1-be": "API only, foreground, port 8002",
     "v1-worker": "ARQ worker only, foreground, V1 queue",
-    "v1-fe": "Frontend only, foreground, port from frontendV1/.env.local",
     "v1-check": "Read-only dependency/schema/frontend check before startup",
     "v1-infra-up": "Start PostgreSQL/Redis/Qdrant/MinIO/Gotenberg; prepare and verify local storage",
     "v1-infra-down": "Stop local infrastructure, preserve volumes",
@@ -29,17 +31,12 @@ COMMANDS = {
     "v1-infra-status": "Show local infrastructure containers",
     "v1-infra-logs": "Follow local infrastructure logs",
     "v1-install-be": "Install backend dependencies from uv.lock",
-    "v1-install-fe": "Install frontend dependencies from package-lock.json",
     "v1-migrate": "Explicit Alembic upgrade head; check target DB first",
     "v1-db-check": "Read current Alembic revision; no migration or seed",
     "v1-test-be": "Backend isolated-DB harness; creates/deletes its test DB",
-    "v1-test-fe": "Frontend Vitest suite",
-    "v1-test": "Isolated backend tests then frontend tests; stop on failure",
-    "v1-test-e2e": "Show staged E2E help; use make.ps1 v1-e2e init/serve/run <stage>",
-    "v1-lint": "Backend Ruff then frontend Biome; no automatic fixes",
-    "v1-lint-fix": "Explicit Ruff/Biome fixes, V1 source only",
-    "v1-typecheck": "Frontend TypeScript; run dev/build first on a fresh clone",
-    "v1-build": "Frontend build including TypeScript",
+    "v1-test": "Isolated backend tests; Frontend V2 has no test suite",
+    "v1-lint": "Backend Ruff then Frontend V2 Biome; no automatic fixes",
+    "v1-lint-fix": "Explicit Ruff/Biome fixes, backend and Frontend V2 source",
     "v1-help": "Show QNU runner commands",
 }
 
@@ -49,11 +46,14 @@ ALIASES = {
 ALIASES.update(
     {
         "dev": "v2-dev",
-        "dev1": "v1-dev",
         "dev2": "v2-dev",
+        "fe": "v2-fe",
         "fe2": "v2-fe",
         "check": "v2-check",
         "db-ready": "v2-check",
+        "install-fe": "v2-install-fe",
+        "typecheck": "v2-typecheck",
+        "build": "v2-build",
     }
 )
 REMOVED_COMMANDS = {"seed", "reset-db", "reseed", "reconcile", "reindex"}
@@ -63,7 +63,6 @@ def command_plan(
     command: str, root: Path, env_dir: str
 ) -> list[tuple[Path, list[str]]]:
     backend = root / "backendV1"
-    frontend = root / "frontendV1"
     frontend_v2 = root / "frontendV2"
     runtime = root if env_dir == "root" else backend
     uv = ["uv", "run", "--project", str(backend), "--frozen", "--extra", "dev"]
@@ -82,7 +81,6 @@ def command_plan(
     )
     worker = (runtime, [*service_uv, "arq", "qnu.workers.settings.WorkerSettings"])
     # Avoid npm.cmd's interactive "Terminate batch job?" during Ctrl+C on Windows.
-    fe = (frontend, ["node", str(frontend / "node_modules/vite/bin/vite.js")])
     fe_v2 = (
         frontend_v2,
         [
@@ -94,7 +92,6 @@ def command_plan(
         ],
     )
     check = (runtime, [*uv, "python", str(root / "scripts/check_v1_runtime.py")])
-    check_v2 = (runtime, [*check[1], "--frontend", frontend_v2.name])
     # Alembic paths are relative to backendV1; explicitly load root env for mode A.
     migration = [
         *uv,
@@ -110,10 +107,15 @@ def command_plan(
         str(runtime / ".env"),
     ]
     plans = {
-        "v2-dev": [check_v2, api, worker, fe_v2],
-        "v2-check": [check_v2],
+        "v2-dev": [check, api, worker, fe_v2],
+        "v2-check": [check],
         "v2-fe": [fe_v2],
-        "v1-dev": [check, api, worker, fe],
+        "v2-install-fe": [
+            (frontend_v2, ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"])
+        ],
+        "v2-typecheck": [(frontend_v2, ["npm", "run", "typecheck"])],
+        "v2-build": [(frontend_v2, ["npm", "run", "build"])],
+        "v1-dev": [check, api, worker],
         "v1-check": [check],
         "v1-infra-down": [(root, [*infra, "down"])],
         "v1-clear": [(root, [*infra, "down", "--volumes"])],
@@ -158,32 +160,22 @@ def command_plan(
         ],
         "v1-be": [api],
         "v1-worker": [worker],
-        "v1-fe": [fe],
         "v1-install-be": [(backend, ["uv", "sync", "--extra", "dev", "--frozen"])],
-        "v1-install-fe": [
-            (frontend, ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"])
-        ],
         "v1-migrate": [(backend, [*migration, "upgrade", "head"])],
         "v1-db-check": [(backend, [*migration, "current"])],
         "v1-test-be": [
             (runtime, [*uv, "python", str(backend / "scripts/run_isolated_tests.py")])
         ],
-        "v1-test-fe": [(frontend, ["npm", "test"])],
-        "v1-test-e2e": [
-            (root, [*uv, "python", str(root / "scripts/v1_e2e_runner.py")])
-        ],
         "v1-lint": [
             (backend, [*uv, "ruff", "check", "."]),
-            (frontend, ["npm", "run", "lint"]),
+            (frontend_v2, ["npm", "run", "lint"]),
         ],
         "v1-lint-fix": [
             (backend, [*uv, "ruff", "check", "--fix", "."]),
-            (frontend, ["npm", "run", "lint:fix"]),
+            (frontend_v2, ["npm", "run", "lint:fix"]),
         ],
-        "v1-typecheck": [(frontend, ["npm", "run", "typecheck"])],
-        "v1-build": [(frontend, ["npm", "run", "build"])],
     }
-    plans["v1-test"] = [*plans["v1-test-be"], *plans["v1-test-fe"]]
+    plans["v1-test"] = [*plans["v1-test-be"]]
     return plans[command]
 
 
@@ -271,10 +263,6 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    if selected in {"e2e", "v1-e2e"}:
-        # Keep the staged runner's argument/approval and credential boundaries.
-        command = [sys.executable, str(ROOT / "scripts/v1_e2e_runner.py"), *argv[1:]]
-        return subprocess.run(command, cwd=ROOT, check=False).returncode
     if argv:
         argv[0] = ALIASES.get(selected, selected)
     parser = argparse.ArgumentParser(description=__doc__)
@@ -296,7 +284,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "v1-help":
         print(
             "make dev (or dev2) starts Backend V1, its worker and Frontend V2. "
-            "Use dev1 for Frontend V1."
+            "Backend only: make v1-dev."
         )
         for name, description in COMMANDS.items():
             print(f"  make {name:<16} {description}")
@@ -365,14 +353,14 @@ def main(argv: list[str] | None = None) -> int:
                 print("clear requires a local Docker socket or pipe.", file=sys.stderr)
                 return 1
         if args.command in {"v1-dev", "v2-dev"}:
-            frontend_name = plan[-1][0].name
-            print(f"Checking Backend V1 and {frontend_name} dependencies...", flush=True)
+            print("Checking Backend V1 dependencies...", flush=True)
             cwd, check = plan[0]
             code = subprocess.run(check, cwd=cwd, check=False).returncode
             if code:
                 return code
+            frontend_note = " and Frontend V2" if args.command == "v2-dev" else ""
             print(
-                f"Starting V1 API/worker and {frontend_name} in foreground. "
+                f"Starting V1 API/worker{frontend_note} in foreground. "
                 "Ctrl+C stops only this session.",
                 flush=True,
             )

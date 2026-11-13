@@ -1,5 +1,7 @@
 # Kiểm tra PDF scan Quy chế tuyển sinh 363
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** frontendV1, `test-v1-e2e.ps1` và bộ `scripts/v1_e2e_*` đã được gỡ khỏi repo. Các lệnh dưới đây không còn chạy được; giữ để truy vết.
+
 Chặng này kiểm riêng OCR, không thay bộ 53 câu, collection đã xuất bản hoặc index hiện tại.
 
 Nguồn: `docs/tai_lieu/tuyen_sinh/Quy chế tuyển sinh đại học 2026 - 363.pdf`, 32 trang,

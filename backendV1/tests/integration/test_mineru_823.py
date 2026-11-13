@@ -88,8 +88,8 @@ def setup(client, code, *, blocked=False):
     )
     assert (
         client.put(
-            f"{API}/workspaces/{workspace['id']}/allowed-providers",
-            json={"provider_ids": [provider["id"]], "defaults": {"ocr": provider["id"]}},
+            f"{API}/modelops/defaults",
+            json={"ocr_provider_id": provider["id"]},
         ).status_code
         == 200
     )
@@ -211,8 +211,8 @@ def test_managed_credentials_and_connection_contract(client):
     assert policy.status_code == 200, policy.text
     assert (
         client.put(
-            f"{API}/workspaces/{workspace['id']}/allowed-providers",
-            json={"provider_ids": [model["id"]], "defaults": {"ocr": model["id"]}},
+            f"{API}/modelops/defaults",
+            json={"ocr_provider_id": model["id"]},
         ).status_code
         == 200
     )

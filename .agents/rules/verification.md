@@ -13,7 +13,7 @@
 
 Backend V1: Ruff chạy từ `backendV1` bằng `uv run ruff check <files>`. Từ root dùng `make test-be` cho harness DB cô lập; khi cần pytest trực tiếp phải thiết lập `TEST_DATABASE_URL` thuộc `qnu_v1_test_*` và xác minh fixture trước. Full gate gồm toàn bộ test V1 trong môi trường cô lập, không chạy test trên DB ứng dụng. Kiểm tra fixture trước khi chạy script có thể gọi DB/model/network. Không tự cài thêm gói hoặc chạy live benchmark chỉ để sửa Markdown.
 
-Frontend: từ `frontendV1`, dùng Biome cục bộ đã cài (`npm exec -- biome check <files>`) và `npm run build`. `frontendV1/AGENTS.md` chứa hợp đồng component chi tiết. Không dùng auto-fix toàn repo hoặc sửa file sinh tự động để che lỗi.
+Frontend: từ `frontendV2`, dùng Biome cục bộ đã cài (`npm exec -- biome check <files>`) và `npm run build`. `frontendV2` không có bộ test riêng. Không dùng auto-fix toàn repo hoặc sửa file sinh tự động để che lỗi.
 
 Chạy full suite một lần ở cuối batch; chỉ lặp khi thay đổi mới, failure hoặc nghi vấn chưa giải quyết cần nó. Không chạy lại toàn bộ backend cho UI thuần túy. Nếu thiếu binary/dependency/quyền, ghi NOT RUN và lý do; không coi đọc tĩnh là build/test PASS.
 

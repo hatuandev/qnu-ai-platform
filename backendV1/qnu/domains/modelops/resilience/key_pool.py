@@ -58,13 +58,12 @@ async def acquire(
             .execution_options(populate_existing=True)
         )
     ).one_or_none()
-    # Revalidate grants and current active/capability state immediately before dispatch.
+    # Revalidate the provider's active/capability state immediately before dispatch.
     allowed = await catalog_service.resolve_workspace_provider(
         db,
         scope.workspace_id,
         capability,
         scope.provider_id,
-        index_run_id=scope.index_run_id,
     )
     if allowed is not provider or (provider.base_url.rstrip("/"), provider.model_name) != (
         endpoint.rstrip("/"),

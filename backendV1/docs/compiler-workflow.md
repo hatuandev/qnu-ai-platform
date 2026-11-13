@@ -36,7 +36,7 @@ Lưu sửa chữ chưa chứng minh đã đối chiếu ảnh. Raw/canonical/MD 
 
 Compiler mới mặc định `auto_review=true`. Có thể gửi `review_provider_id` để chọn
 reviewer được cấp quyền; bỏ trống ghim ID provider của Compiler. Reviewer giải
-quyết lại runtime ModelOps khi chạy, có grant/capacity/quota/usage riêng. Cấu hình
+quyết lại runtime ModelOps khi chạy, có capacity/quota/usage riêng. Cấu hình
 review không thay provider Compiler hoặc default của workspace. API review thủ công
 cũ vẫn dùng default chat hiện hành khi không chỉ định provider.
 

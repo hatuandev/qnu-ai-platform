@@ -242,16 +242,6 @@ def staged_version(client, data):
             },
         )
         assert changed.status_code == 200, changed.text
-        assert (
-            client.put(
-                f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
-                json={
-                    "provider_ids": [data["ocr_provider"]["id"], provider["id"]],
-                    "defaults": {"ocr": data["ocr_provider"]["id"], "chat": provider["id"]},
-                },
-            ).status_code
-            == 200
-        )
         as_actor(EDITOR)
         use_queue(FakeJobQueue())
         compiled = request_compile(client, {**data, "ocr_run_id": ocr_id}, key="new-compiler")
@@ -272,24 +262,6 @@ def staged_version(client, data):
                 data["document_url"] + "/versions/" + version_id,
                 "approve",
                 key="approve-staged",
-            ).status_code
-            == 200
-        )
-        assert (
-            client.put(
-                f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
-                json={
-                    "provider_ids": [
-                        data["ocr_provider"]["id"],
-                        data["embedding_provider"]["id"],
-                        provider["id"],
-                    ],
-                    "defaults": {
-                        "ocr": data["ocr_provider"]["id"],
-                        "embedding": data["embedding_provider"]["id"],
-                        "chat": provider["id"],
-                    },
-                },
             ).status_code
             == 200
         )

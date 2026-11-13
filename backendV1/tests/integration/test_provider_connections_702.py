@@ -68,11 +68,10 @@ def workspace(client, providers):
     )
     assert r.status_code == 201, r.text
     wid = r.json()["id"]
-    r = client.put(
-        f"/platform/v1alpha1/workspaces/{wid}/allowed-providers",
-        json={"provider_ids": providers, "defaults": {"chat": providers[0]}},
+    defaults = client.put(
+        "/platform/v1alpha1/modelops/defaults", json={"chat_provider_id": providers[0]}
     )
-    assert r.status_code == 200, r.text
+    assert defaults.status_code == 200, defaults.text
     return wid
 
 
@@ -225,14 +224,13 @@ def test_delete_referenced_model_reports_reference_type_and_keeps_defaults(clien
     key(client, c["id"])
     first = model(client, c["id"], "guarded-first")
     second = model(client, c["id"], "guarded-second")
-    wid = workspace(client, [first["id"], second["id"]])
+    workspace(client, [first["id"], second["id"]])
 
     blocked = client.delete(f"{API}/connections/{c['id']}/models/{first['id']}")
     assert blocked.status_code == 409, blocked.text
     body = blocked.json()
     assert body["code"] == "model_provider_in_use"
-    assert "cấu hình mặc định của đơn vị" in body["detail"]
-    assert "quyền sử dụng model của đơn vị" in body["detail"]
+    assert "cấu hình mặc định hệ thống" in body["detail"]
     listed = {item["id"] for item in client.get(f"{API}/connections/{c['id']}/models").json()}
     assert listed == {first["id"], second["id"]}
     connection_blocked = client.delete(f"{API}/connections/{c['id']}")
@@ -240,20 +238,12 @@ def test_delete_referenced_model_reports_reference_type_and_keeps_defaults(clien
     assert connection_blocked.json()["code"] == "model_provider_in_use"
 
     moved = client.put(
-        f"/platform/v1alpha1/workspaces/{wid}/allowed-providers",
-        json={"provider_ids": [second["id"]], "defaults": {"chat": second["id"]}},
+        "/platform/v1alpha1/modelops/defaults", json={"chat_provider_id": second["id"]}
     )
     assert moved.status_code == 200, moved.text
     assert client.delete(f"{API}/connections/{c['id']}/models/{first['id']}").status_code == 204
-    stale_default = client.put(
-        f"/platform/v1alpha1/workspaces/{wid}/model-defaults",
-        json={"defaults": {"chat": first["id"]}},
-    )
-    assert stale_default.status_code == 409, stale_default.text
-    assert stale_default.json()["code"] == "allowlist_default_not_allowed"
-    allowlist = client.get(f"/platform/v1alpha1/workspaces/{wid}/allowed-providers").json()
-    assert [item["provider_id"] for item in allowlist["providers"]] == [second["id"]]
-    assert allowlist["providers"][0]["is_default"] is True
+    defaults = client.get("/platform/v1alpha1/modelops/defaults").json()
+    assert defaults["chat_provider_id"] == second["id"]
 
 
 def test_model_usage_history_blocks_deletion_and_is_retained(client):

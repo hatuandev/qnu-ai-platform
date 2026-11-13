@@ -137,7 +137,6 @@ async def request_index(
         is_active=False,
         dimension=runtime.dimension,
         provider_id=runtime.provider_id,
-        system_default_authorized=runtime.system_default_authorized,
         vector_collection="qnu_v1_idx_" + uuid.uuid4().hex,
         config={
             "provider": runtime.public_dict(),

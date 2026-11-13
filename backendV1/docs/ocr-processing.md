@@ -196,9 +196,9 @@ curl -sS "$HOST$BASE/processing-runs/ocr_abc123/evidence" -H "Authorization: Bea
 
 ## 7. ModelOps và bảo mật
 
-- Provider/model/endpoint lấy từ DB theo grant + default của workspace; credential giải mã
+- Provider/model/endpoint lấy từ model mặc định hệ thống sau khi kiểm quyền workspace; credential giải mã
   từ ModelOps DB. Không có API key trong `.env`, không hardcode endpoint/model.
-- Trước mỗi lần gọi: provider phải `active`, có capability `ocr`, được grant cho workspace,
+- Trước mỗi lần gọi: provider phải `active`, có capability `ocr`,
   và còn quota. Provider bị tắt/thiếu capability/hết quota → lỗi riêng, **0 request HTTP**.
 - Endpoint đi qua `assert_allowed_endpoint` (chặn mạng nội bộ ở production).
 - Log chỉ có `model`, `status`, `duration_ms`, `image_bytes` — không có secret,
@@ -266,8 +266,8 @@ input bound có căn cứ + output đã kiểm; unknown bị chặn trước HTT
 | `processing_config_invalid` | 409 | config ghim hỏng |
 | `provider_inactive` | 409 | provider bị tắt |
 | `provider_capability_mismatch` | 409 | provider không có capability `ocr` |
-| `provider_not_found` | 404 | provider chưa được cấp cho workspace |
-| `model_not_configured` | 409 | workspace chưa chọn default cho `ocr` |
+| `provider_not_found` | 404 | provider ghim không tồn tại |
+| `model_not_configured` | 409 | hệ thống chưa cấu hình model mặc định cho `ocr` |
 | `provider_changed` | 409 | provider đổi giữa hai lần chạy của cùng run |
 | `quota_exceeded` / `quota_not_configured` | 409 | hết hoặc thiếu quota |
 | `ocr_credentials_missing` / `ocr_credentials_unreadable` | 503 | thiếu/không giải mã được key |

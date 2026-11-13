@@ -109,8 +109,7 @@ frontend/dist/
 frontend2/playwright-report/
 frontend2/test-results/
 frontend2/dist/
-frontendV1/test-results/
-frontendV1/playwright-report/
+frontendV2/test-results/
 
 # Local orchestration, runtime data and generated QA evidence (never source code)
 .antigravity-bridge/

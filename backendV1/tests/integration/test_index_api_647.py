@@ -33,11 +33,8 @@ def embedding_provider(client, data, endpoint="http://127.0.0.1:20128/v1", dimen
     )
     assert (
         client.put(
-            f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
-            json={
-                "provider_ids": [data["ocr_provider"]["id"], provider["id"]],
-                "defaults": {"embedding": provider["id"], "ocr": data["ocr_provider"]["id"]},
-            },
+            f"{API}/modelops/defaults",
+            json={"embedding_provider_id": provider["id"]},
         ).status_code
         == 200
     )
@@ -117,16 +114,12 @@ def test_real_qdrant_index_and_search_return_pinned_sources(client, indexed):
     assert len(data["embedding"].requests) == before + 1
 
 
-def test_rotating_system_embedding_keeps_pinned_index_without_grant(client, indexed):
+def test_rotating_system_embedding_keeps_pinned_index(client, indexed):
     data = indexed
     first = data["embedding_provider"]["id"]
     assert execute_index(client, data["index_run"]["id"]) == "completed"
     as_actor(PLATFORM)
     assert client.put(f"{API}/modelops/defaults", json={"embedding_provider_id": first}).is_success
-    assert client.put(
-        f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
-        json={"provider_ids": [data["ocr_provider"]["id"]]},
-    ).is_success
     second = client.post(
         f"{API}/modelops/providers",
         json={
@@ -165,10 +158,6 @@ def test_rotating_system_embedding_keeps_pinned_index_without_grant(client, inde
     assert search.json()["index_run_id"] == pinned_run
     assert search.json()["hits"]
     assert data["embedding"].requests[-1]["body"]["model"] == "test-embedding"
-    forbidden = client.post(
-        url, headers={"Idempotency-Key": "ungranted-override"}, json={"provider_id": first}
-    )
-    assert forbidden.status_code == 404, forbidden.text
     fresh = client.post(url, headers={"Idempotency-Key": "new-default"}, json={})
     assert fresh.status_code == 201, fresh.text
     assert fresh.json()["run"]["provider_id"] == second_id

@@ -1,6 +1,6 @@
 # Hướng dẫn chạy QNU AI Platform V1
 
-Hướng dẫn các lệnh `v1-*` cho Backend V1 và Frontend V1 trên Windows. `dev` và `dev2` chạy Backend V1, worker V1 và Frontend V2 ở cổng 3002. Dùng `dev1` hoặc `v1-dev` cho Frontend V1 ở cổng 3001. Thư mục dự án trong các lệnh dưới đây là `D:\DuAnPhanMem\qnu-ai-platform`.
+Hướng dẫn các lệnh `v1-*`/`v2-*` cho Backend V1 và Frontend V2 trên Windows. `dev` và `dev2` chạy Backend V1, worker V1 và Frontend V2 ở cổng 3002; `v1-dev` chỉ chạy API và worker. FrontendV1 đã được gỡ khỏi checkout. Thư mục dự án trong các lệnh dưới đây là `D:\DuAnPhanMem\qnu-ai-platform`.
 
 ## 1. Chạy nhanh hằng ngày
 
@@ -19,11 +19,11 @@ Từ gốc dự án, dùng GNU Make hoặc `make.bat` trên CMD:
 ```text
 make v1-help          # Xem các lệnh V1
 make v1-infra-up      # PostgreSQL + Redis + Qdrant + MinIO + Gotenberg; chuẩn bị bucket local
-make v1-check         # Kiểm tra kết nối, schema và dependency FE
-make v1-dev           # Chạy API + worker + FE trong cùng phiên
+make v1-check         # Kiểm tra kết nối, schema và dependency FE V2
+make v1-dev           # Chạy API + worker trong cùng phiên (không FE)
 make v1-be            # Hoặc chạy riêng API
 make v1-worker        # Hoặc chạy riêng worker
-make v1-fe            # Hoặc chạy riêng FE
+make v2-fe            # Hoặc chạy riêng Frontend V2
 ```
 
 Trong PowerShell, không cần cài GNU Make, dùng runner có sẵn:
@@ -33,11 +33,11 @@ Set-Location D:\DuAnPhanMem\qnu-ai-platform
 .\make.ps1 v1-dev
 ```
 
-`v1-dev` giữ tiến trình ở cửa sổ hiện tại, log ba thành phần hiển thị cùng nhau;
-**Ctrl+C** dừng các tiến trình con của phiên này. Một thành phần thoát thì hai
-thành phần còn lại cũng dừng và trả mã lỗi. Lệnh không tự restart phiên cũ;
-nếu đang có dịch vụ V1 thì dùng lại hoặc dừng đúng phiên đó trước khi mở mới.
-Muốn đọc log riêng, chạy `v1-be`, `v1-worker`, `v1-fe` trong ba cửa sổ.
+`v1-dev` giữ tiến trình ở cửa sổ hiện tại, log API và worker hiển thị cùng nhau;
+**Ctrl+C** dừng các tiến trình con của phiên này. Một thành phần thoát thì thành
+phần còn lại cũng dừng và trả mã lỗi. Lệnh không tự restart phiên cũ; nếu đang
+có dịch vụ V1 thì dùng lại hoặc dừng đúng phiên đó trước khi mở mới. Muốn có
+giao diện, chạy `dev` (API + worker + FE V2) hoặc `v2-fe` ở cửa sổ riêng.
 
 Trước khi mở ba thành phần, `v1-dev` kiểm tra Redis PING, kết nối PostgreSQL và
 revision V1, Qdrant, storage cùng Vite đã cài. Với S3, kiểm tra endpoint, credential
@@ -87,17 +87,16 @@ Các lệnh thiết lập và kiểm tra bổ sung:
 
 | Lệnh | Thực hiện |
 | --- | --- |
-| `make v1-install-be` / `make v1-install-fe` | Cài thư viện theo lockfile; không tạo/ghi đè cấu hình |
+| `make v1-install-be` / `make v2-install-fe` | Cài thư viện theo lockfile; không tạo/ghi đè cấu hình |
 | `make v1-infra-up` | Khởi động PostgreSQL, Redis, Qdrant, MinIO, Gotenberg và chờ health; chuẩn bị storage local, kiểm tra ghi/đọc/xóa tệp thử; không mở API/worker/FE hoặc migrate DB |
 | `make v1-check` | Đọc trạng thái Redis/PostgreSQL schema/Qdrant/storage/Vite, không ghi DB/storage hoặc gọi model |
 | `make v1-db-check` | Đọc Alembic revision hiện tại, không seed hoặc migration |
 | `make v1-migrate` | **Chủ động nâng schema** bằng Alembic; kiểm tra database và backup theo phần 4 trước |
 | `make v1-test-be` | Harness tạo DB thử riêng trên loopback, chạy test rồi dọn đúng DB đó; cần quyền tạo DB |
-| `make v1-test-fe` | Chạy Vitest FE |
-| `make v1-lint` | Ruff BE rồi Biome FE, dừng nếu có lỗi, không tự sửa |
-| `make v1-typecheck` / `make v1-build` | TypeScript / build FE; clone mới cần dev/build để sinh route tree trước khi typecheck riêng |
+| `make v1-lint` | Ruff BE rồi Biome FE V2, dừng nếu có lỗi, không tự sửa |
+| `make v2-typecheck` / `make v2-build` | TypeScript / build FE V2; clone mới cần dev/build để sinh route tree trước khi typecheck riêng |
 
-PowerShell thay `make` bằng `.\make.ps1` cho mọi lệnh trên. `check` và `db-ready` kiểm Vite trong `frontendV2`. Nếu chưa có thư viện FE V2, chạy `npm ci` trong thư mục `frontendV2`. `fe2` chạy riêng Frontend V2. Các lệnh legacy `seed/reset-db/reseed/reconcile/reindex` đã ngừng hỗ trợ.
+PowerShell thay `make` bằng `.\make.ps1` cho mọi lệnh trên. `check` và `db-ready` kiểm Vite trong `frontendV2`. Nếu chưa có thư viện FE V2, chạy `v2-install-fe`. `fe2` chạy riêng Frontend V2. Frontend V2 không có bộ test riêng. Các lệnh legacy `seed/reset-db/reseed/reconcile/reindex` đã ngừng hỗ trợ.
 
 Để thử lại app V1 trên dữ liệu trắng, dừng `dev` bằng Ctrl+C rồi chạy:
 
@@ -106,10 +105,10 @@ PowerShell thay `make` bằng `.\make.ps1` cho mọi lệnh trên. `check` và `
 .\make.ps1 infra-up
 .\make.ps1 migrate
 .\make.ps1 seed-modelops
-.\make.ps1 v1-dev
+.\make.ps1 dev
 ```
 
-Dừng nếu có lệnh báo lỗi. Mở <http://127.0.0.1:3001/> sau khi `v1-dev` khởi động.
+Dừng nếu có lệnh báo lỗi. Mở <http://127.0.0.1:3002/> sau khi `dev` khởi động.
 `clear` xóa volume PostgreSQL, Redis, Qdrant và MinIO của Docker local. Workspace,
 ModelOps và tài liệu lưu trong các volume này cần được tạo lại. Dữ liệu trên
 dịch vụ ngoài Docker hoặc thư mục lưu trữ riêng nằm ngoài phạm vi reset. Giữ cùng
@@ -132,7 +131,7 @@ môi trường `.venv` V1 đã cài. Lệnh khởi động không tự migration
 
 | Thành phần | Địa chỉ / vai trò |
 | --- | --- |
-| Giao diện V1 | <http://127.0.0.1:3001/dashboard> |
+| Giao diện V2 | <http://127.0.0.1:3002/> |
 | API V1 | <http://127.0.0.1:8002> |
 | Tài liệu API | <http://127.0.0.1:8002/docs> |
 | Worker V1 | Chạy OCR, Compiler, review, indexing và các job vận hành; không có trang web riêng |
@@ -176,13 +175,13 @@ uv run --frozen --extra dev arq qnu.workers.settings.WorkerSettings
 ### Cửa sổ 3 — giao diện, dùng chung cho cả hai cách
 
 ```powershell
-Set-Location D:\DuAnPhanMem\qnu-ai-platform\frontendV1
+Set-Location D:\DuAnPhanMem\qnu-ai-platform\frontendV2
 npm run dev
 ```
 
-Mở **<http://127.0.0.1:3001/dashboard>**, đăng nhập rồi chọn workspace. Có thể mở thẳng <http://127.0.0.1:3001/workspaces> để tạo hoặc chọn đơn vị.
+Mở **<http://127.0.0.1:3002/>**. V2 tự đăng nhập qua cầu nối dev khi `QNU_DEV_AUTO_LOGIN=true` và tự định tuyến đơn vị theo `QNU_DEV_WORKSPACE_CODE`; xem phần 5.
 
-`run.ps1` ở gốc là entrypoint tương thích, gọi lại `make.ps1` nên chạy đúng các lệnh V1 bên trên; tên `dev1`/`dev2` không còn trong bộ lệnh V1, dùng `dev`. `backendV1/docker-compose.v1.yml` là entrypoint tương thích include cấu hình root, không phải một stack thứ hai; hướng dẫn này dùng API/worker chạy trực tiếp trên máy. Nếu máy cũ còn thư mục `backend/` hoặc `frontend/` untracked, đó là tàn dư đã bị gỡ khỏi Git — không chạy và không dùng làm căn cứ.
+`run.ps1` ở gốc là entrypoint tương thích, gọi lại `make.ps1` nên chạy đúng các lệnh V1 bên trên; `dev`/`dev2` chạy kèm Frontend V2, `v1-dev` chỉ chạy API/worker. `backendV1/docker-compose.v1.yml` là entrypoint tương thích include cấu hình root, không phải một stack thứ hai; hướng dẫn này dùng API/worker chạy trực tiếp trên máy. Nếu máy cũ còn thư mục `backend/` hoặc `frontend/` untracked, đó là tàn dư đã bị gỡ khỏi Git — không chạy và không dùng làm căn cứ.
 
 ## 2. Chuẩn bị lần đầu
 
@@ -269,7 +268,7 @@ Cài thư viện một lần, hoặc khi lockfile thay đổi:
 Set-Location D:\DuAnPhanMem\qnu-ai-platform\backendV1
 uv sync --extra dev --frozen
 
-Set-Location D:\DuAnPhanMem\qnu-ai-platform\frontendV1
+Set-Location D:\DuAnPhanMem\qnu-ai-platform\frontendV2
 npm ci --ignore-scripts --no-audit --no-fund
 ```
 
@@ -305,7 +304,7 @@ Sửa `backendV1/.env` trên máy, thay các giá trị mẫu:
 | `DEV_ACCESS_PASSWORD` | Mật khẩu truy cập dev do bạn đặt, không để trống |
 | `SSO_ENABLED` | `false` nếu hiện dùng admin dev; bật và cấu hình SSO riêng khi chuyển sang đăng nhập thật |
 | `API_PREFIX` | Giữ `/platform/v1alpha1` để khớp FE hiện tại |
-| `ALLOWED_ORIGINS` | Nếu gọi API trực tiếp từ FE, gồm origin đang dùng, ví dụ `http://127.0.0.1:3001,http://localhost:3001` |
+| `ALLOWED_ORIGINS` | Nếu gọi API trực tiếp từ FE, gồm origin đang dùng, ví dụ `http://127.0.0.1:3002,http://localhost:3002` |
 | `OCR_DISPATCH_ENABLED`, `OWN_RECONCILE` | `true` để giao job và phục hồi job V1 theo cấu hình hiện có |
 
 Biến môi trường đã đặt trong cửa sổ PowerShell có ưu tiên hơn `.env`; nếu cấu hình không khớp, kiểm tra cả hai nơi mà không đưa giá trị bí mật vào log/chụp màn hình.
@@ -351,28 +350,27 @@ Nếu báo không tìm thấy revision phát triển cũ, xem [hướng dẫn mi
 Tạo tệp riêng nếu chưa có:
 
 ```powershell
-Set-Location D:\DuAnPhanMem\qnu-ai-platform\frontendV1
+Set-Location D:\DuAnPhanMem\qnu-ai-platform\frontendV2
 if (-not (Test-Path -LiteralPath .env.local)) {
     Copy-Item -LiteralPath .env.example -Destination .env.local
 }
 ```
 
-Trong `frontendV1/.env.local`, đặt:
+Trong `frontendV2/.env.local`, đặt:
 
 ```dotenv
-FRONTEND_PORT=3001
+FRONTEND_V2_PORT=3002
 QNU_API_PROXY_TARGET=http://127.0.0.1:8002
-VITE_QNU_API_BASE_URL=
-VITE_DEV_AUTH_ENABLED=true
 QNU_DEV_AUTO_LOGIN=true
 QNU_DEV_ACCESS_KEY=<điền đúng DEV_ACCESS_PASSWORD của backend V1>
+QNU_DEV_WORKSPACE_CODE=<mã đơn vị đã seed, ví dụ shl>
 ```
 
-Dòng `<...>` là chỗ điền giá trị riêng trên máy, không để nguyên dấu ngoặc. Giữ `VITE_QNU_API_BASE_URL` trống để FE gọi API qua proxy Vite. Các lệnh ở phần 1 cố định cổng API là 8002; muốn đổi cổng cần đổi cả lệnh API và `QNU_API_PROXY_TARGET`.
+Dòng `<...>` là chỗ điền giá trị riêng trên máy, không để nguyên dấu ngoặc. FE gọi API qua proxy Vite `/platform/v1alpha1`. Các lệnh ở phần 1 cố định cổng API là 8002; muốn đổi cổng cần đổi cả lệnh API và `QNU_API_PROXY_TARGET`.
 
-Khi mở trang V1, cầu nối local lấy token admin **`dev.admin`**, quyền `AI.Admin`; không cần tạo tài khoản hay seed admin trong database. Access key do tiến trình Vite đọc, không nhúng vào bundle; token vẫn được backend xác minh.
+Khi mở trang V2, cầu nối dev lấy token admin **`dev.admin`**, quyền `AI.Admin`; không cần tạo tài khoản hay seed admin trong database. Access key do tiến trình Vite đọc, không nhúng vào bundle; token vẫn được backend xác minh. V2 không tự chọn đơn vị mẫu: thiếu `QNU_DEV_WORKSPACE_CODE`/`VITE_DEV_WORKSPACE_CODE` thì màn hình báo lỗi cấu hình.
 
-Nếu không muốn tự đăng nhập, đặt `QNU_DEV_AUTO_LOGIN=false`, mở <http://127.0.0.1:3001/sign-in> rồi nhập access key dev. Sau khi bấm đăng xuất, tự đăng nhập bị chặn trong phiên tab; dùng nút **Tự đăng nhập bằng cấu hình local** / **Thử lại** để bật lại rõ ràng.
+Nếu không bật tự đăng nhập, V2 báo lỗi cầu nối dev; hiện chưa có màn hình nhập access key. Đặt `QNU_DEV_AUTO_LOGIN=true` và chạy bằng `npm run dev` để làm việc local.
 
 Cơ chế này chỉ dùng cho local development, API đích và trình duyệt phải qua loopback. Build/preview không có cầu nối tự đăng nhập. Khi đổi tệp môi trường, nạp lại đúng tiến trình API/worker/FE liên quan. Production cần tắt dev auth và cấu hình SSO; hướng dẫn này chưa phải quy trình triển khai production.
 
@@ -447,7 +445,7 @@ workspace. Xem [hướng dẫn ModelOps](39_modelops_lay_danh_sach_va_chay_thu.m
 | Hiện tượng | Kiểm tra / cách xử lý |
 | --- | --- |
 | Không mở được cổng 8002 hoặc FE báo không kết nối | Xem cửa sổ API có chạy `qnu.main:app` hay không; kiểm tra cổng và `QNU_API_PROXY_TARGET` |
-| Vite báo cổng 3001 đã dùng | Dừng đúng tiến trình đang chiếm cổng nếu không còn dùng, hoặc đổi `FRONTEND_PORT`; Vite hiện không tự nhảy cổng |
+| Vite báo cổng 3002 đã dùng | Dừng đúng tiến trình đang chiếm cổng nếu không còn dùng, hoặc đổi `FRONTEND_V2_PORT`; runner chạy V2 với `--strictPort` nên không tự nhảy cổng |
 | PostgreSQL báo sai mật khẩu hoặc dùng tên tài khoản Windows | Kiểm tra thư mục chạy, `.env` thực sự được nạp và `DATABASE_URL`; không lấy mặc định làm cấu hình môi trường |
 | PostgreSQL connected nhưng V1 schema not initialized | Database đã kết nối nhưng chưa có bảng V1; xác nhận đúng database rồi chạy `v1-migrate`, kiểm lại bằng `v1-check` |
 | Thiếu bảng/revision hoặc readiness báo schema sai | Chạy `alembic current` đúng môi trường; đối chiếu phần 4 trước khi nâng cấp |
@@ -473,7 +471,7 @@ Nếu cần phục hồi toàn bộ từ backup, dùng [runbook recovery](../../
 ## Nguồn đối chiếu và phạm vi kiểm tra
 
 - [Backend README](../../backendV1/README.md), [pyproject](../../backendV1/pyproject.toml), [Settings](../../backendV1/qnu/platform/config.py), [worker](../../backendV1/qnu/workers/settings.py), [health](../../backendV1/qnu/api/health.py).
-- [FE package](../../frontendV1/package.json), [Vite config](../../frontendV1/vite.config.ts), [môi trường mẫu FE](../../frontendV1/.env.example), [cầu nối admin local](../../frontendV1/dev/dev-auto-login.ts).
+- [FE package](../../frontendV2/package.json), [Vite config](../../frontendV2/vite.config.ts), [môi trường mẫu FE](../../frontendV2/.env.example), [cầu nối admin local](../../frontendV2/dev/dev-auto-login.ts).
 - [Môi trường mẫu BE](../../backendV1/.env.example), [migration](../../backendV1/docs/migrations.md), [quyền workspace/ModelOps](../../backendV1/docs/workspaces-modelops.md), [readiness](../../backendV1/docs/readiness.md).
 
 Hướng dẫn ban đầu được kiểm tra tĩnh ở phiên683. Khi xử lý log khởi động ở

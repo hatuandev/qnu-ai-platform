@@ -204,8 +204,6 @@ async def _provider_references(db: AsyncSession, ids: set[str]) -> list[str]:
     from qnu.domains.modelops.models import (
         ModelDefaults,
         ModelUsageRecord,
-        WorkspaceAllowedProvider,
-        WorkspaceModelDefault,
     )
 
     default_columns = (
@@ -219,18 +217,6 @@ async def _provider_references(db: AsyncSession, ids: set[str]) -> list[str]:
             "cấu hình mặc định hệ thống",
             select(ModelDefaults.id).where(
                 or_(*(column.in_(ids) for column in default_columns))
-            ),
-        ),
-        (
-            "cấu hình mặc định của đơn vị",
-            select(WorkspaceModelDefault.workspace_id).where(
-                WorkspaceModelDefault.provider_id.in_(ids)
-            ),
-        ),
-        (
-            "quyền sử dụng model của đơn vị",
-            select(WorkspaceAllowedProvider.workspace_id).where(
-                WorkspaceAllowedProvider.provider_id.in_(ids)
             ),
         ),
         ("trợ lý", select(Assistant.id).where(Assistant.chat_provider_id.in_(ids))),

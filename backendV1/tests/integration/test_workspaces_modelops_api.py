@@ -1,4 +1,4 @@
-"""API-level acceptance for workspaces, membership and ModelOps allowlists.
+"""API-level acceptance for workspaces, membership and platform ModelOps defaults.
 
 Every case runs through HTTP with a real test database; nothing is faked.
 Skipped (NOT RUN) when TEST_DATABASE_URL is absent.
@@ -246,9 +246,8 @@ def test_provider_and_key_lifecycle_never_returns_plaintext(client: TestClient) 
     assert again.status_code == 200
 
 
-def test_allowlist_controls_catalog_and_stays_workspace_scoped(client: TestClient) -> None:
+def test_catalog_is_membership_scoped_and_defaults_are_platform_only(client: TestClient) -> None:
     workspace_a = _create_workspace(client, "khoa-a")
-    workspace_b = _create_workspace(client, "khoa-b")
     _add_member(client, workspace_a["id"], "cb_a", "admin")
     _add_member(client, workspace_a["id"], "cb_m", "member")
 
@@ -263,20 +262,18 @@ def test_allowlist_controls_catalog_and_stays_workspace_scoped(client: TestClien
             "capabilities": ["chat"],
         },
     ).json()
-
-    _as(PLATFORM)
-    granted = client.put(
-        f"{API}/workspaces/{workspace_a['id']}/allowed-providers",
-        json={"provider_ids": [provider["id"]], "default_provider_id": provider["id"]},
+    configured = client.put(
+        f"{API}/modelops/defaults", json={"chat_provider_id": provider["id"]}
     )
-    assert granted.status_code == 200, granted.text
-    assert granted.json()["providers"][0]["is_default"] is True
+    assert configured.status_code == 200, configured.text
+    assert configured.json()["chat_provider_id"] == provider["id"]
 
     _as(MEMBER_A)
     catalog = client.get(
         f"{API}/modelops/catalog", params={"workspace_id": workspace_a["id"]}
     ).json()
     assert [item["id"] for item in catalog] == [provider["id"]]
+    assert "base_url" not in catalog[0]
 
     _as(OUTSIDER)
     assert (
@@ -285,19 +282,11 @@ def test_allowlist_controls_catalog_and_stays_workspace_scoped(client: TestClien
         ).status_code
         == 404
     )
-    assert (
-        client.put(
-            f"{API}/workspaces/{workspace_a['id']}/allowed-providers",
-            json={"provider_ids": [provider["id"]]},
-        ).status_code
-        == 403
-    )
 
     _as(ADMIN_A)
     assert (
         client.put(
-            f"{API}/workspaces/{workspace_b['id']}/allowed-providers",
-            json={"provider_ids": [provider["id"]]},
+            f"{API}/modelops/defaults", json={"chat_provider_id": provider["id"]}
         ).status_code
         == 403
     )

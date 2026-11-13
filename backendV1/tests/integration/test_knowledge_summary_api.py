@@ -132,11 +132,8 @@ def embedding_provider(client, data, base_url, *, dimension=4):
     )
     assert (
         client.put(
-            f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
-            json={
-                "provider_ids": [data["ocr_provider"]["id"], provider["id"]],
-                "defaults": {"embedding": provider["id"], "ocr": data["ocr_provider"]["id"]},
-            },
+            f"{API}/modelops/defaults",
+            json={"embedding_provider_id": provider["id"]},
         ).status_code
         == 200
     )

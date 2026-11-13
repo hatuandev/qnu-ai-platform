@@ -145,7 +145,7 @@ async def assert_provider_allowed(
     capability: str,
     provider_id: str | None = None,
 ) -> Provider:
-    """Fail with 404 when the provider is unknown or outside the actor's allowlist."""
+    """Fail when the provider is inactive, lacks the capability or is unreachable."""
     return await catalog_service.resolve_provider(db, actor, workspace_id, capability, provider_id)
 
 
@@ -187,10 +187,10 @@ async def _active_key(db: AsyncSession, provider_id: str) -> ProviderKey | None:
 async def resolve_ocr_runtime(
     db: AsyncSession, workspace_id: str, provider_id: str | None = None
 ) -> OcrRuntime:
-    """Resolve the granted OCR provider plus its decrypted credential.
+    """Resolve the OCR provider plus its decrypted credential.
 
     Callers must have authorized the actor for ``workspace_id`` already; this function
-    only enforces the ModelOps rules (grant, capability, active state, credential).
+    only enforces the ModelOps rules (capability, active state, credential).
     """
     provider = await catalog_service.resolve_workspace_provider(
         db, workspace_id, "ocr", provider_id

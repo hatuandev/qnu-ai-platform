@@ -1,5 +1,7 @@
 # V1 — Chạy tiếp sau tắt máy hoặc test lại từ đầu
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** frontendV1, `test-v1-e2e.ps1` và bộ `scripts/v1_e2e_*` đã được gỡ khỏi repo. Các lệnh dưới đây không còn chạy được; giữ để truy vết.
+
 Chạy tại `D:\DuAnPhanMem\qnu-ai-platform`. **Muốn test lại từ đầu, làm mục B theo đúng thứ tự.** Mục A chỉ dành cho tiếp tục phiên cũ sau khi bật máy. Tắt máy không bắt buộc xóa phiên thử.
 
 Profile QNU/9router bật `wait_for_completion` cho model chat khi chạy `provider-setup`. Chính sách này áp dụng khi biên soạn, rà soát bản biên soạn hoặc soát chính tả. Hội thoại dùng `timeout_seconds` đã cấu hình của model. Giới hạn kết nối và gửi dữ liệu áp dụng cho mọi lượt gọi. Trong ModelOps → model → chính sách vận hành, có thể bật **Chờ model xử lý xong** cho model xử lý tài liệu khác. Worker vẫn có giới hạn tổng thời gian riêng qua `WORKER_MODEL_JOB_TIMEOUT_SECONDS` (mặc định 86.400 giây). Lượt `uncertain` cần kiểm tra trước khi tạo yêu cầu mới.

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import sys
 from pathlib import Path
@@ -88,7 +87,7 @@ async def check_qdrant(url: str) -> tuple[bool, str]:
 
 
 async def inspect(
-    settings: Settings, root: Path, head: str, frontend: str = "frontendV1"
+    settings: Settings, root: Path, head: str
 ) -> dict[str, tuple[bool, str]]:
     checks = await asyncio.gather(
         check_redis(settings.REDIS_URL),
@@ -99,23 +98,23 @@ async def inspect(
     results = dict(
         zip(("redis", "postgresql", "qdrant", "storage"), checks, strict=True)
     )
-    vite_present = (root / frontend / "node_modules/vite/bin/vite.js").is_file()
-    install = (
-        "make v1-install-fe" if frontend == "frontendV1" else "npm ci in frontendV2"
-    )
+    frontend = root / "frontendV2"
+    vite_present = (frontend / "node_modules/vite/bin/vite.js").is_file()
     results["frontend"] = (
         vite_present,
-        f"Vite installed in {frontend}" if vite_present else f"Run {install} first",
+        "Vite installed in frontendV2"
+        if vite_present
+        else "Run make v2-install-fe first",
     )
     return results
 
 
-def main(frontend: str = "frontendV1") -> int:
+def main() -> int:
     try:
         from qnu.domains.operations.recovery.service import HEAD
         from qnu.platform.config import get_settings
 
-        results = asyncio.run(inspect(get_settings(), ROOT, HEAD, frontend))
+        results = asyncio.run(inspect(get_settings(), ROOT, HEAD))
     except (
         SQLAlchemyError,
         RedisError,
@@ -153,8 +152,4 @@ def main(frontend: str = "frontendV1") -> int:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--frontend", choices=("frontendV1", "frontendV2"), default="frontendV1"
-    )
-    raise SystemExit(main(parser.parse_args().frontend))
+    raise SystemExit(main())

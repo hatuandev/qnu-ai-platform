@@ -67,9 +67,6 @@ class IndexRun(Base):
     provider_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("providers.id", ondelete="RESTRICT"), nullable=False
     )
-    system_default_authorized: Mapped[bool] = mapped_column(
-        nullable=False, default=False, server_default=text("false")
-    )
     dimension: Mapped[int] = mapped_column(Integer, nullable=False)
     vector_collection: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     config: Mapped[dict] = mapped_column(JSONB, nullable=False)

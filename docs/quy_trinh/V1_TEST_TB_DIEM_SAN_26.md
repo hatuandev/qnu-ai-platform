@@ -1,5 +1,7 @@
 # Kiểm thử PDF thật — TB điểm sàn 26
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** frontendV1, `test-v1-e2e.ps1` và bộ `scripts/v1_e2e_*` đã được gỡ khỏi repo. Các lệnh dưới đây không còn chạy được; giữ để truy vết.
+
 ## Kết quả mới phiên789 — F14/MX-05
 
 Promptv13 hỗ trợ thứ tự đọc/citation cho đoạn liên tiếp cùng snapshot và kết hợp văn bản với ô bảng; schema chỉ cho statements dẫn văn bản. Không cần recompile/reindex để nạp thay đổi RAG này, chỉ serve phải dùng backend hiện tại.

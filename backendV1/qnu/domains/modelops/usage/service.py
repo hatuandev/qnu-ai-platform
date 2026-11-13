@@ -141,7 +141,6 @@ class UsageService:
         provider_id: str | None = None,
         *,
         document_ocr: bool = False,
-        index_run_id: str | None = None,
     ) -> ModelUsageRecord:
         if (
             not request_id
@@ -154,7 +153,7 @@ class UsageService:
             raise AppException("Reservation không hợp lệ.", code="usage_request_invalid")
         await resolve_workspace_access(db, actor, workspace_id, for_update=True)
         provider = await catalog_service.resolve_provider(
-            db, actor, workspace_id, capability, provider_id, index_run_id=index_run_id
+            db, actor, workspace_id, capability, provider_id
         )
         if document_ocr and (
             provider.provider_type != "mineru" or capability != "ocr" or token_budget != 0

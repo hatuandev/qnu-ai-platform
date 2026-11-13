@@ -75,10 +75,9 @@ Chỉ chạy với dev gate được bật, PostgreSQL loopback; không dùng ch
 
 Khóa ngẫu nhiên lưu riêng trong `backendV1/.local/ctsv-test-accounts.json`, bị Git bỏ qua;
 registry xác thực chỉ lưu SHA-256 của khóa. Không chép khóa vào log hoặc tài liệu.
-Trong frontendV1: đăng xuất → mở **Sử dụng Dev Access Key (kiểm thử cục bộ)** →
-dán giá trị khóa tương ứng từ tệp local. Tên tài khoản được máy chủ xác định từ khóa;
-quyền phòng ban vẫn lấy từ membership DB. Chọn **Tự đăng nhập bằng cấu hình local**
-để trở lại admin nền tảng nếu cầu nối local đã được cấu hình.
+Trong frontendV2: cầu nối dev tự đăng nhập bằng `QNU_DEV_ACCESS_KEY` trong
+`frontendV2/.env.local` (phải khớp một khóa trong tệp local ở trên). Tên tài khoản
+được máy chủ xác định từ khóa; quyền phòng ban vẫn lấy từ membership DB.
 Các tài khoản thử nghiệm không phải tài khoản SSO hay tài khoản nhân sự thực.
 
 ## Kiểm thử

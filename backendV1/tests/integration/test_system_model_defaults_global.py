@@ -5,7 +5,7 @@ import pytest
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.resilience.routing import choose_target
 from qnu.platform.database import AsyncSessionFactory
-from qnu.platform.errors import Conflict, EntityNotFound
+from qnu.platform.errors import Conflict
 from tests.integration.test_workspaces_modelops_api import (
     API,
     MEMBER_A,
@@ -39,47 +39,27 @@ def make_provider(client, name="chat-one", capabilities=None):
     return p
 
 
-def test_system_defaults_apply_across_all_workspaces_and_override_old(client):
-    # 1. Create 2 isolated workspaces
-    ws1 = _create_workspace(client, "ws-old-configured")
-    ws2 = _create_workspace(client, "ws-never-configured")
+def test_system_defaults_apply_across_all_workspaces(client):
+    ws1 = _create_workspace(client, "ws-member")
+    ws2 = _create_workspace(client, "ws-other")
 
     _add_member(client, ws1["id"], MEMBER_A.actor_id, "member")
 
-    # 2. Create providers
-    p_old = make_provider(client, name="chat-old", capabilities=["chat"])
     p_system = make_provider(client, name="chat-system", capabilities=["chat"])
     p_ocr = make_provider(client, name="ocr-system", capabilities=["ocr"])
 
-    # ws1 has old workspace-level default for chat
-    _as(PLATFORM)
-    grant_res = client.put(
-        f"{API}/workspaces/{ws1['id']}/allowed-providers",
-        json={"provider_ids": [p_old["id"]], "defaults": {"chat": p_old["id"]}},
-    )
-    assert grant_res.status_code == 200
-
-    # ws2 has NO workspace-level defaults and NO grants at all
-
-    # Before setting system default:
+    # Before a system default exists, no workspace resolves a model implicitly.
     async def check_before():
         async with AsyncSessionFactory() as session:
-            # ws1 uses its workspace default
             selected_ws1, _ = await choose_target(session, ws1["id"], "chat", None)
-            assert selected_ws1 == p_old["id"]
-            prov_ws1 = await catalog_service.resolve_workspace_provider(session, ws1["id"], "chat")
-            assert prov_ws1.id == p_old["id"]
-
-            # ws2 has no defaults configured
-            selected_ws2, _ = await choose_target(session, ws2["id"], "chat", None)
-            assert selected_ws2 is None
+            assert selected_ws1 is None
             with pytest.raises(Conflict) as exc_info:
-                await catalog_service.resolve_workspace_provider(session, ws2["id"], "chat")
+                await catalog_service.resolve_workspace_provider(session, ws1["id"], "chat")
             assert exc_info.value.code == "model_not_configured"
 
     client.portal.call(check_before)
 
-    # 3. Model Administrator sets system-wide default
+    # Model Administrator sets system-wide defaults.
     _as(PLATFORM)
     update_res = client.put(
         f"{API}/modelops/defaults",
@@ -89,49 +69,48 @@ def test_system_defaults_apply_across_all_workspaces_and_override_old(client):
     assert update_res.json()["chat_provider_id"] == p_system["id"]
     assert update_res.json()["ocr_provider_id"] == p_ocr["id"]
 
-    # 4. Now both workspaces resolve to the system default!
+    # Both workspaces resolve the same defaults without any per-unit configuration.
     async def check_after():
         async with AsyncSessionFactory() as session:
-            # ws1 (old configured) now uses p_system (system default overrides old workspace default)
-            selected_ws1, _ = await choose_target(session, ws1["id"], "chat", None)
-            assert selected_ws1 == p_system["id"]
-            prov_ws1 = await catalog_service.resolve_workspace_provider(session, ws1["id"], "chat")
-            assert prov_ws1.id == p_system["id"]
+            for workspace_id in (ws1["id"], ws2["id"]):
+                selected_chat, _ = await choose_target(session, workspace_id, "chat", None)
+                assert selected_chat == p_system["id"]
+                chat = await catalog_service.resolve_workspace_provider(
+                    session, workspace_id, "chat"
+                )
+                assert chat.id == p_system["id"]
 
-            # ws2 (never configured) also automatically resolves to p_system!
-            selected_ws2, _ = await choose_target(session, ws2["id"], "chat", None)
-            assert selected_ws2 == p_system["id"]
-            prov_ws2 = await catalog_service.resolve_workspace_provider(session, ws2["id"], "chat")
-            assert prov_ws2.id == p_system["id"]
+                selected_ocr, _ = await choose_target(session, workspace_id, "ocr", None)
+                assert selected_ocr == p_ocr["id"]
+                ocr = await catalog_service.resolve_workspace_provider(
+                    session, workspace_id, "ocr"
+                )
+                assert ocr.id == p_ocr["id"]
 
-            # ws2 also resolves OCR to p_ocr
-            selected_ocr, _ = await choose_target(session, ws2["id"], "ocr", None)
-            assert selected_ocr == p_ocr["id"]
-            prov_ocr = await catalog_service.resolve_workspace_provider(session, ws2["id"], "ocr")
-            assert prov_ocr.id == p_ocr["id"]
-
-            # Capability isolation: p_ocr is only granted for OCR, not chat
-            with pytest.raises(EntityNotFound) as exc_info:
-                await catalog_service.resolve_workspace_provider(session, ws2["id"], "chat", p_ocr["id"])
-            assert exc_info.value.code == "provider_not_found"
+            # Capability isolation: p_ocr serves OCR only, never chat.
+            with pytest.raises(Conflict) as exc_info:
+                await catalog_service.resolve_workspace_provider(
+                    session, ws2["id"], "chat", p_ocr["id"]
+                )
+            assert exc_info.value.code == "provider_capability_mismatch"
 
     client.portal.call(check_after)
 
-    # 5. Permission checks: Member lacking ai.models.manage cannot update system defaults
+    # Permission checks: a member lacking ai.models.manage cannot update defaults.
     _as(MEMBER_A)
     forbidden_update = client.put(
         f"{API}/modelops/defaults",
-        json={"chat_provider_id": p_old["id"]},
+        json={"chat_provider_id": p_system["id"]},
     )
     assert forbidden_update.status_code == 403
 
-    # Member of ws1 cannot access ws2
+    # Member of ws1 cannot see ws2's catalog.
     forbidden_cross_ws = client.get(
-        f"{API}/workspaces/{ws2['id']}/allowed-providers",
+        f"{API}/modelops/catalog", params={"workspace_id": ws2["id"]}
     )
-    assert forbidden_cross_ws.status_code in (403, 404)
+    assert forbidden_cross_ws.status_code == 404
 
-    # 6. Disabling the provider immediately causes Conflict(code="provider_inactive")
+    # Disabling the default provider immediately makes resolution fail.
     _as(PLATFORM)
     client.patch(
         f"{API}/modelops/providers/{p_system['id']}",

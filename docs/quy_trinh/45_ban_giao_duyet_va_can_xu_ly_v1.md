@@ -1,5 +1,7 @@
 # 45 — Gửi duyệt, yêu cầu sửa và danh sách “Cần xử lý” (V1)
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** `frontendV1` đã được gỡ khỏi repo; giao diện duy nhất hiện hành là `frontendV2`. Nội dung dưới đây mô tả màn hình cũ, không dùng để kết luận hiện trạng.
+
 ```text
 Phiên bản draft (đã chuẩn bị nội dung)
 → editor/admin xem trước và gửi duyệt (submission pending)

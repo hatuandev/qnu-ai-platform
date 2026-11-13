@@ -1,6 +1,6 @@
 # 43 — Bóc tách tự động sau upload trong backendV1
 
-Áp dụng backendV1; frontendV1 chưa thay bố cục trong phiên710. Workspace là biên
+Áp dụng backendV1; frontendV1 chưa thay bố cục trong phiên710 (frontendV1 đã gỡ ngày 2026-11-13; giao diện hiện hành là `frontendV2/`). Workspace là biên
 quyền của đơn vị, mọi thao tác vẫn qua `resolve_workspace_access`. Không dùng quy
 tắc dữ liệu chung của `backend/` để bỏ kiểm membership/quyền của V1.
 

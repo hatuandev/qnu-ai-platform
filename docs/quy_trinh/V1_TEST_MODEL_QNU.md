@@ -1,5 +1,7 @@
 # Kiểm tra bốn model thật trên server QNU
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** frontendV1, `test-v1-e2e.ps1` và bộ `scripts/v1_e2e_*` đã được gỡ khỏi repo. Các lệnh dưới đây không còn chạy được; giữ để truy vết.
+
 Muốn chạy từ model đến upload và toàn bộ pipeline theo một thứ tự duy nhất, dùng [hướng dẫn tổng hợp toàn luồng](./V1_TEST_TOAN_LUONG_MODEL_QNU.md). Phần dưới giải thích riêng nhóm model.
 
 Bổ sung nhóm test riêng sau khi đã thêm nhà cung cấp, khóa và model qua ModelOps. Agent chỉ viết mã và kiểm tra tĩnh; không coi `/models` là bằng chứng inference hoạt động và chưa chạy live inference khi bổ sung mã.

@@ -122,7 +122,9 @@ class RunnerTests(unittest.TestCase):
             with patch.object(runner, "ROOT", root):
                 self.assertEqual(runner.main(["dev", "--env-dir", "root"]), 0)
             check.assert_called_once()
-            self.assertEqual(check.call_args.args[0][-2:], ["--frontend", "frontendV2"])
+            self.assertEqual(
+                Path(check.call_args.args[0][-1]).name, "check_v1_runtime.py"
+            )
             [api, worker, frontend] = services.call_args.args[0]
             self.assertIn("qnu.main:app", api[1])
             self.assertIn("qnu.workers.settings.WorkerSettings", worker[1])
@@ -131,8 +133,9 @@ class RunnerTests(unittest.TestCase):
 
     def test_frontend_aliases_match_their_dev_workflows(self):
         for alias, directory, command in (
-            ("dev1", "frontendV1", "v1-dev"),
+            ("dev", "frontendV2", "v2-dev"),
             ("dev2", "frontendV2", "v2-dev"),
+            ("fe", "frontendV2", "v2-fe"),
             ("fe2", "frontendV2", "v2-fe"),
         ):
             with (
@@ -165,7 +168,7 @@ class RunnerTests(unittest.TestCase):
             services.assert_not_called()
 
     def test_dev_has_one_sync_then_no_sync_service_commands(self):
-        plan = runner.command_plan("v1-dev", runner.ROOT, "root")
+        plan = runner.command_plan("v2-dev", runner.ROOT, "root")
         self.assertEqual(len(plan), 4)
         self.assertNotIn("--no-sync", plan[0][1])
         for _, command in plan[1:3]:
@@ -198,12 +201,12 @@ class RunnerTests(unittest.TestCase):
 
     def test_dev_uses_v1_paths_and_does_not_migrate_or_seed(self):
         for mode in ("root", "backend"):
-            plan = runner.command_plan("v1-dev", runner.ROOT, mode)
+            plan = runner.command_plan("v2-dev", runner.ROOT, mode)
             self.assertEqual(len(plan), 4)
             runtime = runner.ROOT if mode == "root" else runner.ROOT / "backendV1"
             self.assertEqual(
                 [cwd for cwd, _ in plan],
-                [runtime, runtime, runtime, runner.ROOT / "frontendV1"],
+                [runtime, runtime, runtime, runner.ROOT / "frontendV2"],
             )
             args = [arg for _, command in plan for arg in command]
             self.assertIn("qnu.main:app", args)

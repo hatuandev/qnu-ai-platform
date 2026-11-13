@@ -15,7 +15,7 @@ Tài liệu này là cẩm nang bắt buộc cho mọi kỹ sư Frontend và AI 
 
 - Trước thay đổi lớn, làm rõ tác vụ chính từ ngữ cảnh sẵn có: đọc/sửa OCR, duyệt Compiler, tìm nguồn hoặc cấu hình model. Phác thảo ngắn ngay trong trao đổi; lỗi nhỏ chỉ sửa phần cần thiết, không mặc định mở thêm vòng phê duyệt hay thiết kế lại cả trang.
 - Ưu tiên nội dung giúp hoàn thành tác vụ: đoạn văn và chỗ cần sửa ở màn OCR; nguồn và quyết định duyệt ở Compiler; cấu hình và lỗi có thể xử lý ở ModelOps. Chỉ thêm KPI hoặc card khi dữ liệu đó hỗ trợ quyết định thật.
-- Dùng font, màu Teal, semantic tokens và primitives của `frontendV1/`. Tạo thứ bậc bằng cách nhóm và khoảng cách trong hệ thống hiện có; không tự đổi nhận diện vì tham khảo phong cách mới.
+- Dùng font, màu Teal, semantic tokens và primitives của `frontendV2/`. Tạo thứ bậc bằng cách nhóm và khoảng cách trong hệ thống hiện có; không tự đổi nhận diện vì tham khảo phong cách mới.
 - Giữ thuật ngữ nhất quán từ nút đến toast/trạng thái. Khi sửa UI, tự đối chiếu ảnh chụp desktop/mobile và các trạng thái liên quan nếu có công cụ; báo phần chưa kiểm thay vì suy kết quả từ build. Kiểm chứng theo mục8, không chạy test ứng dụng cho task chỉ sửa skill/tài liệu.
 
 Tham khảo tư duy thiết kế từ [frontend-design của Anthropic](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md) và bộ nguyên tắc Art Direction chống "AI Slop" từ [Taste Skill (tasteskill.dev)](https://www.tasteskill.dev/), áp dụng trong các giới hạn QNU dưới đây; giữ nguyên kiến trúc, luồng API và quy tắc dữ liệu thật.
@@ -42,34 +42,21 @@ Tham khảo tư duy thiết kế từ [frontend-design của Anthropic](https://
 Mọi thành phần giao diện phải được phân loại và đặt đúng vị trí theo kiến trúc 3 tầng:
 
 ```text
-frontendV1/src/
+frontendV2/src/
 ├── components/
 │   ├── ui/             # TẦNG 1: Primitives (Radix UI + shadcn/ui)
-│   │   ├── button.tsx, input.tsx, card.tsx, badge.tsx, dialog.tsx,
-│   │   ├── dropdown-menu.tsx, table.tsx, tabs.tsx, sheet.tsx,
-│   │   └── kbd.tsx, spinner.tsx, skeleton.tsx, ...
-│   ├── admin/          # TẦNG 2: Admin Helpers (Tái sử dụng cho trang quản trị)
-│   │   ├── empty-state.tsx     (Hiển thị khi danh sách rỗng)
-│   │   ├── kpi-metric.tsx      (Thẻ chỉ số FinOps, Tokens, TM-08)
-│   │   ├── status-badge.tsx    (Huy hiệu trạng thái có dot chỉ báo)
-│   │   ├── file-upload.tsx     (Kéo thả tệp tri thức đa định dạng)
-│   │   ├── confirm-dialog.tsx  (Xác nhận xóa/phê duyệt hành động)
-│   │   └── field.tsx           (Wrapper trường nhập liệu kèm label và lỗi)
-│   └── ai/             # TẦNG 3: AI Suite (Chuyên biệt cho Trợ lý AI)
-│       ├── chat-message.tsx    (Tin nhắn phân tách User/Assistant kèm avatar)
-│       ├── chat-bubble.tsx     (Khung nội dung Markdown, copy, retry)
-│       ├── message-scroller.tsx (Tự động ghim đáy mượt mà, chống giật)
-│       ├── citation-sheet.tsx  (Ngăn kéo trượt hiển thị dẫn chứng RAG)
-│       ├── attachment.tsx      (Thẻ đính kèm tài liệu OCR)
-│       ├── questionnaire-card.tsx (Thẻ câu hỏi trắc nghiệm Bloom/TM-08)
-│       └── dag-canvas.tsx      (Đồ thị DAG Engine bằng @xyflow/react)
-├── layouts/            # Khung vỏ ứng dụng (AdminShell, AppSidebar, Topbar, CommandMenu)
-├── pages/              # Các màn hình nghiệp vụ độc lập (1 route = 1 page component)
-├── navigation/         # Cấu hình điều hướng tập trung (`config.ts`)
-├── hooks/              # Custom React Hooks (`useRAGStream.ts`)
-├── services/           # Typed API Client (`api-client.ts` + TanStack Query)
+│   ├── admin/          # TẦNG 2: Admin Helpers (EmptyState, KpiMetric, StatusBadge, ConfirmDialog, ...)
+│   ├── knowledge/      # TẦNG 3: Màn nghiệp vụ kho (nguồn, rà soát OCR, vòng đời)
+│   ├── modelops/       # TẦNG 3: Cấu hình provider/model/credential
+│   └── dev/            # Cầu nối phiên dev (DevSessionGate)
+├── routes/             # TanStack Router file-based (khớp routeTree.gen.ts)
+├── api/                # Typed API Client + session token
+├── lib/                # UI store, tiện ích dùng chung
+├── layouts/            # Khung vỏ ứng dụng
 └── styles/             # Design tokens (`tokens.css`, `globals.css`)
 ```
+
+`routeTree.gen.ts` được sinh từ `routes/`; không sửa tay. Thêm màn hình bằng route file mới rồi chạy dev/build để tái sinh tree.
 
 ---
 
@@ -301,4 +288,4 @@ Khi viết mã TSX/TS, **bắt buộc tuân thủ các quy tắc sau** để tr�
 
 Dùng [bảng kiểm chứng chung](../../rules/verification.md): Biome trên file sửa và production build; thêm test hành vi khi đổi logic, auth, API hoặc SSE. Build không chứng minh layout, quyền hoặc luồng server đã đúng. Không chạy backend suite cho thay đổi UI thuần túy.
 
-Các quy định bố cục, nhãn ngắn, filter bar, KPI và ViewModeToggle chuyển từ root tại [admin-patterns](references/admin-patterns.md). Đọc thêm `frontendV1/AGENTS.md` theo đường dẫn tính từ root repo; token thực ở `frontendV1/src/styles/tokens.css` ưu tiên hơn số minh họa.
+Các quy định bố cục, nhãn ngắn, filter bar, KPI và ViewModeToggle chuyển từ root tại [admin-patterns](references/admin-patterns.md). `frontendV2` chưa có AGENTS.md riêng; đọc [AGENTS.md](../../../AGENTS.md) ở root repo. Token thực ở `frontendV2/src/styles/tokens.css` ưu tiên hơn số minh họa.

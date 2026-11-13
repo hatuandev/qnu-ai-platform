@@ -22,10 +22,8 @@ v1_owned:
   - provider_keys
   - provider_key_audits
   - model_defaults
-  - workspace_allowed_providers
 # Thêm tên bảng vào v1_owned khi một migration của backendV1 tạo bảng mới.
 # Không bảng nào trong danh sách legacy được v1 sửa DDL.
-  - workspace_model_defaults
   - workspace_quotas
   - model_usage_records
   - modelops_events

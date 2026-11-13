@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -22,8 +22,6 @@ from qnu.ports.embedding_model import EmbeddingRequest
 @dataclass(frozen=True, slots=True)
 class EmbeddingRuntime(OcrRuntime):
     dimension: int | None = None
-    system_default_authorized: bool = False
-    index_run_id: str | None = None
 
     @property
     def configuration_hash(self) -> str:
@@ -48,16 +46,13 @@ class EmbeddingRuntime(OcrRuntime):
         }
 
     def request(self) -> EmbeddingRequest:
-        scope = self.execution_scope
         return EmbeddingRequest(
             self.base_url,
             self.model_name,
             self.timeout_seconds,
             self.api_key,
             self.dimension,
-            replace(scope, index_run_id=self.index_run_id)
-            if scope and self.index_run_id
-            else scope,
+            self.execution_scope,
         )
 
     def budget(self, texts: list[str]) -> int:
@@ -90,11 +85,10 @@ async def resolve_embedding_runtime(
     provider_id: str | None = None,
     *,
     require_dimension: bool = True,
-    index_run_id: str | None = None,
 ) -> EmbeddingRuntime:
     """Trusted callers authorize the workspace before this resolution."""
-    provider, system_default_authorized = await catalog_service.resolve_workspace_target(
-        db, workspace_id, "embedding", provider_id, index_run_id=index_run_id
+    provider = await catalog_service.resolve_workspace_target(
+        db, workspace_id, "embedding", provider_id
     )
     if "embedding" not in transport_for(provider.provider_type).protocols:
         raise AppException(
@@ -134,8 +128,6 @@ async def resolve_embedding_runtime(
         timeout_seconds=provider.timeout_seconds,
         api_key=secret,
         dimension=dimension,
-        system_default_authorized=system_default_authorized,
-        index_run_id=index_run_id,
         capacity_status="provisional" if effective.status == "provisional" else capacity.status,
         token_limits=effective.token_limits,
         operational_budget=effective,

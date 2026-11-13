@@ -1,5 +1,7 @@
 # Chạy kiểm tra V1 theo từng lệnh
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** frontendV1, `test-v1-e2e.ps1` và bộ `scripts/v1_e2e_*` đã được gỡ khỏi repo. Các lệnh dưới đây không còn chạy được; giữ để truy vết.
+
 Với server AI QNU thật, ưu tiên [hướng dẫn tổng hợp model → toàn bộ pipeline](./V1_TEST_TOAN_LUONG_MODEL_QNU.md), có đủ lệnh và model mặc định theo thứ tự. Tài liệu này tiếp tục mô tả workflow giả lập và cách vận hành runner.
 
 Bộ lệnh dành cho Windows PowerShell, chạy tại thư mục gốc repo. Bạn tự chạy từng chặng và gửi lỗi của chặng đó để xử lý. Chưa nghiệm thu E2E: lần bổ sung mã này chỉ kiểm tra tĩnh, chưa chạy Docker, migration, browser test hay model.

@@ -1,6 +1,6 @@
 # Quy Chuẩn Thiết Kế & Vibe Giao Diện QNU AI Platform (Mandatory UI Vibe Rules)
 
-Tài liệu này là **quy tắc bắt buộc (Hard Rule)** cho mọi AI Model (Claude, Gemini, GPT/Codex, Cursor, Windsurf, Antigravity, v.v.) khi tạo mới, chỉnh sửa hoặc "vibe coding" giao diện trên nền tảng `qnu-ai-platform` (`frontend/` và `frontendV1/`).
+Tài liệu này là **quy tắc bắt buộc (Hard Rule)** cho mọi AI Model (Claude, Gemini, GPT/Codex, Cursor, Windsurf, Antigravity, v.v.) khi tạo mới, chỉnh sửa hoặc "vibe coding" giao diện trên nền tảng `qnu-ai-platform` (`frontendV2/`).
 
 ---
 

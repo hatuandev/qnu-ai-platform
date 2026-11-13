@@ -1,5 +1,7 @@
 # V1 — Test model QNU rồi chạy toàn bộ quy trình
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** frontendV1, `test-v1-e2e.ps1` và bộ `scripts/v1_e2e_*` đã được gỡ khỏi repo. Các lệnh dưới đây không còn chạy được; giữ để truy vết.
+
 Nếu cần bản lệnh ngắn sau khi bật máy hoặc muốn tạo phiên mới, xem [Chạy lại E2E](./V1_QUY_TRINH_TEST_LAI.md).
 
 Đây là hướng dẫn tổng hợp cho một phiên thử dùng server QNU và chat tùy chọn qua 9router. Thứ tự:

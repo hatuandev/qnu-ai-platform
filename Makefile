@@ -7,9 +7,9 @@ V1_PYTHON := backendV1/.venv/bin/python
 endif
 V1_ARGS ?=
 ARGS ?= $(V1_ARGS)
-TASKS := help dev dev1 dev2 be worker fe fe2 check db-ready migrate db-check install-be install-fe infra-up infra-down infra-status infra-logs test test-be test-fe test-e2e e2e lint lint-fix typecheck build seed reset-db reseed reconcile reindex
-V1_TASKS := $(addprefix v1-,help dev be worker fe check migrate db-check install-be install-fe infra-up infra-down infra-status infra-logs test test-be test-fe test-e2e e2e lint lint-fix typecheck build)
-V2_TASKS := v2-dev v2-fe v2-check
+TASKS := help dev dev2 be worker fe fe2 check db-ready migrate db-check install-be install-fe infra-up infra-down infra-status infra-logs test test-be lint lint-fix typecheck build seed reset-db reseed reconcile reindex
+V1_TASKS := $(addprefix v1-,help dev be worker check migrate db-check install-be infra-up infra-down infra-status infra-logs test test-be lint lint-fix)
+V2_TASKS := v2-dev v2-fe v2-check v2-install-fe v2-typecheck v2-build
 .PHONY: $(TASKS) $(V1_TASKS) $(V2_TASKS)
 TASKS += clear seed-modelops
 V1_TASKS += v1-clear v1-seed-modelops

@@ -140,7 +140,7 @@ rỗng vẫn kèm giới hạn. Mỗi loại nhận xét và tổng số đơn v
 
 Trước khi reserve quota (service này tự commit), ghi durable unique request cùng
 input snapshot có hash trong cùng khóa workspace. Nhờ vậy hai request cùng key
-không gọi model hoặc reserve hai lần. ModelOps giải quyết grant, active, credential
+không gọi model hoặc reserve hai lần. ModelOps giải quyết provider active, credential
 được bảo vệ, capacity và quota; không .env key, retry hoặc fallback ngầm.
 
 `queued → running → completed | failed | uncertain`. Studio gửi POST nền và đọc

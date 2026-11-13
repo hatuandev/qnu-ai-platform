@@ -1,5 +1,7 @@
 # Compiler tài liệu lớn — chia phần, reasoning và chạy song song có giới hạn
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** frontendV1, `test-v1-e2e.ps1` và bộ `scripts/v1_e2e_*` đã được gỡ khỏi repo. Các lệnh dưới đây không còn chạy được; giữ để truy vết.
+
 ## Những gì đã triển khai
 
 ### Chia tiếp thích nghi (planner v5)

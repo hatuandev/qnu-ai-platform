@@ -10,7 +10,7 @@ Ngày 2026-10-26, Context641. Chỉ áp dụng backendV1.
 3. Profile lưu trong JSONB hiện có, ghim endpoint/model ở server. Thay đổi identity
    vô hiệu profile; đổi lại identity cũ không tự phục hồi. PATCH không có trường
    giữ nguyên; null tường minh xóa profile; khai báo lại xác nhận đích hiện hành.
-4. Runtime gọi public API để kiểm quyền workspace/grant/capability/provider và lấy
+4. Runtime gọi public API để kiểm quyền workspace/capability/provider và lấy
    snapshot/configuration_hash. Giới hạn input/output và ngân sách tác vụ là ba
    đại lượng riêng; output tự tính chỉ dùng phần context còn lại và giới hạn model.
 5. Đếm đầu vào phải theo đúng protocol, gồm ảnh/framing; unknown phải báo lỗi, không

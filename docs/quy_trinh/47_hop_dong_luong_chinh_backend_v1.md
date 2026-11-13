@@ -254,9 +254,8 @@ mở, preview hết hạn hoặc biên nhận đã kết thúc không thu hẹp 
   bản ghi thư mục đã xóa mềm không chặn thao tác xóa kho.
 - `DELETE /platform/v1alpha1/modelops/connections/{id}` và
   `DELETE .../connections/{id}/models/{model_id}` trả `409 model_provider_in_use` kèm `detail` nêu
-  loại tham chiếu (mặc định hệ thống/đơn vị, quyền sử dụng model, trợ lý, lịch sử lập chỉ mục/biên
-  soạn/phản biện/sử dụng model). Lịch sử được giữ; gỡ model khỏi allowlist không xóa lịch sử;
-  mặc định không được trỏ vào model đã xóa (`409 allowlist_default_not_allowed`).
+  loại tham chiếu (mặc định hệ thống, trợ lý, lịch sử lập chỉ mục/biên soạn/phản biện/sử dụng
+  model). Lịch sử được giữ; cấu hình mặc định hệ thống đang trỏ vào provider/model bị chặn xóa.
 - **Lưu trữ tài liệu** không còn là thao tác chuẩn của FE; `archive` chỉ dùng cho dữ liệu cũ/khôi
   phục.
 

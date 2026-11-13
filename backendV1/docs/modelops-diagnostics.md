@@ -71,7 +71,7 @@ toàn lượt. Tra cứu ID trùng dùng set, tránh chi phí bậc hai khi cata
 
 Trang chi tiết provider có Lấy danh sách model và Thử theo capability. Bộ chọn
 model mở dialog sửa có sẵn; người dùng xem và lưu thủ công. Discovery/probe
-không tự sửa defaults/grants/capacity/dimension hoặc credential. Đổi model vẫn
+không tự sửa defaults/capacity/dimension hoặc credential. Đổi model vẫn
 làm khai báo capacity cũ stale theo quy tắc hiện có.
 
 Query theo session, session mới remount trạng thái tương tác. Không auto-run

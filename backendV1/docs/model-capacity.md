@@ -26,7 +26,7 @@ mới. Dùng JSONB hiện có, không cần migration mới.
 Runtime khác gọi qua `qnu.domains.modelops.public_api`:
 
 - `resolve_model_capacity(db, actor, workspace_id, capability, provider_id=None)`:
-  kiểm resolver/grant/capability/provider rồi trả snapshot bất biến và configuration_hash.
+  kiểm resolver/capability/provider rồi trả snapshot bất biến và configuration_hash.
 - `plan_model_request(..., input_tokens, requested_output_tokens=None,
   reserve_tokens=0, minimum_output_tokens=1)` trả snapshot cùng ngân sách. Chưa biết
   capacity/input hoặc vượt giới hạn gây lỗi tường minh; không cắt nội dung đầu vào.

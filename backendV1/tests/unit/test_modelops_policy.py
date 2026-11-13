@@ -6,11 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from qnu.domains.modelops.keys.service import mask_secret
-from qnu.domains.modelops.schemas import (
-    AllowlistUpdateRequest,
-    KeyCreateRequest,
-    ProviderCreateRequest,
-)
+from qnu.domains.modelops.schemas import KeyCreateRequest, ProviderCreateRequest
 from qnu.platform.errors import AppException
 from qnu.platform.network_policy import assert_allowed_endpoint
 from qnu.platform.ownership import LEGACY_TABLES
@@ -45,11 +41,6 @@ def test_provider_capabilities_must_be_unique_and_known() -> None:
         )
 
 
-def test_workspace_allowlist_rejects_duplicates() -> None:
-    with pytest.raises(ValidationError):
-        AllowlistUpdateRequest(provider_ids=["prv_1", "prv_1"])
-
-
 def test_endpoint_policy_blocks_metadata_and_bad_schemes() -> None:
     with pytest.raises(AppException):
         assert_allowed_endpoint("ftp://example.test/v1", allow_private=True)
@@ -67,7 +58,6 @@ def test_modelops_tables_never_collide_with_legacy_names() -> None:
         "provider_keys",
         "provider_key_audits",
         "model_defaults",
-        "workspace_allowed_providers",
     } <= v1_tables
     assert not (v1_tables & LEGACY_TABLES)
 

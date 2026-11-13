@@ -39,7 +39,7 @@ legacy nào (đã kiểm chứng với `LEGACY_TABLES`). Migration dùng
 - `backend/` không đổi; hai chuỗi migration song song, không stamp chéo.
 - Collection/Assistant/ModelOps sau này phải gọi `resolve_workspace_access`
   (hoặc `require_workspace_role`) trước khi chạm dữ liệu.
-- ModelOps cấp model theo `workspace_allowed_providers`; provider/key là catalog
+- ModelOps cấp model qua bản ghi mặc định hệ thống (bãi bỏ allowlist theo workspace từ batch957); provider/key là catalog
   toàn cục do platform admin quản lý.
 
 ## Ngoài phạm vi batch này

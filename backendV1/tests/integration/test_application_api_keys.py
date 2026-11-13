@@ -196,7 +196,7 @@ async def test_openai_gateway_endpoints(client: TestClient) -> None:
     app.dependency_overrides[get_redis_client] = lambda: redis
     ws_a_id, ws_b_id = _setup_test_workspaces(client)
 
-    # Setup chat provider and grant to workspaces
+    # Setup chat provider and make it the system default
     _as(PLATFORM)
     created = client.post(
         f"{API}/modelops/providers",
@@ -212,14 +212,8 @@ async def test_openai_gateway_endpoints(client: TestClient) -> None:
     assert created.status_code == 201, created.text
     prov_id = created.json()["id"]
 
-    client.put(
-        f"{API}/workspaces/{ws_a_id}/allowed-providers",
-        json={"provider_ids": [prov_id], "defaults": {"chat": prov_id}},
-    )
-    client.put(
-        f"{API}/workspaces/{ws_b_id}/allowed-providers",
-        json={"provider_ids": [prov_id], "defaults": {"chat": prov_id}},
-    )
+    defaults = client.put(f"{API}/modelops/defaults", json={"chat_provider_id": prov_id})
+    assert defaults.status_code == 200, defaults.text
 
     # Create an assistant in Workspace A
     _as(ADMIN_A)

@@ -1,7 +1,7 @@
 # Kiến trúc QNU AI Platform — V1
 
 > **Phạm vi:** tài liệu sống, mô tả hệ thống đang chạy tại HEAD.
-> Bằng chứng là mã trong [`backendV1/`](../backendV1) và [`frontendV1/`](../frontendV1);
+> Bằng chứng là mã trong [`backendV1/`](../backendV1) và [`frontendV2/`](../frontendV2);
 > khi tài liệu mâu thuẫn với mã/test, mã/test thắng.
 > Bản kiến trúc cũ (Next.js, DAG, 5 trợ lý, PaddleOCR/Gemini) đã được thay thế và không còn
 > mô tả hệ thống hiện hành. Bản đồ tài liệu: [docs/README.md](./README.md).

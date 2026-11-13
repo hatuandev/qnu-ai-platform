@@ -41,9 +41,7 @@ async def validate_results(
     )
     if run is None or vectors.target_hash != run.config["vector_target_hash"]:
         raise Conflict("Index đã thay đổi khi trả lời.", code="answer_evidence_changed")
-    runtime = await resolve_embedding_runtime(
-        db, workspace_id, run.provider_id, index_run_id=run.id
-    )
+    runtime = await resolve_embedding_runtime(db, workspace_id, run.provider_id)
     if runtime.configuration_hash != run.config["provider"]["configuration_hash"]:
         raise Conflict("Model embedding đã thay đổi.", code="index_configuration_changed")
     allowed, _ = await _eligible(db, blob, actor, run, document_ids)

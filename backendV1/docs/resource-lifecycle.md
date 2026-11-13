@@ -270,11 +270,10 @@ kiểu không phân biệt hoa thường (`409 folder_name_exists`). Khôi phụ
 `DELETE /platform/v1alpha1/modelops/connections/{id}` và
 `DELETE .../connections/{id}/models/{model_id}` trả `409 model_provider_in_use` khi
 còn tham chiếu, kèm `detail` nêu loại tham chiếu cần xử lý: cấu hình mặc định hệ
-thống, cấu hình mặc định của đơn vị, quyền sử dụng model của đơn vị, trợ lý, lịch sử
-lập chỉ mục, lịch sử biên soạn, lịch sử phản biện hoặc lịch sử sử dụng model. Lịch
-sử sử dụng model được giữ và có khóa ngoại chặn xóa. Gỡ khỏi allowlist của đơn vị
-không xóa lịch sử; cấu hình mặc định không được trỏ vào model đã xóa hoặc ngoài
-allowlist (`409 allowlist_default_not_allowed`).
+thống, trợ lý, lịch sử lập chỉ mục, lịch sử biên soạn, lịch sử phản biện hoặc lịch
+sử sử dụng model. Lịch sử sử dụng model được giữ và có khóa ngoại chặn xóa. Cấu
+hình mặc định hệ thống đang trỏ vào provider/model bị chặn xóa; chuyển mặc định
+sang provider/model khác trước khi xóa.
 
 ## Dừng, khôi phục và dọn
 

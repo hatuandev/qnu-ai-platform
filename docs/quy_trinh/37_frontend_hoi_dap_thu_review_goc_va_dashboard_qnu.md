@@ -1,5 +1,7 @@
 # 37 — Hỏi đáp thử, tải review gốc và dashboard QNU
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** `frontendV1` đã được gỡ khỏi repo; giao diện duy nhất hiện hành là `frontendV2`. Nội dung dưới đây mô tả màn hình cũ, không dùng để kết luận hiện trạng.
+
 Phạm vi: `frontendV1/`, các mục F4–F6 sau [kiểm kê680](../bao_cao/context680/FE_BE_INVENTORY.md).
 Các API backendV1 đã có sẵn; phiên này không thay hành vi server.
 
@@ -10,7 +12,7 @@ Mở workspace → kho tài liệu → **Hỏi đáp thử**. Trang có đườn
 tiếp và tải lại. Cần là thành viên có quyền đọc kho; server kiểm tra quyền
 lại khi nhận yêu cầu.
 
-1. Nhập câu hỏi; chọn model trả lời hoặc để **Theo mặc định workspace**.
+1. Nhập câu hỏi; chọn model trả lời hoặc để **Theo mặc định hệ thống**.
 2. Có thể chọn tài liệu bằng bộ chọn của quy trình36. Không chọn nghĩa là
    toàn bộ tài liệu đủ điều kiện trong kho. Không mở rộng phạm vi khi ít kết quả.
 3. Nếu cần, mở cấu hình RAG để chọn dense/hybrid/rerank, số ứng viên, đoạn

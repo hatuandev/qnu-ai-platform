@@ -7,8 +7,8 @@ Prefix: `/platform/v1alpha1`. Nguồn OpenAPI là DTO/router thực tế; bản 
 1. Xác thực actor bằng SSO hoặc dev login đã cấu hình.
 2. Platform admin tạo workspace và thêm SSO subject vào membership.
 3. ModelOps admin tạo nhà cung cấp → thêm credential → thử kết nối → thêm các model/capability; secret chỉ lưu mã hóa trong DB. Xem [luồng nhà cung cấp–model](../../docs/quy_trinh/42_modelops_nha_cung_cap_va_model.md).
-4. Platform admin cấp provider cho workspace và cấu hình quota tháng UTC.
-5. Admin workspace chọn model mặc định theo capability trong danh sách được cấp.
+4. ModelOps admin cấu hình model mặc định hệ thống theo capability; platform admin đặt quota tháng UTC theo workspace.
+5. ModelOps admin đổi model mặc định hệ thống; admin đơn vị chỉ mở rộng/thu hồi thành viên và không tự thay chính sách model toàn cục.
 6. Thành viên đọc catalog bằng workspace_id cụ thể; domain khác gọi public API ModelOps với actor + workspace + capability + preferred provider nếu có.
 
 ## API
@@ -27,25 +27,23 @@ Prefix: `/platform/v1alpha1`. Nguồn OpenAPI là DTO/router thực tế; bản 
 | Key audit | GET `/modelops/providers/{id}/key-events` |
 | Audit cấu hình | GET `/modelops/events` |
 | Default hệ thống | GET/PUT `/modelops/defaults` |
-| Allowlist | GET/PUT `/workspaces/{id}/allowed-providers` |
-| Default đơn vị | PUT `/workspaces/{id}/model-defaults` |
 | Catalog cho đơn vị | GET `/modelops/catalog?workspace_id={id}` |
 | Quota | GET/PUT `/workspaces/{id}/quota?period=YYYY-MM-01` |
 | Usage | GET `/workspaces/{id}/usage` |
 
-Các thao tác provider/key/default toàn cục yêu cầu `ai.models.manage`; tạo/sửa workspace yêu cầu `ai.workspaces.manage`. Membership role `admin` không tự tạo quyền nền tảng. Admin đơn vị chỉ thay defaults, không tự mở rộng allowlist hoặc tăng quota. Usage/audit đơn vị dành cho admin đơn vị và platform admin; catalog dành cho thành viên đang hoạt động.
+Các thao tác provider/key/default toàn cục yêu cầu `ai.models.manage`; tạo/sửa workspace yêu cầu `ai.workspaces.manage`. Membership role `admin` không tự tạo quyền nền tảng và không đổi được model mặc định hệ thống. Usage/audit đơn vị dành cho admin đơn vị và platform admin; catalog dành cho thành viên đang hoạt động.
 
 ## Quyền và trạng thái
 
 - SSO subject phân biệt hoa/thường; không dùng email hoặc tên hiển thị làm membership key.
 - Workspace mới có thể chưa có admin đơn vị. Platform admin bổ nhiệm/thu hồi để phục hồi quản trị. Admin đơn vị không tự hạ/thu hồi admin hoạt động cuối cùng; khóa workspace row tuần tự hóa các thay đổi đồng thời.
 - Non-member/revoked membership nhận 404. Thành viên thiếu role hoặc workspace suspended nhận 403. Platform admin đọc metadata và phục hồi trạng thái suspended; runtime phân giải model vẫn từ chối suspended, kể cả platform admin.
-- Catalog không trả endpoint hoặc key; provider bị tắt không được phân giải. Model mặc định theo capability phải thuộc grant, còn active và khớp capability. Không tự fallback sang default toàn cục chưa được cấp.
+- Catalog không trả endpoint hoặc key; provider bị tắt không được phân giải. Model mặc định hệ thống theo capability phải còn active và khớp capability; chưa cấu hình thì runtime trả `model_not_configured`, không tự fallback sang model khác ngoài chính sách.
 - Thu hồi key chỉ vô hiệu bản ghi tại QNU và ghi audit; không tuyên bố đã thu hồi credential ở dịch vụ upstream. Rotate nhận credential mới, vô hiệu bản cũ và thêm bản mới trong cùng transaction.
 
 ## Quota/usage nội bộ
 
-`usage_service.reserve` nhận budget do inference tin cậy tính và request hash, kiểm quyền/grant/quota rồi giữ budget trong transaction. Request ID cùng workspace không bị tính hai lần; thay hash/actor/provider/budget trả 409. Caller phải tái dùng record đã có và không gửi lại inference đã thực thi.
+`usage_service.reserve` nhận budget do inference tin cậy tính và request hash, kiểm quyền/quota rồi giữ budget trong transaction. Request ID cùng workspace không bị tính hai lần; thay hash/actor/provider/budget trả 409. Caller phải tái dùng record đã có và không gửi lại inference đã thực thi.
 
 `usage_service.settle` chỉ dành cho kết quả provider quan sát được, không có HTTP endpoint tự khai usage. NULL token giữ reservation và status unknown để đối soát; không coi timeout là miễn phí. NULL cost giữ nghĩa chưa biết. Settlement dùng tháng của reservation, không gán lại theo thời gian nhận kết quả. Giá/tariff và adapter tự đo usage chưa triển khai; chưa có inference thật trong batch này.
 

@@ -11,7 +11,7 @@ Từ Context654, [workflow Compiler](compiler-workflow.md) cho chọn số phiê
 Compiler/review/publication/index/citation cùng ghim đúng bản đã chọn.
 
 Đợt Context651 chỉ làm API backendV1; giao diện được nối ở các đợt sau.
-Không dùng role demo của frontendV1 làm quyền thật. Schema ban đầu đã nằm trong
+Không dùng role demo ở giao diện cũ làm quyền thật. Schema ban đầu đã nằm trong
 `0001_initial_schema`; xem [migration](migrations.md). Đợt đó chỉ áp trên DB test;
 từ Context929, migration áp lên DB dev có kiểm soát và `SCHEMA_HEAD` cập nhật theo.
 
@@ -149,7 +149,7 @@ Quy tắc workspace chỉ áp dụng backendV1, không đổi phạm vi của ba
 
 ## Gợi ý từ model
 
-Runtime chat dùng ModelOps DB, quyền/grant, key được bảo vệ, capacity và quota
+Runtime chat dùng ModelOps DB, quyền workspace, key được bảo vệ, capacity và quota
 hiện có. Không có từ điển gõ tay, credential trong .env hoặc fallback giả.
 Provider/đầu vào lỗi trả lỗi thật, không giả là không có lỗi chính tả.
 

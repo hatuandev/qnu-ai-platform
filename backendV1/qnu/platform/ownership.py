@@ -78,8 +78,6 @@ V1_TABLES = frozenset(
         "provider_keys",
         "provider_key_audits",
         "model_defaults",
-        "workspace_allowed_providers",
-        "workspace_model_defaults",
         "workspace_quotas",
         "model_usage_records",
         "modelops_events",

@@ -113,23 +113,7 @@ def test_assistant_chat_uses_persisted_hybrid_rerank_policy_and_checks_provider_
     with FakeRerank() as rerank:
         rerank_id = setup_rerank(client, data, rerank.base_url)
         as_actor(PLATFORM)
-        allow = client.put(
-            f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
-            json={
-                "provider_ids": [
-                    data["ocr_provider"]["id"],
-                    data["embedding_provider"]["id"],
-                    data["chat_provider"]["id"],
-                    rerank_id,
-                ],
-                "defaults": {
-                    "ocr": data["ocr_provider"]["id"],
-                    "embedding": data["embedding_provider"]["id"],
-                    "chat": data["chat_provider"]["id"],
-                    "rerank": rerank_id,
-                },
-            },
-        )
+        allow = client.put(f"{API}/modelops/defaults", json={"rerank_provider_id": rerank_id})
         assert allow.status_code == 200, allow.text
         payload = {
             "name": "Hybrid",

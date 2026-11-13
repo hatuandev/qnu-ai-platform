@@ -82,13 +82,7 @@ def setup(client, *, two_keys=True):
             assert key.status_code == 201
             own.append(key.json()["id"])
         keys.append(own)
-    granted = client.put(
-        API + f"/workspaces/{ws}/allowed-providers",
-        json={
-            "provider_ids": providers,
-            "defaults": {"chat": providers[0]},
-        },
-    )
+    granted = client.put(API + "/modelops/defaults", json={"chat_provider_id": providers[0]})
     assert granted.status_code == 200, granted.text
     client.put(API + f"/workspaces/{ws}/quota", json={"monthly_token_limit": 100000})
     policy = ResiliencePolicy(key_pool_enabled=True, max_key_attempts=2)
@@ -268,12 +262,11 @@ def test_fallback_selects_once_before_budget_and_ledger_while_explicit_provider_
     client.portal.call(run)
 
 
-def test_fallback_does_not_grant_access_or_bypass_quota(client):
+def test_fallback_requires_workspace_access_and_never_resurrects_inactive_providers(client):
     ws, providers, _ = setup(client)
     policy = ResiliencePolicy(fallbacks={"answer": [providers[1]]})
     client.put(API + f"/modelops/providers/{providers[0]}/resilience", json=policy.model_dump())
     client.patch(API + f"/modelops/providers/{providers[0]}", json={"is_active": False})
-    client.put(API + f"/workspaces/{ws}/quota", json={"is_blocked": True})
 
     async def run():
         async with AsyncSessionFactory() as db:
@@ -292,25 +285,21 @@ def test_fallback_does_not_grant_access_or_bypass_quota(client):
             runtime, _, budget = await prepare_chat_request(
                 db, ADMIN, ws, MESSAGES, provider_id=None, max_output_tokens=100, task="answer"
             )
-            await usage_service.reserve(
+            assert runtime.provider_id == providers[1]
+            usage = await usage_service.reserve(
                 db,
                 ADMIN,
                 ws,
                 "chat",
-                "blocked",
+                "fallback-access",
                 "a" * 64,
                 budget.total_reserved_tokens,
                 runtime.provider_id,
             )
+            assert usage.provider_id == providers[1]
 
     client.portal.call(run)
-    client.patch(API + f"/modelops/providers/{providers[0]}", json={"is_active": True})
-    changed = client.put(
-        API + f"/workspaces/{ws}/allowed-providers",
-        json={"provider_ids": [providers[0]], "defaults": {"chat": providers[0]}},
-    )
-    assert changed.status_code == 200, changed.text
-    client.patch(API + f"/modelops/providers/{providers[0]}", json={"is_active": False})
+    client.patch(API + f"/modelops/providers/{providers[1]}", json={"is_active": False})
 
     async def denied():
         async with AsyncSessionFactory() as db:
@@ -417,27 +406,15 @@ def test_gateway_has_one_attempt_and_operational_leases_do_not_stale_diagnostics
     assert len(calls) == 1
 
 
-@pytest.mark.parametrize("change", ["grant", "target"])
-def test_revalidation_before_key_retry_preserves_permission_or_config_error(client, change):
-    from sqlalchemy import delete
-
-    from qnu.domains.modelops.models import WorkspaceAllowedProvider
-
+def test_revalidation_before_key_retry_reports_config_change(client):
     ws, providers, _ = setup(client)
     calls = []
 
     async def upstream(req):
         calls.append(req)
         async with AsyncSessionFactory() as db:
-            if change == "grant":
-                await db.execute(
-                    delete(WorkspaceAllowedProvider).where(
-                        WorkspaceAllowedProvider.workspace_id == ws
-                    )
-                )
-            else:
-                row = await db.get(Provider, providers[0])
-                row.model_name = "changed"
+            row = await db.get(Provider, providers[0])
+            row.model_name = "changed"
             await db.commit()
         return httpx.Response(401)
 
@@ -447,8 +424,7 @@ def test_revalidation_before_key_retry_preserves_permission_or_config_error(clie
             await model.complete(MESSAGES, request(ws, providers[0]))
         return caught.value.code
 
-    code = client.portal.call(run)
-    assert code == ("provider_not_found" if change == "grant" else "provider_execution_changed")
+    assert client.portal.call(run) == "provider_execution_changed"
     assert len(calls) == 1
 
 
@@ -664,10 +640,7 @@ def test_ocr_fallback_result_is_reusable_while_primary_stays_disabled(client):
         first = setup_ocr_provider(client, ws["id"], primary.base_url)
         second = setup_ocr_provider(client, ws["id"], backup.base_url)
         as_actor(PLATFORM)
-        granted = client.put(
-            API + f"/workspaces/{ws['id']}/allowed-providers",
-            json={"provider_ids": [first["id"], second["id"]], "defaults": {"ocr": first["id"]}},
-        )
+        granted = client.put(API + "/modelops/defaults", json={"ocr_provider_id": first["id"]})
         assert granted.status_code == 200, granted.text
         saved = client.put(
             API + f"/modelops/providers/{first['id']}/resilience",

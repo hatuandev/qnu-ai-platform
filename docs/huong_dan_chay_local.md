@@ -1,6 +1,6 @@
 # Hướng dẫn chạy local — QNU AI Platform V1
 
-Lệnh `dev` chạy **`backendV1/`** ở cổng 8002, ARQ worker V1 và **`frontendV2/`** ở cổng 3002. Dùng `dev1` hoặc `v1-dev` để chạy với Frontend V1 ở cổng 3001.
+Lệnh `dev` chạy **`backendV1/`** ở cổng 8002, ARQ worker V1 và **`frontendV2/`** ở cổng 3002; `v1-dev` chỉ chạy API/worker. FrontendV1 đã được gỡ khỏi checkout.
 
 Xem thêm [hướng dẫn V1 chi tiết](quy_trinh/38_huong_dan_chay_qnu_v1.md) khi thiết lập máy mới, cấu hình ModelOps, xử lý lỗi và migration.
 
@@ -25,10 +25,9 @@ Toàn bộ thao tác hàng ngày được quản lý tập trung qua runner `mak
 | **Kiểm tra revision DB** | `.\make.ps1 db-check` | `make db-check` | Xem revision Alembic hiện tại của `backendV1` (không migrate) |
 | **Nâng cấp Schema DB** | `.\make.ps1 migrate` | `make migrate` | Áp dụng các migration Alembic mới nhất cho `backendV1` |
 | **Kiểm thử Backend** | `.\make.ps1 test-be` | `make test-be` | Chạy bộ test cô lập Backend (tự tạo và dọn DB test riêng) |
-| **Kiểm thử Frontend** | `.\make.ps1 test-fe` | `make test-fe` | Chạy bộ kiểm thử Vitest phía Frontend |
-| **Kiểm tra chuẩn mã (Lint)** | `.\make.ps1 lint` | `make lint` | Kiểm tra Ruff (Python) và Biome (Frontend) |
-| **Kiểm tra kiểu TypeScript** | `.\make.ps1 typecheck` | `make typecheck` | Kiểm tra kiểu TypeScript phía Frontend |
-| **Build sản phẩm Frontend** | `.\make.ps1 build` | `make build` | Build bundle Frontend qua Vite và TypeScript |
+| **Kiểm tra chuẩn mã (Lint)** | `.\make.ps1 lint` | `make lint` | Kiểm tra Ruff (Python) và Biome (Frontend V2) |
+| **Kiểm tra kiểu TypeScript** | `.\make.ps1 typecheck` | `make typecheck` | Kiểm tra kiểu TypeScript phía Frontend V2 |
+| **Build sản phẩm Frontend** | `.\make.ps1 build` | `make build` | Build bundle Frontend V2 qua Vite và TypeScript |
 
 ### 5.2. Quy trình khởi chạy chuẩn hàng ngày
 

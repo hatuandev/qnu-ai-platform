@@ -68,7 +68,7 @@ không tự xác minh lại hạ tầng từ một tệp JUnit.
 ## Nemotron thật và chất lượng OCR
 
 Reporter kỹ thuật luôn ghi hai phần này NOT RUN. Muốn đánh giá riêng cần runtime
-được phép, provider/credential/grant/quota/capacity hợp lệ qua ModelOps và mẫu có
+được phép, provider/credential/quota/capacity hợp lệ qua ModelOps và mẫu có
 ảnh nguồn/đáp án đã đối soát. So chữ, số, thứ tự trang/block, ô bảng, header,
 footnote và phần thiếu. Lưu nguồn/phiên bản, cấu hình và kết quả từng mẫu; unknown
 giữ unknown. Phản hồi OCR replay hoặc provider giả lập không chứng minh chất lượng

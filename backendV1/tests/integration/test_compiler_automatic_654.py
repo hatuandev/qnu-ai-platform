@@ -61,13 +61,7 @@ def test_revoked_provider_fails_only_review_before_http(client):
 
     with prepared(client) as (data, chat):
         as_actor(PLATFORM)
-        result = client.put(
-            f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
-            json={
-                "provider_ids": [data["ocr_provider"]["id"]],
-                "defaults": {"ocr": data["ocr_provider"]["id"]},
-            },
-        )
+        result = client.put(f"{API}/modelops/defaults", json={"chat_provider_id": None})
         assert result.status_code == 200, result.text
         as_actor(EDITOR)
         assert run_review(client, data["run_id"]) == "failed"

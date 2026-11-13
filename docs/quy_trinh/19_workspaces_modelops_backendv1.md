@@ -5,8 +5,8 @@ Chỉ áp dụng backendV1 theo ngoại lệ workspace trong AGENTS.md. Backend 
 1. Xác thực actor qua SSO hoặc dev login cấu hình tường minh.
 2. Platform admin tạo workspace và gán thành viên theo SSO subject phân biệt hoa/thường.
 3. ModelOps admin đăng ký provider/model/capability, lưu credential qua API vào DB mã hóa.
-4. Platform cấp allowlist và quota tháng UTC cho workspace.
-5. Admin đơn vị chọn default theo capability trong grant; thành viên đọc catalog gắn workspace cụ thể.
+4. ModelOps admin cấu hình model mặc định hệ thống theo capability; quota tháng UTC đặt theo workspace.
+5. Thành viên đọc catalog gắn workspace cụ thể; runtime kiểm quyền workspace rồi phân giải model mặc định hệ thống.
 6. Khi nối inference, runtime phải resolve quyền/provider rồi reserve budget trước thực thi; settle bằng usage quan sát thật. Unknown giữ unknown và reservation chờ đối soát.
 
 Nguồn file sẽ upload trực tiếp vào collection trong batch tiếp theo. Chưa có Repository, Knowledge ingestion/RAG/provider inference thật trong batch636. Không coi capability khai báo là verified hoặc tổng token không biết là0.

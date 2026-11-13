@@ -4,7 +4,7 @@
 |---|---|---|
 | identity | actor, dev gate, SSO | platform |
 | workspaces | workspace, membership, audit đơn vị | identity, platform |
-| modelops | provider, key, defaults, allowlist theo workspace | workspaces (access), platform, ports |
+| modelops | provider, key, defaults hệ thống | workspaces (access), platform, ports |
 | ocr | lượt xử lý OCR, trạng thái trang, artifact OCR (ảnh trang, raw, canonical, markdown, manifest) | modelops (public_api, knowledge (public_api chỉ đọc), workspaces (access), platform, ports |
 | knowledge | kho, nguồn, revision, chunk, fact, index, publication | modelops (public_api), workspaces (access), ports, policies |
 | rag | truy xuất, evidence, answer | knowledge (public_api, chỉ đọc), modelops, ports |
@@ -32,4 +32,4 @@
 - `ocr/` không phụ thuộc `rag`/`assistants`; Compiler (batch sau) chỉ đọc snapshot
   `GET .../processing-runs/{run_id}/evidence`, không ghi ngược vào `ocr/`.
 
-Nguồn file/revision thuộc Knowledge; upload trực tiếp vào collection đã triển khai (Context637). Workspace resolver là cổng kiểm quyền; provider/key quản lý tập trung, grants và defaults tách biệt. Bằng chứng OCR thuộc `ocr/` và chỉ được đọc qua public API (Context640).
+Nguồn file/revision thuộc Knowledge; upload trực tiếp vào collection đã triển khai (Context637). Workspace resolver là cổng kiểm quyền; provider/key và model mặc định hệ thống quản lý tập trung. Bằng chứng OCR thuộc `ocr/` và chỉ được đọc qua public API (Context640).

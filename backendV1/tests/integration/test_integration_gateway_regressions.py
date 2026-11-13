@@ -59,10 +59,7 @@ def setup_case(client, **policy):
     )
     assert r.status_code == 201, r.text
     pid = r.json()["id"]
-    client.put(
-        f"{API}/workspaces/{ws}/allowed-providers",
-        json={"provider_ids": [pid], "defaults": {"chat": pid}},
-    )
+    client.put(f"{API}/modelops/defaults", json={"chat_provider_id": pid})
     _as(ADMIN_A)
     r = client.post(f"{API}/workspaces/{ws}/collections", json={"name": "Review collection"})
     assert r.status_code == 201, r.text

@@ -66,7 +66,7 @@ Xem [Compiler v1](compiler-v1.md) và [báo cáo645](../../docs/bao_cao/context6
 |---|---|---|
 | identity | 🟡 dev + SSO JWT/JWKS | Dev gate tường minh, RSA/issuer/audience/expiry có test; chưa live QNU SSO |
 | workspaces | 🟢 API + PostgreSQL test | Membership, role, audit, revocation/case/concurrency; resolver là cổng quyền |
-| modelops | 🟡 control plane + OCR/chat/embedding/rerank | Provider/key/default/grants, quota/usage; dimension/capacity gắn endpoint/model; chưa probe API/lease/fallback runtime |
+| modelops | 🟡 control plane + OCR/chat/embedding/rerank | Provider/key/default hệ thống, quota/usage; dimension/capacity gắn endpoint/model; chưa probe API/lease/fallback runtime |
 | document_types | ❌ bỏ khung | Khung rỗng không import/consumer đã xóa 2026-11-09; kế hoạch taxonomy ở [03_ke_hoach](../../docs/ke_hoach/03_ke_hoach_dong_bo_taxonomy_loai_van_ban.md) |
 | repository | ❌ bỏ | Theo quyết định 2026-10-26; nguồn file thuộc trực tiếp collection (Context637) |
 | ocr | 🟢 PDF/DOCX → bằng chứng + API | Render, ModelOps Nemotron, raw/canonical/markdown/manifest; PDF thật riêng đã chạy, chưa quality acceptance |

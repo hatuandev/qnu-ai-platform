@@ -1,4 +1,4 @@
-"""ModelOps HTTP API: providers, credentials, defaults and workspace allowlists."""
+"""ModelOps HTTP API: providers, credentials, defaults and model catalog."""
 
 from __future__ import annotations
 
@@ -18,9 +18,6 @@ from qnu.domains.modelops.providers.service import (
     reasoning_payload,
 )
 from qnu.domains.modelops.schemas import (
-    AllowedProviderItem,
-    AllowlistResponse,
-    AllowlistUpdateRequest,
     CatalogItem,
     DefaultsResponse,
     DefaultsUpdateRequest,
@@ -36,13 +33,10 @@ from qnu.domains.modelops.schemas import (
     ProviderUpdateRequest,
     ReasoningPolicyResponse,
     ReasoningPolicyUpdate,
-    WorkspaceDefaultsRequest,
 )
 from qnu.domains.modelops.usage.service import usage_service
-from qnu.domains.workspaces.access import resolve_workspace_access
 
 router = APIRouter(prefix="/modelops", tags=["ModelOps"])
-workspace_router = APIRouter(prefix="/workspaces", tags=["Workspaces · Model allowlist"])
 
 
 @router.get("/events", response_model=list[ModelOpsEventResponse])
@@ -75,24 +69,6 @@ def _key_out(key: ProviderKey) -> KeyResponse:
         priority=key.priority,
         created_at=key.created_at,
         updated_at=key.updated_at,
-    )
-
-
-async def _allowlist_out(db: AsyncSession, workspace_id: str) -> AllowlistResponse:
-    defaults = await catalog_service.workspace_defaults(db, workspace_id)
-    return AllowlistResponse(
-        workspace_id=workspace_id,
-        providers=[
-            AllowedProviderItem(
-                provider_id=p.id,
-                name=p.name,
-                capabilities=p.capabilities,
-                is_active=p.is_active,
-                is_default=default,
-                default_capabilities=[cap for cap, pid in defaults.items() if pid == p.id],
-            )
-            for p, default in await catalog_service.get_allowlist(db, workspace_id)
-        ],
     )
 
 
@@ -291,14 +267,14 @@ async def update_defaults(
     return _defaults_out(row)
 
 
-@router.get("/catalog", response_model=list[CatalogItem], summary="Danh mục model được phép dùng")
+@router.get("/catalog", response_model=list[CatalogItem], summary="Danh mục model đang hoạt động")
 async def catalog(
     workspace_id: str | None = None,
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(get_actor),
 ) -> list[CatalogItem]:
     providers = await catalog_service.visible_providers(db, actor, workspace_id)
-    defaults = await catalog_service.workspace_defaults(db, workspace_id) if workspace_id else {}
+    defaults = await catalog_service.system_defaults(db)
     items: list[CatalogItem] = []
     for item in providers:
         payload = provider_payload(item)
@@ -320,48 +296,3 @@ async def catalog(
             )
         )
     return items
-
-
-@workspace_router.get(
-    "/{workspace_id}/allowed-providers",
-    response_model=AllowlistResponse,
-    summary="Provider workspace được cấp",
-)
-async def get_workspace_allowlist(
-    workspace_id: str,
-    db: AsyncSession = Depends(get_db),
-    actor: AuthActor = Depends(get_actor),
-) -> AllowlistResponse:
-    workspace = await resolve_workspace_access(db, actor, workspace_id)
-    return await _allowlist_out(db, workspace.id)
-
-
-@workspace_router.put(
-    "/{workspace_id}/allowed-providers",
-    response_model=AllowlistResponse,
-    summary="Cấp danh sách model cho workspace",
-)
-async def set_workspace_allowlist(
-    workspace_id: str,
-    body: AllowlistUpdateRequest,
-    db: AsyncSession = Depends(get_db),
-    actor: AuthActor = Depends(require_permission("ai.models.manage")),
-) -> AllowlistResponse:
-    workspace = await resolve_workspace_access(db, actor, workspace_id)
-    await catalog_service.set_allowlist(db, workspace.id, body, actor)
-    return await _allowlist_out(db, workspace.id)
-
-
-@workspace_router.put(
-    "/{workspace_id}/model-defaults",
-    response_model=dict[str, str],
-    summary="Chọn model mặc định trong danh sách đã cấp",
-)
-async def set_workspace_defaults(
-    workspace_id: str,
-    body: WorkspaceDefaultsRequest,
-    db: AsyncSession = Depends(get_db),
-    actor: AuthActor = Depends(get_actor),
-) -> dict[str, str]:
-    await catalog_service.set_workspace_defaults(db, actor, workspace_id, body.defaults)
-    return await catalog_service.workspace_defaults(db, workspace_id)

@@ -1,6 +1,6 @@
 # Quy trình vận hành QNU AI Platform
 
-> **Mục 1 là tài liệu sống của V1** (`backendV1/` + `frontendV1/`).
+> **Mục 1 là tài liệu sống của V1** (`backendV1/` + `frontendV2/`).
 > **Mục 2 là lịch sử** của bản `backend/` trước V1, giữ nguyên để truy vết và không dùng
 > để kết luận hiện trạng. Bản đồ tài liệu đầy đủ: [docs/README.md](../README.md).
 
@@ -8,9 +8,15 @@
 
 ## 1. V1 hiện hành
 
+> Một số tài liệu trong mục này đã được dán nhãn **TÀI LIỆU LỊCH SỬ (từ 2026-11-13)** vì mô tả
+> `frontendV1` hoặc harness E2E đã gỡ khỏi repo: `V1_E2E_TUNG_BUOC`, `V1_QUY_TRINH_TEST_LAI`,
+> `V1_TEST_TOAN_LUONG_MODEL_QNU`, `V1_TEST_MODEL_QNU`, `V1_TEST_TB_DIEM_SAN_26`,
+> `V1_TEST_OCR_QUY_CHE_363`, `V1_COMPILER_TAI_LIEU_LON`, `V1_RAG_NGU_CANH_VA_PHAM_VI`,
+> 34, 35, 36, 37 và 45. Nội dung giữ nguyên để truy vết; giao diện hiện hành là `frontendV2/`.
+
 ### 1.1 Chạy, kiểm thử, đánh giá
 
-- [Hướng dẫn chạy QNU V1](./38_huong_dan_chay_qnu_v1.md): API 8002, worker ARQ, frontend 3001,
+- [Hướng dẫn chạy QNU V1](./38_huong_dan_chay_qnu_v1.md): API 8002, worker ARQ, Frontend V2 3002,
   cấu hình, migration, ModelOps và xử lý lỗi thường gặp.
 - [Chạy E2E từng chặng bằng PowerShell](./V1_E2E_TUNG_BUOC.md): môi trường thử riêng, checkpoint,
   báo cáo và lệnh cho từng bước upload → hỏi đáp → purge.

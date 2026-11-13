@@ -106,9 +106,7 @@ async def _eligible(db, blob, actor, run, document_ids) -> tuple[list[IndexInput
 
 
 async def _query_vector(db, actor, run, query, model: EmbeddingModel):
-    runtime = await resolve_embedding_runtime(
-        db, run.workspace_id, run.provider_id, index_run_id=run.id
-    )
+    runtime = await resolve_embedding_runtime(db, run.workspace_id, run.provider_id)
     if runtime.configuration_hash != run.config["provider"]["configuration_hash"]:
         raise Conflict(
             "Embedding model/config không tương thích index.", code="index_configuration_changed"
@@ -122,7 +120,6 @@ async def _query_vector(db, actor, run, query, model: EmbeddingModel):
         digest({"query": query, "config": runtime.configuration_hash}),
         runtime.budget([query]),
         runtime.provider_id,
-        index_run_id=run.id,
     )
     try:
         result = await model.embed([query], bind_usage(runtime.request(), usage.id))
@@ -303,9 +300,7 @@ async def search(
     )
     if active != run.id:
         raise Conflict("Index đã đổi trong khi tìm kiếm.", code="index_changed")
-    runtime = await resolve_embedding_runtime(
-        db, workspace_id, run.provider_id, index_run_id=run.id
-    )
+    runtime = await resolve_embedding_runtime(db, workspace_id, run.provider_id)
     if runtime.configuration_hash != run.config["provider"]["configuration_hash"]:
         raise Conflict("Model đã đổi trong khi tìm kiếm.", code="index_configuration_changed")
     allowed, skipped = await _eligible(db, blob, actor, run, req.document_ids)

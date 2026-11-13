@@ -1,4 +1,4 @@
-"""ModelOps persistence: providers, keys, defaults and workspace allowlists.
+"""ModelOps persistence: providers, keys, system defaults, quotas and usage.
 
 Table names are intentionally distinct from the legacy schema
 (``model_provider_configs``/``provider_api_keys``/``provider_key_events``) so two
@@ -17,7 +17,6 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
-    ForeignKeyConstraint,
     Integer,
     Numeric,
     String,
@@ -140,43 +139,6 @@ class ModelDefaults(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
     )
-
-
-class WorkspaceAllowedProvider(Base):
-    """Providers a workspace may use; the only link ModelOps exposes to workspaces."""
-
-    __tablename__ = "workspace_allowed_providers"
-
-    workspace_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True
-    )
-    provider_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("providers.id", ondelete="CASCADE"), primary_key=True, index=True
-    )
-    is_default: Mapped[bool] = mapped_column(default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow
-    )
-
-
-class WorkspaceModelDefault(Base):
-    """One allowed provider per capability; grants remain centrally administered."""
-
-    __tablename__ = "workspace_model_defaults"
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["workspace_id", "provider_id"],
-            ["workspace_allowed_providers.workspace_id", "workspace_allowed_providers.provider_id"],
-            ondelete="CASCADE",
-        ),
-        CheckConstraint(
-            "capability IN ('chat','embedding','rerank','ocr')",
-            name="ck_workspace_default_capability",
-        ),
-    )
-    workspace_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    capability: Mapped[str] = mapped_column(String(16), primary_key=True)
-    provider_id: Mapped[str] = mapped_column(String(64), nullable=False)
 
 
 class WorkspaceQuota(Base):

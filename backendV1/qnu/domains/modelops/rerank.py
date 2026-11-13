@@ -1,4 +1,4 @@
-"""Resolve rerank through grants, encrypted keys and configured model capacity."""
+"""Resolve rerank through encrypted keys and configured model capacity."""
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 

@@ -1,4 +1,4 @@
-"""DTOs for ModelOps providers, credentials, defaults and workspace allowlists."""
+"""DTOs for ModelOps providers, credentials and system model defaults."""
 
 from __future__ import annotations
 
@@ -182,40 +182,6 @@ class DefaultsResponse(BaseModel):
     updated_by: str | None = None
     updated_at: datetime | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
-
-
-class AllowlistUpdateRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    provider_ids: list[str] = Field(default_factory=list, max_length=50)
-    default_provider_id: str | None = Field(None, max_length=64)
-    defaults: dict[Capability, str] = Field(default_factory=dict)
-
-    @field_validator("provider_ids")
-    @classmethod
-    def dedupe_ids(cls, value: list[str]) -> list[str]:
-        unique = list(dict.fromkeys(item.strip() for item in value if item.strip()))
-        if len(unique) != len(value):
-            raise ValueError("provider_ids không được trùng.")
-        return unique
-
-
-class AllowedProviderItem(BaseModel):
-    provider_id: str
-    name: str
-    capabilities: list[str]
-    is_active: bool
-    is_default: bool
-    default_capabilities: list[Capability] = Field(default_factory=list)
-
-
-class AllowlistResponse(BaseModel):
-    workspace_id: str
-    providers: list[AllowedProviderItem] = Field(default_factory=list)
-
-
-class WorkspaceDefaultsRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    defaults: dict[Capability, str] = Field(default_factory=dict)
 
 
 class CatalogItem(BaseModel):

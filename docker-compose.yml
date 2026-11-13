@@ -1,4 +1,11 @@
 # QNU V1 application stack. Infrastructure remains external and retains its data.
+# No frontend service: frontendV2 has no production SSO yet.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 x-runtime: &runtime
   ENVIRONMENT: ${ENVIRONMENT:-production}
   SERVICE_NAME: qnu-backend-v1
@@ -46,8 +53,17 @@ x-api: &api
   extra_hosts: ["host.docker.internal:host-gateway"]
   environment: *runtime
   volumes: [qnu_storage:/app/storage]
+  logging: *logging
+  init: true
 
 services:
+  # A fresh object store has no bucket; create it before migrations and uploads.
+  storage-init:
+    <<: *api
+    command: ["python", "-m", "qnu.platform.storage_init"]
+    restart: "on-failure:5"
+    healthcheck:
+      disable: true
   bootstrap:
     <<: *api
     # Only the V1 migration chain. No legacy bootstrap or implicit data/model seed.
@@ -55,11 +71,28 @@ services:
     restart: "no"
     healthcheck:
       disable: true
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
   backend:
     <<: *api
     command: ["uvicorn", "qnu.main:app", "--host", "0.0.0.0", "--port", "8002"]
     restart: unless-stopped
+    stop_grace_period: 30s
     expose: ["8002"]
+    # Readiness also checks PostgreSQL and Redis; liveness alone can hide a broken app.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health/ready', timeout=3)",
+        ]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
     depends_on:
       bootstrap:
         condition: service_completed_successfully
@@ -67,31 +100,13 @@ services:
     <<: *api
     command: ["arq", "qnu.workers.settings.WorkerSettings"]
     restart: unless-stopped
+    stop_grace_period: 60s
     healthcheck:
       test: ["CMD", "arq", "--check", "qnu.workers.settings.WorkerSettings"]
       interval: 30s
       timeout: 10s
       start_period: 30s
       retries: 3
-    depends_on:
-      backend:
-        condition: service_healthy
-  frontend:
-    image: qnu-ai-platform-frontend-v1:${APP_IMAGE_TAG:-latest}
-    build:
-      context: ./frontendV1
-      dockerfile: Dockerfile
-      args:
-        VITE_QNU_API_BASE_URL: ${VITE_QNU_API_BASE_URL:-}
-        VITE_SSO_AUTHORITY: ${SSO_AUTHORITY:?Set SSO_AUTHORITY}
-        VITE_SSO_CLIENT_ID: ${SSO_CLIENT_ID:-qnu-ai-platform}
-        VITE_SSO_REDIRECT_URI: ${VITE_SSO_REDIRECT_URI:-/signin-oidc}
-        VITE_SSO_POST_LOGOUT_REDIRECT_URI: ${VITE_SSO_POST_LOGOUT_REDIRECT_URI:-/sign-in}
-        VITE_SSO_SCOPE: ${VITE_SSO_SCOPE:-openid profile email roles offline_access ai.api}
-        VITE_DEV_AUTH_ENABLED: "false"
-    restart: unless-stopped
-    networks: [dokploy-network]
-    expose: ["80"]
     depends_on:
       backend:
         condition: service_healthy

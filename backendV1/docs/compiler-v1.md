@@ -20,7 +20,7 @@ Luồng BE: chọn kết quả OCR đã hoàn tất → tạo job bền vững �
   revision, generation, canonical hash, manifest hash và source hash. Không tự lấy
   revision mới nhất hoặc mở rộng sang collection khác.
 - Chat hiện hỗ trợ provider `openai_compatible`/`local`. Endpoint, model, credential,
-  capability, grant và quota giải quyết qua ModelOps DB. Không có LLM API key trong
+  capability và quota giải quyết qua ModelOps DB. Không có LLM API key trong
   `.env`, không fallback hoặc retry HTTP âm thầm.
 - Kết quả luôn là `publication_status=draft`, `requires_review=true`. Kiểm schema
   và citation không thay thế đánh giá tính đúng của phần diễn giải.

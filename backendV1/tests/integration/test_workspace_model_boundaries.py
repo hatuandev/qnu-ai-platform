@@ -1,4 +1,4 @@
-"""Workspace grants, capability resolution, concurrency and truthful usage accounting."""
+"""Workspace access, capability resolution, concurrency and truthful usage accounting."""
 
 import asyncio
 from decimal import Decimal
@@ -43,13 +43,8 @@ def setup_policy(client, limit=100):
     _add_member(client, ws["id"], ADMIN_A.actor_id, "admin")
     _add_member(client, ws["id"], MEMBER_A.actor_id, "member")
     p = provider(client)
-    assert (
-        client.put(
-            f"{API}/workspaces/{ws['id']}/allowed-providers",
-            json={"provider_ids": [p["id"]], "defaults": {"chat": p["id"]}},
-        ).status_code
-        == 200
-    )
+    defaults = client.put(f"{API}/modelops/defaults", json={"chat_provider_id": p["id"]})
+    assert defaults.status_code == 200, defaults.text
     assert (
         client.put(
             f"{API}/workspaces/{ws['id']}/quota", json={"monthly_token_limit": limit}
@@ -59,29 +54,17 @@ def setup_policy(client, limit=100):
     return ws, p
 
 
-def test_unit_admin_selects_defaults_but_cannot_grant_provider(client):
+def test_unit_admin_sees_defaults_but_cannot_change_system_policy(client):
     ws, p = setup_policy(client)
-    forbidden = provider(client, "not-granted")
     _as(ADMIN_A)
+    catalog = client.get(f"{API}/modelops/catalog", params={"workspace_id": ws["id"]})
+    assert catalog.status_code == 200
+    assert catalog.json()[0]["default_capabilities"] == ["chat"]
     assert (
         client.put(
-            f"{API}/workspaces/{ws['id']}/allowed-providers",
-            json={"provider_ids": [forbidden["id"]]},
+            f"{API}/modelops/defaults", json={"chat_provider_id": p["id"]}
         ).status_code
         == 403
-    )
-    assert (
-        client.put(
-            f"{API}/workspaces/{ws['id']}/model-defaults",
-            json={"defaults": {"chat": forbidden["id"]}},
-        ).status_code
-        == 409
-    )
-    assert (
-        client.put(
-            f"{API}/workspaces/{ws['id']}/model-defaults", json={"defaults": {"chat": p["id"]}}
-        ).status_code
-        == 200
     )
     assert (
         client.put(
@@ -91,17 +74,19 @@ def test_unit_admin_selects_defaults_but_cannot_grant_provider(client):
     )
 
 
-def test_catalog_and_runtime_do_not_union_memberships(client):
+def test_catalog_and_runtime_are_scoped_to_the_requested_workspace(client):
     ws, p = setup_policy(client)
     other = _create_workspace(client, "workspace-b")
-    _add_member(client, other["id"], MEMBER_A.actor_id, "member")
     _as(MEMBER_A)
     assert client.get(f"{API}/modelops/catalog").status_code == 400
     result = client.get(f"{API}/modelops/catalog", params={"workspace_id": ws["id"]})
     assert result.status_code == 200
     assert result.json()[0]["id"] == p["id"]
     assert "base_url" not in result.json()[0]
-    assert client.get(f"{API}/modelops/catalog", params={"workspace_id": other["id"]}).json() == []
+    assert (
+        client.get(f"{API}/modelops/catalog", params={"workspace_id": other["id"]}).status_code
+        == 404
+    )
 
     async def resolve():
         async with AsyncSessionFactory() as db:
@@ -112,29 +97,15 @@ def test_catalog_and_runtime_do_not_union_memberships(client):
     client.portal.call(resolve)
 
 
-def test_grants_defaults_and_disabled_workspace_are_rechecked(client):
+def test_defaults_validation_and_disabled_workspace_are_rechecked(client):
     ws, p = setup_policy(client)
     ocr = provider(client, "ocr-only", ["ocr"])
-    result = client.put(
-        f"{API}/workspaces/{ws['id']}/allowed-providers",
-        json={
-            "provider_ids": [p["id"], ocr["id"]],
-            "defaults": {"chat": p["id"], "ocr": ocr["id"]},
-        },
-    )
-    assert result.status_code == 200
-    assert {cap for item in result.json()["providers"] for cap in item["default_capabilities"]} == {
-        "chat",
-        "ocr",
-    }
-    invalid = client.put(
-        f"{API}/workspaces/{ws['id']}/allowed-providers",
-        json={"provider_ids": [ocr["id"]], "defaults": {"chat": ocr["id"]}},
-    )
+    invalid = client.put(f"{API}/modelops/defaults", json={"embedding_provider_id": p["id"]})
     assert invalid.status_code == 409
-    assert (
-        len(client.get(f"{API}/workspaces/{ws['id']}/allowed-providers").json()["providers"]) == 2
-    )
+    assert invalid.json()["code"] == "provider_capability_mismatch"
+    defaults = client.get(f"{API}/modelops/defaults").json()
+    assert defaults["chat_provider_id"] == p["id"]
+    assert defaults["embedding_provider_id"] is None
     assert (
         client.patch(f"{API}/modelops/providers/{p['id']}", json={"is_active": False}).status_code
         == 200
@@ -145,6 +116,14 @@ def test_grants_defaults_and_disabled_workspace_are_rechecked(client):
         row["id"]
         for row in client.get(f"{API}/modelops/catalog", params={"workspace_id": ws["id"]}).json()
     ] == [ocr["id"]]
+
+    async def resolve():
+        async with AsyncSessionFactory() as db:
+            with pytest.raises(AppException) as error:
+                await assert_provider_allowed(db, MEMBER_A, ws["id"], "chat")
+        assert error.value.code == "provider_inactive"
+
+    client.portal.call(resolve)
     _as(PLATFORM)
     client.patch(f"{API}/workspaces/{ws['id']}", json={"status": "suspended"})
     _as(MEMBER_A)

@@ -246,8 +246,8 @@ def setup_ocr_provider(
         )
         assert key.status_code == 201, key.text
     granted = client.put(
-        f"{API}/workspaces/{workspace_id}/allowed-providers",
-        json={"provider_ids": [provider["id"]], "defaults": {"ocr": provider["id"]}},
+        f"{API}/modelops/defaults",
+        json={"ocr_provider_id": provider["id"]},
     )
     assert granted.status_code == 200, granted.text
     if quota is not None:

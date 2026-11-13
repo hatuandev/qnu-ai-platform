@@ -19,7 +19,7 @@ SPEC.loader.exec_module(runner)
 
 
 class CutoverTests(unittest.TestCase):
-    def test_combined_tests_stop_after_backend_failure(self):
+    def test_test_alias_runs_backend_isolation_harness(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / ".env").touch()
@@ -34,14 +34,6 @@ class CutoverTests(unittest.TestCase):
                 self.assertEqual(run.call_count, 1)
                 self.assertIn("run_isolated_tests.py", run.call_args.args[0][-1])
 
-    def test_e2e_arguments_go_to_existing_staged_runner(self):
-        with patch.object(
-            runner.subprocess, "run", return_value=Mock(returncode=3)
-        ) as run:
-            self.assertEqual(runner.main(["e2e", "status"]), 3)
-            self.assertEqual(Path(run.call_args.args[0][1]).name, "v1_e2e_runner.py")
-            self.assertEqual(run.call_args.args[0][-1], "status")
-
     def test_default_dev_plan_is_v1_and_does_not_migrate(self):
         with contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(runner.main(["dev", "--dry-run"]), 0)
@@ -50,11 +42,11 @@ class CutoverTests(unittest.TestCase):
         self.assertIn("qnu.main:app", commands)
         self.assertIn("qnu.workers.settings.WorkerSettings", commands)
         self.assertNotIn("alembic", commands)
-        self.assertTrue(any("frontendV1" in step["cwd"] for step in plan))
+        self.assertTrue(any("frontendV2" in step["cwd"] for step in plan))
 
     def test_short_build_and_prefixed_build_have_identical_plans(self):
         results = []
-        for command in ("build", "v1-build"):
+        for command in ("build", "v2-build"):
             with contextlib.redirect_stdout(io.StringIO()) as output:
                 self.assertEqual(runner.main([command, "--dry-run"]), 0)
             results.append(json.loads(output.getvalue()))
@@ -122,9 +114,6 @@ class CutoverTests(unittest.TestCase):
         services = json.loads(result.stdout)["services"]
         backend = services["backend"]
         self.assertEqual(Path(backend["build"]["context"]).name, "backendV1")
-        self.assertEqual(
-            Path(services["frontend"]["build"]["context"]).name, "frontendV1"
-        )
         self.assertIn("qnu.main:app", backend["command"])
         self.assertEqual(
             services["bootstrap"]["command"], ["alembic", "upgrade", "head"]
@@ -134,16 +123,7 @@ class CutoverTests(unittest.TestCase):
         )
         self.assertEqual(backend["environment"]["QUEUE_NAME"], "qnu:v1:jobs")
         self.assertEqual(backend["environment"]["DEV_AUTH_ENABLED"], "false")
-        self.assertEqual(
-            services["frontend"]["build"]["args"]["VITE_DEV_AUTH_ENABLED"], "false"
-        )
-
-    def test_nginx_preserves_api_paths_and_waits_for_long_model_calls(self):
-        config = (ROOT / "frontendV1/nginx.conf").read_text(encoding="utf-8")
-        self.assertIn("location /platform/v1alpha1", config)
-        self.assertIn("proxy_pass http://backend:8002;", config)
-        self.assertIn("proxy_buffering off;", config)
-        self.assertIn("proxy_read_timeout 86400s;", config)
+        self.assertNotIn("frontend", services)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 # V1 — Ngữ cảnh chunk và phạm vi có bằng chứng
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** frontendV1, `test-v1-e2e.ps1` và bộ `scripts/v1_e2e_*` đã được gỡ khỏi repo. Các lệnh dưới đây không còn chạy được; giữ để truy vết.
+
 Triển khai phiên 790 cho `backendV1`/`frontendV1`. Không tự sửa corpus hoặc chuyển index đang phục vụ khi cập nhật mã. Prompt trả lời: `qnu.rag.answer/v14`.
 
 ## 1. Nguồn và metadata

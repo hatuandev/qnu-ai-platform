@@ -1,5 +1,8 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên958 — Bỏ frontendV1, hợp nhất về Frontend V2: xóa `frontendV1` và harness E2E V1, runner/Makefile chỉ còn V2 (3002), bỏ service frontend khỏi Docker/Dokploy, cập nhật tài liệu sống và dán nhãn lịch sử; chưa commit](2026-11-13_phien_958_bo_frontend_v1_va_hop_nhat_ve_v2.md).
+- [Phiên957 — Bỏ cấu hình model theo đơn vị: xóa allowlist provider và model mặc định workspace ở backend (endpoint/ORM/schema/guard), migration 0027 drop hai bảng, FE V1/V2 và tài liệu; giữ model mặc định hệ thống](2026-11-13_phien_957_bo_cau_hinh_model_theo_don_vi.md).
+- [Phiên956 — Hoàn thiện Docker cho Dokploy: tạo bucket S3/MinIO tự động trước migrate, healthcheck readiness, log xoay vòng, grace period; chặn frontendV2 chưa có SSO; build image chưa chạy trọn do mạng Docker Desktop](2026-11-13_phien_956_hoan_thien_docker_dokploy.md).
 - [Phiên955 — Cổng kiểm chứng 4 chặng (A 1167, B 333, C 254, D 191), sửa 6 tệp test cũ theo hành vi mới và chốt kết quả gate trung thực](2026-11-13_phien_955_cong_kiem_chung_4_chang_va_sua_test_cu.md).
 - [Phiên954 — B1 mở rộng họ bảng cho câu liệt kê/đếm, C1-lite khoảng hiệu lực mở hai đầu, C2 cache câu trả lời chính xác; C1-full đóng theo cổng dữ liệu Phase 0](2026-11-13_phien_954_b1_c1lite_c2_va_cong_du_lieu_c1full.md).
 - [Phiên953 — B2: đo kích thước đầu vào rerank, thêm trace `rerank_input`, xác nhận live 15 ứng viên/2.512 token/610 ms — quyết định không cắt](2026-11-13_phien_953_rerank_b2_do_va_xac_nhan_live.md).

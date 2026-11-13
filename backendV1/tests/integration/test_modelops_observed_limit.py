@@ -52,10 +52,7 @@ def setup(client, *, max_output=8192):
         ).status_code
         == 201
     )
-    granted = client.put(
-        API + f"/workspaces/{ws}/allowed-providers",
-        json={"provider_ids": [pid], "defaults": {"chat": pid}},
-    )
+    granted = client.put(API + "/modelops/defaults", json={"chat_provider_id": pid})
     assert granted.status_code == 200, granted.text
     client.put(API + f"/workspaces/{ws}/quota", json={"monthly_token_limit": 1000000})
     return ws, pid

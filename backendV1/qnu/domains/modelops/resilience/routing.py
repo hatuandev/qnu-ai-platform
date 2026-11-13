@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.keys.scope import key_scope
-from qnu.domains.modelops.models import Provider, ProviderKey, WorkspaceAllowedProvider
+from qnu.domains.modelops.models import Provider, ProviderKey
 from qnu.domains.modelops.registry import transport_for
 from qnu.domains.modelops.resilience.key_pool import eligible
 from qnu.domains.modelops.resilience.schemas import TASK_CAPABILITIES, Task
@@ -22,13 +22,9 @@ async def choose_target(
     if provider_id is not None:
         return provider_id, ()
     capability = TASK_CAPABILITIES[task]
-    system_default = await catalog_service.system_default_for(db, capability)
-    primary = system_default or (await catalog_service.workspace_defaults(db, workspace_id)).get(capability)
+    primary = await catalog_service.system_default_for(db, capability)
     if primary is None:
         return None, ()  # Preserve the existing model_not_configured contract.
-    is_system_primary = (primary == system_default)
-    if not is_system_primary and await db.get(WorkspaceAllowedProvider, (workspace_id, primary)) is None:
-        raise EntityNotFound("Model chưa được cấp cho workspace.", code="provider_not_found")
     provider = await db.get(Provider, primary)
     if provider is None:
         raise EntityNotFound("Không tìm thấy model.", code="provider_not_found")
@@ -37,11 +33,6 @@ async def choose_target(
         return primary, ()
     trace = []
     for pid in [primary, *candidates]:
-        # Policies never grant permission. Do not disclose an ungranted candidate's ID.
-        is_granted = (pid == system_default) or (await db.get(WorkspaceAllowedProvider, (workspace_id, pid)) is not None)
-        if not is_granted:
-            trace.append({"provider_id": None, "code": "candidate_not_granted"})
-            continue
         row = await db.get(Provider, pid)
         if row is None or not row.is_active:
             trace.append({"provider_id": pid, "code": "provider_inactive"})

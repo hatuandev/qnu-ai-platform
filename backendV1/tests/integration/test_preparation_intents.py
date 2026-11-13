@@ -624,11 +624,8 @@ def test_auto_mode_degrades_when_granted_chat_adapter_is_missing(client):
         )
         assert (
             client.put(
-                f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
-                json={
-                    "provider_ids": [data["ocr_provider"]["id"], provider["id"]],
-                    "defaults": {"ocr": data["ocr_provider"]["id"], "chat": provider["id"]},
-                },
+                f"{API}/modelops/defaults",
+                json={"chat_provider_id": provider["id"]},
             ).status_code
             == 200
         )

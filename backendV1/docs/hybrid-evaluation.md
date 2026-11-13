@@ -30,7 +30,7 @@ hai nhánh. SQL/manifest kiểm lại text, structure và citation. Sau quota co
 quyền/nguồn/model được kiểm trước khi gửi các ứng viên đi rerank và kiểm lại
 trước trả kết quả. Thu hồi nguồn trong lúc HTTP không được trả nội dung cũ.
 
-Provider rerank phải có capability/grant/default hoặc preferred provider hợp lệ,
+Provider rerank phải có capability/default hoặc preferred provider hợp lệ,
 credential mã hóa và capacity cấu hình trong ModelOps. Adapter gửi một request
 `/v1/rerank`, không retry/redirect/fallback ngầm; kiểm đủ index duy nhất trong
 phạm vi và score hữu hạn. Provider lỗi trả lỗi thật, không rơi về kết quả dense

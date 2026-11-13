@@ -20,7 +20,7 @@ Không cần cài Haystack; sử dụng các ranh giới và adapter sẵn có c
   API trả sớm, worker hiện có nhận việc nền; cron mỗi phút và lúc worker khởi động
   khôi phục ý định khi Redis mất kết nối. Nhiều thay đổi được gom theo collection,
   khóa quyền và khóa hàng ngăn delivery trùng tạo nhiều lượt embedding.
-- Worker dùng default embedding được cấp qua ModelOps, giữ snapshot và kiểm lại
+- Worker dùng model embedding mặc định hệ thống qua ModelOps, giữ snapshot và kiểm lại
   quyền/nguồn/hash trước khi kích hoạt. Chỉ đổi active sau khi generation mới hoàn
   tất; lỗi giữ generation cũ, các cổng eligibility vẫn loại nội dung đã thu hồi.
   Provider/permission/configuration lỗi được báo rõ. `uncertain` không tự gửi lại.
@@ -46,8 +46,7 @@ Không cần cài Haystack; sử dụng các ranh giới và adapter sẵn có c
 ## Cấu hình và quyền
 
 - Platform admin đăng ký provider OpenAI-compatible với capability `embedding`,
-  credential mã hóa qua ModelOps, rồi cấp provider cho workspace. Admin workspace
-  chọn default embedding trong danh sách được cấp; quota tháng phải được cấu hình.
+  credential mã hóa qua ModelOps, rồi cấu hình model embedding mặc định hệ thống; quota tháng phải được cấu hình.
 - Provider có `embedding_dimension` và `token_limits.max_input_tokens` hoặc
   `context_window_tokens`. Hai cấu hình gắn với endpoint/model; đổi danh tính làm
   cấu hình cũ `stale`. Không lấy số chiều từ biến cấu hình vector cũ.
@@ -71,7 +70,7 @@ Không cần cài Haystack; sử dụng các ranh giới và adapter sẵn có c
    nhóm hàng, footnote/caption cùng trang vẫn có tham chiếu. Không suy năm từ tên file.
    Nhóm rowspan không thể chia trong budget thì trả lỗi rõ, không cắt âm thầm.
 3. Worker ARQ claim bằng lease/token; kiểm lại quyền người yêu cầu, publication,
-   provider/grant/capacity và quota trước mỗi batch. Ghi dấu đang gọi trước HTTP;
+   provider/capacity và quota trước mỗi batch. Ghi dấu đang gọi trước HTTP;
    lưu raw response có hash, vector staging và usage receipt khi hoàn tất.
 4. Upsert vào collection Qdrant riêng của generation, tên `qnu_v1_idx_<uuid>`;
    deterministic point ID và `wait=true`, yêu cầu xác nhận `completed`. Namespace

@@ -160,9 +160,9 @@ Ghi receipt: tên DB thử, số test, `db_dropped`, `legacy_sentinel_preserved`
 
 Lần chạy 2026-11-08 trên working tree P1–P6: **43 passed** trong 167,88s; receipt `qnu_v1_test_002421364e204f88`, `db_dropped: true`, `legacy_sentinel_preserved: true`, `pytest_exit: 0`, `seconds: 176.42`. Đây là gate bất biến trước pilot, không thay thế phiên pilot thật.
 
-Ma trận trình duyệt P1–P6 ngày 2026-11-08: 11 route × 3 khổ × 2 theme = 66 lượt trên Vite `127.0.0.1:3001` với auto-login dev; 0 lỗi console; sau sửa không còn tràn ngang; `?stage=publication` và các link cũ `?tab=sources|compilations|documents|index`, `?sourceAction=ocr` giữ đúng stage. Tab order qua brand, 8 mục điều hướng và menu tài khoản. Ảnh đã xem: nguồn 390px sáng, xuất bản 390px/1280px sáng; các tổ hợp còn lại dựa trên số đo và ảnh lưu ở thư mục tạm ngoài Git. Đây là gate UI trước pilot, không thay T1–T6 với người thật.
+Ma trận trình duyệt P1–P6 ngày 2026-11-08: 11 route × 3 khổ × 2 theme = 66 lượt trên Vite `127.0.0.1:3001` với auto-login dev; 0 lỗi console; sau sửa không còn tràn ngang; `?stage=publication` và các link cũ `?tab=sources|compilations|documents|index`, `?sourceAction=ocr` giữ đúng stage. Tab order qua brand, 8 mục điều hướng và menu tài khoản. Ảnh đã xem: nguồn 390px sáng, xuất bản 390px/1280px sáng; các tổ hợp còn lại dựa trên số đo và ảnh lưu ở thư mục tạm ngoài Git. Đây là gate UI trước pilot, không thay T1–T6 với người thật. **Ghi chú lịch sử (2026-11-13):** ma trận này chạy trên `frontendV1` đã được gỡ khỏi repo; giao diện hiện hành là `frontendV2`.
 
-Frontend tối thiểu (khi có sửa mã UI): `npm run typecheck`, `npx vitest run tests/v1-answer-review-p6.test.ts tests/v1-conversation-errors-p6.test.ts`, `npm run build`. Kiểm trình duyệt 390px/1280px cho các luồng §3–§4; ghi rõ ảnh đã xem hay chưa.
+Frontend tối thiểu (khi có sửa mã UI): `npm run typecheck`, `npx vitest run tests/v1-answer-review-p6.test.ts tests/v1-conversation-errors-p6.test.ts`, `npm run build`. Kiểm trình duyệt 390px/1280px cho các luồng §3–§4; ghi rõ ảnh đã xem hay chưa. **Ghi chú lịch sử (2026-11-13):** các lệnh `vitest` trên thuộc bộ test `frontendV1` đã gỡ; `frontendV2` hiện chỉ có Biome và `npm run build`, chưa có bộ test riêng.
 
 ## 8. Mẫu biên bản phiên pilot
 

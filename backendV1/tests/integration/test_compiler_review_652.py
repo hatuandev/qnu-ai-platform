@@ -436,20 +436,6 @@ def test_explicit_review_provider_is_used_without_changing_compiler_model(client
             ).status_code
             == 201
         )
-        assert (
-            client.put(
-                f"{API}/workspaces/{data['workspace']['id']}/allowed-providers",
-                json={
-                    "provider_ids": [
-                        data["ocr_provider"]["id"],
-                        data["provider"]["id"],
-                        provider_id,
-                    ],
-                    "defaults": {"chat": data["provider"]["id"], "ocr": data["ocr_provider"]["id"]},
-                },
-            ).status_code
-            == 200
-        )
         as_actor(EDITOR)
         response = review(client, data, provider_id=provider_id)
         assert response.status_code == 200, response.text

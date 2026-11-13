@@ -1,5 +1,7 @@
 # 36 — Frontend phân trang, phạm vi tài liệu và kết quả chính tả
 
+> **TÀI LIỆU LỊCH SỬ (từ 2026-11-13):** `frontendV1` đã được gỡ khỏi repo; giao diện duy nhất hiện hành là `frontendV2`. Nội dung dưới đây mô tả màn hình cũ, không dùng để kết luận hiện trạng.
+
 Áp dụng cho `frontendV1/` và `backendV1/`, sau quy trình35. Triển khai theo
 ba ưu tiên F1–F3 của [kiểm kê680](../bao_cao/context680/FE_BE_INVENTORY.md).
 
