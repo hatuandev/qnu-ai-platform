@@ -9,10 +9,11 @@ import unicodedata
 
 from qnu.domains.knowledge.index.models import IndexChunk
 from qnu.domains.knowledge.index.schemas import SearchHit
+from qnu.domains.knowledge.metadata import matches_metadata
 from qnu.domains.knowledge.publication.evidence import VersionBundle
 from qnu.domains.knowledge.source_sections import source_sections
 
-VERSION = "qnu.rag.structure/v5"
+VERSION = "qnu.rag.structure/v6"
 FURNITURE_TYPES = {"header", "footer"}
 FURNITURE_LABELS = {"header", "page-header", "page_header", "footer", "page-footer", "page_footer"}
 FURNITURE_MAX_CHARS = 240
@@ -530,4 +531,67 @@ def numbered_groups(rows: list[IndexChunk], hits: list[SearchHit], bundles: dict
                         "truncated": len(kept) < len(run) or lo > 0 or hi + 1 < len(run),
                     }
                 )
+    return groups
+
+
+MAX_TABLE_FAMILY_CHUNKS = 8
+
+
+def _family_label(structure: dict) -> str:
+    rows = structure.get("rows") or []
+    header = [cell.get("text", "").strip() for cell in (rows[0] if rows else [])]
+    label = " | ".join(text for text in header if text)
+    return label[:120] or (structure.get("context") or {}).get("title") or "table"
+
+
+def _family_order(row) -> tuple:
+    indices = (row.structure or {}).get("row_indices") or []
+    return (min(indices) if indices else 10**9, row.ordinal)
+
+
+def table_family_groups(rows: list[IndexChunk], hits: list[SearchHit], scopes) -> list[dict]:
+    """Every indexed chunk of the retrieved physical table, for enumeration/count reading.
+
+    The family is the same published input and table citation under an allowed
+    scope. Chunks are the atomic retrieval unit, so a family above the bound is
+    left untouched instead of claiming a partial table as the whole parent.
+    """
+    by_id = {row.id: row for row in rows}
+    rank = {hit.chunk_id: position for position, hit in enumerate(hits)}
+    anchors = {}
+    for hit in hits:
+        row = by_id.get(hit.chunk_id)
+        structure = (row.structure or {}) if row is not None else {}
+        citation = structure.get("source_table_citation")
+        if row is None or row.kind != "table" or not citation:
+            continue
+        anchors.setdefault((row.input_id, citation), []).append(hit.chunk_id)
+    groups = []
+    for (input_id, citation), anchor_ids in anchors.items():
+        family = [
+            row
+            for row in rows
+            if row.input_id == input_id
+            and row.kind == "table"
+            and (row.structure or {}).get("source_table_citation") == citation
+            and any(matches_metadata(row.structure, scope) for scope in scopes)
+        ]
+        available = [key for key in anchor_ids if any(row.id == key for row in family)]
+        if len(family) < 2 or not available or len(family) > MAX_TABLE_FAMILY_CHUNKS:
+            continue
+        family.sort(key=_family_order)
+        groups.append(
+            {
+                "kind": "table_family",
+                "label": _family_label(family[0].structure),
+                "input_id": input_id,
+                "primary_chunk_id": min(available, key=lambda key: rank.get(key, len(rank))),
+                "required_ids": [row.id for row in family],
+                "units": [{"ref": citation, "chunk_ids": [row.id]} for row in family],
+                "family_chunks": len(family),
+                "unindexed_refs": [],
+                "compressed_refs": [],
+                "truncated": False,
+            }
+        )
     return groups

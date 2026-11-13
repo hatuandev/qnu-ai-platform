@@ -87,6 +87,8 @@ class Settings(BaseSettings):
     MODEL_CHAT_CONCURRENCY: int = Field(default=4, ge=1, le=64)
     MODEL_CHAT_QUEUE_TIMEOUT_SECONDS: int = Field(default=300, ge=1, le=3600)
     PUBLICATION_PREVIEW_TTL_SECONDS: int = Field(default=300, ge=1, le=3600)
+    # 0 disables exact answer reuse; keep it off until callers are rate limited.
+    ANSWER_CACHE_TTL_SECONDS: int = Field(default=0, ge=0, le=86400)
     # Optional operator override; otherwise chunk sizing follows the embedding runtime.
     INDEX_CHUNK_MAX_BYTES: int | None = Field(default=None, ge=256)
     INDEX_EMBED_BATCH_SIZE: int = Field(default=16, ge=1, le=128)

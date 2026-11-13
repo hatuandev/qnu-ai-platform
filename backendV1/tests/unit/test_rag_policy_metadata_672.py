@@ -127,9 +127,9 @@ def test_combined_scope_must_match_one_annotated_unit():
     assert not matches_metadata(structure, MetadataFilter(data_year=2024, program="B"))
 
 
-def test_effective_filter_requires_both_known_boundaries():
+def test_effective_filter_matches_an_open_ended_known_boundary():
     scope = MetadataFilter(effective_on="2024-07-01")
-    assert not matches_metadata(
+    assert matches_metadata(
         {"retrieval_metadata": [{"values": {"effective_from": "2024-01-01"}}]}, scope
     )
     assert matches_metadata(

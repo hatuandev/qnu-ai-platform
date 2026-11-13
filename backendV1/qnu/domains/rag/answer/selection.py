@@ -28,6 +28,13 @@ _COMPARISON = re.compile(
     r"compare|difference|highest|lowest)\b",
     re.IGNORECASE,
 )
+# A row count asks how many entries the source holds; a metric count asks for
+# one value. Only the former needs the whole table family.
+_COUNT = re.compile(r"\b(?:bao nhiêu|mấy|how many)\b", re.IGNORECASE)
+_METRIC = re.compile(
+    r"\b(?:số lượng|tỷ lệ|phần trăm|chỉ tiêu|điểm chuẩn|học phí|quota|rate|fee|score)\b",
+    re.IGNORECASE,
+)
 
 
 def _normalized(text: str) -> str:
@@ -43,6 +50,7 @@ def question_needs(question: str, resolved_question: str | None = None) -> dict:
         "condition": bool(_CONDITION.search(question)),
         "enumeration": bool(_ENUMERATION.search(question)),
         "comparison": bool(_COMPARISON.search(question)),
+        "count": bool(_COUNT.search(question)) and not _METRIC.search(question),
         "follow_up": follow_up,
     }
     needs["kind"] = next(

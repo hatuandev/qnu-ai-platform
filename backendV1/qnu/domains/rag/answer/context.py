@@ -24,6 +24,7 @@ from qnu.domains.rag.answer.structure_context import (
     needs_structure,
     numbered_groups,
     select_groups,
+    table_family_groups,
     unresolved_references,
 )
 from qnu.domains.rag.answer.table_support import attach_table_support
@@ -114,7 +115,16 @@ async def expand_context(
     if not result.hits:
         trace["status"] = "no_hits"
         return result, trace
-    if not req.context_window and not any(hit.kind == "paragraph" for hit in result.hits):
+    # A table-only question still needs its family when it enumerates or counts
+    # rows; otherwise a retrieved fragment is read as the whole table.
+    family_needed = (needs["enumeration"] or needs["count"]) and any(
+        hit.kind == "table" for hit in result.hits
+    )
+    if (
+        not req.context_window
+        and not any(hit.kind == "paragraph" for hit in result.hits)
+        and not family_needed
+    ):
         trace["status"] = "disabled"
         return result, trace
     from qnu.domains.knowledge.publication.access import authorize
@@ -181,6 +191,8 @@ async def expand_context(
         structural = select_groups(rows, result.hits, bundles, question)
     if needs["kind"] == "single_value":
         structural = _bounded_single_value(structural, set(anchors))
+    if needs["enumeration"] or needs["count"]:
+        structural.extend(table_family_groups(rows, result.hits, scopes))
     structural.extend(continuation_groups(rows, result.hits, bundles))
     if needs["kind"] == "condition":
         structural.extend(numbered_groups(rows, result.hits, bundles))
@@ -229,6 +241,30 @@ async def expand_context(
             if candidate.chunk_id not in known
         ]
         if not candidates:
+            continue
+        if group["kind"] == "table_family":
+            # A table family is a reading sequence, not one clause: take the
+            # fragments that fit in source order and let coverage report the rest.
+            taken = []
+            for candidate in candidates:
+                outcome = claim(primary.document_id, evidence_size(candidate), protected=True)
+                if outcome != "ok":
+                    if outcome == "budget":
+                        truncated += 1
+                    else:
+                        skipped_share.append(
+                            {
+                                "primary_chunk_id": primary.chunk_id,
+                                "kind": group["kind"],
+                                "bytes": evidence_size(candidate),
+                            }
+                        )
+                    group["truncated"] = True
+                    break
+                taken.append(candidate)
+                known.add(candidate.chunk_id)
+            if taken:
+                accepted_groups.append((position, group, primary, taken))
             continue
         size = sum(evidence_size(candidate) for candidate in candidates)
         outcome = claim(primary.document_id, size, protected=group["kind"] != "continuation")

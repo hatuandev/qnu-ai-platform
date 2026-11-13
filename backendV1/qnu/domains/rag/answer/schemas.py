@@ -104,6 +104,7 @@ class AnswerTrace(BaseModel):
     contract: dict = Field(default_factory=dict)
     verification: dict = Field(default_factory=lambda: {"mode": "off", "status": "not_run"})
     coverage: dict = Field(default_factory=dict)
+    cache: dict = Field(default_factory=dict)
 
 
 class AnswerResponse(BaseModel):

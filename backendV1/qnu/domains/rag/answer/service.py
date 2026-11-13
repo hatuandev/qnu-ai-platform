@@ -15,6 +15,7 @@ from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.modelops.inference.service import prepare_chat_request
 from qnu.domains.modelops.public_api import resolve_chat_runtime
 from qnu.domains.modelops.usage.service import usage_service
+from qnu.domains.rag.answer import cache as answer_cache
 from qnu.domains.rag.answer.cells import PROJECTION_VERSION, materialize
 from qnu.domains.rag.answer.cells import VERSION as CELLS_VERSION
 from qnu.domains.rag.answer.context import expand_context
@@ -139,22 +140,23 @@ async def answer(
     sources = sources_for(retrieval)
     await attach_source_text(db, blob, workspace_id, collection_id, sources, bundles=bundles)
     packing_started = time.monotonic()
+    packing_metadata = (
+        {
+            "any_of": [
+                s.model_dump(mode="json", exclude_none=True)
+                for s in result_scopes(retrieval, req.metadata_filter)
+            ]
+        }
+        if req.scope_resolution == "catalog"
+        else req.metadata_filter.model_dump(mode="json", exclude_none=True)
+    )
     messages, cells, envelope, evidence_bytes, skipped = _pack_messages(
         req,
         sources,
         trace.context,
         resolved_question=retrieval_query,
         persona=persona,
-        metadata_filter=(
-            {
-                "any_of": [
-                    s.model_dump(mode="json", exclude_none=True)
-                    for s in result_scopes(retrieval, req.metadata_filter)
-                ]
-            }
-            if req.scope_resolution == "catalog"
-            else req.metadata_filter.model_dump(mode="json", exclude_none=True)
-        ),
+        metadata_filter=packing_metadata,
     )
     trace.stage_ms["packing"] = round((time.monotonic() - packing_started) * 1000, 3)
     if skipped:
@@ -208,98 +210,176 @@ async def answer(
     inference_hash = runtime.inference_configuration_hash("answer")
     trace.inference_configuration_hash = inference_hash
     trace.reasoning = runtime.reasoning_trace("answer")
-    usage = await usage_service.reserve(
-        db,
-        actor,
-        workspace_id,
-        "chat",
-        answer_id,
-        digest(
+    cache_ttl = answer_cache.ttl_seconds()
+    cache_key = (
+        answer_cache.key(
             {
+                "version": answer_cache.VERSION,
+                "workspace_id": workspace_id,
+                "collection_id": collection_id,
                 "question": req.question,
-                "evidence": proof,
-                "config": runtime.configuration_hash,
-                "inference_config": inference_hash,
+                "retrieval_query": retrieval_query,
+                "persona": persona,
+                "document_ids": sorted(req.document_ids or []),
+                "retrieval": {
+                    "mode": req.retrieval_mode,
+                    "top_k": req.top_k,
+                    "candidate_k": req.candidate_k,
+                    "rrf_k": req.rrf_k,
+                    "rerank_provider_id": req.rerank_provider_id,
+                    "scope_resolution": req.scope_resolution,
+                    "context_window": req.context_window,
+                    "context_max_bytes": req.context_max_bytes,
+                    "metadata": packing_metadata,
+                },
+                "index_run_id": retrieval.index_run_id,
+                "generation": retrieval.generation,
+                "manifest_sha256": trace.retrieval.get("manifest_sha256"),
+                "provider_id": runtime.provider_id,
+                "configuration_hash": runtime.configuration_hash,
+                "inference_configuration_hash": inference_hash,
                 "prompt_version": PROMPT_VERSION,
-                "cell_catalog_sha256": trace.grounding["catalog_sha256"],
-                "metadata_filter": req.metadata_filter.model_dump(mode="json", exclude_none=True),
+                "messages_sha256": digest(
+                    [{"role": m.role, "content": m.content} for m in messages]
+                ),
+                "schema_sha256": digest(answer_schema),
+                "evidence_sha256": proof,
+                "catalog_sha256": trace.grounding["catalog_sha256"],
             }
-        ),
-        budget.total_reserved_tokens,
-        runtime.provider_id,
+        )
+        if cache_ttl
+        else None
     )
-    trace.evidence_sha256, trace.usage_id = proof, usage.id
+    cached = None
+    if cache_key is not None:
+        lookup_started = time.monotonic()
+        cached = await answer_cache.load(cache_key)
+        trace.stage_ms["cache_lookup"] = round((time.monotonic() - lookup_started) * 1000, 3)
+    materialization = {}
+    if cached is not None:
+        # Derived values are rebuilt from this request's sources, cells and scope.
+        try:
+            proposed = parse_answer(cached.content, sources)
+            draft = materialize(proposed, sources, cells, report=materialization)
+            coverage = assess(draft, sources, trace.context)
+        except AppException:
+            await answer_cache.discard(cache_key)
+            cached = None
+    trace.evidence_sha256 = proof
     trace.provider_id, trace.model_name = runtime.provider_id, runtime.model_name
     trace.configuration_hash = runtime.configuration_hash
     trace.routing = list(runtime.routing_trace)
-    try:
-        # Reservation commits. Recheck before HTTP, then release locks during inference.
-        if proof != await validate_results(
-            db, blob, vectors, actor, workspace_id, collection_id, retrieval, req.document_ids
-        ):
-            raise Conflict("Evidence thay đổi trước khi gọi model.", code="answer_evidence_changed")
-        current = await resolve_chat_runtime(db, workspace_id, runtime.provider_id)
-        if current.inference_configuration_hash("answer") != inference_hash:
-            raise Conflict("Model chat đã thay đổi.", code="chat_provider_changed")
-        if checkpoint is not None:
-            await checkpoint()
-        await db.commit()
-    except (Exception, asyncio.CancelledError):
-        # No chat request was sent; this reservation consumed zero chat tokens.
-        await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
-        raise
-    try:
-        started = time.monotonic()
-        result = await chat.complete(messages, bind_usage(request, usage.id))
-    except ChatResponseError as exc:
-        await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
-        raise
-    except (Exception, asyncio.CancelledError):
-        await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
-        raise
-    trace.stage_ms["generation"] = round((time.monotonic() - started) * 1000, 3)
-    await usage_service.settle(db, usage.id, total_tokens=result.total_tokens)
-    trace.prompt_tokens, trace.completion_tokens, trace.total_tokens = (
-        result.prompt_tokens,
-        result.completion_tokens,
-        result.total_tokens,
-    )
-    trace.contract = {
-        "schema_sha256": digest(answer_schema),
-        "finish_reason": result.finish_reason,
-        "output_budget": result.budget_trace,
-        **response_observation(result),
-    }
-    try:
-        proposed = parse_answer(result.content, sources)
-        materialization = {}
-        draft = materialize(proposed, sources, cells, report=materialization)
-        coverage = assess(draft, sources, trace.context)
-    except AppException as exc:
-        await record_workspace_event(
+    usage = None
+    if cached is None:
+        usage = await usage_service.reserve(
             db,
-            workspace_id=workspace_id,
-            actor=actor,
-            action="answer.validation_failed",
-            detail={
-                "answer_id": answer_id,
-                "usage_id": usage.id,
-                "code": exc.code,
-                "issues": getattr(exc, "validation_issues", []),
-                "output_sha256": digest(result.content),
-                "finish_reason": result.finish_reason,
-                "prompt_tokens": result.prompt_tokens,
-                "completion_tokens": result.completion_tokens,
-                "total_tokens": result.total_tokens,
-                "max_output_tokens": request.max_output_tokens,
-                "inference_configuration_hash": inference_hash,
-                "prompt_version": PROMPT_VERSION,
-                "reasoning": trace.reasoning,
-                "contract": trace.contract,
-            },
+            actor,
+            workspace_id,
+            "chat",
+            answer_id,
+            digest(
+                {
+                    "question": req.question,
+                    "evidence": proof,
+                    "config": runtime.configuration_hash,
+                    "inference_config": inference_hash,
+                    "prompt_version": PROMPT_VERSION,
+                    "cell_catalog_sha256": trace.grounding["catalog_sha256"],
+                    "metadata_filter": req.metadata_filter.model_dump(
+                        mode="json", exclude_none=True
+                    ),
+                }
+            ),
+            budget.total_reserved_tokens,
+            runtime.provider_id,
         )
-        await db.commit()
-        raise
+        trace.usage_id = usage.id
+        try:
+            # Reservation commits. Recheck before HTTP, then release locks during inference.
+            if proof != await validate_results(
+                db, blob, vectors, actor, workspace_id, collection_id, retrieval, req.document_ids
+            ):
+                raise Conflict(
+                    "Evidence thay đổi trước khi gọi model.", code="answer_evidence_changed"
+                )
+            current = await resolve_chat_runtime(db, workspace_id, runtime.provider_id)
+            if current.inference_configuration_hash("answer") != inference_hash:
+                raise Conflict("Model chat đã thay đổi.", code="chat_provider_changed")
+            if checkpoint is not None:
+                await checkpoint()
+            await db.commit()
+        except (Exception, asyncio.CancelledError):
+            # No chat request was sent; this reservation consumed zero chat tokens.
+            await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
+            raise
+        try:
+            started = time.monotonic()
+            result = await chat.complete(messages, bind_usage(request, usage.id))
+        except ChatResponseError as exc:
+            await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
+            raise
+        except (Exception, asyncio.CancelledError):
+            await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
+            raise
+        trace.stage_ms["generation"] = round((time.monotonic() - started) * 1000, 3)
+        await usage_service.settle(db, usage.id, total_tokens=result.total_tokens)
+        trace.prompt_tokens, trace.completion_tokens, trace.total_tokens = (
+            result.prompt_tokens,
+            result.completion_tokens,
+            result.total_tokens,
+        )
+        trace.contract = {
+            "schema_sha256": digest(answer_schema),
+            "finish_reason": result.finish_reason,
+            "output_budget": result.budget_trace,
+            **response_observation(result),
+        }
+        try:
+            proposed = parse_answer(result.content, sources)
+            materialization = {}
+            draft = materialize(proposed, sources, cells, report=materialization)
+            coverage = assess(draft, sources, trace.context)
+        except AppException as exc:
+            await record_workspace_event(
+                db,
+                workspace_id=workspace_id,
+                actor=actor,
+                action="answer.validation_failed",
+                detail={
+                    "answer_id": answer_id,
+                    "usage_id": usage.id,
+                    "code": exc.code,
+                    "issues": getattr(exc, "validation_issues", []),
+                    "output_sha256": digest(result.content),
+                    "finish_reason": result.finish_reason,
+                    "prompt_tokens": result.prompt_tokens,
+                    "completion_tokens": result.completion_tokens,
+                    "total_tokens": result.total_tokens,
+                    "max_output_tokens": request.max_output_tokens,
+                    "inference_configuration_hash": inference_hash,
+                    "prompt_version": PROMPT_VERSION,
+                    "reasoning": trace.reasoning,
+                    "contract": trace.contract,
+                },
+            )
+            await db.commit()
+            raise
+    else:
+        trace.cache = {
+            "version": answer_cache.VERSION,
+            "status": "hit",
+            "key": cache_key,
+            "saved_tokens": cached.total_tokens,
+            "origin_usage_id": cached.usage_id,
+        }
+        trace.contract = dict(cached.contract)
+        trace.stage_ms["generation"] = 0.0
+        logger.info(
+            "rag_answer_cache_hit",
+            answer_id=answer_id,
+            index_run_id=retrieval.index_run_id,
+            saved_tokens=cached.total_tokens,
+        )
     trace.grounding["selected_cells"] = [item.cell_id for item in proposed.lookups]
     trace.coverage = {"version": COVERAGE_VERSION, **coverage.model_dump()}
     trace.grounding["narrative_supports"] = continuation_supports(sources)
@@ -365,6 +445,28 @@ async def answer(
     else:
         response.reason = "model_abstained"
         trace.verification["skip_reason"] = "model_abstained"
+    if (
+        cache_key is not None
+        and cached is None
+        and response.status == "answered"
+        and trace.verification["status"] in {"not_run", "supported"}
+    ):
+        await answer_cache.store(
+            cache_key,
+            answer_cache.Entry(
+                version=answer_cache.VERSION,
+                content=result.content,
+                contract=trace.contract,
+                usage_id=usage.id,
+                total_tokens=result.total_tokens,
+            ),
+            cache_ttl,
+        )
+        logger.info(
+            "rag_answer_cache_stored",
+            answer_id=answer_id,
+            total_tokens=result.total_tokens,
+        )
     trace.stage_ms["total"] = round((time.monotonic() - request_started) * 1000, 3)
     logger.info(
         "rag_answer_completed",
@@ -373,7 +475,8 @@ async def answer(
         index_run_id=retrieval.index_run_id,
         sources=len(response.sources),
         provider_id=runtime.provider_id,
-        total_tokens=result.total_tokens,
+        total_tokens=trace.total_tokens,
+        cache=trace.cache.get("status", "miss"),
         stage_ms=trace.stage_ms,
     )
     return response

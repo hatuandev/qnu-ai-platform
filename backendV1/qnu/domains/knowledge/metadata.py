@@ -469,11 +469,12 @@ def matches_metadata(structure: dict | None, scope: MetadataFilter) -> bool:
                 current = values.get("attributes") or {}
                 matches &= all(same_attribute(current.get(k), v) for k, v in value.items())
             elif key == "effective_on":
-                matches &= bool(
-                    values.get("effective_from")
-                    and values.get("effective_until")
-                    and values["effective_from"] <= value <= values["effective_until"]
-                )
+                # An annotated validity interval is open-ended on a missing side.
+                # A unit with neither boundary stays unknown and never matches.
+                start = values.get("effective_from")
+                end = values.get("effective_until")
+                matches &= bool(start or end) and (not start or str(start) <= str(value))
+                matches &= not end or str(value) <= str(end)
             else:
                 matches &= str(values.get(key, "")).casefold() == str(value).casefold()
         if matches:
