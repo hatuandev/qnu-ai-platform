@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.api.dependencies import get_actor, get_blob_store, get_db
@@ -49,3 +49,9 @@ async def readiness(workspace_id: str, assistant_id: str, db: DB, actor: Actor, 
 @router.put("/{assistant_id}", response_model=AssistantResponse)
 async def update(workspace_id: str, assistant_id: str, body: AssistantUpdate, db: DB, actor: Actor):
     return await service.save_assistant(db, actor, workspace_id, body, assistant_id)
+
+
+@router.delete("/{assistant_id}", status_code=204)
+async def purge(workspace_id: str, assistant_id: str, db: DB, actor: Actor) -> Response:
+    await service.delete_assistant(db, actor, workspace_id, assistant_id)
+    return Response(status_code=204)

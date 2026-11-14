@@ -1,5 +1,7 @@
 """Resolve rerank through encrypted keys and configured model capacity."""
 
+TRUNCATION_VERSION = "qnu.rerank-truncation/head-bytes-v1"
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from qnu.domains.modelops.capacity.automatic import operational_budget
@@ -66,8 +68,42 @@ def parts(query: str, documents: list[str]) -> tuple[int, list[int], list[int]]:
     return query_bytes, sizes, [query_bytes + size + 64 for size in sizes]
 
 
+def fit(runtime: OcrRuntime, query: str, documents: list[str]) -> tuple[list[str], dict | None]:
+    """Keep the turn alive when one readable document alone exceeds the byte guard.
+
+    Only the leading bytes are sent to the cross-encoder for scoring; evidence
+    shown to users is still read from the sealed chunk, not from this projection.
+    """
+    limit = capacity(runtime)
+    if runtime.capacity_status not in ("configured", "provisional") or limit is None:
+        raise Conflict("Cần cấu hình capacity rerank.", code="rerank_capacity_required")
+    cap = limit - len(query.encode()) - 64
+    if cap < 1:
+        raise Conflict("Ứng viên vượt capacity rerank.", code="rerank_input_limit_exceeded")
+    fitted: list[str] = []
+    cut_documents = 0
+    cut_bytes = 0
+    for document in documents:
+        raw = document.encode()
+        if len(raw) <= cap:
+            fitted.append(document)
+            continue
+        head = raw[:cap].decode("utf-8", errors="ignore")
+        fitted.append(head)
+        cut_documents += 1
+        cut_bytes += len(raw) - len(head.encode())
+    if not cut_documents:
+        return fitted, None
+    return fitted, {
+        "truncation": TRUNCATION_VERSION,
+        "doc_bytes_cap": cap,
+        "truncated_documents": cut_documents,
+        "truncated_bytes": cut_bytes,
+    }
+
+
 def measure(runtime: OcrRuntime, query: str, documents: list[str]) -> dict:
-    """Sizing facts for trace: what is sent, the byte guard and the token capacity."""
+    """Sizing facts for trace before bounded truncation; the guard compares bytes."""
     query_bytes, sizes, bounds = parts(query, documents)
     limit = capacity(runtime)
     return {

@@ -161,6 +161,9 @@ async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint):
     documents = [rerank_text(h) for h in hits]
     trace["rerank_presentation"] = PRESENTATION_VERSION
     trace["rerank_input"] = runtime_service.measure(runtime, req.query, documents)
+    documents, truncation = runtime_service.fit(runtime, req.query, documents)
+    if truncation:
+        trace["rerank_input"].update(truncation)
     reserved = runtime_service.budget(runtime, req.query, documents)
     usage = await usage_service.reserve(
         db,

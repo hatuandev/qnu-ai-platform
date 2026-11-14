@@ -210,6 +210,7 @@ async def create_review(
                 ),
                 persona=config["persona"],
                 reranker=reranker,
+                compose_insufficient_message=True,
             )
         except (Exception, asyncio.CancelledError) as exc:
             await db.rollback()

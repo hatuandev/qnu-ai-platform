@@ -173,6 +173,19 @@ Sau `publish`, chỉ báo **Sẵn sàng cho trợ lý** khi `summary.readiness.s
 - Chỉ khi `ready` và `serving_matches_published=true` mới báo tài liệu sẵn sàng cho trợ lý. Không
   suy từ việc publish thành công.
 - Trợ lý đọc phạm vi tri thức/binding theo cấu hình của trợ lý; không đưa ID kỹ thuật vào UI thường.
+- Nếu model yêu cầu làm rõ tham chiếu nguồn ở lượt đầu, Backend tra cứu theo câu gốc trong phạm vi
+  trợ lý. Khi kết quả có nhiều tài liệu, Backend yêu cầu người dùng chọn văn bản. Với lượt nối tiếp
+  chưa rõ chủ thể, Backend vẫn yêu cầu làm rõ trước khi tra cứu.
+- Đoạn văn đã xác minh liền nhau có thể đi cùng một đoạn đọc nối và dẫn chứng của cả hai đoạn.
+  Danh sách tiếp qua trang được nối khi có quan hệ hàng đã kiểm chứng. Khi câu hỏi liệt kê,
+  Backend cấp mã cho ô tên để model có thể chọn từng dòng có dẫn chứng.
+- Với câu trả lời từ bảng, model chọn mã ô Backend cấp. Backend kiểm tra ô, lấy giá trị từ nguồn và
+  gắn dẫn chứng. Mã dẫn chứng trùng trong phần đánh giá được gộp. Ý có mã ngoài phạm vi được đánh
+  dấu thiếu căn cứ; các ý có dẫn chứng hợp lệ vẫn được kiểm tra độc lập.
+- Khi lỗi chọn ô hoặc giá trị số có thể sửa và kế hoạch bằng chứng không thiếu phần bắt buộc,
+  Backend có thể gọi lại bước sinh câu trả lời một lần với cùng nguồn và chỉ dẫn sửa lỗi. Lượt này dùng
+  chung giới hạn một lần với nhánh đánh giá lại khi model báo thiếu căn cứ. Backend kiểm lại quyền,
+  nguồn, model, ngân sách và đầu ra. Lỗi hạ tầng và timeout theo chính sách ModelOps.
 
 
 ## 6. Vòng đời ngược: dừng, thu hồi, cập nhật, xóa
@@ -250,8 +263,9 @@ mở, preview hết hạn hoặc biên nhận đã kết thúc không thu hẹp 
 - `POST .../folders/{folder_id}/restore` kiểm theo thứ tự: `404 resource_unavailable` (kho bị lưu
   trữ/xóa), `409 folder_not_deleted`, `409 folder_parent_unavailable`, `409 folder_name_exists`.
   Xóa thư mục chỉ nhận khi rỗng (`409 folder_not_empty`).
-- Xóa cả kho chỉ nhận khi kho không còn tài liệu và thư mục đang hoạt động (`409 collection_not_empty`);
-  bản ghi thư mục đã xóa mềm không chặn thao tác xóa kho.
+- Xóa cả kho là xóa vĩnh viễn (`collection/delete`): preview + xác nhận admin, cascade nguồn/thư mục/
+  bằng chứng/chunk/vector/object của kho; kho còn trợ lý tham chiếu trả `409 collection_in_use_by_assistants`.
+  Sau khi hoàn tất không còn `restore`; không còn `409 collection_not_empty`.
 - `DELETE /platform/v1alpha1/modelops/connections/{id}` và
   `DELETE .../connections/{id}/models/{model_id}` trả `409 model_provider_in_use` kèm `detail` nêu
   loại tham chiếu (mặc định hệ thống, trợ lý, lịch sử lập chỉ mục/biên soạn/phản biện/sử dụng

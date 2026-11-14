@@ -48,6 +48,30 @@ def complete_citations(statements, sources):
     return statements
 
 
+def reading_joins(sources: list[EvidenceSource]) -> list[dict]:
+    """Expose a split sentence together with the citations of both original lines."""
+    by_id = {source.evidence_id: source for source in sources}
+    joins = []
+    for child, parents in continuation_supports(sources).items():
+        if len(parents) != 1:
+            continue
+        parent = parents[0]
+        left = by_id[parent].source_passages[-1]
+        right = by_id[child].source_passages[0]
+        if (
+            not left.get("position", "").isdecimal()
+            or not right.get("position", "").isdecimal()
+            or int(left["position"]) + 1 != int(right["position"])
+            or left["citation"].split(":", 1)[0] != right["citation"].split(":", 1)[0]
+        ):
+            continue
+        tail = left["text"].rsplit(". ", 1)[-1].strip()
+        text = " ".join((tail, right["text"].strip()))
+        if len(text) <= 600:
+            joins.append({"ids": [parent, child], "text": text})
+    return joins
+
+
 def reading_order(sources: list[EvidenceSource]) -> list[list[str]]:
     """Verified contiguous runs by evidence ID only; text stays in each evidence item."""
     buckets = {}

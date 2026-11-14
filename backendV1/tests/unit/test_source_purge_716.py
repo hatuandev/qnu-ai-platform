@@ -64,7 +64,7 @@ def test_published_source_preview_lists_versions_without_destructive_call(monkey
     plan = {"graph_sha256": "graph", "objects": {}, "rows": {}}
     monkeypatch.setattr(
         purge,
-        "inspect_source",
+        "inspect_purge",
         AsyncMock(
             return_value=(
                 plan,

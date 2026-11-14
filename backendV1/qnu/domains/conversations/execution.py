@@ -83,9 +83,13 @@ async def send(
                     **policy,
                 ),
                 retrieval_query=turn.resolved_question,
+                clarify_source_reference=bool(
+                    (turn.rewrite_trace or {}).get("needs_clarification")
+                ),
                 persona=config["persona"],
                 checkpoint=check,
                 reranker=reranker,
+                compose_insufficient_message=True,
             )
         else:
             result = reply

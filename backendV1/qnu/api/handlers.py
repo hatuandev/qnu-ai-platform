@@ -58,6 +58,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def _app_exception(_: Request, exc: AppException) -> JSONResponse:
         if _is_gateway(_):
             return _openai_response(exc.status_code, exc.detail, exc.code)
+        issues = getattr(exc, "validation_issues", None)
         problem = ProblemDetail(
             type=problem_type(exc.code),
             title=exc.title,
@@ -65,6 +66,17 @@ def register_exception_handlers(app: FastAPI) -> None:
             detail=redact(exc.detail),
             code=exc.code,
             correlation_id=current_correlation_id(),
+            errors=(
+                {
+                    "validation": [
+                        f"{'.'.join(str(part) for part in item.get('path', []))}:"
+                        f"{item.get('type', '')}"
+                        for item in issues[:20]
+                    ]
+                }
+                if issues
+                else None
+            ),
         )
         return JSONResponse(
             status_code=exc.status_code,

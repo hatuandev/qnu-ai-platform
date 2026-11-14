@@ -1,4 +1,4 @@
-"""Explicit, workspace-owned dependency graph for permanent source deletion."""
+"""Explicit, workspace-owned dependency graph for permanent source or collection deletion."""
 
 from sqlalchemy import and_, delete, or_, select, tuple_
 
@@ -7,7 +7,7 @@ from qnu.platform.database import Base
 from qnu.platform.errors import Conflict, EntityNotFound
 
 # Only this reviewed set can be purged; adding a new FK does not widen deletion silently.
-TABLES = frozenset(
+SOURCE_TABLES = frozenset(
     {
         "kb_sources",
         "kb_source_revisions",
@@ -43,6 +43,16 @@ TABLES = frozenset(
         "chat_turns",
     }
 )
+# A collection purge owns whole index generations and folder rows, so runs and their
+# manifest objects are deleted instead of resealed for surviving content.
+COLLECTION_TABLES = SOURCE_TABLES | {
+    "kb_collections",
+    "kb_folders",
+    "kb_index_runs",
+    "kb_index_sync",
+    "kb_upload_requests",
+}
+TABLES = COLLECTION_TABLES
 MAX_ROWS = 10000
 SEGMENT_OWNERS = {
     "kb_compilation_segments": "run_id",
@@ -77,6 +87,127 @@ async def _add(db, graph, name, statement, workspace_id):
     if sum(map(len, graph.values())) > MAX_ROWS:
         raise Conflict("Quá nhiều dữ liệu phụ thuộc để xóa một lượt.", code="purge_limit")
     return len(found) != before
+
+
+async def _close_dependencies(db, graph, workspace_id, scope):
+    changed = True
+    while changed:
+        changed = False
+        for name in sorted(scope - {"chat_turns"}):
+            child = table(name)
+            for fk in child.foreign_key_constraints:
+                parent = fk.referred_table
+                parents = graph.get(parent.name)
+                if not parents:
+                    continue
+                keys = [
+                    {c.name: row[c.name] for c in parent.primary_key.columns}
+                    for row in parents.values()
+                ]
+                statement = (
+                    select(child)
+                    .join(
+                        parent, and_(*(element.parent == element.column for element in fk.elements))
+                    )
+                    .where(selected(parent, keys))
+                )
+                # A self-reference needs distinct aliases to select child compiler generations.
+                if child is parent:
+                    alias = parent.alias("purge_parent")
+                    statement = (
+                        select(child)
+                        .join(
+                            alias,
+                            and_(
+                                *(
+                                    element.parent == alias.c[element.column.name]
+                                    for element in fk.elements
+                                )
+                            ),
+                        )
+                        .where(selected(alias, keys))
+                    )
+                changed |= await _add(db, graph, name, statement, workspace_id)
+
+
+async def _guard_unsupported(db, graph, scope):
+    for child in Base.metadata.tables.values():
+        if child.name in scope:
+            continue
+        for fk in child.foreign_key_constraints:
+            parent = fk.referred_table
+            keys = list(graph.get(parent.name, {}).values())
+            if keys and await db.scalar(
+                select(1)
+                .select_from(
+                    child.join(
+                        parent,
+                        and_(*(element.parent == element.column for element in fk.elements)),
+                    )
+                )
+                .where(selected(parent, keys))
+                .limit(1)
+            ):
+                raise Conflict(
+                    "Còn phụ thuộc chưa hỗ trợ xóa; chưa xóa dữ liệu.",
+                    code="purge_dependency_unsupported",
+                )
+
+
+async def _add_empty_document_containers(db, graph, workspace_id):
+    versions = list(graph.get("kb_compiled_versions", {}).values())
+    docs, all_versions = table("kb_compiled_documents"), table("kb_compiled_versions")
+    ids = [row["id"] for row in versions]
+    doc_ids = {row["document_id"] for row in versions}
+    await _add(
+        db,
+        graph,
+        docs.name,
+        select(docs).where(
+            docs.c.id.in_(doc_ids),
+            ~docs.c.id.in_(
+                select(all_versions.c.document_id).where(
+                    all_versions.c.id.not_in(ids),
+                )
+            ),
+        ),
+        workspace_id,
+    )
+
+
+async def _add_citing_turns(db, graph, workspace_id):
+    versions = list(graph.get("kb_compiled_versions", {}).values())
+    ids = [row["id"] for row in versions]
+    if not ids:
+        return
+    turns = table("chat_turns")
+    await _add(
+        db,
+        graph,
+        turns.name,
+        select(turns).where(
+            turns.c.workspace_id == workspace_id,
+            or_(*(turns.c.result["sources"].contains([{"version_id": value}]) for value in ids)),
+        ),
+        workspace_id,
+    )
+
+
+def _check_approved_plan(graph, allow_published):
+    versions = list(graph.get("kb_compiled_versions", {}).values())
+    if any(row["status"] == "published" for row in versions) and not allow_published:
+        raise Conflict(
+            "Tài liệu đang được phát hành. Hãy thu hồi/dừng phát hành các bản liên quan trước khi xóa.",
+            code="source_publication_in_use",
+        )
+    for name, owner_field in SEGMENT_OWNERS.items():
+        segments = graph.get(name, {})
+        for row in segments.values():
+            if row["parent_segment_id"] is None:
+                continue
+            parent = segments.get((row["parent_segment_id"],))
+            if parent is None or parent[owner_field] != row[owner_field]:
+                raise Conflict("Nhóm xử lý ngoài phạm vi xóa.", code="purge_scope_invalid")
 
 
 async def graph_for_source(db, workspace_id, source_id, *, allow_published: bool = False):
@@ -127,112 +258,60 @@ async def graph_for_source(db, workspace_id, source_id, *, allow_published: bool
         ),
         workspace_id,
     )
-    changed = True
-    while changed:
-        changed = False
-        for name in sorted(TABLES - {"chat_turns"}):
-            child = table(name)
-            for fk in child.foreign_key_constraints:
-                parent = fk.referred_table
-                parents = graph.get(parent.name)
-                if not parents:
-                    continue
-                keys = [
-                    {c.name: row[c.name] for c in parent.primary_key.columns}
-                    for row in parents.values()
-                ]
-                statement = (
-                    select(child)
-                    .join(
-                        parent, and_(*(element.parent == element.column for element in fk.elements))
-                    )
-                    .where(selected(parent, keys))
-                )
-                # A self-reference needs distinct aliases to select child compiler generations.
-                if child is parent:
-                    alias = parent.alias("purge_parent")
-                    statement = (
-                        select(child)
-                        .join(
-                            alias,
-                            and_(
-                                *(
-                                    element.parent == alias.c[element.column.name]
-                                    for element in fk.elements
-                                )
-                            ),
-                        )
-                        .where(selected(alias, keys))
-                    )
-                changed |= await _add(db, graph, name, statement, workspace_id)
-    for name, owner_field in SEGMENT_OWNERS.items():
-        segments = graph.get(name, {})
-        for row in segments.values():
-            if row["parent_segment_id"] is None:
-                continue
-            parent = segments.get((row["parent_segment_id"],))
-            if parent is None or parent[owner_field] != row[owner_field]:
-                raise Conflict("Nhóm xử lý ngoài phạm vi xóa.", code="purge_scope_invalid")
-    versions = list(graph.get("kb_compiled_versions", {}).values())
-    if any(row["status"] == "published" for row in versions) and not allow_published:
-        raise Conflict(
-            "Tài liệu đang được phát hành. Hãy thu hồi/dừng phát hành các bản liên quan trước khi xóa.",
-            code="source_publication_in_use",
-        )
+    await _close_dependencies(db, graph, workspace_id, SOURCE_TABLES)
+    _check_approved_plan(graph, allow_published)
     # Remove empty document containers only; documents with other versions remain intact.
-    docs, all_versions = table("kb_compiled_documents"), table("kb_compiled_versions")
-    ids = [row["id"] for row in versions]
-    doc_ids = {row["document_id"] for row in versions}
+    await _add_empty_document_containers(db, graph, workspace_id)
+    # Historical turns containing these citations also contain copied document text.
+    await _add_citing_turns(db, graph, workspace_id)
+    await _guard_unsupported(db, graph, SOURCE_TABLES)
+    return graph
+
+
+async def graph_for_collection(db, workspace_id, collection_id, *, allow_published: bool = False):
+    collections, uploads = table("kb_collections"), table("kb_upload_requests")
+    graph = {}
     await _add(
         db,
         graph,
-        docs.name,
-        select(docs).where(
-            docs.c.id.in_(doc_ids),
-            ~docs.c.id.in_(
-                select(all_versions.c.document_id).where(
-                    all_versions.c.id.not_in(ids),
-                )
-            ),
+        collections.name,
+        select(collections).where(
+            collections.c.id == collection_id,
+            collections.c.workspace_id == workspace_id,
         ),
         workspace_id,
     )
-    # Historical turns containing these citations also contain copied document text.
-    turns = table("chat_turns")
-    if ids:
-        await _add(
-            db,
-            graph,
-            turns.name,
-            select(turns).where(
-                turns.c.workspace_id == workspace_id,
-                or_(
-                    *(turns.c.result["sources"].contains([{"version_id": value}]) for value in ids)
-                ),
-            ),
-            workspace_id,
+    if not graph[collections.name]:
+        raise EntityNotFound("Không tìm thấy kho tri thức.", code="collection_not_found")
+    assistants = Base.metadata.tables["chat_assistants"]
+    if await db.scalar(
+        select(assistants.c.id)
+        .where(
+            assistants.c.workspace_id == workspace_id,
+            assistants.c.collection_id == collection_id,
         )
-    for child in Base.metadata.tables.values():
-        if child.name in TABLES:
-            continue
-        for fk in child.foreign_key_constraints:
-            parent = fk.referred_table
-            keys = list(graph.get(parent.name, {}).values())
-            if keys and await db.scalar(
-                select(1)
-                .select_from(
-                    child.join(
-                        parent,
-                        and_(*(element.parent == element.column for element in fk.elements)),
-                    )
-                )
-                .where(selected(parent, keys))
-                .limit(1)
-            ):
-                raise Conflict(
-                    "Còn phụ thuộc chưa hỗ trợ xóa; chưa xóa dữ liệu.",
-                    code="purge_dependency_unsupported",
-                )
+        .limit(1)
+    ):
+        raise Conflict(
+            "Kho đang được trợ lý sử dụng. Hãy gỡ kho khỏi trợ lý trước khi xóa.",
+            code="collection_in_use_by_assistants",
+        )
+    # The upload ledger has no FK to the collection but would replay deleted ids.
+    await _add(
+        db,
+        graph,
+        uploads.name,
+        select(uploads).where(
+            uploads.c.collection_id == collection_id,
+            uploads.c.workspace_id == workspace_id,
+        ),
+        workspace_id,
+    )
+    await _close_dependencies(db, graph, workspace_id, COLLECTION_TABLES)
+    _check_approved_plan(graph, allow_published)
+    await _add_empty_document_containers(db, graph, workspace_id)
+    await _add_citing_turns(db, graph, workspace_id)
+    await _guard_unsupported(db, graph, COLLECTION_TABLES)
     return graph
 
 
@@ -276,6 +355,10 @@ def graph_plan(graph):
                 add_object(row["markdown_key"], row["markdown_sha256"])
             if name == "ocr_spelling_runs":
                 add_object(f"ocr-spelling/{row['workspace_id']}/{row['id']}/raw-response", None)
+            if name == "kb_index_runs":
+                add_object(row["manifest_key"], row["manifest_sha256"])
+                for receipt in row.get("batch_receipts") or []:
+                    add_object(receipt.get("raw_key"), receipt.get("raw_sha256"))
     # Cancelled workers may still settle usage/timestamps. Fence the approved deletion
     # scope and immutable payload identities, rather than those bookkeeping fields.
     return {
@@ -316,15 +399,18 @@ async def delete_rows(db, plan, workspace_id):
         else:
             await db.execute(delete(target).where(selected(target, keys)))
     states = Base.metadata.tables["resource_lifecycle_states"]
-    ids = [
-        key["id"]
-        for name in ("kb_sources", "kb_compiled_documents")
-        for key in plan["rows"].get(name, [])
-    ]
-    await db.execute(
-        delete(states).where(
-            states.c.workspace_id == workspace_id,
-            states.c.kind.in_(("source", "document")),
-            states.c.resource_id.in_(ids),
-        )
-    )
+    for name, kind in (
+        ("kb_collections", "collection"),
+        ("kb_folders", "folder"),
+        ("kb_sources", "source"),
+        ("kb_compiled_documents", "document"),
+    ):
+        ids = [key["id"] for key in plan["rows"].get(name, [])]
+        if ids:
+            await db.execute(
+                delete(states).where(
+                    states.c.workspace_id == workspace_id,
+                    states.c.kind == kind,
+                    states.c.resource_id.in_(ids),
+                )
+            )

@@ -86,6 +86,10 @@ def test_retrieving_last_row_also_selects_its_verified_continuation():
     assert set(continuation["support_ids"]) == {"header", "tail"}
     selected, _ = supports([header], [header, tail, head], links, MetadataFilter())
     assert "head" not in selected
+    selected, _ = supports(
+        [header], [header, tail, head], links, MetadataFilter(), enumerate_rows=True
+    )
+    assert {"tail", "head"} <= set(selected)
     head.structure["retrieval_metadata"] = [{"values": {"data_year": 2032}}]
     for chunk in (header, tail):
         chunk.structure["retrieval_metadata"] = [{"values": {"data_year": 2031}}]

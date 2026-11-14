@@ -17,6 +17,8 @@ import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as ModelopsRouteImport } from './routes/modelops'
 import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as AssistantsIndexRouteImport } from './routes/assistants.index'
+import { Route as AssistantsAssistantIdRouteImport } from './routes/assistants.$assistantId'
 import { Route as KnowledgeIndexRouteImport } from './routes/knowledge.index'
 import { Route as KnowledgeSourceIdRouteImport } from './routes/knowledge.$sourceId'
 import { Route as PSlugRouteImport } from './routes/p.$slug'
@@ -62,6 +64,16 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AssistantsIndexRoute = AssistantsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AssistantsRoute,
+} as any)
+const AssistantsAssistantIdRoute = AssistantsAssistantIdRouteImport.update({
+  id: '/$assistantId',
+  path: '/$assistantId',
+  getParentRoute: () => AssistantsRoute,
+} as any)
 const KnowledgeIndexRoute = KnowledgeIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -85,43 +97,48 @@ const KnowledgeSourceIdReviewRoute = KnowledgeSourceIdReviewRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/assistants': typeof AssistantsRoute
+  '/assistants': typeof AssistantsRouteWithChildren
   '/chat': typeof ChatRoute
   '/inbox': typeof InboxRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/modelops': typeof ModelopsRoute
   '/operations': typeof OperationsRoute
   '/settings': typeof SettingsRoute
+  '/assistants/$assistantId': typeof AssistantsAssistantIdRoute
   '/knowledge/$sourceId': typeof KnowledgeSourceIdRoute
   '/p/$slug': typeof PSlugRoute
+  '/assistants/': typeof AssistantsIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/knowledge/$sourceId/review': typeof KnowledgeSourceIdReviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/assistants': typeof AssistantsRoute
   '/chat': typeof ChatRoute
   '/inbox': typeof InboxRoute
   '/modelops': typeof ModelopsRoute
   '/operations': typeof OperationsRoute
   '/settings': typeof SettingsRoute
+  '/assistants/$assistantId': typeof AssistantsAssistantIdRoute
   '/knowledge/$sourceId': typeof KnowledgeSourceIdRoute
   '/p/$slug': typeof PSlugRoute
+  '/assistants': typeof AssistantsIndexRoute
   '/knowledge': typeof KnowledgeIndexRoute
   '/knowledge/$sourceId/review': typeof KnowledgeSourceIdReviewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/assistants': typeof AssistantsRoute
+  '/assistants': typeof AssistantsRouteWithChildren
   '/chat': typeof ChatRoute
   '/inbox': typeof InboxRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/modelops': typeof ModelopsRoute
   '/operations': typeof OperationsRoute
   '/settings': typeof SettingsRoute
+  '/assistants/$assistantId': typeof AssistantsAssistantIdRoute
   '/knowledge/$sourceId': typeof KnowledgeSourceIdRoute
   '/p/$slug': typeof PSlugRoute
+  '/assistants/': typeof AssistantsIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/knowledge/$sourceId_/review': typeof KnowledgeSourceIdReviewRoute
 }
@@ -136,21 +153,24 @@ export interface FileRouteTypes {
     | '/modelops'
     | '/operations'
     | '/settings'
+    | '/assistants/$assistantId'
     | '/knowledge/$sourceId'
     | '/p/$slug'
+    | '/assistants/'
     | '/knowledge/'
     | '/knowledge/$sourceId/review'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/assistants'
     | '/chat'
     | '/inbox'
     | '/modelops'
     | '/operations'
     | '/settings'
+    | '/assistants/$assistantId'
     | '/knowledge/$sourceId'
     | '/p/$slug'
+    | '/assistants'
     | '/knowledge'
     | '/knowledge/$sourceId/review'
   id:
@@ -163,15 +183,17 @@ export interface FileRouteTypes {
     | '/modelops'
     | '/operations'
     | '/settings'
+    | '/assistants/$assistantId'
     | '/knowledge/$sourceId'
     | '/p/$slug'
+    | '/assistants/'
     | '/knowledge/'
     | '/knowledge/$sourceId_/review'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AssistantsRoute: typeof AssistantsRoute
+  AssistantsRoute: typeof AssistantsRouteWithChildren
   ChatRoute: typeof ChatRoute
   InboxRoute: typeof InboxRoute
   KnowledgeRoute: typeof KnowledgeRouteWithChildren
@@ -239,6 +261,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/assistants/': {
+      id: '/assistants/'
+      path: '/'
+      fullPath: '/assistants/'
+      preLoaderRoute: typeof AssistantsIndexRouteImport
+      parentRoute: typeof AssistantsRoute
+    }
+    '/assistants/$assistantId': {
+      id: '/assistants/$assistantId'
+      path: '/$assistantId'
+      fullPath: '/assistants/$assistantId'
+      preLoaderRoute: typeof AssistantsAssistantIdRouteImport
+      parentRoute: typeof AssistantsRoute
+    }
     '/knowledge/': {
       id: '/knowledge/'
       path: '/'
@@ -270,6 +306,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AssistantsRouteChildren {
+  AssistantsAssistantIdRoute: typeof AssistantsAssistantIdRoute
+  AssistantsIndexRoute: typeof AssistantsIndexRoute
+}
+
+const AssistantsRouteChildren: AssistantsRouteChildren = {
+  AssistantsAssistantIdRoute: AssistantsAssistantIdRoute,
+  AssistantsIndexRoute: AssistantsIndexRoute,
+}
+
+const AssistantsRouteWithChildren = AssistantsRoute._addFileChildren(
+  AssistantsRouteChildren,
+)
+
 interface KnowledgeRouteChildren {
   KnowledgeSourceIdRoute: typeof KnowledgeSourceIdRoute
   KnowledgeIndexRoute: typeof KnowledgeIndexRoute
@@ -288,7 +338,7 @@ const KnowledgeRouteWithChildren = KnowledgeRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AssistantsRoute: AssistantsRoute,
+  AssistantsRoute: AssistantsRouteWithChildren,
   ChatRoute: ChatRoute,
   InboxRoute: InboxRoute,
   KnowledgeRoute: KnowledgeRouteWithChildren,

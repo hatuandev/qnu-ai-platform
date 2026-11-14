@@ -106,7 +106,9 @@ def chat_session(client, ready):  # noqa: F811
                     "standalone_override",
                     (previous[-1] + " " if previous else "") + incoming["current_question"],
                 ),
-                "needs_clarification": fake.mode == "clarify",
+                "needs_clarification": fake.mode == "clarify" or getattr(
+                    fake, "require_clarification", False
+                ),
             }
             if fake.mode == "rewrite_bad":
                 value = {"unexpected": True}
@@ -159,7 +161,9 @@ def test_saved_answer_replay_and_followup_use_new_evidence(client, chat_session)
     assert len(data["answer_chat"].requests) == before + 2
     incoming = json.loads(data["answer_chat"].requests[-2]["body"]["messages"][-1]["content"])
     assert incoming["previous_user_questions"] == [first.json()["question"]]
-    assert "150" not in json.dumps(incoming)
+    earlier_answer = first.json()["result"]["answer"].strip()
+    assert incoming["previous_assistant_answers"] == [earlier_answer[:600]]
+    assert "revision_id" not in json.dumps(incoming)
     listing = client.get(data["conversation_url"] + "/turns")
     assert listing.status_code == 200, listing.text
     assert [t["turn_no"] for t in listing.json()] == [1, 2]
@@ -176,7 +180,7 @@ def test_first_knowledge_turn_preserves_original_query_when_model_rewrites_it(cl
 
 
 @pytest.mark.parametrize("route", ["greeting", "courtesy", "identity", "protected_request"])
-def test_social_reply_comes_from_model_once_and_stays_out_of_retrieval_history(
+def test_social_reply_comes_from_model_once_and_stays_out_of_retrieval_evidence(
     client, chat_session, route
 ):
     data = chat_session
@@ -205,8 +209,13 @@ def test_social_reply_comes_from_model_once_and_stays_out_of_retrieval_history(
     question = send(client, data, "Xin chào, chỉ tiêu trúng tuyển năm 2024?", seq=1, key="turn-two")
     assert question.status_code == 200, question.text
     assert question.json()["result"]["sources"]
-    assert question.json()["history_turn_ids"] == []
+    assert question.json()["history_turn_ids"] == [reply["id"]]
     assert len(fake.requests) == before + 3
+    route_payload = json.loads(fake.requests[-2]["body"]["messages"][-1]["content"])
+    assert route_payload["previous_user_questions"] == ["Dạ, xin chào trợ lý ạ!"]
+    assert route_payload["previous_assistant_answers"] == [fake.direct_answer]
+    answer_payload = fake.requests[-1]["body"]["messages"]
+    assert all(fake.direct_answer not in message["content"] for message in answer_payload)
 
 
 @pytest.mark.parametrize(
@@ -335,6 +344,37 @@ def test_unclear_or_bad_rewrite_never_reaches_answer(client, chat_session, mode,
     assert response.status_code >= 400, response.text
     assert response.json()["code"] == code
     assert len(chat_session["answer_chat"].requests) == before + 1
+
+
+def test_first_turn_can_resolve_document_reference_from_single_source(client, chat_session):
+    chat_session["answer_chat"].require_clarification = True
+    response = send(client, chat_session, "Tài liệu này quy định gì?")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["result"]["status"] == "answered"
+    assert body["rewrite_trace"]["needs_clarification"] is True
+    assert body["resolved_question"] == "Tài liệu này quy định gì?"
+
+
+def test_first_turn_requests_clarification_for_multiple_matching_documents(
+    client, chat_session, monkeypatch
+):
+    from qnu.domains.rag.answer import service
+
+    search = service.search
+
+    async def two_documents(*args, **kwargs):
+        found = await search(*args, **kwargs)
+        first = found.hits[0]
+        other = first.model_copy(update={"document_id": "second-document"})
+        return found.model_copy(update={"hits": [first, other]})
+
+    monkeypatch.setattr(service, "search", two_documents)
+    chat_session["answer_chat"].require_clarification = True
+    response = send(client, chat_session, "Tài liệu này quy định gì?")
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == "conversation_clarification_required"
+    assert len(chat_session["answer_chat"].requests) == 1
 
 
 def test_conversation_owner_is_not_bypassed_by_platform_admin(client, chat_session):

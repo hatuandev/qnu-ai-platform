@@ -88,57 +88,68 @@ export function FolderFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <FolderPlus className="size-4 text-primary" />
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <FolderPlus className="size-4.5 text-primary shrink-0" />
               <span>{isEdit ? "Đổi tên thư mục" : "Tạo thư mục mới"}</span>
             </DialogTitle>
-            <DialogDescription className="text-xs">
-              Thư mục dùng để phân loại tài liệu theo năm hoặc chủ đề.
+            <DialogDescription className="text-xs text-muted-foreground">
+              {isEdit
+                ? "Cập nhật tên thư mục lưu trữ."
+                : "Phân loại tài liệu theo năm hoặc chủ đề quản lý."}
             </DialogDescription>
           </DialogHeader>
 
           {error && (
-            <div className="p-2.5 rounded-md bg-destructive/10 border border-destructive/20 text-xs text-destructive">
+            <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive">
               {error}
             </div>
           )}
 
-          <Field>
-            <FieldLabel required>Tên thư mục</FieldLabel>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="VD: Năm 2026, Biểu mẫu, Quy chế..."
-              className="h-8 text-xs"
-              disabled={isPending}
-              autoFocus
-            />
-          </Field>
+          <div className="pt-1">
+            <Field>
+              <FieldLabel
+                required
+                className="text-xs font-medium text-foreground"
+              >
+                Tên thư mục
+              </FieldLabel>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="VD: Năm 2026, Biểu mẫu, Quy chế..."
+                className="h-9 text-xs bg-background"
+                disabled={isPending}
+                autoFocus
+              />
+            </Field>
+          </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => onOpenChange(false)}
               disabled={isPending}
-              className="h-8 text-xs"
+              className="h-8 text-xs font-medium"
             >
               Hủy
             </Button>
             <Button
               type="submit"
               size="sm"
-              disabled={isPending}
-              className="h-8 text-xs gap-1.5"
+              disabled={isPending || !name.trim()}
+              className="h-8 text-xs font-medium gap-1.5 shadow-2xs"
             >
               {isPending ? (
                 <Loader2 className="size-3.5 animate-spin" />
-              ) : (
+              ) : isEdit ? (
                 <Save className="size-3.5" />
+              ) : (
+                <FolderPlus className="size-3.5" />
               )}
-              <span>{isEdit ? "Lưu" : "Tạo thư mục"}</span>
+              <span>{isEdit ? "Lưu thay đổi" : "Tạo thư mục"}</span>
             </Button>
           </DialogFooter>
         </form>

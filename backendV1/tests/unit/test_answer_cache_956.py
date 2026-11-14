@@ -268,7 +268,8 @@ async def test_abstained_generation_is_not_cached(monkeypatch):
     assert first.status == "insufficient_evidence"
     assert first.reason == "model_abstained"
     assert h.store == {}
-    assert h.chat.complete.await_count == 2
+    # Each request has an initial draft and one re-evaluation of the same evidence.
+    assert h.chat.complete.await_count == 4
 
 
 @pytest.mark.asyncio

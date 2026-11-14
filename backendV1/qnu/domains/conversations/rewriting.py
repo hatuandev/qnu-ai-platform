@@ -20,6 +20,16 @@ from qnu.platform.errors import AppException, Conflict
 from qnu.ports.chat_model import ChatModel, ChatResponseError
 from qnu.ports.provider_execution import bind_usage
 
+HISTORY_ANSWER_MAX_CHARS = 600
+
+
+def _history_answer(result: dict | None) -> str:
+    """Keep the assistant's own earlier wording for continuity, never as evidence."""
+    if not result:
+        return ""
+    text = result.get("answer") or result.get("message") or ""
+    return text.strip()[:HISTORY_ANSWER_MAX_CHARS]
+
 
 async def resolve_turn(
     db: AsyncSession,
@@ -39,7 +49,6 @@ async def resolve_turn(
                         ConversationTurn.conversation_id == conversation.id,
                         ConversationTurn.turn_no < turn.turn_no,
                         ConversationTurn.status == "completed",
-                        ConversationTurn.result["status"].as_string() != "direct_reply",
                     )
                     .order_by(ConversationTurn.turn_no.desc())
                     .limit(count)
@@ -52,13 +61,17 @@ async def resolve_turn(
     rows.reverse()
     turn.history_turn_ids = [r.id for r in rows]
     history = [r.question for r in rows]
-    if sum(len(q.encode()) for q in history) > get_settings().CONVERSATION_HISTORY_MAX_BYTES:
+    answers = [_history_answer(r.result) for r in rows]
+    if (
+        sum(len(q.encode()) + len(a.encode()) for q, a in zip(history, answers))
+        > get_settings().CONVERSATION_HISTORY_MAX_BYTES
+    ):
         raise AppException(
             "Lịch sử vượt budget; mở hội thoại mới hoặc giảm history_turns.",
             code="conversation_history_limit",
             status_code=422,
         )
-    messages = messages_for(turn.question, history, config)
+    messages = messages_for(turn.question, history, answers, config)
     await checkpoint(db, actor, turn)
     runtime, request, budget = await prepare_chat_request(
         db,
@@ -134,7 +147,7 @@ async def resolve_turn(
         "route": value.route,
         "needs_clarification": value.needs_clarification,
     }
-    if value.needs_clarification:
+    if value.needs_clarification and turn.turn_no > 1:
         raise Conflict(
             "Câu hỏi nối tiếp chưa rõ chủ thể; cần hỏi đầy đủ hơn.",
             code="conversation_clarification_required",

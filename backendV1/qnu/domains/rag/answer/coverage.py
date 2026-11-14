@@ -4,8 +4,6 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from qnu.platform.errors import AppException
-
 if TYPE_CHECKING:
     from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer
 
@@ -63,6 +61,13 @@ def plan_for(sources: list["EvidenceSource"], context: dict) -> dict:
     }
 
 
+def plan_ready(plan: dict) -> bool:
+    """The envelope already carries every unit the plan can prove it requires."""
+    return not plan["unresolved_references"] and all(
+        not group["unprovided_units"] for group in plan["groups"]
+    )
+
+
 def referenced_ids(answer: "ModelAnswer", coverage: CoverageReport) -> set[str]:
     """Keep every public coverage witness in the revalidated response snapshot."""
     return (
@@ -72,21 +77,21 @@ def referenced_ids(answer: "ModelAnswer", coverage: CoverageReport) -> set[str]:
     )
 
 
-def _requirements(answer: "ModelAnswer", sources: list["EvidenceSource"]) -> list[Requirement]:
+def _requirements(
+    answer: "ModelAnswer", sources: list["EvidenceSource"], issues: list[dict]
+) -> list[Requirement]:
     allowed = {s.evidence_id for s in sources}
     used = {eid for statement in answer.statements for eid in statement.evidence_ids}
     requirements = []
-    for item in answer.assessment:
-        if (
-            len(set(item.evidence_ids)) != len(item.evidence_ids)
-            or not set(item.evidence_ids) <= allowed
-        ):
-            raise AppException(
-                "Căn cứ đánh giá phạm vi không hợp lệ.",
-                code="answer_coverage_invalid",
-                status_code=502,
-                title="Phản hồi mô hình không hợp lệ",
-            )
+    for index, item in enumerate(answer.assessment):
+        ids = list(dict.fromkeys(item.evidence_ids))
+        if not set(ids) <= allowed:
+            issues.append({"path": ["assessment", index, "evidence_ids"], "type": "not_allowed"})
+            requirements.append(item.model_copy(update={"status": "missing", "evidence_ids": []}))
+            continue
+        if len(ids) != len(item.evidence_ids):
+            issues.append({"path": ["assessment", index, "evidence_ids"], "type": "duplicate"})
+            item = item.model_copy(update={"evidence_ids": ids})
         if item.status == "covered" and (
             not item.evidence_ids or not set(item.evidence_ids) <= used
         ):
@@ -138,9 +143,18 @@ def _scope_status(context: dict, structures: list[StructuralCoverage]) -> str:
     )
 
 
-def assess(answer: "ModelAnswer", sources: list["EvidenceSource"], context: dict) -> CoverageReport:
+def assess(
+    answer: "ModelAnswer",
+    sources: list["EvidenceSource"],
+    context: dict,
+    *,
+    report: dict | None = None,
+) -> CoverageReport:
     """Structural citation coverage complements, but never replaces, entailment checks."""
-    requirements = _requirements(answer, sources)
+    issues: list[dict] = []
+    requirements = _requirements(answer, sources, issues)
+    if report is not None and issues:
+        report["assessment_issues"] = issues
     structures = _structures(answer, sources, context)
     scope_status = _scope_status(context, structures)
     partial = (

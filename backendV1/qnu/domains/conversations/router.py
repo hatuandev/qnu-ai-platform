@@ -48,8 +48,9 @@ async def listing(
     actor: Actor,
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    assistant_id: str | None = Query(None, max_length=64),
 ):
-    return await service.listing(db, actor, workspace_id, limit, offset)
+    return await service.listing(db, actor, workspace_id, limit, offset, assistant_id)
 
 
 @router.get("/{conversation_id}", response_model=ConversationResponse)

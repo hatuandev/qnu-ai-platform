@@ -1,11 +1,13 @@
 from datetime import UTC, datetime
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from qnu.domains.answer_review.models import AnswerReview
 from qnu.domains.assistants.models import Assistant
 from qnu.domains.assistants.schemas import AssistantConfig, AssistantReadiness, AssistantUpdate
+from qnu.domains.conversations.models import Conversation, ConversationTurn
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.index.models import IndexInput, IndexRun, IndexSync
@@ -14,6 +16,7 @@ from qnu.domains.knowledge.policies.access import load_collection
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.lifecycle.effects import cancel_related_jobs
 from qnu.domains.lifecycle.guards import require_available, visible
+from qnu.domains.lifecycle.models import ResourceState
 from qnu.domains.modelops.public_api import assert_provider_allowed
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.rag.policy import RagPolicy
@@ -156,6 +159,103 @@ async def save_assistant(
     await db.commit()
     await db.refresh(row)
     return row
+
+
+async def delete_assistant(
+    db: AsyncSession, actor: AuthActor, workspace_id: str, assistant_id: str
+) -> dict[str, int]:
+    """Permanently removes an assistant, including its trash state and dependent chats.
+
+    Collection purge checks every ``chat_assistants`` row, so a soft-deleted row would
+    keep the collection locked forever; this is the only path that frees it. Chat turns,
+    conversations and answer reviews reference the assistant with RESTRICT, so they are
+    deleted in dependency order inside the same transaction.
+    """
+    await resolve_workspace_access(
+        db, actor, workspace_id, required_roles=("admin",), for_update=True
+    )
+    row = await db.scalar(
+        select(Assistant)
+        .where(Assistant.id == assistant_id, Assistant.workspace_id == workspace_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if row is None:
+        raise EntityNotFound("Không tìm thấy trợ lý.", code="assistant_not_found")
+    cancelled_turns = await cancel_related_jobs(db, workspace_id, "assistant", row)
+    conversation_ids = list(
+        (
+            await db.scalars(
+                select(Conversation.id).where(
+                    Conversation.workspace_id == workspace_id,
+                    Conversation.assistant_id == assistant_id,
+                )
+            )
+        ).all()
+    )
+    turns_deleted = (
+        await db.execute(
+            delete(ConversationTurn).where(
+                ConversationTurn.workspace_id == workspace_id,
+                ConversationTurn.conversation_id.in_(conversation_ids),
+            )
+        )
+    ).rowcount
+    reviews_deleted = (
+        await db.execute(
+            delete(AnswerReview).where(
+                AnswerReview.workspace_id == workspace_id,
+                AnswerReview.assistant_id == assistant_id,
+            )
+        )
+    ).rowcount
+    conversations_deleted = (
+        await db.execute(
+            delete(Conversation).where(
+                Conversation.workspace_id == workspace_id,
+                Conversation.assistant_id == assistant_id,
+            )
+        )
+    ).rowcount
+    # Lifecycle rows carry no foreign key; remove them explicitly so a restore
+    # cannot resurrect a state for an identifier that no longer exists.
+    await db.execute(
+        delete(ResourceState).where(
+            ResourceState.workspace_id == workspace_id,
+            ResourceState.kind == "conversation",
+            ResourceState.resource_id.in_(conversation_ids),
+        )
+    )
+    await db.execute(
+        delete(ResourceState).where(
+            ResourceState.workspace_id == workspace_id,
+            ResourceState.kind == "assistant",
+            ResourceState.resource_id == assistant_id,
+        )
+    )
+    await db.delete(row)
+    await record_workspace_event(
+        db,
+        workspace_id=workspace_id,
+        actor=actor,
+        action="assistant.deleted",
+        detail={
+            "assistant_id": assistant_id,
+            "revision": row.revision,
+            "collection_id": row.collection_id,
+            "cancelled_turns": cancelled_turns,
+            "conversations_deleted": conversations_deleted,
+            "turns_deleted": turns_deleted,
+            "answer_reviews_deleted": reviews_deleted,
+        },
+    )
+    await db.commit()
+    return {
+        "conversations_deleted": conversations_deleted,
+        "turns_deleted": turns_deleted,
+        "answer_reviews_deleted": reviews_deleted,
+        "cancelled_turns": cancelled_turns,
+    }
 
 
 async def assistant_readiness(

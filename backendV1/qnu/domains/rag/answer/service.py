@@ -20,15 +20,20 @@ from qnu.domains.rag.answer.cells import PROJECTION_VERSION, materialize
 from qnu.domains.rag.answer.cells import VERSION as CELLS_VERSION
 from qnu.domains.rag.answer.context import expand_context
 from qnu.domains.rag.answer.coverage import VERSION as COVERAGE_VERSION
-from qnu.domains.rag.answer.coverage import assess, referenced_ids
+from qnu.domains.rag.answer.coverage import assess, plan_for, plan_ready, referenced_ids
 from qnu.domains.rag.answer.drafting import (
+    APPEAL_VERSION,
     PROMPT_VERSION,
+    REPAIR_INSTRUCTIONS,
+    appeal_messages,
+    name_repair_schema,
     output_schema,
     parse_answer,
     payload_metrics,
     response_observation,
     sources_for,
 )
+from qnu.domains.rag.answer.fallback import compose as compose_fallback
 from qnu.domains.rag.answer.narrative import continuation_supports
 from qnu.domains.rag.answer.packing import pack_messages as _pack_messages
 from qnu.domains.rag.answer.projection import PAYLOAD_VERSION
@@ -62,9 +67,11 @@ async def answer(
     req: AnswerRequest,
     *,
     retrieval_query: str | None = None,
+    clarify_source_reference: bool = False,
     persona: str = "",
     checkpoint: Callable[[], Awaitable[None]] | None = None,
     reranker: Reranker | None = None,
+    compose_insufficient_message: bool = False,
 ) -> AnswerResponse:
     answer_id = "ans_" + uuid.uuid4().hex
     trace = AnswerTrace(
@@ -96,6 +103,11 @@ async def answer(
     )
     trace.stage_ms["retrieval"] = round((time.monotonic() - request_started) * 1000, 3)
     trace.retrieval = retrieval.trace
+    if clarify_source_reference and len({hit.document_id for hit in retrieval.hits}) > 1:
+        raise Conflict(
+            "Có nhiều tài liệu phù hợp. Bạn muốn hỏi về văn bản nào?",
+            code="conversation_clarification_required",
+        )
     response = AnswerResponse(
         id=answer_id,
         status="insufficient_evidence",
@@ -103,6 +115,24 @@ async def answer(
         generation=retrieval.generation,
         trace=trace,
     )
+
+    async def compose_message(reason: str) -> None:
+        started = time.monotonic()
+        response.message, info = await compose_fallback(
+            db,
+            chat,
+            actor,
+            workspace_id,
+            req.provider_id,
+            req.question,
+            reason,
+            persona,
+            idempotency=answer_id,
+            checkpoint=checkpoint,
+        )
+        trace.fallback = info
+        trace.stage_ms["fallback"] = round((time.monotonic() - started) * 1000, 3)
+
     context_started = time.monotonic()
     bundles = {}
     retrieval, trace.context = await expand_context(
@@ -120,6 +150,8 @@ async def answer(
     if not retrieval.hits:
         response.reason = retrieval.status
         trace.verification["skip_reason"] = "no_evidence"
+        if compose_insufficient_message:
+            await compose_message(response.reason)
         trace.stage_ms["total"] = round((time.monotonic() - request_started) * 1000, 3)
         return response
     selected_hits, selection = select_hits(
@@ -239,6 +271,7 @@ async def answer(
                 "configuration_hash": runtime.configuration_hash,
                 "inference_configuration_hash": inference_hash,
                 "prompt_version": PROMPT_VERSION,
+                "appeal_version": APPEAL_VERSION,
                 "messages_sha256": digest(
                     [{"role": m.role, "content": m.content} for m in messages]
                 ),
@@ -261,7 +294,7 @@ async def answer(
         try:
             proposed = parse_answer(cached.content, sources)
             draft = materialize(proposed, sources, cells, report=materialization)
-            coverage = assess(draft, sources, trace.context)
+            coverage = assess(draft, sources, trace.context, report=materialization)
         except AppException:
             await answer_cache.discard(cache_key)
             cached = None
@@ -269,6 +302,17 @@ async def answer(
     trace.provider_id, trace.model_name = runtime.provider_id, runtime.model_name
     trace.configuration_hash = runtime.configuration_hash
     trace.routing = list(runtime.routing_trace)
+    async def safety_check():
+        if proof != await validate_results(
+            db, blob, vectors, actor, workspace_id, collection_id, retrieval, req.document_ids
+        ):
+            raise Conflict("Evidence thay đổi khi model trả lời.", code="answer_evidence_changed")
+        current = await resolve_chat_runtime(db, workspace_id, runtime.provider_id)
+        if current.inference_configuration_hash("answer") != inference_hash:
+            raise Conflict("Model chat đã thay đổi khi trả lời.", code="chat_provider_changed")
+        if checkpoint is not None:
+            await checkpoint()
+
     usage = None
     if cached is None:
         usage = await usage_service.reserve(
@@ -296,17 +340,7 @@ async def answer(
         trace.usage_id = usage.id
         try:
             # Reservation commits. Recheck before HTTP, then release locks during inference.
-            if proof != await validate_results(
-                db, blob, vectors, actor, workspace_id, collection_id, retrieval, req.document_ids
-            ):
-                raise Conflict(
-                    "Evidence thay đổi trước khi gọi model.", code="answer_evidence_changed"
-                )
-            current = await resolve_chat_runtime(db, workspace_id, runtime.provider_id)
-            if current.inference_configuration_hash("answer") != inference_hash:
-                raise Conflict("Model chat đã thay đổi.", code="chat_provider_changed")
-            if checkpoint is not None:
-                await checkpoint()
+            await safety_check()
             await db.commit()
         except (Exception, asyncio.CancelledError):
             # No chat request was sent; this reservation consumed zero chat tokens.
@@ -334,12 +368,14 @@ async def answer(
             "output_budget": result.budget_trace,
             **response_observation(result),
         }
+        materialization = {}
+        first_error = None
         try:
             proposed = parse_answer(result.content, sources)
-            materialization = {}
             draft = materialize(proposed, sources, cells, report=materialization)
-            coverage = assess(draft, sources, trace.context)
+            coverage = assess(draft, sources, trace.context, report=materialization)
         except AppException as exc:
+            first_error = exc
             await record_workspace_event(
                 db,
                 workspace_id=workspace_id,
@@ -360,10 +396,206 @@ async def answer(
                     "prompt_version": PROMPT_VERSION,
                     "reasoning": trace.reasoning,
                     "contract": trace.contract,
+                    # IDs, counts and hashes only: a failed turn keeps the
+                    # evidence shape without storing private source text.
+                    "context_trace": {
+                        "primary_ids": trace.context.get("primary_ids", []),
+                        "added": trace.context.get("added", []),
+                        "rank_band": trace.context.get("rank_band", []),
+                        "table_support": trace.context.get("table_support"),
+                        "unresolved_support_ids": trace.context.get("unresolved_support_ids", []),
+                        "selection": trace.context.get("selection", {}),
+                        "bytes_used": trace.context.get("bytes_used"),
+                        "packing": trace.context.get("packing", {}),
+                        "materialization": materialization,
+                    },
+                    "grounding": trace.grounding,
                 },
             )
             await db.commit()
-            raise
+            if first_error.code not in REPAIR_INSTRUCTIONS:
+                raise
+        trace.appeal = {"attempted": False}
+        if first_error is not None or draft.status == "insufficient_evidence":
+            repair_code = first_error.code if first_error is not None else None
+            trace.appeal = {
+                "version": APPEAL_VERSION,
+                "attempted": False,
+                "trigger": repair_code or "insufficient_evidence",
+                "outcome": "skipped_structure",
+            }
+            if plan_ready(plan_for(sources, trace.context)):
+                needs = selection.get("needs", {})
+                list_names = (
+                    repair_code == "answer_table_value_not_extractive"
+                    and needs.get("enumeration")
+                    and not needs.get("single_value")
+                )
+                # A leading unselectable table may be the very list requested.
+                # In that case names must come verbatim from its original text.
+                unavailable = {item["evidence_id"] for item in cells["issues"]}
+                prefer_names = list_names and sources[0].evidence_id not in unavailable
+                names_schema = name_repair_schema(answer_schema, cells) if prefer_names else None
+                retry_schema = names_schema or answer_schema
+                retry_messages = appeal_messages(
+                    messages,
+                    repair_code,
+                    names_only=names_schema is not None,
+                    list_names=list_names,
+                )
+                try:
+                    retry_runtime, retry_request, retry_budget = await prepare_chat_request(
+                        db,
+                        actor,
+                        workspace_id,
+                        retry_messages,
+                        provider_id=runtime.provider_id,
+                        task="answer",
+                        reasoning_task="answer",
+                        max_output_tokens=req.max_output_tokens,
+                        output_schema=retry_schema,
+                    )
+                except AppException as exc:
+                    if exc.code not in {
+                        "model_input_limit_exceeded",
+                        "model_output_limit_exceeded",
+                        "model_context_limit_exceeded",
+                    }:
+                        raise
+                    trace.appeal.update({"outcome": "skipped_budget", "code": exc.code})
+                else:
+                    if retry_runtime.inference_configuration_hash("answer") != inference_hash:
+                        raise Conflict("Model chat đã thay đổi.", code="chat_provider_changed")
+                    trace.appeal.update({"attempted": True, "outcome": "failed"})
+        if trace.appeal["attempted"]:
+            trace.appeal["schema_sha256"] = digest(retry_schema)
+            appeal_usage = await usage_service.reserve(
+                db,
+                actor,
+                workspace_id,
+                "chat",
+                answer_id + ":appeal",
+                digest(
+                    {
+                        "question": req.question,
+                        "evidence": proof,
+                        "config": runtime.configuration_hash,
+                        "inference_config": inference_hash,
+                        "prompt_version": PROMPT_VERSION,
+                        "appeal_version": APPEAL_VERSION,
+                        "trigger": trace.appeal["trigger"],
+                        "messages_sha256": digest([m.content for m in retry_messages]),
+                        "schema_sha256": trace.appeal["schema_sha256"],
+                        "cell_catalog_sha256": trace.grounding["catalog_sha256"],
+                        "metadata_filter": req.metadata_filter.model_dump(
+                            mode="json", exclude_none=True
+                        ),
+                    }
+                ),
+                retry_budget.total_reserved_tokens,
+                runtime.provider_id,
+            )
+            trace.appeal["usage_id"] = appeal_usage.id
+            try:
+                await safety_check()
+                await db.commit()
+            except (Exception, asyncio.CancelledError):
+                await usage_service.settle(db, appeal_usage.id, total_tokens=0, failed=True)
+                raise
+            appeal_started = time.monotonic()
+            try:
+                appeal_result = await chat.complete(
+                    retry_messages, bind_usage(retry_request, appeal_usage.id)
+                )
+            except ChatResponseError as exc:
+                await usage_service.settle(
+                    db, appeal_usage.id, total_tokens=exc.usage_tokens, failed=True
+                )
+                trace.appeal.update({"outcome": "provider_error", "code": exc.code})
+            except (Exception, asyncio.CancelledError):
+                await usage_service.settle(db, appeal_usage.id, total_tokens=None, failed=True)
+                raise
+            else:
+                await usage_service.settle(
+                    db, appeal_usage.id, total_tokens=appeal_result.total_tokens
+                )
+                trace.stage_ms["appeal"] = round((time.monotonic() - appeal_started) * 1000, 3)
+                trace.appeal.update(
+                    {
+                        "prompt_tokens": appeal_result.prompt_tokens,
+                        "completion_tokens": appeal_result.completion_tokens,
+                        "total_tokens": appeal_result.total_tokens,
+                    }
+                )
+                appeal_report = {}
+                try:
+                    appeal_proposed = parse_answer(appeal_result.content, sources)
+                    if names_schema is not None:
+                        allowed_names = set(
+                            names_schema["$defs"]["CellSelection"]["properties"]["cell_id"]["enum"]
+                        )
+                        if appeal_proposed.statements or any(
+                            item.cell_id not in allowed_names for item in appeal_proposed.lookups
+                        ):
+                            raise AppException(
+                                "Lượt sửa phải chọn tên trong danh mục.",
+                                code="answer_cell_invalid",
+                                status_code=502,
+                            )
+                    appeal_draft = materialize(
+                        appeal_proposed, sources, cells, report=appeal_report
+                    )
+                    appeal_coverage = assess(
+                        appeal_draft, sources, trace.context, report=appeal_report
+                    )
+                except AppException as exc:
+                    trace.appeal.update(
+                        {
+                            "outcome": "invalid",
+                            "code": exc.code,
+                            "issues": getattr(exc, "validation_issues", [])[:20],
+                        }
+                    )
+                else:
+                    repaired_abstention = (
+                        first_error is not None
+                        and first_error.code == "answer_table_value_not_extractive"
+                        and names_schema is None
+                        and bool(appeal_draft.message)
+                    )
+                    if appeal_draft.status == "answered" or repaired_abstention:
+                        trace.appeal["first_tokens"] = {
+                            "prompt_tokens": trace.prompt_tokens,
+                            "completion_tokens": trace.completion_tokens,
+                            "total_tokens": trace.total_tokens,
+                        }
+                        result, proposed, draft = appeal_result, appeal_proposed, appeal_draft
+                        coverage, materialization = appeal_coverage, appeal_report
+                        trace.prompt_tokens = result.prompt_tokens
+                        trace.completion_tokens = result.completion_tokens
+                        trace.total_tokens = result.total_tokens
+                        trace.contract = {
+                            "schema_sha256": digest(retry_schema),
+                            "finish_reason": result.finish_reason,
+                            "output_budget": result.budget_trace,
+                            **response_observation(result),
+                        }
+                        trace.appeal["outcome"] = (
+                            "answered" if draft.status == "answered" else "safe_abstention"
+                        )
+                        first_error = None
+                    else:
+                        trace.appeal["outcome"] = "still_insufficient"
+        if first_error is not None:
+            await record_workspace_event(
+                db,
+                workspace_id=workspace_id,
+                actor=actor,
+                action="answer.repair_failed",
+                detail={"answer_id": answer_id, **trace.appeal},
+            )
+            await db.commit()
+            raise first_error
     else:
         trace.cache = {
             "version": answer_cache.VERSION,
@@ -404,17 +636,6 @@ async def answer(
         trace.grounding["materialization"] = materialization
     started = time.monotonic()
 
-    async def safety_check():
-        if proof != await validate_results(
-            db, blob, vectors, actor, workspace_id, collection_id, retrieval, req.document_ids
-        ):
-            raise Conflict("Evidence thay đổi khi model trả lời.", code="answer_evidence_changed")
-        current = await resolve_chat_runtime(db, workspace_id, runtime.provider_id)
-        if current.inference_configuration_hash("answer") != inference_hash:
-            raise Conflict("Model chat đã thay đổi khi trả lời.", code="chat_provider_changed")
-        if checkpoint is not None:
-            await checkpoint()
-
     await safety_check()
     trace.stage_ms["validation"] = round((time.monotonic() - started) * 1000, 3)
     if draft.status == "answered" and req.verification_mode != "off":
@@ -441,9 +662,16 @@ async def answer(
             response.answer, response.statements = None, []
             response.coverage = coverage.model_copy(update={"status": "insufficient"})
             trace.coverage["status"] = "insufficient"
+            if compose_insufficient_message:
+                await compose_message(response.reason)
     else:
         response.reason = "model_abstained"
         trace.verification["skip_reason"] = "model_abstained"
+        if draft.message:
+            response.message = draft.message
+            trace.fallback = {"source": "draft", "version": PROMPT_VERSION}
+        elif compose_insufficient_message:
+            await compose_message(response.reason)
     if (
         cache_key is not None
         and cached is None

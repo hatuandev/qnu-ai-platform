@@ -13,7 +13,7 @@ TABLE_FIELDS = (
     "rows",
     "page_notes",
 )
-PRESENTATION_VERSION = "qnu.evidence-reading/v1"
+PRESENTATION_VERSION = "qnu.evidence-reading/v2"
 
 
 def table_prefix(hit: SearchHit) -> str | None:
@@ -22,11 +22,21 @@ def table_prefix(hit: SearchHit) -> str | None:
         return None
     if not all(key in structure for key in TABLE_FIELDS):
         return None
-    duplicate = json.dumps(
-        {key: structure[key] for key in TABLE_FIELDS}, ensure_ascii=False, sort_keys=True
-    )
     text = original_text(hit)
-    return text[: -len(duplicate)] if text.endswith(duplicate) else None
+    head, separator, tail = text.rpartition("\n")
+    if not separator:
+        return None
+    try:
+        serialized = json.loads(tail)
+    except ValueError:
+        return None
+    if not isinstance(serialized, dict) or not all(key in serialized for key in TABLE_FIELDS):
+        return None
+    # Split table groups add metadata such as rowspan_split to the sealed tail;
+    # every serialized value must still match this chunk before reinterpreting it.
+    if any(structure.get(key) != value for key, value in serialized.items()):
+        return None
+    return head + separator
 
 
 def reading_text(hit: SearchHit) -> str:

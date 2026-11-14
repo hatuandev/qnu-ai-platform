@@ -12,10 +12,12 @@ from qnu.domains.rag.answer.narrative import complete_citations
 from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer, Statement
 from qnu.platform.errors import AppException
 
-VERSION = "qnu.answer-cells/v10"
+VERSION = "qnu.answer-cells/v13"
 PROJECTION_VERSION = "qnu.answer-projection/v7"
 
 _YEAR = re.compile(r"^(?:19|20)\d{2}$")
+_NUMERIC_CODE = re.compile(r"\d[\dA-Z]*(?:[-./]\d[\dA-Z]*)*")
+_PARENTHESIZED_LIST = re.compile(r"(?:\([^()\n]+\)\s*)+")
 _ORDINAL = re.compile(r"(?m)(?:^|(?<=[;\n]))\s*\d{1,2}[.)](?=\s)")
 # "Bảng 7", "Điều 14" name a document object; the digits are not data.
 _STRUCTURAL_REF = re.compile(
@@ -59,7 +61,12 @@ def _ref(source, position):
     return ref if evidence and ref in source.citations else None
 
 
-def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> dict:
+def catalog(
+    sources: list[EvidenceSource],
+    links: list[dict] | None = None,
+    *,
+    include_names: bool = False,
+) -> dict:
     """No cross-publication joins or header inference from neighboring text."""
     by_chunk = {s.chunk_id: s for s in sources}
     relationships = {link["chunk_id"]: link for link in links or []}
@@ -72,7 +79,20 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
         for link in links or []
         if link.get("header") and any(key in by_chunk for key in link.get("support_ids", []))
     }
+    # A retrieved fragment can establish the header for a sibling of the
+    # same physical table added later by contextual reading.
+    sibling_headers = {}
+    for link in links or []:
+        anchor = by_chunk.get(link["chunk_id"])
+        if anchor is not None:
+            ref = (anchor.structure or {}).get("source_table_citation")
+            if ref:
+                sibling_headers.setdefault(
+                    (anchor.document_id, anchor.version_id, anchor.publication_decision_id, ref),
+                    link,
+                )
     tables, issues = [], []
+    list_continuations = []
     for source in sources:
         structure = source.structure or {}
         if source.kind != "table" or "rows" not in structure:
@@ -86,7 +106,10 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
         link = relationships.get(source.chunk_id)
         header_link = link or support_headers.get(source.chunk_id)
         if not header_link:
-            header_link = family_links.get(structure.get("source_table_citation"))
+            ref = structure.get("source_table_citation")
+            header_link = sibling_headers.get(
+                (source.document_id, source.version_id, source.publication_decision_id, ref)
+            ) or family_links.get(ref)
         # A proven multi-tier header may be only partially marked in the source
         # fragment. Its dependency already proved every tier; never let partial
         # flags collapse two metric tiers into one ambiguous column path.
@@ -178,6 +201,12 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
                 and any(ch.isalpha() for ch in p.cell["text"])
                 and _ref(origin, p)
             ]
+            # An identifier split by a line wrap can contain letters, e.g.
+            # 120045\nAB. Prefer the following named field as the row label.
+            if len(labels) > 1 and _NUMERIC_CODE.fullmatch(
+                "".join(labels[0].cell["text"].split())
+            ):
+                labels = labels[1:]
             # A value without a named subject is ambiguous; never label it with row number.
             if not labels:
                 # Numeric lookup keys are subjects too (e.g. a conversion grid).
@@ -214,7 +243,12 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
                 row_subjects = [s for s in subjects if s.column < p.column] or [label]
                 field = fields.get(str(p.column))
                 ref = _ref(source, p)
-                if not field or not ref or not p.cell["text"].strip() or p == label:
+                row_name = include_names and origin is source and p == label and any(
+                    ch.isalpha() for ch in p.cell["text"]
+                )
+                if (
+                    not field or not ref or not p.cell["text"].strip() or (p == label and not row_name)
+                ):
                     continue
                 # A merged data cell is addressable only if every covered column has
                 # exactly the same header path; otherwise its field is ambiguous.
@@ -242,6 +276,7 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
                         "subject_labels": [s.cell["text"] for s in row_subjects],
                         "column": p.column,
                         "value": p.cell["text"],
+                        **({"row_name": True} if row_name else {}),
                         "evidence_ids": ids,
                         "source_cells": list(
                             dict.fromkeys(
@@ -259,8 +294,42 @@ def catalog(sources: list[EvidenceSource], links: list[dict] | None = None) -> d
                         ),
                     }
                 )
+                if row == 0 and previous is not None and origin is previous:
+                    previous_row = max(previous.structure["row_indices"])
+                    list_continuations.append(
+                        (
+                            f"{previous.evidence_id}:r{previous_row}:k{p.column}",
+                            f"{source.evidence_id}:r{row}:k{p.column}",
+                        )
+                    )
         tables.append({"evidence_id": source.evidence_id, "fields": fields, "cells": entries})
-    return {"version": VERSION, "tables": tables, "issues": issues}
+    return {
+        "version": VERSION,
+        "tables": tables,
+        "issues": issues,
+        "list_continuations": list_continuations,
+    }
+
+
+def join_continued_lists(tables: list[dict], continuations: list[tuple[str, str]]) -> None:
+    """Keep proven fragments whole only when both survived scope filtering."""
+    by_id = {cell["cell_id"]: cell for table in tables for cell in table["cells"]}
+    for left_id, right_id in continuations:
+        left, right = by_id.get(left_id), by_id.get(right_id)
+        if (
+            not left or not right
+            or left["subject_labels"] != right["subject_labels"]
+            or not all(_PARENTHESIZED_LIST.fullmatch(c["value"].strip()) for c in (left, right))
+        ):
+            continue
+        joined = {
+            "value": left["value"].rstrip() + "\n" + right["value"].lstrip(),
+            "evidence_ids": list(dict.fromkeys(left["evidence_ids"] + right["evidence_ids"])),
+            "source_cells": list(dict.fromkeys(left["source_cells"] + right["source_cells"])),
+            "joined_list_id": left_id,
+        }
+        left.update(joined)
+        right.update(joined)
 
 
 def _numbers(text: str) -> set[str]:
@@ -680,28 +749,30 @@ def materialize(
     allowed = {
         cell["cell_id"]: (table, cell) for table in cells["tables"] for cell in table["cells"]
     }
-    selected = [item.cell_id for item in answer.lookups]
-    seen = set()
-    issues = []
-    for index, key in enumerate(selected):
+    selected, rejected, seen = [], [], set()
+    for index, item in enumerate(answer.lookups):
+        key = item.cell_id
         if key in seen:
-            issue_type = "duplicate"
+            rejected.append({"path": ["lookups", index, "cell_id"], "type": "duplicate"})
         elif key not in allowed:
-            issue_type = "not_in_catalog"
+            rejected.append({"path": ["lookups", index, "cell_id"], "type": "not_in_catalog"})
         else:
-            issue_type = None
+            selected.append(key)
         seen.add(key)
-        if issue_type:
-            issues.append({"path": ["lookups", index, "cell_id"], "type": issue_type})
-    if issues:
-        error = AppException(
-            "Ô được chọn không thuộc bằng chứng.",
-            code="answer_cell_invalid",
-            status_code=502,
-            title="Ô bảng mô hình chọn không hợp lệ",
-        )
-        error.validation_issues = issues[:20]
-        raise error
+    if rejected:
+        if report is not None:
+            report["rejected_lookups"] = rejected
+        # One malformed identifier must not discard the valid cells beside it;
+        # a lookup set with no valid cell still fails the whole answer.
+        if not selected:
+            error = AppException(
+                "Ô được chọn không thuộc bằng chứng.",
+                code="answer_cell_invalid",
+                status_code=502,
+                title="Ô bảng mô hình chọn không hợp lệ",
+            )
+            error.validation_issues = rejected[:20]
+            raise error
     structured = {s.evidence_id for s in sources if s.kind == "table"}
     selectable = {t["evidence_id"] for t in cells["tables"] if t["cells"]}
     # Selectable tables keep the cell-selection contract. Unselectable tables have
@@ -758,13 +829,35 @@ def materialize(
         and (not selected or not selectable.intersection(s.evidence_ids))
     ]
     complete_citations(statements, sources)
+    emitted_names, emitted_lists = set(), set()
+    by_evidence = {source.evidence_id: source for source in sources}
     for key in selected:
         table, cell = allowed[key]
+        if cell.get("row_name"):
+            source = by_evidence[table["evidence_id"]]
+            name_key = (
+                source.document_id,
+                source.version_id,
+                source.publication_decision_id,
+                _normalized(cell["value"]),
+            )
+            if name_key in emitted_names:
+                continue
+            emitted_names.add(name_key)
+        if list_id := cell.get("joined_list_id"):
+            if list_id in emitted_lists:
+                continue
+            emitted_lists.add(list_id)
         field = " / ".join(table["fields"][str(cell["column"])])
+        text = (
+            " ".join(cell["value"].split())
+            if cell.get("row_name")
+            else f"{cell['subject']} — {field}: {cell['value']}"
+        )
         try:
             statements.append(
                 Statement(
-                    text=f"{cell['subject']} — {field}: {cell['value']}",
+                    text=text,
                     evidence_ids=cell["evidence_ids"],
                 )
             )
@@ -786,16 +879,16 @@ def materialize(
         )
         error.validation_issues = [{"path": ["statements"], "type": "too_many_statements"}]
         raise error
-    return ModelAnswer(status=answer.status, statements=statements, assessment=answer.assessment)
+    return ModelAnswer(
+        status=answer.status,
+        statements=statements,
+        assessment=answer.assessment,
+        message=answer.message,
+    )
 
 
 def prompt_catalog(cells: dict) -> dict:
-    """One presentation per value: header path, subject, value and compact cell key.
-
-    The table ID plus row and column keys compose the full server cell ID; the
-    repeated ID prefix is not sent per cell. Geometry, spans, source cells and
-    citation refs stay in the server catalog.
-    """
+    """Expose exact lookup IDs beside values while keeping provenance server-side."""
     tables, unselectable = [], []
     omitted = set(cells.get("selection", {}).get("omitted_tables", []))
     for table in cells["tables"]:
@@ -805,13 +898,16 @@ def prompt_catalog(cells: dict) -> dict:
             continue
         rows, order = {}, []
         for cell in table["cells"]:
-            _, row, column = cell["cell_id"].rsplit(":", 2)
+            _, row, _ = cell["cell_id"].rsplit(":", 2)
             if row not in rows:
                 rows[row] = {"row": row, "subject": cell["subject"], "cells": {}}
                 order.append(row)
             elif len(cell["subject"]) > len(rows[row]["subject"]):
                 rows[row]["subject"] = cell["subject"]
-            rows[row]["cells"][column] = cell["value"]
+            if cell.get("row_name"):
+                rows[row]["name_id"] = cell["cell_id"]
+            else:
+                rows[row]["cells"][cell["cell_id"]] = cell["value"]
         columns = {f"k{column}": " / ".join(path) for column, path in table["fields"].items()}
         tables.append(
             {
@@ -822,6 +918,9 @@ def prompt_catalog(cells: dict) -> dict:
                         "row": rows[row]["row"],
                         "subject": rows[row]["subject"],
                         "cells": rows[row]["cells"],
+                        **(
+                            {"name_id": rows[row]["name_id"]} if "name_id" in rows[row] else {}
+                        ),
                     }
                     for row in order
                 ],

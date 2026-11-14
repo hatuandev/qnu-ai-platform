@@ -40,9 +40,9 @@ class FakeAnswerChat(FakeNemotron):
         }
         # The fake follows the production table contract; negative modes below
         # deliberately keep malformed prose/citations to exercise rejection.
-        if self.mode in {"ok", "mixed_lookup", "mixed_narrative"}:
+        if self.mode in {"ok", "mixed_lookup", "mixed_narrative", "repair_cell"}:
             choices = [
-                {"cell_id": f"{t['id']}:{row['row']}:{key}", "value": value}
+                {"cell_id": key, "value": value}
                 for t in incoming.get("tables", [])
                 for row in t["rows"]
                 for key, value in row["cells"].items()
@@ -66,7 +66,7 @@ class FakeAnswerChat(FakeNemotron):
                     value["statements"] = [
                         {"text": paragraph["text"], "evidence_ids": [paragraph["id"]]}
                     ]
-        if self.mode == "foreign_cell":
+        if self.mode == "foreign_cell" or (self.mode == "repair_cell" and index == 0):
             value = {"status": "answered", "statements": [], "lookups": [{"cell_id": "E999:r1:k2"}]}
         if self.mode == "abstain":
             value = {"status": "insufficient_evidence", "statements": []}
@@ -181,7 +181,9 @@ def test_answer_returns_only_server_bound_sources(client, ready):
     assert sent["response_format"]["type"] == "json_schema"
     contract = sent["response_format"]["json_schema"]
     assert contract["strict"] is True
-    assert set(contract["schema"]["required"]) == {"status", "statements", "lookups", "assessment"}
+    assert set(contract["schema"]["required"]) == {
+        "status", "statements", "lookups", "assessment", "message"
+    }
     assert sent["model"] == "test-chat"
     assert "revision_id" not in sent["messages"][-1]["content"]
 
@@ -190,16 +192,16 @@ def test_answer_projection_preserves_published_table_and_prompt_contract(client,
     response = ask(client, ready)
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["trace"]["prompt_version"] == "qnu.rag.answer/v28"
+    assert body["trace"]["prompt_version"] == "qnu.rag.answer/v35"
     assert body["trace"]["grounding"]["selected_cells"]
     selection = body["trace"]["context"]["selection"]
     packing = body["trace"]["context"]["packing"]
     assert selection["version"] == "qnu.rag.selection/v2"
     assert selection["selected_count"] >= 1
-    assert packing["payload_version"] == "qnu.answer-payload/v3"
+    assert packing["payload_version"] == "qnu.answer-payload/v4"
     assert packing["system_prompt_bytes"] and packing["component_bytes"]["evidence"] > 0
     assert packing["request_bytes_estimate"] > packing["system_prompt_bytes"]
-    assert body["trace"]["grounding"]["payload_version"] == "qnu.answer-payload/v3"
+    assert body["trace"]["grounding"]["payload_version"] == "qnu.answer-payload/v4"
     sent = json.loads(ready["answer_chat"].requests[0]["body"]["messages"][-1]["content"])
     schema = ready["answer_chat"].requests[0]["body"]["response_format"]["json_schema"]["schema"]
     assert schema["$defs"]["Statement"]["properties"]["evidence_ids"]["items"]["enum"] == [
@@ -214,11 +216,14 @@ def test_answer_projection_preserves_published_table_and_prompt_contract(client,
     table = next(t for t in sent["tables"] if t["id"] == source["evidence_id"])
     assert table["columns"] and table["rows"]
     assert all(
-        re.fullmatch(r"E[1-9]\d*:r\d+:k\d+", f"{table['id']}:{row['row']}:{key}")
+        re.fullmatch(r"E[1-9]\d*:r\d+:k\d+", key)
         for row in table["rows"]
         for key in row["cells"]
     )
     assert "source_cells" not in json.dumps(table)
+    assert set(schema["$defs"]["CellSelection"]["properties"]["cell_id"]["enum"]) == {
+        cell_id for entry in sent["tables"] for row in entry["rows"] for cell_id in row["cells"]
+    }
     # Full source geometry remains available to the backend contract.
     assert source["structure"]["source_table_citation"] in source["citations"]
 
@@ -241,7 +246,23 @@ def test_invalid_answer_is_an_error_not_no_data(client, ready, mode, code):
     response = ask(client, ready)
     assert response.status_code >= 400, response.text
     assert response.json()["code"] == code
-    assert len(ready["answer_chat"].requests) == 1
+    expected_calls = 2 if mode in {"foreign_cell", "numeric_prose"} else 1
+    assert len(ready["answer_chat"].requests) == expected_calls
+
+
+def test_repairs_bad_selection_once_using_same_evidence(client, ready):
+    chat = ready["answer_chat"]
+    chat.mode = "repair_cell"
+    response = ask(client, ready)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "answered" and "150" in body["answer"]
+    assert body["trace"]["appeal"]["trigger"] == "answer_cell_invalid"
+    assert body["trace"]["appeal"]["outcome"] == "answered"
+    first, retry = [call["body"] for call in chat.requests]
+    assert first["messages"][-1] == retry["messages"][-1]
+    assert first["response_format"] == retry["response_format"]
+    assert "lookups[].cell_id" in retry["messages"][0]["content"]
 
 
 def test_model_can_abstain_without_fabricated_answer(client, ready):

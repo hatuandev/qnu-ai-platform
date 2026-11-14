@@ -61,21 +61,27 @@ async def create(
 
 
 async def listing(
-    db: AsyncSession, actor: AuthActor, workspace_id: str, limit: int, offset: int
+    db: AsyncSession,
+    actor: AuthActor,
+    workspace_id: str,
+    limit: int,
+    offset: int,
+    assistant_id: str | None = None,
 ) -> list[Conversation]:
     await resolve_workspace_access(db, actor, workspace_id)
+    query = select(Conversation).where(
+        Conversation.workspace_id == workspace_id,
+        Conversation.owner_ref == actor_ref(actor),
+        visible("conversation", Conversation.id),
+        visible("assistant", Conversation.assistant_id),
+        visible("collection", Conversation.collection_id),
+    )
+    if assistant_id is not None:
+        query = query.where(Conversation.assistant_id == assistant_id)
     return list(
         (
             await db.scalars(
-                select(Conversation)
-                .where(
-                    Conversation.workspace_id == workspace_id,
-                    Conversation.owner_ref == actor_ref(actor),
-                    visible("conversation", Conversation.id),
-                    visible("assistant", Conversation.assistant_id),
-                    visible("collection", Conversation.collection_id),
-                )
-                .order_by(Conversation.updated_at.desc(), Conversation.id)
+                query.order_by(Conversation.updated_at.desc(), Conversation.id)
                 .offset(offset)
                 .limit(limit)
             )

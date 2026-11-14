@@ -11,6 +11,7 @@ from qnu.domains.rag.answer.cells import catalog, materialize
 from qnu.domains.rag.answer.drafting import messages_for, parse_answer
 from qnu.domains.rag.answer.packing import pack_messages
 from qnu.domains.rag.answer.schemas import EvidenceSource
+from qnu.domains.rag.answer.table_selection import select_catalog
 from qnu.platform.errors import AppException
 
 
@@ -55,6 +56,58 @@ def source(rows, *, headers=1, widths=None, key="E1", table="ocr:t", columns=Non
 
 def selected(cell_id):
     return json.dumps({"status": "answered", "statements": [], "lookups": [{"cell_id": cell_id}]})
+
+
+def test_wrapped_alphanumeric_identifier_keeps_the_following_name_as_subject():
+    s = source(
+        [["No.", "Reference", "Name", "Capacity"], ["1", "120045\nAB", "West laboratory", "30"]]
+    )
+    cells = catalog([s])
+    result = materialize(parse_answer(selected("E1:r1:k3"), [s]), [s], cells)
+    assert result.statements[0].text == "West laboratory — Capacity: 30"
+    assert any(
+        cell["cell_id"] == "E1:r1:k1" and cell["value"] == "120045\nAB"
+        for cell in cells["tables"][0]["cells"]
+    )
+
+
+def test_enumeration_can_choose_a_row_name_without_copying_an_unrequested_number():
+    s = source([["Name", "Capacity"], ["West laboratory", "30"]])
+    cells = catalog([s], include_names=True)
+    payload = json.loads(messages_for("Which places?", [s], table_cells=cells)[-1].content)
+    row = payload["tables"][0]["rows"][0]
+    assert row["name_id"] == "E1:r1:k0"
+    draft = parse_answer(selected(row["name_id"]), [s])
+    result = materialize(draft, [s], cells)
+    assert result.statements[0].text == "West laboratory"
+    assert result.statements[0].evidence_ids == ["E1"]
+
+
+def test_wrapped_list_cell_renders_both_proven_fragments_once():
+    left = source([["Name", "Options"], ["West", "(A, B)"]], table="ocr:left")
+    right = source([["", "(C, D)"]], headers=0, key="E2", table="ocr:right")
+    sources = [left, right]
+    cells = catalog(
+        sources,
+        [
+            {
+                "chunk_id": "E2",
+                "support_ids": ["E1"],
+                "header": "ocr:left",
+                "previous": "ocr:left",
+            }
+        ],
+    )
+    question = "What options are available?"
+    scoped = select_catalog(cells, sources, question, [], data_years={2031})
+    scoped_answer = materialize(parse_answer(selected("E2:r0:k1"), sources), sources, scoped)
+    assert [item.text for item in scoped_answer.statements] == ["West — Options: (C, D)"]
+    cells = select_catalog(cells, sources, question, [])
+    draft = parse_answer(selected("E2:r0:k1"), sources)
+    draft.lookups.extend(parse_answer(selected("E1:r1:k1"), sources).lookups)
+    result = materialize(draft, sources, cells)
+    assert [item.text for item in result.statements] == ["West — Options: (A, B)\n(C, D)"]
+    assert set(result.statements[0].evidence_ids) == {"E1", "E2"}
 
 
 @pytest.mark.parametrize(
@@ -151,9 +204,10 @@ def test_forged_or_duplicate_selection_is_rejected():
     ]
     value = json.loads(selected("E1:r1:k1"))
     value["lookups"] *= 2
-    with pytest.raises(AppException) as exc:
-        materialize(parse_answer(json.dumps(value), [s]), [s], catalog([s]))
-    assert exc.value.validation_issues == [{"path": ["lookups", 1, "cell_id"], "type": "duplicate"}]
+    report = {}
+    draft = materialize(parse_answer(json.dumps(value), [s]), [s], catalog([s]), report=report)
+    assert len(draft.statements) == 1
+    assert report["rejected_lookups"] == [{"path": ["lookups", 1, "cell_id"], "type": "duplicate"}]
 
 
 def test_borrowed_header_and_carried_subject_require_same_published_identity():
@@ -205,7 +259,7 @@ def test_layout_quality_and_compact_prompt_keep_server_catalog():
     table = payload["tables"][0]
     assert table["id"] == "E1"
     assert table["columns"] == {"k0": "Name", "k1": "Price"}
-    assert table["rows"] == [{"row": "r1", "subject": "Alpha", "cells": {"k1": "18"}}]
+    assert table["rows"] == [{"row": "r1", "subject": "Alpha", "cells": {"E1:r1:k1": "18"}}]
     server = catalog([s])["tables"][0]["cells"][0]
     assert server["cell_id"] == "E1:r1:k1" and server["source_cells"]
 
@@ -216,9 +270,15 @@ def test_compact_prompt_rows_still_materialize_from_full_server_cell_ids():
     cells = catalog(sources)
     payload = json.loads(messages_for("Price?", sources)[-1].content)
     assert [table["rows"][0] for table in payload["tables"]] == [
-        {"row": "r1", "subject": "Item 0", "cells": {"k1": "100"}}
-    ] * 5
-    assert all(set(row["cells"]) <= {"k1"} for table in payload["tables"] for row in table["rows"])
+        {"row": "r1", "subject": "Item 0", "cells": {f"E{i}:r1:k1": "100"}}
+        for i in range(1, 6)
+    ]
+    assert all(
+        key.endswith(":k1")
+        for table in payload["tables"]
+        for row in table["rows"]
+        for key in row["cells"]
+    )
     answer = materialize(
         parse_answer(selected("E3:r1:k1"), sources),
         sources,
@@ -228,17 +288,17 @@ def test_compact_prompt_rows_still_materialize_from_full_server_cell_ids():
     assert answer.statements[0].evidence_ids == ["E3"]
 
 
-def test_large_table_family_fits_catalog_budget_without_dropping_sources():
+def test_large_table_family_preserves_sources_and_respects_envelope_budget():
     rows = [["H1", "H2", "H3", "H4", "H5", "H6"]] + [
         [f"Program {i}", "10", "20", "30", "40", "50"] for i in range(12)
     ]
     sources = [source(rows, key=f"ich_{i:012x}", table=f"ocr:ev{i:04d}") for i in range(5)]
     req = SimpleNamespace(
-        question="Ngưỡng 15.00 áp dụng cho những trường hợp nào?", context_max_bytes=8000
+        question="Ngưỡng 15.00 áp dụng cho những trường hợp nào?", context_max_bytes=16000
     )
     messages, cells, _evidence, size, skipped = pack_messages(req, sources, {})
     assert skipped == []
-    assert size <= 8000
+    assert size <= req.context_max_bytes
     assert {table["evidence_id"] for table in cells["tables"]} == {
         source.chunk_id for source in sources
     }
@@ -246,8 +306,13 @@ def test_large_table_family_fits_catalog_budget_without_dropping_sources():
     assert payload["tables"][0]["rows"][0] == {
         "row": "r1",
         "subject": "Program 0",
-        "cells": {"k1": "10", "k2": "20", "k3": "30", "k4": "40", "k5": "50"},
+        "name_id": "ich_000000000000:r1:k0",
+        "cells": {f"ich_000000000000:r1:k{i}": str(i * 10) for i in range(1, 6)},
     }
+    req.context_max_bytes = size - 1
+    with pytest.raises(AppException) as exc:
+        pack_messages(req, sources, {})
+    assert exc.value.code == "answer_context_budget_exceeded"
 
 
 @pytest.mark.asyncio

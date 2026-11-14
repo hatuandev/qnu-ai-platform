@@ -84,42 +84,14 @@ async def inspect(
             db, actor, workspace_id, required_roles=("admin",), for_update=True
         )
     targets.require_operation(kind, action, row, resource)
-    if kind == "collection" and action == "delete":
-        from qnu.domains.knowledge.models import KBFolder, KBSource
-
-        source_count = await db.scalar(
-            select(func.count()).select_from(KBSource).where(
-                KBSource.collection_id == row.id, KBSource.workspace_id == workspace_id
-            )
-        )
-        folder_count = await db.scalar(
-            select(func.count())
-            .select_from(KBFolder)
-            .where(
-                KBFolder.collection_id == row.id,
-                KBFolder.workspace_id == workspace_id,
-                KBFolder.id.not_in(
-                    select(ResourceState.resource_id).where(
-                        ResourceState.workspace_id == workspace_id,
-                        ResourceState.kind == "folder",
-                        ResourceState.status == "deleted",
-                    )
-                ),
-            )
-        )
-        if source_count or folder_count:
-            raise Conflict(
-                "Chỉ xóa kho khi kho đã trống tài liệu và thư mục.",
-                code="collection_not_empty",
-            )
     if action == "withdraw":
         impact_note = {"withdraw_keeps_originals": True, "restore_available": True}
     else:
         impact_note = {}
     current, impact = await targets.snapshot(db, workspace_id, kind, row, parameters)
     impact.update(impact_note)
-    if kind == "source" and action == "delete":
-        plan, permanent_impact = await purge.inspect_source(db, row, blob)
+    if action == "delete" and kind in purge.PURGE_KINDS:
+        plan, permanent_impact = await purge.inspect_purge(db, kind, row, blob)
         current["purge_graph_sha256"] = plan["graph_sha256"]
         impact.update(permanent_impact)
     if action == "replace":
@@ -191,12 +163,12 @@ async def detail(
     await resolve_workspace_access(db, actor, workspace_id, for_update=True)
     visible = LifecycleAction.actor_ref == actor_ref(actor)
     if await caller_workspace_role(db, actor, workspace_id) == "admin":
-        # A workspace admin can resume a confirmed permanent source deletion that
-        # outlived its confirmer. Other receipts stay bound to their owner.
+        # A workspace admin can resume a confirmed permanent source or collection
+        # deletion that outlived its confirmer. Other receipts stay bound to their owner.
         visible = or_(
             visible,
             and_(
-                LifecycleAction.kind == "source",
+                LifecycleAction.kind.in_(("source", "collection")),
                 LifecycleAction.action == "delete",
                 LifecycleAction.status != "preview",
             ),
@@ -281,13 +253,14 @@ async def accept(
             from qnu.domains.lifecycle.replacement import prepare_replacement
 
             return await prepare_replacement(db, blob, vectors, queue, actor, row, target)
-        if row.kind == "source" and row.action == "delete":
+        if row.action == "delete":
             from qnu.domains.lifecycle import purge
 
-            await purge.prepare(db, blob, vectors, actor, row, target)
-            await db.commit()
-            await purge.dispatch(row, queue)
-            return row
+            if row.kind in purge.PURGE_KINDS:
+                await purge.prepare(db, blob, vectors, actor, row, target)
+                await db.commit()
+                await purge.dispatch(row, queue)
+                return row
         if row.action != "cleanup":
             row.result = await effects.apply(db, row, target)
             row.status, row.finished_at = "completed", utcnow()

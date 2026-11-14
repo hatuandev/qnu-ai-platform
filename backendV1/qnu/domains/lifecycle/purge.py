@@ -22,6 +22,7 @@ from qnu.domains.lifecycle import effects
 from qnu.domains.lifecycle.models import LifecycleAction, ResourceState
 from qnu.domains.lifecycle.purge_graph import (
     delete_rows,
+    graph_for_collection,
     graph_for_source,
     graph_plan,
     selected,
@@ -36,24 +37,38 @@ from qnu.platform.logging import get_logger
 
 logger = get_logger(__name__)
 TASK = "source_purge_job"
+PURGE_KINDS = ("source", "collection")
 
 
-def is_source_delete(row):
-    return row.kind == "source" and row.action == "delete"
+def is_purge_delete(row):
+    return row.kind in PURGE_KINDS and row.action == "delete"
 
 
-async def inspect_source(db, source, blob):
-    graph = await graph_for_source(db, source.workspace_id, source.id, allow_published=True)
+def _resource_detail(row) -> dict:
+    key = "collection_id" if row.kind == "collection" else "source_id"
+    return {"action_id": row.id, key: row.resource_id}
+
+
+async def _graph_for(db, row):
+    loader = graph_for_collection if row.kind == "collection" else graph_for_source
+    return await loader(db, row.workspace_id, row.resource_id, allow_published=True)
+
+
+async def inspect_purge(db, kind, resource, blob):
+    loader = graph_for_collection if kind == "collection" else graph_for_source
+    graph = await loader(db, resource.workspace_id, resource.id, allow_published=True)
     plan = graph_plan(graph)
     versions = graph.get("kb_compiled_versions", {}).values()
     published = [row["id"] for row in versions if row["status"] == "published"]
     return plan, {
-        "collection_id": source.collection_id,
-        "resource_label": source.title,
+        "collection_id": resource.id if kind == "collection" else resource.collection_id,
+        "resource_label": resource.name if kind == "collection" else resource.title,
         "permanent": True,
         "originals_and_raw_evidence": "permanently_deleted",
         "restore_available": False,
         "files_to_delete": len(plan["objects"]),
+        "sources_to_delete": len(graph.get("kb_sources", {})),
+        "folders_to_delete": len(graph.get("kb_folders", {})),
         "compiled_versions_to_delete": len(plan["rows"].get("kb_compiled_versions", [])),
         "published_versions_to_withdraw": len(published),
         "published_version_ids": published,
@@ -108,7 +123,12 @@ async def _checkpoint(db, graph) -> list[dict]:
                     "lease_expires_at": _lease_text(row.get("lease_expires_at")),
                 }
             )
-    run_ids = sorted({row["run_id"] for row in graph.get("kb_index_inputs", {}).values()})
+    run_ids = {row["run_id"] for row in graph.get("kb_index_inputs", {}).values()}
+    run_ids |= {
+        row["id"]
+        for row in graph.get("kb_index_runs", {}).values()
+        if row.get("status") in ("queued", "running")
+    }
     if run_ids:
         for run in (
             await db.scalars(
@@ -152,13 +172,13 @@ async def _checkpoint_open(db, checkpoint) -> bool:
 
 
 async def require_not_pending(db, workspace_id, kind, resource_id):
-    if kind != "source":
+    if kind not in PURGE_KINDS:
         return
     pending = await db.scalar(
         select(LifecycleAction.id)
         .where(
             LifecycleAction.workspace_id == workspace_id,
-            LifecycleAction.kind == "source",
+            LifecycleAction.kind == kind,
             LifecycleAction.resource_id == resource_id,
             LifecycleAction.action == "delete",
             LifecycleAction.status == "pending",
@@ -166,7 +186,8 @@ async def require_not_pending(db, workspace_id, kind, resource_id):
         .limit(1)
     )
     if pending:
-        raise Conflict("Tài liệu đang được xóa vĩnh viễn.", code="source_purge_pending")
+        label = "Kho" if kind == "collection" else "Tài liệu"
+        raise Conflict(f"{label} đang được xóa vĩnh viễn.", code=f"{kind}_purge_pending")
 
 
 async def _cancel(db, graph) -> None:
@@ -207,12 +228,13 @@ async def _cancel(db, graph) -> None:
         ).all():
             await effects.cancel_job(db, "preparation", intent)
     # Only builders containing affected inputs are cancelled; unrelated jobs remain untouched.
-    ids = {row["run_id"] for row in graph.get("kb_index_inputs", {}).values()}
+    run_ids = {row["run_id"] for row in graph.get("kb_index_inputs", {}).values()}
+    run_ids |= {row["id"] for row in graph.get("kb_index_runs", {}).values()}
     for run in (
         await db.scalars(
             select(IndexRun)
             .where(
-                IndexRun.id.in_(ids),
+                IndexRun.id.in_(run_ids),
                 IndexRun.status.in_(("queued", "running")),
             )
             .with_for_update()
@@ -221,7 +243,7 @@ async def _cancel(db, graph) -> None:
         await effects.cancel_job(db, "index", run)
 
 
-async def prepare(db, blob, vectors, actor, row, source):
+async def prepare(db, blob, vectors, actor, row, resource):
     # A persisted task re-resolves server authority; never copy JWT roles into a queue payload.
     await resolve_workspace_access(
         db,
@@ -232,13 +254,13 @@ async def prepare(db, blob, vectors, actor, row, source):
     )
     # Confirmed permanent deletion withdraws every related published version in
     # the same transaction; the assistant stops using the source before cleanup.
-    await effects.withdraw(db, row, source)
+    await effects.withdraw(db, row, resource)
     checkpoint: list[dict] = []
     recorded: set[tuple[str, str]] = set()
     # Re-scan after cancellation so children created by a stopping coordinator are
     # recorded and stopped too; the bounded loop cannot chase an unbounded chain.
     for _ in range(3):
-        graph = await graph_for_source(db, row.workspace_id, source.id, allow_published=True)
+        graph = await _graph_for(db, row)
         discovered = [
             entry
             for entry in await _checkpoint(db, graph)
@@ -250,21 +272,21 @@ async def prepare(db, blob, vectors, actor, row, source):
             recorded.add((entry["table"], entry["id"]))
             checkpoint.append(entry)
         await _cancel(db, graph)
-    resource = await db.get(ResourceState, (row.workspace_id, "source", source.id))
-    if resource is None:
+    resource_state = await db.get(ResourceState, (row.workspace_id, row.kind, row.resource_id))
+    if resource_state is None:
         db.add(
             ResourceState(
                 workspace_id=row.workspace_id,
-                kind="source",
-                resource_id=source.id,
+                kind=row.kind,
+                resource_id=row.resource_id,
                 status="deleted",
             )
         )
     else:
-        resource.status, resource.revision = "deleted", resource.revision + 1
+        resource_state.status, resource_state.revision = "deleted", resource_state.revision + 1
     await db.flush()
     # Capture post-cancellation rows. Workers cannot create more source-derived work.
-    settled = await graph_for_source(db, row.workspace_id, source.id, allow_published=True)
+    settled = await _graph_for(db, row)
     plan = graph_plan(settled)
     plan["blob_target_hash"], plan["vector_target_hash"] = blob.target_hash, vectors.target_hash
     row.confirmed_by = row.confirmed_by or row.actor_ref
@@ -285,8 +307,8 @@ async def prepare(db, blob, vectors, actor, row, source):
         db,
         workspace_id=row.workspace_id,
         actor=actor,
-        action="source.purge_accepted",
-        detail={"action_id": row.id, "source_id": source.id},
+        action=f"{row.kind}.purge_accepted",
+        detail=_resource_detail(row),
     )
 
 
@@ -337,6 +359,27 @@ async def _delete_vectors(db, vectors, graph):
             raise Conflict("Vector target đã đổi; chưa xóa.", code="purge_target_changed")
         for offset in range(0, len(ids), 256):
             await vectors.delete_points(run.vector_collection, ids[offset : offset + 256])
+
+
+async def _delete_collection_vectors(vectors, graph):
+    """Every generation of the collection is retired whole, so its Qdrant collection goes too."""
+    embedded = {chunk["run_id"] for chunk in graph.get("kb_index_chunks", {}).values()}
+    for run in sorted(graph.get("kb_index_runs", {}).values(), key=lambda item: item["id"]):
+        if run["id"] not in embedded:
+            continue
+        if (run.get("config") or {}).get("vector_target_hash") != vectors.target_hash:
+            raise Conflict("Vector target đã đổi; chưa xóa.", code="purge_target_changed")
+        await vectors.delete_collection(run["vector_collection"])
+
+
+async def _delete_index_run_objects(blob, workspace_id, graph) -> None:
+    """Sweep the retired generation prefixes so stale manifests and batches do not survive."""
+    for run in graph.get("kb_index_runs", {}).values():
+        prefix = f"v1/workspaces/{workspace_id}/index/{run['id']}/"
+        for item in await blob.list_objects(prefix):
+            await blob.purge(item.key)
+            if await blob.exists(item.key):
+                raise Conflict("Object vẫn còn trong storage.", code="purge_storage_failed")
 
 
 INDEX_PREFIX = "v1/workspaces/{workspace_id}/index/"
@@ -707,7 +750,7 @@ async def _record_failure(db, action_id: str, token: str, exc: Exception) -> str
         # A replacement worker owns the receipt; its lease and error state stay intact.
         await db.commit()
         return "pending"
-    row.error_code = exc.code if isinstance(exc, AppException) else "source_purge_failed"
+    row.error_code = exc.code if isinstance(exc, AppException) else f"{row.kind}_purge_failed"
     row.last_error_at = utcnow()
     row.lease_expires_at, row.worker_id = None, None
     row.progress = {
@@ -720,7 +763,7 @@ async def _record_failure(db, action_id: str, token: str, exc: Exception) -> str
 
 async def execute(db, blob, vectors, action_id):
     initial = await db.get(LifecycleAction, action_id)
-    if initial is None or not is_source_delete(initial) or initial.status != "pending":
+    if initial is None or not is_purge_delete(initial) or initial.status != "pending":
         return "not_pending"
     workspace_id, actor = initial.workspace_id, background_actor(initial.actor_ref)
     token = f"purge:{uuid.uuid4().hex}"
@@ -768,7 +811,7 @@ async def execute(db, blob, vectors, action_id):
             or vectors.target_hash != plan["vector_target_hash"]
         ):
             raise Conflict("Storage/vector target đã đổi; chưa xóa.", code="purge_target_changed")
-        graph = await graph_for_source(db, workspace_id, row.resource_id, allow_published=True)
+        graph = await _graph_for(db, row)
         plan = _settled_plan(plan, graph)
         await _assert_exclusive_blobs(db, plan)
         await _fence(
@@ -778,7 +821,10 @@ async def execute(db, blob, vectors, action_id):
             {"phase": "deleting_vectors", "progress": _progress("Đang xóa vector", 25)},
         )
         await db.commit()
-        await _delete_vectors(db, vectors, graph)
+        if row.kind == "collection":
+            await _delete_collection_vectors(vectors, graph)
+        else:
+            await _delete_vectors(db, vectors, graph)
         await _fence(
             db,
             action_id,
@@ -790,14 +836,27 @@ async def execute(db, blob, vectors, action_id):
         )
         await db.commit()
         await _delete_objects(blob, plan, workspace_id)
-        await _fence(
-            db,
-            action_id,
-            token,
-            {"phase": "resealing", "progress": _progress("Đang cập nhật chỉ mục còn lại", 80)},
-        )
-        await db.commit()
-        await _reseal_indexes(db, blob, graph, row.id, token)
+        if row.kind == "collection":
+            await _fence(
+                db,
+                action_id,
+                token,
+                {
+                    "phase": "deleting_indexes",
+                    "progress": _progress("Đang xóa chỉ mục của kho", 80),
+                },
+            )
+            await db.commit()
+            await _delete_index_run_objects(blob, workspace_id, graph)
+        else:
+            await _fence(
+                db,
+                action_id,
+                token,
+                {"phase": "resealing", "progress": _progress("Đang cập nhật chỉ mục còn lại", 80)},
+            )
+            await db.commit()
+            await _reseal_indexes(db, blob, graph, row.id, token)
         plan = {**plan, **graph_plan(graph)}
         await _fence(
             db,
@@ -807,6 +866,17 @@ async def execute(db, blob, vectors, action_id):
         )
         await db.commit()
         await delete_rows(db, plan, workspace_id)
+        completed_result = {
+            "permanent": True,
+            "originals_retained": False,
+            "restore_available": False,
+            "files_deleted": len(plan["objects"]),
+            "backups_retained": True,
+            "phase": "completed",
+        }
+        if row.kind == "collection":
+            completed_result["sources_deleted"] = len(plan["rows"].get("kb_sources", []))
+            completed_result["folders_deleted"] = len(plan["rows"].get("kb_folders", []))
         completed = await db.scalar(
             update(LifecycleAction)
             .where(
@@ -824,14 +894,7 @@ async def execute(db, blob, vectors, action_id):
                 progress=_progress("Đã xóa vĩnh viễn", 100),
                 lease_expires_at=None,
                 worker_id=None,
-                result={
-                    "permanent": True,
-                    "originals_retained": False,
-                    "restore_available": False,
-                    "files_deleted": len(plan["objects"]),
-                    "backups_retained": True,
-                    "phase": "completed",
-                },
+                result=completed_result,
             )
             .returning(LifecycleAction.id)
         )
@@ -842,10 +905,9 @@ async def execute(db, blob, vectors, action_id):
             db,
             workspace_id=workspace_id,
             actor=actor,
-            action="source.purged",
+            action=f"{row.kind}.purged",
             detail={
-                "action_id": action_id,
-                "source_id": row.resource_id,
+                **_resource_detail(row),
                 "confirmed_by": getattr(row, "confirmed_by", None),
                 "takeover_by": getattr(row, "takeover_by", None),
             },
@@ -883,7 +945,7 @@ async def takeover(db, actor, workspace_id, action_id) -> LifecycleAction:
         .where(
             LifecycleAction.id == action_id,
             LifecycleAction.workspace_id == workspace_id,
-            LifecycleAction.kind == "source",
+            LifecycleAction.kind.in_(PURGE_KINDS),
             LifecycleAction.action == "delete",
         )
         .with_for_update()
@@ -904,10 +966,9 @@ async def takeover(db, actor, workspace_id, action_id) -> LifecycleAction:
         db,
         workspace_id=workspace_id,
         actor=actor,
-        action="source.purge_takeover",
+        action=f"{row.kind}.purge_takeover",
         detail={
-            "action_id": row.id,
-            "source_id": row.resource_id,
+            **_resource_detail(row),
             "confirmed_by": row.confirmed_by,
             "takeover_by": row.takeover_by,
         },
@@ -955,7 +1016,7 @@ async def reconcile(ctx):
             await db.scalars(
                 select(LifecycleAction)
                 .where(
-                    LifecycleAction.kind == "source",
+                    LifecycleAction.kind.in_(PURGE_KINDS),
                     LifecycleAction.action == "delete",
                     LifecycleAction.status == "pending",
                 )

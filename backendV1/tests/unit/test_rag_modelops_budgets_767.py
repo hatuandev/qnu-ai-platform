@@ -267,9 +267,66 @@ async def test_rerank_trace_measures_sent_bytes_and_capacity_headroom(monkeypatc
     tight = replace(target, token_limits=ModelTokenLimits(context_window_tokens=256))
     metrics = hybrid.runtime_service.measure(tight, "Q", ["B" * 300])
     assert metrics["over_capacity_documents"] == 1
+    fitted, truncation = hybrid.runtime_service.fit(tight, "Q", ["B" * 300])
+    assert fitted == ["B" * 191]
+    assert truncation == {
+        "truncation": hybrid.runtime_service.TRUNCATION_VERSION,
+        "doc_bytes_cap": 191,
+        "truncated_documents": 1,
+        "truncated_bytes": 109,
+    }
+    assert hybrid.runtime_service.budget(tight, "Q", fitted) == 1 + 191 + 64
     with pytest.raises(AppException) as caught:
-        hybrid.runtime_service.budget(tight, "Q", ["B" * 300])
-    assert caught.value.code == "rerank_input_limit_exceeded"
-    with pytest.raises(AppException) as caught:
-        hybrid.runtime_service.budget(replace(target, token_limits=None), "Q", ["B" * 300])
+        hybrid.runtime_service.fit(replace(target, token_limits=None), "Q", ["B" * 300])
     assert caught.value.code == "rerank_capacity_required"
+    with pytest.raises(AppException) as caught:
+        hybrid.runtime_service.fit(tight, "Q" * 200, ["B" * 300])
+    assert caught.value.code == "rerank_input_limit_exceeded"
+
+
+@pytest.mark.asyncio
+async def test_rerank_truncates_over_capacity_documents_without_failing_the_turn(monkeypatch):
+    from qnu.ports.reranker import RerankHit, RerankResult
+
+    tight = replace(runtime(), token_limits=ModelTokenLimits(context_window_tokens=512))
+    monkeypatch.setattr(hybrid.runtime_service, "resolve", AsyncMock(return_value=tight))
+    reserve = AsyncMock(return_value=SimpleNamespace(id="usage"))
+    monkeypatch.setattr(hybrid.usage_service, "reserve", reserve)
+    monkeypatch.setattr(hybrid.usage_service, "settle", AsyncMock())
+    model = SimpleNamespace(
+        rerank=AsyncMock(return_value=RerankResult([RerankHit(1, 0.9), RerankHit(0, 0.1)], 42))
+    )
+    long_vietnamese = "Kết quả được xếp loại Đạt khi Q từ 80 điểm. " * 40
+    hits = [
+        hit("A" * 100).model_copy(update={"chunk_id": "c0"}),
+        hit(long_vietnamese).model_copy(update={"chunk_id": "c1"}),
+    ]
+    trace = {"ranking": {}, "score_kinds": {}}
+    selected = await hybrid.rerank(
+        SimpleNamespace(commit=AsyncMock()),
+        None,
+        "workspace",
+        SimpleNamespace(query="Q", rerank_provider_id="provider", top_k=1),
+        hits,
+        model,
+        trace,
+        AsyncMock(return_value="proof"),
+    )
+    sent = model.rerank.await_args.args[1]
+    cap = 512 - 1 - 64
+    document = hybrid.rerank_text(hits[1])
+    assert len(sent) == 2
+    assert sent[0] == "A" * 100
+    assert 0 < len(sent[1].encode()) <= cap
+    assert "\ufffd" not in sent[1]
+    assert document.startswith(sent[1])
+    assert hits[1].text == long_vietnamese
+    assert trace["rerank_input"]["truncation"] == hybrid.runtime_service.TRUNCATION_VERSION
+    assert trace["rerank_input"]["truncated_documents"] == 1
+    assert trace["rerank_input"]["truncated_bytes"] == len(document.encode()) - len(
+        sent[1].encode()
+    )
+    assert trace["rerank_input"]["doc_bytes_cap"] == cap
+    assert trace["rerank_input"]["over_capacity_documents"] == 1
+    assert reserve.await_args.args[6] == 1 + 100 + 64 + 1 + len(sent[1].encode()) + 64
+    assert len(selected) == 1

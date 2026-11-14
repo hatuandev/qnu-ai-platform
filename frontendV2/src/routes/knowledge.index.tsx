@@ -103,6 +103,8 @@ function KnowledgePage() {
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
   const [editingCollection, setEditingCollection] =
     useState<CollectionResponse | null>(null);
+  const [deletingCollection, setDeletingCollection] =
+    useState<CollectionResponse | null>(null);
 
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<FolderResponse | null>(
@@ -514,6 +516,15 @@ function KnowledgePage() {
                           <Pencil className="size-3.5" />
                           <span>Chỉnh sửa thông tin</span>
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => setDeletingCollection(col)}
+                          className="gap-2"
+                        >
+                          <Trash2 className="size-3.5" />
+                          <span>Xóa kho</span>
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -561,6 +572,16 @@ function KnowledgePage() {
               handleSelectCollection(item.id);
             }
           }}
+        />
+
+        <LifecycleDeleteDialog
+          open={Boolean(deletingCollection)}
+          onOpenChange={(open) => !open && setDeletingCollection(null)}
+          workspaceId={activeWorkspaceId || ""}
+          kind="collection"
+          resourceId={deletingCollection?.id || null}
+          resourceTitle={deletingCollection?.name || ""}
+          onSuccess={() => void refetchCollections()}
         />
       </div>
     );
@@ -1325,8 +1346,9 @@ function KnowledgePage() {
         open={Boolean(deletingSource)}
         onOpenChange={(open) => !open && setDeletingSource(null)}
         workspaceId={activeWorkspaceId || ""}
-        sourceId={deletingSource?.id || null}
-        sourceTitle={deletingSource?.title || ""}
+        kind="source"
+        resourceId={deletingSource?.id || null}
+        resourceTitle={deletingSource?.title || ""}
         onSuccess={() => {
           void refetchSources();
           void refetchCollections();

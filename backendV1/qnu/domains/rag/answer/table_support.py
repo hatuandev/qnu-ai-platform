@@ -7,6 +7,7 @@ from qnu.domains.knowledge.index.query_scope import result_scopes
 from qnu.domains.knowledge.index.search import _eligible, _hits, manifest
 from qnu.domains.knowledge.metadata import matches_metadata
 from qnu.domains.knowledge.publication.access import authorize
+from qnu.domains.rag.answer.selection import question_needs
 from qnu.domains.rag.answer.table_context import bound_dependencies
 from qnu.platform.errors import Conflict
 from qnu.ports.vector_store import VectorHit
@@ -43,7 +44,7 @@ def _support_link(source, tables, relationships, scopes):
     }
 
 
-def supports(primary, rows, relationships, metadata_filter, scopes=None):
+def supports(primary, rows, relationships, metadata_filter, scopes=None, *, enumerate_rows=False):
     selected, links, tables = {}, {}, {}
     by_id = {r.id: r for r in rows}
     for row in rows:
@@ -66,10 +67,8 @@ def supports(primary, rows, relationships, metadata_filter, scopes=None):
 
         structure = source.structure
         next_table = continuations.get((source.input_id, structure["source_table_citation"]))
-        if (
-            not next_table
-            or structure.get("original_row_count", 0) - 1 not in structure["row_indices"]
-        ):
+        last_row = structure.get("original_row_count", 0) - 1
+        if not next_table or (last_row not in structure["row_indices"] and not enumerate_rows):
             continue
         head = next(
             (
@@ -166,12 +165,21 @@ async def attach_table_support(db, blob, actor, workspace_id, collection_id, res
     )
     relationships = await bound_dependencies(db, blob, allowed, rows)
     scopes = result_scopes(result, req.metadata_filter)
-    needed, links = supports(result.hits, rows, relationships, req.metadata_filter, scopes)
+    needs = question_needs(req.question)
+    needed, links = supports(
+        result.hits,
+        rows,
+        relationships,
+        req.metadata_filter,
+        scopes,
+        enumerate_rows=needs["enumeration"] or needs["count"],
+    )
     known = {h.chunk_id for h in result.hits}
-    # Do not silently discard a primary result to make dependencies fit.
-    # Four additional dependencies are a separate, bounded allowance. Top-k
-    # remains unchanged; every item still consumes the shared byte/token budget.
-    room, selected, resolved, unresolved = 4, {}, [], []
+    # Header and continuation rows are the conditions under which a table cell
+    # may be cited at all; they cannot compete with an optional allowance, or
+    # the catalog loses its header and every numeric statement is rejected.
+    # The shared byte budget and packing still bound what reaches the model.
+    selected, resolved, unresolved = {}, [], []
     for link in links:
         extra = list(
             dict.fromkeys(
@@ -180,9 +188,6 @@ async def attach_table_support(db, blob, actor, workspace_id, collection_id, res
                 if key not in known and key not in selected
             )
         )
-        if len(selected) + len(extra) > room:
-            unresolved.extend(extra)
-            continue
         selected.update({key: needed[key] for key in extra})
         resolved.append(link)
     siblings, sibling_links = section_siblings(

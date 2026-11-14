@@ -5,7 +5,13 @@ import json
 
 from qnu.domains.rag.answer.cells import catalog, prompt_catalog
 from qnu.domains.rag.answer.context import evidence_size
-from qnu.domains.rag.answer.drafting import PROMPT_VERSION, compact_evidence_item, messages_for
+from qnu.domains.rag.answer.drafting import (
+    PROMPT_VERSION,
+    compact_evidence_item,
+    messages_for,
+    name_repair_schema,
+    output_schema,
+)
 from qnu.domains.rag.answer.schemas import EvidenceSource
 
 
@@ -81,7 +87,58 @@ def test_arbitrary_json_in_table_text_is_not_removed():
 
 
 def test_new_answer_contract_has_a_distinct_prompt_version():
-    assert PROMPT_VERSION == "qnu.rag.answer/v28"
+    assert PROMPT_VERSION == "qnu.rag.answer/v35"
+
+
+def test_list_repair_only_allows_proven_names_and_leaves_original_schema_intact():
+    cells = {
+        "tables": [
+            {
+                "cells": [
+                    {"cell_id": "E1:r1:k0", "row_name": True},
+                    {"cell_id": "E1:r1:k1"},
+                ]
+            }
+        ]
+    }
+    original = output_schema()
+    repair = name_repair_schema(original, cells)
+    assert repair["properties"]["statements"]["maxItems"] == 0
+    assert repair["$defs"]["CellSelection"]["properties"]["cell_id"]["enum"] == ["E1:r1:k0"]
+    assert original["properties"]["statements"]["maxItems"] != 0
+    assert name_repair_schema(original, {"tables": []}) is None
+
+
+def test_reading_join_keeps_exact_adjacent_passages_and_both_citations():
+    left = source("Inspection opens from", {}, {"ocr:a": {}}).model_copy(
+        update={
+            "evidence_id": "E1",
+            "kind": "paragraph",
+            "source_passages": [
+                {
+                    "citation": "ocr:a",
+                    "text": "A notice follows. Inspection opens from",
+                    "position": "2",
+                }
+            ],
+        }
+    )
+    right = left.model_copy(
+        update={
+            "evidence_id": "E2",
+            "chunk_id": "second",
+            "citations": {"ocr:b": {}},
+            "source_passages": [
+                {"citation": "ocr:b", "text": "day 4 to day 9.", "position": "3"}
+            ],
+        }
+    )
+    payload = json.loads(messages_for("When is inspection open?", [right, left])[-1].content)
+    assert payload["joins"] == [
+        {"ids": ["E1", "E2"], "text": "Inspection opens from day 4 to day 9."}
+    ]
+    right.source_passages[0]["position"] = "4"
+    assert "joins" not in json.loads(messages_for("When?", [right, left])[-1].content)
 
 
 def test_prompt_requires_partial_answers_when_any_requirement_is_grounded():

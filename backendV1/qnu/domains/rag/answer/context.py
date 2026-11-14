@@ -36,6 +36,10 @@ from qnu.ports.vector_store import VectorHit
 # also produced primaries; the share follows primary coverage, not rank.
 MIN_DOCUMENT_SHARE = 4096
 
+# Reranked runners-up stay trimmable reading context: retrieval already found
+# them relevant, but they must not displace a primary or a structural group.
+RANK_BAND = 5
+
 
 def evidence_size(hit: SearchHit) -> int:
     # Two-digit IDs cover top20 plus at most four structural table dependencies.
@@ -183,6 +187,63 @@ async def expand_context(
         used[document_id] = spent + size
         consumed += size
         return "ok"
+
+    async def append_rank_band(additions: list[SearchHit]) -> None:
+        """Reranked runners-up become trimmable reading, never mandatory evidence."""
+        ordered = result.trace.get("rerank_ranked_ids") or []
+        if not ordered or result.trace.get("facets"):
+            return
+        tail = [key for key in ordered[len(trace["primary_ids"]) :] if key not in known]
+        if not tail:
+            return
+        rows = {
+            row.id: row
+            for row in await db.scalars(
+                select(IndexChunk).where(
+                    IndexChunk.run_id == run.id,
+                    IndexChunk.id.in_(tail),
+                    IndexChunk.input_id.in_([b.id for b in allowed]),
+                )
+            )
+        }
+        # Tables already arrive through table_support links; dumping whole tables as
+        # reading evidence only inflates the prompt.
+        band = [key for key in tail if key in rows and rows[key].kind != "table"][:RANK_BAND]
+        skipped_tables = sum(1 for key in tail if key in rows and rows[key].kind == "table")
+        if skipped_tables:
+            trace["rank_band_tables_skipped"] = skipped_tables
+        if not band:
+            return
+        version = {b.id: b.version_id for b in allowed}
+        candidates = await _hits(
+            db,
+            run,
+            allowed,
+            [
+                _neighbor_hit(rows[key], run, version[rows[key].input_id])
+                for key in band
+                if key in rows
+                and any(matches_metadata(rows[key].structure, scope) for scope in scopes)
+            ],
+            sealed,
+        )
+        taken = []
+        for candidate in candidates:
+            if candidate.chunk_id in known:
+                continue
+            if claim(candidate.document_id, evidence_size(candidate)) != "ok":
+                trace["rank_band_skipped"] = trace.get("rank_band_skipped", 0) + 1
+                continue
+            known.add(candidate.chunk_id)
+            taken.append(candidate)
+        if not taken:
+            return
+        additions.extend(taken)
+        trace["added"].extend(
+            {"chunk_id": candidate.chunk_id, "primary_chunk_id": None, "kind": "rank"}
+            for candidate in taken
+        )
+        trace["rank_band"] = [candidate.chunk_id for candidate in taken]
 
     structural = []
     question = resolved_question or req.question
@@ -336,6 +397,7 @@ async def expand_context(
         trace["parts_joined"] = len(parts)
         truncated += part_truncated
     if not window:
+        await append_rank_band(additions)
         trace.update(status="expanded" if additions else "disabled", bytes_used=consumed)
         trace["expansion"] = {
             "primary_counts": dict(counts),
@@ -385,9 +447,11 @@ async def expand_context(
             truncated += 1
             continue
         additions.append(candidate)
+        known.add(candidate.chunk_id)
         trace["added"].append(
             {"chunk_id": candidate.chunk_id, "primary_chunk_id": primary_id, "parent": parent}
         )
+    await append_rank_band(additions)
     trace.update(status="expanded", bytes_used=consumed, skipped_budget=truncated)
     trace["expansion"] = {
         "primary_counts": dict(counts),

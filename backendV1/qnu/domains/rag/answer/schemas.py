@@ -70,6 +70,18 @@ class ModelAnswer(BaseModel):
     statements: list[Statement] = Field(max_length=20)
     lookups: list[CellSelection] = Field(default_factory=list, max_length=20)
     assessment: list[Requirement] = Field(default_factory=list, max_length=20)
+    message: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("message")
+    @classmethod
+    def plain_message(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not value.strip() or re.search(
+            r"\[[Ee]\d+\]|\[[^\]]*\]\([^)]+\)|<[/!A-Za-z][^>]*>", value
+        ):
+            raise ValueError("Message phải là text thuần, không citation hay HTML.")
+        return value.strip()
 
     @model_validator(mode="after")
     def consistent_status(self) -> "ModelAnswer":
@@ -105,6 +117,8 @@ class AnswerTrace(BaseModel):
     verification: dict = Field(default_factory=lambda: {"mode": "off", "status": "not_run"})
     coverage: dict = Field(default_factory=dict)
     cache: dict = Field(default_factory=dict)
+    fallback: dict = Field(default_factory=dict)
+    appeal: dict = Field(default_factory=dict)
 
 
 class AnswerResponse(BaseModel):
@@ -121,6 +135,7 @@ class AnswerResponse(BaseModel):
         | None
     ) = None
     answer: str | None = None
+    message: str | None = None
     statements: list[Statement] = Field(default_factory=list)
     sources: list[EvidenceSource] = Field(default_factory=list)
     index_run_id: str

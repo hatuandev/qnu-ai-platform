@@ -11,24 +11,25 @@ Phạm vi: chỉ `backendV1/`; workspace là biên quyền theo ADR v1. Mọi th
 
 Hợp đồng thao tác thông thường cho FE gồm bốn nút: **Dừng xử lý** (hủy
 `PreparationIntent` hoặc `job/cancel`), **Ngừng dùng cho trợ lý** (`withdraw`),
-**Cập nhật tài liệu** (`document/replace`) và **Xóa vĩnh viễn** (`source/delete`).
+**Cập nhật tài liệu** (`document/replace`) và **Xóa vĩnh viễn** (`source/delete`,
+`collection/delete`).
 `archive` vẫn được API hỗ trợ cho dữ liệu cũ, khôi phục và tác vụ vận hành nhưng
 không còn là thao tác chuẩn trong luồng người dùng thường.
 
 | Tài nguyên (`kind`) | Thao tác (`action`) | Kết quả |
 |---|---|---|
 | `collection`, `source`, `document` | `withdraw` | Thu hồi mọi bản `published` liên quan khỏi RAG/dẫn chứng ngay; giữ file, revision và lịch sử; chỉ admin |
-| `collection`, `document` | `archive`, `delete`, `restore` | Lưu trữ, đưa vào thùng rác hoặc khôi phục; giữ nguồn và lịch sử |
-| `collection` | `delete` | Chỉ nhận khi kho không còn tài liệu và thư mục đang hoạt động; bản ghi thư mục đã xóa mềm không chặn, trả `409 collection_not_empty` nếu còn nội dung |
+| `collection` | `archive`, `restore` | Lưu trữ hoặc khôi phục kho còn tồn tại; giữ nguồn và lịch sử |
+| `document` | `archive`, `delete`, `restore` | Lưu trữ, đưa vào thùng rác hoặc khôi phục; giữ nguồn và lịch sử |
 | `source` | `archive`, `restore` | Lưu trữ hoặc khôi phục nguồn còn tồn tại |
-| `source` | `delete` | Xóa vĩnh viễn sau một lần xem trước và một lần xác nhận; tự thu hồi bản `published` liên quan khi nhận lệnh |
+| `source`, `collection` | `delete` | Xóa vĩnh viễn sau một lần xem trước và một lần xác nhận; tự thu hồi bản `published` liên quan khi nhận lệnh. `collection/delete` xóa cascade mọi nguồn, thư mục, bằng chứng OCR/Compiler, chunk/vector và object lưu trữ của kho; kho đang được trợ lý dùng trả `409 collection_in_use_by_assistants` |
 | `assistant` | `pause`, `resume`, `archive`, `delete`, `restore` | Ngừng/bật phục vụ hoặc đưa vào thùng rác; khôi phục xong vẫn tắt, cần bật riêng |
 | `conversation` | `archive`, `delete`, `restore` | Chỉ chủ hội thoại được thao tác, kể cả khi người khác là quản trị |
 | `job` | `cancel` + `job_kind` | Hủy OCR, Compiler, index, review tự động, review ngữ nghĩa, kiểm chính tả hoặc lượt hỏi |
 | `index` | `cleanup` | Xóa collection vector v1 và chunk DB của generation đã ngừng dùng |
 | `document` | `replace` + `replacement_version_id` | Chuẩn bị chỉ mục cho bản đã duyệt, rồi chuyển publication và index trong một transaction |
 
-Ngoại trừ `source/delete`, `delete` là **xóa có thể khôi phục**, không xóa vĩnh viễn file gốc, raw OCR,
+Ngoại trừ `source/delete` và `collection/delete`, `delete` là **xóa có thể khôi phục**, không xóa vĩnh viễn file gốc, raw OCR,
 Markdown/JSON đã lưu, quyết định duyệt hay lịch sử hội thoại. Tài nguyên bị xóa/lưu
 trữ bị chặn trên API đọc nội dung, tải tệp, tác vụ và RAG; kết quả hỏi đáp cũ phải
 kiểm lại nguồn trước khi trả về. Tài nguyên con vẫn bị chặn nếu kho cha bị lưu trữ/xóa.
@@ -188,6 +189,21 @@ và `revision_unchanged`; thông báo không lộ ID nguồn nội bộ.
   trả kế hoạch nội bộ/đường dẫn object. Giữ audit/idempotency, metadata/hash lịch sử
   và các bundle backup đã tạo theo chính sách sao lưu riêng; đây không phải purge
   cả backup hay dữ liệu ngoài kho QNU. Không khôi phục nguồn đã xóa vĩnh viễn bằng `restore`.
+
+### Xóa vĩnh viễn cả kho
+
+`collection/delete` dùng đúng một biên nhận và cùng worker với `source/delete`, nhưng
+phạm vi là toàn kho: mọi nguồn/revision, thư mục (kể cả thư mục đã xóa mềm), bằng
+chứng OCR/Compiler/Review, bản phát hành, chunk DB, các `IndexRun` cùng generation
+vector và object `v1/workspaces/{workspace_id}/index/{run_id}/` đều bị xóa; upload
+ledger của kho cũng bị dọn để không phát lại id đã xóa. Generation vector được xóa
+nguyên collection thay vì reseal, vì không còn nội dung nào cần giữ; object nguồn
+vẫn phải nằm trong workspace và không được tài liệu khác tham chiếu. Kho còn trợ lý
+tham chiếu bị chặn ngay ở preview/accept bằng `409 collection_in_use_by_assistants`;
+admin phải gỡ kho khỏi trợ lý trước. Preview trả `sources_to_delete`,
+`folders_to_delete`, `files_to_delete`, `published_versions_to_withdraw` và
+`restore_available=false`; biên nhận hoàn tất trả thêm `sources_deleted`/`folders_deleted`.
+Sau khi hoàn tất, kho và mọi tài nguyên con trả `404`; không có `restore`.
 - Admin workspace xem lượt kẹt qua `GET /source-deletions/active` và tiếp quản qua
   `POST /actions/{action_id}/takeover`. Biên nhận giữ `confirmed_by` của người xác
   nhận ban đầu và `takeover_by`/`takeover_at` của người tiếp quản; cả hai được ghi

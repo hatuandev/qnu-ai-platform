@@ -6,7 +6,7 @@ import {
   useUpdateCollectionMutation,
 } from "@/api/knowledge/queries";
 import type { CollectionResponse } from "@/api/knowledge/types";
-import { Field, FieldDescription, FieldLabel } from "@/components/admin/field";
+import { Field, FieldLabel } from "@/components/admin/field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -90,75 +90,82 @@ export function CollectionFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <FolderPlus className="size-4 text-primary" />
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <FolderPlus className="size-4.5 text-primary shrink-0" />
               <span>
                 {isEdit ? "Chỉnh sửa kho tri thức" : "Tạo kho tri thức mới"}
               </span>
             </DialogTitle>
-            <DialogDescription className="text-xs">
-              Kho tri thức là không gian tập hợp tài liệu theo chủ đề hoặc phòng
-              ban.
+            <DialogDescription className="text-xs text-muted-foreground">
+              {isEdit
+                ? "Cập nhật tên và mô tả phạm vi lưu trữ tài liệu của kho."
+                : "Thiết lập không gian lưu trữ và bóc tách tài liệu mới."}
             </DialogDescription>
           </DialogHeader>
 
           {error && (
-            <div className="p-2.5 rounded-md bg-destructive/10 border border-destructive/20 text-xs text-destructive">
+            <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive">
               {error}
             </div>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-3.5 pt-1">
             <Field>
-              <FieldLabel required>Tên kho tri thức</FieldLabel>
+              <FieldLabel
+                required
+                className="text-xs font-medium text-foreground"
+              >
+                Tên kho tri thức
+              </FieldLabel>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="VD: Tuyển sinh 2026, Đào tạo & Khảo thí..."
-                className="h-8 text-xs"
+                className="h-9 text-xs bg-background"
                 disabled={isPending}
                 autoFocus
               />
             </Field>
 
             <Field>
-              <FieldLabel>Mô tả mục đích</FieldLabel>
+              <FieldLabel className="text-xs font-medium text-foreground">
+                Mô tả mục đích
+              </FieldLabel>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Mô tả phạm vi văn bản lưu trữ trong kho này..."
-                className="text-xs resize-none"
+                placeholder="Mô tả phạm vi văn bản lưu trữ trong kho này (tùy chọn)..."
+                className="text-xs resize-none bg-background leading-relaxed"
                 rows={3}
                 disabled={isPending}
               />
-              <FieldDescription>
-                Tùy chọn, giúp người dùng phân biệt mục đích kho.
-              </FieldDescription>
             </Field>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => onOpenChange(false)}
               disabled={isPending}
-              className="h-8 text-xs"
+              className="h-8 text-xs font-medium"
             >
               Hủy
             </Button>
             <Button
               type="submit"
               size="sm"
-              disabled={isPending}
-              className="h-8 text-xs gap-1.5"
+              disabled={isPending || !name.trim()}
+              className="h-8 text-xs font-medium gap-1.5 shadow-2xs"
             >
               {isPending ? (
                 <Loader2 className="size-3.5 animate-spin" />
-              ) : (
+              ) : isEdit ? (
                 <Save className="size-3.5" />
+              ) : (
+                <FolderPlus className="size-3.5" />
               )}
               <span>{isEdit ? "Lưu thay đổi" : "Tạo kho"}</span>
             </Button>

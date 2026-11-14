@@ -3,6 +3,7 @@
 import re
 import unicodedata
 
+from qnu.domains.rag.answer.cells import join_continued_lists
 from qnu.domains.rag.answer.selection import question_needs
 
 VERSION = "qnu.rag.table-selection/v2"
@@ -151,7 +152,23 @@ def select_catalog(
         year_omitted += len(kept) - len(narrowed)
         if table["cells"] and not narrowed:
             omitted.append(table["evidence_id"])
-        tables.append({**table, "cells": narrowed})
+        tables.append({**table, "cells": [dict(cell) for cell in narrowed]})
+    continuations = cells.get("list_continuations", [])
+    if not years:
+        join_continued_lists(tables, continuations)
+    else:
+        # Under an explicit year, both fragments must carry their own matching
+        # year proof. Unknown survives selection but cannot inherit a year
+        # through a synthesized list.
+        allowed = {
+            cell["cell_id"]
+            for table in tables
+            for cell in table["cells"]
+            if _cell_years(cell, scopes[table["evidence_id"]]) & years
+        }
+        join_continued_lists(
+            tables, [(left, right) for left, right in continuations if {left, right} <= allowed]
+        )
     return {
         **cells,
         "tables": tables,

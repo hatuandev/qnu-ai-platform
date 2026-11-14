@@ -56,8 +56,23 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def ensure_version_table_width(connection: Connection) -> None:
+    """Revision ids (e.g. 0028_drop_index_system_default_authorized) exceed the
+    VARCHAR(32) Alembic creates by default for the version table."""
+    connection.execute(
+        text(
+            f"CREATE TABLE IF NOT EXISTS {VERSION_TABLE} "
+            "(version_num VARCHAR(64) NOT NULL PRIMARY KEY)"
+        )
+    )
+    connection.execute(
+        text(f"ALTER TABLE {VERSION_TABLE} ALTER COLUMN version_num TYPE VARCHAR(64)")
+    )
+
+
 def do_run_migrations(connection: Connection) -> None:
     connection.execute(text("SELECT pg_advisory_xact_lock(1367258177)"))
+    ensure_version_table_width(connection)
     context.configure(
         connection=connection,
         target_metadata=target_metadata,

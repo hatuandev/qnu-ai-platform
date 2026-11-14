@@ -8,7 +8,6 @@ from qnu.domains.rag.answer.coverage import assess, plan_for
 from qnu.domains.rag.answer.drafting import parse_answer
 from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer
 from qnu.domains.rag.answer.structure_context import needs_structure, select_groups
-from qnu.platform.errors import AppException
 from tests.unit.test_rag_clause_context_856 import chunk
 
 
@@ -161,15 +160,21 @@ def test_grounded_general_answer_can_expose_missing_details_without_abstaining()
 
 
 @pytest.mark.parametrize("ids", [["E999"], ["E1", "E1"]])
-def test_coverage_rejects_foreign_or_duplicate_sources(ids):
+def test_coverage_normalizes_duplicate_ids_and_quarantines_foreign_ids(ids):
     src = sources(corpus()[0][:1])
     answer = ModelAnswer(
         status="insufficient_evidence",
         statements=[],
         assessment=[{"label": "Condition", "status": "missing", "evidence_ids": ids}],
     )
-    with pytest.raises(AppException, match="phạm vi"):
-        assess(answer, src, {})
+    diagnostics = {}
+    report = assess(answer, src, {}, report=diagnostics)
+    foreign = ids == ["E999"]
+    assert report.requirements[0].evidence_ids == ([] if foreign else ["E1"])
+    assert report.requirements[0].status == "missing"
+    assert diagnostics["assessment_issues"] == [
+        {"path": ["assessment", 0, "evidence_ids"], "type": "not_allowed" if foreign else "duplicate"}
+    ]
 
 
 def test_citation_claim_without_an_answer_does_not_count_as_covered():

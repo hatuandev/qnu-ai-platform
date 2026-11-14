@@ -81,6 +81,18 @@ export function useCommitLifecycleActionMutation(workspaceId?: string | null) {
             queryKey: [...knowledgeKeys.all, "sources", workspaceId],
           });
         }
+        // If collection delete, drop list entry and cached collection detail
+        if (receipt.kind === "collection") {
+          queryClient.removeQueries({
+            queryKey: knowledgeKeys.collection(
+              workspaceId,
+              receipt.resource_id,
+            ),
+          });
+          void queryClient.invalidateQueries({
+            queryKey: [...knowledgeKeys.all, "collections", workspaceId],
+          });
+        }
       }
     },
   });

@@ -11,7 +11,7 @@ ready = ready_fixture
 
 
 @pytest.mark.parametrize("foreign", [False, True])
-def test_partial_answer_contract_and_foreign_coverage_rejection(
+def test_partial_answer_preserves_grounded_statements_with_foreign_assessment(
     client, ready, monkeypatch, foreign
 ):
     chat = ready["answer_chat"]
@@ -46,9 +46,6 @@ def test_partial_answer_contract_and_foreign_coverage_rejection(
         json={"question": "Nguồn nói gì?", "context_max_bytes": 32000, "retrieval_mode": "dense"},
     )
     assert len(chat.requests) == 1
-    if foreign:
-        assert result.status_code == 502 and result.json()["code"] == "answer_coverage_invalid"
-        return
     assert result.status_code == 200, result.text
     body = result.json()
     assert body["status"] == "answered" and body["statements"]
@@ -56,6 +53,11 @@ def test_partial_answer_contract_and_foreign_coverage_rejection(
     assert body["coverage"]["requirements"][1]["label"] == "Danh sách chi tiết"
     assert body["trace"]["coverage"]["version"] == "qnu.rag.coverage/v2"
     assert body["sources"] and all(s["publication_decision_id"] for s in body["sources"])
+    if foreign:
+        assert body["coverage"]["requirements"][1]["evidence_ids"] == []
+        assert body["trace"]["grounding"]["materialization"]["assessment_issues"] == [
+            {"path": ["assessment", 1, "evidence_ids"], "type": "not_allowed"}
+        ]
 
 
 @pytest.mark.parametrize("abstain", [False, True])
@@ -77,7 +79,7 @@ def test_unused_coverage_witness_stays_in_the_revalidated_response(
             if abstain
             else [{"text": source["text"], "evidence_ids": [source["id"]]}],
             "assessment": [
-                {"label": "Missing detail", "status": "missing", "evidence_ids": witnesses}
+                {"label": "Missing detail", "status": "missing", "evidence_ids": [witness["id"]]}
             ],
         }
         return 200, json.dumps(
@@ -94,6 +96,6 @@ def test_unused_coverage_witness_stays_in_the_revalidated_response(
     )
     assert result.status_code == 200, result.text
     body = result.json()
-    assert len(chat.requests) == 1
+    assert len(chat.requests) == (2 if abstain else 1)
     assert set(witnesses) <= {s["evidence_id"] for s in body["sources"]}
     assert bool(body["statements"]) is not abstain

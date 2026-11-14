@@ -134,25 +134,123 @@ def test_collection_archive_blocks_children_and_can_restore(client):
     assert client.get(url + "/sources/" + source["id"]).status_code == 200
 
 
-def test_collection_delete_requires_empty_store(client):
-    workspace, collection, _ = setup_source(client)
-    as_actor(PLATFORM)
-    blocked = preview(client, workspace, "collection", collection["id"], "delete")
-    assert blocked.status_code == 409
-    assert blocked.json()["code"] == "collection_not_empty"
+def test_collection_delete_purges_sources_folders_and_files(client):
+    from sqlalchemy import func, select
 
-    empty = create_collection(client, workspace["id"], "Kho trống")
-    removed = accept(
-        client, workspace, preview(client, workspace, "collection", empty["id"], "delete")
-    )
-    assert removed.status_code == 200, removed.text
-    restored = accept(
+    from qnu.domains.knowledge.models import KBCollection, KBFolder, KBSource, KBSourceRevision
+    from qnu.domains.lifecycle.purge import execute
+    from qnu.domains.workspaces.models import WorkspaceEvent
+    from qnu.main import app
+    from qnu.platform.database import AsyncSessionFactory
+    from tests.integration.ocr_support import FakeJobQueue, use_queue
+
+    workspace, collection, source = setup_source(client)
+    folders_url = f"{API}/workspaces/{workspace['id']}/collections/{collection['id']}/folders"
+    assert client.post(folders_url, json={"name": "Còn hoạt động"}).status_code == 201
+    residue = client.post(folders_url, json={"name": "Đã xóa"}).json()
+    assert client.delete(folders_url + "/" + residue["id"]).status_code == 200
+    second = upload_source(
         client,
-        workspace,
-        preview(client, workspace, "collection", empty["id"], "restore"),
-        "restore",
-    )
-    assert restored.status_code == 200, restored.text
+        workspace["id"],
+        collection["id"],
+        payload=b"%PDF-1.7\n% second synthetic input\n%%EOF\n",
+    ).json()["source"]
+
+    async def storage_keys():
+        async with AsyncSessionFactory() as db:
+            return list(
+                (
+                    await db.scalars(
+                        select(KBSourceRevision.storage_key).where(
+                            KBSourceRevision.source_id.in_((source["id"], second["id"]))
+                        )
+                    )
+                ).all()
+            )
+
+    keys = client.portal.call(storage_keys)
+    assert len(keys) == 2
+    assert all(client.portal.call(app.state.container.blob_store.exists, key) for key in keys)
+
+    add_member(client, workspace["id"], PLATFORM.actor_id, "admin")
+    as_actor(PLATFORM)
+    use_queue(FakeJobQueue(failing=True))
+    proposal = preview(client, workspace, "collection", collection["id"], "delete")
+    assert proposal.status_code == 200, proposal.text
+    impact = proposal.json()["impact"]
+    assert impact["permanent"] is True
+    assert impact["restore_available"] is False
+    assert impact["sources_to_delete"] == 2
+    assert impact["folders_to_delete"] == 2
+    assert impact["files_to_delete"] == len(keys)
+
+    pending = accept(client, workspace, proposal)
+    assert pending.status_code == 200, pending.text
+    assert pending.json()["status"] == "pending"
+    collection_url = f"{API}/workspaces/{workspace['id']}/collections/{collection['id']}"
+    assert client.get(collection_url).status_code == 404
+    duplicate = preview(client, workspace, "collection", collection["id"], "delete")
+    assert duplicate.status_code == 409
+    assert duplicate.json()["code"] == "collection_purge_pending"
+
+    async def worker():
+        async with AsyncSessionFactory() as db:
+            return await execute(
+                db,
+                app.state.container.blob_store,
+                app.state.container.vector_store,
+                pending.json()["id"],
+            )
+
+    assert client.portal.call(worker) == "completed"
+    receipt = client.get(lifecycle(workspace) + "/actions/" + pending.json()["id"]).json()
+    assert receipt["status"] == "completed"
+    assert receipt["result"]["sources_deleted"] == 2
+    assert receipt["result"]["folders_deleted"] == 2
+    assert receipt["result"]["restore_available"] is False
+    assert all(not client.portal.call(app.state.container.blob_store.exists, key) for key in keys)
+    assert client.get(collection_url).status_code == 404
+    assert client.get(collection_url + "/sources").status_code == 404
+    assert preview(client, workspace, "collection", collection["id"], "restore").status_code == 404
+
+    async def remaining_rows():
+        async with AsyncSessionFactory() as db:
+            return (
+                await db.scalar(
+                    select(func.count())
+                    .select_from(KBCollection)
+                    .where(KBCollection.id == collection["id"])
+                ),
+                await db.scalar(
+                    select(func.count())
+                    .select_from(KBSource)
+                    .where(KBSource.collection_id == collection["id"])
+                ),
+                await db.scalar(
+                    select(func.count())
+                    .select_from(KBFolder)
+                    .where(KBFolder.collection_id == collection["id"])
+                ),
+            )
+
+    assert client.portal.call(remaining_rows) == (0, 0, 0)
+
+    async def audit():
+        async with AsyncSessionFactory() as db:
+            return list(
+                (
+                    await db.scalars(
+                        select(WorkspaceEvent.action).where(
+                            WorkspaceEvent.workspace_id == workspace["id"],
+                            WorkspaceEvent.action.in_(
+                                ("collection.purge_accepted", "collection.purged")
+                            ),
+                        )
+                    )
+                ).all()
+            )
+
+    assert sorted(client.portal.call(audit)) == ["collection.purge_accepted", "collection.purged"]
 
 
 def test_source_delete_receipt_is_owner_or_workspace_admin_only(client):
@@ -296,33 +394,17 @@ def test_collection_withdraw_retires_serving_scope_and_keeps_originals(client):
     assert original.status_code == 200 and original.content
 
 
-def test_collection_delete_allows_only_soft_deleted_folder_residue(client):
-    workspace = workspace_with_editor(client, "collection-residue")
-    as_actor(EDITOR)
-    collection = create_collection(client, workspace["id"], "Kho còn thư mục xóa")
-    folders = (
-        f"{API}/workspaces/{workspace['id']}/collections/{collection['id']}/folders"
-    )
-    active = client.post(folders, json={"name": "Còn hoạt động"}).json()
-    removed = client.post(folders, json={"name": "Đã xóa"}).json()
-    assert client.delete(folders + "/" + removed["id"]).status_code == 200
-
+def test_collection_bound_to_assistant_cannot_be_deleted(client):
+    workspace, collection, _ = setup_source(client)
     as_actor(PLATFORM)
+    created = client.post(
+        f"{API}/workspaces/{workspace['id']}/assistants",
+        json={"name": "Trợ lý đang dùng kho", "collection_id": collection["id"]},
+    )
+    assert created.status_code == 201, created.text
     blocked = preview(client, workspace, "collection", collection["id"], "delete")
     assert blocked.status_code == 409
-    assert blocked.json()["code"] == "collection_not_empty"
-
-    as_actor(EDITOR)
-    assert client.delete(folders + "/" + active["id"]).status_code == 200
-    as_actor(PLATFORM)
-    allowed = accept(
-        client,
-        workspace,
-        preview(client, workspace, "collection", collection["id"], "delete"),
-        "residue-delete",
-    )
-    assert allowed.status_code == 200, allowed.text
-    assert allowed.json()["status"] == "completed"
+    assert blocked.json()["code"] == "collection_in_use_by_assistants"
 
 
 @pytest.mark.parametrize("change", ["hash", "expired"])
@@ -373,11 +455,12 @@ def test_concurrent_acceptance_has_one_effect_and_one_receipt(client):
     assert len(client.get(lifecycle(workspace) + "/resources").json()["items"]) == 1
 
 
-def test_deleted_restore_requires_admin(client):
+def test_permanent_collection_delete_requires_admin(client):
     workspace = workspace_with_editor(client, "lifecycle-restore")
-    as_actor(PLATFORM)
-    collection = create_collection(client, workspace["id"], "Kho trống")
-    p = preview(client, workspace, "collection", collection["id"], "delete")
-    assert accept(client, workspace, p).status_code == 200
     as_actor(EDITOR)
-    assert preview(client, workspace, "collection", collection["id"], "restore").status_code == 403
+    collection = create_collection(client, workspace["id"], "Kho trống")
+    assert preview(client, workspace, "collection", collection["id"], "delete").status_code == 403
+    as_actor(PLATFORM)
+    proposal = preview(client, workspace, "collection", collection["id"], "delete")
+    assert proposal.status_code == 200, proposal.text
+    assert proposal.json()["impact"]["restore_available"] is False
