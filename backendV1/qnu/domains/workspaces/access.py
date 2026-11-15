@@ -14,10 +14,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.identity.service_actor import is_public_chatbot_actor
 from qnu.domains.workspaces.models import Workspace, WorkspaceMember
 from qnu.platform.errors import AppException, EntityNotFound, Forbidden
 
 PLATFORM_PERMISSION = "ai.workspaces.manage"
+# Mirrors READ_ROLES in knowledge/policies/access.py; service reads never widen it.
+PUBLIC_CHATBOT_READ_ROLES = frozenset({"admin", "editor", "reviewer", "member"})
 
 
 def is_platform_admin(actor: AuthActor) -> bool:
@@ -75,6 +78,16 @@ async def resolve_workspace_access(
     workspace = (await db.execute(stmt)).scalar_one_or_none()
     if workspace is None:
         raise EntityNotFound("Không tìm thấy workspace.", code="workspace_not_found")
+
+    if is_public_chatbot_actor(actor):
+        # Server-built identity for anonymous public turns, never supplied by a
+        # request. It is admitted for read-role requirements only; anything
+        # wider fails closed instead of falling through to membership checks.
+        if not set(required_roles or ()) <= PUBLIC_CHATBOT_READ_ROLES:
+            raise Forbidden("Định danh dịch vụ chỉ được đọc.", code="workspace_forbidden")
+        if workspace.status != "active" and not allow_suspended:
+            raise Forbidden("Workspace đang tạm dừng.", code="workspace_suspended")
+        return workspace
 
     if is_platform_admin(actor):
         if workspace.status != "active" and not allow_suspended:

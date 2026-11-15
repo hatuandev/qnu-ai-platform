@@ -14,6 +14,7 @@ import {
   type DetectionResponse,
   type DetectRequest,
   detectTextReview,
+  getSpellingStatus,
   getTextReview,
   getTextReviewCheck,
   getTextReviewJson,
@@ -309,7 +310,9 @@ export function useTextReviewChecksQuery(
   revisionId?: string | null,
   runId?: string | null,
   version?: number,
-  options?: { refetchInterval?: number | false },
+  options?: {
+    shouldPoll?: (checks: DetectionResponse[] | undefined) => boolean;
+  },
 ) {
   const enabled = Boolean(
     workspaceId && collectionId && sourceId && revisionId && runId,
@@ -341,7 +344,52 @@ export function useTextReviewChecksQuery(
     },
     enabled,
     staleTime: 10_000,
-    refetchInterval: options?.refetchInterval ?? false,
+    refetchInterval: (query) =>
+      options?.shouldPoll?.(query.state.data) ? 5000 : false,
+  });
+}
+
+export function useSpellingStatusQuery(
+  workspaceId: string | null | undefined,
+  collectionId: string,
+  sourceId: string,
+  revisionId: string,
+  runId: string,
+  version: number,
+  isPreparing: boolean,
+) {
+  return useQuery({
+    queryKey: [
+      ...ocrReviewKeys.all,
+      "spelling-summary",
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      runId,
+      version,
+    ],
+    queryFn: ({ signal }) => {
+      if (!workspaceId)
+        throw new Error("Missing workspace for spelling status");
+      return getSpellingStatus(
+        workspaceId,
+        collectionId,
+        sourceId,
+        revisionId,
+        runId,
+        version,
+        { signal },
+      );
+    },
+    enabled: Boolean(
+      workspaceId && collectionId && sourceId && revisionId && runId,
+    ),
+    staleTime: 5_000,
+    refetchInterval: (query) => {
+      const status = query.state.data;
+      return status?.running || (isPreparing && !status?.check) ? 5000 : false;
+    },
   });
 }
 
@@ -567,6 +615,17 @@ function storeUpdatedCheck(
     },
     replaceCheck,
   );
+  void queryClient.invalidateQueries({
+    queryKey: [
+      ...ocrReviewKeys.all,
+      "spelling-summary",
+      scope.workspaceId,
+      scope.collectionId,
+      scope.sourceId,
+      scope.revisionId,
+      scope.runId,
+    ],
+  });
 }
 
 export function useSetTextReviewDispositionMutation(

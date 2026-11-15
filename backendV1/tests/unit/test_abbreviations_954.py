@@ -267,6 +267,9 @@ def _wire(monkeypatch, catalog):
         ),
     )
     monkeypatch.setattr(search_module, "metadata_chunk_ids", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        search_module, "published_versions", AsyncMock(return_value=[SimpleNamespace(id="ver")])
+    )
     monkeypatch.setattr(search_module, "_query_vector", query_vector)
     monkeypatch.setattr(
         search_module,
@@ -274,7 +277,13 @@ def _wire(monkeypatch, catalog):
         AsyncMock(return_value=SimpleNamespace(configuration_hash="embed-hash")),
     )
     monkeypatch.setattr(search_module, "_hits", AsyncMock(return_value=[]))
-    db = SimpleNamespace(scalar=AsyncMock(side_effect=[run, run.id]))
+    db = SimpleNamespace(
+        scalar=AsyncMock(return_value=run),
+        execute=AsyncMock(
+            return_value=SimpleNamespace(one_or_none=lambda: (run.id, run.manifest_sha256))
+        ),
+        commit=AsyncMock(),
+    )
     vectors = SimpleNamespace(target_hash="target", search=AsyncMock(return_value=[]))
     return db, vectors, calls, embedded
 

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Bot,
   Database,
+  Globe,
   LayoutDashboard,
   ListChecks,
   MessageSquare,
@@ -22,6 +23,7 @@ import {
   useDeleteAssistantMutation,
 } from "@/api/assistants";
 import { ApiProblemError } from "@/api/client";
+import { useAssistantPublicationQuery } from "@/api/publications";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { EmptyState } from "@/components/admin/empty-state";
 import { PageBreadcrumbs } from "@/components/admin/page-breadcrumbs";
@@ -31,6 +33,7 @@ import { AskTestPanel } from "@/components/assistants/ask-test-panel";
 import { AssistantConfigForm } from "@/components/assistants/assistant-config-form";
 import { AssistantLogs } from "@/components/assistants/assistant-logs";
 import { AssistantOverview } from "@/components/assistants/assistant-overview";
+import { AssistantPublicationTab } from "@/components/assistants/assistant-publication-tab";
 import {
   READINESS_MAP,
   readinessHeroLabel,
@@ -50,7 +53,7 @@ import { useUiStore } from "@/lib/ui-store";
 
 const assistantDetailSearchSchema = z.object({
   tab: z
-    .enum(["overview", "config", "ask", "reviews", "logs"])
+    .enum(["overview", "config", "ask", "reviews", "logs", "publication"])
     .catch("overview"),
 });
 
@@ -88,6 +91,10 @@ function AssistantDetailPage() {
     refetch: refetchReadiness,
     isRefetching: isRefreshingReadiness,
   } = useAssistantReadinessQuery(workspaceId, assistant?.id);
+  const { data: publication } = useAssistantPublicationQuery(
+    workspaceId,
+    assistant?.id,
+  );
 
   const goToTab = (next: AssistantTab) => {
     void navigate({ search: { tab: next }, replace: true });
@@ -186,6 +193,15 @@ function AssistantDetailPage() {
                 {readinessHeroLabel(readiness?.status ?? "uncertain")}
               </Badge>
             ) : null}
+            {publication?.enabled ? (
+              <Badge
+                variant="outline"
+                className="h-5 gap-1 border-primary/30 bg-primary/10 px-1.5 text-[11px] font-normal text-primary"
+              >
+                <Globe className="size-3" />
+                <span>Công khai</span>
+              </Badge>
+            ) : null}
             {!assistant.is_active ? (
               <Badge
                 variant="warning"
@@ -218,12 +234,11 @@ function AssistantDetailPage() {
           <div className="flex shrink-0 items-center gap-2">
             {tab !== "ask" ? (
               <Button
-                variant="outline"
                 size="sm"
                 className="h-8 gap-1.5 text-xs font-medium"
                 onClick={() => goToTab("ask")}
               >
-                <Play className="size-3.5 text-primary" />
+                <Play className="size-3.5 fill-current" />
                 <span>Hỏi thử</span>
               </Button>
             ) : null}
@@ -299,6 +314,10 @@ function AssistantDetailPage() {
             <ScrollText className="size-3.5" />
             <span>Nhật ký</span>
           </TabsTrigger>
+          <TabsTrigger value="publication" className="gap-1.5 text-xs">
+            <Globe className="size-3.5" />
+            <span>Công khai</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -336,6 +355,13 @@ function AssistantDetailPage() {
 
         <TabsContent value="logs">
           <AssistantLogs workspaceId={workspaceId} assistantId={assistant.id} />
+        </TabsContent>
+
+        <TabsContent value="publication">
+          <AssistantPublicationTab
+            workspaceId={workspaceId}
+            assistant={assistant}
+          />
         </TabsContent>
       </Tabs>
 

@@ -20,7 +20,7 @@ async def _keys(url: str, force: bool = False) -> dict:
     if not force and _cache[0] == url and _cache[1] > time.monotonic():
         return _cache[2]
     try:
-        async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
+        async with httpx.AsyncClient(timeout=5, follow_redirects=False, trust_env=False) as client:
             response = await client.get(url)
             response.raise_for_status()
             data = response.json()
@@ -34,7 +34,14 @@ async def _keys(url: str, force: bool = False) -> dict:
         }
         if not keys:
             raise ValueError("Empty signing key set")
-    except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError) as exc:
+    except (
+        httpx.HTTPError,
+        httpx.InvalidURL,
+        ValueError,
+        KeyError,
+        TypeError,
+        AttributeError,
+    ) as exc:
         raise AppException(
             "Không tải được khóa xác thực SSO.", code="sso_unavailable", status_code=503
         ) from exc

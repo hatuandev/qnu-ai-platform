@@ -419,6 +419,54 @@ def test_withdrawal_during_query_embedding_is_rechecked(client, indexed, monkeyp
     assert response.json()["status"] == "no_eligible_content" and not response.json()["hits"]
 
 
+def test_vector_search_releases_workspace_lock_and_rechecks_publication(
+    client, indexed, monkeypatch
+):
+    import asyncio
+
+    from qnu.domains.knowledge.publication.decisions import commit_decision, create_preview
+    from qnu.domains.knowledge.publication.schemas import CommitRequest, PreviewRequest
+    from qnu.main import app
+    from qnu.platform.database import AsyncSessionFactory
+
+    assert execute_index(client, indexed["index_run"]["id"]) == "completed"
+    container = app.state.container
+    original = container.vector_store.search
+    scope = (
+        indexed["workspace"]["id"],
+        indexed["collection"]["id"],
+        indexed["compiled"]["document"]["id"],
+        indexed["compiled"]["version"]["id"],
+    )
+
+    async def withdraw_during_search(*args, **kwargs):
+        hits = await original(*args, **kwargs)
+        assert hits
+        async with asyncio.timeout(3), AsyncSessionFactory() as db:
+            preview = await create_preview(
+                db,
+                container.blob_store,
+                PLATFORM,
+                *scope,
+                PreviewRequest(action="withdraw", reason="Synthetic race check."),
+            )
+            await commit_decision(
+                db,
+                container.blob_store,
+                PLATFORM,
+                *scope,
+                CommitRequest(preview_id=preview.id, preview_sha256=preview.preview_sha256),
+                "withdraw-during-vector-search",
+            )
+        return hits
+
+    monkeypatch.setattr(container.vector_store, "search", withdraw_during_search)
+    response = client.post(indexed["base"] + "/search", json={"query": "x", "mode": "dense"})
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "no_eligible_content"
+    assert response.json()["hits"] == []
+
+
 def test_provider_disabled_during_embedding_is_rechecked(client, indexed, monkeypatch):
     from qnu.domains.modelops.models import Provider
     from qnu.main import app

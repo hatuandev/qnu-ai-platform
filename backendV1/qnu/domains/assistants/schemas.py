@@ -3,7 +3,14 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from qnu.domains.assistants.guardrail_policy import GuardrailPolicy
 from qnu.domains.rag.policy import RagPolicy
+
+
+class AssistantRagPolicy(RagPolicy):
+    """RAG policy plus assistant-only behavior; stored in the existing JSONB column."""
+
+    guardrail_policy: GuardrailPolicy = Field(default_factory=GuardrailPolicy)
 
 
 class AssistantConfig(BaseModel):
@@ -17,7 +24,7 @@ class AssistantConfig(BaseModel):
     history_turns: int = Field(3, strict=True, ge=0, le=10)
     max_output_tokens: int | None = Field(None, strict=True, gt=0)
     is_active: bool = True
-    rag_policy: RagPolicy = Field(default_factory=RagPolicy)
+    rag_policy: AssistantRagPolicy = Field(default_factory=AssistantRagPolicy)
 
     @model_validator(mode="after")
     def candidate_budget(self):
@@ -33,7 +40,7 @@ class AssistantConfig(BaseModel):
         return value.strip()
 
 
-class NewAssistantRagPolicy(RagPolicy):
+class NewAssistantRagPolicy(AssistantRagPolicy):
     scope_resolution: Literal["explicit", "catalog"] = "catalog"
     context_window: int = Field(1, strict=True, ge=0, le=5)
 

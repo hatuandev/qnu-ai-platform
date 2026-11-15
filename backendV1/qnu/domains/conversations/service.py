@@ -5,7 +5,7 @@ from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from qnu.domains.assistants.schemas import AssistantConfig
+from qnu.domains.assistants.schemas import AssistantConfig, AssistantRagPolicy
 from qnu.domains.assistants.service import get_assistant
 from qnu.domains.conversations.access import current_assistant, owned
 from qnu.domains.conversations.models import Conversation, ConversationTurn
@@ -18,7 +18,6 @@ from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.lifecycle.effects import cancel_related_jobs
 from qnu.domains.lifecycle.guards import visible
 from qnu.domains.ocr.ids import new_id
-from qnu.domains.rag.policy import RagPolicy
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.config import get_settings
@@ -181,7 +180,9 @@ async def reserve_turn(
         )
     conversation.last_turn_no += 1
     conversation.updated_at = utcnow()
-    policy = RagPolicy.model_validate(conversation.assistant_snapshot.get("rag_policy", {}))
+    policy = AssistantRagPolicy.model_validate(
+        conversation.assistant_snapshot.get("rag_policy", {})
+    )
     fixed_scope = policy.metadata_filter.model_dump(mode="json", exclude_none=True)
     previous = await db.scalar(
         select(ConversationTurn)

@@ -1,5 +1,7 @@
 import { Bell, Menu, Moon, Search, Sun, User } from "lucide-react";
 import { useState } from "react";
+import { isSsoEnabled, logoutSso } from "@/api/sso";
+import { logoutDevSession } from "@/components/dev/dev-session-gate";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,6 +25,16 @@ import { AppSidebar } from "./app-sidebar";
 export function AppTopbar() {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const { theme, setTheme, devActor } = useUiStore();
+
+  const handleLogout = () => {
+    if (isSsoEnabled()) {
+      void logoutSso();
+      return;
+    }
+    if (import.meta.env.DEV) {
+      logoutDevSession();
+    }
+  };
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border/60 bg-card px-4 gap-4">
@@ -119,7 +131,10 @@ export function AppTopbar() {
               Khóa API & Quyền
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-xs text-destructive">
+            <DropdownMenuItem
+              className="text-xs text-destructive"
+              onClick={handleLogout}
+            >
               Đăng xuất
             </DropdownMenuItem>
           </DropdownMenuContent>

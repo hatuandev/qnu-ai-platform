@@ -1055,6 +1055,7 @@ function SourceStudioPage() {
                   workspaceId={activeWorkspaceId}
                   collectionId={resolvedCollectionId}
                   sourceId={sourceId}
+                  isPreparing={isPreparing}
                   {...reviewScope}
                 />
               )}

@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import {
   Bot,
   Database,
+  Globe,
   MessageSquare,
   MoreHorizontal,
   Pause,
@@ -14,6 +15,7 @@ import {
   useAssistantReadinessQuery,
 } from "@/api/assistants";
 import type { CatalogItem } from "@/api/modelops";
+import { useAssistantPublicationQuery } from "@/api/publications";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,7 +73,15 @@ export function AssistantCard({
     workspaceId,
     assistant.id,
   );
+  const { data: publication } = useAssistantPublicationQuery(
+    workspaceId,
+    assistant.id,
+  );
   const readinessBadge = readiness ? READINESS_MAP[readiness.status] : null;
+  const isPubliclyLive =
+    Boolean(publication?.configured) &&
+    Boolean(publication?.enabled) &&
+    Boolean(publication?.system_enabled);
 
   return (
     <Card className="relative flex flex-col border-border/60 shadow-2xs transition-colors hover:border-primary/50">
@@ -173,6 +183,15 @@ export function AssistantCard({
               className="h-4 px-1.5 text-[10px] font-normal"
             >
               {readinessBadge.label}
+            </Badge>
+          )}
+          {publication?.configured && publication.enabled && (
+            <Badge
+              variant={isPubliclyLive ? "info" : "secondary"}
+              className="h-4 gap-1 px-1.5 text-[10px] font-normal"
+            >
+              <Globe className="size-3" />
+              <span>{isPubliclyLive ? "Công khai" : "Công khai tạm ẩn"}</span>
             </Badge>
           )}
         </div>

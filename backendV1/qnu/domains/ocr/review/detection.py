@@ -4,7 +4,7 @@ import asyncio
 import json
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
@@ -22,6 +22,8 @@ from qnu.domains.ocr.review.schemas import (
     IgnoredSuggestion,
     RejectedSuggestion,
     ReviewDocument,
+    SpellingCheckSummary,
+    SpellingStatusSummary,
     Suggestion,
 )
 from qnu.domains.ocr.review.service import (
@@ -303,15 +305,19 @@ async def reviews_for(db: AsyncSession, check_ids: list[str]) -> dict[str, Spell
     return {row.check_id: row for row in rows}
 
 
+async def _expire_check(db: AsyncSession, row: SpellingRun) -> None:
+    if row.status == "running" and row.expires_at <= utcnow():
+        row.status, row.error_code = "uncertain", "ocr_spelling_interrupted"
+        await db.commit()
+
+
 async def readable_check(
     db: AsyncSession,
     row: SpellingRun,
     ignored: list[IgnoredSuggestion] | None = None,
     review: SpellingReview | None = None,
 ) -> DetectionResponse:
-    if row.status == "running" and row.expires_at <= utcnow():
-        row.status, row.error_code = "uncertain", "ocr_spelling_interrupted"
-        await db.commit()
+    await _expire_check(db, row)
     if ignored is None:
         ignored = (await ignored_suggestions(db, [row.id])).get(row.id, [])
     if review is None:
@@ -368,9 +374,81 @@ async def list_checks(
     )
     if version is not None:
         query = query.where(SpellingRun.version == version)
-    rows = [row for row in (await db.scalars(query)).all() if "automatic_parent" not in row.trace]
+    rows = (
+        await db.scalars(query.where(SpellingRun.trace["automatic_parent"].astext.is_(None)))
+    ).all()
     ignored = await ignored_suggestions(db, [row.id for row in rows])
     reviews = await reviews_for(db, [row.id for row in rows])
-    return [
-        await readable_check(db, row, ignored.get(row.id, []), reviews.get(row.id)) for row in rows
-    ]
+    for row in rows:
+        await _expire_check(db, row)
+    return [detection_response(row, ignored.get(row.id, []), reviews.get(row.id)) for row in rows]
+
+
+async def status_summary(
+    db: AsyncSession, run: OcrProcessingRun, version: int
+) -> SpellingStatusSummary:
+    # Match the detail screen's priority even when approval produced a new text version.
+    status = case(
+        (
+            SpellingRun.status == "running",
+            case((SpellingRun.expires_at <= utcnow(), "uncertain"), else_="running"),
+        ),
+        else_=SpellingRun.status,
+    )
+    ignored_count = (
+        select(func.count())
+        .where(SpellingDisposition.check_id == SpellingRun.id)
+        .correlate(SpellingRun)
+        .scalar_subquery()
+    )
+    withheld = SpellingRun.trace["withheld_suggestions"]
+    withheld_count = case(
+        (func.jsonb_typeof(withheld) == "array", func.jsonb_array_length(withheld)), else_=0
+    )
+    row = (
+        await db.execute(
+            select(
+                status.label("status"),
+                func.bool_or(status == "running").over().label("running"),
+                SpellingReview.reviewed_at,
+                SpellingRun.checked_evidence_ids,
+                SpellingRun.trace["total_evidence_count"].label("total_evidence_count"),
+                ignored_count.label("ignored_count"),
+                (func.jsonb_array_length(SpellingRun.suggestions) + withheld_count).label(
+                    "suggestions"
+                ),
+            )
+            .outerjoin(SpellingReview, SpellingReview.check_id == SpellingRun.id)
+            .where(
+                SpellingRun.run_id == run.id,
+                SpellingRun.workspace_id == run.workspace_id,
+                SpellingRun.collection_id == run.collection_id,
+                SpellingRun.trace["automatic_parent"].astext.is_(None),
+                or_(SpellingRun.version == version, SpellingReview.reviewed_version == version),
+            )
+            .order_by(
+                case(
+                    (SpellingReview.reviewed_at.is_not(None), 0),
+                    (status == "completed", 1),
+                    (status == "running", 2),
+                    else_=3,
+                ),
+                SpellingRun.created_at.desc(),
+                SpellingRun.id.desc(),
+            )
+            .limit(1)
+        )
+    ).one_or_none()
+    if row is None:
+        return SpellingStatusSummary()
+    return SpellingStatusSummary(
+        running=row.running,
+        check=SpellingCheckSummary(
+            status=row.status,
+            reviewed_at=row.reviewed_at,
+            checked_count=len(set(row.checked_evidence_ids)),
+            total_evidence_count=row.total_evidence_count,
+            pending_count=max(0, row.suggestions - row.ignored_count),
+            ignored_count=row.ignored_count,
+        ),
+    )

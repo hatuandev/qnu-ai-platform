@@ -12,8 +12,6 @@ export * from "./compilation";
 export * from "./config";
 export * from "./conversations";
 export * from "./documents";
-export * from "./inbox";
-export * from "./inbox";
 export * from "./indexing";
 export * from "./integrations";
 export * from "./knowledge";

@@ -16,7 +16,7 @@ from qnu.domains.answer_review.schemas import (
     AnswerReviewLabelUpdate,
     AnswerReviewResponse,
 )
-from qnu.domains.assistants.schemas import AssistantConfig
+from qnu.domains.assistants.schemas import AssistantConfig, AssistantRagPolicy
 from qnu.domains.assistants.service import assistant_readiness, get_assistant
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import utcnow
@@ -24,7 +24,6 @@ from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.rag.answer.schemas import AnswerRequest, AnswerResponse
 from qnu.domains.rag.answer.service import answer
-from qnu.domains.rag.policy import RagPolicy
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.errors import AppException, Conflict, EntityNotFound
@@ -187,7 +186,9 @@ async def create_review(
     )
     await db.commit()
 
-    policy = RagPolicy.model_validate(config.get("rag_policy", {})).model_dump(mode="json")
+    policy = AssistantRagPolicy.model_validate(config.get("rag_policy", {})).model_dump(
+        mode="json", exclude={"guardrail_policy"}
+    )
     collection_id = assistant.collection_id
     item_ids = [item.id for item in items]
     for item_id, question in zip(item_ids, req.questions, strict=True):

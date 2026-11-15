@@ -11,9 +11,122 @@
       href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
       rel="stylesheet"
     />
+    <style>
+      #boot-fallback {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: #f6f8f8;
+        color: #0f172a;
+        font-family: Inter, system-ui, -apple-system, sans-serif;
+      }
+      #boot-fallback[hidden] {
+        display: none;
+      }
+      #boot-fallback .boot-card {
+        width: 100%;
+        max-width: 380px;
+        border: 1px solid #e2e8e6;
+        border-radius: 12px;
+        background: #ffffff;
+        padding: 24px;
+      }
+      #boot-fallback .boot-title {
+        margin: 0 0 8px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      #boot-fallback .boot-detail {
+        margin: 0 0 16px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #5b6b73;
+      }
+      #boot-fallback .boot-action {
+        width: 100%;
+        height: 36px;
+        border: 0;
+        border-radius: 6px;
+        background: #0f766e;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      @media (prefers-color-scheme: dark) {
+        #boot-fallback {
+          background: #0b1220;
+          color: #e2e8f0;
+        }
+        #boot-fallback .boot-card {
+          border-color: #1e293b;
+          background: #111a2b;
+        }
+        #boot-fallback .boot-detail {
+          color: #94a3b8;
+        }
+        #boot-fallback .boot-action {
+          background: #14b8a6;
+          color: #04241f;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot-fallback" role="alert" hidden>
+      <div class="boot-card">
+        <p class="boot-title">Không tải được giao diện</p>
+        <p class="boot-detail" id="boot-fallback-detail">
+          Trang chưa tải xong, có thể do mạng hoặc máy chủ tạm thời gián đoạn.
+          Bấm Tải lại trang để thử lại.
+        </p>
+        <button
+          type="button"
+          class="boot-action"
+          onclick="window.location.reload()"
+        >
+          Tải lại trang
+        </button>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var panel = document.getElementById("boot-fallback");
+        var root = document.getElementById("root");
+        function showFallback(detail) {
+          if (!panel || !root || root.childElementCount > 0) return;
+          if (detail) {
+            document.getElementById("boot-fallback-detail").textContent =
+              detail;
+          }
+          panel.hidden = false;
+        }
+        if (root) {
+          // A slow cold start can trip the watchdog right before React
+          // mounts; hide the panel again as soon as #root has content.
+          var observer = new MutationObserver(function () {
+            if (root.childElementCount > 0) {
+              panel.hidden = true;
+              observer.disconnect();
+            }
+          });
+          observer.observe(root, { childList: true });
+        }
+        window.setTimeout(function () {
+          showFallback();
+        }, 8000);
+        window.addEventListener("vite:preloadError", function (event) {
+          event.preventDefault();
+          showFallback(
+            "Trình duyệt không tải được một phần giao diện. Bấm Tải lại trang để thử lại.",
+          );
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

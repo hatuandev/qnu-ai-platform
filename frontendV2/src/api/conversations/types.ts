@@ -33,7 +33,12 @@ export type TurnStatus =
 export type DirectReply = {
   id: string;
   status: "direct_reply";
-  route: "greeting" | "courtesy" | "identity" | "protected_request";
+  route:
+    | "greeting"
+    | "courtesy"
+    | "identity"
+    | "protected_request"
+    | "guardrail";
   answer: string;
 };
 

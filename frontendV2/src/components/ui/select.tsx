@@ -86,13 +86,16 @@ function SelectLabel({
 function SelectItem({
   className,
   children,
+  description,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Item>) {
+}: React.ComponentProps<typeof SelectPrimitive.Item> & {
+  description?: React.ReactNode;
+}) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "type-control relative flex min-h-9 w-full cursor-default select-none items-center rounded-sm py-1.5 pr-8 pl-2 outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "type-control relative flex min-h-9 w-full cursor-default select-none items-center justify-between gap-3 rounded-sm py-1.5 pr-8 pl-2 outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}
       {...props}
@@ -102,7 +105,14 @@ function SelectItem({
           <Check className="size-4" />
         </SelectPrimitive.ItemIndicator>
       </span>
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      <SelectPrimitive.ItemText className="truncate">
+        {children}
+      </SelectPrimitive.ItemText>
+      {description ? (
+        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+          {description}
+        </span>
+      ) : null}
     </SelectPrimitive.Item>
   );
 }

@@ -1,6 +1,6 @@
 # Triển khai QNU V1 trên Docker / Dokploy
 
-Root `docker-compose.yml` đã chuyển sang `backendV1`; Compose hiện chỉ có backend/worker (chưa có service frontend vì `frontendV2` chưa có SSO production). File `backendV1/docker-compose.v1.yml` là entrypoint tương thích, include cùng cấu hình root; không duy trì hai stack ứng dụng khác nhau.
+Root `docker-compose.yml` đã chuyển sang `backendV1`; Compose có backend/worker và service frontend dựng từ `frontendV2` (nginx phục vụ SPA, proxy same-origin `/platform/` tới backend:8002). Service frontend nằm sau profile `frontend` và chưa bật mặc định vì `frontendV2` chưa có SSO production. File `backendV1/docker-compose.v1.yml` là entrypoint tương thích, include cùng cấu hình root; không duy trì hai stack ứng dụng khác nhau. Kênh chatbot công khai có [checklist riêng](06_kenh_chatbot_cong_khai.md).
 
 ## Dịch vụ
 
@@ -10,8 +10,9 @@ Root `docker-compose.yml` đã chuyển sang `backendV1`; Compose hiện chỉ c
 | bootstrap | `alembic upgrade head`, chỉ migration V1 | Kết nối DB đã được cấu hình và storage-init xong |
 | backend | `qnu.main:app`, nội bộ8002 | Bootstrap thành công |
 | worker | `qnu.workers.settings.WorkerSettings` | Backend healthy |
+| frontend (profile `frontend`) | nginx phục vụ `frontendV2` và proxy `/platform/` tới backend | Backend healthy; chỉ build/up khi được duyệt |
 
-Compose không có service frontend: website trên server vẫn là bản cũ có SSO cho tới khi `frontendV2` được bổ sung đăng nhập production. Worker có trần vận hành `WORKER_MODEL_JOB_TIMEOUT_SECONDS` mặc định86400; thời gian chờ provider vẫn do ModelOps.
+Compose mặc định vẫn chỉ deploy backend/worker: website trên server là bản cũ có SSO cho tới khi `frontendV2` được bổ sung đăng nhập production. Trang công khai `/chatbot/{slug}` chạy không cần token theo [checklist kênh công khai](06_kenh_chatbot_cong_khai.md). Worker có trần vận hành `WORKER_MODEL_JOB_TIMEOUT_SECONDS` mặc định86400; thời gian chờ provider vẫn do ModelOps.
 
 ## Chuẩn bị
 
@@ -20,7 +21,7 @@ Compose không có service frontend: website trên server vẫn là bản cũ c�
 3. Hạ tầng PostgreSQL/Redis/Qdrant/MinIO/Gotenberg phải truy cập được từ container qua `dokploy-network`. URL localhost ở trong container không trỏ về laptop hay container hạ tầng khác. Không chạy infra local để thay hạ tầng production.
 4. Điền mẫu `.env.dokploy.example` bằng secret store/Dokploy Environment. Không copy placeholder đè khóa thật; không đưa key AI vào file này. ModelOps DB quyết định provider/model/key/grant/default.
 5. `ALLOWED_ORIGINS` là chuỗi origin ngăn cách bằng dấu phẩy, không phải JSON array. `PUBLIC_BASE_URL` là URL mà browser truy cập được cho API cùng origin. Giữ queue/cache V1 riêng, không dùng hàng đợi legacy.
-6. Production V1 yêu cầu DEV_AUTH_ENABLED=false, SSO_ENABLED=true và cấu hình OpenIddict thật. Các cờ demo legacy cho dev login trong production không có hiệu lực ở V1. API xác thực token Bearer theo SSO; chưa có bundle frontend production trong Compose.
+6. Production V1 yêu cầu DEV_AUTH_ENABLED=false, SSO_ENABLED=true và cấu hình OpenIddict thật. Các cờ demo legacy cho dev login trong production không có hiệu lực ở V1. API xác thực token Bearer theo SSO. Bundle `frontendV2` đã đóng gói nhưng chỉ bật qua profile `frontend`; trang công khai không cần token, giao diện quản trị vẫn cần SSO.
 7. Volume `qnu_platform_storage` vẫn được giữ cùng tên, mount `/app/storage`. UID10001 phải có quyền ghi khi dùng local storage; không đổi quyền hàng loạt trên dữ liệu chưa kiểm. Nếu S3, cấu hình cùng bucket đã chứa dữ liệu V1. `storage-init` tự tạo bucket khi thiếu; với AWS S3 hoặc khóa không có quyền `CreateBucket`, tạo bucket trước bằng công cụ quản trị.
 
 ## Kiểm cấu hình và build trước triển khai
@@ -42,7 +43,7 @@ docker compose --env-file .env.production ps
 docker compose --env-file .env.production logs --tail=100 bootstrap backend worker
 ```
 
-Dokploy: chọn repository/branch đã kiểm, dùng root Compose, nhập Environment, rồi Deploy. Khi `frontendV2` có SSO, thêm domain HTTPS vào service frontend mới; hiện tại chỉ triển khai backend/worker và giữ website cũ trên server.
+Dokploy: chọn repository/branch đã kiểm, dùng root Compose, nhập Environment, rồi Deploy. Lần deploy hiện hành chỉ triển khai backend/worker và giữ website cũ trên server. Khi được duyệt mở kênh công khai, thêm `--profile frontend` khi build/up, gắn domain HTTPS vào service `frontend` cổng 80 và lần lượt kiểm mục 4–5 của [checklist kênh công khai](06_kenh_chatbot_cong_khai.md).
 
 Bootstrap không seed, không tạo provider/key mặc định và không OCR/reindex lại tài liệu. API/worker không tự migrate. Sau deploy kiểm đúng V1 UI, SSO, workspace membership, ModelOps MinerU và các chức năng upload/OCR/compiler/publication/chat trên kho thử trước demo. Build và health không thay thế bài test chất lượng RAG/OCR.
 
@@ -53,7 +54,7 @@ Bootstrap không seed, không tạo provider/key mặc định và không OCR/re
 - Log mỗi container giới hạn 20 MB × 5 tệp để tránh đầy đĩa server; log lâu dài vẫn thu qua Dokploy/nhật ký tập trung nếu cần.
 - `stop_grace_period` 30 giây cho backend và 60 giây cho worker để deploy/restart không cắt ngang xử lý.
 - Chỉ một replica backend đặt `OWN_RECONCILE=true`; replica bổ sung đặt `false` để không tranh việc quét hàng đợi.
-- `frontendV2` chưa có luồng đăng nhập production (chỉ có cầu nối dev của Vite và tự tắt trong bản build). Trên server tiếp tục dùng website cũ có SSO; chỉ đưa V2 lên Compose sau khi bổ sung SSO và kiểm thử đăng nhập thật.
+- `frontendV2` chưa có luồng đăng nhập production (chỉ có cầu nối dev của Vite và tự tắt trong bản build). Image production đã đóng gói và nằm sau profile `frontend`; chỉ bật giao diện quản trị V2 sau khi bổ sung SSO và kiểm thử đăng nhập thật. Trang công khai không cần token và đi theo [checklist kênh công khai](06_kenh_chatbot_cong_khai.md).
 
 ## Giữ dữ liệu và quay lại bản trước
 

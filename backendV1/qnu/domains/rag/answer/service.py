@@ -34,6 +34,7 @@ from qnu.domains.rag.answer.drafting import (
     sources_for,
 )
 from qnu.domains.rag.answer.fallback import compose as compose_fallback
+from qnu.domains.rag.answer.hygiene import clean_model_answer
 from qnu.domains.rag.answer.narrative import continuation_supports
 from qnu.domains.rag.answer.packing import pack_messages as _pack_messages
 from qnu.domains.rag.answer.projection import PAYLOAD_VERSION
@@ -293,8 +294,10 @@ async def answer(
         # Derived values are rebuilt from this request's sources, cells and scope.
         try:
             proposed = parse_answer(cached.content, sources)
+            proposed, hygiene = clean_model_answer(proposed, req.question)
             draft = materialize(proposed, sources, cells, report=materialization)
             coverage = assess(draft, sources, trace.context, report=materialization)
+            trace.grounding["hygiene"] = {"stage": "cache", **hygiene}
         except AppException:
             await answer_cache.discard(cache_key)
             cached = None
@@ -372,8 +375,10 @@ async def answer(
         first_error = None
         try:
             proposed = parse_answer(result.content, sources)
+            proposed, hygiene = clean_model_answer(proposed, req.question)
             draft = materialize(proposed, sources, cells, report=materialization)
             coverage = assess(draft, sources, trace.context, report=materialization)
+            trace.grounding["hygiene"] = {"stage": "generation", **hygiene}
         except AppException as exc:
             first_error = exc
             await record_workspace_event(
@@ -528,8 +533,12 @@ async def answer(
                     }
                 )
                 appeal_report = {}
+                appeal_hygiene = {}
                 try:
                     appeal_proposed = parse_answer(appeal_result.content, sources)
+                    appeal_proposed, appeal_hygiene = clean_model_answer(
+                        appeal_proposed, req.question
+                    )
                     if names_schema is not None:
                         allowed_names = set(
                             names_schema["$defs"]["CellSelection"]["properties"]["cell_id"]["enum"]
@@ -571,6 +580,7 @@ async def answer(
                         }
                         result, proposed, draft = appeal_result, appeal_proposed, appeal_draft
                         coverage, materialization = appeal_coverage, appeal_report
+                        trace.grounding["hygiene"] = {"stage": "appeal", **appeal_hygiene}
                         trace.prompt_tokens = result.prompt_tokens
                         trace.completion_tokens = result.completion_tokens
                         trace.total_tokens = result.total_tokens

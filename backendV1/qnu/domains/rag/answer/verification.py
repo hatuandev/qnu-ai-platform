@@ -1,4 +1,4 @@
-"""One bounded ModelOps judge call; errors remain errors and quotes must resolve exactly."""
+"""One bounded ModelOps judge call; enforce fails closed and observe records failures."""
 
 import asyncio
 import json
@@ -199,19 +199,50 @@ async def verify(
         await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
         raise
     started = time.monotonic()
+    trace = {
+        "mode": req.verification_mode,
+        "version": VERSION,
+        "provider_id": runtime.provider_id,
+        "model_name": runtime.model_name,
+        "configuration_hash": runtime.configuration_hash,
+        "inference_configuration_hash": inference_hash,
+        "reasoning": runtime.reasoning_trace("answer"),
+        "usage_id": usage.id,
+    }
     try:
         result = await chat.complete(messages, bind_usage(request, usage.id))
     except ChatResponseError as exc:
         await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
-        raise
+        if req.verification_mode != "observe":
+            raise
+        return {
+            **trace,
+            "status": "error",
+            "error_code": "answer_verification_error",
+            "total_tokens": exc.usage_tokens,
+            "ms": round((time.monotonic() - started) * 1000, 3),
+            "findings": [],
+        }
     except (Exception, asyncio.CancelledError):
         await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
         raise
     try:
         report = parse_report(result.content, statements, sources)
-    except AppException:
+    except AppException as exc:
         await usage_service.settle(db, usage.id, total_tokens=result.total_tokens, failed=True)
-        raise
+        if req.verification_mode != "observe":
+            raise
+        return {
+            **trace,
+            "status": "invalid",
+            "error_code": exc.code,
+            "prompt_tokens": result.prompt_tokens,
+            "completion_tokens": result.completion_tokens,
+            "total_tokens": result.total_tokens,
+            "output_budget": result.budget_trace,
+            "ms": round((time.monotonic() - started) * 1000, 3),
+            "findings": [],
+        }
     await usage_service.settle(db, usage.id, total_tokens=result.total_tokens)
     await check()
     statuses = {f.status for f in report.findings}
@@ -223,15 +254,8 @@ async def verify(
         else "supported"
     )
     return {
-        "mode": req.verification_mode,
+        **trace,
         "status": status,
-        "version": VERSION,
-        "provider_id": runtime.provider_id,
-        "model_name": runtime.model_name,
-        "configuration_hash": runtime.configuration_hash,
-        "inference_configuration_hash": inference_hash,
-        "reasoning": runtime.reasoning_trace("answer"),
-        "usage_id": usage.id,
         "prompt_tokens": result.prompt_tokens,
         "completion_tokens": result.completion_tokens,
         "total_tokens": result.total_tokens,

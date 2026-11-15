@@ -1,8 +1,10 @@
 """Map existing durable records into one scoped operations view without a second job ledger."""
 
+from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import String, cast, literal, null, select, union_all
+from sqlalchemy import String, cast, func, literal, null, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.conversations.models import ConversationTurn
@@ -73,21 +75,29 @@ def recoverable(kind: str, row: Base) -> tuple[bool, str]:
     return False, "Tác vụ đang được sở hữu hoặc đã kết thúc; không đổi trạng thái để chạy lại ngầm."
 
 
-async def view(db: AsyncSession, kind: str, row: Base) -> JobView:
+async def index_progress(db: AsyncSession, workspace_id: str, run_ids: list[str]) -> dict[str, int]:
+    if not run_ids:
+        return {}
+    rows = await db.execute(
+        select(IndexChunk.run_id, func.count())
+        .where(
+            IndexChunk.workspace_id == workspace_id,
+            IndexChunk.run_id.in_(run_ids),
+            func.jsonb_typeof(IndexChunk.vector) == "array",
+        )
+        .group_by(IndexChunk.run_id)
+    )
+    return {run_id: count for run_id, count in rows}
+
+
+def _view(kind: str, row: Base, index_done: int = 0) -> JobView:
     spec = SPECS[kind]
     allowed, reason = recoverable(kind, row)
     done, total = None, None
     if kind == "ocr":
         done, total = row.pages_done, row.pages_total
     elif kind == "index":
-        from sqlalchemy import func
-
-        done = await db.scalar(
-            select(func.count())
-            .select_from(IndexChunk)
-            .where(IndexChunk.run_id == row.id, IndexChunk.vector.is_not(None))
-        )
-        total = row.chunks_total
+        done, total = index_done, row.chunks_total
     return JobView(
         kind=kind,
         id=getattr(row, spec.id_field),
@@ -112,6 +122,39 @@ async def view(db: AsyncSession, kind: str, row: Base) -> JobView:
         recovery_allowed=allowed,
         recovery_reason=reason,
     )
+
+
+async def view(db: AsyncSession, kind: str, row: Base) -> JobView:
+    counts = await index_progress(db, row.workspace_id, [row.id]) if kind == "index" else {}
+    return _view(kind, row, counts.get(getattr(row, SPECS[kind].id_field), 0))
+
+
+async def page_views(
+    db: AsyncSession, workspace_id: str, refs: Sequence[tuple[str, str]]
+) -> list[JobView]:
+    by_kind: dict[str, list[str]] = defaultdict(list)
+    for kind, job_id in refs:
+        by_kind[kind].append(job_id)
+
+    by_ref: dict[tuple[str, str], Base] = {}
+    for kind, ids in by_kind.items():
+        spec = SPECS[kind]
+        id_column = getattr(spec.model, spec.id_field)
+        rows = await db.scalars(
+            select(spec.model)
+            .where(spec.model.workspace_id == workspace_id, id_column.in_(ids))
+            .execution_options(populate_existing=True)
+        )
+        by_ref.update({(kind, getattr(row, spec.id_field)): row for row in rows})
+
+    counts = await index_progress(
+        db, workspace_id, [job_id for kind, job_id in by_ref if kind == "index"]
+    )
+    return [
+        _view(kind, row, counts.get(job_id, 0) if kind == "index" else 0)
+        for kind, job_id in refs
+        if (row := by_ref.get((kind, job_id))) is not None
+    ]
 
 
 def job_union(workspace_id: str, kind: str | None, status: str | None, collection_id: str | None):

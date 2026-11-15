@@ -20,9 +20,9 @@ function getRouteCrumbs(
   workspaceName?: string,
 ): BreadcrumbEntry[] {
   const rootLabel = workspaceName || "QNU AI Platform";
-  const crumbs: BreadcrumbEntry[] = [{ label: rootLabel, to: "/" }];
+  const crumbs: BreadcrumbEntry[] = [{ label: rootLabel, to: "/dashboard" }];
 
-  if (pathname === "/" || pathname === "") {
+  if (pathname === "/dashboard" || pathname === "") {
     crumbs.push({ label: "Tổng quan" });
     return crumbs;
   }
@@ -33,11 +33,6 @@ function getRouteCrumbs(
     if (pathname !== "/knowledge") {
       crumbs.push({ label: "Chi tiết tài liệu" });
     }
-    return crumbs;
-  }
-
-  if (pathname.startsWith("/inbox")) {
-    crumbs.push({ label: "Hộp thư duyệt" });
     return crumbs;
   }
 

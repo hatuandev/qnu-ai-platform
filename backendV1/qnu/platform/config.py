@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     DEV_ACCESS_PASSWORD: str = ""
     SSO_ENABLED: bool = False
     SSO_AUTHORITY: str = ""
-    SSO_AUDIENCE: str = "ai.api"
+    SSO_AUDIENCE: str = "ai_api"
     SSO_JWKS_URL: str = ""
     SSO_JWKS_CACHE_SECONDS: int = Field(300, ge=1, le=3600)
 
@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     MODEL_CHAT_CONCURRENCY: int = Field(default=4, ge=1, le=64)
     MODEL_CHAT_QUEUE_TIMEOUT_SECONDS: int = Field(default=300, ge=1, le=3600)
     PUBLICATION_PREVIEW_TTL_SECONDS: int = Field(default=300, ge=1, le=3600)
+    # System kill-switch: off hides every public chatbot link regardless of the
+    # per-assistant publication flag an admin set.
+    PUBLIC_CHATBOTS_ENABLED: bool = True
+    PUBLIC_CHATBOT_SESSION_TTL_SECONDS: int = Field(default=1800, ge=60, le=86400)
     # 0 disables exact answer reuse; keep it off until callers are rate limited.
     ANSWER_CACHE_TTL_SECONDS: int = Field(default=0, ge=0, le=86400)
     # Optional operator override; otherwise chunk sizing follows the embedding runtime.

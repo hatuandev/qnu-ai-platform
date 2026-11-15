@@ -5,8 +5,10 @@
 
 > **Phạm vi V1:** quy trình triển khai hiện hành là
 > [02_quy_trinh_trien_khai_dokploy.md](./02_quy_trinh_trien_khai_dokploy.md) — root
-> `docker-compose.yml` build từ `backendV1/`, backend nội bộ cổng **8002**; chưa có service
-> frontend trong Compose vì `frontendV2` chưa có SSO production. Bảng công nghệ dưới đây mô
+> `docker-compose.yml` build từ `backendV1/`, backend nội bộ cổng **8002**; service frontend
+> (`frontendV2`, nginx + proxy same-origin) đã đóng gói nhưng nằm sau profile `frontend` vì
+> `frontendV2` chưa có SSO production. Kênh chatbot công khai có
+> [checklist riêng](./06_kenh_chatbot_cong_khai.md). Bảng công nghệ dưới đây mô
 > tả hạ tầng chung; các cổng đã cập nhật theo V1. Tài liệu lịch sử dùng cổng 8001 không còn
 > áp dụng.
 
@@ -19,6 +21,7 @@ Thư mục này được tổ chức thành các chuyên đề rõ ràng để t
 1. [**`01_cong_nghe_ha_tang.md`**](./01_cong_nghe_ha_tang.md): Bóc tách chi tiết từng công nghệ trong Stack triển khai, vai trò, cổng kết nối và lý do lựa chọn.
 2. [**`02_quy_trinh_trien_khai_dokploy.md`**](./02_quy_trinh_trien_khai_dokploy.md): Hướng dẫn từng bước thao tác thực tế trên giao diện Dokploy Dashboard từ lúc chuẩn bị VPS đến khi chạy thực tế.
 3. [**`03_an_toan_du_lieu_va_van_hanh.md`**](./03_an_toan_du_lieu_va_van_hanh.md): Cơ chế lưu trữ bền vững (Persistent Volumes), sao lưu dữ liệu, giám sát sức khỏe (Health Probes) và xử lý sự cố.
+4. [**`06_kenh_chatbot_cong_khai.md`**](./06_kenh_chatbot_cong_khai.md): Checklist đưa kênh chatbot công khai (`/chatbot/{slug}`) lên production: điều kiện SSO, domain/TLS, bật publication, kiểm chứng header nhúng và kịch bản test iframe thật.
 
 ---
 

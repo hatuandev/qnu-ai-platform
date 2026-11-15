@@ -52,6 +52,10 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/chat")({
   component: ChatPage,
+  validateSearch: (search: Record<string, unknown>): { q?: string } => {
+    const question = typeof search.q === "string" ? search.q.trim() : "";
+    return question ? { q: question.slice(0, 500) } : {};
+  },
 });
 
 const DRAFT_VALUE = "__draft__";
@@ -231,6 +235,15 @@ function ChatPage() {
   } | null>(null);
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const { q: presetQuestion } = Route.useSearch();
+
+  // A question handed over from the landing page prefills the composer once,
+  // then the query param is dropped so a reload starts a clean conversation.
+  useEffect(() => {
+    if (!presetQuestion) return;
+    setInput(presetQuestion);
+    void navigate({ to: "/chat", search: {}, replace: true });
+  }, [presetQuestion, navigate]);
 
   const assistantsQuery = useAssistantsQuery(workspaceId);
   const assistants = assistantsQuery.data ?? [];

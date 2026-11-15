@@ -174,6 +174,18 @@ export type DetectionResponse = {
   reviewed_by?: string | null;
 };
 
+export type SpellingStatusSummary = {
+  running: boolean;
+  check: {
+    status: string;
+    reviewed_at: string | null;
+    checked_count: number;
+    total_evidence_count: number | null;
+    pending_count: number;
+    ignored_count: number;
+  } | null;
+};
+
 export type DetectRequest = {
   source_version?: number | null;
   expected_version: number;
@@ -298,6 +310,28 @@ export function getTextReviewCheck(
       runId,
       checkId,
     ),
+    options,
+  );
+}
+
+export function getSpellingStatus(
+  workspaceId: string,
+  collectionId: string,
+  sourceId: string,
+  revisionId: string,
+  runId: string,
+  version: number,
+  options?: { signal?: AbortSignal },
+) {
+  const checksPath = ocrPaths.textReviewChecks(
+    workspaceId,
+    collectionId,
+    sourceId,
+    revisionId,
+    runId,
+  );
+  return v1Client.get<SpellingStatusSummary>(
+    `${checksPath}/summary?version=${version}`,
     options,
   );
 }

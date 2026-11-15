@@ -29,6 +29,7 @@ from qnu.domains.modelops import models as _modelops_models  # noqa: F401 - regi
 from qnu.domains.ocr import models as _ocr_models  # noqa: F401 - register tables
 from qnu.domains.ocr.review import models as _ocr_review_models  # noqa: F401
 from qnu.domains.operations import models as _operations_models  # noqa: F401
+from qnu.domains.publications import models as _publication_release_models  # noqa: F401
 from qnu.domains.workspaces import models as _workspace_models  # noqa: F401 - register tables
 from qnu.platform.config import get_settings
 from qnu.platform.database import Base

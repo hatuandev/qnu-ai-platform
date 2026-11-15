@@ -1,14 +1,18 @@
 import type { RagPolicy } from "@/api/assistants";
 import type { CatalogItem } from "@/api/modelops";
 import { Field, FieldDescription, FieldLabel } from "@/components/admin/field";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
 import { localityLabel, providerLabel } from "./model-label";
 
 export const AUTO_POLICY_TARGET = "auto";
@@ -235,15 +239,15 @@ export function validateRagPolicy(
 }
 
 export function ModelOption({ item }: { item: CatalogItem }) {
+  const provider = providerLabel(item);
+  const locality = localityLabel(item.provider_type);
+  const meta = locality ? `${provider} · ${locality}` : provider;
   return (
-    <span className="flex flex-col items-start">
-      <span>{item.model_name}</span>
-      <span className="text-[11px] text-muted-foreground">
-        {providerLabel(item)}
-        {localityLabel(item.provider_type)
-          ? ` · ${localityLabel(item.provider_type)}`
-          : ""}
+    <span className="flex w-full items-center justify-between gap-3 text-xs">
+      <span className="truncate font-medium text-foreground">
+        {item.model_name}
       </span>
+      <span className="shrink-0 text-[11px] text-muted-foreground">{meta}</span>
     </span>
   );
 }
@@ -272,15 +276,12 @@ function PolicySelect<T extends string>({
       </SelectTrigger>
       <SelectContent>
         {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            <div className="flex flex-col text-left py-0.5">
-              <span className="text-xs font-medium text-foreground">
-                {option.label}
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                {option.hint}
-              </span>
-            </div>
+          <SelectItem
+            key={option.value}
+            value={option.value}
+            description={option.hint}
+          >
+            {option.label}
           </SelectItem>
         ))}
       </SelectContent>
@@ -322,25 +323,35 @@ export function RetrievalFields({
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field>
-          <FieldLabel className="text-xs font-medium">
-            Ứng viên trước xếp hạng lại
-          </FieldLabel>
-          <Input
-            type="number"
-            min={1}
-            max={100}
-            value={form.candidateK}
-            onChange={(event) => onChange({ candidateK: event.target.value })}
-            className="h-9 bg-background text-xs"
-            disabled={disabled}
-          />
+        <Field className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 p-3">
+          <div className="flex items-center justify-between">
+            <FieldLabel className="text-xs font-medium">
+              Ứng viên trước xếp hạng lại
+            </FieldLabel>
+            <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
+              {form.candidateK || 40} đoạn
+            </span>
+          </div>
+          <div className="pt-2">
+            <Slider
+              min={10}
+              max={100}
+              step={5}
+              value={[Number(form.candidateK) || 40]}
+              onValueChange={([val]) => onChange({ candidateK: String(val) })}
+              disabled={disabled}
+            />
+          </div>
+          <div className="flex justify-between text-[10px] font-medium text-muted-foreground/60">
+            <span>10</span>
+            <span>40 (khuyên dùng)</span>
+            <span>100</span>
+          </div>
           <FieldDescription>
-            Số đoạn lấy ra trước khi chọn trích dẫn; tối thiểu bằng số đoạn
-            trích dẫn.
+            Số đoạn lấy ra trước khi xếp hạng; tối thiểu bằng số đoạn trích dẫn.
           </FieldDescription>
         </Field>
-        <Field>
+        <Field className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 p-3">
           <FieldLabel className="text-xs font-medium">
             Ngưỡng hợp nhất thứ hạng
           </FieldLabel>
@@ -374,17 +385,21 @@ export function RetrievalFields({
               <SelectValue placeholder="Chọn mô hình xếp hạng" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={AUTO_POLICY_TARGET}>
-                <span className="flex flex-col items-start">
-                  <span>Tự động theo hệ thống</span>
-                  <span className="text-[11px] text-muted-foreground">
-                    Dùng mô hình xếp hạng mặc định
-                  </span>
-                </span>
+              <SelectItem value={AUTO_POLICY_TARGET} description="Mặc định">
+                Tự động theo hệ thống
               </SelectItem>
+              <SelectSeparator />
               {rerankModels.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  <ModelOption item={item} />
+                <SelectItem
+                  key={item.id}
+                  value={item.id}
+                  description={
+                    localityLabel(item.provider_type)
+                      ? `${providerLabel(item)} · ${localityLabel(item.provider_type)}`
+                      : providerLabel(item)
+                  }
+                >
+                  {item.model_name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -430,22 +445,40 @@ export function ContextFields({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Field>
-          <FieldLabel className="text-xs font-medium">
-            Đoạn liền kề mở rộng
-          </FieldLabel>
-          <Input
-            type="number"
-            min={0}
-            max={5}
-            value={form.contextWindow}
-            onChange={(event) =>
-              onChange({ contextWindow: event.target.value })
-            }
-            className="h-9 bg-background text-xs"
-            disabled={disabled}
-          />
+          <div className="flex items-center justify-between">
+            <FieldLabel className="text-xs font-medium">
+              Đoạn liền kề mở rộng
+            </FieldLabel>
+            <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+              {Number(form.contextWindow) === 0
+                ? "Tự động"
+                : `+${form.contextWindow} đoạn`}
+            </span>
+          </div>
+          <div className="grid grid-cols-6 gap-1 pt-1">
+            {[0, 1, 2, 3, 4, 5].map((num) => {
+              const isSelected = Number(form.contextWindow) === num;
+              return (
+                <button
+                  key={num}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onChange({ contextWindow: String(num) })}
+                  className={cn(
+                    "flex h-9 cursor-pointer items-center justify-center rounded-md text-xs font-medium transition-colors",
+                    isSelected
+                      ? "bg-primary font-semibold text-primary-foreground shadow-2xs"
+                      : "border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {num === 0 ? "Tự động" : `+${num}`}
+                </button>
+              );
+            })}
+          </div>
           <FieldDescription>
-            0 để hệ thống tự chọn theo loại câu hỏi.
+            Lấy thêm các đoạn văn liền kề trước và sau mỗi trích dẫn để giữ trọn
+            vẹn ngữ cảnh.
           </FieldDescription>
         </Field>
         <Field>
@@ -520,12 +553,11 @@ export function MetadataScopeFields({
           <FieldLabel className="text-xs font-medium">
             Hiệu lực đến ngày
           </FieldLabel>
-          <Input
-            type="date"
+          <DatePicker
             value={form.effectiveOn}
-            onChange={(event) => onChange({ effectiveOn: event.target.value })}
-            className="h-9 bg-background text-xs"
+            onChange={(val) => onChange({ effectiveOn: val })}
             disabled={disabled}
+            placeholder="Không giới hạn"
           />
         </Field>
       </div>
@@ -587,6 +619,14 @@ export function VerificationFields({
             })
           }
         />
+        <FieldDescription>
+          {form.verificationMode === "off" &&
+            "Tắt hoàn toàn bước kiểm chứng để phản hồi nhanh nhất."}
+          {form.verificationMode === "observe" &&
+            "Vẫn gửi câu trả lời cho người dùng nhưng ghi nhận cảnh báo vi phạm căn cứ vào nhật ký."}
+          {form.verificationMode === "enforce" &&
+            "Chặn và từ chối trả lời nếu phát hiện thông tin suy diễn không có trong tài liệu xuất bản."}
+        </FieldDescription>
       </Field>
 
       {form.verificationMode !== "off" && (
@@ -606,25 +646,32 @@ export function VerificationFields({
                 <SelectValue placeholder="Chọn mô hình kiểm chứng" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={AUTO_POLICY_TARGET}>
-                  <span className="flex flex-col items-start">
-                    <span>Mô hình trò chuyện của trợ lý</span>
-                    <span className="text-[11px] text-muted-foreground">
-                      Dùng chung mô hình đang trả lời
-                    </span>
-                  </span>
+                <SelectItem value={AUTO_POLICY_TARGET} description="Mặc định">
+                  Mô hình trò chuyện của trợ lý
                 </SelectItem>
+                <SelectSeparator />
                 {chatModels.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    <ModelOption item={item} />
+                  <SelectItem
+                    key={item.id}
+                    value={item.id}
+                    description={
+                      localityLabel(item.provider_type)
+                        ? `${providerLabel(item)} · ${localityLabel(item.provider_type)}`
+                        : providerLabel(item)
+                    }
+                  >
+                    {item.model_name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <FieldDescription>
+              Mô hình chuyên trách kiểm tra độ chính xác và đối chiếu căn cứ.
+            </FieldDescription>
           </Field>
           <Field>
             <FieldLabel className="text-xs font-medium">
-              Giới hạn kiểm chứng
+              Giới hạn kiểm chứng (tokens)
             </FieldLabel>
             <Input
               type="number"
@@ -635,12 +682,12 @@ export function VerificationFields({
                   verificationMaxOutputTokens: event.target.value,
                 })
               }
-              placeholder="Tự động"
+              placeholder="Tự động theo mô hình"
               className="h-9 bg-background text-xs"
               disabled={disabled}
             />
             <FieldDescription>
-              Giới hạn token đầu ra riêng cho bước kiểm chứng.
+              Để trống để hệ thống tự tối ưu ngân sách token kiểm chứng.
             </FieldDescription>
           </Field>
         </div>

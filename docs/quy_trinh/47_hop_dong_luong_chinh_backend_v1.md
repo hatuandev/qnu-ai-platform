@@ -69,7 +69,7 @@ lại. Khi caller chọn `mode="ai"` hoặc `provider_id` tường minh, lỗi c
   `?group_by_source=true` để nhóm theo nguồn; `?partial=true` để xem phần đã xong.
 - `GET /compilation-runs/{run_id}/markdown` và `GET /compilation-runs/{run_id}/draft.json` — tệp đã lưu nguyên byte, kèm `ETag` là SHA-256. Dùng các đường dẫn này để tải tệp.
 - `GET /compilation-runs/{run_id}/progress` — trạng thái từng phần và token quan sát được.
-- Khi lượt đọc tệp hoàn tất, worker xếp hàng soát chính tả trên phiên bản văn bản gốc. Kết quả theo lượt đọc và phiên bản văn bản tại `GET /sources/{source_id}/revisions/{revision_id}/processing-runs/{ocr_run_id}/text-review/checks?version={version}`. Chỉ báo soát xong toàn bộ khi lượt hoàn tất và số đoạn đã soát khớp `total_evidence_count`. Lượt cũ có thể thiếu trường tổng này.
+- Khi lượt đọc tệp hoàn tất, worker xếp hàng soát chính tả trên phiên bản văn bản gốc. Trang chi tiết đọc `GET .../text-review/checks/summary?version={version}` theo lượt OCR và phiên bản đang xem. Kết quả gồm trạng thái, số đoạn đã soát và số gợi ý. Sau khi người dùng mở màn rà soát, giao diện mới đọc gợi ý chi tiết qua `GET .../text-review/checks`. Chỉ báo soát xong toàn bộ khi lượt hoàn tất và số đoạn đã soát khớp `total_evidence_count`. Lượt cũ có thể thiếu trường tổng này.
 - Nếu phản hồi của một nhóm không qua kiểm tra gợi ý (`ocr_spelling_invalid`), worker tiếp tục các nhóm chưa gửi. Nhóm lỗi không được tính vào số đoạn đã soát và lượt chung báo chưa hoàn tất. Các lỗi quyền, phiên bản, cấu hình, quota hoặc lỗi hạ tầng vẫn dừng lượt.
 - Khi người dùng bấm soát lại sau lỗi, worker giữ kết quả các nhóm đã xong nếu phiên bản, SHA-256, model, cấu hình và prompt vẫn khớp. Model chỉ nhận các đoạn chưa có kết quả.
 - Người dùng xác nhận sửa qua `POST .../text-review` theo phiên bản và SHA-256 đã xem. Khi duyệt chính tả, API đối chiếu từng vị trí trong `spelling_edits` với gợi ý và văn bản đã gửi. Sau khi lưu bản sửa mới, gửi yêu cầu chuẩn bị lại với đúng lượt đọc và phiên bản văn bản vừa lưu. Nếu bước chuẩn bị gặp lỗi mạng, dùng lại khóa của bước đó.
@@ -173,6 +173,9 @@ Sau `publish`, chỉ báo **Sẵn sàng cho trợ lý** khi `summary.readiness.s
 - Chỉ khi `ready` và `serving_matches_published=true` mới báo tài liệu sẵn sàng cho trợ lý. Không
   suy từ việc publish thành công.
 - Trợ lý đọc phạm vi tri thức/binding theo cấu hình của trợ lý; không đưa ID kỹ thuật vào UI thường.
+- Backend truy vấn Qdrant ngoài đoạn giữ khóa đơn vị. Trước khi dùng kết quả, backend kiểm lại quyền,
+  generation, manifest, model embedding và phạm vi nguồn. Thay đổi phạm vi trong lúc chờ trả lỗi
+  xung đột hoặc trạng thái không còn nguồn khả dụng, tùy kết quả kiểm tra.
 - Nếu model yêu cầu làm rõ tham chiếu nguồn ở lượt đầu, Backend tra cứu theo câu gốc trong phạm vi
   trợ lý. Khi kết quả có nhiều tài liệu, Backend yêu cầu người dùng chọn văn bản. Với lượt nối tiếp
   chưa rõ chủ thể, Backend vẫn yêu cầu làm rõ trước khi tra cứu.

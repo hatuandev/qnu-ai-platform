@@ -94,16 +94,26 @@ def test_verification_mode_controls_release_without_silently_rewriting(
         assert body["answer"] is None and body["statements"] == [] and body["sources"]
 
 
-@pytest.mark.parametrize("outcome", ["http_error", "bad_quote", "missing", "withdraw"])
-def test_judge_and_source_failures_are_errors_even_in_observe_mode(client, ready, outcome):
+@pytest.mark.parametrize(
+    "outcome,verification_status",
+    [("http_error", "error"), ("bad_quote", "invalid"), ("missing", "invalid")],
+)
+def test_observe_judge_failures_keep_the_answer_and_record_status(
+    client, ready, outcome, verification_status
+):
     judging({**ready, "client": client}, outcome)
     response = ask(client, ready, verification_mode="observe")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "answered" and "150" in body["answer"]
+    assert body["trace"]["verification"]["status"] == verification_status
+
+
+def test_withdrawn_source_is_still_an_error_in_observe_mode(client, ready):
+    judging({**ready, "client": client}, "withdraw")
+    response = ask(client, ready, verification_mode="observe")
     assert response.status_code >= 400, response.text
-    if outcome in {"bad_quote", "missing"}:
-        assert response.json()["code"] == "answer_verification_invalid"
-    if outcome == "withdraw":
-        assert response.json()["code"] in {"answer_evidence_changed", "index_outdated"}
-    assert "status" not in response.json() or response.json()["status"] != "insufficient_evidence"
+    assert response.json()["code"] in {"answer_evidence_changed", "index_outdated"}
 
 
 def test_assistant_chat_uses_persisted_hybrid_rerank_policy_and_checks_provider_access(

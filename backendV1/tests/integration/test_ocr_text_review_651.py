@@ -746,6 +746,23 @@ def test_ignored_suggestions_persist_per_check_without_touching_text(client):
     response = disposition(client, data, check["id"], suggestion)
     assert response.status_code == 200, response.text
     assert response.json()["ignored_suggestions"] == [ignored]
+    summary = client.get(url + "/checks/summary?version=0")
+    assert summary.status_code == 200, summary.text
+    assert summary.json() == {
+        "running": False,
+        "check": {
+            "status": "completed",
+            "reviewed_at": None,
+            "checked_count": len(set(check["checked_evidence_ids"])),
+            "total_evidence_count": check["total_evidence_count"],
+            "pending_count": 0,
+            "ignored_count": 1,
+        },
+    }
+    assert client.get(url + "/checks/summary?version=1").json() == {
+        "running": False,
+        "check": None,
+    }
     assert client.get(url + "/checks?version=0").json()[0]["ignored_suggestions"] == [ignored]
     assert client.get(url + "/checks/" + check["id"]).json()["ignored_suggestions"] == [ignored]
     assert disposition(client, data, check["id"], suggestion).status_code == 200
@@ -753,6 +770,7 @@ def test_ignored_suggestions_persist_per_check_without_touching_text(client):
     undone = disposition(client, data, check["id"], suggestion, ignored=False)
     assert undone.status_code == 200, undone.text
     assert undone.json()["ignored_suggestions"] == []
+    assert client.get(url + "/checks/summary?version=0").json()["check"]["pending_count"] == 1
     assert client.get(url + "/checks/" + check["id"]).json()["ignored_suggestions"] == []
 
 
@@ -964,6 +982,9 @@ def test_completing_review_records_approval_and_replays(client):
     assert reviewed["reviewed_sha256"] == saved["canonical_sha256"]
     assert reviewed["reviewed_by"] == EDITOR.actor_id
     assert reviewed["reviewed_at"]
+    summary = client.get(url + "/checks/summary?version=1")
+    assert summary.status_code == 200, summary.text
+    assert summary.json()["check"]["reviewed_at"] == reviewed["reviewed_at"]
     assert client.get(url + "/checks?version=0").json()[0]["reviewed_version"] == 1
     replay = save(client, url, body, "complete-one")
     assert replay.status_code == 200

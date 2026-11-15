@@ -17,6 +17,7 @@ from qnu.domains.ocr.review.schemas import (
     SaveReview,
     SpellingDispositionBatch,
     SpellingDispositionRequest,
+    SpellingStatusSummary,
     TextVersionSummary,
 )
 from qnu.domains.ocr.router import _scope
@@ -199,6 +200,15 @@ async def rerun_checks(
             status_code=503,
         ) from exc
     return RerunReviewResponse(run_id=run.id, version=body.version, status="queued")
+
+
+@router.get("/checks/summary", response_model=SpellingStatusSummary)
+async def check_summary(
+    version: int = Query(..., ge=0),
+    run: OcrProcessingRun = Depends(scoped_run),
+    db: AsyncSession = Depends(get_db),
+):
+    return await detection.status_summary(db, run, version)
 
 
 @router.get("/checks/{check_id}", response_model=DetectionResponse)

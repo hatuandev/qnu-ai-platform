@@ -2,6 +2,8 @@ import { Link } from "@tanstack/react-router";
 import {
   Activity,
   ChevronRight,
+  ExternalLink,
+  Globe,
   ListChecks,
   MessageSquare,
   RefreshCw,
@@ -10,6 +12,7 @@ import { useAnswerReviewsQuery } from "@/api/answer-reviews";
 import type { AssistantReadiness, AssistantResponse } from "@/api/assistants";
 import { useAssistantConversationsQuery } from "@/api/conversations";
 import { useCatalogQuery } from "@/api/modelops";
+import { useAssistantPublicationQuery } from "@/api/publications";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -95,6 +98,10 @@ export function AssistantOverview({
     assistant.id,
   );
   const reviewsQuery = useAnswerReviewsQuery(workspaceId, assistant.id);
+  const { data: publication } = useAssistantPublicationQuery(
+    workspaceId,
+    assistant.id,
+  );
 
   const model = assistant.chat_provider_id
     ? catalog.find((item) => item.id === assistant.chat_provider_id)
@@ -200,7 +207,7 @@ export function AssistantOverview({
           <SummaryRow label="Mô hình" value={modelName} />
           <SummaryRow
             label="Kho tri thức"
-            value={readiness?.collection_name ?? assistant.collection_id}
+            value={readiness?.collection_name || "Kho tri thức liên kết"}
           />
           <SummaryRow label="Truy xuất" value={retrievalLabel} />
           <SummaryRow
@@ -208,6 +215,14 @@ export function AssistantOverview({
             value={`${assistant.top_k} đoạn · ${assistant.history_turns} lượt ghi nhớ`}
           />
           <SummaryRow label="Kiểm chứng" value={verificationLabel} />
+          <SummaryRow
+            label="Kênh công khai"
+            value={
+              publication?.enabled
+                ? `Đang bật (/${publication.slug})`
+                : "Chưa công khai"
+            }
+          />
           <SummaryRow
             label="Phiên bản"
             value={`${assistant.revision} · ${formatDateTime(assistant.updated_at)}`}
@@ -240,7 +255,9 @@ export function AssistantOverview({
               <span>Hội thoại gần đây</span>
             </CardTitle>
             <CardDescription>
-              Năm hội thoại cập nhật gần nhất của trợ lý.
+              {conversationsQuery.data?.length
+                ? `${conversationsQuery.data.length} hội thoại đã lưu · Hiển thị 5 gần nhất`
+                : "Năm hội thoại cập nhật gần nhất của trợ lý."}
             </CardDescription>
           </div>
           <Button
@@ -254,7 +271,11 @@ export function AssistantOverview({
               params={{ assistantId: assistant.id }}
               search={{ tab: "logs" }}
             >
-              <span>Nhật ký</span>
+              <span>
+                {conversationsQuery.data?.length
+                  ? `Toàn bộ (${conversationsQuery.data.length})`
+                  : "Nhật ký"}
+              </span>
               <ChevronRight className="size-3.5" />
             </Link>
           </Button>
@@ -320,83 +341,132 @@ export function AssistantOverview({
         </CardContent>
       </Card>
 
-      <Card className="border-border/60 shadow-2xs">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <ListChecks className="size-4 text-primary" />
-              <span>Kiểm thử gần đây</span>
-            </CardTitle>
-            <CardDescription>Lần chạy thử mới nhất.</CardDescription>
-          </div>
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-0.5 px-2 text-xs"
-          >
-            <Link
-              to="/assistants/$assistantId"
-              params={{ assistantId: assistant.id }}
-              search={{ tab: "reviews" }}
-            >
-              <span>Tất cả</span>
-              <ChevronRight className="size-3.5" />
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {reviewsQuery.isLoading ? (
-            <Skeleton className="h-14 rounded-md" />
-          ) : reviewsQuery.isError ? (
-            <p className="text-xs text-destructive">
-              Không tải được lịch sử kiểm thử.
-            </p>
-          ) : !latestReview ? (
-            <div className="flex flex-col items-start gap-2 rounded-md bg-muted/30 px-3 py-3">
-              <p className="text-xs text-muted-foreground">
-                Chưa có lần kiểm thử nào.
-              </p>
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-              >
-                <Link
-                  to="/assistants/$assistantId"
-                  params={{ assistantId: assistant.id }}
-                  search={{ tab: "ask" }}
-                >
-                  Chạy hỏi thử
-                </Link>
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant={REVIEW_STATUS_MAP[latestReview.status].variant}
-                  className="h-5 px-1.5 text-[11px] font-normal"
-                >
-                  {REVIEW_STATUS_MAP[latestReview.status].label}
-                </Badge>
-                <span className="text-[11px] text-muted-foreground">
-                  {formatDateTime(latestReview.created_at)}
-                </span>
+      <div className="space-y-4">
+        {publication?.enabled ? (
+          <Card className="border-border/60 shadow-2xs">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div className="space-y-0.5">
+                <CardTitle className="flex items-center gap-1.5 text-sm">
+                  <Globe className="size-4 text-primary" />
+                  <span>Cổng trực tuyến</span>
+                </CardTitle>
+                <CardDescription>
+                  Đang mở tiếp nhận câu hỏi trực tuyến.
+                </CardDescription>
               </div>
-              <p className="text-xs text-foreground">
-                {latestReview.question_count} câu hỏi · {answeredCount} câu trả
-                lời được
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Chạy trên phiên bản {latestReview.assistant_revision} của trợ
-                lý.
-              </p>
+              <Badge
+                variant="outline"
+                className="h-5 gap-1 border-primary/30 bg-primary/10 px-1.5 text-[10px] font-medium text-primary"
+              >
+                <span className="size-1.5 rounded-full bg-emerald-500" />
+                <span>Hoạt động</span>
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-2 pt-1 text-xs">
+              <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 px-2.5 py-1.5 font-mono text-xs text-foreground">
+                <span className="truncate">/{publication.slug}</span>
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 gap-1 px-1.5 text-[11px] text-primary hover:text-primary"
+                >
+                  <a
+                    href={`/chatbot/${publication.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <span>Mở cổng</span>
+                    <ExternalLink className="size-3" />
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <Card className="border-border/60 shadow-2xs">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <ListChecks className="size-4 text-primary" />
+                <span>Kiểm thử gần đây</span>
+              </CardTitle>
+              <CardDescription>Lần chạy thử mới nhất.</CardDescription>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-0.5 px-2 text-xs"
+            >
+              <Link
+                to="/assistants/$assistantId"
+                params={{ assistantId: assistant.id }}
+                search={{ tab: "reviews" }}
+              >
+                <span>Tất cả</span>
+                <ChevronRight className="size-3.5" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {reviewsQuery.isLoading ? (
+              <Skeleton className="h-14 rounded-md" />
+            ) : reviewsQuery.isError ? (
+              <p className="text-xs text-destructive">
+                Không tải được lịch sử kiểm thử.
+              </p>
+            ) : !latestReview ? (
+              <div className="flex flex-col items-start gap-2 rounded-md bg-muted/30 p-3">
+                <p className="text-xs font-medium text-foreground">
+                  Chưa có đợt kiểm thử nào
+                </p>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Thực hiện hỏi thử để kiểm tra câu trả lời, sau đó chấm nhãn độ
+                  chính xác để theo dõi chất lượng.
+                </p>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 h-7 text-xs font-medium"
+                >
+                  <Link
+                    to="/assistants/$assistantId"
+                    params={{ assistantId: assistant.id }}
+                    search={{ tab: "ask" }}
+                  >
+                    Mở Hỏi thử để đánh giá
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant={REVIEW_STATUS_MAP[latestReview.status].variant}
+                    className="h-5 px-1.5 text-[11px] font-normal"
+                  >
+                    {REVIEW_STATUS_MAP[latestReview.status].label}
+                  </Badge>
+                  <span className="text-[11px] text-muted-foreground">
+                    {formatDateTime(latestReview.created_at)}
+                  </span>
+                </div>
+                <p className="text-xs text-foreground">
+                  {latestReview.question_count} câu hỏi · {answeredCount} câu
+                  trả lời được
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Chạy trên phiên bản {latestReview.assistant_revision} của trợ
+                  lý.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

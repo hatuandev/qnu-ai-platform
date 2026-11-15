@@ -1,6 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { DevSessionGate } from "@/components/dev/dev-session-gate";
 import { AppNotifications } from "@/components/ui/app-notifications";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { queryClient } from "@/lib/query-client";
@@ -20,7 +19,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={250}>
-        <DevSessionGate>{children}</DevSessionGate>
+        {children}
         <AppNotifications />
       </TooltipProvider>
     </QueryClientProvider>

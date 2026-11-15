@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.policies.access import load_collection
 from qnu.domains.modelops.models import ModelUsageRecord
-from qnu.domains.operations.jobs.catalog import job_union, load_job, view
+from qnu.domains.operations.jobs.catalog import job_union, load_job, page_views, view
 from qnu.domains.operations.models import EvidenceBackup, OperationAction
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.platform.errors import EntityNotFound
@@ -55,7 +55,7 @@ async def list_jobs(
             .offset(offset)
         )
     ).all()
-    items = [await view(db, k, await load_job(db, workspace_id, k, job_id)) for k, job_id in refs]
+    items = await page_views(db, workspace_id, [(kind, job_id) for kind, job_id in refs])
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 

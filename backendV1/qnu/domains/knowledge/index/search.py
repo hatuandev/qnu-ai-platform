@@ -289,16 +289,48 @@ async def search(
     started = time.monotonic()
     query = await _query_vector(db, actor, run, req.query, model)
     embedding_ms = round((time.monotonic() - started) * 1000, 3)
-    # Recheck after the embedding request releases quota/source locks. Keep this read
-    # transaction locked through Qdrant retrieval so withdrawals cannot slip between checks.
+
+    # Embedding accounting commits the preliminary transaction. Check for known
+    # withdrawals before dispatch and leave the workspace unlocked during Qdrant I/O.
+    await authorize(db, actor, workspace_id, collection_id)
+    versions = await published_versions(db, workspace_id, collection_id, req.document_ids)
+    searched_versions = {binding.version_id for binding in allowed}
+    published_ids = {version.id for version in versions}
+    if not searched_versions <= published_ids and published_ids:
+        raise Conflict("Nguồn đã thay đổi khi tìm kiếm.", code="answer_evidence_changed")
+    searched_chunks = None if chunk_ids is None else set(chunk_ids)
+    await db.commit()
+    dense_started = time.monotonic()
+    raw = (
+        await vectors.search(
+            run.vector_collection,
+            query,
+            req.top_k if req.mode == "dense" else req.candidate_k,
+            {
+                "run_id": run.id,
+                "workspace_id": workspace_id,
+                "collection_id": collection_id,
+                "version_id": sorted(searched_versions),
+                **({"chunk_id": chunk_ids} if chunk_ids is not None else {}),
+            },
+        )
+        if published_ids
+        else []
+    )
+    dense_ms = round((time.monotonic() - dense_started) * 1000, 3)
+    sealed = await manifest(db, blob, run)
+
+    # Validate against current database state before using any vector result.
     await resolve_workspace_access(db, actor, workspace_id, for_update=True)
     await authorize(db, actor, workspace_id, collection_id)
-    active = await db.scalar(
-        select(IndexRun.id).where(
-            IndexRun.collection_id == collection_id, IndexRun.is_active.is_(True)
+    active = (
+        await db.execute(
+            select(IndexRun.id, IndexRun.manifest_sha256).where(
+                IndexRun.collection_id == collection_id, IndexRun.is_active.is_(True)
+            )
         )
-    )
-    if active != run.id:
+    ).one_or_none()
+    if active != (run.id, run.manifest_sha256):
         raise Conflict("Index đã đổi trong khi tìm kiếm.", code="index_changed")
     runtime = await resolve_embedding_runtime(db, workspace_id, run.provider_id)
     if runtime.configuration_hash != run.config["provider"]["configuration_hash"]:
@@ -313,7 +345,6 @@ async def search(
             eligible_documents=0,
             skipped_documents=skipped,
         )
-    sealed = await manifest(db, blob, run)
     if scope_trace:
         _, _, current_scope = await plan(
             db, run, allowed, sealed, original_query, req.metadata_filter
@@ -338,21 +369,14 @@ async def search(
                 **({"scope_resolution": scope_trace} if scope_trace else {}),
             },
         )
-    dense_started = time.monotonic()
-    raw = await vectors.search(
-        run.vector_collection,
-        query,
-        req.top_k if req.mode == "dense" else req.candidate_k,
-        {
-            "run_id": run.id,
-            "workspace_id": workspace_id,
-            "collection_id": collection_id,
-            "version_id": [b.version_id for b in allowed],
-            **({"chunk_id": chunk_ids} if chunk_ids is not None else {}),
-        },
-    )
-    hits = await _hits(db, run, allowed, raw, sealed)
     metadata_ids = set(chunk_ids) if chunk_ids is not None else None
+    if (
+        not published_ids
+        or searched_versions != {binding.version_id for binding in allowed}
+        or searched_chunks != metadata_ids
+    ):
+        raise Conflict("Phạm vi đã thay đổi khi tìm kiếm.", code="answer_evidence_changed")
+    hits = await _hits(db, run, allowed, raw, sealed)
     if metadata_ids is not None and any(h.chunk_id not in metadata_ids for h in hits):
         raise DependencyUnavailable(
             "Vector trả chunk ngoài phạm vi metadata.", code="vector_response_invalid"
@@ -365,7 +389,7 @@ async def search(
         "dense_ranked_ids": [h.chunk_id for h in hits],
         "top_k": req.top_k,
         "query_embedding_ms": embedding_ms,
-        "dense_ms": round((time.monotonic() - dense_started) * 1000, 3),
+        "dense_ms": dense_ms,
         "ranking": {"dense": [{"chunk_id": h.chunk_id, "score": h.score} for h in hits]},
         "score_kinds": {"dense": "vector_similarity"},
         "metadata_filter": req.metadata_filter.model_dump(mode="json", exclude_none=True),

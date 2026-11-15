@@ -6,17 +6,11 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { useTextReviewChecksQuery } from "@/api/ocr/queries";
+import { useEffect, useRef } from "react";
+import { useSpellingStatusQuery } from "@/api/ocr/queries";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import {
-  currentSpellingCheck,
-  formatSpellingMoment,
-  spellingCoverage,
-  spellingIgnoredCount,
-  spellingPendingCount,
-  spellingPercent,
-} from "@/lib/spelling-review";
+import { formatSpellingMoment, spellingPercent } from "@/lib/spelling-review";
 
 interface SpellingStatusStripProps {
   workspaceId?: string | null;
@@ -25,6 +19,7 @@ interface SpellingStatusStripProps {
   revisionId: string;
   runId: string;
   textVersion: number;
+  isPreparing?: boolean;
 }
 
 export function SpellingStatusStrip({
@@ -34,24 +29,37 @@ export function SpellingStatusStrip({
   revisionId,
   runId,
   textVersion,
+  isPreparing = false,
 }: SpellingStatusStripProps) {
-  const { data, isLoading, isError } = useTextReviewChecksQuery(
+  const { data, isLoading, isError, refetch } = useSpellingStatusQuery(
     workspaceId,
     collectionId,
     sourceId,
     revisionId,
     runId,
-    undefined,
-    { refetchInterval: 5000 },
+    textVersion,
+    isPreparing,
   );
-  const check = currentSpellingCheck(data, textVersion);
-  const coverage = check ? spellingCoverage(check) : null;
+  const check = data?.check;
+  const wasPreparing = useRef(isPreparing);
+  useEffect(() => {
+    if (wasPreparing.current && !isPreparing && !check && !isLoading) {
+      void refetch();
+    }
+    wasPreparing.current = isPreparing;
+  }, [check, isLoading, isPreparing, refetch]);
+  const coverage = check
+    ? { checked: check.checked_count, total: check.total_evidence_count }
+    : null;
   const percent = coverage
     ? spellingPercent(coverage.checked, coverage.total)
     : null;
-  const pending = check ? spellingPendingCount(check) : 0;
-  const ignored = spellingIgnoredCount(check);
-  const complete = coverage?.complete === true;
+  const pending = check?.pending_count ?? 0;
+  const ignored = check?.ignored_count ?? 0;
+  const complete =
+    check?.status === "completed" &&
+    coverage?.total != null &&
+    coverage.checked === coverage.total;
   const reviewed = check?.reviewed_at != null;
   const running = check?.status === "running";
   const failed = check?.status === "failed";

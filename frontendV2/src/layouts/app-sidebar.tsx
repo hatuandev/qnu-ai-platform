@@ -4,15 +4,12 @@ import {
   Bot,
   ChevronLeft,
   ChevronRight,
-  Inbox,
   LayoutDashboard,
   MessagesSquare,
   Server,
   Settings,
   Workflow,
 } from "lucide-react";
-import { useInboxQuery } from "@/api/inbox/queries";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
@@ -22,8 +19,6 @@ export type NavItem = {
   title: string;
   href: string;
   icon: typeof LayoutDashboard;
-  badge?: string | number;
-  badgeVariant?: "default" | "secondary" | "destructive" | "outline";
 };
 
 export type NavSection = {
@@ -36,7 +31,7 @@ const navigationSections: NavSection[] = [
     items: [
       {
         title: "Tổng quan",
-        href: "/",
+        href: "/dashboard",
         icon: LayoutDashboard,
       },
     ],
@@ -48,11 +43,6 @@ const navigationSections: NavSection[] = [
         title: "Kho tri thức",
         href: "/knowledge",
         icon: BookOpen,
-      },
-      {
-        title: "Hộp thư duyệt",
-        href: "/inbox",
-        icon: Inbox,
       },
     ],
   },
@@ -101,14 +91,8 @@ export function AppSidebar({
   onNavigate?: () => void;
 }) {
   const { pathname } = useLocation();
-  const {
-    sidebarCollapsed: desktopCollapsed,
-    toggleSidebar,
-    activeWorkspaceId,
-  } = useUiStore();
+  const { sidebarCollapsed: desktopCollapsed, toggleSidebar } = useUiStore();
   const sidebarCollapsed = !mobile && desktopCollapsed;
-  const { data: inboxData } = useInboxQuery(activeWorkspaceId);
-  const inboxPendingCount = inboxData?.meta?.total ?? 0;
 
   return (
     <aside
@@ -135,9 +119,8 @@ export function AppSidebar({
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const isActive =
-                  item.href === "/"
-                    ? pathname === "/"
-                    : pathname.startsWith(item.href);
+                  pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
 
                 return (
                   <Link
@@ -165,24 +148,6 @@ export function AppSidebar({
                     {!sidebarCollapsed && (
                       <span className="truncate flex-1">{item.title}</span>
                     )}
-                    {!sidebarCollapsed &&
-                      (item.href === "/inbox"
-                        ? inboxPendingCount > 0 && (
-                            <Badge
-                              variant="default"
-                              className="ml-auto text-[10px] h-4 px-1.5"
-                            >
-                              {inboxPendingCount}
-                            </Badge>
-                          )
-                        : item.badge && (
-                            <Badge
-                              variant={item.badgeVariant || "secondary"}
-                              className="ml-auto text-[10px] h-4 px-1.5"
-                            >
-                              {item.badge}
-                            </Badge>
-                          ))}
                   </Link>
                 );
               })}

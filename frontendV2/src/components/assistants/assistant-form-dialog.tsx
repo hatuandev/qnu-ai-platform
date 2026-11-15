@@ -26,6 +26,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -34,7 +35,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AssistantAdvancedFields,
-  ModelOption,
   NEW_ASSISTANT_POLICY,
   type RagPolicyFormState,
 } from "./assistant-advanced-fields";
@@ -45,6 +45,7 @@ import {
   initialState,
   validateAssistantForm,
 } from "./assistant-form-state";
+import { localityLabel, providerLabel } from "./model-label";
 
 export function AssistantFormDialog({
   open,
@@ -262,17 +263,21 @@ export function AssistantFormDialog({
                         <SelectValue placeholder="Chọn mô hình" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={AUTO_MODEL}>
-                          <span className="flex flex-col items-start">
-                            <span>Tự động theo hệ thống</span>
-                            <span className="text-[11px] text-muted-foreground">
-                              Dùng mô hình trò chuyện mặc định
-                            </span>
-                          </span>
+                        <SelectItem value={AUTO_MODEL} description="Mặc định">
+                          Tự động theo hệ thống
                         </SelectItem>
+                        <SelectSeparator />
                         {chatModels.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            <ModelOption item={item} />
+                          <SelectItem
+                            key={item.id}
+                            value={item.id}
+                            description={
+                              localityLabel(item.provider_type)
+                                ? `${providerLabel(item)} · ${localityLabel(item.provider_type)}`
+                                : providerLabel(item)
+                            }
+                          >
+                            {item.model_name}
                           </SelectItem>
                         ))}
                       </SelectContent>

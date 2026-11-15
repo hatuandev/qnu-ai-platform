@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 import uuid
 from datetime import UTC, date, datetime
@@ -15,9 +16,13 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.modelops.access import require_model_admin
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.models import ModelOpsEvent, ModelUsageRecord, WorkspaceQuota
+from qnu.domains.modelops.usage.scope import current_account
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.errors import AppException, Conflict, EntityNotFound
+from qnu.platform.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def month_start(period: date | None = None) -> date:
@@ -180,7 +185,6 @@ class UsageService:
                 raise Conflict("Request ID đã dùng cho yêu cầu khác.", code="idempotency_conflict")
             await db.commit()
             return old
-        quota.tokens_reserved += token_budget
         record = ModelUsageRecord(
             id="usage_" + uuid.uuid4().hex[:16],
             workspace_id=workspace_id,
@@ -194,8 +198,21 @@ class UsageService:
             reserved_tokens=token_budget,
             status="reserved",
         )
+        quota.tokens_reserved += token_budget
         db.add(record)
         await db.commit()
+        account = current_account.get()
+        if account is not None:
+            try:
+                await account.reserve(record.id, token_budget)
+            except (Exception, asyncio.CancelledError):
+                # The provider has not been called. Close this ModelOps reservation
+                # without holding the workspace/quota locks while waiting on Redis.
+                try:
+                    await self.settle(db, record.id, total_tokens=0, failed=True)
+                except Exception:
+                    logger.warning("usage_admission_cleanup_failed", usage_id=record.id)
+                raise
         await db.refresh(record)
         return record
 
@@ -245,6 +262,9 @@ class UsageService:
             record.total_tokens, record.cost_usd, record.status = total_tokens, cost_usd, status
         await db.commit()
         await db.refresh(record)
+        account = current_account.get()
+        if account is not None:
+            await account.settle(usage_id, record.total_tokens)
         return record
 
 

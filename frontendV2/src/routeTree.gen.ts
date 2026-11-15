@@ -12,16 +12,18 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AssistantsRouteImport } from './routes/assistants'
 import { Route as ChatRouteImport } from './routes/chat'
-import { Route as InboxRouteImport } from './routes/inbox'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as ModelopsRouteImport } from './routes/modelops'
 import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SigninOidcRouteImport } from './routes/signin-oidc'
+import { Route as SignoutCallbackOidcRouteImport } from './routes/signout-callback-oidc'
 import { Route as AssistantsIndexRouteImport } from './routes/assistants.index'
 import { Route as AssistantsAssistantIdRouteImport } from './routes/assistants.$assistantId'
+import { Route as ChatbotSlugRouteImport } from './routes/chatbot.$slug'
 import { Route as KnowledgeIndexRouteImport } from './routes/knowledge.index'
 import { Route as KnowledgeSourceIdRouteImport } from './routes/knowledge.$sourceId'
-import { Route as PSlugRouteImport } from './routes/p.$slug'
 import { Route as KnowledgeSourceIdReviewRouteImport } from './routes/knowledge.$sourceId_.review'
 
 const IndexRoute = IndexRouteImport.update({
@@ -39,9 +41,9 @@ const ChatRoute = ChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InboxRoute = InboxRouteImport.update({
-  id: '/inbox',
-  path: '/inbox',
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KnowledgeRoute = KnowledgeRouteImport.update({
@@ -64,6 +66,16 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SigninOidcRoute = SigninOidcRouteImport.update({
+  id: '/signin-oidc',
+  path: '/signin-oidc',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignoutCallbackOidcRoute = SignoutCallbackOidcRouteImport.update({
+  id: '/signout-callback-oidc',
+  path: '/signout-callback-oidc',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AssistantsIndexRoute = AssistantsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -73,6 +85,11 @@ const AssistantsAssistantIdRoute = AssistantsAssistantIdRouteImport.update({
   id: '/$assistantId',
   path: '/$assistantId',
   getParentRoute: () => AssistantsRoute,
+} as any)
+const ChatbotSlugRoute = ChatbotSlugRouteImport.update({
+  id: '/chatbot/$slug',
+  path: '/chatbot/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const KnowledgeIndexRoute = KnowledgeIndexRouteImport.update({
   id: '/',
@@ -84,11 +101,6 @@ const KnowledgeSourceIdRoute = KnowledgeSourceIdRouteImport.update({
   path: '/$sourceId',
   getParentRoute: () => KnowledgeRoute,
 } as any)
-const PSlugRoute = PSlugRouteImport.update({
-  id: '/p/$slug',
-  path: '/p/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const KnowledgeSourceIdReviewRoute = KnowledgeSourceIdReviewRouteImport.update({
   id: '/$sourceId_/review',
   path: '/$sourceId/review',
@@ -99,14 +111,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/assistants': typeof AssistantsRouteWithChildren
   '/chat': typeof ChatRoute
-  '/inbox': typeof InboxRoute
+  '/dashboard': typeof DashboardRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/modelops': typeof ModelopsRoute
   '/operations': typeof OperationsRoute
   '/settings': typeof SettingsRoute
+  '/signin-oidc': typeof SigninOidcRoute
+  '/signout-callback-oidc': typeof SignoutCallbackOidcRoute
   '/assistants/$assistantId': typeof AssistantsAssistantIdRoute
+  '/chatbot/$slug': typeof ChatbotSlugRoute
   '/knowledge/$sourceId': typeof KnowledgeSourceIdRoute
-  '/p/$slug': typeof PSlugRoute
   '/assistants/': typeof AssistantsIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/knowledge/$sourceId/review': typeof KnowledgeSourceIdReviewRoute
@@ -114,13 +128,15 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
-  '/inbox': typeof InboxRoute
+  '/dashboard': typeof DashboardRoute
   '/modelops': typeof ModelopsRoute
   '/operations': typeof OperationsRoute
   '/settings': typeof SettingsRoute
+  '/signin-oidc': typeof SigninOidcRoute
+  '/signout-callback-oidc': typeof SignoutCallbackOidcRoute
   '/assistants/$assistantId': typeof AssistantsAssistantIdRoute
+  '/chatbot/$slug': typeof ChatbotSlugRoute
   '/knowledge/$sourceId': typeof KnowledgeSourceIdRoute
-  '/p/$slug': typeof PSlugRoute
   '/assistants': typeof AssistantsIndexRoute
   '/knowledge': typeof KnowledgeIndexRoute
   '/knowledge/$sourceId/review': typeof KnowledgeSourceIdReviewRoute
@@ -130,14 +146,16 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/assistants': typeof AssistantsRouteWithChildren
   '/chat': typeof ChatRoute
-  '/inbox': typeof InboxRoute
+  '/dashboard': typeof DashboardRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/modelops': typeof ModelopsRoute
   '/operations': typeof OperationsRoute
   '/settings': typeof SettingsRoute
+  '/signin-oidc': typeof SigninOidcRoute
+  '/signout-callback-oidc': typeof SignoutCallbackOidcRoute
   '/assistants/$assistantId': typeof AssistantsAssistantIdRoute
+  '/chatbot/$slug': typeof ChatbotSlugRoute
   '/knowledge/$sourceId': typeof KnowledgeSourceIdRoute
-  '/p/$slug': typeof PSlugRoute
   '/assistants/': typeof AssistantsIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/knowledge/$sourceId_/review': typeof KnowledgeSourceIdReviewRoute
@@ -148,14 +166,16 @@ export interface FileRouteTypes {
     | '/'
     | '/assistants'
     | '/chat'
-    | '/inbox'
+    | '/dashboard'
     | '/knowledge'
     | '/modelops'
     | '/operations'
     | '/settings'
+    | '/signin-oidc'
+    | '/signout-callback-oidc'
     | '/assistants/$assistantId'
+    | '/chatbot/$slug'
     | '/knowledge/$sourceId'
-    | '/p/$slug'
     | '/assistants/'
     | '/knowledge/'
     | '/knowledge/$sourceId/review'
@@ -163,13 +183,15 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/chat'
-    | '/inbox'
+    | '/dashboard'
     | '/modelops'
     | '/operations'
     | '/settings'
+    | '/signin-oidc'
+    | '/signout-callback-oidc'
     | '/assistants/$assistantId'
+    | '/chatbot/$slug'
     | '/knowledge/$sourceId'
-    | '/p/$slug'
     | '/assistants'
     | '/knowledge'
     | '/knowledge/$sourceId/review'
@@ -178,14 +200,16 @@ export interface FileRouteTypes {
     | '/'
     | '/assistants'
     | '/chat'
-    | '/inbox'
+    | '/dashboard'
     | '/knowledge'
     | '/modelops'
     | '/operations'
     | '/settings'
+    | '/signin-oidc'
+    | '/signout-callback-oidc'
     | '/assistants/$assistantId'
+    | '/chatbot/$slug'
     | '/knowledge/$sourceId'
-    | '/p/$slug'
     | '/assistants/'
     | '/knowledge/'
     | '/knowledge/$sourceId_/review'
@@ -195,12 +219,14 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AssistantsRoute: typeof AssistantsRouteWithChildren
   ChatRoute: typeof ChatRoute
-  InboxRoute: typeof InboxRoute
+  DashboardRoute: typeof DashboardRoute
   KnowledgeRoute: typeof KnowledgeRouteWithChildren
   ModelopsRoute: typeof ModelopsRoute
   OperationsRoute: typeof OperationsRoute
   SettingsRoute: typeof SettingsRoute
-  PSlugRoute: typeof PSlugRoute
+  SigninOidcRoute: typeof SigninOidcRoute
+  SignoutCallbackOidcRoute: typeof SignoutCallbackOidcRoute
+  ChatbotSlugRoute: typeof ChatbotSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -226,11 +252,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/inbox': {
-      id: '/inbox'
-      path: '/inbox'
-      fullPath: '/inbox'
-      preLoaderRoute: typeof InboxRouteImport
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/knowledge': {
@@ -261,6 +287,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/signin-oidc': {
+      id: '/signin-oidc'
+      path: '/signin-oidc'
+      fullPath: '/signin-oidc'
+      preLoaderRoute: typeof SigninOidcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signout-callback-oidc': {
+      id: '/signout-callback-oidc'
+      path: '/signout-callback-oidc'
+      fullPath: '/signout-callback-oidc'
+      preLoaderRoute: typeof SignoutCallbackOidcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/assistants/': {
       id: '/assistants/'
       path: '/'
@@ -275,6 +315,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AssistantsAssistantIdRouteImport
       parentRoute: typeof AssistantsRoute
     }
+    '/chatbot/$slug': {
+      id: '/chatbot/$slug'
+      path: '/chatbot/$slug'
+      fullPath: '/chatbot/$slug'
+      preLoaderRoute: typeof ChatbotSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/knowledge/': {
       id: '/knowledge/'
       path: '/'
@@ -288,13 +335,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/knowledge/$sourceId'
       preLoaderRoute: typeof KnowledgeSourceIdRouteImport
       parentRoute: typeof KnowledgeRoute
-    }
-    '/p/$slug': {
-      id: '/p/$slug'
-      path: '/p/$slug'
-      fullPath: '/p/$slug'
-      preLoaderRoute: typeof PSlugRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/knowledge/$sourceId_/review': {
       id: '/knowledge/$sourceId_/review'
@@ -340,12 +380,14 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AssistantsRoute: AssistantsRouteWithChildren,
   ChatRoute: ChatRoute,
-  InboxRoute: InboxRoute,
+  DashboardRoute: DashboardRoute,
   KnowledgeRoute: KnowledgeRouteWithChildren,
   ModelopsRoute: ModelopsRoute,
   OperationsRoute: OperationsRoute,
   SettingsRoute: SettingsRoute,
-  PSlugRoute: PSlugRoute,
+  SigninOidcRoute: SigninOidcRoute,
+  SignoutCallbackOidcRoute: SignoutCallbackOidcRoute,
+  ChatbotSlugRoute: ChatbotSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

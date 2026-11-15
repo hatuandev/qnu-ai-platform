@@ -113,6 +113,7 @@ V1_TABLES = frozenset(
         "kb_index_inputs",
         "kb_index_chunks",
         "chat_assistants",
+        "assistant_publications",
         "chat_conversations",
         "chat_turns",
         "app_clients",

@@ -2,12 +2,17 @@ import {
   AlertTriangle,
   Building2,
   Loader2,
+  LogIn,
   RefreshCw,
   ShieldAlert,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type AuthActor, getMe } from "@/api/auth";
-import { getAccessToken, setAccessToken } from "@/api/session-token";
+import {
+  clearAccessToken,
+  getAccessToken,
+  setAccessToken,
+} from "@/api/session-token";
 import {
   getWorkspace,
   resolveWorkspaceRoute,
@@ -21,7 +26,36 @@ export type DevSessionStatus =
   | "authenticating"
   | "resolving"
   | "ready"
+  | "signed_out"
   | "error";
+
+const SIGNED_OUT_KEY = "qnu.dev.signedOut";
+
+function isSignedOut(): boolean {
+  try {
+    return window.sessionStorage.getItem(SIGNED_OUT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setSignedOut(value: boolean): void {
+  try {
+    if (value) {
+      window.sessionStorage.setItem(SIGNED_OUT_KEY, "1");
+    } else {
+      window.sessionStorage.removeItem(SIGNED_OUT_KEY);
+    }
+  } catch {
+    // Storage may be unavailable; the in-memory token is already cleared.
+  }
+}
+
+export function logoutDevSession(): void {
+  setSignedOut(true);
+  clearAccessToken();
+  window.location.reload();
+}
 
 function DevSessionGateInner({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<DevSessionStatus>("checking");
@@ -34,6 +68,10 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
 
   const initDevSession = useCallback(async () => {
     if (isExecutingRef.current) return;
+    if (!getAccessToken() && isSignedOut()) {
+      setStatus("signed_out");
+      return;
+    }
     isExecutingRef.current = true;
 
     setStatus("authenticating");
@@ -129,6 +167,7 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
       }
 
       setDevActor(currentActor);
+      setSignedOut(false);
 
       // 2. Resolve default workspace code
       if (!configuredWorkspaceCode) {
@@ -221,6 +260,38 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
 
   if (status === "ready") {
     return <>{children}</>;
+  }
+
+  if (status === "signed_out") {
+    return (
+      <div className="flex h-screen w-screen flex-col items-center justify-center bg-background px-4 text-foreground antialiased select-none">
+        <div className="w-full max-w-md rounded-xl border border-border/80 bg-card p-6 shadow-sm space-y-5">
+          <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <LogIn className="size-6" />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-sm font-semibold text-foreground">
+              Đã đăng xuất
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Phiên làm việc dev đã kết thúc. Bấm Đăng nhập lại để vào nền tảng
+              bằng cầu nối dev hiện hành.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            className="w-full h-9 text-xs font-medium gap-2"
+            onClick={() => {
+              setSignedOut(false);
+              initDevSession();
+            }}
+          >
+            <LogIn className="size-3.5" />
+            <span>Đăng nhập lại</span>
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -6,7 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.answer_review.models import AnswerReview
 from qnu.domains.assistants.models import Assistant
-from qnu.domains.assistants.schemas import AssistantConfig, AssistantReadiness, AssistantUpdate
+from qnu.domains.assistants.schemas import (
+    AssistantConfig,
+    AssistantRagPolicy,
+    AssistantReadiness,
+    AssistantUpdate,
+)
 from qnu.domains.conversations.models import Conversation, ConversationTurn
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import utcnow
@@ -19,7 +24,6 @@ from qnu.domains.lifecycle.guards import require_available, visible
 from qnu.domains.lifecycle.models import ResourceState
 from qnu.domains.modelops.public_api import assert_provider_allowed
 from qnu.domains.ocr.ids import new_id
-from qnu.domains.rag.policy import RagPolicy
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.errors import AppException, Conflict, EntityNotFound
@@ -80,6 +84,19 @@ async def save_assistant(
         existing = await get_assistant(db, actor, workspace_id, assistant_id, write=True)
         if "max_output_tokens" not in req.model_fields_set:
             req = req.model_copy(update={"max_output_tokens": existing.max_output_tokens})
+        if (
+            "rag_policy" in req.model_fields_set
+            and "guardrail_policy" not in req.rag_policy.model_fields_set
+        ):
+            # Older FE clients cannot accidentally reset a guardrail they do not expose.
+            stored = AssistantRagPolicy.model_validate(existing.rag_policy)
+            req = req.model_copy(
+                update={
+                    "rag_policy": req.rag_policy.model_copy(
+                        update={"guardrail_policy": stored.guardrail_policy}
+                    )
+                }
+            )
         if "rag_policy" not in req.model_fields_set:
             # Older FE clients cannot accidentally reset a policy they do not expose.
             try:
@@ -125,7 +142,7 @@ async def save_assistant(
         # Pausing and resuming the same configuration must not strand its conversations.
         if any(
             (
-                RagPolicy.model_validate(row.rag_policy).model_dump(mode="json")
+                AssistantRagPolicy.model_validate(row.rag_policy).model_dump(mode="json")
                 if key == "rag_policy"
                 else getattr(row, key)
             )

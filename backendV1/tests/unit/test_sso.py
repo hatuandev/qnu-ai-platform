@@ -33,7 +33,7 @@ def signed(monkeypatch):
         payload = {
             "sub": "Subject-CaseSensitive",
             "iss": "https://sso.example.test",
-            "aud": "ai.api",
+            "aud": "ai_api",
             "exp": datetime.now(UTC) + timedelta(minutes=5),
             "roles": ["staff"],
             "permissions": ["ai.workspaces.view"],

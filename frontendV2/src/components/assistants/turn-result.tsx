@@ -27,6 +27,7 @@ const DIRECT_ROUTE_TEXT: Record<DirectReply["route"], string> = {
   courtesy: "Xã giao",
   identity: "Giới thiệu",
   protected_request: "Yêu cầu cần bảo vệ",
+  guardrail: "Ngoài phạm vi hỗ trợ",
 };
 
 function directReplyBody(reply: DirectReply) {

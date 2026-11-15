@@ -32,6 +32,8 @@ from qnu.domains.modelops.usage.router import router as usage_router
 from qnu.domains.ocr.review.router import router as ocr_review_router
 from qnu.domains.ocr.router import router as ocr_processing_router
 from qnu.domains.operations.router import router as operations_router
+from qnu.domains.publications.public_router import router as public_chatbots_router
+from qnu.domains.publications.router import router as assistant_publication_router
 from qnu.domains.rag.answer.router import router as answers_router
 from qnu.domains.workspaces.router import router as workspaces_router
 from qnu.platform.config import Settings
@@ -43,6 +45,8 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(identity_router, prefix=settings.API_PREFIX)
     app.include_router(workspaces_router, prefix=settings.API_PREFIX)
     app.include_router(assistants_router, prefix=settings.API_PREFIX)
+    app.include_router(assistant_publication_router, prefix=settings.API_PREFIX)
+    app.include_router(public_chatbots_router, prefix=settings.API_PREFIX)
     app.include_router(answer_review_router, prefix=settings.API_PREFIX)
     app.include_router(conversations_router, prefix=settings.API_PREFIX)
     app.include_router(knowledge_collections_router, prefix=settings.API_PREFIX)

@@ -141,6 +141,7 @@ function SpellingReviewWorkspace() {
   const scope = spellingScope(summary, search.runId);
   const activeRevisionId = search.revisionId ?? scope?.revisionId;
   const ocrRunId = search.runId ?? scope?.runId;
+  const [isRecheckPending, setIsRecheckPending] = useState(false);
 
   // 2. One working text per source: always the latest saved text.
   const {
@@ -170,7 +171,18 @@ function SpellingReviewWorkspace() {
     activeRevisionId,
     ocrRunId,
     undefined,
-    { refetchInterval: 5000 },
+    {
+      shouldPoll: (items) =>
+        isRecheckPending ||
+        Boolean(
+          items?.some(
+            (check) =>
+              check.status === "running" &&
+              (reviewDoc?.version === undefined ||
+                check.version === reviewDoc.version),
+          ),
+        ),
+    },
   );
 
   const hasLoadError = hasReviewError || Boolean(checksError);
@@ -236,7 +248,6 @@ function SpellingReviewWorkspace() {
   const [isSaving, setIsSaving] = useState(false);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [recheckRetry, setRecheckRetry] = useState<boolean | null>(null);
-  const [isRecheckPending, setIsRecheckPending] = useState(false);
   const saveAttempt = useRef<{ signature: string; key: string } | null>(null);
 
   // Original document preview (toggleable panel)

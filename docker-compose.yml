@@ -1,5 +1,6 @@
 # QNU V1 application stack. Infrastructure remains external and retains its data.
-# No frontend service: frontendV2 has no production SSO yet.
+# The frontendV2 container is prepared but gated behind the "frontend" profile
+# until production SSO exists; the public chatbot pages work without SSO.
 x-logging: &logging
   driver: json-file
   options:
@@ -32,7 +33,7 @@ x-runtime: &runtime
   DEV_AUTH_ENABLED: ${DEV_AUTH_ENABLED:-false}
   SSO_ENABLED: ${SSO_ENABLED:-true}
   SSO_AUTHORITY: ${SSO_AUTHORITY:?Set SSO_AUTHORITY}
-  SSO_AUDIENCE: ${SSO_AUDIENCE:-ai.api}
+  SSO_AUDIENCE: ${SSO_AUDIENCE:-ai_api}
   SSO_JWKS_URL: ${SSO_JWKS_URL:-}
   ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Set comma-separated ALLOWED_ORIGINS}
   PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set browser-visible PUBLIC_BASE_URL}
@@ -43,6 +44,8 @@ x-runtime: &runtime
   MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-62914560}
   WORKER_MODEL_JOB_TIMEOUT_SECONDS: ${WORKER_MODEL_JOB_TIMEOUT_SECONDS:-86400}
   OWN_RECONCILE: ${OWN_RECONCILE:-true}
+  # Env-only kill-switch for /public/chatbots/*; must be passed into the container.
+  PUBLIC_CHATBOTS_ENABLED: ${PUBLIC_CHATBOTS_ENABLED:-true}
 
 x-api: &api
   image: qnu-ai-platform-v1:${APP_IMAGE_TAG:-latest}
@@ -76,7 +79,11 @@ services:
         condition: service_completed_successfully
   backend:
     <<: *api
-    command: ["uvicorn", "qnu.main:app", "--host", "0.0.0.0", "--port", "8002"]
+    command: ["uvicorn", "qnu.main:app", "--host", "0.0.0.0", "--port", "8002", "--proxy-headers"]
+    environment:
+      <<: *runtime
+      # Configure the actual proxy IPs or a dedicated proxy subnet in Dokploy.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1,::1}
     restart: unless-stopped
     stop_grace_period: 30s
     expose: ["8002"]
@@ -96,6 +103,19 @@ services:
     depends_on:
       bootstrap:
         condition: service_completed_successfully
+  frontend:
+    profiles: ["frontend"]
+    image: qnu-ai-platform-frontend-v2:${APP_IMAGE_TAG:-latest}
+    build:
+      context: ./frontendV2
+      dockerfile: Dockerfile
+    networks: [dokploy-network]
+    expose: ["80"]
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      backend:
+        condition: service_healthy
   worker:
     <<: *api
     command: ["arq", "qnu.workers.settings.WorkerSettings"]

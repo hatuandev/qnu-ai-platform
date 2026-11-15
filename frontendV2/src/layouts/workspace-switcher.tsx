@@ -227,7 +227,7 @@ export function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
   const handleAddMember = async () => {
     const trimmedActor = newMemberActorRef.trim();
     if (!trimmedActor) {
-      toast.error("Vui lòng nhập email hoặc định danh người dùng!");
+      toast.error("Vui lòng nhập mã định danh người dùng!");
       return;
     }
 
@@ -666,7 +666,7 @@ export function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
                 <Input
                   value={newMemberActorRef}
                   onChange={(e) => setNewMemberActorRef(e.target.value)}
-                  placeholder="Email hoặc mã định danh..."
+                  placeholder="Mã định danh QNU SSO..."
                   className="h-8 text-xs sm:col-span-1"
                 />
                 <Input
@@ -711,6 +711,10 @@ export function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
                   </Button>
                 </div>
               </div>
+              <p className="text-[11px] text-muted-foreground leading-tight">
+                Dùng đúng mã định danh QNU SSO của người dùng (claim sub); hệ
+                thống đối chiếu chính xác, không tra theo email.
+              </p>
             </div>
           </div>
 

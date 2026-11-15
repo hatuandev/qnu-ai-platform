@@ -50,17 +50,6 @@ export function formatSpellingMoment(value: string) {
   });
 }
 
-export function spellingPendingCount(check: DetectionResponse) {
-  const total =
-    (check.suggestions?.length ?? 0) +
-    (check.withheld_suggestions?.length ?? 0);
-  return Math.max(0, total - (check.ignored_suggestions?.length ?? 0));
-}
-
-export function spellingIgnoredCount(check: DetectionResponse | undefined) {
-  return check?.ignored_suggestions?.length ?? 0;
-}
-
 export function spellingCoverage(check: DetectionResponse) {
   const checked = new Set(check.checked_evidence_ids).size;
   const total = check.total_evidence_count ?? null;

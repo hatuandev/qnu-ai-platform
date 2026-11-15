@@ -183,3 +183,17 @@ class DetectionResponse(BaseModel):
     reviewed_version: int | None = None
     reviewed_sha256: str | None = None
     reviewed_by: str | None = None
+
+
+class SpellingCheckSummary(BaseModel):
+    status: str
+    reviewed_at: datetime | None
+    checked_count: int
+    total_evidence_count: int | None
+    pending_count: int
+    ignored_count: int
+
+
+class SpellingStatusSummary(BaseModel):
+    check: SpellingCheckSummary | None = None
+    running: bool = False

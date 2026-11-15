@@ -4,6 +4,7 @@ import asyncio
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from qnu.domains.assistants.schemas import AssistantRagPolicy
 from qnu.domains.conversations.access import checkpoint
 from qnu.domains.conversations.history import readable
 from qnu.domains.conversations.models import ConversationTurn
@@ -14,7 +15,6 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.rag.answer.schemas import AnswerRequest
 from qnu.domains.rag.answer.service import answer
-from qnu.domains.rag.policy import RagPolicy
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.errors import AppException, Conflict
 from qnu.platform.logging import get_logger
@@ -63,7 +63,9 @@ async def send(
 
         reply, provider_id = await resolve_turn(db, actor, conversation, turn, chat)
         if reply is None:
-            policy = RagPolicy.model_validate(config.get("rag_policy", {})).model_dump(mode="json")
+            policy = AssistantRagPolicy.model_validate(
+                config.get("rag_policy", {})
+            ).model_dump(mode="json", exclude={"guardrail_policy"})
             policy["metadata_filter"] = turn.metadata_filter or {}
             result = await answer(
                 db,

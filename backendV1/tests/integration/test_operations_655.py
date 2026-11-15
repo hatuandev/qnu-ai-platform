@@ -11,6 +11,7 @@ from tests.integration.compiler_support import (
     processed_input,
     request_compile,
 )
+from tests.integration.index_support import execute_index
 from tests.integration.knowledge_support import (
     API,
     EDITOR,
@@ -21,6 +22,7 @@ from tests.integration.knowledge_support import (
     as_actor,
 )
 from tests.integration.ocr_support import FakeJobQueue, use_queue
+from tests.integration.test_index_api_647 import indexed  # noqa: F401
 from tests.integration.workflow_support import mutate
 
 
@@ -62,6 +64,45 @@ def test_jobs_filters_scope_counts_and_actual_progress(client):
     assert client.get(data["ops"] + "/jobs").status_code == 403
     as_actor(EDITOR)
     assert client.get(data["ops"] + "/backups").status_code == 403
+
+
+def test_index_jobs_batch_vector_progress(client, indexed):  # noqa: F811
+    from sqlalchemy import event
+
+    from qnu.platform.database import engine
+
+    completed_id = indexed["index_run"]["id"]
+    assert execute_index(client, completed_id) == "completed"
+    as_actor(EDITOR)
+    next_run = client.post(
+        indexed["base"] + "/indexing-runs",
+        json={},
+        headers={"Idempotency-Key": "index-two"},
+    )
+    assert next_run.status_code == 201, next_run.text
+    queued_id = next_run.json()["run"]["id"]
+
+    counts = []
+
+    def record_count(*args):
+        statement = args[2].lower()
+        if "from kb_index_chunks" in statement and "count(" in statement:
+            counts.append(statement)
+
+    workspace = indexed["workspace"]["id"]
+    add_member(client, workspace, PLATFORM.actor_id, "admin")
+    as_actor(PLATFORM)
+    event.listen(engine.sync_engine, "before_cursor_execute", record_count)
+    try:
+        result = client.get(f"{API}/workspaces/{workspace}/operations/jobs?kind=index")
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", record_count)
+    assert result.status_code == 200, result.text
+    queued, completed = result.json()["items"]
+    assert queued["id"] == queued_id and queued["progress_done"] == 0
+    assert completed["id"] == completed_id
+    assert completed["progress_done"] == completed["progress_total"] > 0
+    assert len(counts) == 1
 
 
 def test_backup_contains_original_raw_and_pinned_metadata_without_keys(client):

@@ -114,4 +114,91 @@
     line-height: 1rem;
     letter-spacing: 0.01em;
   }
+
+  /* Public landing surface: token-driven grid so dark mode follows the app. */
+  .landing-grid {
+    background-color: var(--background);
+    background-image:
+      linear-gradient(
+        to right,
+        color-mix(in oklab, var(--primary) 6%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in oklab, var(--primary) 6%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 28px 28px;
+  }
+
+  html:has(.landing-shell) {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--primary) 40%, transparent)
+      transparent;
+  }
+
+  html:has(.landing-shell)::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  html:has(.landing-shell)::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  html:has(.landing-shell)::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--primary) 35%, transparent);
+    border-radius: 8px;
+  }
+
+  html:has(.landing-shell)::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--primary) 55%, transparent);
+  }
+
+  .landing-rise {
+    animation: landing-rise 0.55s var(--ease-out-standard) both;
+  }
+
+  .landing-delay-1 {
+    animation-delay: 0.08s;
+  }
+
+  .landing-delay-2 {
+    animation-delay: 0.16s;
+  }
+
+  .landing-delay-3 {
+    animation-delay: 0.24s;
+  }
+
+  .landing-aurora {
+    animation: landing-drift 16s ease-in-out infinite alternate;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing-rise,
+    .landing-aurora {
+      animation: none;
+    }
+  }
+}
+
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes landing-drift {
+  from {
+    transform: translate3d(-6%, -2%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(6%, 3%, 0) scale(1.1);
+  }
 }

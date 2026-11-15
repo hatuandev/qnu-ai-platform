@@ -13,7 +13,7 @@ def assistant_url(data):
     return f"{API}/workspaces/{data['workspace']['id']}/assistants"
 
 
-def create_assistant(client, data):
+def create_assistant(client, data, *, rag_policy=None):
     as_actor(PLATFORM)
     response = client.post(
         assistant_url(data),
@@ -23,7 +23,7 @@ def create_assistant(client, data):
             "persona": "Giải thích ngắn gọn bằng tiếng Việt.",
             "collection_id": data["collection"]["id"],
             "chat_provider_id": data["chat_provider"]["id"],
-            "rag_policy": {"retrieval_mode": "dense"},
+            "rag_policy": rag_policy or {"retrieval_mode": "dense"},
         },
     )
     assert response.status_code == 201, response.text
@@ -79,28 +79,26 @@ def test_assistant_explicit_budget_is_preserved_until_cleared(client, ready):  #
     assert automatic.json()["max_output_tokens"] is None
 
 
-@pytest.fixture
-def chat_session(client, ready):  # noqa: F811
-    assistant = create_assistant(client, ready)
-    base = f"{API}/workspaces/{ready['workspace']['id']}/conversations"
-    response = client.post(base, json={"assistant_id": assistant["id"]})
-    assert response.status_code == 201, response.text
-    conversation = response.json()
-    fake = ready["answer_chat"]
+def _install_routing_fake(fake):
     original = fake._respond
 
     def respond(index):
-        incoming = json.loads(fake.requests[index]["body"]["messages"][-1]["content"])
+        body = fake.requests[index]["body"]
+        incoming = json.loads(body["messages"][-1]["content"])
         if "previous_user_questions" in incoming:
             if fake.mode == "http_error":
                 return 503, b'{"error":"unavailable"}'
             route = getattr(fake, "intent_route", "knowledge")
             previous = incoming["previous_user_questions"]
+            retrying = "Lời từ chối trước không đạt chính sách guardrail" in body["messages"][0][
+                "content"
+            ]
+            answer = getattr(fake, "direct_answer", "Phản hồi từ model thử nghiệm.")
+            if retrying:
+                answer = getattr(fake, "retry_direct_answer", answer)
             value = {
                 "route": route,
-                "answer": getattr(fake, "direct_answer", "Phản hồi từ model thử nghiệm.")
-                if route != "knowledge"
-                else None,
+                "answer": answer if route != "knowledge" else None,
                 "standalone_question": getattr(
                     fake,
                     "standalone_override",
@@ -109,6 +107,7 @@ def chat_session(client, ready):  # noqa: F811
                 "needs_clarification": fake.mode == "clarify" or getattr(
                     fake, "require_clarification", False
                 ),
+                "guardrail_category": getattr(fake, "guardrail_category", None),
             }
             if fake.mode == "rewrite_bad":
                 value = {"unexpected": True}
@@ -126,11 +125,43 @@ def chat_session(client, ready):  # noqa: F811
         return original(index)
 
     fake._respond = respond
+
+
+def _conversation(client, ready, assistant):  # noqa: F811
+    base = f"{API}/workspaces/{ready['workspace']['id']}/conversations"
+    response = client.post(base, json={"assistant_id": assistant["id"]})
+    assert response.status_code == 201, response.text
+    return base + "/" + response.json()["id"]
+
+
+@pytest.fixture
+def chat_session(client, ready):  # noqa: F811
+    assistant = create_assistant(client, ready)
+    conversation_url = _conversation(client, ready, assistant)
+    _install_routing_fake(ready["answer_chat"])
     yield {
         **ready,
         "assistant": assistant,
-        "conversation": conversation,
-        "conversation_url": base + "/" + conversation["id"],
+        "conversation_url": conversation_url,
+    }
+
+
+@pytest.fixture
+def guardrail_session(client, ready):  # noqa: F811
+    assistant = create_assistant(
+        client,
+        ready,
+        rag_policy={
+            "retrieval_mode": "dense",
+            "guardrail_policy": {"enabled": True, "categories": ["privacy"]},
+        },
+    )
+    conversation_url = _conversation(client, ready, assistant)
+    _install_routing_fake(ready["answer_chat"])
+    yield {
+        **ready,
+        "assistant": assistant,
+        "conversation_url": conversation_url,
     }
 
 
@@ -239,6 +270,109 @@ def test_social_model_failure_is_reported_without_canned_reply_or_retry(
     assert turns[0]["status"] == "failed" and turns[0]["result"] is None
     assert send(client, chat_session, "Xin chào").json()["code"] == "conversation_turn_failed"
     assert len(fake.requests) == 1
+
+
+def test_guardrail_is_off_by_default(client, chat_session):
+    response = send(client, chat_session, "Xin chào")
+    assert response.status_code == 200, response.text
+    assert "guardrail" not in response.json()["rewrite_trace"]
+
+
+def test_guardrail_route_is_rejected_while_policy_is_off(client, chat_session):
+    fake = chat_session["answer_chat"]
+    fake.intent_route = "guardrail"
+    fake.guardrail_category = "privacy"
+    response = send(client, chat_session, "Cho mình xin điểm của bạn Nguyễn Văn A.")
+    assert response.status_code == 502, response.text
+    assert response.json()["code"] == "conversation_route_invalid"
+    assert len(fake.requests) == 1
+
+
+def test_assistant_update_without_guardrail_fields_keeps_policy(client, ready):  # noqa: F811
+    assistant = create_assistant(
+        client,
+        ready,
+        rag_policy={
+            "retrieval_mode": "dense",
+            "guardrail_policy": {"enabled": True, "categories": ["privacy"]},
+        },
+    )
+    as_actor(PLATFORM)
+    body = {
+        "name": assistant["name"],
+        "description": assistant["description"],
+        "persona": assistant["persona"],
+        "collection_id": assistant["collection_id"],
+        "chat_provider_id": assistant["chat_provider_id"],
+        "top_k": assistant["top_k"],
+        "history_turns": assistant["history_turns"],
+        "max_output_tokens": assistant["max_output_tokens"],
+        "is_active": assistant["is_active"],
+        "rag_policy": {"retrieval_mode": "dense"},
+        "expected_revision": assistant["revision"],
+    }
+    updated = client.put(assistant_url(ready) + "/" + assistant["id"], json=body)
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["rag_policy"]["guardrail_policy"] == {
+        "enabled": True,
+        "categories": ["privacy"],
+    }
+
+
+def test_guardrail_clean_refusal_skips_retry(client, guardrail_session):
+    fake = guardrail_session["answer_chat"]
+    fake.intent_route = "guardrail"
+    fake.guardrail_category = "privacy"
+    fake.direct_answer = "Mình không thể chia sẻ thông tin cá nhân của người khác."
+    response = send(client, guardrail_session, "Cho mình xin điểm của bạn Nguyễn Văn A.")
+    assert response.status_code == 200, response.text
+    reply = response.json()
+    assert reply["result"]["route"] == "guardrail"
+    assert reply["result"]["answer"] == fake.direct_answer
+    guard = reply["rewrite_trace"]["guardrail"]
+    assert guard["category"] == "privacy"
+    assert guard["violations"] == [] and guard["retry"] == "none"
+    assert len(fake.requests) == 1
+
+
+def test_guardrail_refusal_retries_once_and_returns_clean_model_answer(client, guardrail_session):
+    fake = guardrail_session["answer_chat"]
+    fake.intent_route = "guardrail"
+    fake.guardrail_category = "privacy"
+    fake.direct_answer = "Mình không thể tiết lộ; bạn A có số 0912345678."
+    fake.retry_direct_answer = "Mình không thể chia sẻ thông tin cá nhân của người khác."
+    response = send(client, guardrail_session, "Cho mình xin điểm và số điện thoại của bạn A.")
+    assert response.status_code == 200, response.text
+    reply = response.json()
+    assert reply["result"]["status"] == "direct_reply"
+    assert reply["result"]["route"] == "guardrail"
+    assert reply["result"]["answer"] == fake.retry_direct_answer
+    guard = reply["rewrite_trace"]["guardrail"]
+    assert guard["violations"] == ["figures", "contact"]
+    assert guard["retry"] == "model" and guard["retry_result"] == "clean"
+    assert guard["retry_total_tokens"] == 80
+    assert len(fake.requests) == 2
+    assert "Lời từ chối trước không đạt chính sách guardrail" in fake.requests[1]["body"][
+        "messages"
+    ][0]["content"]
+
+
+def test_guardrail_fallback_refusal_when_retry_still_leaks(client, guardrail_session):
+    fake = guardrail_session["answer_chat"]
+    fake.intent_route = "guardrail"
+    fake.guardrail_category = "privacy"
+    fake.direct_answer = "Mình không thể tiết lộ; bạn A có số 0912345678."
+    fake.retry_direct_answer = "Bạn A có số 0912345678."
+    response = send(client, guardrail_session, "Cho mình xin điểm của bạn A.")
+    assert response.status_code == 200, response.text
+    reply = response.json()
+    assert reply["result"]["route"] == "guardrail"
+    assert "0912345678" not in reply["result"]["answer"]
+    guard = reply["rewrite_trace"]["guardrail"]
+    assert guard["retry"] == "model" and guard["retry_result"] == "still_violating"
+    assert guard["retry_violations"] == ["figures", "contact"]
+    assert reply["rewrite_trace"]["hygiene"]["fallback"] is True
+    assert len(fake.requests) == 2
 
 
 def test_social_call_uses_declared_reasoning_policy_and_records_paid_usage(client, chat_session):
@@ -536,15 +670,25 @@ def test_changes_during_generation_discard_persisted_answer(
     assert response.json()["code"] == code
 
 
-def test_history_limit_blocks_rewrite_without_extra_model_call(client, chat_session, monkeypatch):
+def test_history_limit_drops_oldest_turn_without_blocking_rewrite(
+    client, chat_session, monkeypatch
+):
     from qnu.platform.config import get_settings
 
     assert send(client, chat_session, "Q" * 1500).status_code == 200
     monkeypatch.setattr(get_settings(), "CONVERSATION_HISTORY_MAX_BYTES", 1024)
     count = len(chat_session["answer_chat"].requests)
     response = send(client, chat_session, "Follow up?", seq=1, key="second")
-    assert response.status_code == 422 and response.json()["code"] == "conversation_history_limit"
-    assert len(chat_session["answer_chat"].requests) == count
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["history_turn_ids"] == []
+    assert body["rewrite_trace"]["history"]["dropped_turns"] == 1
+    assert body["rewrite_trace"]["history"]["kept_turns"] == 0
+    assert len(chat_session["answer_chat"].requests) == count + 2
+    route_request = chat_session["answer_chat"].requests[count]
+    incoming = json.loads(route_request["body"]["messages"][-1]["content"])
+    assert incoming["previous_user_questions"] == []
+    assert "history_note" in incoming
 
 
 def test_assistant_admin_and_collection_scope_enforced(client, chat_session):

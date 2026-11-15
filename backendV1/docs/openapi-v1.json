@@ -3270,6 +3270,94 @@
         }
       }
     },
+    "/platform/v1alpha1/workspaces/{workspace_id}/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/processing-runs/{run_id}/text-review/checks/summary": {
+      "get": {
+        "tags": [
+          "Knowledge · OCR text review"
+        ],
+        "summary": "Check Summary",
+        "operationId": "check_summary_platform_v1alpha1_workspaces__workspace_id__collections__collection_id__sources__source_id__revisions__revision_id__processing_runs__run_id__text_review_checks_summary_get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Revision Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpellingStatusSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/platform/v1alpha1/workspaces/{workspace_id}/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/processing-runs/{run_id}/text-review/checks/{check_id}": {
       "get": {
         "tags": [
@@ -8131,6 +8219,336 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Compare Platform V1Alpha1 Workspaces  Workspace Id  Collections  Collection Id  Retrieval Evaluations Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/v1alpha1/workspaces/{workspace_id}/assistants/{assistant_id}/publication": {
+      "get": {
+        "tags": [
+          "Assistant Publications"
+        ],
+        "summary": "Detail",
+        "operationId": "detail_platform_v1alpha1_workspaces__workspace_id__assistants__assistant_id__publication_get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "assistant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assistant Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Assistant Publications"
+        ],
+        "summary": "Save",
+        "operationId": "save_platform_v1alpha1_workspaces__workspace_id__assistants__assistant_id__publication_put",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "assistant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assistant Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicationUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/v1alpha1/workspaces/{workspace_id}/assistants/{assistant_id}/publication/stats": {
+      "get": {
+        "tags": [
+          "Assistant Publications"
+        ],
+        "summary": "Stats",
+        "operationId": "stats_platform_v1alpha1_workspaces__workspace_id__assistants__assistant_id__publication_stats_get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "assistant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assistant Id"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 30,
+              "minimum": 7,
+              "default": 7,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationStatsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/v1alpha1/public/chatbots": {
+      "get": {
+        "tags": [
+          "Public Chatbots"
+        ],
+        "summary": "Listing",
+        "operationId": "listing_platform_v1alpha1_public_chatbots_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicChatbotListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/v1alpha1/public/chatbots/{slug}": {
+      "get": {
+        "tags": [
+          "Public Chatbots"
+        ],
+        "summary": "Info",
+        "operationId": "info_platform_v1alpha1_public_chatbots__slug__get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicChatbotInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/v1alpha1/public/chatbots/{slug}/sessions": {
+      "post": {
+        "tags": [
+          "Public Chatbots"
+        ],
+        "summary": "Session",
+        "operationId": "session_platform_v1alpha1_public_chatbots__slug__sessions_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/v1alpha1/public/chatbots/{slug}/turns": {
+      "post": {
+        "tags": [
+          "Public Chatbots"
+        ],
+        "summary": "Turn",
+        "operationId": "turn_platform_v1alpha1_public_chatbots__slug__turns_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicTurnRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicTurnResponse"
                 }
               }
             }
@@ -13474,6 +13892,587 @@
         "type": "object",
         "title": "ProviderUpdateRequest"
       },
+      "PublicChatbotInfo": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "welcome_message": {
+            "type": "string",
+            "title": "Welcome Message"
+          },
+          "starter_prompts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Starter Prompts"
+          },
+          "max_turns_per_session": {
+            "type": "integer",
+            "title": "Max Turns Per Session"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "display_name",
+          "welcome_message",
+          "starter_prompts",
+          "max_turns_per_session",
+          "available",
+          "unavailable_reason"
+        ],
+        "title": "PublicChatbotInfo"
+      },
+      "PublicChatbotListResponse": {
+        "properties": {
+          "chatbots": {
+            "items": {
+              "$ref": "#/components/schemas/PublicChatbotSummary"
+            },
+            "type": "array",
+            "title": "Chatbots"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chatbots"
+        ],
+        "title": "PublicChatbotListResponse"
+      },
+      "PublicChatbotSummary": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "welcome_message": {
+            "type": "string",
+            "title": "Welcome Message"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "display_name",
+          "welcome_message",
+          "available",
+          "unavailable_reason"
+        ],
+        "title": "PublicChatbotSummary"
+      },
+      "PublicCitation": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "title",
+          "page"
+        ],
+        "title": "PublicCitation"
+      },
+      "PublicSessionResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "title": "Expires In Seconds"
+          },
+          "max_turns": {
+            "type": "integer",
+            "title": "Max Turns"
+          },
+          "turns_remaining": {
+            "type": "integer",
+            "title": "Turns Remaining"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "expires_in_seconds",
+          "max_turns",
+          "turns_remaining"
+        ],
+        "title": "PublicSessionResponse"
+      },
+      "PublicTurnRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 16,
+            "title": "Session Id"
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Question"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "question"
+        ],
+        "title": "PublicTurnRequest"
+      },
+      "PublicTurnResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "answered",
+              "insufficient_evidence"
+            ],
+            "title": "Status"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/PublicCitation"
+            },
+            "type": "array",
+            "title": "Citations"
+          },
+          "turns_remaining": {
+            "type": "integer",
+            "title": "Turns Remaining"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "answer",
+          "message",
+          "citations",
+          "turns_remaining"
+        ],
+        "title": "PublicTurnResponse"
+      },
+      "PublicationResponse": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "welcome_message": {
+            "type": "string",
+            "title": "Welcome Message"
+          },
+          "starter_prompts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Starter Prompts"
+          },
+          "max_turns_per_session": {
+            "type": "integer",
+            "title": "Max Turns Per Session"
+          },
+          "daily_token_budget": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Token Budget"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "public_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Path"
+          },
+          "system_enabled": {
+            "type": "boolean",
+            "title": "System Enabled"
+          },
+          "readiness": {
+            "type": "string",
+            "title": "Readiness"
+          }
+        },
+        "type": "object",
+        "required": [
+          "configured",
+          "enabled",
+          "slug",
+          "display_name",
+          "welcome_message",
+          "starter_prompts",
+          "max_turns_per_session",
+          "daily_token_budget",
+          "revision",
+          "updated_by",
+          "updated_at",
+          "public_path",
+          "system_enabled",
+          "readiness"
+        ],
+        "title": "PublicationResponse"
+      },
+      "PublicationStatDay": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "sessions": {
+            "type": "integer",
+            "title": "Sessions"
+          },
+          "turns": {
+            "type": "integer",
+            "title": "Turns"
+          },
+          "insufficient_turns": {
+            "type": "integer",
+            "title": "Insufficient Turns"
+          },
+          "error_turns": {
+            "type": "integer",
+            "title": "Error Turns"
+          },
+          "tokens": {
+            "type": "integer",
+            "title": "Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "sessions",
+          "turns",
+          "insufficient_turns",
+          "error_turns",
+          "tokens"
+        ],
+        "title": "PublicationStatDay"
+      },
+      "PublicationStatTotals": {
+        "properties": {
+          "sessions": {
+            "type": "integer",
+            "title": "Sessions"
+          },
+          "turns": {
+            "type": "integer",
+            "title": "Turns"
+          },
+          "insufficient_turns": {
+            "type": "integer",
+            "title": "Insufficient Turns"
+          },
+          "error_turns": {
+            "type": "integer",
+            "title": "Error Turns"
+          },
+          "tokens": {
+            "type": "integer",
+            "title": "Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sessions",
+          "turns",
+          "insufficient_turns",
+          "error_turns",
+          "tokens"
+        ],
+        "title": "PublicationStatTotals"
+      },
+      "PublicationStatsResponse": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/PublicationStatTotals"
+          },
+          "daily": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationStatDay"
+            },
+            "type": "array",
+            "title": "Daily"
+          },
+          "budget_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Limit"
+          },
+          "budget_used_today": {
+            "type": "integer",
+            "title": "Budget Used Today"
+          },
+          "top_questions": {
+            "items": {
+              "$ref": "#/components/schemas/PublicationUnansweredQuestion"
+            },
+            "type": "array",
+            "title": "Top Questions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "configured",
+          "days",
+          "totals",
+          "daily",
+          "budget_limit",
+          "budget_used_today",
+          "top_questions"
+        ],
+        "title": "PublicationStatsResponse"
+      },
+      "PublicationUnansweredQuestion": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "times_asked": {
+            "type": "integer",
+            "title": "Times Asked"
+          },
+          "last_asked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Asked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "times_asked",
+          "last_asked_at"
+        ],
+        "title": "PublicationUnansweredQuestion"
+      },
+      "PublicationUpdate": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 3,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])$",
+            "title": "Slug"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "welcome_message": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Welcome Message",
+            "default": ""
+          },
+          "starter_prompts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 6,
+            "title": "Starter Prompts"
+          },
+          "max_turns_per_session": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Turns Per Session",
+            "default": 15
+          },
+          "daily_token_budget": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Token Budget"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slug",
+          "display_name"
+        ],
+        "title": "PublicationUpdate"
+      },
       "PublishedResponse": {
         "properties": {
           "document": {
@@ -15285,6 +16284,80 @@
           "reason"
         ],
         "title": "PreviewRequest"
+      },
+      "SpellingCheckSummary": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "checked_count": {
+            "type": "integer",
+            "title": "Checked Count"
+          },
+          "total_evidence_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Evidence Count"
+          },
+          "pending_count": {
+            "type": "integer",
+            "title": "Pending Count"
+          },
+          "ignored_count": {
+            "type": "integer",
+            "title": "Ignored Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "reviewed_at",
+          "checked_count",
+          "total_evidence_count",
+          "pending_count",
+          "ignored_count"
+        ],
+        "title": "SpellingCheckSummary"
+      },
+      "SpellingStatusSummary": {
+        "properties": {
+          "check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpellingCheckSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "running": {
+            "type": "boolean",
+            "title": "Running",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "SpellingStatusSummary"
       }
     }
   }
