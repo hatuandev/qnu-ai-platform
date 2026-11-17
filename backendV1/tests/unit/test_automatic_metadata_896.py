@@ -80,6 +80,55 @@ def test_auto_correct_roles_and_dynamic_attributes_without_mutating_source():
     assert not matches_metadata(other, MetadataFilter(data_year=2026))
 
 
+def test_effective_date_keeps_its_role_separate_from_the_issue_date():
+    source = bundle("Ngày ban hành mô phỏng: 18/10/2026\nNgày bắt đầu áp dụng mô phỏng: 01/11/2026")
+    (annotation,) = preview(source)["annotations"]
+    assert annotation["values"] == {"issued_year": 2026, "effective_from": "2026-11-01"}
+
+
+@pytest.mark.parametrize("ambiguous", [False, True])
+def test_pinned_pdf_header_recovers_date_only_from_its_own_line(ambiguous):
+    from qnu.domains.knowledge.compilation.source_first import build_source_draft
+
+    source = bundle("742", "5", "31", "Gia Lai, ngày   tháng năm 2026")
+    document = source.documents[0]
+    document.update(
+        evidence={f"ev{i}": {"page": 1} for i in range(4)},
+        identity={},
+        canonical_sha256="a" * 64,
+        manifest_sha256="b" * 64,
+    )
+    blocks = document["pages"][0]["blocks"]
+    for block, (left, right) in zip(
+        blocks, [(0.1, 0.14), (0.73, 0.75), (0.65, 0.68), (0.49, 0.88)], strict=True
+    ):
+        block.update(
+            origin="native",
+            bbox={"units": "normalized_0_1", "x0": left, "x1": right, "y0": 0.12, "y1": 0.14},
+        )
+    if ambiguous:
+        blocks[0]["text"] = "12"
+        blocks[0]["bbox"].update(x0=0.59, x1=0.61)
+    before = deepcopy(document)
+    draft = build_source_draft("Thông báo", source.documents, "cmp")
+    assert document == before
+    paragraphs = draft["sections"][0]["paragraphs"]
+    annotations = preview(replace(source, content=draft))["annotations"]
+    if ambiguous:
+        assert paragraphs[-1]["text"] == blocks[-1]["text"]
+        assert not annotations
+    else:
+        assert paragraphs[-1] == {
+            "text": "Gia Lai, ngày 31 tháng 5 năm 2026",
+            "citations": ["ocr:ev3", "ocr:ev2", "ocr:ev1"],
+        }
+        (annotation,) = annotations
+        assert annotation["values"] == {"issued_year": 2026}
+        assert [proof["citation"] for proof in annotation["evidence"]] == paragraphs[-1][
+            "citations"
+        ]
+
+
 def test_old_misclassified_ai_proposals_are_rechecked_and_unverified_pairs_not_imported():
     source = bundle("Mùa tuyển sinh 2026", "Trường có Mã 0012. Phần khác có số 9999.")
     source.content["supplement"] = {
@@ -130,9 +179,7 @@ def test_phone_clusters_and_contact_fields_never_become_data_year():
         "Mùa tuyển sinh 2026",
     )
     found = preview(source)["annotations"]
-    assert not [
-        item for item in found if item["values"].get("data_year") in {1800, 1900}
-    ]
+    assert not [item for item in found if item["values"].get("data_year") in {1800, 1900}]
     assert [a["values"] for a in found if a["values"].get("data_year")] == [{"data_year": 2026}]
 
 
@@ -144,16 +191,12 @@ def test_old_model_proposal_for_a_hotline_number_is_rechecked():
                 "annotation": {
                     "target": "paragraph:0:0",
                     "values": {"data_year": 1800},
-                    "evidence": [
-                        {"citation": "ocr:ev0", "quote": "Tư vấn tuyển sinh: 1800 6357"}
-                    ],
+                    "evidence": [{"citation": "ocr:ev0", "quote": "Tư vấn tuyển sinh: 1800 6357"}],
                 }
             }
         ]
     }
-    assert not [
-        item for item in preview(source)["annotations"] if item["values"].get("data_year")
-    ]
+    assert not [item for item in preview(source)["annotations"] if item["values"].get("data_year")]
 
 
 def test_empty_and_multiple_sources_do_not_invent_global_scope():

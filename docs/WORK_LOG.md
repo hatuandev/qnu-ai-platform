@@ -1,5 +1,7 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context1002 — Khôi phục ngày ban hành và lịch tuyển sinh có dẫn chứng.](nhat_ky/2026-11-17_phien_1002_khoi_phuc_ngay_va_lich.md)
+- [Context1001 — Kiểm chứng metadata và chuyển phiên bản trên bốn tài liệu.](nhat_ky/2026-11-17_phien_1001_kiem_chung_metadata_va_phat_hanh.md)
 - [Context1000 — Liên kết JSON và Markdown, giảm ngữ cảnh rà soát.](nhat_ky/2026-11-17_phien_1000_lien_ket_json_markdown.md)
 - [Context999 — Đối chiếu bản nháp theo nội dung đã lưu.](nhat_ky/2026-11-17_phien_999_ra_soat_theo_noi_dung.md)
 - [Context998 — Đo xử lý DOCX phức tạp với Qwen.](nhat_ky/2026-11-17_phien_998_do_qwen_docx_phuc_tap.md)

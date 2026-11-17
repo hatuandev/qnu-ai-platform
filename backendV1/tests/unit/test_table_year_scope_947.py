@@ -292,7 +292,8 @@ def test_unmarked_first_row_is_not_treated_as_a_header():
     assert preview(published(content, documents))["annotations"] == []
 
 
-def test_unmarked_multitier_year_header_scopes_its_child_columns():
+@pytest.mark.parametrize("marked", [False, True])
+def test_multitier_year_header_scopes_its_child_columns(marked):
     content, documents = fixture(
         headers=[
             [
@@ -303,15 +304,13 @@ def test_unmarked_multitier_year_header_scopes_its_child_columns():
         ],
         body=[["Công nghệ thông tin", "80", "15"], ["Kỹ thuật phần mềm", "100", "20"]],
         columns=3,
-        marked=False,
+        marked=marked,
     )
     found = annotations(content, documents)
     for column in (1, 2):
         annotation = found[f"table:{RUN}:{TABLE}:column:{column}"]
         assert annotation["values"] == {"data_year": 2024}
-        assert annotation["evidence"] == [
-            {"citation": f"{RUN}:{TABLE}-c0-1", "quote": "2024"}
-        ]
+        assert annotation["evidence"] == [{"citation": f"{RUN}:{TABLE}-c0-1", "quote": "2024"}]
     listed = preview(published(content, documents))["annotations"]
     _, chunk = table_chunk(content, documents, listed)
     assert {item["target"] for item in chunk.structure["retrieval_metadata"]} == {

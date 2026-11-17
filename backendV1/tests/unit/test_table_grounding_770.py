@@ -71,6 +71,21 @@ def test_wrapped_alphanumeric_identifier_keeps_the_following_name_as_subject():
     )
 
 
+def test_row_group_with_its_own_code_column_keeps_the_child_name():
+    s = source(
+        [
+            ["Nhóm", "Mã CT", "Chương trình", "Chỉ tiêu"],
+            ["Kỹ thuật", "0201", "Cơ điện tử", "30"],
+            ["0202", "Tự động hóa", "42"],
+        ],
+        widths={(1, 0): (2, 1)},
+        columns=4,
+    )
+    cells = catalog([s])
+    result = materialize(parse_answer(selected("E1:r2:k3"), [s]), [s], cells)
+    assert result.statements[0].text == "Kỹ thuật / Tự động hóa — Chỉ tiêu: 42"
+
+
 def test_enumeration_can_choose_a_row_name_without_copying_an_unrequested_number():
     s = source([["Name", "Capacity"], ["West laboratory", "30"]])
     cells = catalog([s], include_names=True)

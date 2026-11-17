@@ -22,7 +22,10 @@ def acknowledgement(client, version_url):
                 fixture.requests.append(
                     {
                         "body": {
-                            "messages": [{"role": m.role, "content": m.content} for m in messages]
+                            "messages": [{"role": m.role, "content": m.content} for m in messages],
+                            "response_format": {"type": "json_schema"}
+                            if request.output_schema
+                            else {},
                         }
                     }
                 )

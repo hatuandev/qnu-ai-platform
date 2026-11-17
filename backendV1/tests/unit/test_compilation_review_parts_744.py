@@ -112,6 +112,21 @@ def test_flagged_and_shared_source_prose_is_not_assessed_locally():
     assert literal.source_prose_pairs(payload) == {"b": "ocr_one:ev2"}
 
 
+def test_title_review_includes_its_exact_source_even_if_not_a_prose_pair():
+    payload = material()
+    payload["source_units"].append(source("ocr_one:title", "NGƯỠNG 2026", page=1, kind="title"))
+    payload["draft_units"] = [
+        payload["draft_units"][0],
+        paragraph("copied", "Nguồn thứ nhất.", ["ocr_one:ev1"]),
+    ]
+    plans = parts.plan_parts(
+        payload, capacity=24000, structured=True, source_copies={"copied": "ocr_one:ev1"}
+    )
+    title = next(plan for plan in plans if "title" in plan.draft_ids)
+    assert title.context_source_ids == ("ocr_one:title",)
+    assert any("ocr_one:title" in plan.source_ids for plan in plans)
+
+
 def test_plan_covers_every_unit_once_and_repeats_earlier_source_as_context():
     payload = material()
     # The review instructions now cost ~4.8K byte-bound tokens; allow room for

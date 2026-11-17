@@ -105,6 +105,15 @@ def column_year(cells: list[dict]) -> int | None:
     return column_year_proof(cells)[0]
 
 
+def table_year_headers(table: dict, shape: dict) -> tuple[list[int], bool]:
+    marked = header_rows(shape)
+    if len(marked) == 1:
+        return marked, False
+    structural = multitier_header(table) or []
+    allow_bare = bool(structural and (not marked or set(structural) <= set(marked)))
+    return marked or structural, allow_bare
+
+
 def _has_data(positions: list, headers: list[int], column: int) -> bool:
     """A non-header cell physically covers this column; spans keep their own start."""
     return any(
@@ -126,8 +135,7 @@ def header_year_scopes(draft: dict) -> list[dict]:
         positions, errors = layout(shape)
         if errors:
             continue
-        native = header_rows(shape)
-        tiers = native or multitier_header(table) or []
+        tiers, allow_bare = table_year_headers(table, shape)
         if not tiers:
             continue
         headers = set(tiers)
@@ -138,7 +146,7 @@ def header_year_scopes(draft: dict) -> list[dict]:
                 if position.row in headers
                 and position.column <= column < position.column + position.cell["col_span"]
             ]
-            year, proof = column_year_proof(governing, allow_bare_year=not native)
+            year, proof = column_year_proof(governing, allow_bare_year=allow_bare)
             if year is None or not _has_data(positions, headers, column):
                 continue
             cell = proof[0]

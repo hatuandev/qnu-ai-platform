@@ -12,6 +12,7 @@ from itertools import groupby
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
+from qnu.domains.knowledge.compilation.issued_line import recover_issued_line
 from qnu.domains.knowledge.compilation.schemas import SegmentDraftContent
 from qnu.domains.knowledge.compilation.table_year import conversion_year_scopes, header_year_scopes
 from qnu.domains.knowledge.compilation.units import Unit, build_units
@@ -63,7 +64,7 @@ mà tiêu đề bao quát và dẫn đúng các khối liên quan. Không chép 
 không đề xuất tiêu đề đã có. Khi thiếu căn cứ để bổ sung, trả danh sách rỗng.
 """
 )
-RULE_VERSION = "qnu.compiler.metadata-rules/v8"
+RULE_VERSION = "qnu.compiler.metadata-rules/v10"
 KNOWN_FIELDS = {
     "issued_year",
     "data_year",
@@ -73,7 +74,8 @@ KNOWN_FIELDS = {
     "intake",
 }
 ISSUED_YEAR = r"\bnăm\s+ban\s+hành\s*[:–-]?\s*(\d{4})(?!\d)"
-ISSUED_DATE = r"\bngày\s+ban\s+hành\s*[:–-]?"
+_SIMULATED_FIELD = r"(?:[ \t]+mô[ \t]+phỏng)?"
+ISSUED_DATE = rf"\bngày\s+ban\s+hành{_SIMULATED_FIELD}\s*[:–-]?"
 PLACE_DATE = r"(?m)^[^\d,\n:;.!?]{2,60},[ \t]*(?=ngày\b)"
 DATA = (
     r"(?:năm\s+dữ\s+liệu|niên\s+độ\s+báo\s+cáo|mùa\s+tuyển\s+sinh|"
@@ -93,7 +95,10 @@ CONTACT_LABEL = re.compile(
     re.IGNORECASE,
 )
 EFFECTIVE = {
-    "effective_from": r"(?:có\s+hiệu\s+lực\s+(?:thi\s+hành\s+)?(?:kể\s+)?từ|(?:^|[.!?;\n]\s*)hiệu\s+lực\s+từ)",
+    "effective_from": (
+        r"(?:có\s+hiệu\s+lực\s+(?:thi\s+hành\s+)?(?:kể\s+)?từ|(?:^|[.!?;\n]\s*)hiệu\s+lực\s+từ"
+        rf"|(?:^|[;\n])[ \t]*ngày\s+bắt\s+đầu\s+áp\s+dụng{_SIMULATED_FIELD}[ \t]*[:：])"
+    ),
     "effective_until": r"(?:có\s+hiệu\s+lực\s+(?:thi\s+hành\s+)?đến\s+hết|(?:^|[.!?;\n]\s*)hiệu\s+lực\s+đến\s+hết)",
 }
 NUMERIC_DATE = r"\s*(?:ngày\s+)?(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?!\d)"
@@ -374,6 +379,9 @@ def automatic_entries(draft: dict, documents: list[dict]) -> list[dict]:
         "attributes",
         "năm ban hành",
         "ngày ban hành",
+        "ngày ban hành mô phỏng",
+        "ngày bắt đầu áp dụng",
+        "ngày bắt đầu áp dụng mô phỏng",
         "năm dữ liệu",
         "niên độ báo cáo",
         "hiệu lực từ",
@@ -591,6 +599,8 @@ def _proposal_entries(
                     },
                 )
     entries.update(_conversion_year_entries(draft, documents))
+    if entry := _issued_line_entry(draft, documents):
+        entries[entry["id"]] = entry
     for event, proof in fragmented_proofs(documents):
         refs = [part["citation"] for part in proof]
         if not all(ref in draft["citations"] for ref in refs):
@@ -614,6 +624,39 @@ def _proposal_entries(
                 "source": draft["citations"][refs[0]],
             }
     return list(entries.values())
+
+
+def _issued_line_entry(draft: dict, documents: list[dict]) -> dict | None:
+    if len(documents) != 1 or not documents[0]["pages"]:
+        return None
+    document = documents[0]
+    first = document["pages"][0]
+    if first.get("page_number") != 1 or not (line := recover_issued_line(first["blocks"])):
+        return None
+    blocks = [first["blocks"][position] for position in line.positions]
+    refs = [f"{document['ocr_run_id']}:{block['evidence_id']}" for block in blocks]
+    if not all(ref in draft["citations"] for ref in refs) or not any(
+        paragraph["text"] == line.text and paragraph["citations"] == refs
+        for section in draft["sections"]
+        for paragraph in section["paragraphs"]
+    ):
+        return None
+    item = {
+        "target": "document",
+        "values": {"issued_year": line.value.year},
+        "evidence": [
+            {"citation": ref, "quote": block["text"].strip()}
+            for ref, block in zip(refs, blocks, strict=True)
+        ],
+    }
+    return {
+        "id": hashlib.sha256(json_bytes(item)).hexdigest(),
+        "status": "proposed",
+        "annotation": item,
+        "origin": "rules",
+        "segment": None,
+        "source": draft["citations"][refs[0]],
+    }
 
 
 def _conversion_year_entries(draft: dict, documents: list[dict]) -> dict:

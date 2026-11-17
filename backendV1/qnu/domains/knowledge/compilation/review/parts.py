@@ -886,16 +886,30 @@ def _build_group(
                 raw_owned.append(ref)
     new_owned = _expand_source_rows(material, raw_owned, owned_sources)
     title_only = draft_ids == ["title"] and bool(material.get("verified_source_prose"))
-    if title_only:
+    if "title" in draft_ids:
+        title_text = " ".join(drafts["title"]["text"].casefold().split())
         anchor = next(
             (
                 unit["id"]
                 for unit in material["source_units"]
-                if unit["id"] in material["verified_source_prose"] and _unit_bytes(unit) <= 1024
+                if title_text
+                and unit["kind"] in {"text", "paragraph", "title", "heading", "section_header"}
+                and not unit.get("requires_review")
+                and _unit_bytes(unit) <= 1024
+                and " ".join(unit["text"].casefold().split()) == title_text
             ),
             None,
         )
-        if anchor:
+        if anchor is None and title_only:
+            anchor = next(
+                (
+                    unit["id"]
+                    for unit in material["source_units"]
+                    if unit["id"] in material["verified_source_prose"] and _unit_bytes(unit) <= 1024
+                ),
+                None,
+            )
+        if anchor and anchor not in cited and anchor not in new_owned:
             cited.append(anchor)
 
     def attempt(

@@ -10,6 +10,7 @@ from qnu.domains.knowledge.compilation.table_year import (
     column_year_proof,
     conversion_year_scopes,
     labelled_years,
+    table_year_headers,
     year_mentions,
 )
 from qnu.domains.knowledge.index.table_dependencies import multitier_header
@@ -528,8 +529,7 @@ def _require_table_year_proof(item: RetrievalAnnotation, content: dict) -> None:
     shape, positions = _grid(entry)
     if positions is None:
         raise _invalid("Không đọc được cấu trúc bảng để xác định tiêu đề cột.")
-    native = header_rows(shape)
-    tiers = native or multitier_header(entry["table"]) or []
+    tiers, allow_bare = table_year_headers(entry["table"], shape)
     headers = set(tiers)
     governing = [
         position
@@ -540,7 +540,7 @@ def _require_table_year_proof(item: RetrievalAnnotation, content: dict) -> None:
     # The whole governing header text is inspected: a short quote must not hide
     # a role, and a multi-year child header must not inherit one parent year.
     proven, proof_cells = column_year_proof(
-        [position.cell for position in governing], allow_bare_year=bool(tiers and not native)
+        [position.cell for position in governing], allow_bare_year=allow_bare
     )
     run = entry["citation"].split(":", 1)[0]
     proofs = {run + ":" + position["evidence_id"] for position in proof_cells}

@@ -31,6 +31,22 @@ class FakeAnswerChat(FakeNemotron):
                     "usage": {"total_tokens": 80},
                 }
             ).encode()
+        if "situation" in incoming and "evidence" not in incoming:
+            return 200, json.dumps(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {"message": "Chưa tìm thấy thông tin phù hợp trong nguồn hiện có."}
+                                )
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {"total_tokens": 80},
+                }
+            ).encode()
         source = next(
             (e for e in incoming["evidence"] if e["kind"] == "table"), incoming["evidence"][0]
         )

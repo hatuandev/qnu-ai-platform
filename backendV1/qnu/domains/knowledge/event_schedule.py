@@ -41,7 +41,7 @@ EVENT_LABELS = (
             r"|thời\s+gian\s+(?:đăng\s+ký|nhận|nộp)(?:\s+hồ\s+sơ)?"
             r"|đăng\s+ký\s+(?:thông\s+tin\s+)?(?:xét\s+tuyển|dự\s+tuyển|nhập\s+học|xét\s+học\s+bạ|"
             r"tuyển\s+sinh)(?:\s+trực\s+tuyến|\s+trực\s+tiếp)?"
-            r"|(?:thời\s+gian\s+)?đăng\s+ký\s+dự\s+thi(?:\s+năng\s+khiếu)?"
+            r"|(?:thời\s+gian\s+)?đăng\s+ký\s+(?:dự\s+thi(?:\s+năng\s+khiếu)?|thi\s+năng\s+khiếu)"
             r"|nhận\s+hồ\s+sơ(?:\s+đăng\s+ký|\s+xét\s+tuyển)?"
             r"|gia\s+hạn\s+(?:thời\s+gian\s+)?(?:đăng\s+ký|nộp|xác\s+nhận))" + EVENT_BOUNDARY,
             re.IGNORECASE,
@@ -54,6 +54,8 @@ EVENT_LABELS = (
             r"|(?:ngày\s+thi|thời\s+gian\s+thi|lịch\s+thi|tổ\s+chức\s+thi)\s+năng\s+khiếu"
             r"(?:\s+dành\s+cho\s+[^,.;\n]{3,120}?(?=\s+(?:vào|từ|ngày)\s+))?"
             r"|tổ\s+chức\s+thi\s+tuyển\s+sinh"
+            r"|(?:^|(?<=\)))[ \t]*thi\s+năng\s+khiếu(?:[ \t]+[^:;.\n]{2,60}?)?"
+            r"(?=[ \t]*:[ \t]*(?:thi|vào|ngày)\b)"
             r"|ngày\s+kiểm\s+tra\s+(?:năng\s+lực|tư\s+duy|đánh\s+giá)"
             r"|kỳ\s+thi\s+(?:đánh\s+giá\s+năng\s+lực|tuyển\s+sinh))" + EVENT_BOUNDARY,
             re.IGNORECASE,
@@ -81,11 +83,12 @@ EVENT_TIME = re.compile(
 )
 RANGE_BETWEEN = re.compile(r"^\s*(?:đến|tới|hết|[-–—])\s*(?P<before>trước\s+)?$", re.IGNORECASE)
 LISTED_DAYS = re.compile(
-    r"\bcác\s+ngày\s+((?:\d{1,2}\s*,\s*){0,29}\d{1,2})\s+(?:và|&)\s+"
+    r"\bcác\s+ngày\s+((?:\d{1,2}\s*,\s*){0,29}\d{1,2})(?:\s*,\s*|\s+(?:và|&)\s+)"
     r"(\d{1,2})/(\d{1,2})/(\d{4})(?![\d/])",
     re.IGNORECASE,
 )
 START_CUE = re.compile(r"\b(?:từ|kể\s+từ|bắt\s+đầu\s+từ)\b", re.IGNORECASE)
+TRAILING_RANGE = re.compile(r"\b(?:đến|tới)(?:\s+trước)?$", re.IGNORECASE)
 RELATIVE_DEADLINE = re.compile(
     r"(?:trong\s+vòng|không\s+quá|chậm\s+nhất(?:\s+là)?|tối\s+đa|sau|trước)\s+"
     r"(\d{1,3})\s+(ngày\s+làm\s+việc|tuần|tháng|ngày)\b"
@@ -111,7 +114,7 @@ EVENT_METHOD = re.compile(
     r"(?:phương\s+thức|hình\s+thức)\s*[:：]?\s*([^,.;\n]{3,120})", re.IGNORECASE
 )
 EVENT_CHANNEL = re.compile(
-    r"\b((?:trực\s+tuyến\s+)?trên\s+.{3,120}?)"
+    r"\b((?:(?:trực\s+tuyến\s+)?trên\s+|tại\s+(?=https?://)).{3,120}?)"
     r"(?=\s+(?:từ|đến|trước|ngày|trong\s+khoảng|là)\s+)",
     re.IGNORECASE,
 )
@@ -192,7 +195,7 @@ def _event_value(kind: EventKind, label: str, window: str, prefix: str) -> Event
             return None
     else:
         spans = _moment_spans(window)
-        if not spans:
+        if not spans or TRAILING_RANGE.search(window.rstrip(" .;")):
             return None
         if len(spans) >= 2:
             if len(spans) != 2:
@@ -259,7 +262,7 @@ def _event_value(kind: EventKind, label: str, window: str, prefix: str) -> Event
 
 def extract_events(quote: str) -> list[tuple[EventValue, str]]:
     """Extract labelled schedules; an unlabeled or ambiguous date proves nothing."""
-    if len(quote) > 2000 or not quote.strip():
+    if len(quote) > 2000 or not re.search(r"\d", quote):
         return []
     proposals = []
     cursor = proof_start = 0
@@ -328,23 +331,34 @@ def fragmented_windows(blocks: list[dict]) -> dict[int, tuple[int, EventValue]]:
             or not head
             or head.endswith((".", ";", "!", "?"))
             or not any(pattern.search(head) for _, pattern in EVENT_LABELS)
-            or any(event.moment for event, _ in extract_events(head))
         ):
             continue
+        complete = [event for event, _ in extract_events(head)]
+        unfinished = CLAUSE_BOUNDARY.split(head)[-1].strip()
         text = head
         for end in range(start + 1, min(start + 3, len(blocks))):
             tail = _fragment(blocks[end])
-            if not tail or not tail[:1].islower():
+            if not tail or not (
+                tail[:1].islower() or (tail[:1].isdigit() and TRAILING_RANGE.search(text))
+            ):
                 break
             text += " " + tail
             if not tail.endswith((".", ";")):
                 continue
-            found = extract_events(text)
+            found = [
+                event
+                for event, quote in extract_events(text)
+                if event.window_start
+                and event.moment
+                and event not in complete
+                and (
+                    (quote == text and event.label.strip() in head)
+                    or (complete and unfinished and quote.startswith(unfinished) and quote != head)
+                )
+            ]
             if len(found) == 1:
-                event, quote = found[0]
-                if event.window_start and event.moment and quote == text and event.label in head:
-                    windows[start] = (end + 1, event)
-                    consumed = end + 1
+                windows[start] = (end + 1, found[0])
+                consumed = end + 1
             break
     return windows
 

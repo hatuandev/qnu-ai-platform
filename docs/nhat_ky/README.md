@@ -1,5 +1,7 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên 1002 — Khôi phục ngày ban hành và lịch tuyển sinh có dẫn chứng.](2026-11-17_phien_1002_khoi_phuc_ngay_va_lich.md)
+- [Phiên 1001 — Kiểm chứng metadata và chuyển phiên bản trên bốn tài liệu.](2026-11-17_phien_1001_kiem_chung_metadata_va_phat_hanh.md)
 - [Phiên 1000 — Liên kết JSON và Markdown, giảm ngữ cảnh rà soát.](2026-11-17_phien_1000_lien_ket_json_markdown.md)
 - [Phiên 999 — Đối chiếu bản nháp theo nội dung đã lưu.](2026-11-17_phien_999_ra_soat_theo_noi_dung.md)
 - [Phiên 998 — Đo xử lý DOCX phức tạp với Qwen.](2026-11-17_phien_998_do_qwen_docx_phuc_tap.md)

@@ -63,6 +63,16 @@ Planner không trộn phần bảng literal với phần văn xuôi. `--recover`
 - Đoạn chép nguyên văn khối bảng chỉ được xác nhận cục bộ khi khối nguồn không có cờ cần kiểm tra, cấu trúc và ô bảng khớp JSON đã ghim, còn văn bản khớp từng đoạn theo đúng thứ tự. Từng ô vẫn được tính vào độ phủ ở phần rà soát nguồn. Đoạn nhận xét viết lại hoặc dẫn bảng không đủ căn cứ tiếp tục được xử lý theo ngân sách ModelOps.
 - Khi phát hành, PostgreSQL lưu nội dung, dẫn chứng và cấu trúc của đoạn. Qdrant lưu vector và khóa dẫn tới đoạn thuộc đúng phiên bản đã phát hành.
 
+### Đối chiếu năm và tên dòng trong bảng nhiều tầng (phiên 1001)
+
+- Quy tắc metadata v9 dùng cùng kiểm tra hình học khi gợi ý năm và khi xác minh trước lúc lưu. Ô năm ở tiêu đề nhiều tầng đã được nhận diện có thể làm căn cứ cho các cột con. Năm chỉ lan qua các cột nằm dưới ô đó. Tiêu đề mâu thuẫn tiếp tục giữ trạng thái chưa rõ.
+- Khi rà soát tên bản nháp, backend ưu tiên khối tiêu đề nguồn khớp văn bản. Khi tạo câu trả lời từ bảng có tên nhóm gộp dọc, cột mã riêng có thể nối tiếp tới tên dòng con. Báo cáo và câu trả lời giữ trích dẫn về dữ liệu đã ghim.
+
+### Khôi phục ngày và lịch có dẫn chứng (phiên 1002)
+
+- Khi lớp văn bản gốc của PDF tách ngày và tháng khỏi dòng ngày ban hành trên trang 1, bản nháp có thể ghép lại nếu cả hai số nằm rõ trên cùng dòng và tạo được ngày hợp lệ. Giữ dẫn chứng về khối chứa năm và hai khối số. Metadata v10 xác minh đúng ba khối trước khi ghi năm ban hành ở cấp tài liệu.
+- Danh sách ngày thi chung tháng và năm được lưu theo từng ngày. Khoảng đăng ký tách qua nhiều khối chỉ được ghép khi đủ nhãn, đủ hai đầu thời gian và có dấu kết câu. Ngày ban hành, ngày hiệu lực và các mốc lịch giữ vai trò riêng.
+
 ### Nền tảng giữ nguyên
 
 - Giữ snapshot đầy đủ và bất biến. Khi request một lượt vượt giới hạn, lập manifest các phần theo block/hàng bảng; bỏ evidence map và ảnh Base64 khỏi request từng phần. Bảng literal do backend ghép từ nguồn, không nhờ model viết lại ô.

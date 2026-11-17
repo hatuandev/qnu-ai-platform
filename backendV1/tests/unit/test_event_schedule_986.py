@@ -126,6 +126,33 @@ def test_two_intakes_keep_their_own_deadlines():
     assert result["conflicts"] == []
 
 
+def test_exam_date_list_and_fragmented_registration_stay_separate():
+    source = bundle(
+        "a) Thi năng khiếu GDTC: thi vào các ngày 03,04,05/8/2026. Thí",
+        "sinh đăng ký thi năng khiếu tại https://example.edu.vn từ 01/7/2026 đến",
+        "27/7/2026.",
+    )
+    source.documents[0].update(
+        evidence={f"ev{i}": {"page": 1} for i in range(3)},
+        identity={},
+        canonical_sha256="a" * 64,
+        manifest_sha256="b" * 64,
+    )
+    draft = build_source_draft("Lịch thi", source.documents, "compile")
+    (annotation,) = events_of(preview(replace(source, content=draft)))
+    assert len(annotation["values"]["events"]) == 2
+    by_kind = {event["kind"]: event for event in annotation["values"]["events"]}
+    assert by_kind["exam_date"]["dates"] == ["2026-08-03", "2026-08-04", "2026-08-05"]
+    assert by_kind["registration_deadline"]["window_start"] == {"date": "2026-07-01"}
+    assert by_kind["registration_deadline"]["moment"] == {"date": "2026-07-27"}
+    assert by_kind["registration_deadline"]["method"] == "tại https://example.edu.vn"
+    assert {proof["citation"] for proof in annotation["evidence"]} == {
+        "ocr:ev0",
+        "ocr:ev1",
+        "ocr:ev2",
+    }
+
+
 def test_one_intake_exam_and_result_dates_are_kept_together():
     source = bundle("Đợt 1: ngày thi 20/7/2026, công bố kết quả ngày 10/8/2026.")
     events = events_of(preview(source))[0]["values"]["events"]

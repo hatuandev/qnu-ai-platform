@@ -7,6 +7,10 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **2026-11-17 — Context1002 — Khôi phục ngày ban hành và lịch tuyển sinh.** Xác minh ba bản nháp thực với Qwen. PDF 2026 ghép ngày 31/5 từ ba khối gốc, PDF 2025 nhận đúng ngày thi và cửa sổ đăng ký, DOCX phức tạp ghi ngày áp dụng. Ca integration thiếu căn cứ đã đạt. Rà soát hai PDF chậm hơn trong lượt đo mới, DOCX gần như cũ. [Nhật ký](../nhat_ky/2026-11-17_phien_1002_khoi_phuc_ngay_va_lich.md) · [Snapshot](./snapshots/2026-11-17_session_1002.md).
+
+- **2026-11-17 — Context1001 — Kiểm chứng metadata và chuyển phiên bản.** Hai PDF và hai Word qua bóc tách, rà soát Qwen, duyệt và phát hành trong kho thử. Sửa năm cho cột con của bảng nhiều tầng, cấp đúng đoạn tiêu đề cho lượt rà soát và giữ tên chương trình dưới nhóm ô gộp. Điểm Kế toán 2025 trả 20,3 từ v1 khi v2 còn nháp, sau đó dẫn đúng v2. Ngày đã sửa 31/5/2026 truy về trang 1 và đúng bản sửa. [Nhật ký](../nhat_ky/2026-11-17_phien_1001_kiem_chung_metadata_va_phat_hanh.md) · [Snapshot](./snapshots/2026-11-17_session_1001.md).
+
 - **2026-11-17 — Context1000 — Liên kết JSON và Markdown.** Markdown nguồn gắn mã khối/ô, bản sửa gắn phiên bản văn bản và bản biên soạn gắn phạm vi từng đoạn. Backend dùng JSON đã ghim để đối chiếu đoạn chép nguyên văn bảng. Word phức tạp hoàn tất rà soát 56,72 giây, 1 lượt Qwen, 10.094 token. Tệp thử PDF 120 trang qua duyệt, lập chỉ mục và tìm kiếm đúng bản đã sửa. [Nhật ký](../nhat_ky/2026-11-17_phien_1000_lien_ket_json_markdown.md) · [Snapshot](./snapshots/2026-11-17_session_1000.md).
 
 - **2026-11-17 — Context999 — Đối chiếu bản nháp theo nội dung đã lưu.** Lượt rà soát mặc định có thể dùng đối chiếu nguyên văn khi dựng lại được các mục đã lưu từ nguồn, kể cả sau bước AI bổ sung. Trên cùng bản nháp Word của phiên 998, Qwen hoàn tất 23/23 phần trong 118,55 giây, 5 lượt gọi, 102.050 token. Báo cáo kiểm 840 mục nguồn và 862 mục bản nháp, có 2 mục cần đối chiếu. [Nhật ký](../nhat_ky/2026-11-17_phien_999_ra_soat_theo_noi_dung.md) · [Snapshot](./snapshots/2026-11-17_session_999.md).

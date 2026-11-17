@@ -3,6 +3,7 @@
 from pydantic import ValidationError
 
 from qnu.domains.knowledge.compilation.drafting import validated_draft
+from qnu.domains.knowledge.compilation.issued_line import recover_issued_line
 from qnu.domains.knowledge.compilation.quality import (
     CONFIRMED_BY_SOURCE,
     PARTIALLY_CHECKED,
@@ -21,9 +22,22 @@ def build_source_draft(topic: str, documents: list[dict], run_id: str) -> dict:
         for page in document["pages"]:
             blocks = page["blocks"]
             windows = fragmented_windows(blocks)
+            issued = recover_issued_line(blocks) if page.get("page_number") == 1 else None
             consumed = 0
             for index, block in enumerate(blocks):
                 if index < consumed:
+                    continue
+                if issued and index in issued.positions:
+                    if index == issued.header:
+                        paragraphs.append(
+                            {
+                                "text": issued.text,
+                                "citations": [
+                                    f"{document['ocr_run_id']}:{blocks[i]['evidence_id']}"
+                                    for i in issued.positions
+                                ],
+                            }
+                        )
                     continue
                 if index in windows:
                     consumed = windows[index][0]

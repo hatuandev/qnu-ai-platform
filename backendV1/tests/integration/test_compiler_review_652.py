@@ -64,15 +64,18 @@ class ReviewChat(FakeChat):
             self.started.set()
             assert self.release.wait(5)
         sources, drafts = incoming["source_units"], incoming["draft_units"]
+        visible_sources = sources + incoming.get("context_source_units", [])
+        visible_drafts = drafts + incoming.get("context_draft_units", [])
+        source_ids = [unit["id"] for unit in visible_sources]
+        draft_ids = [unit["id"] for unit in visible_drafts]
         source_checks = [
             {
                 "source_id": s["id"],
-                "status": "covered",
-                "draft_ids": [
-                    next(
-                        (d["id"] for d in drafts if d.get("source_id") == s["id"]), drafts[0]["id"]
-                    )
-                ],
+                "status": "covered" if draft_ids else "out_of_scope",
+                "draft_ids": next(
+                    ([d["id"]] for d in visible_drafts if d.get("source_id") == s["id"]),
+                    draft_ids[:1],
+                ),
                 "explanation": "Đã đối chiếu trong phạm vi fixture.",
                 "suggested_action": "",
             }
@@ -81,8 +84,10 @@ class ReviewChat(FakeChat):
         draft_checks = [
             {
                 "draft_id": d["id"],
-                "status": "supported",
-                "source_ids": [d.get("source_id", sources[0]["id"])],
+                "status": "supported" if source_ids else "uncertain",
+                "source_ids": [d["source_id"]]
+                if d.get("source_id") in source_ids
+                else source_ids[:1],
                 "explanation": "Có nguồn tương ứng trong fixture.",
                 "suggested_action": "",
             }

@@ -12,11 +12,12 @@ from qnu.domains.rag.answer.narrative import complete_citations
 from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer, Statement
 from qnu.platform.errors import AppException
 
-VERSION = "qnu.answer-cells/v13"
+VERSION = "qnu.answer-cells/v14"
 PROJECTION_VERSION = "qnu.answer-projection/v8"
 
 _YEAR = re.compile(r"^(?:19|20)\d{2}$")
 _NUMERIC_CODE = re.compile(r"\d[\dA-Z]*(?:[-./]\d[\dA-Z]*)*")
+_CODE_HEADER = re.compile(r"^(?:mã|id|code|identifier)\b")
 _PARENTHESIZED_LIST = re.compile(r"(?:\([^()\n]+\)\s*)+")
 _ORDINAL = re.compile(r"(?m)(?:^|(?<=[;\n]))\s*\d{1,2}[.)](?=\s)")
 # "Bảng 7", "Điều 14" name a document object; the digits are not data.
@@ -227,11 +228,14 @@ def catalog(
                     # A numeric identity code under the same header as the leading
                     # label is part of the subject path, not a value; skip it so the
                     # following name is kept (e.g. group / code / program name).
-                    if (
-                        candidate is not label
-                        and fields.get("0")
-                        and fields.get(str(candidate.column)) == fields["0"]
-                    ):
+                    candidate_path = fields.get(str(candidate.column), ())
+                    shares_group_header = bool(fields.get("0") and candidate_path == fields["0"])
+                    has_code_header = bool(
+                        label.cell["row_span"] > 1
+                        and _NUMERIC_CODE.fullmatch(candidate.cell["text"].strip())
+                        and any(_CODE_HEADER.match(_normalized(part)) for part in candidate_path)
+                    )
+                    if candidate is not label and (shares_group_header or has_code_header):
                         continue
                     break
                 if not _ref(origin, candidate):
