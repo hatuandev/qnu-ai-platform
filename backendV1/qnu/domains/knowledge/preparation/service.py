@@ -36,6 +36,7 @@ from qnu.domains.knowledge.preparation.models import (
 )
 from qnu.domains.knowledge.preparation.schemas import PreparationRequest
 from qnu.domains.knowledge.public_api import resolve_revision_scope
+from qnu.domains.modelops.document_processing import document_provider
 from qnu.domains.modelops.public_api import assert_provider_allowed
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.ocr.models import OcrProcessingRun
@@ -115,9 +116,12 @@ async def create_intent(
             return PreparationOutcome(existing, False, await dispatch(db, existing, queue))
         return PreparationOutcome(existing, False, existing.dispatched_at is not None)
 
-    if req.mode == "ai":
-        await assert_provider_allowed(db, actor, workspace_id, "chat", req.provider_id)
     provider_id = req.provider_id
+    if req.mode == "ai":
+        document_target = provider_id or await document_provider(db)
+        provider = await assert_provider_allowed(db, actor, workspace_id, "chat", document_target)
+        if document_target is not None:
+            provider_id = provider.id
     policy: dict | None = None
     if req.mode == "auto":
         policy, provider_id = await preparation_plan.auto_policy(db, actor, workspace_id)
@@ -148,6 +152,8 @@ async def create_intent(
             "workflow_version": "qnu.preparation/v1",
             **preparation_plan.plan_flags(req.mode, policy),
             **({"policy": policy} if policy is not None else {}),
+            # An explicit choice is pinned; otherwise the document group applies.
+            **({"provider_explicit": True} if req.provider_id else {}),
         },
         ocr_run_id=req.ocr_run_id,
     )
@@ -709,11 +715,14 @@ def _compilation_request(intent: PreparationIntent, run: OcrProcessingRun) -> Co
     versions = {run.id: intent.text_version} if intent.text_version else {}
     flags = preparation_plan.plan_flags(intent.mode, intent.config.get("policy"))
     uses_ai = flags["ai_supplement"] or flags["selective_supplement"]
+    # Only an admin-explicit provider is pinned; a document-group choice keeps the
+    # group so the same configuration drives preparation and compilation.
+    pinned = intent.provider_id if intent.config.get("provider_explicit") else None
     return CompilationRequest(
         topic=intent.topic,
         ocr_run_ids=[run.id],
         text_versions=versions,
-        provider_id=intent.provider_id if uses_ai else None,
+        provider_id=pinned if uses_ai else None,
         max_output_tokens=intent.max_output_tokens if flags["ai_supplement"] else None,
         **flags,
     )

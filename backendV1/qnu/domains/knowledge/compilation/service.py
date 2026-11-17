@@ -36,6 +36,11 @@ from qnu.domains.knowledge.compilation.reads import (
     read_segment_raw,
 )
 from qnu.domains.knowledge.compilation.schemas import CompilationRequest
+from qnu.domains.modelops.document_processing import (
+    DocumentGroup,
+    configured_concurrency,
+    resolve_document_group,
+)
 from qnu.domains.modelops.inference.service import (
     available_input_tokens,
     prepare_chat_limits,
@@ -45,7 +50,6 @@ from qnu.domains.modelops.public_api import assert_provider_allowed
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.workspaces.access import actor_ref
 from qnu.domains.workspaces.public_api import record_workspace_event
-from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException, Conflict
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
@@ -86,6 +90,95 @@ class CompilationOutcome:
     run: CompilationRun
     created: bool
     dispatched: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PinnedGroup:
+    """Group models a run may use, with the budget every part must fit."""
+
+    models: list[dict]
+    skipped: list[dict]
+    capacity: int | None
+    output_tokens: int
+
+
+async def pin_document_group(
+    db: AsyncSession,
+    actor: AuthActor,
+    workspace_id: str,
+    group: DocumentGroup,
+    requested_output: int | None,
+    runtime,
+    budget,
+) -> PinnedGroup:
+    """Pin each usable group model and the tightest shared budget.
+
+    A part is assigned to one model at send time, so the plan must fit every
+    pinned model. Models that cannot report a budget are skipped with a trace
+    instead of silently shrinking the run to one model.
+    """
+    pinned = [
+        (
+            group.models[0].concurrency if group.models else 1,
+            runtime,
+            budget.max_output_tokens,
+        )
+    ]
+    skipped: list[dict] = []
+    for member in group.models[1:]:
+        try:
+            other, other_budget = await prepare_chat_limits(
+                db,
+                actor,
+                workspace_id,
+                provider_id=member.provider_id,
+                task="compiler",
+                max_output_tokens=requested_output,
+            )
+        except AppException as exc:
+            logger.warning(
+                "compilation_group_model_skipped",
+                provider_id=member.provider_id,
+                code=exc.code,
+            )
+            skipped.append({"provider_id": member.provider_id, "code": exc.code})
+            continue
+        pinned.append((member.concurrency, other, other_budget.max_output_tokens))
+    output_tokens = min(output for _, _, output in pinned)
+    primary_capacity = available_input_tokens(runtime.token_limits, output_tokens)
+    if primary_capacity is None:
+        return PinnedGroup(
+            models=[], skipped=skipped, capacity=None, output_tokens=output_tokens
+        )
+    usable = [primary_capacity]
+    models = [
+        {
+            "provider_id": runtime.provider_id,
+            "concurrency": pinned[0][0],
+            "configuration_hash": runtime.configuration_hash,
+        }
+    ]
+    for concurrency, other_runtime, _ in pinned[1:]:
+        capacity = available_input_tokens(other_runtime.token_limits, output_tokens)
+        if capacity is None:
+            skipped.append(
+                {"provider_id": other_runtime.provider_id, "code": "model_capacity_required"}
+            )
+            continue
+        usable.append(capacity)
+        models.append(
+            {
+                "provider_id": other_runtime.provider_id,
+                "concurrency": concurrency,
+                "configuration_hash": other_runtime.configuration_hash,
+            }
+        )
+    return PinnedGroup(
+        models=models,
+        skipped=skipped,
+        capacity=min(usable),
+        output_tokens=output_tokens,
+    )
 
 
 async def dispatch(db: AsyncSession, run: CompilationRun, queue: JobQueue | None) -> bool:
@@ -240,7 +333,8 @@ async def request_run(
     auto_review = req.auto_review and not req.selective_supplement
     schema = output_schema(documents) if req.structured_output and not has_supplement else None
     requested_output = req.max_output_tokens
-    provider_id = req.provider_id
+    group = await resolve_document_group(db, req.provider_id)
+    provider_id = group.provider_id
     planned_runtime = None
     if req.max_output_tokens is None and not has_supplement:
         planned_runtime, _ = await prepare_chat_limits(
@@ -253,6 +347,7 @@ async def request_run(
         )
         provider_id = planned_runtime.provider_id
     plans: list[split.SegmentPlan] = []
+    pinned = PinnedGroup(models=[], skipped=[], capacity=None, output_tokens=0)
     projection = split.PROJECTION_SUPPLEMENT if req.ai_supplement else split.PROJECTION_V4
     if req.selective_supplement:
         projection = split.PROJECTION_SELECTIVE
@@ -304,7 +399,10 @@ async def request_run(
                 task="compiler",
                 max_output_tokens=requested_output,
             )
-            capacity = available_input_tokens(runtime.token_limits, budget.max_output_tokens)
+            pinned = await pin_document_group(
+                db, actor, workspace_id, group, requested_output, runtime, budget
+            )
+            capacity = pinned.capacity
             if capacity is None:
                 raise AppException(
                     "Chưa xác định được ngân sách biên soạn.",
@@ -317,7 +415,7 @@ async def request_run(
                 req.topic,
                 capacity=capacity,
                 structured=req.structured_output,
-                output_tokens=budget.max_output_tokens,
+                output_tokens=pinned.output_tokens,
             )
             plans = await asyncio.to_thread(
                 split.finalize_plans,
@@ -333,7 +431,10 @@ async def request_run(
     ):
         raise Conflict("Model thay đổi trong lúc lập kế hoạch.", code="chat_provider_changed")
     if not plans:
-        capacity = available_input_tokens(runtime.token_limits, budget.max_output_tokens)
+        pinned = await pin_document_group(
+            db, actor, workspace_id, group, requested_output, runtime, budget
+        )
+        capacity = pinned.capacity
         if capacity is None:
             if req.selective_supplement:
                 return await persist_source_draft("model_capacity_required")
@@ -348,7 +449,7 @@ async def request_run(
                 capacity=capacity,
                 structured=req.structured_output,
                 projection=projection,
-                output_tokens=budget.max_output_tokens,
+                output_tokens=pinned.output_tokens,
                 selected_units=selected_units,
             )
             plans = await asyncio.to_thread(
@@ -386,7 +487,9 @@ async def request_run(
             **runtime.public_dict(),
             "reasoning": runtime.reasoning_trace("compiler"),
         },
-        "max_output_tokens": budget.max_output_tokens,
+        "max_output_tokens": pinned.output_tokens if plans else budget.max_output_tokens,
+        **({"document_models": pinned.models} if plans else {}),
+        **({"document_models_skipped": pinned.skipped} if plans and pinned.skipped else {}),
         "automatic_output_budget": req.max_output_tokens is None,
         "reasoning_directive": (
             reasoning_directive.public_dict() if reasoning_directive is not None else None
@@ -416,12 +519,13 @@ async def request_run(
             "prompt_version": split.prompt_version_for(projection),
             "projection_version": projection,
             "segment_count": len(plans),
-            "concurrency": get_settings().COMPILER_SEGMENT_CONCURRENCY,
-            "input_capacity_tokens": available_input_tokens(
-                runtime.token_limits, budget.max_output_tokens
-            ),
-            "output_tokens": budget.max_output_tokens,
-            "output_content_bytes": split.output_content_bytes(budget.max_output_tokens),
+            "concurrency": pinned.models[0]["concurrency"]
+            if pinned.models
+            else await configured_concurrency(db, runtime.provider_id),
+            "models": len(pinned.models),
+            "input_capacity_tokens": pinned.capacity,
+            "output_tokens": pinned.output_tokens,
+            "output_content_bytes": split.output_content_bytes(pinned.output_tokens),
             "manifest_sha256": None,
         }
     run = CompilationRun(
@@ -445,8 +549,8 @@ async def request_run(
             run,
             plans,
             documents,
-            capacity=available_input_tokens(runtime.token_limits, budget.max_output_tokens) or 0,
-            output_tokens=budget.max_output_tokens,
+            capacity=pinned.capacity or 0,
+            output_tokens=pinned.output_tokens,
         )
         manifest_payload = json_bytes(manifest)
         await store(db, blob, run, "segment_manifest", manifest_payload)
@@ -463,7 +567,7 @@ async def request_run(
         segment_config = {
             "provider_id": runtime.provider_id,
             "configuration_hash": runtime.configuration_hash,
-            "max_output_tokens": budget.max_output_tokens,
+            "max_output_tokens": pinned.output_tokens,
             "structured_output": bool(req.structured_output),
             "auto_review": auto_review,
             "projection_version": projection,
@@ -490,7 +594,7 @@ async def request_run(
                                 "input_sha256": plan.input_sha256,
                                 "schema_sha256": plan.schema_sha256,
                                 "configuration_hash": runtime.configuration_hash,
-                                "max_output_tokens": budget.max_output_tokens,
+                                "max_output_tokens": pinned.output_tokens,
                                 "structured_output": bool(req.structured_output),
                                 "projection_version": plan.projection,
                                 "reasoning": reasoning_public,

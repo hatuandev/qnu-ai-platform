@@ -4,6 +4,7 @@ import {
   Check,
   CheckCircle2,
   Cpu,
+  FileText,
   Loader2,
   Moon,
   Palette,
@@ -31,6 +32,7 @@ import type {
 } from "@/api/modelops/types";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { SpellingDefaultsPanel } from "@/components/knowledge/spelling-defaults-panel";
+import { DocumentProcessingPanel } from "@/components/modelops/document-processing-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,7 +65,12 @@ export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
-type SettingsTab = "appearance" | "models" | "spelling" | "account";
+type SettingsTab =
+  | "appearance"
+  | "models"
+  | "documents"
+  | "spelling"
+  | "account";
 
 const NAV_ITEMS: {
   id: SettingsTab;
@@ -79,6 +86,11 @@ const NAV_ITEMS: {
     id: "models",
     title: "Mô hình mặc định",
     icon: Cpu,
+  },
+  {
+    id: "documents",
+    title: "Xử lý văn bản",
+    icon: FileText,
   },
   {
     id: "spelling",
@@ -99,6 +111,7 @@ function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
     if (typeof window !== "undefined" && window.location.search) {
       if (window.location.search.includes("models")) return "models";
+      if (window.location.search.includes("documents")) return "documents";
       if (window.location.search.includes("spelling")) return "spelling";
       if (window.location.search.includes("account")) return "account";
     }
@@ -110,7 +123,8 @@ function SettingsPage() {
   const actor = authData?.actor;
   const isSignedIn = !authQuery.isError && actor?.authenticated === true;
   const canManageSystem = isSignedIn && isModelAdmin(actor);
-  const shouldLoadModels = activeTab === "models" && canManageSystem;
+  const shouldLoadModels =
+    (activeTab === "models" || activeTab === "documents") && canManageSystem;
   const accountError =
     authQuery.error instanceof ApiProblemError && authQuery.error.isUnauthorized
       ? "Bạn chưa đăng nhập."
@@ -122,7 +136,7 @@ function SettingsPage() {
     isError: errorDefaults,
     refetch: refetchDefaults,
     isFetching: fetchingDefaults,
-  } = useModelDefaultsQuery(shouldLoadModels);
+  } = useModelDefaultsQuery(activeTab === "models" && canManageSystem);
 
   const {
     data: providers = [],
@@ -298,7 +312,9 @@ function SettingsPage() {
         <aside className="md:w-48 lg:w-56 shrink-0">
           <nav className="flex flex-wrap gap-1 md:flex-col">
             {NAV_ITEMS.filter(
-              (item) => item.id !== "spelling" || canManageSystem,
+              (item) =>
+                (item.id !== "spelling" && item.id !== "documents") ||
+                canManageSystem,
             ).map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -663,6 +679,30 @@ function SettingsPage() {
             </div>
           )}
 
+          {activeTab === "documents" &&
+            canManageSystem &&
+            (errorProviders || errorConnections ? (
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <p role="alert">Không tải được danh sách mô hình.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    void refetchProviders();
+                    void refetchConnections();
+                  }}
+                >
+                  Thử lại
+                </Button>
+              </div>
+            ) : loadingProviders || loadingConnections ? (
+              <Skeleton className="h-48 w-full" />
+            ) : (
+              <DocumentProcessingPanel
+                models={availableModelsForCapability.get("chat") ?? []}
+                connections={connections}
+              />
+            ))}
           {activeTab === "spelling" && canManageSystem && (
             <SpellingDefaultsPanel />
           )}

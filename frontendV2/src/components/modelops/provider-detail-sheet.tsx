@@ -1,5 +1,6 @@
 import {
   AlertCircle,
+  Brain,
   CheckCircle2,
   Cpu,
   FlaskConical,
@@ -74,6 +75,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CAPABILITY_LABELS, CONNECTION_FAMILIES } from "./constants";
 import { ModelCapacityDialog } from "./model-capacity-dialog";
+import { ReasoningPolicyDialog } from "./reasoning-policy-dialog";
 
 const SOURCE_LABELS: Record<CapacitySource, string> = {
   server_reported: "Nhà cung cấp công bố",
@@ -250,6 +252,9 @@ function ProviderDetailSheetContent({
     null,
   );
   const [capacityModel, setCapacityModel] = useState<ModelProvider | null>(
+    null,
+  );
+  const [reasoningModel, setReasoningModel] = useState<ModelProvider | null>(
     null,
   );
   const [keyToDelete, setKeyToDelete] = useState<ProviderKey | null>(null);
@@ -754,6 +759,12 @@ function ProviderDetailSheetContent({
                                     Kiểm tra suy luận
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
+                                    onSelect={() => setReasoningModel(model)}
+                                  >
+                                    <Brain className="size-3.5" />
+                                    Mức suy nghĩ
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
                                     onSelect={() => setCapacityModel(model)}
                                   >
                                     <Pencil className="size-3.5" />
@@ -1145,6 +1156,16 @@ function ProviderDetailSheetContent({
         open={Boolean(capacityModel)}
         onOpenChange={(next) => {
           if (!next) setCapacityModel(null);
+        }}
+      />
+
+      {/* Mức suy nghĩ cho biên soạn/rà soát */}
+      <ReasoningPolicyDialog
+        connectionId={connection.id}
+        model={reasoningModel}
+        open={Boolean(reasoningModel)}
+        onOpenChange={(next) => {
+          if (!next) setReasoningModel(null);
         }}
       />
     </>

@@ -203,3 +203,47 @@ export type CatalogItem = {
   embedding_dimension?: number | null;
   embedding_dimension_status?: "unknown" | "configured" | "stale";
 };
+
+export type ReasoningMode =
+  | "server_default"
+  | "effort"
+  | "toggle"
+  | "chat_template_kwarg";
+
+export type ReasoningLevel = "off" | "low";
+
+export type ReasoningScalar = boolean | number | string | null;
+
+export type ReasoningPolicy = {
+  mode: ReasoningMode;
+  parameter: string | null;
+  low_value: ReasoningScalar;
+  off_value: ReasoningScalar;
+  tasks: Partial<Record<ReasoningLevel, string[]>> | null;
+  verified: boolean;
+  note: string | null;
+};
+
+export type ReasoningStatus =
+  | "not_configured"
+  | "server_default"
+  | "unverified"
+  | "active";
+
+export type ReasoningTrace = {
+  applied: boolean;
+  status?: string;
+  mode?: string;
+  parameter?: string | null;
+  reason?: string;
+  level?: ReasoningLevel;
+  value?: ReasoningScalar;
+  policy_sha256?: string;
+};
+
+export type ProviderReasoning = {
+  provider_id: string;
+  status: ReasoningStatus;
+  policy: ReasoningPolicy | null;
+  effective: Record<string, ReasoningTrace>;
+};

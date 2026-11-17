@@ -7,10 +7,12 @@ It exists because that path used to be unreachable: the first part raised
 ``uncertain`` without ever sending a request.
 """
 
+import asyncio
 import json
 
 import pytest
 
+from qnu.domains.knowledge.compilation.review import execution as review_execution
 from tests.integration.compiler_support import (
     FakeChat,
     chat_provider,
@@ -125,14 +127,41 @@ def small_provider(client, data, base_url, *, context_window, max_output, model=
     return provider
 
 
-def test_long_review_runs_in_parts_and_still_covers_every_unit(client):
+@pytest.mark.parametrize("limit", [1, 5])
+def test_long_review_runs_in_parts_and_still_covers_every_unit(client, monkeypatch, limit):
+    active = peak = 0
+    run_part = review_execution._part_session
+
+    async def count_in_flight(*args, **kwargs):
+        nonlocal active, peak
+        active += 1
+        peak = max(peak, active)
+        try:
+            await asyncio.sleep(0)
+            return await run_part(*args, **kwargs)
+        finally:
+            active -= 1
+
+    monkeypatch.setattr(review_execution, "_part_session", count_in_flight)
     data = processed_input(client, code="segmented-review")
     with SegmentedReviewChat() as chat:
         provider = chat_provider(client, data, chat.base_url, model="big-chat")
         assert set_quota(client, data["workspace"]["id"], 5_000_000).status_code == 200
+        if limit > 1:
+            as_actor(PLATFORM)
+            configured = client.patch(
+                f"{API}/modelops/document-processing",
+                json={"provider_id": provider["id"], "concurrency": {provider["id"]: 2}},
+            )
+            assert configured.is_success, configured.text
+            as_actor(EDITOR)
         requested = request_compile(client, data)
         assert requested.status_code == 201, requested.text
-        run_id = requested.json()["run"]["id"]
+        run = requested.json()["run"]
+        assert run["provider_id"] == provider["id"]
+        run_id = run["id"]
+        progress = client.get(f"{data['url']}/{run_id}/progress").json()
+        assert progress["concurrency"] == (2 if limit > 1 else 1)
         assert execute_compile(client, run_id) == "completed"
         small = small_provider(
             client,
@@ -142,12 +171,28 @@ def test_long_review_runs_in_parts_and_still_covers_every_unit(client):
             max_output=4096,
         )
         base = data["url"] + "/" + run_id + "/reviews"
-        body = {"provider_id": small["id"]}
+        as_actor(PLATFORM)
+        saved = client.patch(
+            f"{API}/modelops/document-processing",
+            json={
+                "provider_id": small["id"],
+                **({"concurrency": {small["id"]: limit}} if limit > 1 else {}),
+            },
+        )
+        assert saved.is_success, saved.text
+        as_actor(EDITOR)
+        if limit > 1:
+            assert saved.json()["concurrency"] == {provider["id"]: 2, small["id"]: 5}
+            assert client.get(f"{data['url']}/{run_id}/progress").json()["concurrency"] == 2
+        body = {}
         response = client.post(base, json=body, headers={"Idempotency-Key": "segmented-review"})
         assert response.status_code == 200, response.text
         row = response.json()
         assert row["status"] == "completed", row
+        assert row["provider_id"] == small["id"]
+        assert row["trace"]["review_concurrency"] == limit
         assert row["trace"]["segmentation"]["segment_count"] >= 2
+        assert peak == (0 if limit == 1 else min(limit, row["trace"]["segmentation"]["segment_count"]))
         progress = client.get(f"{base}/{row['id']}/progress").json()
         assert progress["segmented"] is True
         assert progress["total"] >= 2

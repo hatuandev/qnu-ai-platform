@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.api.dependencies import get_actor, get_db
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.identity.permissions import require_permission
+from qnu.domains.modelops import document_processing
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.diagnostics.summary import provider_summaries
 from qnu.domains.modelops.keys.service import key_service
@@ -247,6 +248,23 @@ async def revoke_key(
 ) -> KeyResponse:
     key = await key_service.revoke_key(db, provider_id, key_id, actor, body.reason)
     return _key_out(key)
+
+
+@router.get("/document-processing", response_model=document_processing.DocumentProcessingSettings)
+async def get_document_processing(
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.models.manage")),
+) -> document_processing.DocumentProcessingSettings:
+    return await document_processing.read(db)
+
+
+@router.patch("/document-processing", response_model=document_processing.DocumentProcessingSettings)
+async def patch_document_processing(
+    body: document_processing.DocumentProcessingUpdate,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.models.manage")),
+) -> document_processing.DocumentProcessingSettings:
+    return await document_processing.update(db, body, actor)
 
 
 @router.get("/defaults", response_model=DefaultsResponse, summary="Model mặc định hệ thống")

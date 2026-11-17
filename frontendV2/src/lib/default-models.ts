@@ -29,19 +29,25 @@ export const CAPABILITIES_LIST: {
   },
 ];
 
-export function formatModelLabel(item: {
+export function formatProviderLabel(item: {
   model_name: string;
   name: string;
 }): string {
   const parts = item.name.split("·").map((s) => s.trim());
-  let providerName = parts[0] || item.name;
   if (
     parts.length > 1 &&
     parts[parts.length - 1].toLowerCase() === item.model_name.toLowerCase()
   ) {
-    providerName = parts.slice(0, -1).join(" · ").trim();
+    return parts.slice(0, -1).join(" · ").trim();
   }
-  return `${item.model_name} · ${providerName}`;
+  return parts[0] || item.name;
+}
+
+export function formatModelLabel(item: {
+  model_name: string;
+  name: string;
+}): string {
+  return `${item.model_name} · ${formatProviderLabel(item)}`;
 }
 
 export function buildSystemDefaultsPayload(

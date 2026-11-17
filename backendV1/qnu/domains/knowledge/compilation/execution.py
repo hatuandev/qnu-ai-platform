@@ -57,7 +57,7 @@ from qnu.domains.knowledge.compilation.quality import (
     PARTIALLY_CHECKED,
     quality_validation,
 )
-from qnu.domains.knowledge.compilation.scheduler import effective_concurrency, run_bounded
+from qnu.domains.knowledge.compilation.scheduler import group_slots, run_slots
 from qnu.domains.knowledge.compilation.service import authorize_collection
 from qnu.domains.knowledge.compilation.source_first import build_source_draft
 from qnu.domains.modelops.inference.service import prepare_chat_request
@@ -445,13 +445,16 @@ async def _run_segment(
     model,
     actor,
     total,
+    provider_id: str | None = None,
 ) -> None:
     if segment.status == "completed":
         return
     parts = await refinement.children(db, run, segment)
     if not parts:
         try:
-            await _run_leaf(db, blob, run, segment, documents, model, actor, total)
+            await _run_leaf(
+                db, blob, run, segment, documents, model, actor, total, provider_id
+            )
             return
         except ChatResponseError as exc:
             if exc.code != "chat_output_truncated":
@@ -468,7 +471,15 @@ async def _run_segment(
                 code=child.error_code or "compilation_child_incomplete",
             )
         await _run_segment(
-            db, blob, run, child, documents, model, actor, child.config["request_total"]
+            db,
+            blob,
+            run,
+            child,
+            documents,
+            model,
+            actor,
+            child.config["request_total"],
+            provider_id,
         )
         _, payload = await read_segment(db, blob, child, "draft_json")
         drafts.append(json.loads(payload))
@@ -512,10 +523,13 @@ async def _run_leaf(
     model: ChatModel,
     actor: AuthActor,
     total: int,
+    provider_id: str | None = None,
 ) -> None:
     """One part in its own session; the caller owns the session and the lease."""
     if segment.status == "completed":
         return
+    # A part keeps the model it was first sent to; only a fresh part takes the slot.
+    assigned = segment.config.get("assigned_provider_id") or provider_id or run.provider_id
     plan = split.plan_from_scope(segment.scope)
     payload, citations = split.build_projection(
         run.topic,
@@ -544,6 +558,14 @@ async def _run_leaf(
             code="compilation_segment_mismatch",
         )
     recorded, reasoning = _stored_reasoning(segment)
+    if assigned != segment.config.get("provider_id"):
+        # Another group model owns this part: its reasoning contract is its own.
+        recorded = "assigned_reasoning" in segment.config
+        reasoning = (
+            ReasoningDirective.from_public_dict(segment.config.get("assigned_reasoning"))
+            if recorded
+            else None
+        )
     raw = await segment_artifact(db, segment.id, "raw_response")
     if raw is not None:
         _, raw_payload = await read_segment(db, blob, segment, "raw_response")
@@ -566,36 +588,51 @@ async def _run_leaf(
                 "Phần biên soạn đã hết số lần thử.",
                 code="compilation_segment_attempts_exhausted",
             )
+        pinned = next(
+            (
+                entry
+                for entry in run.config.get("document_models") or []
+                if entry.get("provider_id") == assigned
+            ),
+            None,
+        )
         runtime, request, budget = await prepare_chat_request(
             db,
             actor,
             run.workspace_id,
             messages,
-            provider_id=run.provider_id,
+            provider_id=assigned,
             task="compiler",
             max_output_tokens=segment.config["max_output_tokens"],
             output_schema=schema,
             reasoning=reasoning,
+            # The limit chosen for that model governs admission, not the env default.
+            admission_limit=(pinned or {}).get("concurrency"),
         )
         if run.config.get("automatic_output_budget"):
             request = replace(request, automatic_output_budget=True)
-        if (
-            runtime.configuration_hash != run.config["provider"]["configuration_hash"]
-            or runtime.provider_id != segment.config["provider_id"]
-        ):
+        expected_hash = (
+            pinned["configuration_hash"]
+            if pinned is not None
+            else run.config["provider"]["configuration_hash"]
+        )
+        if runtime.configuration_hash != expected_hash or runtime.provider_id != assigned:
             raise Conflict(
                 "Model hoặc prompt đã đổi so với yêu cầu.",
                 code="compilation_provider_changed",
             )
+        live = runtime.reasoning_directive("compiler")
+        live_public = live.public_dict() if live is not None else None
         if recorded:
-            live = runtime.reasoning_directive("compiler")
-            if (live.public_dict() if live is not None else None) != (
+            if live_public != (
                 reasoning.public_dict() if reasoning is not None else None
             ):
                 raise Conflict(
                     "Chính sách reasoning đã đổi so với yêu cầu của phần này.",
                     code="compilation_reasoning_changed",
                 )
+        else:
+            segment.config = {**segment.config, "assigned_reasoning": live_public}
         request = replace(request, enforce_completion_timeout=True)
         usage = await usage_service.reserve(
             db,
@@ -605,11 +642,16 @@ async def _run_leaf(
             f"compile:{run.id}:segment:{segment.segment_index}:{segment.attempt_count + 1}",
             segment.request_hash,
             budget.total_reserved_tokens,
-            run.provider_id,
+            assigned,
         )
         segment.usage_id = usage.id
         segment.status = "running"
         segment.worker_id = run.worker_id
+        segment.config = {
+            **segment.config,
+            "assigned_provider_id": assigned,
+            "assigned_configuration_hash": runtime.configuration_hash,
+        }
         segment.attempt_count += 1
         segment.started_at = segment.started_at or utcnow()
         segment.request_started_at = utcnow()
@@ -870,6 +912,7 @@ async def _run_part(
     documents: list[dict],
     model: ChatModel,
     total: int,
+    provider_id: str | None = None,
 ) -> str:
     """One independent part in its own session; never shares a session or lease row."""
     async with AsyncSessionFactory() as db:
@@ -891,6 +934,7 @@ async def _run_part(
                 model,
                 background_actor(run.requested_by),
                 total,
+                provider_id,
             )
         except ClaimLost:
             await db.rollback()
@@ -945,13 +989,15 @@ async def _run_parts(
     *,
     total: int,
 ) -> list[BaseException]:
-    """Bounded overlap; stop launching new parts after the first failure."""
-    limit = effective_concurrency(run.config)
+    """Bounded overlap per group model; stop launching new parts after the first failure."""
+    slots = group_slots(run.config)
     clock = asyncio.get_running_loop().time
     next_refresh = 0.0
 
-    async def worker(segment_id: str) -> str:
-        return await _run_part(run.id, run.worker_id, segment_id, blob, documents, model, total)
+    async def worker(segment_id: str, provider_id: str | None) -> str:
+        return await _run_part(
+            run.id, run.worker_id, segment_id, blob, documents, model, total, provider_id
+        )
 
     async def settled() -> None:
         nonlocal next_refresh
@@ -960,7 +1006,7 @@ async def _run_parts(
         await _write_partial(db, blob, run, documents)
         next_refresh = clock() + PARTIAL_OUTPUT_INTERVAL_SECONDS
 
-    return await run_bounded(segment_ids, worker, limit=limit, on_settled=settled)
+    return await run_slots(segment_ids, worker, slots, on_settled=settled)
 
 
 async def _compile_segmented(
@@ -1002,11 +1048,13 @@ async def _compile_segmented(
         # model slot. The parent has only read state here and can release its
         # connection before the children need it.
         await db.commit()
+        slots = group_slots(run.config)
         logger.info(
             "compilation_parts_started",
             run_id=run.id,
             parts=len(pending),
-            concurrency=effective_concurrency(run.config),
+            concurrency=sum(slot.limit for slot in slots),
+            models=len(slots),
         )
         failures = await _run_parts(db, blob, run, documents, model, pending, total=len(segments))
         # No part is in flight here: the scheduler waited for every worker it started.

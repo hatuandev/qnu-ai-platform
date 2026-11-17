@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.modelops.catalog.service import catalog_service
+from qnu.domains.modelops.document_processing import document_provider
 from qnu.domains.modelops.keys.scope import key_scope
 from qnu.domains.modelops.models import Provider, ProviderKey
 from qnu.domains.modelops.registry import transport_for
@@ -21,6 +22,10 @@ async def choose_target(
     # Explicit selection is a hard pin, including replay of a durable run.
     if provider_id is not None:
         return provider_id, ()
+    if task in {"compiler", "compiler_review"}:
+        target = await document_provider(db)
+        if target is not None:
+            return target, ({"provider_id": target, "code": "document_default"},)
     capability = TASK_CAPABILITIES[task]
     primary = await catalog_service.system_default_for(db, capability)
     if primary is None:

@@ -1,60 +1,51 @@
-# Migration backendV1
+# Migration Backend V1
 
-Baseline `0001_initial_schema` thay thế15revision phát triển0001–0015 ngày
-2026-10-27 theo yêu cầu người dùng, gồm vòng đời tài liệu/chatbot. DDL baseline
-vẫn giữ nguyên. Chuỗi hiện hành thêm `0002_operational_readiness`: một cột JSONB
-review acknowledgement và bảng `ops_storage_cleanup_actions`.
-`0003_rag_policy_metadata` thêm JSONB rag_policy ở chat_assistants,
-retrieval_metadata ở kb_compiled_versions và metadata_filter ở chat_turns.
-`0004_application_api_keys` thêm ứng dụng, API key inbound và nhật ký request.
-`0005_provider_connections` thêm nhà cung cấp cha/model con và phạm vi credential,
-chuyển các model cũ theo endpoint nhưng giữ ID và ciphertext của khóa. Xem
-[quy trình chuyển dữ liệu](../../docs/quy_trinh/42_modelops_nha_cung_cap_va_model.md).
-Không đổi các revision cũ; thay đổi schema tiếp theo dùng revision mới.
-
-## Tạo DB mới
-
-Sau khi chọn `DATABASE_URL` và kiểm tra quyền sở hữu, từ `backendV1` chạy:
+Revision hiện tại là `0033_document_model_group`. Từ thư mục gốc trên Windows, dùng:
 
 ```powershell
-uv run alembic upgrade head
-uv run alembic current
+.\make.ps1 v1-db-check
+.\make.ps1 v1-migrate
+.\make.ps1 v1-db-check
 ```
 
-Revision mong đợi: `0005_provider_connections`. DB cũ chạy các revision còn thiếu;
-DB mới chạy baseline và bốn revision bổ sung. Chạy lại upgrade là no-op ở head.
-Migration tạo bảng version riêng `alembic_version_backendv1`, giữ nguyên version
-và bảng của `backend/`. Nếu trùng bất kỳ tên bảng v1 ngoài lịch sử hiện hành,
-baseline dừng trước DDL; không tự nhận bảng đó hoặc sửa dữ liệu.
+`v1-db-check` đọc revision trong giao dịch PostgreSQL chỉ đọc. Database mới chưa
+có revision sẽ trả về kết quả trống. `v1-migrate` áp dụng thay đổi schema cho
+database đã được chọn. Khi kiểm tra thấy `0033_document_model_group (head)`, có thể
+chạy `.\make.ps1 dev` để mở Backend V1, worker và Frontend V2.
 
-DDL được đóng băng trong file migration, lấy từ DB PostgreSQL thử đã chạy đủ
-chuỗi cũ. Migration không import model ứng dụng hay dùng `Base.metadata.create_all()`;
-thay đổi ORM sau này không làm baseline thay đổi theo. Có thể xuất SQL bằng
-`uv run alembic upgrade head --sql` để xem trước.
+## Khởi tạo và nâng cấp
 
-## Các revision phát triển cũ
+- **Database chưa có schema V1.** Với schema mặc định `public` và bản gộp nằm
+  trong chuỗi hiện hành, `v1-migrate` tạo schema trực tiếp từ
+  [bản SQL 0031](../alembic/baselines/0031_spelling_defaults.sql) và ghi
+  `alembic_version_backendv1` trong cùng một giao dịch, rồi chạy các revision
+  còn thiếu. Nếu phát hiện bảng V1
+  đã tồn tại ngoài lịch sử, lệnh dừng. Bảng và revision của backend legacy
+  được giữ nguyên.
+- **Database đã có revision V1.** Alembic chạy đúng các revision còn thiếu,
+  gồm các bước chuyển dữ liệu. Nếu revision không có trong chuỗi hiện hành,
+  cần kiểm tra lịch sử trước khi nâng cấp. Giữ bản sao lưu cho database đã
+  có dữ liệu.
+- **Kiểm tra chuỗi đầy đủ.** Từ `backendV1`, chạy `uv run alembic upgrade head`
+  trên database thử đã cấu hình. Khi gọi Alembic trực tiếp và cần đường
+  khởi tạo nhanh, dùng `uv run alembic upgrade head --tag qnu-bootstrap`.
+  `alembic upgrade head --sql` dùng để xem
+  DDL lịch sử, vì một số bước chuyển dữ liệu chỉ chạy online.
 
-Nguồn15file được lưu nguyên bytes trong
-[`alembic/archive/0001-0015_20261027.zip`](../alembic/archive/0001-0015_20261027.zip).
-ZIP không nằm trong thư mục `versions`, không được Alembic nạp. Đây là bản sao
-nguồn migration, không chứa dữ liệu DB hoặc credential.
+Bản gộp là DDL đóng băng từ `pg_dump --schema-only --schema=public --no-owner
+--no-privileges --exclude-table=public.alembic_version_backendv1` trên database
+cô lập đã chạy toàn bộ chuỗi đến 0031. Khi tạo bản gộp mới, bỏ phần cấu hình
+phiên dump và lệnh tạo schema `public`, sau đó so sánh schema của hai đường khởi
+tạo trên PostgreSQL thử nghiệm. Kiểm tra nâng cấp với dữ liệu mẫu, bảo toàn bảng
+legacy, rollback khi xung đột và chạy lại ở head. Database test có tiền tố
+`qnu_v1_test_`.
 
-Tên0005,0009,0015 trong báo cáo/nhật ký cũ là lịch sử, không phải revision có thể
-chạy riêng trong chuỗi mới. Mọi chức năng đến0015 đã nằm trong baseline mới.
+## Lịch sử revision
 
-DB có `alembic_version_backendv1` trỏ một revision cũ sẽ bị Alembic từ chối do
-revision đó không nằm trong chuỗi hiện hành. Không dùng `stamp head`, xóa bảng
-version hoặc dựng lại DB để bỏ qua. Cần giữ backup, kiểm schema/data thực tế và
-lập chuyển tiếp riêng nếu gặp môi trường như vậy. Lần gộp này chỉ thay mã và chạy
-DB thử riêng; không chuyển revision hay áp DDL lên DB đang phục vụ.
-
-## Kiểm chứng và lưu bằng chứng
-
-- So sánh DB từ chuỗi cũ với DB từ baseline: column/type/default/nullability,
-  PK, FK, unique/check constraint và index, gồm điều kiện index một phần.
-- So sánh migration với ORM; giữ legacy sentinel và version table.
-- Kiểm tra trùng bảng dừng an toàn, upgrade lặp không đổi và downgrade không
-  giả thành công. Baseline từ chối downgrade để giữ dữ liệu bằng chứng.
-- Kiểm thử tích hợp dùng DB `qnu_v1_test_*`, không dùng DB phục vụ.
-
-Các tài liệu chức năng trỏ baseline này; lịch sử kiểm chứng cũ được giữ nguyên.
+Chuỗi hiện hành giữ nguyên `0001_initial_schema` và các revision đã phát hành.
+Bản gộp chỉ bổ sung đường khởi tạo, các thay đổi schema tiếp theo dùng revision mới.
+Các migration phát triển trước khi đóng băng `0001_initial_schema` ngày
+2026-10-27 nằm trong [ZIP lưu trữ](../alembic/archive/0001-0015_20261027.zip).
+Nếu database còn trỏ đến một revision phát triển đã lưu trữ, cần lập đường
+chuyển tiếp theo schema và dữ liệu thực tế. Chuyển revision bằng tay không thực
+hiện các bước chuyển dữ liệu.

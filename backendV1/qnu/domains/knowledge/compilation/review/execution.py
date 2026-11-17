@@ -36,6 +36,7 @@ from qnu.domains.knowledge.compilation.review.schemas import (
     ReviewRequest,
     ReviewResponse,
 )
+from qnu.domains.knowledge.compilation.scheduler import bounded_concurrency
 from qnu.domains.modelops.inference.service import prepare_chat_request
 from qnu.domains.modelops.public_api import resolve_chat_runtime
 from qnu.domains.modelops.reasoning import ReasoningDirective
@@ -338,7 +339,7 @@ async def _execute_segments(
         await service.checkpoint(db, blob, actor, row, run)
         root_count = max(1, sum(1 for seg in segments if seg.parent_segment_id is None))
         limits = refinement.limits_for(row.trace, root_count, segments=segments)
-        concurrency = 2 if row.trace.get("review_concurrency") == 2 else 1
+        concurrency = bounded_concurrency(row.trace.get("review_concurrency"))
         while True:
             await _owned_checkpoint(db, blob, actor, row, run, token)
             segments = await _load_segments(db, row_id)
@@ -367,7 +368,7 @@ async def _execute_segments(
             if not runnable:
                 break
             total_active = len(leaves)
-            if concurrency == 2 and len(runnable) > 1:
+            if concurrency > 1 and len(runnable) > 1:
                 await db.commit()  # Release the review lock before independent part sessions.
                 for offset in range(0, len(runnable), concurrency):
                     batch = runnable[offset : offset + concurrency]
@@ -1008,6 +1009,8 @@ async def _run_segment(
             max_output_tokens=segment.config["max_output_tokens"],
             output_schema=schema,
             reasoning=reasoning,
+            # The saved review limit governs admission, not the env default.
+            admission_limit=bounded_concurrency(row.trace.get("review_concurrency")),
         )
         if row.trace.get("automatic_output_budget"):
             request = replace(request, automatic_output_budget=True)

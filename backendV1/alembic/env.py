@@ -6,9 +6,12 @@ one database. It never stamps or rewrites the legacy chain.
 
 from __future__ import annotations
 
+from logging import getLogger
 from logging.config import fileConfig
+from pathlib import Path
 
-from sqlalchemy import pool, text
+from alembic.migration import MigrationContext
+from sqlalchemy import inspect, pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -41,8 +44,11 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 VERSION_TABLE = "alembic_version_backendv1"
+BASELINE_REVISION = "0031_spelling_defaults"
+BOOTSTRAP_TAG = "qnu-bootstrap"
 config.set_main_option("sqlalchemy.url", get_settings().DATABASE_URL)
 target_metadata = Base.metadata
+log = getLogger("alembic.runtime.migration")
 
 
 def run_migrations_offline() -> None:
@@ -72,9 +78,37 @@ def ensure_version_table_width(connection: Connection) -> None:
     )
 
 
+def bootstrap_empty_v1(connection: Connection, migration: MigrationContext) -> None:
+    scripts = context.script
+    if (
+        context.get_tag_argument() != BOOTSTRAP_TAG
+        or migration.opts["destination_rev"] != "head"
+        or migration.get_current_heads()
+        or connection.scalar(text("SELECT current_schema()")) != "public"
+    ):
+        return
+    if not any(revision.revision == BASELINE_REVISION for revision in scripts.walk_revisions()):
+        return
+
+    initial = scripts.get_revision("0001_initial_schema")
+    owned = set(initial.module.V1_OWNED) | set(target_metadata.tables)
+    existing = owned.intersection(inspect(connection).get_table_names(schema="public"))
+    if existing:
+        raise RuntimeError(
+            "V1 tables already exist outside the migration history; no automatic adoption: "
+            + ", ".join(sorted(existing))
+        )
+
+    ddl = (Path(__file__).with_name("baselines") / f"{BASELINE_REVISION}.sql").read_text(
+        encoding="utf-8"
+    )
+    # asyncpg can execute the whole frozen script on the migration's existing transaction.
+    connection.connection.run_async(lambda driver: driver.execute(ddl))
+    migration.stamp(scripts, BASELINE_REVISION)
+    log.info("Initialized empty V1 schema at %s", BASELINE_REVISION)
+
+
 def do_run_migrations(connection: Connection) -> None:
-    connection.execute(text("SELECT pg_advisory_xact_lock(1367258177)"))
-    ensure_version_table_width(connection)
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
@@ -82,6 +116,14 @@ def do_run_migrations(connection: Connection) -> None:
         compare_type=True,
         include_object=include_object,
     )
+    migration = context.get_context()
+    if "destination_rev" in migration.opts:
+        connection.execute(text("SELECT pg_advisory_xact_lock(1367258177)"))
+        ensure_version_table_width(connection)
+        bootstrap_empty_v1(connection, migration)
+    else:
+        connection.execute(text("SET TRANSACTION READ ONLY"))
+        migration.opts["dont_mutate"] = True
     with context.begin_transaction():
         context.run_migrations()
 
@@ -92,9 +134,11 @@ async def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-    async with connectable.begin() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
+    try:
+        async with connectable.begin() as connection:
+            await connection.run_sync(do_run_migrations)
+    finally:
+        await connectable.dispose()
 
 
 if context.is_offline_mode():

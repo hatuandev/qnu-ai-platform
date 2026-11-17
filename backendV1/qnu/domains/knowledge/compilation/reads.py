@@ -25,7 +25,7 @@ from qnu.domains.knowledge.compilation.models import (
     CompilationSegmentArtifact,
     utcnow,
 )
-from qnu.domains.knowledge.compilation.scheduler import effective_concurrency
+from qnu.domains.knowledge.compilation.scheduler import group_slots
 from qnu.domains.knowledge.compilation.schemas import (
     CompilationProgress,
     CompilationProgressSummary,
@@ -98,9 +98,14 @@ async def progress_summary(
     run_id: str,
 ) -> CompilationProgressSummary:
     run = await get_run(db, actor, workspace_id, collection_id, run_id)
-    total, completed = (await db.execute(
+    total, completed, running = (await db.execute(
         select(
-            func.count(), func.count().filter(CompilationSegment.status == "completed")
+            func.count(),
+            func.count().filter(CompilationSegment.status == "completed"),
+            # A part that already has provider bytes is still being validated.
+            func.count().filter(
+                CompilationSegment.status.in_(("running", "received"))
+            ),
         ).where(
             CompilationSegment.run_id == run.id,
             CompilationSegment.parent_segment_id.is_(None),
@@ -108,8 +113,13 @@ async def progress_summary(
     )).one()
     if not total and not run.config.get("segmentation"):
         total, completed = 1, int(run.status == "completed")
+        running = int(run.status == "running")
     return CompilationProgressSummary(
-        status=run.status, completed=completed, total=total, elapsed_seconds=_elapsed_seconds(run)
+        status=run.status,
+        completed=completed,
+        total=total,
+        running=running,
+        elapsed_seconds=_elapsed_seconds(run),
     )
 
 
@@ -155,7 +165,7 @@ async def progress(
             for segment in segments
             if segment.status in {"running", "received"}
         ]
-        concurrency = effective_concurrency(run.config)
+        concurrency = sum(slot.limit for slot in group_slots(run.config))
     else:
         # A single-call run is one durable request; map its status without inventing parts.
         completed = int(run.status == "completed")

@@ -5,13 +5,25 @@ from types import SimpleNamespace
 
 import pytest
 
-from qnu.domains.knowledge.compilation import execution
+from qnu.domains.knowledge.compilation import execution, scheduler
 from qnu.domains.knowledge.compilation import segments as split
 from qnu.domains.knowledge.compilation.scheduler import run_bounded
 
 
 def segment(index: int, status: str, error_code: str | None = None):
     return SimpleNamespace(segment_index=index, status=status, error_code=error_code)
+
+
+def test_default_concurrency_is_one_and_existing_pins_still_apply(monkeypatch):
+    limits = SimpleNamespace(COMPILER_SEGMENT_CONCURRENCY=4, MODEL_CHAT_CONCURRENCY=3)
+    monkeypatch.setattr(
+        "qnu.domains.modelops.document_processing.get_settings", lambda: limits
+    )
+
+    assert scheduler.effective_concurrency({}) == 1
+    assert scheduler.effective_concurrency({"segmentation": {"concurrency": 2}}) == 2
+    # The saved pin governs; the environment value is only a default.
+    assert scheduler.effective_concurrency({"segmentation": {"concurrency": 4}}) == 4
 
 
 @pytest.mark.asyncio

@@ -29,8 +29,10 @@ from qnu.domains.knowledge.review import models as review_submission_models  # n
 from qnu.domains.lifecycle import models as lifecycle_models  # noqa: F401
 from qnu.domains.modelops import models as modelops_models  # noqa: F401
 from qnu.domains.ocr import models as ocr_models  # noqa: F401
+from qnu.domains.ocr.review import defaults as spelling_defaults  # noqa: F401
 from qnu.domains.ocr.review import models as ocr_review_models  # noqa: F401
 from qnu.domains.operations import models as operations_models  # noqa: F401
+from qnu.domains.publications import models as publication_release_models  # noqa: F401
 from qnu.domains.workspaces import models as workspace_models  # noqa: F401
 from qnu.platform.config import get_settings
 from qnu.platform.database import Base

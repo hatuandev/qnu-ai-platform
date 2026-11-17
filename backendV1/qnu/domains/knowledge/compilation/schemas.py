@@ -129,6 +129,7 @@ class CompilationProgressSummary(BaseModel):
     status: str
     completed: int
     total: int
+    running: int = 0
     elapsed_seconds: float | None
 
 

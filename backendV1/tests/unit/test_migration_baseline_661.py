@@ -1,5 +1,6 @@
 """A frozen baseline and additive revisions initialize only the owned v1 schema."""
 
+import re
 from io import StringIO
 
 from alembic.config import Config
@@ -68,7 +69,10 @@ def test_initial_schema_offline_sql_creates_v1_without_touching_legacy():
     assert "CREATE TABLE kb_sources" in sql and "serving_revision_no" in sql
     assert "CREATE TABLE alembic_version_backendv1" in sql
     assert "CREATE TABLE alembic_version (" not in sql
-    assert "DROP TABLE" not in sql
+    assert set(re.findall(r"^DROP TABLE (\w+);$", sql, re.MULTILINE)) == {
+        "workspace_allowed_providers",
+        "workspace_model_defaults",
+    }
     assert "0001_initial_schema" in sql
     assert "ADD COLUMN progress JSONB" in sql and "ADD COLUMN attempt_count INTEGER" in sql
     assert "status IN ('pending','building','ready','empty','failed','uncertain')" in sql

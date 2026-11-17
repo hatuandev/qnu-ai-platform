@@ -71,6 +71,8 @@ async def chat_slot(request: ChatRequest) -> AsyncIterator[None]:
             "chat_admission_unavailable", "Không kiểm tra được giới hạn model.", 503
         ) from exc
     key, token = resource_key(request.endpoint, request.model), uuid.uuid4().hex
+    # The environment value is the default; a document part may pin a higher limit.
+    limit = max(settings.MODEL_CHAT_CONCURRENCY, getattr(request, "admission_limit", None) or 0)
     ttl_ms = max(1, int((request.timeout_seconds + 30) * 1000))
     deadline = time.monotonic() + settings.MODEL_CHAT_QUEUE_TIMEOUT_SECONDS
     while True:
@@ -82,7 +84,7 @@ async def chat_slot(request: ChatRequest) -> AsyncIterator[None]:
         try:
             async with asyncio.timeout(min(5, remaining)):
                 accepted = await client.eval(
-                    ACQUIRE, 1, key, settings.MODEL_CHAT_CONCURRENCY, ttl_ms, token
+                    ACQUIRE, 1, key, limit, ttl_ms, token
                 )
         except Exception as exc:
             raise _not_dispatched(

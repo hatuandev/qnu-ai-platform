@@ -9,16 +9,23 @@ ModelOps/the embedding runtime, and collections are named per index run.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import AnyHttpUrl, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# The repository keeps one .env at its root; a backendV1-local file may override it.
+# Process environment always wins over both.
+ENV_FILES = (Path(__file__).resolve().parents[3] / ".env", ".env")
+
 
 class Settings(BaseSettings):
     """Environment-driven settings with safe local defaults."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=ENV_FILES, env_file_encoding="utf-8", extra="ignore"
+    )
 
     ENVIRONMENT: str = "development"
     SERVICE_NAME: str = "qnu-backend-v1"
@@ -77,14 +84,14 @@ class Settings(BaseSettings):
     COMPILER_LEASE_SECONDS: int = Field(default=900, ge=60)
     # Independent parts may overlap, but the provider is shared with every other
     # caller: keep this small and below the server's own concurrency.
-    COMPILER_SEGMENT_CONCURRENCY: int = Field(default=2, ge=1, le=4)
+    COMPILER_SEGMENT_CONCURRENCY: int = Field(default=5, ge=1, le=64)
     # Spelling batches and embedded-image OCR are independent units; keep both small
     # because they share the same provider and the chat admission queue.
     SPELLING_BATCH_CONCURRENCY: int = Field(default=3, ge=1, le=8)
     OCR_IMAGE_CONCURRENCY: int = Field(default=3, ge=1, le=8)
     # Shared Redis admission for all managed chat calls to the same endpoint/model.
     # Operational policy, not a claim about discovered server max_num_seqs.
-    MODEL_CHAT_CONCURRENCY: int = Field(default=4, ge=1, le=64)
+    MODEL_CHAT_CONCURRENCY: int = Field(default=5, ge=1, le=64)
     MODEL_CHAT_QUEUE_TIMEOUT_SECONDS: int = Field(default=300, ge=1, le=3600)
     PUBLICATION_PREVIEW_TTL_SECONDS: int = Field(default=300, ge=1, le=3600)
     # System kill-switch: off hides every public chatbot link regardless of the

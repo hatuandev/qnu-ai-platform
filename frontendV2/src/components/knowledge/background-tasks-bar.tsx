@@ -11,7 +11,7 @@ import {
   StopCircle,
   X,
 } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { knowledgeKeys } from "@/api/knowledge/queries";
 import {
@@ -31,21 +31,48 @@ import { cn } from "@/lib/utils";
 
 const activeStatuses = new Set(["queued", "waiting_ocr", "compiling"]);
 
+function toTimestamp(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  if (totalSeconds < 60) return `${totalSeconds} giây`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) {
+    return `${minutes} phút ${String(seconds).padStart(2, "0")} giây`;
+  }
+  const hours = Math.floor(minutes / 60);
+  return `${hours} giờ ${String(minutes % 60).padStart(2, "0")} phút`;
+}
+
 function TaskItemRow({ task }: { task: BackgroundTask }) {
   const queryClient = useQueryClient();
   const updateTaskStatus = useBackgroundTasksStore((s) => s.updateTaskStatus);
   const dismissTask = useBackgroundTasksStore((s) => s.dismissTask);
   const isRunning = activeStatuses.has(task.status);
 
+  // Fetches once for finished tasks too so real start/finish times can be
+  // backfilled; the query stops polling on terminal statuses.
   const { data: intentData, isError } = usePreparationIntentQuery(
     task.workspaceId,
     task.collectionId,
     task.id,
-    { enabled: isRunning },
   );
 
   const progressQuery = usePreparationProgressQuery(intentData);
-  const disconnected = isError || (isRunning && progressQuery.isError);
+  const disconnected = isRunning && (isError || progressQuery.isError);
+
+  // Tick once per second only while running so elapsed time stays honest, never simulated.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isRunning) return;
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [isRunning]);
 
   const cancelMutation = useCancelPreparationIntentMutation(
     task.workspaceId,
@@ -60,6 +87,14 @@ function TaskItemRow({ task }: { task: BackgroundTask }) {
       status: intentData.status,
       step: intentData.step || undefined,
       errorCode: intentData.error_code,
+      startedAt: intentData.started_at,
+      finishedAt: intentData.finished_at,
+      durationMs: (() => {
+        const startedMs = toTimestamp(intentData.started_at);
+        const finishedMs = toTimestamp(intentData.finished_at);
+        if (startedMs === null || finishedMs === null) return null;
+        return Math.max(0, finishedMs - startedMs);
+      })(),
     });
 
     if (intentData.status === "ready" && task.status !== "ready") {
@@ -114,6 +149,53 @@ function TaskItemRow({ task }: { task: BackgroundTask }) {
       compilationProgress: progressQuery.data?.compilationProgress,
     });
   }, [intentData, task.status, task.step, task.errorCode, progressQuery.data]);
+
+  const timing = useMemo(() => {
+    const processingStartMs = toTimestamp(
+      intentData?.started_at ?? task.startedAt,
+    );
+    const finishedMs = toTimestamp(intentData?.finished_at ?? task.finishedAt);
+    const createdMs = toTimestamp(intentData?.created_at ?? task.createdAt);
+
+    let processingMs = task.durationMs ?? null;
+    if (processingStartMs !== null) {
+      if (finishedMs !== null) {
+        processingMs = Math.max(0, finishedMs - processingStartMs);
+      } else if (isRunning) {
+        processingMs = Math.max(0, nowMs - processingStartMs);
+      }
+    }
+
+    const totalEndMs = finishedMs ?? (isRunning ? nowMs : null);
+    const totalMs =
+      createdMs !== null && totalEndMs !== null
+        ? Math.max(0, totalEndMs - createdMs)
+        : processingMs;
+
+    return { processingMs, totalMs };
+  }, [
+    intentData?.started_at,
+    intentData?.finished_at,
+    intentData?.created_at,
+    task.startedAt,
+    task.finishedAt,
+    task.createdAt,
+    task.durationMs,
+    isRunning,
+    nowMs,
+  ]);
+
+  const timingTitle = (() => {
+    if (timing.processingMs === null) return undefined;
+    const parts = [`Thời gian xử lý: ${formatDuration(timing.processingMs)}`];
+    if (
+      timing.totalMs !== null &&
+      timing.totalMs > timing.processingMs + 1000
+    ) {
+      parts.push(`Tổng từ lúc gửi: ${formatDuration(timing.totalMs)}`);
+    }
+    return parts.join(" · ");
+  })();
 
   return (
     <div
@@ -233,8 +315,8 @@ function TaskItemRow({ task }: { task: BackgroundTask }) {
           )}
         />
 
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground leading-tight">
-          <span className="truncate">
+        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground leading-tight">
+          <span className="truncate min-w-0">
             {disconnected
               ? "Mất kết nối theo dõi. Đang kết nối lại…"
               : isRunning
@@ -243,6 +325,16 @@ function TaskItemRow({ task }: { task: BackgroundTask }) {
                   ? "Đã sẵn sàng duyệt và hỏi đáp"
                   : presentation.detail}
           </span>
+          {timing.processingMs !== null && (
+            <span
+              className="shrink-0 tabular-nums font-medium text-muted-foreground"
+              title={timingTitle}
+            >
+              {isRunning
+                ? formatDuration(timing.processingMs)
+                : `Xử lý ${formatDuration(timing.processingMs)}`}
+            </span>
+          )}
         </div>
       </div>
     </div>

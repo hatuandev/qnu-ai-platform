@@ -50,6 +50,10 @@ from qnu.domains.knowledge.compilation.review.report import (
 from qnu.domains.knowledge.compilation.review.schemas import ReviewRequest
 from qnu.domains.knowledge.compilation.service import get_run
 from qnu.domains.knowledge.publication.evidence import digest
+from qnu.domains.modelops.document_processing import (
+    configured_concurrency,
+    resolve_document_group,
+)
 from qnu.domains.modelops.inference.service import (
     available_input_tokens,
     prepare_chat_limits,
@@ -206,6 +210,10 @@ async def prepare(
         await db.commit()
         return PreparedReview(run, previous, None, None)
     material = await load_material(db, blob, run)
+    # Review follows the document group's priority model unless the caller pinned one.
+    review_provider = req.provider_id
+    if review_provider is None:
+        review_provider = (await resolve_document_group(db)).provider_id
     sections = (
         await asyncio.to_thread(retained_sections, material.payload, run.id)
         if allow_structured
@@ -227,7 +235,7 @@ async def prepare(
                 actor,
                 workspace_id,
                 messages,
-                provider_id=req.provider_id,
+                provider_id=review_provider,
                 task="compiler_review",
                 max_output_tokens=req.max_output_tokens,
                 output_schema=schema,
@@ -249,7 +257,7 @@ async def prepare(
             db,
             actor,
             workspace_id,
-            provider_id=req.provider_id,
+            provider_id=review_provider,
             task="compiler_review",
             max_output_tokens=req.max_output_tokens,
         )
@@ -293,7 +301,7 @@ async def prepare(
     trace = {
         "background_review": enqueue,
         "literal_check_version": 1,
-        "review_concurrency": 2,
+        "review_concurrency": await configured_concurrency(db, runtime.provider_id),
         "context_resolution_version": 2,
         "reference_contract_version": 2,
         "execution_token": new_id("rex"),

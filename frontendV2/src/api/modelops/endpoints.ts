@@ -26,6 +26,8 @@ export const modelopsPaths = {
   discover: (providerId: string) =>
     `/modelops/providers/${providerId}/discover`,
   probe: (providerId: string) => `/modelops/providers/${providerId}/probe`,
+  reasoning: (providerId: string) =>
+    `/modelops/providers/${providerId}/reasoning`,
   keys: (providerId: string) => `/modelops/providers/${providerId}/keys`,
   keyRotate: (providerId: string, keyId: string) =>
     `/modelops/providers/${providerId}/keys/${keyId}/rotate`,

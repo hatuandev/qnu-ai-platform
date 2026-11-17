@@ -1,3 +1,3 @@
 """Schema supported by this API/worker/recovery build."""
 
-SCHEMA_HEAD = "0030_publication_stats"
+SCHEMA_HEAD = "0033_document_model_group"

@@ -135,6 +135,10 @@ class ModelDefaults(Base):
     rerank_model: Mapped[str | None] = mapped_column(String(200), nullable=True)
     ocr_provider_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     ocr_model: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    document_provider_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    document_concurrency: Mapped[dict[str, int] | None] = mapped_column(JSONB(none_as_null=True))
+    document_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    document_models: Mapped[list[dict] | None] = mapped_column(JSONB(none_as_null=True))
     updated_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow

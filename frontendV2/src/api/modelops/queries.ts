@@ -14,6 +14,7 @@ import {
   getCatalog,
   getConnection,
   getModelDefaults,
+  getProviderReasoning,
   listConnectionKeys,
   listConnectionModels,
   listConnections,
@@ -24,6 +25,7 @@ import {
   updateConnection,
   updateModelDefaults,
   updateProviderCapacity,
+  updateProviderReasoning,
 } from "./requests";
 import type {
   Capability,
@@ -33,6 +35,7 @@ import type {
   ConnectionUpdateInput,
   DefaultsUpdateRequest,
   KeyCreateRequest,
+  ReasoningPolicy,
   TokenLimits,
 } from "./types";
 
@@ -46,6 +49,10 @@ export const modelopsKeys = {
     [...modelopsKeys.connection(id), "keys"] as const,
   defaults: () => [...modelopsKeys.all, "defaults"] as const,
   providers: () => [...modelopsKeys.all, "providers"] as const,
+  reasoning: (providerId: string) =>
+    [...modelopsKeys.all, "reasoning", providerId] as const,
+  documentProcessing: () =>
+    [...modelopsKeys.all, "document-processing"] as const,
   catalog: (workspaceId?: string | null) =>
     [...modelopsKeys.all, "catalog", workspaceId ?? "global"] as const,
 };
@@ -318,5 +325,38 @@ export function useCatalogQuery(workspaceId?: string | null, enabled = true) {
     queryFn: ({ signal }) => getCatalog({ workspaceId }, { signal }),
     enabled,
     staleTime: 30 * 1000,
+  });
+}
+
+export function useProviderReasoningQuery(providerId: string) {
+  return useQuery({
+    queryKey: modelopsKeys.reasoning(providerId),
+    queryFn: ({ signal }) => getProviderReasoning(providerId, { signal }),
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useSetProviderReasoningMutation(
+  providerId: string,
+  connectionId?: string,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (policy: ReasoningPolicy) =>
+      updateProviderReasoning(providerId, policy),
+    onSuccess: (reasoning) => {
+      queryClient.setQueryData(modelopsKeys.reasoning(providerId), reasoning);
+      if (connectionId) {
+        void queryClient.invalidateQueries({
+          queryKey: modelopsKeys.connectionModels(connectionId),
+        });
+      }
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.providers(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.documentProcessing(),
+      });
+    },
   });
 }

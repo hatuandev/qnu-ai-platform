@@ -18,9 +18,9 @@ Lượt mới luôn có ít nhất một checkpoint phần. Projection/prompt v4
 
 ### Review bảng literal và chạy song song (phiên 751)
 
-Lượt review mới ghim `literal_check_version=1` và `review_concurrency=2` trong trace. Một phần chỉ dùng kiểm tra xác định khi mọi ô sở hữu khớp đúng ID bằng chứng, ID bảng, văn bản, hàng/cột, header và rowspan/colspan; ID trùng hoặc tham chiếu thiếu đều trả về nhánh review bằng model. Kết quả vẫn qua cùng bộ kiểm tra coverage/citation, lưu assessment/checksum và kiểm quyền. Đây là xác nhận giữ nguyên nguồn, **không xác nhận OCR đúng với ảnh**. Narrative, điều kiện, nguồn không phải ô bảng và mọi sai khác vẫn cần model.
+Lượt review mới ghim `literal_check_version=1` và mức đồng thời trong trace. Một phần chỉ dùng kiểm tra xác định khi mọi ô sở hữu khớp đúng ID bằng chứng, ID bảng, văn bản, hàng/cột, header và rowspan/colspan; ID trùng hoặc tham chiếu thiếu đều trả về nhánh review bằng model. Kết quả vẫn qua cùng bộ kiểm tra coverage/citation, lưu assessment/checksum và kiểm quyền. Đây là xác nhận giữ nguyên nguồn, **không xác nhận OCR đúng với ảnh**. Narrative, điều kiện, nguồn không phải ô bảng và mọi sai khác vẫn cần model.
 
-Các phần cần model chạy tối đa hai phần đồng thời, mỗi phần có phiên DB riêng. Chờ cả nhóm đang gửi hoàn tất trước khi dừng vì lỗi; không tự gửi lại yêu cầu uncertain. Giới hạn ModelOps chung vẫn áp dụng. Trace cũ không có chính sách này tiếp tục xử lý theo hợp đồng cũ.
+Lượt mới chưa có cấu hình chạy từng phần. Lượt ghim nhiều phần đồng thời dùng phiên DB riêng cho từng phần, chờ nhóm đang gửi hoàn tất trước khi dừng vì lỗi và chịu trần ModelOps. Yêu cầu chưa rõ kết quả giữ trạng thái `uncertain`.
 
 Đối chiếu chỉ đọc với PDF điểm sàn đã có: 16/22 phần của lượt review cũ đủ điều kiện kiểm tra literal. Đây không phải số đo thời gian chạy thật của chính sách mới.
 
@@ -109,7 +109,8 @@ Planner không trộn phần bảng literal với phần văn xuôi. `--recover`
 
 ### Chạy song song có giới hạn
 
-- `COMPILER_SEGMENT_CONCURRENCY` mặc định 2, tối đa 4. Chỉ các phần thực sự độc lập mới chạy đồng thời; phần không phụ thuộc kết quả phần khác.
+- Quản trị viên mở **Cài đặt → Xử lý văn bản** để chọn model biên soạn và rà soát bản biên soạn cho toàn hệ thống. Có thể lưu mức riêng cho mỗi model. Nếu chọn theo model trò chuyện, luồng sử dụng cấu hình mặc định hiện có. Yêu cầu đã chỉ định model và lượt đã ghim giữ lựa chọn của mình.
+- Mặc định mỗi tài liệu xử lý một phần tại một thời điểm. Chỉ các phần độc lập chạy đồng thời. Khi lập kế hoạch, hệ thống ghim mức lưu cho model thực tế. Bộ lập lịch áp dụng thêm hai trần vận hành `COMPILER_SEGMENT_CONCURRENCY` và `MODEL_CHAT_CONCURRENCY`. Cả hai mặc định 5 và cấu hình hạ tầng có thể ghi đè.
 - Mỗi phần mở session riêng, tự kiểm `run.worker_id` trước khi ghi; mất lease ⇒ `claim_lost`, không ghi đè.
 - Chỉ orchestrator ghi bản partial (một writer), sau mỗi lần một phần kết thúc.
 - Phần lỗi/không chắc chắn dừng việc khởi động phần mới nhưng **không huỷ** phần đang chạy (tránh usage uncertain cho bytes sắp bền vững). Run chỉ `completed` khi mọi phần `completed`.
@@ -119,8 +120,8 @@ Planner không trộn phần bảng literal với phần văn xuôi. `--recover`
 
 ### Giới hạn dùng chung cho model
 
-- ModelOps dùng Redis hiện có để chia slot giữa API/worker, workspace và provider alias có cùng endpoint/model trong cùng `CACHE_NAMESPACE`. `MODEL_CHAT_CONCURRENCY` mặc định 4; `MODEL_CHAT_QUEUE_TIMEOUT_SECONDS` mặc định 300. Đây là chính sách vận hành, không phải capacity suy ra từ `/models` hoặc `max_num_seqs`.
-- Các process cùng deployment cần dùng chung Redis/namespace/cấu hình giới hạn. Mỗi run compiler vẫn tối đa 2 phần mặc định, đồng thời chịu mức trần chung. Chat và review dùng cùng cổng admission.
+- ModelOps dùng Redis hiện có để chia slot giữa API/worker, workspace và provider alias có cùng endpoint/model trong cùng `CACHE_NAMESPACE`. `MODEL_CHAT_CONCURRENCY` mặc định 5 và `MODEL_CHAT_QUEUE_TIMEOUT_SECONDS` mặc định 300. Đây là giới hạn vận hành do QNU đặt.
+- Các process cùng deployment cần dùng chung Redis/namespace/cấu hình giới hạn. Biên soạn và rà soát mặc định chạy một phần mỗi lượt xử lý, đồng thời chịu trần chung theo model. Chat và review dùng cùng cổng admission.
 - Hết thời gian xếp hàng hoặc Redis lỗi: không gửi request upstream, báo `chat_admission_timeout`/`chat_admission_unavailable`, usage biết chắc bằng 0. Thời gian xếp hàng tách khỏi deadline inference.
 - Hủy/lỗi không chắc chắn giữ slot đến TTL (`request timeout + 30s`); không gọi lại tự động. Đây là lease phía QNU, không chứng minh server đã hủy tác vụ; server vẫn phải quản lý giới hạn thực của nó. Lỗi trả slot giữ TTL, không làm mất phản hồi đã đo.
 

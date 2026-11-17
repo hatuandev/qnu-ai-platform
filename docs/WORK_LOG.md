@@ -1,5 +1,10 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context1009 — Model và số lượt xử lý văn bản.](nhat_ky/2026-11-17_phien_1009_model_xu_ly_van_ban.md)
+- [Context1008 — Khởi tạo gọn migration Backend V1.](nhat_ky/2026-11-17_phien_1008_khoi_tao_gon_migration_v1.md)
+- [Context1007 — Mặc định xử lý văn bản một phần tại một thời điểm.](nhat_ky/2026-11-17_phien_1007_mac_dinh_mot_luot_xu_ly_van_ban.md)
+- [Context1004 — So sánh Qwen và Luna trên cùng bản nháp Word.](nhat_ky/2026-11-17_phien_1004_so_sanh_qwen_luna_docx.md)
+- [Context1003 — Cập nhật hướng dẫn agent về JSON và Markdown.](nhat_ky/2026-11-17_phien_1003_huong_dan_agent_json_markdown.md)
 - [Context1002 — Khôi phục ngày ban hành và lịch tuyển sinh có dẫn chứng.](nhat_ky/2026-11-17_phien_1002_khoi_phuc_ngay_va_lich.md)
 - [Context1001 — Kiểm chứng metadata và chuyển phiên bản trên bốn tài liệu.](nhat_ky/2026-11-17_phien_1001_kiem_chung_metadata_va_phat_hanh.md)
 - [Context1000 — Liên kết JSON và Markdown, giảm ngữ cảnh rà soát.](nhat_ky/2026-11-17_phien_1000_lien_ket_json_markdown.md)

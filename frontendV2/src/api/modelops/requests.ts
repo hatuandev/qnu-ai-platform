@@ -19,6 +19,8 @@ import type {
   ModelDefaults,
   ModelProvider,
   ProviderKey,
+  ProviderReasoning,
+  ReasoningPolicy,
   TokenLimits,
 } from "./types";
 
@@ -195,6 +197,25 @@ export async function probeModel(
     { capability },
     { timeoutMs: 70_000 },
   );
+}
+
+export async function getProviderReasoning(
+  providerId: string,
+  options?: { signal?: AbortSignal },
+): Promise<ProviderReasoning> {
+  return v1Client.get<ProviderReasoning>(
+    modelopsPaths.reasoning(providerId),
+    options,
+  );
+}
+
+export async function updateProviderReasoning(
+  providerId: string,
+  policy: ReasoningPolicy,
+): Promise<ProviderReasoning> {
+  return v1Client.put<ProviderReasoning>(modelopsPaths.reasoning(providerId), {
+    policy,
+  });
 }
 
 export async function listProviders(options?: {

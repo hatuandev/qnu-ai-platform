@@ -222,13 +222,15 @@ class RunnerTests(unittest.TestCase):
         cwd, command = runner.command_plan("v1-migrate", runner.ROOT, "root")[0]
         self.assertEqual(cwd, runner.ROOT / "backendV1")
         self.assertEqual(
-            command[-5:],
+            command[-7:],
             [
                 "--env-file",
                 (runner.ROOT / ".env").as_posix(),
                 "alembic",
                 "upgrade",
                 "head",
+                "--tag",
+                "qnu-bootstrap",
             ],
         )
         _, backend_command = runner.command_plan("v1-db-check", runner.ROOT, "backend")[

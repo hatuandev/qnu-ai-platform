@@ -123,7 +123,7 @@ def main() -> int:
     receipt = {"database": name, "db_dropped": False, "legacy_sentinel_preserved": False}
     try:
         migration = subprocess.run(
-            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            [sys.executable, "-m", "alembic", "upgrade", "head", "--tag", "qnu-bootstrap"],
             cwd=ROOT,
             env=env,
             capture_output=True,

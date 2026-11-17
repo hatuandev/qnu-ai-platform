@@ -3,6 +3,7 @@
 import pytest
 
 from qnu.domains.modelops.catalog.service import catalog_service
+from qnu.domains.modelops.document_processing import configured_concurrency
 from qnu.domains.modelops.resilience.routing import choose_target
 from qnu.platform.database import AsyncSessionFactory
 from qnu.platform.errors import Conflict
@@ -124,3 +125,41 @@ def test_system_defaults_apply_across_all_workspaces(client):
             assert exc_info.value.code == "provider_inactive"
 
     client.portal.call(check_inactive)
+
+
+def test_document_settings_are_system_wide_and_keep_a_limit_per_model(client):
+    workspace = _create_workspace(client, "ws-document")
+    _add_member(client, workspace["id"], MEMBER_A.actor_id, "member")
+    first = make_provider(client, name="document-first")["id"]
+    second = make_provider(client, name="document-second")["id"]
+    ocr = make_provider(client, name="ocr-only", capabilities=["ocr"])["id"]
+    path = f"{API}/modelops/document-processing"
+    assert client.get(path).json()["concurrency"] == {}
+    assert client.put(f"{API}/modelops/defaults", json={"chat_provider_id": first}).is_success
+
+    response = client.patch(path, json={"provider_id": second, "concurrency": {first: 2, second: 5}})
+    assert response.is_success, response.text
+    assert response.json()["concurrency"] == {first: 2, second: 5}
+    assert client.patch(path, json={"concurrency": {first: 0}}).status_code == 422
+    assert client.patch(path, json={"concurrency": {first: 65}}).status_code == 422
+    assert client.patch(path, json={"provider_id": ocr}).status_code == 409
+
+    async def resolve():
+        async with AsyncSessionFactory() as session:
+            for task in ("compiler", "compiler_review"):
+                target, _ = await choose_target(session, workspace["id"], task, None)
+                assert target == second
+                explicit, _ = await choose_target(session, workspace["id"], task, first)
+                assert explicit == first
+            target, _ = await choose_target(session, workspace["id"], "chat", None)
+            assert target == first
+            assert await configured_concurrency(session, second) == 5
+
+    client.portal.call(resolve)
+    cleared = client.patch(path, json={"provider_id": None, "concurrency": {second: 1}})
+    assert cleared.is_success, cleared.text
+    assert cleared.json()["provider_id"] is None
+    assert cleared.json()["concurrency"] == {first: 2}
+    _as(MEMBER_A)
+    assert client.get(path).status_code == 403
+    assert client.patch(path, json={"provider_id": first}).status_code == 403

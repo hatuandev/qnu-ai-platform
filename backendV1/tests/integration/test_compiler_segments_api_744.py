@@ -113,9 +113,16 @@ def test_new_small_run_uses_one_refinable_node_and_exposes_its_artifacts(client)
         assert body["latest_output_generation"] is not None
         summary = client.get(base + "/progress/summary")
         assert summary.status_code == 200, summary.text
-        assert set(summary.json()) == {"status", "completed", "total", "elapsed_seconds"}
+        assert set(summary.json()) == {
+            "status",
+            "completed",
+            "total",
+            "running",
+            "elapsed_seconds",
+        }
         assert summary.json()["completed"] == body["completed"]
         assert summary.json()["total"] == body["total"]
+        assert summary.json()["running"] == 0
 
         assert client.get(base + "/draft?partial=true").status_code == 200
         assert client.get(base + "/segments/1/raw").status_code == 200

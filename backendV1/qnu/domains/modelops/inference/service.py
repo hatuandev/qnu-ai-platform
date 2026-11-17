@@ -104,6 +104,7 @@ async def prepare_chat_request(
     task: Task = "chat",
     reasoning=None,
     reasoning_task: str | None = None,
+    admission_limit: int | None = None,
 ) -> tuple[ChatRuntime, ChatRequest, RequestTokenBudget]:
     await resolve_workspace_access(db, actor, workspace_id)
     provider_id, routing = await choose_target(db, workspace_id, task, provider_id)
@@ -144,6 +145,7 @@ async def prepare_chat_request(
             output_schema=output_schema,
             execution=runtime.execution_scope,
             reasoning=reasoning,
+            admission_limit=admission_limit,
         ),
         budget,
     )

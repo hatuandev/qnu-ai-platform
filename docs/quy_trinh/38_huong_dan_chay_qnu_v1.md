@@ -323,27 +323,21 @@ psql --host 127.0.0.1 --port 5432 --username qnu --dbname postgres --password --
 
 Đổi role/host theo môi trường và nhập mật khẩu khi được hỏi. Sau đó đặt `DATABASE_URL` trỏ tới database vừa tạo. Môi trường dùng chung database đã tồn tại thì bỏ bước tạo mới.
 
-Với **cách B** ở phần 1:
+Từ thư mục gốc, dùng cấu hình môi trường đã chọn ở phần 1:
 
 ```powershell
-Set-Location D:\DuAnPhanMem\qnu-ai-platform\backendV1
-uv run --frozen --extra dev alembic current
-uv run --frozen --extra dev alembic upgrade head
-uv run --frozen --extra dev alembic current
+.\make.ps1 v1-db-check
+.\make.ps1 v1-migrate
+.\make.ps1 v1-db-check
+.\make.ps1 dev
 ```
 
-Với **cách A** dùng `.env` ở gốc, migration vẫn chạy từ `backendV1/` để đúng `alembic.ini`, nhưng nạp tệp cấu hình ở gốc một cách tường minh:
-
-```powershell
-Set-Location D:\DuAnPhanMem\qnu-ai-platform\backendV1
-uv run --frozen --extra dev --env-file ..\.env alembic current
-uv run --frozen --extra dev --env-file ..\.env alembic upgrade head
-uv run --frozen --extra dev --env-file ..\.env alembic current
-```
-
-Chỉ chạy `upgrade` sau khi xác nhận đúng database cần nâng cấp và có bản sao lưu nếu đã có dữ liệu. Head hiện tại là **`0005_provider_connections`**, nối sau `0004_application_api_keys`; giữ baseline `0001_initial_schema` và các revision đã phát hành. Bảng quản lý revision V1 là `alembic_version_backendv1`.
-
-Nếu báo không tìm thấy revision phát triển cũ, xem [hướng dẫn migration](../../backendV1/docs/migrations.md). Cần chuyển tiếp schema/dữ liệu theo hiện trạng; không dùng `stamp head`, xóa database hoặc `run.ps1 reset-db` để vượt lỗi. CLI `qnu.cli.main` hiện là khung, chưa thực hiện migrate/preflight; dùng Alembic như trên.
+Chỉ chạy `v1-migrate` sau khi xác nhận đúng database và có bản sao lưu nếu đã có
+dữ liệu. Nếu lần kiểm tra đầu đã báo `0033_document_model_group (head)`, có thể chạy
+`dev` ngay. Database V1 mới có thể khởi tạo từ bản schema gộp. Database đã có
+revision chạy các bước còn thiếu và giữ bảng theo dõi riêng
+`alembic_version_backendv1`. Xem [hướng dẫn migration](../../backendV1/docs/migrations.md)
+nếu database báo revision cũ không còn trong chuỗi.
 
 ## 5. Cấu hình FE và tự đăng nhập admin local
 

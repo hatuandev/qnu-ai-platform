@@ -1,5 +1,10 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên 1009 — Model và số lượt xử lý văn bản.](2026-11-17_phien_1009_model_xu_ly_van_ban.md)
+- [Phiên 1008 — Khởi tạo gọn migration Backend V1.](2026-11-17_phien_1008_khoi_tao_gon_migration_v1.md)
+- [Phiên 1007 — Mặc định xử lý văn bản một phần tại một thời điểm.](2026-11-17_phien_1007_mac_dinh_mot_luot_xu_ly_van_ban.md)
+- [Phiên 1004 — So sánh Qwen và Luna trên cùng bản nháp Word.](2026-11-17_phien_1004_so_sanh_qwen_luna_docx.md)
+- [Phiên 1003 — Cập nhật hướng dẫn agent về JSON và Markdown.](2026-11-17_phien_1003_huong_dan_agent_json_markdown.md)
 - [Phiên 1002 — Khôi phục ngày ban hành và lịch tuyển sinh có dẫn chứng.](2026-11-17_phien_1002_khoi_phuc_ngay_va_lich.md)
 - [Phiên 1001 — Kiểm chứng metadata và chuyển phiên bản trên bốn tài liệu.](2026-11-17_phien_1001_kiem_chung_metadata_va_phat_hanh.md)
 - [Phiên 1000 — Liên kết JSON và Markdown, giảm ngữ cảnh rà soát.](2026-11-17_phien_1000_lien_ket_json_markdown.md)

@@ -24,6 +24,9 @@ export type BackgroundTask = {
   step: string;
   errorCode: string | null;
   createdAt: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  durationMs?: number | null;
   isDismissed?: boolean;
 };
 
@@ -44,6 +47,9 @@ type BackgroundTasksState = {
       status?: BackgroundTaskStatus;
       step?: string;
       errorCode?: string | null;
+      startedAt?: string | null;
+      finishedAt?: string | null;
+      durationMs?: number | null;
     },
   ) => void;
   dismissTask: (id: string) => void;
@@ -102,6 +108,18 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>()(
                     update.errorCode !== undefined
                       ? update.errorCode
                       : t.errorCode,
+                  startedAt:
+                    update.startedAt !== undefined
+                      ? update.startedAt
+                      : t.startedAt,
+                  finishedAt:
+                    update.finishedAt !== undefined
+                      ? update.finishedAt
+                      : t.finishedAt,
+                  durationMs:
+                    update.durationMs !== undefined
+                      ? update.durationMs
+                      : t.durationMs,
                 }
               : t,
           ),

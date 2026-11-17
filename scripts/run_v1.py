@@ -161,7 +161,7 @@ def command_plan(
         "v1-be": [api],
         "v1-worker": [worker],
         "v1-install-be": [(backend, ["uv", "sync", "--extra", "dev", "--frozen"])],
-        "v1-migrate": [(backend, [*migration, "upgrade", "head"])],
+        "v1-migrate": [(backend, [*migration, "upgrade", "head", "--tag", "qnu-bootstrap"])],
         "v1-db-check": [(backend, [*migration, "current"])],
         "v1-test-be": [
             (runtime, [*uv, "python", str(backend / "scripts/run_isolated_tests.py")])

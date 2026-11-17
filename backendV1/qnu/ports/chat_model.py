@@ -44,6 +44,8 @@ class ChatRequest:
     automatic_output_budget: bool = False
     budget_identity: str | None = None
     enforce_completion_timeout: bool = False
+    # Document runs pin their configured per-model limit; None keeps the env default.
+    admission_limit: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -12,6 +12,7 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import CompilationRun
 from qnu.domains.knowledge.preparation.models import PreparationIntent
 from qnu.domains.knowledge.preparation.schemas import PreparationRequest
+from qnu.domains.modelops.document_processing import document_provider
 from qnu.domains.modelops.public_api import (
     OPTIONAL_CHAT_UNAVAILABLE_CODES,
     assert_provider_allowed,
@@ -111,7 +112,9 @@ async def auto_policy(
 ) -> tuple[dict, str | None]:
     """Pin the automatic policy without blocking on optional AI configuration."""
     try:
-        provider = await assert_provider_allowed(db, actor, workspace_id, "chat", None)
+        provider = await assert_provider_allowed(
+            db, actor, workspace_id, "chat", await document_provider(db)
+        )
     except AppException as exc:
         if exc.code not in OPTIONAL_CHAT_UNAVAILABLE_CODES:
             raise

@@ -41,6 +41,24 @@ async def test_success_releases_only_its_own_shared_slot(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_pinned_document_limit_raises_the_shared_admission_limit(monkeypatch):
+    client, request = fixture(monkeypatch)
+    request.admission_limit = 7
+    async with admission.chat_slot(request):
+        pass
+    assert client.eval.await_args.args[3] == 7
+
+
+@pytest.mark.asyncio
+async def test_pinned_limit_never_lowers_the_shared_default(monkeypatch):
+    client, request = fixture(monkeypatch)
+    request.admission_limit = 1
+    async with admission.chat_slot(request):
+        pass
+    assert client.eval.await_args.args[3] == 2
+
+
+@pytest.mark.asyncio
 async def test_no_dispatch_when_admission_cannot_be_checked(monkeypatch):
     client, request = fixture(monkeypatch)
     client.eval.side_effect = ConnectionError("offline")
