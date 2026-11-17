@@ -1,6 +1,7 @@
 """Readable text, exact changes and model suggestions are separate contracts."""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -176,6 +177,7 @@ class DetectionResponse(BaseModel):
     ignored_suggestions: list[IgnoredSuggestion] = Field(default_factory=list)
     checked_evidence_ids: list[str]
     total_evidence_count: int | None = None
+    scope: Literal["full", "selected", "skipped"] = "full"
     error_code: str | None
     usage_id: str | None
     created_at: datetime
@@ -192,6 +194,7 @@ class SpellingCheckSummary(BaseModel):
     total_evidence_count: int | None
     pending_count: int
     ignored_count: int
+    scope: Literal["full", "selected", "skipped"] = "full"
 
 
 class SpellingStatusSummary(BaseModel):

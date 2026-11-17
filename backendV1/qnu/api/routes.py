@@ -29,6 +29,7 @@ from qnu.domains.modelops.diagnostics.router import router as diagnostics_router
 from qnu.domains.modelops.resilience.router import router as resilience_router
 from qnu.domains.modelops.router import router as modelops_router
 from qnu.domains.modelops.usage.router import router as usage_router
+from qnu.domains.ocr.review.defaults_router import router as spelling_defaults_router
 from qnu.domains.ocr.review.router import router as ocr_review_router
 from qnu.domains.ocr.router import router as ocr_processing_router
 from qnu.domains.operations.router import router as operations_router
@@ -55,6 +56,7 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(preparation_router, prefix=settings.API_PREFIX)
     app.include_router(ocr_processing_router, prefix=settings.API_PREFIX)
     app.include_router(ocr_review_router, prefix=settings.API_PREFIX)
+    app.include_router(spelling_defaults_router, prefix=settings.API_PREFIX)
     app.include_router(compilation_router, prefix=settings.API_PREFIX)
     app.include_router(compilation_review_router, prefix=settings.API_PREFIX)
     app.include_router(compilation_workflow_router, prefix=settings.API_PREFIX)

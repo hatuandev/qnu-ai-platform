@@ -190,8 +190,14 @@ def test_manifest_checksums_match_the_payloads() -> None:
 
 
 def test_markdown_keeps_literal_values_and_points_back_to_pages() -> None:
-    markdown = render_markdown(_canonical([_document(1, TABLE_RAW)]))
+    canonical = _canonical([_document(1, TABLE_RAW)])
+    markdown = render_markdown(canonical)
     assert "<!-- page 1 -->" in markdown
+    for key, ref in canonical["evidence"].items():
+        if ref["kind"] == "table_cell":
+            assert markdown.count(f'id="{key}"') == 1
+        else:
+            assert markdown.count(f"<!-- evidence: {key} -->") == 1
     assert "PHỤ LỤC 01" in markdown
     assert ">0<" in markdown
     assert ">-<" in markdown

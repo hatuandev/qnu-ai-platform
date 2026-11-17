@@ -50,6 +50,17 @@ MAX_CONTEXT_TOKENS = 2147483647
 NATIVE_DISCOVERY_TYPES = ("local", "openai_compatible", "ollama", "llamacpp")
 
 
+def published_limit(row: dict, *keys: str) -> int | None:
+    """Read one catalog limit; aliases must agree so contradictory data fails closed."""
+    present = {key: row[key] for key in keys if key in row}
+    if not present:
+        return None
+    values = set(present.values())
+    if len(values) != 1 or type(next(iter(values))) is not int:
+        raise ValueError("Invalid declared limit")
+    return next(iter(values))
+
+
 def models_url(endpoint: str) -> str:
     base = endpoint.strip().rstrip("/")
     for suffix in ("/chat/completions", "/embeddings", "/rerank", "/models"):
@@ -191,8 +202,10 @@ def validate(
             result.model_metadata.append(
                 DiscoveredModel(
                     id=model,
-                    context_window_tokens=row.get("max_model_len"),
-                    max_output_tokens=row.get("max_output_tokens"),
+                    context_window_tokens=published_limit(row, "max_model_len", "context_length"),
+                    max_output_tokens=published_limit(
+                        row, "max_output_tokens", "max_completion_tokens"
+                    ),
                     embedding_dimension=row.get("embedding_dimension"),
                 )
             )

@@ -1,17 +1,18 @@
 """Source-bound annotations; unknown values never match a filter."""
 
 import re
-from datetime import date
-from typing import Annotated
+from datetime import date as Date
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
 from qnu.domains.knowledge.compilation.table_year import (
-    column_year,
-    data_year,
+    column_year_proof,
+    conversion_year_scopes,
     labelled_years,
     year_mentions,
 )
+from qnu.domains.knowledge.index.table_dependencies import multitier_header
 from qnu.domains.knowledge.index.table_layout import header_rows, layout, table_structure
 from qnu.domains.knowledge.source_sections import source_sections
 from qnu.platform.errors import AppException
@@ -53,15 +54,229 @@ def scope_conflicts(fixed: dict, requested: dict) -> bool:
     )
 
 
+EventKind = Literal[
+    "registration_deadline", "exam_date", "result_date", "fee_deadline", "enrollment_confirmation"
+]
+
+
+class EventMoment(BaseModel):
+    """One normalized moment; partial dates keep the precision of the source."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    date: Date | None = None
+    year: int | None = Field(None, strict=True, ge=1990, le=2100)
+    month: int | None = Field(None, strict=True, ge=1, le=12)
+    day: int | None = Field(None, strict=True, ge=1, le=31)
+    time: str | None = Field(None, pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+
+    @model_validator(mode="after")
+    def shape(self):
+        if self.date is not None:
+            if self.year is not None or self.month is not None or self.day is not None:
+                raise ValueError("Mốc đầy đủ không đi kèm ngày/tháng/năm rời.")
+            return self
+        if self.month is None:
+            raise ValueError("Mốc thiếu năm cần ít nhất tháng.")
+        if self.day is not None and self.year is not None:
+            raise ValueError("Ngày đủ năm phải dùng trường date.")
+        if self.day is not None:
+            try:
+                Date(2000, self.month, self.day)
+            except ValueError:
+                raise ValueError("Ngày/tháng không hợp lệ.") from None
+        return self
+
+
+class RelativeDeadline(BaseModel):
+    """A duration anchored to a named source event, never converted without a start date."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    value: int = Field(strict=True, ge=1, le=366)
+    unit: Literal["day", "working_day", "week", "month"]
+    from_event: str = Field(min_length=3, max_length=200)
+
+
+class EventValue(BaseModel):
+    """One source-bound schedule event, keeping its original label and scope."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    kind: EventKind
+    label: str = Field(min_length=2, max_length=200)
+    moment: EventMoment | None = None
+    window_start: EventMoment | None = None
+    relative: RelativeDeadline | None = None
+    dates: list[Date] | None = Field(
+        None, min_length=2, max_length=31, exclude_if=lambda value: value is None
+    )
+    end_exclusive: Literal[True] | None = Field(None, exclude_if=lambda value: value is None)
+    intake: str | None = Field(None, min_length=1, max_length=120)
+    audience: str | None = Field(None, min_length=1, max_length=160)
+    method: str | None = Field(None, min_length=1, max_length=160)
+    clause: str | None = Field(None, min_length=1, max_length=160)
+    note: str | None = Field(None, min_length=1, max_length=120)
+    supersedes: str | None = Field(None, min_length=3, max_length=200)
+
+    @model_validator(mode="after")
+    def shape(self):
+        modes = (
+            bool(self.moment or self.window_start),
+            self.relative is not None,
+            self.dates is not None,
+        )
+        if sum(modes) > 1:
+            raise ValueError("Sự kiện chỉ dùng một cách biểu diễn thời gian.")
+        if not any(modes):
+            raise ValueError("Sự kiện cần mốc thời gian hoặc thời hạn tương đối.")
+        if self.dates is not None and len(set(self.dates)) != len(self.dates):
+            raise ValueError("Danh sách ngày của sự kiện không được trùng lặp.")
+        if self.end_exclusive is not None and self.moment is None:
+            raise ValueError("Cần có mốc kết thúc để xác định hạn trước thời điểm đó.")
+        if (
+            self.window_start is not None
+            and self.moment is not None
+            and self.window_start.date is not None
+            and self.moment.date is not None
+            and self.moment.date < self.window_start.date
+        ):
+            raise ValueError("Khoảng thời gian không hợp lệ.")
+        return self
+
+
+def _normalized(text: str) -> str:
+    return " ".join(text.casefold().split())
+
+
+def _numeric_moment_forms(moment: EventMoment) -> list[str]:
+    if moment.date is not None:
+        parts = (moment.date.day, moment.date.month, moment.date.year)
+        return [
+            f"{day}{separator}{month}{separator}{year}"
+            for day in {str(parts[0]), f"{parts[0]:02d}"}
+            for month in {str(parts[1]), f"{parts[1]:02d}"}
+            for separator in ("/", "-", ".")
+            for year in {str(parts[2])}
+        ]
+    if moment.day is not None and moment.month is not None:
+        return [
+            f"{day}{separator}{month}"
+            for day in {str(moment.day), f"{moment.day:02d}"}
+            for month in {str(moment.month), f"{moment.month:02d}"}
+            for separator in ("/", ".")
+        ]
+    if moment.year is not None and moment.month is not None:
+        return [
+            f"{month}{separator}{moment.year}"
+            for month in {str(moment.month), f"{moment.month:02d}"}
+            for separator in ("/", ".")
+        ]
+    return []
+
+
+def moment_in_quote(moment: EventMoment, quote: str) -> bool:
+    text = _normalized(quote)
+    if moment.date is not None:
+        written = (
+            f"{prefix}{day} tháng {month} năm {moment.date.year}"
+            for prefix in ("ngày ", "")
+            for day in {str(moment.date.day), f"{moment.date.day:02d}"}
+            for month in {str(moment.date.month), f"{moment.date.month:02d}"}
+        )
+    elif moment.day is not None and moment.month is not None:
+        written = (
+            f"{prefix}{day} tháng {month}"
+            for prefix in ("ngày ", "")
+            for day in {str(moment.day), f"{moment.day:02d}"}
+            for month in {str(moment.month), f"{moment.month:02d}"}
+        )
+    elif moment.year is not None and moment.month is not None:
+        written = (
+            f"tháng {month} năm {moment.year}"
+            for month in {str(moment.month), f"{moment.month:02d}"}
+        )
+    else:
+        written = ()
+    matched = any(phrase in text for phrase in written) or any(
+        re.search(r"(?<![\d/.\-])" + re.escape(form) + r"(?!\d)(?![/.\-]\s*\d)", text)
+        for form in _numeric_moment_forms(moment)
+    )
+    if not matched:
+        return False
+    if moment.time is None:
+        return True
+    hour, minute = moment.time.split(":")
+    return any(
+        candidate in text
+        for candidate in (
+            moment.time,
+            f"{int(hour)}:{minute}",
+            f"{int(hour)}h{minute}",
+            f"{int(hour)} giờ {minute}",
+            f"{hour} giờ {minute}",
+        )
+    )
+
+
+def _scope_literals(event: EventValue) -> list[str]:
+    return [
+        value
+        for value in (
+            event.intake,
+            event.audience,
+            event.method,
+            event.clause,
+            event.note,
+            event.supersedes,
+        )
+        if value
+    ]
+
+
+def event_proved(event: EventValue, quotes: list[str]) -> bool:
+    """Read historical publications under their original literal-proof contract."""
+    if (
+        event.kind in {"fee_deadline", "enrollment_confirmation"}
+        or event.dates is not None
+        or event.end_exclusive is not None
+    ):
+        from qnu.domains.knowledge.event_schedule import event_proved as has_matching_event
+
+        return has_matching_event(event, quotes)
+    texts = [_normalized(quote) for quote in quotes]
+
+    def stated(literal: str) -> bool:
+        return any(_normalized(literal) in text for text in texts)
+
+    if not stated(event.label):
+        return False
+    if event.relative is not None:
+        unit = {
+            "day": "ngày",
+            "working_day": "ngày làm việc",
+            "week": "tuần",
+            "month": "tháng",
+        }[event.relative.unit]
+        if not stated(f"{event.relative.value} {unit}"):
+            return False
+        if not stated(event.relative.from_event):
+            return False
+    moments = [moment for moment in (event.window_start, event.moment) if moment is not None]
+    if not moments and event.relative is None:
+        return False
+    if not all(any(moment_in_quote(moment, quote) for quote in quotes) for moment in moments):
+        return False
+    return all(stated(value) for value in _scope_literals(event))
+
+
 class MetadataValues(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     data_year: int | None = Field(None, strict=True, ge=1000, le=9999)
     issued_year: int | None = Field(None, strict=True, ge=1000, le=9999)
-    effective_from: date | None = None
-    effective_until: date | None = None
+    effective_from: Date | None = None
+    effective_until: Date | None = None
     program: str | None = Field(None, min_length=1, max_length=160)
     intake: str | None = Field(None, min_length=1, max_length=160)
     attributes: MetadataAttributes | None = None
+    events: list[EventValue] | None = Field(None, min_length=1, max_length=20)
 
     @model_validator(mode="after")
     def interval(self):
@@ -78,7 +293,14 @@ class MetadataFilter(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     data_year: int | None = Field(None, strict=True, ge=1000, le=9999)
     issued_year: int | None = Field(None, strict=True, ge=1000, le=9999)
-    effective_on: date | None = None
+    event_year: int | None = Field(
+        None, strict=True, ge=1000, le=9999, exclude_if=lambda value: value is None
+    )
+    event_kind: EventKind | None = Field(None, exclude_if=lambda value: value is None)
+    event_method: str | None = Field(
+        None, min_length=1, max_length=160, exclude_if=lambda value: value is None
+    )
+    effective_on: Date | None = None
     program: str | None = Field(None, min_length=1, max_length=160)
     intake: str | None = Field(None, min_length=1, max_length=160)
 
@@ -107,6 +329,8 @@ class RetrievalAnnotation(BaseModel):
             (self.values.data_year, self.values.program, self.values.intake)
         ):
             raise ValueError("Năm dữ liệu/ngành/đợt phải gắn đoạn hoặc hàng/ô cụ thể.")
+        if self.target == "document" and self.values.events:
+            raise ValueError("Lịch và thời hạn phải gắn đoạn hoặc hàng/ô cụ thể.")
         return self
 
 
@@ -184,7 +408,7 @@ def _header_refs(entry: dict, index: int) -> set[str]:
     shape, positions = _grid(entry)
     if positions is None:
         return set()
-    headers = set(header_rows(shape))
+    headers = set(header_rows(shape) or multitier_header(entry["table"]) or [])
     run = entry["citation"].split(":", 1)[0]
     return {
         run + ":" + position.cell["evidence_id"]
@@ -256,13 +480,15 @@ def _proved_by_evidence(item: RetrievalAnnotation, refs: set[str], year: int) ->
     )
 
 
-def _require_row_year_proof(
-    item: RetrievalAnnotation, entry: dict, row: int, year: int
-) -> None:
+def _require_row_year_proof(item: RetrievalAnnotation, entry: dict, row: int, year: int) -> None:
     """A row data_year is proven by a labelled year cell inside that same row."""
     _, positions = _grid(entry)
     cells = (
-        [position.cell for position in positions if position.row <= row < position.row + position.cell["row_span"]]
+        [
+            position.cell
+            for position in positions
+            if position.row <= row < position.row + position.cell["row_span"]
+        ]
         if positions is not None
         else []
     )
@@ -302,7 +528,9 @@ def _require_table_year_proof(item: RetrievalAnnotation, content: dict) -> None:
     shape, positions = _grid(entry)
     if positions is None:
         raise _invalid("Không đọc được cấu trúc bảng để xác định tiêu đề cột.")
-    headers = set(header_rows(shape))
+    native = header_rows(shape)
+    tiers = native or multitier_header(entry["table"]) or []
+    headers = set(tiers)
     governing = [
         position
         for position in positions
@@ -311,13 +539,11 @@ def _require_table_year_proof(item: RetrievalAnnotation, content: dict) -> None:
     ]
     # The whole governing header text is inspected: a short quote must not hide
     # a role, and a multi-year child header must not inherit one parent year.
-    proven = column_year([position.cell for position in governing])
+    proven, proof_cells = column_year_proof(
+        [position.cell for position in governing], allow_bare_year=bool(tiers and not native)
+    )
     run = entry["citation"].split(":", 1)[0]
-    proofs = {
-        run + ":" + position.cell["evidence_id"]
-        for position in governing
-        if data_year(position.cell.get("text", "")) == year
-    }
+    proofs = {run + ":" + position["evidence_id"] for position in proof_cells}
     known = {proven} if proven is not None else set()
     if cell is not None:
         target_cell = next(
@@ -364,6 +590,8 @@ def validate_annotations(
         else {}
     )
     seen = set()
+    conversion = None
+    fragmented = None
     global_values = next((a["values"] for a in annotations if a["target"] == "document"), {})
     for raw in annotations:
         item = RetrievalAnnotation.model_validate(raw)
@@ -379,8 +607,17 @@ def validate_annotations(
         table = re.fullmatch(
             r"table:(.+):row:(\d+)(?::column:(\d+))?", item.target
         ) or re.fullmatch(r"table:(.+):column:(\d+)", item.target)
+        conversion_bound = False
         if table:
             table_ref = table.group(1)
+            if item.values.data_year is not None and any(
+                e.citation not in refs for e in item.evidence
+            ):
+                if conversion is None:
+                    conversion = conversion_year_scopes(documents)
+                conversion_bound = _proved_conversion_year(item, conversion.get(table_ref))
+            if conversion_bound:
+                refs |= {proof["citation"] for proof in conversion[table_ref][1]}
             local_texts = {
                 **texts,
                 table_ref: "\n".join(texts.get(r, "") for r in sorted(refs - {table_ref})),
@@ -395,6 +632,8 @@ def validate_annotations(
                 raise _invalid("Trích đoạn metadata không thuộc nguồn đã ghim của target.")
         quotes = "\n".join(e.quote for e in item.evidence).casefold()
         for key, value in item.values.model_dump(mode="json", exclude_none=True).items():
+            if key == "events":
+                continue
             if key != "attributes" and key in global_values and global_values[key] != value:
                 raise _invalid("Metadata của target mâu thuẫn với metadata toàn văn bản.")
             if key == "attributes":
@@ -410,7 +649,7 @@ def validate_annotations(
                 continue
             alternatives = [str(value)]
             if key.startswith("effective_"):
-                day = date.fromisoformat(value)
+                day = Date.fromisoformat(value)
                 alternatives += [
                     f"{d}{sep}{m}{sep}{day.year}"
                     for d in {str(day.day), f"{day.day:02d}"}
@@ -426,8 +665,50 @@ def validate_annotations(
                 found = _mentions_year(quotes, value)
             if not found:
                 raise _invalid("Giá trị metadata cần xuất hiện trong trích đoạn nguồn.")
-        if strict_roles:
+        for event in item.values.events or []:
+            if _event_evidence_valid(event, item.evidence, texts, strict_roles):
+                continue
+            if fragmented is None:
+                from qnu.domains.knowledge.event_schedule import fragmented_proofs
+
+                fragmented = list(fragmented_proofs(documents))
+            stated = [evidence.model_dump() for evidence in item.evidence]
+            if not any(
+                event == candidate and all(part in stated for part in proof)
+                for candidate, proof in fragmented
+            ):
+                raise _invalid(
+                    "Sự kiện cần nhãn, mốc thời gian và phạm vi trong cùng trích đoạn nguồn."
+                )
+        if strict_roles and not conversion_bound:
             _require_table_year_proof(item, content)
+
+
+def _proved_conversion_year(
+    item: RetrievalAnnotation, scope: tuple[int, list[dict]] | None
+) -> bool:
+    if scope is None or not re.fullmatch(r"table:.+:column:\d+", item.target):
+        return False
+    year, evidence = scope
+    stated = [entry.model_dump() for entry in item.evidence]
+    return item.values.model_dump(exclude_none=True) == {"data_year": year} and all(
+        proof in stated for proof in evidence
+    )
+
+
+def _event_evidence_valid(
+    event: EventValue, evidence: list[MetadataEvidence], texts: dict[str, str], strict_roles: bool
+) -> bool:
+    if not strict_roles:
+        return event_proved(event, [item.quote for item in evidence])
+    # The extractor uses these metadata models. Import it at the validation boundary.
+    from qnu.domains.knowledge.event_schedule import event_proved as has_matching_event
+
+    return any(
+        has_matching_event(event, [item.quote])
+        and has_matching_event(event, [texts[item.citation]])
+        for item in evidence
+    )
 
 
 def chunk_metadata(annotations: list[dict], targets: set[str]) -> list[dict]:
@@ -459,10 +740,29 @@ def chunk_metadata(annotations: list[dict], targets: set[str]) -> list[dict]:
 
 def matches_metadata(structure: dict | None, scope: MetadataFilter) -> bool:
     wanted = scope.model_dump(mode="json", exclude_none=True)
-    if not wanted:
+    event_kind = wanted.pop("event_kind", None)
+    event_year = wanted.pop("event_year", None)
+    event_method = wanted.pop("event_method", None)
+    event_scope = any(value is not None for value in (event_kind, event_year, event_method))
+    event_intake = wanted.pop("intake", None) if event_scope else None
+    if not wanted and not event_scope:
         return True
     for annotation in (structure or {}).get("retrieval_metadata", []):
         values = annotation["values"]
+        if event_scope and not any(
+            (event_kind is None or event.get("kind") == event_kind)
+            and (event_year is None or event_year in event_years(event))
+            and (
+                event_method is None
+                or (event.get("method") or "").casefold() == event_method.casefold()
+            )
+            and (
+                event_intake is None
+                or (event.get("intake") or "").casefold() == event_intake.casefold()
+            )
+            for event in values.get("events") or []
+        ):
+            continue
         matches = True
         for key, value in wanted.items():
             if key == "attributes":
@@ -475,8 +775,28 @@ def matches_metadata(structure: dict | None, scope: MetadataFilter) -> bool:
                 end = values.get("effective_until")
                 matches &= bool(start or end) and (not start or str(start) <= str(value))
                 matches &= not end or str(value) <= str(end)
+            elif key == "intake":
+                # An intake named by the source unit or by one of its schedule
+                # events both scope this unit; events carry their own intake.
+                requested = str(value).casefold()
+                matches &= str(values.get("intake", "")).casefold() == requested or any(
+                    isinstance(event, dict)
+                    and str(event.get("intake") or "").casefold() == requested
+                    for event in values.get("events") or []
+                )
             else:
                 matches &= str(values.get(key, "")).casefold() == str(value).casefold()
         if matches:
             return True
     return False
+
+
+def event_years(event: dict) -> set[int]:
+    years = {Date.fromisoformat(day).year for day in event.get("dates") or []}
+    for key in ("window_start", "moment"):
+        moment = event.get(key) or {}
+        if moment.get("date"):
+            years.add(Date.fromisoformat(moment["date"]).year)
+        elif moment.get("year") is not None:
+            years.add(moment["year"])
+    return years

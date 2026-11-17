@@ -5,6 +5,8 @@ import {
   FlaskConical,
   Key,
   Loader2,
+  MoreHorizontal,
+  Pencil,
   Plus,
   RefreshCw,
   Save,
@@ -20,10 +22,12 @@ import {
   useConnectionModelsQuery,
   useDeleteKeyMutation,
   useDeleteModelMutation,
+  useSyncModelCapacityMutation,
   useTestConnectionMutation,
   useUpdateConnectionMutation,
 } from "@/api/modelops/queries";
 import type {
+  CapacitySource,
   Connection,
   ConnectionFamily,
   ConnectionTestResult,
@@ -36,6 +40,13 @@ import { Field, FieldDescription, FieldLabel } from "@/components/admin/field";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -62,6 +73,89 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CAPABILITY_LABELS, CONNECTION_FAMILIES } from "./constants";
+import { ModelCapacityDialog } from "./model-capacity-dialog";
+
+const SOURCE_LABELS: Record<CapacitySource, string> = {
+  server_reported: "Nhà cung cấp công bố",
+  operator_configured: "Quản trị viên khai báo",
+  application_default: "QNU tạm tính",
+};
+
+const SOURCE_BADGES: Record<CapacitySource, string> = {
+  server_reported:
+    "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
+  operator_configured: "bg-primary/10 text-primary border-primary/20",
+  application_default:
+    "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
+};
+
+function capacitySource(model: ModelProvider): CapacitySource {
+  if (model.capacity_status === "configured" && model.token_limits) {
+    const sources = Object.values(model.field_sources ?? {});
+    if (sources.length > 0 && sources.every((s) => s === "server_reported")) {
+      return "server_reported";
+    }
+    if (sources.some((s) => s === "operator_configured")) {
+      return "operator_configured";
+    }
+    return model.capacity_basis ?? "operator_configured";
+  }
+  return "application_default";
+}
+
+function formatLimit(value?: number | null): string {
+  if (!value) return "—";
+  return value >= 1000 ? `${Math.round(value / 1000)}k` : String(value);
+}
+
+function CapacitySummary({ model }: { model: ModelProvider }) {
+  if (model.capacity_status === "stale") {
+    return (
+      <div className="space-y-0.5">
+        <span className="text-[11px] text-muted-foreground">
+          Endpoint hoặc model đã đổi
+        </span>
+        <Badge
+          variant="outline"
+          className="h-3.5 px-1 text-[9px] font-normal bg-destructive/10 text-destructive border-destructive/20"
+        >
+          Cần đồng bộ lại
+        </Badge>
+      </div>
+    );
+  }
+  const source = capacitySource(model);
+  const limits = model.token_limits;
+  const parts: string[] = [];
+  if (limits?.context_window_tokens) {
+    parts.push(`Ngữ cảnh ${formatLimit(limits.context_window_tokens)}`);
+  }
+  if (limits?.max_input_tokens) {
+    parts.push(`Đầu vào ${formatLimit(limits.max_input_tokens)}`);
+  }
+  if (limits?.max_output_tokens) {
+    parts.push(`Đầu ra ${formatLimit(limits.max_output_tokens)}`);
+  }
+  if (parts.length === 0) {
+    if (!model.capabilities.includes("chat")) {
+      return <span className="text-[11px] text-muted-foreground">—</span>;
+    }
+    parts.push("Ngữ cảnh 32k · Đầu ra 4k");
+  }
+  return (
+    <div className="space-y-0.5">
+      <span className="font-mono text-[11px] text-muted-foreground">
+        {parts.join(" · ")}
+      </span>
+      <Badge
+        variant="outline"
+        className={`h-3.5 px-1 text-[9px] font-normal ${SOURCE_BADGES[source]}`}
+      >
+        {SOURCE_LABELS[source]}
+      </Badge>
+    </div>
+  );
+}
 
 export function ProviderDetailSheet({
   connection,
@@ -114,6 +208,7 @@ function ProviderDetailSheetContent({
   const updateMutation = useUpdateConnectionMutation();
   const testMutation = useTestConnectionMutation(connection.id);
   const deleteModelMutation = useDeleteModelMutation(connection.id);
+  const syncCapacityMutation = useSyncModelCapacityMutation(connection.id);
   const addKeyMutation = useAddKeyMutation(connection.id);
   const deleteKeyMutation = useDeleteKeyMutation(connection.id);
 
@@ -152,6 +247,9 @@ function ProviderDetailSheetContent({
 
   // Delete confirmations
   const [modelToDelete, setModelToDelete] = useState<ModelProvider | null>(
+    null,
+  );
+  const [capacityModel, setCapacityModel] = useState<ModelProvider | null>(
     null,
   );
   const [keyToDelete, setKeyToDelete] = useState<ProviderKey | null>(null);
@@ -288,6 +386,24 @@ function ProviderDetailSheetContent({
       setKeyToDelete(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Xóa khóa thất bại";
+      toast.error(msg);
+    }
+  };
+
+  // Đồng bộ giới hạn token do endpoint công bố cho một model
+  const handleSyncCapacity = async (model: ModelProvider) => {
+    try {
+      const row = await syncCapacityMutation.mutateAsync(model.model_name);
+      if (!row?.token_limits) {
+        toast.warning(
+          `Nhà cung cấp không công bố giới hạn token cho "${model.model_name}".`,
+        );
+        return;
+      }
+      toast.success(`Đã đồng bộ giới hạn token cho "${model.model_name}"`);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Đồng bộ giới hạn thất bại";
       toast.error(msg);
     }
   };
@@ -569,13 +685,13 @@ function ProviderDetailSheetContent({
                     <Table>
                       <TableHeader>
                         <TableRow className="h-9 text-[11px] bg-muted/20">
-                          <TableHead className="w-[180px]">
+                          <TableHead className="w-[170px]">
                             Tên mô hình
                           </TableHead>
                           <TableHead>Năng lực</TableHead>
-                          <TableHead className="text-right">Ngữ cảnh</TableHead>
-                          <TableHead className="w-[110px] text-right">
-                            Thao tác
+                          <TableHead className="w-[210px]">Giới hạn</TableHead>
+                          <TableHead className="w-[44px] text-right">
+                            <span className="sr-only">Thao tác</span>
                           </TableHead>
                         </TableRow>
                       </TableHeader>
@@ -603,37 +719,65 @@ function ProviderDetailSheetContent({
                               </div>
                             </TableCell>
 
-                            <TableCell className="text-right font-mono text-[11px] text-muted-foreground">
-                              {model.token_limits?.context_window_tokens
-                                ? `${Math.round(model.token_limits.context_window_tokens / 1000)}k`
-                                : "—"}
+                            <TableCell>
+                              <CapacitySummary model={model} />
                             </TableCell>
 
                             <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 px-2 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10"
-                                  onClick={() => onOpenProbeModel(model)}
-                                  title="Thử nghiệm suy luận mô hình"
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="size-7 p-0 text-muted-foreground data-[state=open]:bg-accent"
+                                    title="Thao tác"
+                                  >
+                                    {syncCapacityMutation.isPending &&
+                                    syncCapacityMutation.variables ===
+                                      model.model_name ? (
+                                      <Loader2 className="size-3.5 animate-spin" />
+                                    ) : (
+                                      <MoreHorizontal className="size-3.5" />
+                                    )}
+                                    <span className="sr-only">Thao tác</span>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                  align="end"
+                                  className="text-xs"
                                 >
-                                  <FlaskConical className="size-3.5" />
-                                  <span>Test</span>
-                                </Button>
-
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="size-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                  onClick={() => setModelToDelete(model)}
-                                  title="Xóa mô hình này"
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </Button>
-                              </div>
+                                  <DropdownMenuItem
+                                    onSelect={() => onOpenProbeModel(model)}
+                                  >
+                                    <FlaskConical className="size-3.5" />
+                                    Kiểm tra suy luận
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onSelect={() => setCapacityModel(model)}
+                                  >
+                                    <Pencil className="size-3.5" />
+                                    Sửa giới hạn
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      void handleSyncCapacity(model);
+                                    }}
+                                    disabled={syncCapacityMutation.isPending}
+                                  >
+                                    <RefreshCw className="size-3.5" />
+                                    Đồng bộ từ nhà cung cấp
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onSelect={() => setModelToDelete(model)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                    Xóa model
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -992,6 +1136,16 @@ function ProviderDetailSheetContent({
         confirmVariant="destructive"
         isLoading={deleteKeyMutation.isPending}
         onConfirm={handleConfirmDeleteKey}
+      />
+
+      {/* Thông số ngữ cảnh/đầu ra của model */}
+      <ModelCapacityDialog
+        connectionId={connection.id}
+        model={capacityModel}
+        open={Boolean(capacityModel)}
+        onOpenChange={(next) => {
+          if (!next) setCapacityModel(null);
+        }}
       />
     </>
   );

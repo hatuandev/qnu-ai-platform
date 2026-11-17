@@ -131,6 +131,41 @@ def test_multitier_header_proof_returns_header_tiers():
     assert multitier_header(table()) == [0, 1]
 
 
+def test_hybrid_page_accepts_only_its_native_table_block():
+    doc = document(method="hybrid")
+    block = doc["pages"][0]["blocks"][0]
+    block["origin"] = "native"
+    link = dependencies(doc)["run:t"]
+    assert link["header_rows"] == [0, 1]
+    assert link["previous"] is None
+    block["origin"] = "ocr"
+    assert "run:t" not in dependencies(doc)
+
+
+def test_horizontal_groups_keep_the_metric_tier_after_the_year():
+    rows = [
+        [cell("Ngành", "c00"), cell("Năm 2024", "c01", cs=2), cell("Năm 2025", "c03", cs=2)],
+        [
+            cell(text, f"c1{i}")
+            for i, text in enumerate(["", "Chỉ tiêu", "Điểm", "Chỉ tiêu", "Điểm"])
+        ],
+        [cell(text, f"c2{i}") for i, text in enumerate(["Alpha", "80", "24.5", "75", "25.1"])],
+        [cell(text, f"c3{i}") for i, text in enumerate(["Beta", "90", "20.0", "70", "21.2"])],
+    ]
+    for top in rows[0]:
+        top["header"] = True
+    assert multitier_header(table(rows, columns=5)) == [0, 1]
+    native = document(rows, columns=5)
+    native["pages"][0]["blocks"][0]["bbox"] = None
+    assert dependencies(native)["run:t"]["header_rows"] == [0, 1]
+    source = chunk(rows, [0, 1, 2, 3], key="E1", total=4, columns=5)
+    result = catalog([source], [link_for("E1", "E1")])
+    assert result["tables"][0]["fields"]["3"] == ["Năm 2025", "Chỉ tiêu"]
+    assert result["tables"][0]["fields"]["4"] == ["Năm 2025", "Điểm"]
+    rows[1][0]["text"] = "Tên một dòng dữ liệu"
+    assert multitier_header(table(rows, columns=5)) is None
+
+
 @pytest.mark.parametrize(
     "change",
     [

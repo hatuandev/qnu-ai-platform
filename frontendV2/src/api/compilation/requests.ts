@@ -7,7 +7,7 @@ import { compilationPaths } from "./endpoints";
 import type {
   CompilationCreatedResponse,
   CompilationDraftResponse,
-  CompilationProgressResponse,
+  CompilationProgressSummaryResponse,
   EditCommitRequest,
   EditContextResponse,
   EditPreviewRequest,
@@ -88,14 +88,14 @@ export async function commitEdits(
   );
 }
 
-export function getCompilationProgress(
+export function getCompilationProgressSummary(
   workspaceId: string,
   collectionId: string,
   runId: string,
   options?: { signal?: AbortSignal },
 ) {
-  return v1Client.get<CompilationProgressResponse>(
-    compilationPaths.progress(workspaceId, collectionId, runId),
+  return v1Client.get<CompilationProgressSummaryResponse>(
+    compilationPaths.progressSummary(workspaceId, collectionId, runId),
     options,
   );
 }

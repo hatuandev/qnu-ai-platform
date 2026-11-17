@@ -38,10 +38,66 @@ export type CreateDocumentRequest = {
   document_key: string;
   title: string;
   compilation_run_id: string;
+  automatic_metadata_sha256?: string;
 };
 
 export type RegisterVersionRequest = {
   compilation_run_id: string;
+  automatic_metadata_sha256?: string;
+};
+
+export type EventMoment = {
+  date?: string | null;
+  year?: number | null;
+  month?: number | null;
+  day?: number | null;
+  time?: string | null;
+};
+
+export type MetadataEvent = {
+  kind:
+    | "registration_deadline"
+    | "exam_date"
+    | "result_date"
+    | "fee_deadline"
+    | "enrollment_confirmation";
+  label: string;
+  moment?: EventMoment | null;
+  window_start?: EventMoment | null;
+  dates?: string[] | null;
+  end_exclusive?: true | null;
+  relative?: {
+    value: number;
+    unit: "day" | "working_day" | "week" | "month";
+    from_event: string;
+  } | null;
+  intake?: string | null;
+  audience?: string | null;
+  method?: string | null;
+  clause?: string | null;
+  note?: string | null;
+  supersedes?: string | null;
+};
+
+export type RetrievalAnnotation = {
+  target: string;
+  values: {
+    data_year?: number | null;
+    issued_year?: number | null;
+    effective_from?: string | null;
+    effective_until?: string | null;
+    program?: string | null;
+    intake?: string | null;
+    attributes?: Record<string, string | number | boolean> | null;
+    events?: MetadataEvent[] | null;
+  };
+  evidence: { citation: string; quote: string }[];
+};
+
+export type AutomaticMetadataPreview = {
+  rules_version: string;
+  annotations: RetrievalAnnotation[];
+  sha256: string;
 };
 
 export type ReviewFinding = {
@@ -49,6 +105,14 @@ export type ReviewFinding = {
   finding: {
     explanation?: string;
     suggested_action?: string;
+    draft_excerpts?: { heading?: string; text: string }[];
+    source_locations?: {
+      source_id: string;
+      revision_id: string;
+      file_name: string | null;
+      page: number;
+      table_number: number;
+    }[];
     [key: string]: unknown;
   };
 };

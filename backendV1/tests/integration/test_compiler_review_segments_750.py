@@ -9,6 +9,8 @@ It exists because that path used to be unreachable: the first part raised
 
 import json
 
+import pytest
+
 from tests.integration.compiler_support import (
     FakeChat,
     chat_provider,
@@ -17,7 +19,7 @@ from tests.integration.compiler_support import (
     request_compile,
 )
 from tests.integration.knowledge_support import API, EDITOR, PLATFORM, as_actor
-from tests.integration.ocr_support import set_quota
+from tests.integration.ocr_support import FakeJobQueue, ocr_blocks, set_quota, use_queue
 
 SECTIONS = 40
 BODY = "Điều kiện xét tuyển theo đề án năm 2026 được ghi rõ trong bảng chỉ tiêu. " * 8
@@ -173,6 +175,84 @@ def test_long_review_runs_in_parts_and_still_covers_every_unit(client):
         assert client.get(f"{base}/{row['id']}/segments/{seg_index}/markdown").status_code == 200
 
 
+def test_worker_records_oversized_table_finding_and_exposes_pinned_source(client):
+    from qnu.main import app
+    from qnu.workers.tasks.compilation import manual_compiler_review_job
+
+    class TableReviewChat(SegmentedReviewChat):
+        def _respond(self, index):
+            incoming = json.loads(self.requests[index]["body"]["messages"][-1]["content"])
+            if "allowed_citations" not in incoming:
+                return super()._respond(index)
+            citation = next(
+                ref for ref in incoming["allowed_citations"] if ref.endswith(":ev_p001_b002")
+            )
+            return self._reply(
+                {
+                    "title": "Bảng đối chiếu",
+                    "sections": [
+                        {
+                            "heading": "Tổng hợp",
+                            "paragraphs": [
+                                {"text": "Tổng hợp từ cả bảng.", "citations": [citation]}
+                            ],
+                        }
+                    ],
+                    "unknowns": [],
+                }
+            )
+
+    rows = [r"\thead{STT} & \thead{Nội dung}"]
+    rows.extend(f"{number} & " + ("Điều kiện áp dụng. " * 60) for number in range(1, 23))
+    table = r"\begin{tabular}{cc} " + r" \\ ".join(rows) + r" \end{tabular}"
+    data = processed_input(
+        client,
+        code="planner-limited-review",
+        response=ocr_blocks("Bảng đối chiếu|Title", table + "|Table"),
+    )
+    with TableReviewChat() as chat:
+        chat_provider(client, data, chat.base_url)
+        assert set_quota(client, data["workspace"]["id"], 5_000_000).status_code == 200
+        requested = request_compile(client, data)
+        assert requested.status_code == 201, requested.text
+        run_id = requested.json()["run"]["id"]
+        assert execute_compile(client, run_id) == "completed"
+        small = small_provider(client, data, chat.base_url, context_window=22000, max_output=4096)
+        base = data["url"] + "/" + run_id + "/reviews"
+        use_queue(FakeJobQueue())
+        queued = client.post(
+            base + "?background=true",
+            json={"provider_id": small["id"]},
+            headers={"Idempotency-Key": "planner-limited"},
+        )
+        assert queued.status_code == 200, queued.text
+        review_id = queued.json()["id"]
+        assert (
+            client.portal.call(
+                manual_compiler_review_job, {"container": app.state.container}, review_id
+            )
+            == "completed"
+        )
+        response = client.get(f"{base}/{review_id}/report")
+        assert response.status_code == 200, response.text
+        report = response.json()
+        assert report["verdict"] == "needs_attention"
+        (finding,) = [item for item in report["findings"] if item.get("source_locations")]
+        assert finding["status"] == "uncertain" and finding["sources"] == []
+        assert finding["draft_excerpts"][0]["text"] == "Tổng hợp từ cả bảng."
+        (location,) = finding["source_locations"]
+        assert location["source_id"] == data["source"]["id"]
+        assert location["revision_id"] == data["revision"]["id"]
+        assert location["page"] == 1
+        calls = [json.loads(call["body"]["messages"][-1]["content"]) for call in chat.requests]
+        assert any(call.get("source_units") for call in calls)
+        assert not any(
+            unit["text"] == "Tổng hợp từ cả bảng."
+            for call in calls
+            for unit in call.get("draft_units", [])
+        )
+
+
 class TruncatingFirstReviewPartChat(SegmentedReviewChat):
     def __init__(self):
         super().__init__()
@@ -233,3 +313,363 @@ def test_truncated_review_segment_splits_into_children_and_exposes_segment_artif
             idx = seg["index"]
             assert client.get(f"{base}/{row['id']}/segments/{idx}/assessment").status_code == 200
             assert client.get(f"{base}/{row['id']}/segments/{idx}/markdown").status_code == 200
+
+
+def test_worker_preserves_terminal_recovery_code_if_cleanup_fails(client, monkeypatch):
+    from dataclasses import replace
+
+    from qnu.domains.knowledge.compilation.review import execution, refinement
+    from qnu.main import app
+    from qnu.workers.tasks.compilation import manual_compiler_review_job
+
+    class InvalidCoverageChat(SegmentedReviewChat):
+        def _respond(self, index):
+            incoming = json.loads(self.requests[index]["body"]["messages"][-1]["content"])
+            if "allowed_citations" in incoming:
+                return self._draft(incoming["allowed_citations"][0])
+            return self._reply({"source_assessments": [], "draft_assessments": []})
+
+    async def broken_cleanup(*args):
+        raise RuntimeError("Test recovery bookkeeping failure")
+
+    limits_for = refinement.limits_for
+    monkeypatch.setattr(
+        refinement,
+        "limits_for",
+        lambda *args, **kwargs: replace(limits_for(*args, **kwargs), max_contract_recoveries=0),
+    )
+    monkeypatch.setattr(execution, "_mark_uncertain", broken_cleanup)
+    data = processed_input(client, code="terminal-review-code")
+    with InvalidCoverageChat() as chat:
+        chat_provider(client, data, chat.base_url, model="full-chat")
+        assert set_quota(client, data["workspace"]["id"], 5_000_000).status_code == 200
+        requested = request_compile(client, data)
+        assert requested.status_code == 201, requested.text
+        run_id = requested.json()["run"]["id"]
+        assert execute_compile(client, run_id) == "completed"
+        small = small_provider(client, data, chat.base_url, context_window=40960, max_output=4096)
+        base = data["url"] + "/" + run_id + "/reviews"
+        use_queue(FakeJobQueue())
+        queued = client.post(
+            base + "?background=true",
+            json={"provider_id": small["id"]},
+            headers={"Idempotency-Key": "terminal-review-code"},
+        )
+        assert queued.status_code == 200, queued.text
+        review_id = queued.json()["id"]
+        assert (
+            client.portal.call(
+                manual_compiler_review_job, {"container": app.state.container}, review_id
+            )
+            == "failed"
+        )
+        row = client.get(f"{base}/{review_id}").json()
+        assert row["error_code"] == "compilation_review_recovery_exhausted"
+        progress = client.get(f"{base}/{review_id}/progress").json()
+        assert any(seg["error_code"] == row["error_code"] for seg in progress["segments"])
+
+
+def test_source_first_review_repairs_only_missing_and_uncited_units(client, monkeypatch):
+    from qnu.domains.knowledge.compilation.review import service
+    from qnu.main import app
+    from qnu.workers.tasks.compilation import manual_compiler_review_job
+
+    # Keep the fixture on the model path to exercise recovery of several findings.
+    monkeypatch.setattr(service, "source_prose_pairs", lambda material: {})
+
+    class RepairChat(SegmentedReviewChat):
+        def _respond(self, index):
+            request = self.requests[index]["body"]
+            payload = json.loads(request["messages"][-1]["content"])
+            assert request["response_format"]["type"] == "json_schema"
+            assert "tối đa 240 ký tự" in request["messages"][0]["content"]
+            _, raw = super()._respond(index)
+            data = json.loads(json.loads(raw)["choices"][0]["message"]["content"])
+            result = {
+                field: {
+                    item[identity]: {k: v for k, v in item.items() if k != identity}
+                    for item in data[field]
+                }
+                for field, identity in (
+                    ("source_assessments", "source_id"),
+                    ("draft_assessments", "draft_id"),
+                )
+            }
+            if index == 0:
+                candidates = [
+                    item["id"] for item in payload["draft_units"] if item["kind"] == "paragraph"
+                ]
+                self.failed_ids = set(candidates[:2])
+                assert len(self.failed_ids) == 2
+                del result["draft_assessments"][candidates[0]]
+                result["draft_assessments"][candidates[1]]["source_ids"] = ["not-in-pinned-scope"]
+            return self._reply(result)
+
+    data = processed_input(
+        client,
+        code="source-first-review-repair",
+        response=ocr_blocks(
+            "Chỉ tiêu theo ngành|Title",
+            "Ngành A có chỉ tiêu 25.|Text",
+            "Ngành B có chỉ tiêu 30.|Text",
+        ),
+    )
+    with RepairChat() as chat:
+        chat_provider(client, data, chat.base_url)
+        assert set_quota(client, data["workspace"]["id"], 5_000_000).status_code == 200
+        compiled = request_compile(client, data, source_first=True, auto_review=False)
+        assert compiled.status_code == 201, compiled.text
+        run_id = compiled.json()["run"]["id"]
+        assert execute_compile(client, run_id) == "completed"
+        assert not chat.requests
+        base = data["url"] + "/" + run_id + "/reviews"
+        use_queue(FakeJobQueue())
+        queued = client.post(
+            base + "?background=true", json={}, headers={"Idempotency-Key": "repair"}
+        )
+        assert queued.status_code == 200, queued.text
+        review_id = queued.json()["id"]
+        replay = client.post(
+            base + "?background=true", json={}, headers={"Idempotency-Key": "repair"}
+        )
+        assert replay.status_code == 200 and replay.json()["id"] == review_id
+        conflicting = client.post(
+            base + "?background=true",
+            json={"structured_output": False},
+            headers={"Idempotency-Key": "repair"},
+        )
+        assert (
+            conflicting.status_code == 409 and conflicting.json()["code"] == "idempotency_conflict"
+        )
+        assert (
+            client.portal.call(
+                manual_compiler_review_job, {"container": app.state.container}, review_id
+            )
+            == "completed"
+        )
+
+        assert len(chat.requests) == 2
+        first, repair = [json.loads(r["body"]["messages"][-1]["content"]) for r in chat.requests]
+        assert "section:1:heading" not in {u["id"] for u in first["draft_units"]}
+        assert {u["id"] for u in repair["draft_units"]} == chat.failed_ids
+        assert repair["source_units"] == []
+        assert len(chat.requests[1]["body"]["messages"][-1]["content"]) < len(
+            chat.requests[0]["body"]["messages"][-1]["content"]
+        )
+        row = client.get(f"{base}/{review_id}").json()
+        assert row["usage_tokens"] == 300
+        assert row["trace"]["refinement_events"][0]["policy"] == "repair_owned_units/v1"
+        report = client.get(f"{base}/{review_id}/report").json()
+        assert report["summary"]["draft_units_checked"] == len(first["draft_units"]) + 1
+        heading = next(
+            check
+            for check in report["draft_assessments"]
+            if check["draft_id"] == "section:1:heading"
+        )
+        assert heading["status"] == "supported" and len(heading["source_excerpts"]) == 1
+        assert "not-in-pinned-scope" not in json.dumps(report)
+
+
+@pytest.mark.parametrize("selective", [False, True])
+def test_review_verifies_retained_prose_without_model_round_trip(client, selective):
+    from qnu.main import app
+    from qnu.workers.tasks.compilation import manual_compiler_review_job
+
+    class TitleChat(SegmentedReviewChat):
+        def _respond(self, index):
+            messages = self.requests[index]["body"]["messages"]
+            payload = json.loads(messages[-1]["content"])
+            if "part" in payload:
+                (unit,) = payload["part"]["owned"]
+                citation = f"{unit['ocr_run_id']}:{unit['evidence_id']}"
+                return self._reply(
+                    {
+                        "sections": [],
+                        "unknowns": [],
+                        "metadata": [
+                            {
+                                "field": "Số hiệu",
+                                "value": "07/AB",
+                                "citation": citation,
+                                "quote": "Số hiệu: 07/AB",
+                            }
+                        ],
+                    }
+                )
+            assert "Nội dung và độ phủ nguồn được kiểm riêng" in messages[0]["content"]
+            assert payload["source_units"] == []
+            assert [unit["id"] for unit in payload["draft_units"]] == ["title"]
+            anchor = payload["context_source_units"][0]["id"]
+            return self._reply(
+                {
+                    "source_assessments": {},
+                    "draft_assessments": {
+                        "title": {
+                            "status": "supported",
+                            "source_ids": [anchor],
+                            "explanation": "Tiêu đề phù hợp.",
+                            "suggested_action": "",
+                        }
+                    },
+                }
+            )
+
+    data = processed_input(
+        client,
+        code=f"retained-review-prose-{int(selective)}",
+        response=ocr_blocks(
+            "Chỉ tiêu tuyển sinh|Title",
+            "Năm 2026 có 25 chỉ tiêu.|Text",
+            "Năm 2025 có 19 chỉ tiêu.|Text",
+            "Số hiệu: 07/AB|Text",
+        ),
+    )
+    with TitleChat() as chat:
+        chat_provider(client, data, chat.base_url)
+        assert set_quota(client, data["workspace"]["id"], 5_000_000).status_code == 200
+        compiled = request_compile(
+            client,
+            data,
+            source_first=not selective,
+            selective_supplement=selective,
+            auto_review=False,
+        )
+        assert compiled.status_code == 201, compiled.text
+        run = compiled.json()["run"]
+        assert run["source_first"] is (not selective)
+        run_id = run["id"]
+        assert execute_compile(client, run_id) == "completed"
+        assert len(chat.requests) == int(selective)
+        run_path = data["url"] + "/" + run_id
+        draft_before = client.get(run_path + "/draft.json").content
+        if selective:
+            supplement = json.loads(draft_before)["supplement"]
+            assert supplement["state"] == "completed"
+            assert any(item["origin"] == "model" for item in supplement["metadata"])
+        use_queue(FakeJobQueue())
+        queued = client.post(
+            run_path + "/reviews?background=true", json={}, headers={"Idempotency-Key": "prose"}
+        )
+        assert queued.status_code == 200, queued.text
+        review_id = queued.json()["id"]
+        outcome = client.portal.call(
+            manual_compiler_review_job, {"container": app.state.container}, review_id
+        )
+        assert outcome == "completed"
+        assert len(chat.requests) == int(selective) + 1
+        review_path = run_path + "/reviews?background=true"
+        replay = client.post(review_path, json={}, headers={"Idempotency-Key": "prose"})
+        assert replay.json()["id"] == review_id
+        different = client.post(
+            review_path, json={"structured_output": False}, headers={"Idempotency-Key": "prose"}
+        )
+        assert different.status_code == 409, different.text
+        report = client.get(f"{run_path}/reviews/{review_id}/report").json()
+        assert report["summary"]["source_units_checked"] == 4
+        assert report["summary"]["draft_units_checked"] == 6
+        assert report["summary"]["finding_count"] == 0
+        assert all(
+            a["source"]["text"] == a["draft_excerpts"][0]["text"]
+            for a in report["source_assessments"]
+        )
+        assert client.get(run_path + "/draft.json").content == draft_before
+
+
+def test_source_first_review_splits_single_over_budget_text_block(client):
+    from qnu.domains.modelops.inference.service import request_input_tokens
+    from qnu.main import app
+    from qnu.ports.chat_model import ChatMessage
+    from qnu.workers.tasks.compilation import manual_compiler_review_job
+
+    original = "Ngưỡng22%" * 5000
+    context_window = 36096
+    max_output = 4096
+
+    class SpanChat(SegmentedReviewChat):
+        def _respond(self, index):
+            request = self.requests[index]["body"]
+            messages = [ChatMessage(item["role"], item["content"]) for item in request["messages"]]
+            schema = request["response_format"]["json_schema"]["schema"]
+            assert request_input_tokens(messages, schema) + request["max_tokens"] <= context_window
+            payload = json.loads(messages[-1].content)
+            sources = payload["source_units"]
+            drafts = payload["draft_units"]
+            visible_sources = {
+                unit["id"]: unit for unit in sources + payload.get("context_source_units", [])
+            }
+            visible_drafts = drafts + payload.get("context_draft_units", [])
+            draft_refs = {
+                ref: draft["id"] for draft in visible_drafts for ref in draft.get("citations", [])
+            }
+            assert all(
+                visible_sources[ref]["text"] == draft["text"]
+                for draft in drafts
+                for ref in draft.get("citations", [])
+            )
+            return self._reply(
+                {
+                    "source_assessments": {
+                        src["id"]: {
+                            "status": "covered",
+                            "draft_ids": [draft_refs[src["id"]]],
+                            "explanation": "Khớp nguyên văn.",
+                            "suggested_action": "",
+                        }
+                        for src in sources
+                    },
+                    "draft_assessments": {
+                        draft["id"]: {
+                            "status": "supported",
+                            "source_ids": draft.get("citations") or [next(iter(visible_sources))],
+                            "explanation": "Khớp nguyên văn.",
+                            "suggested_action": "",
+                        }
+                        for draft in drafts
+                    },
+                }
+            )
+
+    data = processed_input(
+        client, code="source-first-review-long-block", response=ocr_blocks(original + "|Text")
+    )
+    with SpanChat() as chat:
+        provider = small_provider(
+            client, data, chat.base_url, context_window=context_window, max_output=max_output
+        )
+        assert set_quota(client, data["workspace"]["id"], 5_000_000).status_code == 200
+        compiled = request_compile(client, data, source_first=True, auto_review=False)
+        assert compiled.status_code == 201, compiled.text
+        run_id = compiled.json()["run"]["id"]
+        assert execute_compile(client, run_id) == "completed"
+        base = data["url"] + "/" + run_id + "/reviews"
+        use_queue(FakeJobQueue())
+        queued = client.post(
+            base + "?background=true",
+            json={"provider_id": provider["id"]},
+            headers={"Idempotency-Key": "text-spans"},
+        )
+        assert queued.status_code == 200, queued.text
+        review_id = queued.json()["id"]
+        assert (
+            client.portal.call(
+                manual_compiler_review_job, {"container": app.state.container}, review_id
+            )
+            == "completed"
+        )
+        assert len(chat.requests) > 1
+        report = client.get(f"{base}/{review_id}/report").json()
+        source = [item["source"] for item in report["source_assessments"]]
+        draft = [
+            item["draft"]
+            for item in report["draft_assessments"]
+            if item["draft"]["kind"] == "paragraph"
+        ]
+        assert len(source) == len(draft) > 3
+        assert len({unit["source_block_id"] for unit in source}) == 1
+        assert [unit["start_char"] for unit in source] == [
+            0,
+            *(unit["end_char"] for unit in source[:-1]),
+        ]
+        assert "".join(unit["text"] for unit in source) == original
+        assert "".join(unit["text"] for unit in draft) == original
+        assert report["summary"]["finding_count"] == 0

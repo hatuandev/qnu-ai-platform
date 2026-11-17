@@ -224,6 +224,9 @@ async def test_discovery_keeps_only_validated_capacity_fields():
         ("max_model_len", 0),
         ("max_model_len", -1),
         ("max_model_len", 3.5),
+        ("context_length", True),
+        ("context_length", "8192"),
+        ("max_completion_tokens", 3.5),
         ("embedding_dimension", 65537),
         ("max_output_tokens", 8193),
     ],
@@ -231,6 +234,37 @@ async def test_discovery_keeps_only_validated_capacity_fields():
 async def test_discovery_rejects_invalid_metadata_without_leaking_raw(field, value):
     result, _ = await call(
         "discovery", {"data": [{"id": "a", "max_model_len": 8192, field: value}]}
+    )
+    assert result.code == "provider_response_invalid"
+    assert result.models == [] and result.model_metadata == []
+
+
+async def test_discovery_reads_openai_catalog_limit_aliases():
+    result, _ = await call(
+        "discovery",
+        {
+            "data": [
+                {
+                    "id": "cx/gpt-6-luna",
+                    "context_length": 200000,
+                    "max_completion_tokens": 64000,
+                    "capabilities": {"contextWindow": 200000, "maxOutput": 64000},
+                }
+            ]
+        },
+    )
+    assert result.model_metadata[0].model_dump() == {
+        "id": "cx/gpt-6-luna",
+        "context_window_tokens": 200000,
+        "max_output_tokens": 64000,
+        "embedding_dimension": None,
+    }
+
+
+async def test_discovery_rejects_conflicting_limit_aliases():
+    result, _ = await call(
+        "discovery",
+        {"data": [{"id": "a", "max_model_len": 8192, "context_length": 16384}]},
     )
     assert result.code == "provider_response_invalid"
     assert result.models == [] and result.model_metadata == []

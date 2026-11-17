@@ -100,6 +100,23 @@ def test_row_year_proven_by_a_labelled_cell_in_its_row_is_accepted():
     validate_annotations([ok], content, documents, strict_roles=True)
 
 
+def test_year_inside_a_data_cell_scopes_only_that_cell():
+    content, documents = fixture(
+        headers=[["Ngành đào tạo", "Chỉ tiêu"]],
+        body=[["Mùa tuyển sinh 2027", "95"]],
+        columns=2,
+    )
+    found = annotations(content, documents)
+    assert not [
+        item
+        for item in found.values()
+        if item["target"].startswith("table:") and ":row:" not in item["target"]
+    ]
+    cell = found[f"table:{RUN}:{TABLE}:row:1:column:0"]
+    assert cell["values"] == {"data_year": 2027}
+    validate_annotations([cell], content, documents, strict_roles=True)
+
+
 def test_parent_single_year_never_overrides_a_multi_year_child_header():
     content, documents = fixture(
         headers=[

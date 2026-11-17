@@ -4,6 +4,7 @@ import json
 
 from qnu.domains.modelops.capacity.schemas import ModelTokenLimits
 from qnu.domains.ocr.review import automatic
+from qnu.domains.ocr.review.context import ContextIndex, build_context
 from qnu.domains.ocr.review.schemas import ContextSuggestedText, TextUnit
 
 
@@ -50,6 +51,38 @@ def test_batches_are_capped_and_cover_every_unit_in_order(monkeypatch):
     assert [offset for offset, _ in batches] == [0, 4, 8]
     assert [len(group) for _, group in batches] == [4, 4, 3]
     assert [evidence_id for _, group in batches for evidence_id in group] == ids
+
+
+def test_index_preserves_context_order_and_ownership_across_pages():
+    rows, _ = document(1)
+    target = next(iter(rows.values()))
+    def text(key, kind="paragraph"):
+        return {"evidence_id": key, "type": kind, "text": key}
+    document_body = {"pages": [
+        {"page_number": 1, "blocks": [text("title", "title"), text("previous")]},
+        {"page_number": 2, "blocks": [
+            {
+                **text("table", "table"),
+                "table": {"status": "parsed", "rows": [
+                    [{**text("header"), "header": True}],
+                    [text(target.evidence_id), text("same_row")],
+                    [text("unrelated_row")],
+                ]},
+            },
+            text("next"),
+        ]},
+    ]}
+    index = ContextIndex.from_document(document_body)
+    context = build_context(index, {target.evidence_id: target})
+    assert [item["evidence_id"] for item in context["units"]] == [target.evidence_id]
+    assert [(item["evidence_id"], item["relationship"]) for item in context["context"]] == [
+        ("title", "preceding_heading"),
+        ("header", "table_header"),
+        ("same_row", "table_row"),
+        ("previous", "page_boundary_candidate"),
+        ("next", "adjacent_block"),
+    ]
+    assert all(item["read_only"] for item in context["context"])
 
 
 def test_small_envelope_yields_smaller_batches(monkeypatch):

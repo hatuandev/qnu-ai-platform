@@ -1,5 +1,11 @@
-import { AlertCircle, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
-import { useRef, useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import {
   useCommitDecisionMutation,
   useCompiledVersionQuery,
@@ -7,15 +13,22 @@ import {
   useDecisionPreviewMutation,
   useDocumentSummaryQuery,
   useRegisterCompiledDocumentVersionMutation,
+  useRegistrationMetadataQuery,
   useReviewGateQuery,
 } from "@/api/documents/queries";
 import type {
+  AutomaticMetadataPreview,
   DecisionFindingResolution,
   DecisionPreviewResponse,
   DocumentSummaryResponse,
+  EventMoment,
+  MetadataEvent,
+  RetrievalAnnotation,
   ReviewAck,
+  ReviewFinding,
   VersionResponse,
 } from "@/api/documents/types";
+import { getRevisionContentBlob } from "@/api/knowledge/requests";
 import type { SourceVersionRef } from "@/api/knowledge/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +46,235 @@ type PendingDecision = {
   preview: DecisionPreviewResponse;
   key: string;
 };
+
+type SourceLocation = NonNullable<
+  ReviewFinding["finding"]["source_locations"]
+>[number];
+
+function ReviewSource({
+  workspaceId,
+  collectionId,
+  location,
+}: {
+  workspaceId: string;
+  collectionId: string;
+  location: SourceLocation;
+}) {
+  const [open, setOpen] = useState(false);
+  const [source, setSource] = useState<{
+    url: string;
+    pdf: boolean;
+    fileName?: string;
+  } | null>(null);
+  const [error, setError] = useState(false);
+  const {
+    source_id: sourceId,
+    revision_id: revisionId,
+    page,
+    file_name: fileName,
+  } = location;
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    let url: string | undefined;
+    void getRevisionContentBlob(
+      workspaceId,
+      collectionId,
+      sourceId,
+      revisionId,
+      {
+        signal: controller.signal,
+      },
+    ).then(
+      ({ blob, contentType, fileName: revisionFileName }) => {
+        if (controller.signal.aborted) return;
+        url = URL.createObjectURL(blob);
+        setSource({
+          url,
+          pdf: contentType.split(";")[0] === "application/pdf",
+          fileName: revisionFileName,
+        });
+      },
+      () => {
+        if (!controller.signal.aborted) setError(true);
+      },
+    );
+    return () => {
+      controller.abort();
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [workspaceId, collectionId, sourceId, revisionId, open]);
+
+  return (
+    <details
+      onToggle={(event) => {
+        const expanded = event.currentTarget.open;
+        setOpen(expanded);
+        if (!expanded) {
+          setSource(null);
+          setError(false);
+        }
+      }}
+    >
+      <summary className="cursor-pointer font-medium text-primary">
+        {fileName || "Tệp gốc"} · Bảng {location.table_number} · Trang {page}
+      </summary>
+      {open && (
+        <div className="mt-2 space-y-2">
+          {error ? (
+            <p role="alert">Không thể mở tệp gốc. Hãy đóng và mở lại để thử.</p>
+          ) : source ? (
+            <>
+              {source.pdf && (
+                <iframe
+                  className="h-96 w-full"
+                  title={`Tệp gốc, trang ${page}`}
+                  src={`${source.url}#page=${page}`}
+                />
+              )}
+              <a
+                className="text-primary underline"
+                href={source.url}
+                download={source.fileName || fileName || "tep-goc"}
+              >
+                Tải tệp gốc
+              </a>
+            </>
+          ) : (
+            <p role="status">Đang mở tệp gốc…</p>
+          )}
+        </div>
+      )}
+    </details>
+  );
+}
+
+const EVENT_UNITS: Record<string, string> = {
+  day: "ngày",
+  working_day: "ngày làm việc",
+  week: "tuần",
+  month: "tháng",
+};
+
+function formatIsoDate(value: string): string {
+  const [year, month, day] = value.split("-");
+  return day && month && year ? `${day}/${month}/${year}` : value;
+}
+
+function formatMoment(moment: EventMoment | null | undefined): string {
+  if (!moment) return "";
+  const parts: string[] = [];
+  if (moment.date) parts.push(formatIsoDate(moment.date));
+  else if (moment.year && moment.month)
+    parts.push(`tháng ${moment.month}/${moment.year}`);
+  else if (moment.month && moment.day)
+    parts.push(`ngày ${moment.day}/${moment.month}`);
+  else if (moment.month) parts.push(`tháng ${moment.month}`);
+  if (moment.time) parts.push(moment.time);
+  return parts.join(" ");
+}
+
+function formatSchedule(event: MetadataEvent): string {
+  if (event.relative) {
+    const unit = EVENT_UNITS[event.relative.unit] ?? event.relative.unit;
+    return `trong ${event.relative.value} ${unit} kể từ ${event.relative.from_event}`;
+  }
+  if (event.dates?.length) return event.dates.map(formatIsoDate).join(", ");
+  const start = formatMoment(event.window_start);
+  const moment = formatMoment(event.moment);
+  const end = event.end_exclusive && moment ? `trước ${moment}` : moment;
+  if (start && end) return `từ ${start} đến ${end}`;
+  return end || start || "chưa rõ thời điểm";
+}
+
+function formatScalar(value: string | number | boolean): string {
+  if (typeof value === "boolean") return value ? "Có" : "Không";
+  return String(value);
+}
+
+function annotationContext(target: string): string | null {
+  if (target === "document") return null;
+  if (target.startsWith("section:")) return "Trong một mục";
+  if (target.startsWith("paragraph:")) return "Trong một đoạn";
+  if (/^table:.+:row:/.test(target)) return "Trong một hàng của bảng";
+  if (target.startsWith("table:")) return "Trong một cột của bảng";
+  return "Trong một phần của tài liệu";
+}
+
+function annotationLines(values: RetrievalAnnotation["values"]): string[] {
+  const lines: string[] = [];
+  if (values.data_year) lines.push(`Năm dữ liệu: ${values.data_year}`);
+  if (values.issued_year) lines.push(`Năm ban hành: ${values.issued_year}`);
+  if (values.effective_from)
+    lines.push(`Hiệu lực từ: ${formatIsoDate(values.effective_from)}`);
+  if (values.effective_until)
+    lines.push(`Hiệu lực đến: ${formatIsoDate(values.effective_until)}`);
+  if (values.program) lines.push(`Ngành: ${values.program}`);
+  if (values.intake) lines.push(`Đợt: ${values.intake}`);
+  for (const [key, value] of Object.entries(values.attributes ?? {})) {
+    lines.push(`${key}: ${formatScalar(value)}`);
+  }
+  for (const event of values.events ?? []) {
+    lines.push(`${event.label}: ${formatSchedule(event)}`);
+  }
+  return [...new Set(lines)];
+}
+
+function RegistrationMetadataPanel({
+  preview,
+  isPending,
+  error,
+  onRetry,
+}: {
+  preview?: AutomaticMetadataPreview;
+  isPending: boolean;
+  error: Error | null;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-md bg-muted/40 p-3">
+      <p className="font-medium">Thông tin tự nhận diện từ nguồn</p>
+      {isPending ? (
+        <p role="status">Đang nhận diện năm, ngành, đợt và lịch…</p>
+      ) : error ? (
+        <div role="alert" className="space-y-2 text-destructive">
+          <p>Không tải được thông tin đăng ký: {error.message}</p>
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            <RefreshCw className="size-3.5" />
+            Thử lại
+          </Button>
+        </div>
+      ) : preview?.annotations.length ? (
+        <ul className="space-y-2">
+          {preview.annotations.map((annotation) => {
+            const context = annotationContext(annotation.target);
+            return (
+              <li key={annotation.target} className="space-y-1">
+                {context && (
+                  <p className="text-xs text-muted-foreground">{context}</p>
+                )}
+                <ul className="list-disc pl-4">
+                  {annotationLines(annotation.values).map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p>
+          Chưa nhận diện được năm, ngành, đợt hoặc lịch có căn cứ trong nguồn
+          này.
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Thông tin này được lưu cùng phiên bản và chỉ dùng làm phạm vi tra cứu;
+        hãy đối chiếu nhanh trước khi đăng ký.
+      </p>
+    </div>
+  );
+}
 
 /** The dialog is keyed by compilation run. Closing it never resets a committed step. */
 export function PublicationDialog({
@@ -114,6 +356,12 @@ export function PublicationDialog({
     open ? documentId : null,
     open ? versionId : null,
   );
+  const metadataQuery = useRegistrationMetadataQuery(
+    workspaceId,
+    collectionId,
+    open ? compilationRunId : null,
+    open && !versionId,
+  );
   const version = versionQuery.data ?? registeredVersion;
   const summary = summaryQuery.data;
   const exact =
@@ -161,6 +409,13 @@ export function PublicationDialog({
       !(canRegister === true || capabilities?.can_register === true)
     )
       return;
+    const metadataSha = metadataQuery.data?.sha256;
+    if (!metadataSha) {
+      setError(
+        "Chưa tải được thông tin tự nhận diện của nguồn. Hãy thử tải lại trước khi đăng ký.",
+      );
+      return;
+    }
     lock.current = true;
     setBusy(true);
     setError(null);
@@ -168,20 +423,36 @@ export function PublicationDialog({
       const result = documentId
         ? await registerVersion.mutateAsync({
             documentId,
-            data: { compilation_run_id: compilationRunId },
+            data: {
+              compilation_run_id: compilationRunId,
+              automatic_metadata_sha256: metadataSha,
+            },
             idempotencyKey: `reg_version_${documentId}_${compilationRunId}`,
           })
         : await create.mutateAsync({
-            data: registration.current,
+            data: {
+              ...registration.current,
+              automatic_metadata_sha256: metadataSha,
+            },
             idempotencyKey: `reg_${compilationRunId}`,
           });
       setDocumentId(result.document.id);
       setVersionId(result.version.id);
       setRegisteredVersion(result.version);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Không thể đăng ký tài liệu.",
-      );
+      if (
+        (err as { code?: string } | null)?.code ===
+        "registration_metadata_changed"
+      ) {
+        void metadataQuery.refetch();
+        setError(
+          "Thông tin tự nhận diện vừa thay đổi. Bản xem trước đã được tải lại; hãy đối chiếu rồi bấm Tiếp tục.",
+        );
+      } else {
+        setError(
+          err instanceof Error ? err.message : "Không thể đăng ký tài liệu.",
+        );
+      }
     } finally {
       lock.current = false;
       setBusy(false);
@@ -311,11 +582,19 @@ export function PublicationDialog({
           </div>
         )}
         {!versionId ? (
-          <p className="text-sm text-muted-foreground">
-            Lưu bản đang xem thành{" "}
-            {documentId ? "phiên bản mới của tài liệu" : "tài liệu"} trước khi
-            duyệt.
-          </p>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">
+              Lưu bản đang xem thành{" "}
+              {documentId ? "phiên bản mới của tài liệu" : "tài liệu"} trước khi
+              duyệt.
+            </p>
+            <RegistrationMetadataPanel
+              preview={metadataQuery.data}
+              isPending={metadataQuery.isPending}
+              error={metadataQuery.error}
+              onRetry={() => void metadataQuery.refetch()}
+            />
+          </div>
         ) : versionQuery.isPending && !registeredVersion ? (
           <p role="status" className="text-sm">
             Đang kiểm tra phiên bản…
@@ -348,6 +627,32 @@ export function PublicationDialog({
                         {item.finding.explanation ??
                           "Nhận xét cần đối chiếu với bản gốc."}
                       </p>
+                      {item.finding.source_locations?.map((location) => (
+                        <ReviewSource
+                          key={`${location.revision_id}:${location.table_number}`}
+                          workspaceId={workspaceId}
+                          collectionId={collectionId}
+                          location={location}
+                        />
+                      ))}
+                      {Boolean(item.finding.source_locations?.length) && (
+                        <details>
+                          <summary className="cursor-pointer font-medium text-primary">
+                            Xem đoạn cần đối chiếu
+                          </summary>
+                          {item.finding.draft_excerpts?.map((draft) => (
+                            <div
+                              className="mt-2 whitespace-pre-wrap"
+                              key={draft.text}
+                            >
+                              {draft.heading && (
+                                <p className="font-medium">{draft.heading}</p>
+                              )}
+                              <p>{draft.text}</p>
+                            </div>
+                          ))}
+                        </details>
+                      )}
                       <select
                         aria-label={`Xử lý nhận xét ${index + 1}`}
                         disabled={frozen}
@@ -483,6 +788,7 @@ export function PublicationDialog({
             <Button
               disabled={
                 busy ||
+                !metadataQuery.data ||
                 !(canRegister === true || capabilities?.can_register === true)
               }
               onClick={register}

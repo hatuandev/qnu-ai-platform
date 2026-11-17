@@ -11,6 +11,8 @@ Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thu�
 
 ## Kế hoạch QNU V1 hiện tại
 
+- [16/11/2026 — Metadata năm và thời gian cho QNU V1](2026-11-16_metadata_nam_va_thoi_gian_v1.md) — nhận diện năm theo bảng, lịch và hạn theo sự kiện, tự lưu khi phát hành và kiểm thử RAG trọng tâm. **Sẵn sàng bàn giao triển khai.**
+
 - [15/11/2026 — Mở rộng QNU: soạn thảo, học liệu và hỗ trợ công việc](./2026-11-15_mo_rong_qnu_soan_thao_hoc_lieu_va_cong_viec.md) — P0–P6 bao gồm agent soạn thảo P2, agent tạo câu hỏi P3, hướng dẫn tuyển sinh công khai P5, ngân hàng đề và báo cáo xuyên suốt. **Kế hoạch đề xuất.**
 
 - [16 — Hoàn thiện và nghiệm thu luồng chuẩn bị nội dung](./16_hoan_thien_va_nghiem_thu_luong_chuan_bi_noi_dung.md): kế hoạch G0–G6, dùng Qwen llama.cpp/BGE/MinerU đã seed; 8 nguồn, mục tiêu 97 câu mỗi biến thể A/B, kiểm chất lượng/tốc độ/độ bền và pilot. Mới lập kế hoạch, live benchmark NOT RUN.

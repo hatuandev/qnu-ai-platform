@@ -73,6 +73,7 @@ from qnu.ports.chat_model import ChatModel, ChatResponseError
 from qnu.ports.provider_execution import bind_usage
 
 logger = get_logger(__name__)
+PARTIAL_OUTPUT_INTERVAL_SECONDS = 30
 
 
 async def finish(
@@ -460,12 +461,6 @@ async def _run_segment(
                 raise
     drafts = []
     for child in parts:
-        policy = run.config["refinement"]
-        if (utcnow() - run.started_at).total_seconds() > policy["max_seconds"]:
-            raise AppException(
-                "Đã hết ngân sách thời gian chia phần.",
-                code="compilation_refinement_time_exhausted",
-            )
         await _resume_segment(db, blob, run, child)
         if child.status in {"failed", "uncertain"}:
             raise AppException(
@@ -484,6 +479,10 @@ async def _run_segment(
     }
     if run.config.get("ai_supplement"):
         draft["metadata"] = [item for child in drafts for item in child.get("metadata", [])]
+        draft["events"] = [item for child in drafts for item in child.get("events", [])]
+        draft["rejected_metadata_proposals"] = sum(
+            child.get("rejected_metadata_proposals", 0) for child in drafts
+        )
     own = segment.config["refined_usage_tokens"]
     segment.usage_tokens = (
         own + sum(child.usage_tokens for child in parts)
@@ -597,17 +596,7 @@ async def _run_leaf(
                     "Chính sách reasoning đã đổi so với yêu cầu của phần này.",
                     code="compilation_reasoning_changed",
                 )
-        policy = run.config.get("refinement")
-        if policy and run.started_at is not None:
-            elapsed = (utcnow() - run.started_at).total_seconds()
-            if (
-                elapsed + request.timeout_seconds + get_settings().MODEL_CHAT_QUEUE_TIMEOUT_SECONDS
-                > policy["max_seconds"]
-            ):
-                raise AppException(
-                    "Không đủ thời gian cho lượt gọi tiếp theo.",
-                    code="compilation_refinement_time_exhausted",
-                )
+        request = replace(request, enforce_completion_timeout=True)
         usage = await usage_service.reserve(
             db,
             actor,
@@ -651,6 +640,7 @@ async def _run_leaf(
 
         owned = project_documents(documents, plan.owned, [])
         draft["metadata"] = supplement.owned_metadata(draft, owned)
+        draft["events"] = supplement.owned_events(draft, owned)
         if plan.projection == split.PROJECTION_SELECTIVE:
             draft["sections"] = supplement.useful_sections(draft, owned, documents)
     if run.config.get("refinement"):
@@ -824,19 +814,41 @@ async def _merged_draft(
 
 
 async def _write_partial(
-    db: AsyncSession, blob: BlobStore, run: CompilationRun, documents: list[dict]
+    db: AsyncSession,
+    blob: BlobStore,
+    run: CompilationRun,
+    documents: list[dict],
+    *,
+    force: bool = False,
 ) -> None:
     """Single writer for partial generations; called only by the orchestrator."""
+    latest = await compilation_outputs.latest(db, run.id, partial=True)
+    if latest and not force:
+        age = (utcnow() - latest.created_at).total_seconds()
+        if age < PARTIAL_OUTPUT_INTERVAL_SECONDS:
+            await db.commit()
+            return
     segments = await _segments(db, run.id)
     if not run.config.get("ai_supplement") and not any(
         segment.status == "completed" for segment in segments
     ):
+        if not force:
+            await db.commit()
         return
     complete_nodes = (
         await _supplement_segments(db, segments) if run.selective_supplement else segments
     )
-    parts = await _completed_parts(db, blob, complete_nodes)
     coverage = _coverage(segments)
+    completed_ids = sorted(node.id for node in complete_nodes if node.status == "completed")
+    if (
+        latest
+        and latest.coverage.get("completed_node_ids") == completed_ids
+        and (not force or latest.coverage.get("segments") == coverage["segments"])
+    ):
+        if not force:
+            await db.commit()
+        return
+    parts = await _completed_parts(db, blob, complete_nodes)
     merged = await _merged_draft(run, documents, parts, coverage, partial=True)
     await compilation_outputs.store_output(
         db,
@@ -844,7 +856,7 @@ async def _write_partial(
         run,
         draft_payload=json_bytes(merged),
         markdown_payload=split.partial_markdown(merged),
-        coverage=coverage,
+        coverage={**coverage, "completed_node_ids": completed_ids},
         partial=True,
     )
     await commit_owned(db, run)
@@ -935,12 +947,18 @@ async def _run_parts(
 ) -> list[BaseException]:
     """Bounded overlap; stop launching new parts after the first failure."""
     limit = effective_concurrency(run.config)
+    clock = asyncio.get_running_loop().time
+    next_refresh = 0.0
 
     async def worker(segment_id: str) -> str:
         return await _run_part(run.id, run.worker_id, segment_id, blob, documents, model, total)
 
     async def settled() -> None:
+        nonlocal next_refresh
+        if clock() < next_refresh:
+            return
         await _write_partial(db, blob, run, documents)
+        next_refresh = clock() + PARTIAL_OUTPUT_INTERVAL_SECONDS
 
     return await run_bounded(segment_ids, worker, limit=limit, on_settled=settled)
 
@@ -962,19 +980,28 @@ async def _compile_segmented(
         if segment.status == "completed":
             continue
         await _resume_segment(db, blob, run, segment)
-        if segment.status in {"failed", "uncertain"}:
-            return await _finish_segment_problem(
-                db,
-                blob,
-                run,
-                documents,
-                segments,
-                "uncertain" if segment.status == "uncertain" else "failed",
-                segment.error_code,
-            )
     segments = await _segments(db, run.id)
+    # Reconcile every in-flight part before returning a terminal status for
+    # the run. A hard stop can interrupt more than one independent request.
+    uncertain_part = next((part for part in segments if part.status == "uncertain"), None)
+    failed_part = next((part for part in segments if part.status == "failed"), None)
+    stopped = uncertain_part or failed_part
+    if stopped is not None:
+        return await _finish_segment_problem(
+            db,
+            blob,
+            run,
+            documents,
+            segments,
+            "uncertain" if uncertain_part is not None else "failed",
+            stopped.error_code,
+        )
     pending = [segment.id for segment in segments if segment.status != "completed"]
     if pending:
+        # Each part uses an independent session, including while waiting for a
+        # model slot. The parent has only read state here and can release its
+        # connection before the children need it.
+        await db.commit()
         logger.info(
             "compilation_parts_started",
             run_id=run.id,
@@ -1038,7 +1065,10 @@ async def _compile_segmented(
         run.usage_tokens = refinement.total_usage(nodes)
     coverage = _coverage(segments)
     if coverage["state"] != "completed":
-        return await finish(db, run, "failed", "compilation_segments_incomplete")
+        return await _finish_segment_problem(
+            db, blob, run, documents, segments, "failed", "compilation_segments_incomplete"
+        )
+    await _write_partial(db, blob, run, documents, force=True)
     return await _finalize_segmented(db, blob, run, documents, segments, coverage)
 
 
@@ -1090,6 +1120,7 @@ async def _finish_segment_problem(
         return await _finalize_segmented(
             db, blob, run, documents, segments, _coverage(segments), failure_code=code
         )
+    await _write_partial(db, blob, run, documents, force=True)
     return await finish(db, run, status, code)
 
 
@@ -1235,6 +1266,12 @@ async def execute_run(
             if run is None or run.worker_id != token:
                 return "not_claimed"
             code = exc.code if isinstance(exc, AppException) else "compilation_failed"
+            logger.warning(
+                "compilation_run_failed",
+                run_id=run_id,
+                error_type=type(exc).__name__,
+                error_code=code,
+            )
             try:
                 if run.config.get("workflow_version") == "qnu.compiler.workflow/v2":
                     uncertain = code == "chat_provider_uncertain" or await _uncertain_segment(

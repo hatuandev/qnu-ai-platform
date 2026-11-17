@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.models import CompilationRun, utcnow
-from qnu.domains.knowledge.compilation.review import artifacts, parts, refinement
+from qnu.domains.knowledge.compilation.review import artifacts, parts, refinement, text_spans
 from qnu.domains.knowledge.compilation.review.access import (
     REVIEW_ROLES,
     authorize,
@@ -22,6 +22,12 @@ from qnu.domains.knowledge.compilation.review.access import (
     list_reviews,
     target_matches,
     untouched,
+)
+from qnu.domains.knowledge.compilation.review.literal import (
+    assess_source_headings,
+    assess_table_text_copies,
+    retained_sections,
+    source_prose_pairs,
 )
 from qnu.domains.knowledge.compilation.review.material import ReviewMaterial, load_material
 from qnu.domains.knowledge.compilation.review.models import (
@@ -113,6 +119,7 @@ async def prepare(
 ) -> PreparedReview:
     await authorize(db, actor, workspace_id, collection_id, write=True)
     run = await get_run(db, actor, workspace_id, collection_id, run_id)
+    allow_structured = req.structured_output or "structured_output" not in req.model_fields_set
     if key == "auto:" + run_id:
         from qnu.domains.knowledge.compilation.workflow.models import AutoReviewJob
 
@@ -136,7 +143,17 @@ async def prepare(
         )
     )
     if previous is not None:
-        if previous.request_hash != request_hash:
+        # Old rows used the compiler mode to choose the review contract. Replay
+        # their existing plan even if today's automatic policy would choose another.
+        stored_choice = previous.trace.get("allow_structured_review")
+        if stored_choice is None:
+            legacy_choice = run.source_first and allow_structured
+            choice_matches = (
+                previous.trace.get("concise_source_review", legacy_choice) == legacy_choice
+            )
+        else:
+            choice_matches = stored_choice == allow_structured
+        if previous.request_hash != request_hash or not choice_matches:
             raise Conflict("Idempotency-Key đã dùng cho review khác.", code="idempotency_conflict")
         if enqueue or previous.trace.get("background_review"):
             return PreparedReview(run, previous, None, None)
@@ -189,42 +206,45 @@ async def prepare(
         await db.commit()
         return PreparedReview(run, previous, None, None)
     material = await load_material(db, blob, run)
-    messages = messages_for(material.payload, structured=req.structured_output)
-    schema = (
-        output_schema(material.payload, require_references=2) if req.structured_output else None
+    sections = (
+        await asyncio.to_thread(retained_sections, material.payload, run.id)
+        if allow_structured
+        else []
     )
+    concise = allow_structured and (run.source_first or bool(sections))
+    structured = concise or req.structured_output
+    schema = None
+    single_call = (None, None)
     runtime: ChatRuntime
-    budget = None
     plans: list[parts.ReviewPartPlan] = []
-    try:
-        runtime, request, budget = await prepare_chat_request(
-            db,
-            actor,
-            workspace_id,
-            messages,
-            provider_id=req.provider_id,
-            task="compiler_review",
-            max_output_tokens=req.max_output_tokens,
-            output_schema=schema,
-            reasoning_task="compiler_review",
-        )
-        reasoning_dir = runtime.reasoning_directive("compiler_review")
-        reasoning_shares = reasoning_dir is None or reasoning_dir.level != "off"
-        if parts.requires_output_segmentation(
-            material.payload,
-            output_tokens=budget.max_output_tokens,
-            structured=req.structured_output,
-            reasoning_shares_budget=reasoning_shares,
-        ):
-            raise AppException(
-                "Ước lượng đầu ra review vượt ngân sách an toàn một lần gọi; chuyển sang chia phần.",
-                code="compilation_review_output_requires_segments",
-                status_code=422,
+    span_layout: text_spans.SpanLayout = {}
+    if not concise:
+        messages = messages_for(material.payload, structured=structured)
+        schema = output_schema(material.payload, require_references=2) if structured else None
+        try:
+            runtime, request, budget = await prepare_chat_request(
+                db,
+                actor,
+                workspace_id,
+                messages,
+                provider_id=req.provider_id,
+                task="compiler_review",
+                max_output_tokens=req.max_output_tokens,
+                output_schema=schema,
+                reasoning_task="compiler_review",
             )
-        single_call = (request, messages)
-    except AppException as exc:
-        if exc.code not in SEGMENTED_CODES:
-            raise
+            reasoning_dir = runtime.reasoning_directive("compiler_review")
+            if not parts.requires_output_segmentation(
+                material.payload,
+                output_tokens=budget.max_output_tokens,
+                structured=structured,
+                reasoning_shares_budget=reasoning_dir is None or reasoning_dir.level != "off",
+            ):
+                single_call = (request, messages)
+        except AppException as exc:
+            if exc.code not in SEGMENTED_CODES:
+                raise
+    if single_call[0] is None:
         runtime, budget = await prepare_chat_limits(
             db,
             actor,
@@ -239,19 +259,32 @@ async def prepare(
                 "Chưa xác định được ngân sách review.",
                 code="model_capacity_required",
                 status_code=422,
-            ) from exc
+            )
         reasoning_dir = runtime.reasoning_directive("compiler_review")
         reasoning_shares = reasoning_dir is None or reasoning_dir.level != "off"
-        plans = await asyncio.to_thread(
-            parts.plan_parts,
-            material.payload,
-            capacity=capacity,
-            output_tokens=budget.max_output_tokens,
-            structured=req.structured_output,
-            reasoning_shares_budget=reasoning_shares,
-        )
-        single_call = (None, None)
-    assert budget is not None
+        if concise:
+            structural = assess_source_headings(material.payload, sections)
+            if sections:
+                structural += await asyncio.to_thread(assess_table_text_copies, material.payload)
+            source_copies = source_prose_pairs(material.payload) if sections else None
+            material, plans, span_layout = await asyncio.to_thread(
+                text_spans.plan,
+                material,
+                capacity=capacity,
+                output_tokens=budget.max_output_tokens,
+                reasoning_shares_budget=reasoning_shares,
+                structural_drafts=structural,
+                source_copies=source_copies,
+            )
+        else:
+            plans = await asyncio.to_thread(
+                parts.plan_parts,
+                material.payload,
+                capacity=capacity,
+                output_tokens=budget.max_output_tokens,
+                structured=structured,
+                reasoning_shares_budget=reasoning_shares,
+            )
     reasoning = runtime.reasoning_directive("compiler_review")
     reasoning_shares = reasoning is None or reasoning.level != "off"
     out_budget = parts.output_budget(
@@ -284,7 +317,9 @@ async def prepare(
         "reasoning_reserve_tokens": out_budget.reasoning_reserve_tokens,
         "framing_reserve_tokens": out_budget.framing_reserve_tokens,
         "total_reserved_tokens": budget.total_reserved_tokens,
-        "structured_output": req.structured_output,
+        "concise_source_review": concise,
+        "allow_structured_review": allow_structured,
+        "structured_output": structured,
         "output_schema_sha256": digest(schema) if schema is not None else None,
     }
     if plans:
@@ -293,7 +328,7 @@ async def prepare(
                 "workflow_version": "qnu.compiler.review.workflow/v2",
                 "segmentation": {
                     "planner_version": parts.PLANNER_VERSION,
-                    "prompt_version": parts.SEGMENT_PROMPT_VERSION,
+                    "prompt_version": plans[0].prompt_version,
                     "segment_count": len(plans),
                     "input_capacity_tokens": available_input_tokens(
                         runtime.token_limits, budget.max_output_tokens
@@ -306,6 +341,8 @@ async def prepare(
                 },
             }
         )
+    if span_layout:
+        trace[text_spans.VERSION] = span_layout
     seconds = max(900, runtime.timeout_seconds + 60) * max(1, len(plans))
     row = CompilationReview(
         id=new_id("rvw"),
@@ -439,7 +476,7 @@ async def _store_segments(
                 attempt_count=0,
                 scope=plan.scope_dict(),
                 input_sha256=plan.input_sha256,
-                prompt_version=parts.SEGMENT_PROMPT_VERSION,
+                prompt_version=plan.prompt_version,
                 schema_sha256=plan.schema_sha256,
                 config=config,
                 request_hash=digest(

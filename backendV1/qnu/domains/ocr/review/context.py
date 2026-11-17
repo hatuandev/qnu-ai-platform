@@ -2,6 +2,7 @@
 
 import re
 import unicodedata
+from dataclasses import dataclass
 
 from pydantic import ValidationError
 
@@ -19,7 +20,40 @@ MAX_CONTEXT_CHARS = 8000
 MAX_CONTEXT_ITEM_CHARS = 1500
 
 
-def build_context(document: dict, targets: dict[str, TextUnit], *, max_chars=MAX_CONTEXT_CHARS):
+@dataclass(frozen=True, slots=True)
+class ContextIndex:
+    blocks: list[tuple[int, dict]]
+    locations: dict[str, list[tuple[int, int | None]]]
+    headings: list[tuple[int, dict] | None]
+    headers: dict[int, list[tuple[int, int]]]
+
+    @classmethod
+    def from_document(cls, document: dict) -> "ContextIndex":
+        blocks = [(p["page_number"], b) for p in document["pages"] for b in p["blocks"]]
+        locations: dict[str, list[tuple[int, int | None]]] = {}
+        headings = []
+        headers = {}
+        heading = None
+        for index, (page, block) in enumerate(blocks):
+            if block["type"] == "title":
+                heading = (page, block)
+            headings.append(heading)
+            locations.setdefault(block["evidence_id"], []).append((index, None))
+            table = block.get("table")
+            if not table or table["status"] != "parsed":
+                continue
+            headers[index] = []
+            for row, cells in enumerate(table["rows"]):
+                for column, cell in enumerate(cells):
+                    locations.setdefault(cell["evidence_id"], []).append((index, row))
+                    if cell.get("header"):
+                        headers[index].append((row, column))
+        return cls(blocks, locations, headings, headers)
+
+
+def build_context(
+    document: dict | ContextIndex, targets: dict[str, TextUnit], *, max_chars=MAX_CONTEXT_CHARS
+):
     """Only same-table cells, source neighbors and the preceding heading are read-only."""
     contexts, seen = [], set(targets)
     remaining, truncated = max_chars, False
@@ -52,31 +86,29 @@ def build_context(document: dict, targets: dict[str, TextUnit], *, max_chars=MAX
         )
         remaining -= len(text[:limit])
 
-    blocks = [(p["page_number"], b) for p in document["pages"] for b in p["blocks"]]
-    heading = None
-    for index, (page, block) in enumerate(blocks):
-        if block["type"] == "title":
-            heading = (page, block)
-        table = block.get("table")
-        rows = table["rows"] if table and table["status"] == "parsed" else []
-        selected_rows = {
-            r for r, row in enumerate(rows) if any(c["evidence_id"] in targets for c in row)
-        }
-        if block["evidence_id"] not in targets and not selected_rows:
-            continue
+    lookup = document if isinstance(document, ContextIndex) else ContextIndex.from_document(document)
+    blocks = lookup.blocks
+    selected: dict[int, set[int]] = {}
+    for evidence_id in targets:
+        for index, row in lookup.locations.get(evidence_id, []):
+            rows = selected.setdefault(index, set())
+            if row is not None:
+                rows.add(row)
+    for index, selected_rows in sorted(selected.items()):
+        page, block = blocks[index]
+        heading = lookup.headings[index]
         if heading:
             add(heading[1], heading[0], "preceding_heading")
-        for r, row in enumerate(rows):
-            for c, cell in enumerate(row):
-                if cell.get("header") or r in selected_rows:
-                    add(
-                        cell,
-                        page,
-                        "table_header" if cell.get("header") else "table_row",
-                        block["evidence_id"],
-                        r + 1,
-                        c + 1,
-                    )
+        if index in lookup.headers:
+            rows = block["table"]["rows"]
+            coordinates = set(lookup.headers[index])
+            coordinates.update((r, c) for r in selected_rows for c in range(len(rows[r])))
+            for r, c in sorted(coordinates):
+                cell = rows[r][c]
+                add(
+                    cell, page, "table_header" if cell.get("header") else "table_row",
+                    block["evidence_id"], r + 1, c + 1,
+                )
         for neighbor in (index - 1, index + 1):
             if 0 <= neighbor < len(blocks):
                 other_page, other = blocks[neighbor]

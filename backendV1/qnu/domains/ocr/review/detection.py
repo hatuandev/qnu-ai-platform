@@ -13,7 +13,12 @@ from qnu.domains.modelops.public_api import resolve_chat_runtime
 from qnu.domains.modelops.usage.service import usage_service
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.ocr.models import OcrProcessingRun, utcnow
-from qnu.domains.ocr.review.context import CONTEXT_VERSION, build_context, contextual_suggestions
+from qnu.domains.ocr.review.context import (
+    CONTEXT_VERSION,
+    ContextIndex,
+    build_context,
+    contextual_suggestions,
+)
 from qnu.domains.ocr.review.models import SpellingDisposition, SpellingReview, SpellingRun
 from qnu.domains.ocr.review.schemas import (
     ContextSuggestedText,
@@ -81,7 +86,7 @@ async def inspect(
     automatic_parent: str | None = None,
     configuration_hash: str | None = None,
     review: ReviewDocument | None = None,
-    canonical: dict | None = None,
+    canonical: dict | ContextIndex | None = None,
 ) -> DetectionResponse:
     await authorize(db, actor, run, write=True, lock=True)
     # Preserve replay hashes of pre-existing requests that did not select a snapshot.
@@ -333,6 +338,7 @@ def detection_response(
     response = DetectionResponse.model_validate(row).model_copy(
         update={
             "total_evidence_count": row.trace.get("total_evidence_count"),
+            "scope": row.trace.get("scope", "full"),
             "withheld_suggestions": [
                 Suggestion.model_validate(s) for s in row.trace.get("withheld_suggestions", [])
             ],
@@ -413,6 +419,7 @@ async def status_summary(
                 SpellingReview.reviewed_at,
                 SpellingRun.checked_evidence_ids,
                 SpellingRun.trace["total_evidence_count"].label("total_evidence_count"),
+                SpellingRun.trace["scope"].astext.label("scope"),
                 ignored_count.label("ignored_count"),
                 (func.jsonb_array_length(SpellingRun.suggestions) + withheld_count).label(
                     "suggestions"
@@ -428,6 +435,11 @@ async def status_summary(
             )
             .order_by(
                 case(
+                    (SpellingRun.trace["scope"].astext == "skipped", 2),
+                    (SpellingRun.trace["scope"].astext == "selected", 1),
+                    else_=0,
+                ),
+                case(
                     (SpellingReview.reviewed_at.is_not(None), 0),
                     (status == "completed", 1),
                     (status == "running", 2),
@@ -440,7 +452,14 @@ async def status_summary(
         )
     ).one_or_none()
     if row is None:
-        return SpellingStatusSummary()
+        # Preparation can finish before the spelling worker claims its first job.
+        pending = (
+            version == 0
+            and run.status in {"completed", "completed_with_warnings"}
+            and run.finished_at is not None
+            and (utcnow() - run.finished_at).total_seconds() < 600
+        )
+        return SpellingStatusSummary(running=pending)
     return SpellingStatusSummary(
         running=row.running,
         check=SpellingCheckSummary(
@@ -450,5 +469,6 @@ async def status_summary(
             total_evidence_count=row.total_evidence_count,
             pending_count=max(0, row.suggestions - row.ignored_count),
             ignored_count=row.ignored_count,
+            scope=row.scope or "full",
         ),
     )

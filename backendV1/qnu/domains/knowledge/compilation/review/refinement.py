@@ -330,15 +330,11 @@ def total_usage(segments: list[CompilationReviewSegment]) -> int | None:
 
 
 def _executed_request_count(segments: list[CompilationReviewSegment]) -> int:
-    return sum(
-        int(entry.get("requests") or 1) for seg in segments for entry in _live_attempts(seg)
-    )
+    return sum(int(entry.get("requests") or 1) for seg in segments for entry in _live_attempts(seg))
 
 
 def _token_exposure(segments: list[CompilationReviewSegment]) -> int:
-    return sum(
-        _attempt_exposure(entry, seg) for seg in segments for entry in _live_attempts(seg)
-    )
+    return sum(_attempt_exposure(entry, seg) for seg in segments for entry in _live_attempts(seg))
 
 
 def _observed_tokens_sum(segments: list[CompilationReviewSegment]) -> int:
@@ -430,6 +426,8 @@ def check_limits(
     segments: list[CompilationReviewSegment],
     parent: CompilationReviewSegment,
     limits: ReviewRefinementLimits,
+    *,
+    child_requests: int = 2,
 ) -> None:
     """Structural ceilings before creating children; requests are re-checked per send."""
     now = utcnow()
@@ -458,7 +456,7 @@ def check_limits(
             code="compilation_review_refinement_node_limit_exceeded",
             status_code=422,
         )
-    if _executed_request_count(segments) + 2 > limits.max_requests:
+    if _executed_request_count(segments) + child_requests > limits.max_requests:
         raise AppException(
             "Review vượt tổng số lượt gọi model tối đa.",
             code="compilation_review_refinement_request_limit_exceeded",
@@ -470,7 +468,7 @@ def check_limits(
             or (review.trace or {}).get("max_output_tokens")
             or parts.DEFAULT_MAX_OUTPUT_TOKENS
         )
-        if _token_exposure(segments) + 2 * step_budget > limits.max_tokens:
+        if _token_exposure(segments) + child_requests * step_budget > limits.max_tokens:
             raise AppException(
                 "Review vượt tổng ngân sách token refinement.",
                 code="compilation_review_refinement_token_budget_exceeded",
@@ -615,6 +613,11 @@ def split_segment_plans(
     )
     reasoning_cfg = cfg.get("reasoning") or {}
     reasoning_shares = reasoning_cfg.get("level") != "off"
+    prompt_version = (
+        parts.CONCISE_SEGMENT_PROMPT_VERSION
+        if parent.prompt_version == parts.CONCISE_SEGMENT_PROMPT_VERSION
+        else parts.SEGMENT_PROMPT_VERSION
+    )
 
     def build_child(
         child_index: int,
@@ -639,9 +642,7 @@ def split_segment_plans(
             material_payload, set(owned_s), cited_s - set(owned_s), source_order
         )
         if owned_d:
-            ctx_drafts = parts._draft_context(
-                material_payload, set(owned_d), draft_order, set()
-            )
+            ctx_drafts = parts._draft_context(material_payload, set(owned_d), draft_order, set())
             for key in parent_ctx_drafts:
                 if key not in owned_d and key not in ctx_drafts:
                     ctx_drafts.append(key)
@@ -663,14 +664,11 @@ def split_segment_plans(
             capacity=capacity,
             output_tokens=max_output_tokens,
             reasoning_shares_budget=reasoning_shares,
+            prompt_version=prompt_version,
         )
 
-    left_plan = build_child(
-        next_index, left_sources, left_drafts, right_sources, right_drafts
-    )
-    right_plan = build_child(
-        next_index + 1, right_sources, right_drafts, left_sources, left_drafts
-    )
+    left_plan = build_child(next_index, left_sources, left_drafts, right_sources, right_drafts)
+    right_plan = build_child(next_index + 1, right_sources, right_drafts, left_sources, left_drafts)
     assert_progress(source_ids, draft_ids, (left_plan, right_plan))
     return left_plan, right_plan
 
@@ -728,7 +726,7 @@ def create_child_segments(
                 attempt_count=0,
                 scope=child_scope,
                 input_sha256=plan.input_sha256,
-                prompt_version=parts.SEGMENT_PROMPT_VERSION,
+                prompt_version=plan.prompt_version,
                 schema_sha256=plan.schema_sha256,
                 config=child_config,
                 request_hash=digest(
@@ -785,19 +783,9 @@ def verify_parent_child_coverage(
             continue
         p_sources = list((parent.scope or {}).get("source_ids", []))
         p_drafts = list((parent.scope or {}).get("draft_ids", []))
-        c_sources = [
-            key
-            for child in children
-            for key in (child.scope or {}).get("source_ids", [])
-        ]
-        c_drafts = [
-            key
-            for child in children
-            for key in (child.scope or {}).get("draft_ids", [])
-        ]
-        if Counter(p_sources) != Counter(c_sources) or Counter(p_drafts) != Counter(
-            c_drafts
-        ):
+        c_sources = [key for child in children for key in (child.scope or {}).get("source_ids", [])]
+        c_drafts = [key for child in children for key in (child.scope or {}).get("draft_ids", [])]
+        if Counter(p_sources) != Counter(c_sources) or Counter(p_drafts) != Counter(c_drafts):
             raise AppException(
                 "Phần con review không khớp toàn vẹn phạm vi sở hữu của phần cha.",
                 code="compilation_review_plan_invalid",

@@ -15,6 +15,7 @@ from qnu.domains.knowledge.compilation.models import CompilationRun
 from qnu.domains.knowledge.compilation.schemas import (
     CompilationCreated,
     CompilationProgress,
+    CompilationProgressSummary,
     CompilationRequest,
     CompilationResponse,
 )
@@ -113,6 +114,17 @@ async def compilation_progress(
     actor: AuthActor = Depends(get_actor),
 ) -> CompilationProgress:
     return await service.progress(db, actor, workspace_id, collection_id, run_id)
+
+
+@router.get("/{run_id}/progress/summary", response_model=CompilationProgressSummary)
+async def compilation_progress_summary(
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_actor),
+) -> CompilationProgressSummary:
+    return await service.progress_summary(db, actor, workspace_id, collection_id, run_id)
 
 
 @router.get("/{run_id}/segments/{segment_index}/raw")

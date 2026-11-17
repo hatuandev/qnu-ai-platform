@@ -29,13 +29,17 @@ export function currentSpellingCheck(
 ) {
   if (!checks || version === undefined) return undefined;
   const relevant = checks.filter(
-    (check) => check.version === version || check.reviewed_version === version,
+    (check) =>
+      check.scope !== "skipped" &&
+      (check.version === version || check.reviewed_version === version),
   );
+  const fullChecks = relevant.filter((check) => check.scope !== "selected");
+  const candidates = fullChecks.length ? fullChecks : relevant;
   return (
-    relevant.find((check) => check.reviewed_at) ??
-    relevant.find((check) => check.status === "completed") ??
-    relevant.find((check) => check.status === "running") ??
-    relevant[0]
+    candidates.find((check) => check.reviewed_at) ??
+    candidates.find((check) => check.status === "completed") ??
+    candidates.find((check) => check.status === "running") ??
+    candidates[0]
   );
 }
 

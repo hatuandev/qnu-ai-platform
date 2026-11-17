@@ -40,6 +40,7 @@ export type DocumentTaskProgressInput = {
     completed: number;
     total: number;
     segmented?: boolean;
+    elapsedSeconds?: number | null;
   } | null;
 };
 
@@ -178,7 +179,7 @@ export function resolveDocumentTaskProgress(
         unit: "phần",
         percent: pct,
         isIndeterminate: false,
-        detailText: `Đã chuẩn bị ${compDone}/${compTotal} phần`,
+        detailText: `${(compilationProgress?.elapsedSeconds ?? 0) >= 25 * 60 ? "Đang mất nhiều thời gian · " : ""}Đã chuẩn bị ${compDone}/${compTotal} phần`,
       };
     } else {
       // Single-part compilation or total not established

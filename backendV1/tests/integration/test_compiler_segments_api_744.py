@@ -1,7 +1,10 @@
 """New progress/partial routes stay additive for existing single-call runs."""
 
 import json
+from datetime import timedelta
 
+from qnu.domains.knowledge.compilation.models import CompilationRun, utcnow
+from qnu.platform.database import AsyncSessionFactory
 from tests.integration.compiler_support import (
     FakeChat,
     chat_provider,
@@ -66,6 +69,31 @@ class CompatibilityChat(FakeChat):
         return 200, self.last_raw
 
 
+def test_compiler_can_dispatch_parts_after_old_run_deadline(client):
+    data = processed_input(client, code="compiler-long-running")
+    with FakeChat() as chat:
+        chat_provider(client, data, chat.base_url)
+        created = request_compile(client, data)
+        assert created.status_code == 201, created.text
+        run_id = created.json()["run"]["id"]
+
+        async def age_existing_run():
+            async with AsyncSessionFactory() as db:
+                run = await db.get(CompilationRun, run_id)
+                run.started_at = utcnow() - timedelta(minutes=31)
+                run.config = {
+                    **run.config,
+                    "refinement": {**run.config["refinement"], "max_seconds": 1500},
+                }
+                await db.commit()
+
+        client.portal.call(age_existing_run)
+        assert execute_compile(client, run_id) == "completed"
+        assert len(chat.requests) == 1
+        progress = client.get(data["url"] + "/" + run_id + "/progress").json()
+        assert progress["completed"] == 1 and progress["elapsed_seconds"] >= 31 * 60
+
+
 def test_new_small_run_uses_one_refinable_node_and_exposes_its_artifacts(client):
     data = processed_input(client, code="compat-progress")
     with CompatibilityChat() as chat:
@@ -83,6 +111,11 @@ def test_new_small_run_uses_one_refinable_node_and_exposes_its_artifacts(client)
         assert body["total"] == 1 and body["completed"] == 1
         assert len(body["segments"]) == 1 and len(body["nodes"]) == 1
         assert body["latest_output_generation"] is not None
+        summary = client.get(base + "/progress/summary")
+        assert summary.status_code == 200, summary.text
+        assert set(summary.json()) == {"status", "completed", "total", "elapsed_seconds"}
+        assert summary.json()["completed"] == body["completed"]
+        assert summary.json()["total"] == body["total"]
 
         assert client.get(base + "/draft?partial=true").status_code == 200
         assert client.get(base + "/segments/1/raw").status_code == 200

@@ -17,7 +17,12 @@ from html import escape
 from typing import Any
 
 from qnu.domains.ocr.artifacts.render import RenderedDocument
-from qnu.domains.ocr.config import CANONICAL_SCHEMA, MANIFEST_SCHEMA, MARKDOWN_VERSION
+from qnu.domains.ocr.config import (
+    CANONICAL_SCHEMA,
+    LEGACY_MARKDOWN_VERSION,
+    MANIFEST_SCHEMA,
+    MARKDOWN_VERSION,
+)
 from qnu.domains.ocr.layout import PageLayout, Table
 
 BBOX_UNITS = "normalized_0_1"
@@ -215,13 +220,13 @@ def build_canonical(
     return canonical
 
 
-def _table_html(table: dict[str, Any]) -> str:
+def _table_html(table: dict[str, Any], *, linked: bool) -> str:
     parts = ['<table class="ocr">']
     for row in table["rows"]:
         parts.append("<tr>")
         for cell in row:
             tag = "th" if cell["header"] else "td"
-            attributes = ""
+            attributes = f' id="{escape(cell["evidence_id"])}"' if linked else ""
             if cell["col_span"] > 1:
                 attributes += f' colspan="{cell["col_span"]}"'
             if cell["row_span"] > 1:
@@ -232,15 +237,18 @@ def _table_html(table: dict[str, Any]) -> str:
     return "".join(parts)
 
 
-def render_markdown(canonical: dict[str, Any]) -> str:
-    """Derived Markdown keeps literal text and marks each page; tables stay structured."""
+def render_markdown(canonical: dict[str, Any], *, legacy: bool = False) -> str:
+    """Render source content with stable references into the accompanying JSON."""
     identity = canonical["identity"]
+    markdown_version = LEGACY_MARKDOWN_VERSION if legacy else MARKDOWN_VERSION
     lines = [
-        f"<!-- {MARKDOWN_VERSION} -->",
+        f"<!-- {markdown_version} -->",
         f"<!-- source_sha256: {identity['source_sha256']} -->",
         f"<!-- run_id: {identity['run_id']} generation: {identity['generation']} -->",
-        "",
     ]
+    if not legacy and (version_id := (canonical.get("text_review") or {}).get("version_id")):
+        lines.append(f"<!-- text_version_id: {escape(version_id)} -->")
+    lines.append("")
     renderer = canonical.get("processing", {}).get("renderer", {})
     unit = "document" if renderer.get("pagination") == "document" else "page"
     for page in canonical["pages"]:
@@ -261,12 +269,14 @@ def render_markdown(canonical: dict[str, Any]) -> str:
                 f" error={failure['error_code']} -->"
             )
         for block in page["blocks"]:
+            if not legacy:
+                lines.append(f"<!-- evidence: {escape(block['evidence_id'])} -->")
             if image := block.get("image"):
                 lines.append(f"![Ảnh trong tài liệu]({image['filename']})")
                 lines.append("")
             table = block.get("table")
             if table is not None and table["status"] == "parsed":
-                lines.append(_table_html(table))
+                lines.append(_table_html(table, linked=not legacy))
                 lines.append("")
                 continue
             if block["text"]:

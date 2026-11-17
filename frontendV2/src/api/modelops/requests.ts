@@ -19,6 +19,7 @@ import type {
   ModelDefaults,
   ModelProvider,
   ProviderKey,
+  TokenLimits,
 } from "./types";
 
 export function buildConnectionModelPayload(input: ConnectionModelCreateInput) {
@@ -132,6 +133,36 @@ export async function deleteConnectionModel(
   modelId: string,
 ): Promise<void> {
   await v1Client.delete(modelopsPaths.connectionModel(connectionId, modelId));
+}
+
+export async function discoverProvider(
+  providerId: string,
+): Promise<DiagnosticCheck> {
+  return v1Client.post<DiagnosticCheck>(
+    modelopsPaths.discover(providerId),
+    {},
+    { timeoutMs: 120_000 },
+  );
+}
+
+export async function syncConnectionCapacity(
+  connectionId: string,
+  body: { check_id: string; model_names: string[] },
+): Promise<ModelProvider[]> {
+  return v1Client.post<ModelProvider[]>(
+    modelopsPaths.connectionSyncCapacity(connectionId),
+    body,
+    { timeoutMs: 120_000 },
+  );
+}
+
+export async function updateProviderCapacity(
+  providerId: string,
+  tokenLimits: TokenLimits,
+): Promise<ModelProvider> {
+  return v1Client.patch<ModelProvider>(modelopsPaths.provider(providerId), {
+    token_limits: tokenLimits,
+  });
 }
 
 export async function listConnectionKeys(

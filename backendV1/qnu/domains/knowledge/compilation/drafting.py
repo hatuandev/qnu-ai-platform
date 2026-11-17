@@ -115,20 +115,29 @@ def validated_draft(draft: DraftContent, topic: str, documents: list[dict], run_
 def markdown_for(draft: dict) -> str:
     title = draft["title"]
     lines = [f"# {escape(title)}", ""] if title and title.strip() else []
+    if node := draft.get("node"):
+        lines.append(f"<!-- compilation_segment_id: {escape(node['id'])} -->")
+    else:
+        lines.append(f"<!-- compilation_run_id: {escape(draft['compilation_run_id'])} -->")
     lines += ["> Bản nháp chưa duyệt.", ""]
-    for section in draft["sections"]:
+    for section_no, section in enumerate(draft["sections"], start=1):
+        lines += [f"<!-- draft_id: section:{section_no}:heading -->"]
         lines += [f"## {escape(section['heading'])}", ""]
-        for paragraph in section["paragraphs"]:
+        for paragraph_no, paragraph in enumerate(section["paragraphs"], start=1):
+            lines.append(f"<!-- draft_id: section:{section_no}:paragraph:{paragraph_no} -->")
             refs = " ".join(f"[{escape(ref)}]" for ref in paragraph["citations"])
             lines += [escape(paragraph["text"]) + " " + refs, ""]
-    for entry in draft["source_tables"]:
-        lines += [f"### Bảng nguồn [{escape(entry['citation'])}]", "", "<table>"]
-        for row in entry["table"]["rows"]:
+    for table_no, entry in enumerate(draft["source_tables"], start=1):
+        ref = escape(entry["citation"])
+        lines += [f"<!-- draft_id: table:{table_no} -->", f"### Bảng nguồn [{ref}]", "", "<table>"]
+        for row_no, row in enumerate(entry["table"]["rows"], start=1):
             lines.append("<tr>")
-            for cell in row:
+            for cell_no, cell in enumerate(row, start=1):
                 tag = "th" if cell["header"] else "td"
+                cell_id = f"table:{table_no}:row:{row_no}:cell:{cell_no}"
                 lines.append(
-                    f'<{tag} rowspan="{cell["row_span"]}" colspan="{cell["col_span"]}">{escape(cell["text"])}</{tag}>'
+                    f'<{tag} id="{cell_id}" rowspan="{cell["row_span"]}" '
+                    f'colspan="{cell["col_span"]}">{escape(cell["text"])}</{tag}>'
                 )
             lines.append("</tr>")
         lines += ["</table>", ""]

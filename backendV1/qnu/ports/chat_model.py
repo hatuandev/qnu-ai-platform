@@ -43,6 +43,7 @@ class ChatRequest:
     wait_for_completion: bool = False
     automatic_output_budget: bool = False
     budget_identity: str | None = None
+    enforce_completion_timeout: bool = False
 
 
 @dataclass(frozen=True, slots=True)

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import CompilationRun, utcnow
-from qnu.domains.knowledge.compilation.review import artifacts, refinement
+from qnu.domains.knowledge.compilation.review import artifacts, refinement, text_spans
 from qnu.domains.knowledge.compilation.review.material import ReviewMaterial, load_material
 from qnu.domains.knowledge.compilation.review.models import (
     CompilationReview,
@@ -117,6 +117,9 @@ async def target_matches(
             "Nguồn hoặc bản nháp đã khác đối tượng review.",
             code="compilation_review_target_changed",
         )
+    layout = row.trace.get(text_spans.VERSION)
+    if layout:
+        return text_spans.apply_layout(material, layout)
     return material
 
 

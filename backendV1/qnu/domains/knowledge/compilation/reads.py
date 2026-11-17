@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
@@ -28,6 +28,7 @@ from qnu.domains.knowledge.compilation.models import (
 from qnu.domains.knowledge.compilation.scheduler import effective_concurrency
 from qnu.domains.knowledge.compilation.schemas import (
     CompilationProgress,
+    CompilationProgressSummary,
     CompilationSegmentProgress,
 )
 from qnu.domains.knowledge.source_sections import reading_groups
@@ -83,6 +84,35 @@ async def _group_draft(
     return hashlib.sha256(json_bytes(content)).hexdigest(), content
 
 
+def _elapsed_seconds(run: CompilationRun) -> float | None:
+    if run.started_at is None:
+        return None
+    return round(((run.finished_at or utcnow()) - run.started_at).total_seconds(), 1)
+
+
+async def progress_summary(
+    db: AsyncSession,
+    actor: AuthActor,
+    workspace_id: str,
+    collection_id: str,
+    run_id: str,
+) -> CompilationProgressSummary:
+    run = await get_run(db, actor, workspace_id, collection_id, run_id)
+    total, completed = (await db.execute(
+        select(
+            func.count(), func.count().filter(CompilationSegment.status == "completed")
+        ).where(
+            CompilationSegment.run_id == run.id,
+            CompilationSegment.parent_segment_id.is_(None),
+        )
+    )).one()
+    if not total and not run.config.get("segmentation"):
+        total, completed = 1, int(run.status == "completed")
+    return CompilationProgressSummary(
+        status=run.status, completed=completed, total=total, elapsed_seconds=_elapsed_seconds(run)
+    )
+
+
 async def progress(
     db: AsyncSession,
     actor: AuthActor,
@@ -92,16 +122,6 @@ async def progress(
 ) -> CompilationProgress:
     """Report only durable part states and provider-observed token counts."""
     run = await get_run(db, actor, workspace_id, collection_id, run_id)
-    segments = list(
-        (
-            await db.scalars(
-                select(CompilationSegment)
-                .where(CompilationSegment.run_id == run.id)
-                .where(CompilationSegment.parent_segment_id.is_(None))
-                .order_by(CompilationSegment.segment_index)
-            )
-        ).all()
-    )
     latest = await compilation_outputs.latest(db, run.id)
     nodes = list(
         (
@@ -114,6 +134,7 @@ async def progress(
             )
         ).all()
     )
+    segments = [node for node in nodes if node.parent_segment_id is None]
     counts: dict[str, int] = {}
     for segment in segments:
         counts[segment.status] = counts.get(segment.status, 0) + 1
@@ -149,11 +170,6 @@ async def progress(
     usage_tokens = sum(observed) if observed else run.usage_tokens
     if run.config.get("refinement"):
         usage_tokens = refinement.total_usage(nodes)
-    elapsed_seconds = (
-        round(((run.finished_at or utcnow()) - run.started_at).total_seconds(), 1)
-        if run.started_at is not None
-        else None
-    )
     return CompilationProgress(
         refinement_timeout_seconds=(run.config.get("refinement") or {}).get("max_seconds", 0),
         nodes=[
@@ -203,7 +219,7 @@ async def progress(
         received=counts.get("received", 0) if segmented else 0,
         concurrency=concurrency,
         active_segments=active,
-        elapsed_seconds=elapsed_seconds,
+        elapsed_seconds=_elapsed_seconds(run),
         planner_version=(run.config.get("segmentation") or {}).get("planner_version"),
         queue_timeout_seconds=get_settings().MODEL_CHAT_QUEUE_TIMEOUT_SECONDS,
     )

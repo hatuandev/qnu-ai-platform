@@ -1,6 +1,7 @@
 """Text editing crosses the HTTP, authorization, persistence and blob boundaries."""
 
 import asyncio
+import hashlib
 import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -58,11 +59,19 @@ def test_save_updates_both_files_preserves_original_and_replays(client):
         client.get(url + "/document").json()["pages"][0]["blocks"][0]["text"]
         == body["changes"][0]["after"]
     )
-    assert body["changes"][0]["after"] in client.get(url + "/markdown").text
+    markdown = client.get(url + "/markdown")
+    assert body["changes"][0]["after"] in markdown.text
+    assert f"<!-- evidence: {saved['units'][0]['evidence_id']} -->" in markdown.text
+    assert f"<!-- text_version_id: {saved['version_id']} -->" in markdown.text
+    assert hashlib.sha256(markdown.content).hexdigest() == saved["markdown_sha256"]
     assert client.get(url.removesuffix("/text-review") + "/document").content == original_json
     again = save(client, url, body)
     assert again.status_code == 200 and again.json()["version_id"] == saved["version_id"]
-    assert client.get(url + "?version=0").json()["units"][0]["text"] == "PHỤ LỤC 01"
+    version_zero = client.get(url + "?version=0").json()
+    assert version_zero["units"][0]["text"] == "PHỤ LỤC 01"
+    original_md = client.get(url + "/markdown?version=0")
+    assert saved["version_id"] not in original_md.text
+    assert hashlib.sha256(original_md.content).hexdigest() == version_zero["markdown_sha256"]
     assert (
         save(
             client, url, edit_body(saved, saved["units"][0], "Bản sửa thứ hai"), "save-two"
@@ -87,7 +96,27 @@ def test_table_cell_save_keeps_structure_numbers_and_updates_projection(client):
     before["rows"][1][1]["text"] = "Chỉ tiêu tuyển sinh đại học"
     assert table == before
     assert "Chỉ tiêu tuyển sinh đại học" in changed["pages"][0]["blocks"][1]["text"]
-    assert ">0<" in client.get(url + "/markdown").text
+    markdown = client.get(url + "/markdown").text
+    assert ">0<" in markdown
+    assert f'id="{unit["evidence_id"]}">Chỉ tiêu tuyển sinh đại học<' in markdown
+
+
+def test_saved_legacy_markdown_reads_without_regenerating_the_artifact(client, monkeypatch):
+    from qnu.domains.ocr.review import service
+
+    data = processed_input(client, code="legacy-markdown")
+    url = review_url(data)
+    current = client.get(url).json()
+    render = service.render_markdown
+    with monkeypatch.context() as patch:
+        patch.setattr(service, "render_markdown", lambda doc, **_: render(doc, legacy=True))
+        saved = save(client, url, edit_body(current, current["units"][0], "Bản chỉnh sửa cũ"))
+        assert saved.status_code == 200, saved.text
+    reopened = client.get(url + "?version=1")
+    assert reopened.status_code == 200, reopened.text
+    markdown = client.get(url + "/markdown?version=1")
+    assert markdown.text.startswith("<!-- qnu.ocr.markdown/v1 -->\n")
+    assert hashlib.sha256(markdown.content).hexdigest() == reopened.json()["markdown_sha256"]
 
 
 def test_conflicts_do_not_overwrite_newer_edits(client):
@@ -295,6 +324,61 @@ def test_automatic_review_preserves_coverage_after_batch_error(client, monkeypat
         assert client.portal.call(spelling_check_job, context, data["ocr_run_id"]) == "completed"
         assert len(model.requests) == sent
     assert client.get(url).json() == original
+
+
+def test_whole_document_spelling_waits_and_reuses_automatic_coverage(client, monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+
+    from qnu.domains.ocr.review import automatic, defaults
+    from qnu.main import app
+    from qnu.workers.tasks.ocr import spelling_check_job
+
+    data = processed_input(client, code="spelling-whole-after-auto")
+    original = client.get(review_url(data)).json()
+    expected = [unit["evidence_id"] for unit in original["units"]]
+    assert len(expected) > 1
+    monkeypatch.setattr(defaults, "eligible_ids", lambda *args: {expected[0]})
+
+    async def execute():
+        started = asyncio.Event()
+        release = asyncio.Event()
+        sent = []
+
+        async def inspect_batch(*args):
+            ids = args[-1]
+            sent.extend(ids)
+            if ids == expected[:1]:
+                started.set()
+                await release.wait()
+            return SimpleNamespace(
+                status="completed",
+                checked_evidence_ids=ids,
+                suggestions=[],
+                withheld_suggestions=[],
+                rejected_suggestions=[],
+            )
+
+        monkeypatch.setattr(automatic, "_inspect_batch", inspect_batch)
+        context = {"container": app.state.container}
+        auto = asyncio.create_task(spelling_check_job(context, data["ocr_run_id"], 0, False, True))
+        await asyncio.wait_for(started.wait(), timeout=5)
+        manual = asyncio.create_task(spelling_check_job(context, data["ocr_run_id"]))
+        try:
+            await asyncio.sleep(0.12)
+            assert sent == expected[:1]
+        finally:
+            release.set()
+            outcomes = await asyncio.wait_for(asyncio.gather(auto, manual), timeout=10)
+        assert outcomes == ["completed", "completed"]
+        assert sent == expected
+
+    with FakeChat() as model:
+        chat_provider(client, data, model.base_url)
+        client.portal.call(execute)
+        check = client.get(review_url(data) + "/checks/summary?version=0").json()["check"]
+        assert check["scope"] == "full"
+        assert check["checked_count"] == len(expected)
 
 
 @pytest.mark.parametrize(
@@ -757,6 +841,7 @@ def test_ignored_suggestions_persist_per_check_without_touching_text(client):
             "total_evidence_count": check["total_evidence_count"],
             "pending_count": 0,
             "ignored_count": 1,
+            "scope": "full",
         },
     }
     assert client.get(url + "/checks/summary?version=1").json() == {

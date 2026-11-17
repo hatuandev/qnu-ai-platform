@@ -433,6 +433,29 @@ def test_contract_invalid_part_is_recovered_by_splitting_only_that_part(monkeypa
     assert refinement.total_usage(env.db.segments) == 320 * _requests(env)
 
 
+@pytest.mark.parametrize("breaker", [_missing_unit, _bad_reference])
+def test_exhausted_contract_recovery_keeps_findings_from_saved_response(monkeypatch, breaker):
+    env = _setup_segmented_harness(
+        monkeypatch, unit_count=18, refinement_policy={"max_contract_recoveries": 0}
+    )
+    roots = _roots(env)
+    target = roots[0]
+
+    def handler(chat, incoming):
+        content = json.loads(_valid_assessment_json(incoming))
+        if _is_scope(incoming, target):
+            content = breaker(incoming, content)
+        return _result(json.dumps(content))
+
+    chat = RecordingChat(handler)
+    _run(env, chat)
+    assert chat.calls == len(roots)
+    assert env.review.status == "completed" and env.review.verdict == "needs_attention"
+    assert target.status == "completed" and target.error_code is None
+    assert target.config["refinement_stop"] == "compilation_review_recovery_exhausted"
+    assert target.config["assessment_method"] == "unverified_after_refinement/v1"
+
+
 def test_extra_readonly_context_assessment_is_diagnosed_not_discarded(monkeypatch):
     env = _setup_segmented_harness(monkeypatch, unit_count=18)
     target = _roots(env)[0]

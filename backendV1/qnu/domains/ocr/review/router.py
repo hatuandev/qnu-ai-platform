@@ -113,11 +113,11 @@ async def download_markdown(
     db: AsyncSession = Depends(get_db),
     blob: BlobStore = Depends(get_blob_store),
 ):
-    doc, _, row = await service.document(db, blob, run, version)
+    _, _, row = await service.document(db, blob, run, version)
     payload = (
         await service.checked_bytes(blob, row.markdown_key, row.markdown_sha256)
         if row
-        else service.render_markdown(doc).encode("utf-8")
+        else await processing_service.read_markdown(db, blob, run)
     )
     return Response(
         payload,
@@ -174,7 +174,10 @@ async def rerun_checks(
 ):
     await service.authorize(db, actor, run, write=True)
     await service.version_row(db, run.id, body.version)
-    existing = (await detection.list_checks(db, run, body.version))[:1]
+    checks = await detection.list_checks(db, run, body.version)
+    if any(check.status == "running" for check in checks):
+        return RerunReviewResponse(run_id=run.id, version=body.version, status="running")
+    existing = [check for check in checks if check.scope == "full"][:1]
     if existing:
         current = existing[0]
         if current.status in {"running", "completed", "cancelled"} or not body.retry:

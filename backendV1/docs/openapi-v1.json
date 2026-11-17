@@ -8565,6 +8565,126 @@
           }
         }
       }
+    },
+    "/platform/v1alpha1/settings/spelling": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Get Defaults",
+        "operationId": "get_defaults_platform_v1alpha1_settings_spelling_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpellingDefaults"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Update Defaults",
+        "operationId": "update_defaults_platform_v1alpha1_settings_spelling_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpellingDefaults"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpellingDefaults"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/v1alpha1/workspaces/{workspace_id}/collections/{collection_id}/compilation-runs/{run_id}/progress/summary": {
+      "get": {
+        "tags": [
+          "Knowledge · Compiler"
+        ],
+        "summary": "Compilation Progress Summary",
+        "operationId": "compilation_progress_summary_platform_v1alpha1_workspaces__workspace_id__collections__collection_id__compilation_runs__run_id__progress_summary_get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompilationProgressSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -9962,6 +10082,41 @@
         ],
         "title": "CompilationCreated"
       },
+      "CompilationProgressSummary": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "elapsed_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "completed",
+          "total",
+          "elapsed_seconds"
+        ],
+        "title": "CompilationProgressSummary"
+      },
       "CompilationRequest": {
         "properties": {
           "topic": {
@@ -10788,6 +10943,16 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "full",
+              "selected",
+              "skipped"
+            ],
+            "title": "Scope",
+            "default": "full"
           }
         },
         "type": "object",
@@ -11274,6 +11439,77 @@
         ],
         "title": "EvaluationRequest"
       },
+      "EventMoment": {
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2100.0,
+                "minimum": 1990.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 12.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "day": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 31.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EventMoment",
+        "description": "One normalized moment; partial dates keep the precision of the source."
+      },
       "EventResponse": {
         "properties": {
           "id": {
@@ -11340,6 +11576,172 @@
           "created_at"
         ],
         "title": "EventResponse"
+      },
+      "EventValue": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "registration_deadline",
+              "exam_date",
+              "result_date",
+              "fee_deadline",
+              "enrollment_confirmation"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Label"
+          },
+          "moment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "window_start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "relative": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RelativeDeadline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dates": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "type": "array",
+                "maxItems": 31,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dates"
+          },
+          "end_exclusive": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "const": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Exclusive"
+          },
+          "intake": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intake"
+          },
+          "audience": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "clause": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clause"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "supersedes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "label"
+        ],
+        "title": "EventValue",
+        "description": "One source-bound schedule event, keeping its original label and scope."
       },
       "EvidenceSnapshotResponse": {
         "properties": {
@@ -12422,6 +12824,50 @@
             ],
             "title": "Issued Year"
           },
+          "event_year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9999.0,
+                "minimum": 1000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Year"
+          },
+          "event_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "registration_deadline",
+                  "exam_date",
+                  "result_date",
+                  "fee_deadline",
+                  "enrollment_confirmation"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Kind"
+          },
+          "event_method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Method"
+          },
           "effective_on": {
             "anyOf": [
               {
@@ -12459,6 +12905,41 @@
               }
             ],
             "title": "Intake"
+          },
+          "attributes": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 500,
+                      "minLength": 1
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                },
+                "propertyNames": {
+                  "maxLength": 80,
+                  "minLength": 1
+                },
+                "type": "object",
+                "maxProperties": 20,
+                "minProperties": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributes"
           }
         },
         "additionalProperties": false,
@@ -12542,6 +13023,22 @@
               }
             ],
             "title": "Intake"
+          },
+          "events": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EventValue"
+                },
+                "type": "array",
+                "maxItems": 20,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events"
           }
         },
         "additionalProperties": false,
@@ -14727,6 +15224,41 @@
         ],
         "title": "RegistrationResponse"
       },
+      "RelativeDeadline": {
+        "properties": {
+          "value": {
+            "type": "integer",
+            "maximum": 366.0,
+            "minimum": 1.0,
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "day",
+              "working_day",
+              "week",
+              "month"
+            ],
+            "title": "Unit"
+          },
+          "from_event": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "From Event"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value",
+          "unit",
+          "from_event"
+        ],
+        "title": "RelativeDeadline",
+        "description": "A duration anchored to a named source event, never converted without a start date."
+      },
       "ResiliencePolicy": {
         "properties": {
           "key_pool_enabled": {
@@ -15472,6 +16004,28 @@
           "revision"
         ],
         "title": "SourceUploadResponse"
+      },
+      "SpellingDefaults": {
+        "properties": {
+          "ocr": {
+            "type": "boolean",
+            "title": "Ocr",
+            "default": true
+          },
+          "pdf_text": {
+            "type": "boolean",
+            "title": "Pdf Text",
+            "default": false
+          },
+          "word_text": {
+            "type": "boolean",
+            "title": "Word Text",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SpellingDefaults"
       },
       "Statement": {
         "properties": {
@@ -16325,6 +16879,16 @@
           "ignored_count": {
             "type": "integer",
             "title": "Ignored Count"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "full",
+              "selected",
+              "skipped"
+            ],
+            "title": "Scope",
+            "default": "full"
           }
         },
         "type": "object",

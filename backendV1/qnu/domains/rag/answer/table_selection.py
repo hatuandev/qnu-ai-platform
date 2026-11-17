@@ -6,7 +6,7 @@ import unicodedata
 from qnu.domains.rag.answer.cells import join_continued_lists
 from qnu.domains.rag.answer.selection import question_needs
 
-VERSION = "qnu.rag.table-selection/v2"
+VERSION = "qnu.rag.table-selection/v4"
 
 _ROW_CELL = re.compile(r"^table:(.+):row:(\d+):column:(\d+)$")
 _ROW = re.compile(r"^table:(.+):row:(\d+)$")
@@ -41,35 +41,94 @@ def requested_data_years(metadata_filter: dict | None) -> set[int]:
     return {scope["data_year"] for scope in scopes if type(scope.get("data_year")) is int}
 
 
-def _year_scopes(
-    source,
-) -> tuple[dict[int, set[int]], dict[int, set[int]], dict[tuple[int, int], set[int]]]:
-    """Column, row and cell year proof published on this source's own annotations."""
-    structure = source.structure or {}
+def requested_intakes(metadata_filter: dict | None) -> set[str]:
+    """Exact intakes already resolved for this turn; empty means no intake scope."""
+    if not metadata_filter:
+        return set()
+    scopes = metadata_filter.get("any_of") or [metadata_filter]
+    return {
+        scope["intake"]
+        for scope in scopes
+        if isinstance(scope.get("intake"), str) and scope["intake"]
+    }
+
+
+def _norm(value) -> str:
+    return " ".join(unicodedata.normalize("NFC", str(value)).casefold().split())
+
+
+def _scoped_targets(structure: dict) -> list[tuple[str, object, dict]]:
+    """Row, column and cell targets proven on this source's own annotations."""
     citation = structure.get("source_table_citation")
-    columns: dict[int, set[int]] = {}
-    rows: dict[int, set[int]] = {}
-    cells: dict[tuple[int, int], set[int]] = {}
     if not citation:
-        return columns, rows, cells
+        return []
+    found = []
     for annotation in structure.get("retrieval_metadata", []):
-        year = (annotation.get("values") or {}).get("data_year")
-        if type(year) is not int:
-            continue
         target = annotation.get("target", "")
+        values = annotation.get("values") or {}
         cell = _ROW_CELL.fullmatch(target)
         column = _COLUMN.fullmatch(target)
         row = _ROW.fullmatch(target)
         if cell and cell.group(1) == citation:
-            cells.setdefault((int(cell.group(2)), int(cell.group(3))), set()).add(year)
+            found.append(("cell", (int(cell.group(2)), int(cell.group(3))), values))
         elif column and column.group(1) == citation:
-            columns.setdefault(int(column.group(2)), set()).add(year)
+            found.append(("column", int(column.group(2)), values))
         elif row and row.group(1) == citation:
-            rows.setdefault(int(row.group(2)), set()).add(year)
+            found.append(("row", int(row.group(2)), values))
+    return found
+
+
+def _year_scopes(
+    source,
+) -> tuple[dict[int, set[int]], dict[int, set[int]], dict[tuple[int, int], set[int]]]:
+    """Column, row and cell year proof published on this source's own annotations."""
+    columns: dict[int, set[int]] = {}
+    rows: dict[int, set[int]] = {}
+    cells: dict[tuple[int, int], set[int]] = {}
+    for kind, key, values in _scoped_targets(source.structure or {}):
+        year = values.get("data_year")
+        if type(year) is not int:
+            continue
+        if kind == "cell":
+            cells.setdefault(key, set()).add(year)
+        elif kind == "column":
+            columns.setdefault(key, set()).add(year)
+        else:
+            rows.setdefault(key, set()).add(year)
+    return columns, rows, cells
+
+
+def _intake_scopes(
+    source,
+) -> tuple[dict[int, set[str]], dict[int, set[str]], dict[tuple[int, int], set[str]]]:
+    """Column, row and cell intake proof, including intakes named by events."""
+    columns: dict[int, set[str]] = {}
+    rows: dict[int, set[str]] = {}
+    cells: dict[tuple[int, int], set[str]] = {}
+    for kind, key, values in _scoped_targets(source.structure or {}):
+        proven = {_norm(values["intake"])} if values.get("intake") else set()
+        proven |= {
+            _norm(event["intake"])
+            for event in values.get("events") or []
+            if isinstance(event, dict) and event.get("intake")
+        }
+        if not proven:
+            continue
+        bucket = cells if kind == "cell" else columns if kind == "column" else rows
+        bucket.setdefault(key, set()).update(proven)
     return columns, rows, cells
 
 
 def _cell_years(cell: dict, scopes) -> set[int]:
+    columns, rows, cells = scopes
+    match = _CELL_KEY.search(cell.get("cell_id", ""))
+    if not match:
+        return set()
+    row, column = int(match.group(1)), int(match.group(2))
+    return columns.get(column, set()) | rows.get(row, set()) | cells.get((row, column), set())
+
+
+def _cell_intakes(cell: dict, scopes) -> set[str]:
     columns, rows, cells = scopes
     match = _CELL_KEY.search(cell.get("cell_id", ""))
     if not match:
@@ -84,6 +143,11 @@ def _year_kept(cell: dict, scopes, years: set[int]) -> bool:
     return not proven or bool(proven & years)
 
 
+def _intake_kept(cell: dict, scopes, intakes: set[str]) -> bool:
+    proven = _cell_intakes(cell, scopes)
+    return not proven or bool(proven & intakes)
+
+
 def select_catalog(
     cells: dict,
     sources: list,
@@ -91,12 +155,13 @@ def select_catalog(
     links: list[dict],
     *,
     data_years: set[int] | None = None,
+    intakes: set[str] | None = None,
 ) -> dict:
-    """Keep all fields/notes for named subjects and requested years; uncertain keeps all.
+    """Keep all fields/notes for named subjects and requested scope; uncertain keeps all.
 
     Families require the same publication and physical table or sealed header
     dependency. A match in another document/table never narrows this family.
-    Years come from published column/row/cell annotations only.
+    Years and intakes come from published row/column/cell annotations only.
     """
     by_id = {s.evidence_id: s for s in sources}
     needs = question_needs(question)
@@ -139,32 +204,57 @@ def select_catalog(
             ]
             selected[table["evidence_id"]] = kept
     years = data_years or set()
-    scopes = {source.evidence_id: _year_scopes(source) for source in sources}
+    wanted_intakes = {_norm(value) for value in intakes or set()}
+    year_scopes = {source.evidence_id: _year_scopes(source) for source in sources}
+    intake_scopes = (
+        {source.evidence_id: _intake_scopes(source) for source in sources} if wanted_intakes else {}
+    )
     tables, omitted = [], []
     year_omitted = 0
+    intake_omitted = 0
     for table in cells["tables"]:
         kept = selected.get(table["evidence_id"], table["cells"])
-        narrowed = (
-            [cell for cell in kept if _year_kept(cell, scopes[table["evidence_id"]], years)]
+        by_year = (
+            [cell for cell in kept if _year_kept(cell, year_scopes[table["evidence_id"]], years)]
             if years
             else kept
         )
-        year_omitted += len(kept) - len(narrowed)
+        narrowed = (
+            [
+                cell
+                for cell in by_year
+                if _intake_kept(cell, intake_scopes[table["evidence_id"]], wanted_intakes)
+            ]
+            if wanted_intakes
+            else by_year
+        )
+        year_omitted += len(kept) - len(by_year)
+        intake_omitted += len(by_year) - len(narrowed)
         if table["cells"] and not narrowed:
             omitted.append(table["evidence_id"])
-        tables.append({**table, "cells": [dict(cell) for cell in narrowed]})
+        projected = [dict(cell) for cell in narrowed]
+        if len(years) > 1:
+            for cell in projected:
+                proven = _cell_years(cell, year_scopes[table["evidence_id"]])
+                if len(proven) == 1 and proven <= years:
+                    cell["data_year"] = next(iter(proven))
+        tables.append({**table, "cells": projected})
     continuations = cells.get("list_continuations", [])
-    if not years:
+    if not years and not wanted_intakes:
         join_continued_lists(tables, continuations)
     else:
-        # Under an explicit year, both fragments must carry their own matching
-        # year proof. Unknown survives selection but cannot inherit a year
-        # through a synthesized list.
+        # Under an explicit scope, both fragments must carry their own matching
+        # proof. Unknown survives selection but cannot inherit a scope through
+        # a synthesized list.
         allowed = {
             cell["cell_id"]
             for table in tables
             for cell in table["cells"]
-            if _cell_years(cell, scopes[table["evidence_id"]]) & years
+            if (not years or _cell_years(cell, year_scopes[table["evidence_id"]]) & years)
+            and (
+                not wanted_intakes
+                or _cell_intakes(cell, intake_scopes[table["evidence_id"]]) & wanted_intakes
+            )
         }
         join_continued_lists(
             tables, [(left, right) for left, right in continuations if {left, right} <= allowed]
@@ -177,7 +267,9 @@ def select_catalog(
             "basis": "exact_source_subject_and_sealed_table_family",
             "matched_families": matched_families,
             "requested_years": sorted(years),
+            "requested_intakes": sorted(intakes or set()),
             "year_omitted_cells": year_omitted,
+            "intake_omitted_cells": intake_omitted,
             "available_cells": sum(len(t["cells"]) for t in cells["tables"]),
             "selected_cells": sum(len(t["cells"]) for t in tables),
             "omitted_tables": omitted,

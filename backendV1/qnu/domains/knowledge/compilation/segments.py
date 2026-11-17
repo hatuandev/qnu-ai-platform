@@ -18,6 +18,8 @@ import json
 from dataclasses import dataclass, field
 from itertools import pairwise
 
+from pydantic import ValidationError
+
 from qnu.domains.knowledge.compilation import segments_v2
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.drafting import SYSTEM_PROMPT
@@ -69,8 +71,8 @@ PROMPT_VERSIONS = {
     PROJECTION_V2: segments_v2.PROMPT_VERSION,
     PROJECTION_V3: "qnu.compiler.segment.prompt/v3",
     PROJECTION_V4: PROMPT_VERSION,
-    PROJECTION_SUPPLEMENT: "qnu.compiler.supplement.prompt/v2",
-    PROJECTION_SELECTIVE: "qnu.compiler.selective-supplement.prompt/v2",
+    PROJECTION_SUPPLEMENT: "qnu.compiler.supplement.prompt/v3",
+    PROJECTION_SELECTIVE: "qnu.compiler.selective-supplement.prompt/v3",
 }
 
 TARGET_RATIO = 0.7
@@ -551,6 +553,13 @@ def segment_system(index: int, total: int, *, projection: str = PROJECTION_V4) -
 def segment_schema(citations: list[str], projection: str = PROJECTION_V4) -> dict:
     contract = SupplementPart if projection in SUPPLEMENT_PROJECTIONS else SegmentDraftContent
     schema = contract.model_json_schema()
+    if projection in SUPPLEMENT_PROJECTIONS:
+        # Preserve the request fingerprints of already-planned structured jobs.
+        # The wider schedule vocabulary is extracted from source by the server.
+        properties = schema["$defs"]["EventValue"]["properties"]
+        properties["kind"]["enum"] = ["registration_deadline", "exam_date", "result_date"]
+        for field in ("dates", "end_exclusive"):
+            del properties[field]
     schema["$defs"]["DraftParagraph"]["properties"]["citations"]["items"]["enum"] = citations
     return schema
 
@@ -959,13 +968,33 @@ def plan_from_scope(scope: dict) -> SegmentPlan:
     )
 
 
+def _parse_supplement(content: str) -> tuple[SupplementPart, int]:
+    try:
+        return SupplementPart.model_validate_json(content), 0
+    except ValidationError as exc:
+        rejected = set()
+        for issue in exc.errors(include_input=False, include_context=False, include_url=False):
+            location = issue["loc"]
+            if len(location) < 2 or location[0] != "metadata" or not isinstance(location[1], int):
+                raise
+            rejected.add(location[1])
+        payload = json.loads(content)
+        payload["metadata"] = [
+            item for index, item in enumerate(payload["metadata"]) if index not in rejected
+        ]
+        return SupplementPart.model_validate_json(json_bytes(payload)), len(rejected)
+
+
 def parse_segment_draft(
     content: str, allowed_citations: set[str], projection: str = PROJECTION_V4
 ) -> dict:
-    contract = SupplementPart if projection in SUPPLEMENT_PROJECTIONS else SegmentDraftContent
+    is_supplement = projection in SUPPLEMENT_PROJECTIONS
     try:
-        value = contract.model_validate_json(content)
-    except Exception as exc:  # Pydantic validation is reported as one stable contract
+        if is_supplement:
+            value, rejected = _parse_supplement(content)
+        else:
+            value, rejected = SegmentDraftContent.model_validate_json(content), 0
+    except (ValidationError, ValueError) as exc:
         raise AppException(
             "LLM trả phần bản nháp sai schema.",
             code="compilation_draft_invalid",
@@ -981,7 +1010,18 @@ def parse_segment_draft(
                     code="compilation_citation_invalid",
                     status_code=502,
                 )
-    return value.model_dump()
+    if isinstance(value, SupplementPart) and any(
+        event.citation not in allowed_citations for event in value.events
+    ):
+        raise AppException(
+            "Phần bản nháp có citation không thuộc nguồn của phần.",
+            code="compilation_citation_invalid",
+            status_code=502,
+        )
+    draft = value.model_dump(mode="json")
+    if rejected:
+        draft["rejected_metadata_proposals"] = rejected
+    return draft
 
 
 def _merge_sections(parts: list[dict]) -> list[dict]:

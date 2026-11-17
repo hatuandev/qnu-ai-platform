@@ -637,7 +637,11 @@ async def answer(
         - (len(draft.statements) - len(proposed.lookups)),
     }
     trace.grounding["cell_proofs"] = [
-        {key: cell[key] for key in ("cell_id", "evidence_ids", "source_cells")}
+        {
+            key: cell[key]
+            for key in ("cell_id", "evidence_ids", "source_cells", "data_year")
+            if key in cell
+        }
         for table in cells["tables"]
         for cell in table["cells"]
         if cell["cell_id"] in trace.grounding["selected_cells"]
@@ -662,6 +666,17 @@ async def answer(
         response.answer = "\n\n".join(
             s.text + " " + " ".join(f"[{e}]" for e in s.evidence_ids) for s in draft.statements
         )
+        requested_years = set(cells.get("selection", {}).get("requested_years", []))
+        proven_years = {
+            item["data_year"] for item in trace.grounding["cell_proofs"] if "data_year" in item
+        }
+        missing_years = requested_years - proven_years
+        if len(requested_years) > 1 and proven_years and missing_years and not proposed.statements:
+            missing = ", ".join(map(str, sorted(missing_years)))
+            response.answer += f"\n\nChưa xác minh được giá trị cho năm {missing} từ các ô đã đối chiếu."
+            response.coverage = coverage.model_copy(update={"status": "partial"})
+            trace.coverage["status"] = "partial"
+            trace.grounding["missing_data_years"] = sorted(missing_years)
         if req.verification_mode == "enforce" and trace.verification["status"] != "supported":
             response.status = "insufficient_evidence"
             response.reason = (

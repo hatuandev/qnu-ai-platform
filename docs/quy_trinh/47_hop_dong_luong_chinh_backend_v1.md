@@ -101,6 +101,7 @@ cho trợ lý.
 2. Đọc cổng duyệt: `GET .../versions/{version_id}/review-gate`.
    - `200` trả `review_id`, `report_sha256`, `bundle_sha256`, `verdict` và `findings`
      (`finding_id`, `finding`). Chỉ review **đã hoàn tất** của đúng phiên bản mới xuất hiện ở đây.
+   - Đoạn dẫn cả bảng vượt ngân sách có thể xuất hiện với trạng thái **Cần đối chiếu**. Báo cáo giữ đoạn biên soạn và vị trí bảng trong đúng bản tệp gốc. Trong hộp duyệt, mở vị trí để đối chiếu nguồn, rồi xử lý phát hiện như các mục khác.
    - `409 publication_review_required` khi chưa có review hoàn tất khớp phiên bản. Đây không phải
      lỗi hệ thống: UI cho phép chọn bỏ qua review có xác nhận nếu người dùng có quyền duyệt.
 

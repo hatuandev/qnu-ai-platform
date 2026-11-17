@@ -22,7 +22,8 @@ PDF_INSPECTOR_VERSION = "1.25.2"
 PROMPT_VERSION = "nemotron-parse/v1"
 CANONICAL_SCHEMA = "qnu.ocr.document/v1"
 MANIFEST_SCHEMA = "qnu.ocr.manifest/v1"
-MARKDOWN_VERSION = "qnu.ocr.markdown/v1"
+LEGACY_MARKDOWN_VERSION = "qnu.ocr.markdown/v1"
+MARKDOWN_VERSION = "qnu.ocr.markdown/v2"
 TABLE_LAYOUT_VERSION = "nemotron-tabular/v2"
 
 OCR_PROMPT = "</s><s><predict_bbox><predict_classes><output_markdown><predict_text_in_pic>"
@@ -154,6 +155,7 @@ def config_payload(config: ProcessingConfig) -> dict[str, object]:
         )
     return {
         "renderer": renderer,
+        "markdown_version": MARKDOWN_VERSION,
         "ocr": {
             "max_page_bytes": config.max_page_bytes,
             "max_output_tokens": config.max_output_tokens,

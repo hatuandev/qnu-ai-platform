@@ -10,6 +10,7 @@ import {
   RotateCw,
   Save,
   ShieldAlert,
+  SpellCheck,
   Sun,
   User,
 } from "lucide-react";
@@ -29,6 +30,7 @@ import type {
   ModelProvider,
 } from "@/api/modelops/types";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { SpellingDefaultsPanel } from "@/components/knowledge/spelling-defaults-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,7 +63,7 @@ export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
-type SettingsTab = "appearance" | "models" | "account";
+type SettingsTab = "appearance" | "models" | "spelling" | "account";
 
 const NAV_ITEMS: {
   id: SettingsTab;
@@ -79,6 +81,11 @@ const NAV_ITEMS: {
     icon: Cpu,
   },
   {
+    id: "spelling",
+    title: "Soát chính tả",
+    icon: SpellCheck,
+  },
+  {
     id: "account",
     title: "Tài khoản",
     icon: User,
@@ -92,6 +99,7 @@ function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
     if (typeof window !== "undefined" && window.location.search) {
       if (window.location.search.includes("models")) return "models";
+      if (window.location.search.includes("spelling")) return "spelling";
       if (window.location.search.includes("account")) return "account";
     }
     return "appearance";
@@ -288,8 +296,10 @@ function SettingsPage() {
       <div className="flex flex-col space-y-6 md:flex-row md:space-x-8 md:space-y-0">
         {/* Left Sub-nav */}
         <aside className="md:w-48 lg:w-56 shrink-0">
-          <nav className="flex space-x-1 md:flex-col md:space-x-0 md:space-y-1">
-            {NAV_ITEMS.map((item) => {
+          <nav className="flex flex-wrap gap-1 md:flex-col">
+            {NAV_ITEMS.filter(
+              (item) => item.id !== "spelling" || canManageSystem,
+            ).map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
 
@@ -299,7 +309,7 @@ function SettingsPage() {
                   type="button"
                   onClick={() => setActiveTab(item.id)}
                   className={cn(
-                    "flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors w-full text-left",
+                    "flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors md:w-full text-left",
                     isActive
                       ? "bg-muted font-semibold text-foreground shadow-2xs"
                       : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
@@ -653,7 +663,10 @@ function SettingsPage() {
             </div>
           )}
 
-          {/* TAB 3: TÀI KHOẢN (ACCOUNT) */}
+          {activeTab === "spelling" && canManageSystem && (
+            <SpellingDefaultsPanel />
+          )}
+          {/* TÀI KHOẢN */}
           {activeTab === "account" && (
             <div className="space-y-6">
               <div className="space-y-0.5">

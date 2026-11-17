@@ -41,13 +41,24 @@ def typed_header(table: dict) -> bool:
     )
 
 
-def multitier_header(table: dict) -> list[int] | None:
-    """Header tiers proven by a merged identity label above numeric columns.
+def _horizontal_metric_tier(rows: list[list[dict]], identity_width: int) -> bool:
+    top, second = rows[:2]
+    return (
+        len(top) > 1
+        and all(cell.get("header") and cell["row_span"] == 1 for cell in top)
+        and all(cell["col_span"] >= 2 for cell in top[1:])
+        and len(second) > identity_width
+        and all(cell["row_span"] == cell["col_span"] == 1 for cell in second)
+        and all(not cell["text"].strip() for cell in second[:identity_width])
+        and all(any(ch.isalpha() for ch in cell["text"]) for cell in second[identity_width:])
+    )
 
-    One complete native block whose top-left label spans several rows and the
-    identity columns; every other header cell is a label or a merged numeric
-    group (e.g. a year), and at least one data column is purely numeric.
-    Geometry and type contrast only — no vocabulary, no cross-page join.
+
+def multitier_header(table: dict) -> list[int] | None:
+    """Prove header tiers from merged geometry and type contrast within one block.
+
+    Accept a vertically merged identity label or a marked top row of horizontal
+    groups over a separate metric row with an empty identity slot.
     """
     rows, columns = table["rows"], table["column_count"]
     if len(rows) < 4 or columns < 2 or not rows[0]:
@@ -57,12 +68,16 @@ def multitier_header(table: dict) -> list[int] | None:
     if (
         type(height) is not int
         or type(identity_width) is not int
-        or height < 2
+        or height < 1
         or identity_width < 1
         or identity_width >= columns
         or len(rows) - height < 2
     ):
         return None
+    if height == 1:
+        if not _horizontal_metric_tier(rows, identity_width):
+            return None
+        height = 2
     if not first["text"].strip() or not any(ch.isalpha() for ch in first["text"]):
         return None
     positions, errors = layout(
@@ -155,16 +170,20 @@ def dependencies(document: dict) -> dict[str, dict]:
         tables = [b for b in blocks if b.get("table")]
         for block in tables:
             table = block["table"]
+            page_method = page.get("extraction_method")
+            native_page = page_method == "native"
+            native_block = native_page or (
+                page_method == "hybrid" and block.get("origin") == "native"
+            )
             if (
-                page.get("extraction_method") != "native"
+                not native_block
                 or block.get("requires_review")
-                or not block.get("bbox")
                 or table.get("status") != "parsed"
             ):
                 previous, header, chain = None, None, []
                 continue
             ref = run + ":" + block["evidence_id"]
-            if not header_row(table) and typed_header(table):
+            if block.get("bbox") and not header_row(table) and typed_header(table):
                 result[ref] = {
                     "basis": TYPED_BASIS,
                     "header": ref,
@@ -182,6 +201,11 @@ def dependencies(document: dict) -> dict[str, dict]:
                     "previous": None,
                     "header_rows": tiers,
                 }
+                previous, header, chain = None, None, []
+                continue
+            if not native_page or not block.get("bbox"):
+                # Same-block merged tiers use logical cell coordinates. Page
+                # continuations below still need a native page and placement.
                 previous, header, chain = None, None, []
                 continue
             start = 1 if header_row(table) else 0

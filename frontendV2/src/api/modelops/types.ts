@@ -11,8 +11,12 @@ export type ConnectionFamily =
 
 export type Capability = "chat" | "embedding" | "rerank" | "ocr";
 
+export type CapacityBasis = "operator_configured" | "server_reported";
+export type CapacitySource = CapacityBasis | "application_default";
+
 export type TokenLimits = {
   context_window_tokens?: number | null;
+  max_input_tokens?: number | null;
   max_output_tokens?: number | null;
 };
 
@@ -93,6 +97,8 @@ export type ModelProvider = {
   token_limits?: TokenLimits | null;
   embedding_dimension?: number | null;
   capacity_status?: string;
+  capacity_basis?: CapacityBasis | null;
+  field_sources?: Record<string, CapacitySource>;
   created_at: string;
   updated_at: string;
 };

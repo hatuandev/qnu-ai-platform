@@ -1,11 +1,25 @@
 """Segmented compilation keeps every table row and never sends the whole snapshot."""
 
 import copy
+import json
 
 import pytest
 
 from qnu.domains.knowledge.compilation import segments as split
 from qnu.platform.errors import AppException
+
+
+def test_long_citation_list_checks_membership_instead_of_document_size():
+    refs = [f"ocr_one:cell_{index}" for index in range(129)]
+    paragraph = {"text": "Dữ liệu từ các ô nguồn.", "citations": refs[:]}
+    payload = {"sections": [{"heading": "Bảng", "paragraphs": [paragraph]}]}
+    accepted = split.parse_segment_draft(json.dumps(payload), set(refs))
+    assert accepted["sections"][0]["paragraphs"][0]["citations"] == refs
+
+    paragraph["citations"][-1] = "ocr_other:cell_128"
+    with pytest.raises(AppException) as error:
+        split.parse_segment_draft(json.dumps(payload), set(refs))
+    assert error.value.code == "compilation_citation_invalid"
 
 
 def test_trailing_conditions_and_headers_remain_available_across_pages():

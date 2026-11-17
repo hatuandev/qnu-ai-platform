@@ -121,9 +121,9 @@ export type CompilationCreatedResponse = {
 };
 
 // Durable root-part counts, not elapsed-time estimates or physical pages.
-export type CompilationProgressResponse = {
-  run_id: string;
+export type CompilationProgressSummaryResponse = {
   status: string;
   total: number;
   completed: number;
+  elapsed_seconds: number | null;
 };

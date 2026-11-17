@@ -14,14 +14,14 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.identity.background import background_actor
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.models import CompilationRun, utcnow
-from qnu.domains.knowledge.compilation.review import artifacts, parts, refinement, service
+from qnu.domains.knowledge.compilation.review import artifacts, parts, refinement, repair, service
 from qnu.domains.knowledge.compilation.review.literal import assess as assess_literal
+from qnu.domains.knowledge.compilation.review.literal import assess_source_prose
 from qnu.domains.knowledge.compilation.review.models import (
     CompilationReview,
     CompilationReviewSegment,
 )
 from qnu.domains.knowledge.compilation.review.report import (
-    build_report,
     decode_keyed,
     diagnose_contract,
     markdown_for,
@@ -56,6 +56,23 @@ TERMINAL_CODE_PREFIXES = (
     "compilation_review_budget_",
     "compilation_review_recovery_",
 )
+CONTRACT_RECOVERY_STOPS = {
+    "compilation_review_recovery_exhausted",
+    "compilation_review_refinement_depth_exceeded",
+    "compilation_review_refinement_atomic_limit",
+}
+
+
+def _persisted_review_stop(segments: list[CompilationReviewSegment]) -> str | None:
+    return next(
+        (
+            segment.error_code
+            for segment in refinement.ordered_leaves(segments)
+            if segment.status == "failed"
+            and (segment.error_code or "").startswith(TERMINAL_CODE_PREFIXES)
+        ),
+        None,
+    )
 
 
 async def execute(
@@ -143,13 +160,20 @@ async def run_queued(db: AsyncSession, blob: BlobStore, chat: ChatModel, review_
         if row is None:
             return "missing"
         if row.status in {"queued", "running"}:
-            row.status, row.finished_at = "failed", utcnow()
-            row.error_code = (
-                exc.code if isinstance(exc, AppException) else "compilation_review_internal_error"
+            terminal = (
+                None
+                if isinstance(exc, AppException)
+                else _persisted_review_stop(await _load_segments(db, review_id))
             )
+            code = exc.code if isinstance(exc, AppException) else terminal
+            row.status, row.finished_at = "failed", utcnow()
+            row.error_code = code or "compilation_review_internal_error"
             await db.commit()
             logger.warning(
-                "manual_review_job_failed", review_id=review_id, error_code=row.error_code
+                "manual_review_job_failed",
+                review_id=review_id,
+                error_code=row.error_code,
+                error_type=type(exc).__name__,
             )
         return row.status
 
@@ -242,7 +266,8 @@ async def execute_prepared(
             if req.structured_output
             else result.content
         )
-        built = build_report(content, material.payload, row_id, row.bundle_sha256)
+        checked = validate_content(content, material.payload, unverified="uncited")
+        built = report_from_assessments(checked, material.payload, row_id, row.bundle_sha256)
         await artifacts.store(db, blob, row, "report_json", json_bytes(built))
         await artifacts.store(db, blob, row, "markdown", markdown_for(built))
         row.verdict, row.status, row.finished_at = built["verdict"], "completed", utcnow()
@@ -404,7 +429,14 @@ async def _execute_segments(
         await _owned_checkpoint(db, blob, actor, row, run, token)
         segments = await _load_segments(db, row_id)
         assessed = await _merged_assessments(db, blob, row, segments, material)
-        built = report_from_assessments(assessed, material.payload, row_id, row.bundle_sha256)
+        planner_limited = {
+            item["draft_id"]
+            for segment in refinement.ordered_leaves(segments)
+            for item in segment.scope.get("preassessed_drafts", [])
+        }
+        built = report_from_assessments(
+            assessed, material.payload, row_id, row.bundle_sha256, planner_limited=planner_limited
+        )
         await artifacts.store(db, blob, row, "report_json", json_bytes(built))
         await artifacts.store(db, blob, row, "markdown", markdown_for(built))
         row.usage_tokens = refinement.total_usage(segments)
@@ -441,25 +473,40 @@ async def _execute_segments(
             await db.commit()
         raise
     except Exception as exc:
-        await _mark_uncertain(db, row_id, token)
+        try:
+            await _mark_uncertain(db, row_id, token)
+        except Exception as recovery_error:
+            logger.warning(
+                "compilation_review_recovery_write_failed",
+                review_id=row_id,
+                error_type=type(recovery_error).__name__,
+            )
+            raise exc from recovery_error
         failed = await db.get(
             CompilationReview, row_id, populate_existing=True, with_for_update=True
         )
-        code = exc.code if isinstance(exc, AppException) else "compilation_review_internal_error"
-        logger.exception(
+        all_segments = await _load_segments(db, row_id)
+        terminal = (
+            _persisted_review_stop(all_segments) if not isinstance(exc, AppException) else None
+        )
+        code = (
+            exc.code
+            if isinstance(exc, AppException)
+            else terminal or "compilation_review_internal_error"
+        )
+        logger.warning(
             "compilation_review_segments_failed",
             review_id=row_id,
             error_type=type(exc).__name__,
             error_code=code,
         )
-        all_segments = await _load_segments(db, row_id)
         # A request having been sent is not by itself uncertainty: a complete answer that
         # broke the contract, a spent budget or a known provider error are all decided
         # outcomes. Only a part whose provider result is truly unknown makes the review so.
         has_uncertain_segment = any(seg.status == "uncertain" for seg in all_segments)
         is_uncertain = (
             has_uncertain_segment
-            or not isinstance(exc, AppException)
+            or (not isinstance(exc, AppException) and terminal is None)
             or "uncertain" in code
             or "interrupted" in code
             or "expired" in code
@@ -503,8 +550,26 @@ async def _refine_segment(
     request is checked against the review-wide budget at the provider boundary.
     """
     await _owned_checkpoint(db, blob, actor, row, run, token)
+    active_leaves = len(refinement.ordered_leaves(segments))
+    next_index = max((seg.segment_index for seg in segments), default=0) + 1
+    targeted = None
+    if (
+        reason == refinement.CONTRACT_INVALID
+        and parent.prompt_version == parts.CONCISE_SEGMENT_PROMPT_VERSION
+        and not (parent.config or {}).get("targeted_repair")
+    ):
+        targeted = await _targeted_plan(db, blob, parent, material, next_index, active_leaves + 1)
+        if targeted is not None and targeted.children is None:
+            payload = parts.plan_from_scope(parent.scope)
+            check = _checked_reuse(material, payload, targeted.accepted)
+            parent.config = {
+                **parent.config,
+                "ignored_context_assessments": targeted.ignored_context,
+            }
+            await _store_checked_part(db, blob, row, parent, material, check)
+            return []
     try:
-        refinement.check_limits(row, segments, parent, limits)
+        refinement.check_limits(row, segments, parent, limits, child_requests=1 if targeted else 2)
         if (
             reason == refinement.CONTRACT_INVALID
             and refinement.contract_recoveries(row) >= limits.max_contract_recoveries
@@ -514,22 +579,31 @@ async def _refine_segment(
                 code="compilation_review_recovery_exhausted",
                 status_code=422,
             )
-        next_index = max((seg.segment_index for seg in segments), default=0) + 1
-        active_leaves = len(refinement.ordered_leaves(segments))
-        children_plans = refinement.split_segment_plans(
-            material.payload,
-            parent,
-            next_index=next_index,
-            total_estimate=active_leaves + 1,
+        children_plans = (
+            targeted.children
+            if targeted
+            else refinement.split_segment_plans(
+                material.payload,
+                parent,
+                next_index=next_index,
+                total_estimate=active_leaves + 1,
+            )
         )
+        assert children_plans is not None
     except AppException as exc:
-        parent.error_code = exc.code
         parent.config = {
             **(parent.config or {}),
             "refinement_exhausted": True,
             "refinement_stop": exc.code,
             "refinement_reason": reason,
         }
+        if (
+            reason == refinement.CONTRACT_INVALID
+            and exc.code in CONTRACT_RECOVERY_STOPS
+            and await _retain_unverified_part(db, blob, row, parent, material, active_leaves)
+        ):
+            return []
+        parent.error_code = exc.code
         await db.commit()
         raise
     children = refinement.create_child_segments(
@@ -550,7 +624,8 @@ async def _refine_segment(
             "child_segment_indices": [child.segment_index for child in children],
             "depth": refinement.segment_depth(parent) + 1,
             "reason": reason,
-            "policy": "split_owned_scope/v1",
+            "policy": "repair_owned_units/v1" if targeted else "split_owned_scope/v1",
+            **({"ignored_context_assessments": targeted.ignored_context} if targeted else {}),
             "parent_input_sha256": parent.input_sha256,
             "diagnosis": ((parent.config or {}).get("last_failure") or {}).get("diagnosis"),
         }
@@ -560,8 +635,53 @@ async def _refine_segment(
         "refinement_policy": limits.to_dict(),
         "refinement_events": refinement_events,
     }
-    await db.commit()
+    if targeted:
+        for child in children:
+            child.config = {**child.config, "targeted_repair": True}
+        await db.flush()
+        reused = children[0]
+        reused.config = {**reused.config, "assessment_method": "reused_valid_checks/v1"}
+        reused.usage_tokens = 0
+        check = _checked_reuse(material, children_plans[0], targeted.accepted)
+        await _store_checked_part(db, blob, row, reused, material, check)
+    else:
+        await db.commit()
     return children
+
+
+async def _targeted_plan(db, blob, parent, material, next_index: int, total: int):
+    if not await artifacts.segment_artifact(db, parent.id, "raw_response"):
+        return None
+    _, raw = await artifacts.read_segment(db, blob, parent, "raw_response")
+    try:
+        choice = json.loads(raw)["choices"][0]
+        if choice.get("finish_reason") != "stop":
+            return None
+        content = choice["message"]["content"]
+    except (ValueError, KeyError, IndexError, AttributeError, TypeError):
+        return None
+    plan, _, _ = parts.rebuild_part(material.payload, parent.scope, total=total, structured=True)
+    return repair.plan_repair(
+        material.payload,
+        plan,
+        content,
+        next_index=next_index,
+        total=total,
+        reasoning_shares_budget=((parent.config or {}).get("reasoning") or {}).get("level")
+        != "off",
+    )
+
+
+def _checked_reuse(material, plan, accepted: ReviewContent) -> ReviewContent:
+    payload = parts.payload_for(
+        material.payload,
+        plan.source_ids,
+        plan.draft_ids,
+        plan.context_source_ids,
+        plan.context_draft_ids,
+        projection=plan.projection,
+    )
+    return validate_content(accepted.model_dump_json(), payload)
 
 
 async def _part_session(
@@ -657,6 +777,9 @@ async def _verify_manifest(
                 scope.get("context_source_ids"),
                 scope.get("context_draft_ids"),
                 scope.get("input_sha256"),
+                scope.get("preassessed_drafts", []),
+                scope.get("literal_only", False),
+                scope.get("source_copy_only", False),
             )
             for scope in scopes
         ]
@@ -667,6 +790,9 @@ async def _verify_manifest(
                 segment.scope.get("context_source_ids"),
                 segment.scope.get("context_draft_ids"),
                 segment.input_sha256,
+                segment.scope.get("preassessed_drafts", []),
+                segment.scope.get("literal_only", False),
+                segment.scope.get("source_copy_only", False),
             )
             for segment in roots
         ]
@@ -757,7 +883,64 @@ async def _run_segment(
     plan, messages, schema = parts.rebuild_part(
         material.payload, segment.scope, total=total, structured=structured
     )
-    if row.trace.get("literal_check_version") == 1 and segment.request_started_at is None:
+    if plan.source_copy_only:
+        await _owned_checkpoint(db, blob, actor, row, run, token)
+        assessment = assess_source_prose(material.payload, plan.payload)
+        if assessment is None or segment.request_started_at is not None:
+            raise Conflict(
+                "Phần văn bản không còn khớp kế hoạch đối chiếu cục bộ.",
+                code="compilation_review_segment_mismatch",
+            )
+        checked = validate_content(json_bytes(assessment).decode(), plan.payload)
+        segment.usage_tokens = 0
+        segment.config = {**segment.config, "assessment_method": "source_prose/v1"}
+        await _store_checked_part(db, blob, row, segment, material, checked)
+        return
+    preassessed = list((segment.scope or {}).get("preassessed_drafts") or ())
+    if preassessed:
+        # Server checks are pinned in the root manifest and need no model call.
+        await _owned_checkpoint(db, blob, actor, row, run, token)
+        checked = validate_content(
+            json.dumps(
+                {"source_assessments": [], "draft_assessments": preassessed},
+                ensure_ascii=False,
+            ),
+            plan.payload,
+        )
+        await artifacts.store_segment(
+            db, blob, row, segment, "assessment_json", json_bytes(checked.model_dump())
+        )
+        await artifacts.store_segment(
+            db,
+            blob,
+            row,
+            segment,
+            "markdown",
+            segment_markdown_for(
+                row,
+                segment,
+                checked,
+                material.payload,
+                parent_index=(segment.scope or {}).get("parent_segment_index"),
+            ),
+        )
+        segment.status, segment.finished_at, segment.usage_tokens = "completed", utcnow(), 0
+        if any(item["status"] != "supported" for item in preassessed):
+            method = "planner_limit/v1"
+        elif any(":paragraph:" in item["draft_id"] for item in preassessed):
+            method = "source_structure/v1"
+        else:
+            method = "source_headings/v1"
+        segment.config = {
+            **segment.config,
+            "assessment_method": method,
+            "preassessed": True,
+        }
+        await db.commit()
+        return
+    if (plan.literal_only or row.trace.get("literal_check_version") == 1) and (
+        segment.request_started_at is None
+    ):
         assessment = assess_literal(material.payload, plan.payload)
         if assessment is not None:
             await _owned_checkpoint(db, blob, actor, row, run, token)
@@ -787,6 +970,11 @@ async def _run_segment(
             }
             await db.commit()
             return
+    if plan.literal_only:
+        raise Conflict(
+            "Phần đối chiếu cục bộ không còn khớp ô nguồn.",
+            code="compilation_review_segment_mismatch",
+        )
     raw = await artifacts.segment_artifact(db, segment.id, "raw_response")
     if raw is not None:
         _, payload = await artifacts.read_segment(db, blob, segment, "raw_response")
@@ -920,7 +1108,7 @@ async def _run_segment(
     try:
         if structured:
             content = decode_keyed(content, plan.payload)
-        checked = validate_content(content, plan.payload)
+        checked = validate_content(content, plan.payload, unverified="uncited")
     except AppException as exc:
         if exc.code != refinement.CONTRACT_INVALID:
             raise
@@ -935,8 +1123,36 @@ async def _run_segment(
         }
         await _fail_segment(db, segment, refinement.CONTRACT_INVALID)
         raise
+    await _store_checked_part(db, blob, row, segment, material, checked)
+
+
+async def _retain_unverified_part(db, blob, row, segment, material, total: int) -> bool:
+    raw = await artifacts.segment_artifact(db, segment.id, "raw_response")
+    if raw is None:
+        return False
+    _, payload = await artifacts.read_segment(db, blob, segment, "raw_response")
+    structured = bool(row.trace.get("structured_output"))
+    plan, _, _ = parts.rebuild_part(
+        material.payload, segment.scope, total=total, structured=structured
+    )
+    try:
+        choice = json.loads(payload)["choices"][0]
+        if choice.get("finish_reason") != "stop":
+            return False
+        content = choice["message"]["content"]
+        if structured:
+            content = decode_keyed(content, plan.payload)
+        checked = validate_content(content, plan.payload, unverified="exhausted")
+    except (AppException, ValueError, AttributeError, KeyError, IndexError, TypeError):
+        return False
+    segment.config = {**segment.config, "assessment_method": "unverified_after_refinement/v1"}
+    await _store_checked_part(db, blob, row, segment, material, checked)
+    return True
+
+
+async def _store_checked_part(db, blob, row, segment, material, checked: ReviewContent) -> None:
     await artifacts.store_segment(
-        db, blob, row, segment, "assessment_json", content.encode("utf-8")
+        db, blob, row, segment, "assessment_json", json_bytes(checked.model_dump(mode="json"))
     )
     await artifacts.store_segment(
         db,

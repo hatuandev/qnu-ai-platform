@@ -1,6 +1,6 @@
 export const compilationPaths = {
-  progress: (workspaceId: string, collectionId: string, runId: string) =>
-    `/workspaces/${workspaceId}/collections/${collectionId}/compilation-runs/${runId}/progress`,
+  progressSummary: (workspaceId: string, collectionId: string, runId: string) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/compilation-runs/${runId}/progress/summary`,
   runs: (workspaceId: string, collectionId: string) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/compilation-runs`,
   run: (workspaceId: string, collectionId: string, runId: string) =>

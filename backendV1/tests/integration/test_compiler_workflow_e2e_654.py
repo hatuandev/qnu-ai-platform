@@ -46,6 +46,13 @@ def test_corrected_source_survives_review_edit_publish_index_and_citations(clien
         assert accepted.status_code == 201, accepted.text
         child = accepted.json()["run"]["id"]
         assert run_review(client, child) == "completed"
+        child_path = f"{data['url']}/{child}"
+        draft = client.get(child_path + "/draft.json").json()
+        markdown = client.get(child_path + "/markdown").text
+        assert draft["compilation_run_id"] == child
+        assert f"<!-- compilation_run_id: {child} -->" in markdown
+        assert "<!-- draft_id: section:1:paragraph:1 -->" in markdown
+        assert 'id="table:1:row:1:cell:1"' in markdown
         base = f"{API}/workspaces/{data['workspace']['id']}/collections/{data['collection']['id']}"
         registered = client.post(
             base + "/compiled-documents",

@@ -5,6 +5,7 @@
 import { v1Client } from "../v1-client";
 import { compiledDocumentPaths } from "./endpoints";
 import type {
+  AutomaticMetadataPreview,
   CreateDocumentRequest,
   DecisionCommitRequest,
   DecisionPreviewRequest,
@@ -78,6 +79,22 @@ export async function listCompiledDocuments(
 ): Promise<DocumentResponse[]> {
   return v1Client.get<DocumentResponse[]>(
     compiledDocumentPaths.documents(workspaceId, collectionId),
+    options,
+  );
+}
+
+export async function getRegistrationMetadata(
+  workspaceId: string,
+  collectionId: string,
+  runId: string,
+  options?: { signal?: AbortSignal },
+): Promise<AutomaticMetadataPreview> {
+  return v1Client.get<AutomaticMetadataPreview>(
+    compiledDocumentPaths.registrationMetadata(
+      workspaceId,
+      collectionId,
+      runId,
+    ),
     options,
   );
 }

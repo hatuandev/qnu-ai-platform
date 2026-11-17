@@ -29,6 +29,7 @@ TABLES = (
     "kb_compilation_segment_artifacts",
     "kb_compilation_segments",
     "ocr_spelling_reviews",
+    "ocr_spelling_defaults",
     "ocr_spelling_dispositions",
     "ocr_spelling_runs",
     "ocr_text_versions",

@@ -165,6 +165,7 @@ export type DetectionResponse = {
   ignored_suggestions?: IgnoredSuggestion[];
   checked_evidence_ids: string[];
   total_evidence_count?: number | null;
+  scope?: "full" | "selected" | "skipped";
   error_code?: string | null;
   usage_id?: string | null;
   created_at: string;
@@ -183,6 +184,7 @@ export type SpellingStatusSummary = {
     total_evidence_count: number | null;
     pending_count: number;
     ignored_count: number;
+    scope?: "full" | "selected" | "skipped";
   } | null;
 };
 

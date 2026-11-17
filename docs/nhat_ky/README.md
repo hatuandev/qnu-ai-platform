@@ -1,5 +1,33 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên 1000 — Liên kết JSON và Markdown, giảm ngữ cảnh rà soát.](2026-11-17_phien_1000_lien_ket_json_markdown.md)
+- [Phiên 999 — Đối chiếu bản nháp theo nội dung đã lưu.](2026-11-17_phien_999_ra_soat_theo_noi_dung.md)
+- [Phiên 998 — Đo xử lý DOCX phức tạp với Qwen.](2026-11-17_phien_998_do_qwen_docx_phuc_tap.md)
+- [Phiên 997 — Đối chiếu nguyên văn phía backend trước khi gọi Qwen.](2026-11-17_phien_997_ra_soat_nguyen_van_qwen.md)
+- [Phiên 996 — Tải mới và rà soát tệp tuyển sinh 02–04 bằng Qwen.](2026-11-17_phien_996_tai_moi_va_ra_soat_qwen_tep_02_04.md)
+- [Phiên 995 — Rà soát khối văn bản dài theo ngân sách model.](2026-11-17_phien_995_ra_soat_khoi_van_ban_dai.md)
+- [Phiên 994 — Chạy thử rà soát Qwen trên một tệp tuyển sinh nhỏ.](2026-11-17_phien_994_thu_ra_soat_qwen_tep_nho.md)
+- [Phiên 993 — Rà soát bản nháp giữ nguyên nguồn, phục hồi theo mục lỗi.](2026-11-17_phien_993_ra_soat_dung_phan_loi.md)
+- [Phiên990 — Rà soát và metadata trong lượt chạy lại tài liệu tuyển sinh.](2026-11-16_phien_990_ra_soat_va_metadata_tuyen_sinh.md)
+
+- [Phiên989 — Nghiệm thu lịch đăng ký P5 và điểm Kế toán P7.](2026-11-16_phien_989_lich_va_diem_tuyen_sinh.md)
+
+- [Phiên988 — Gắn năm có dẫn chứng cho hai bảng quy đổi của P2.](2026-11-16_phien_988_gan_nam_bang_quy_doi.md)
+
+- [Phiên987 — Sửa kiểm chứng lịch và phạm vi năm sau C3.](2026-11-16_phien_987_sua_kiem_chung_lich_va_nam.md)
+
+- [Phiên986 — Triển khai kế hoạch metadata năm và thời gian: chặng A (năm theo vai trò, header bảng nhiều tầng), chặng B (sự kiện đăng ký/thi/kết quả), chặng C1 (FE V2 đăng ký kèm sha metadata), C2 (năm trần theo catalog, intake trong sự kiện, thu hẹp hàng bảng theo đợt) và C3 (E2E corpus cô lập: metadata tự lưu đúng phiên bản, chặn gửi trùng, index đúng bản phục vụ; chấm tay 9/14 câu đạt, các mục live FE và loại trừ bản chưa xuất bản NOT RUN — không tuyên bố PASS toàn chặng).](2026-11-16_phien_986_trien_khai_metadata_nam_chang_A.md)
+
+- [Phiên985 — Bàn giao kế hoạch metadata năm và thời gian cho V1.](2026-11-16_phien_985_ke_hoach_metadata_thoi_gian.md)
+
+- [Phiên984 — Tối ưu tác vụ biên dịch và soát chính tả.](2026-11-16_phien_984_toi_uu_bien_dich_va_soat_chinh_ta.md)
+
+- [Phiên983 — Giới hạn biên dịch theo phần và soát chính tả theo nguồn.](2026-11-16_phien_983_gioi_han_theo_phan_va_soat_chinh_ta.md)
+
+- [Phiên982 — Khôi phục lượt kiểm thử 24 tài liệu tuyển sinh sau khi dừng đột ngột.](2026-11-16_phien_982_khoi_phuc_kiem_thu_tuyen_sinh.md)
+
+- [Phiên981 — Ổn định rà soát bảng lớn và mở đúng vị trí nguồn trong hộp duyệt.](2026-11-16_phien_981_on_dinh_ra_soat_bang_lon.md)
+
 - [Phiên980 — Tối ưu truy vấn trang chủ chatbot, ô chính tả và trang Tác vụ.](2026-11-15_phien_980_toi_uu_truy_van_ba_man_hinh.md)
 
 - [Phiên979 — Kiểm tra và sửa tạm dừng chatbot công khai, landing và mặc định IP proxy.](2026-11-15_phien_979_kiem_tra_tam_dung_chatbot_cong_khai.md)

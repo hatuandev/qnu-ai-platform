@@ -74,12 +74,9 @@ class CredentialExecutor:
     async def call(self, capability, request, invoke):
         if capability == "chat":
             async with chat_slot(request):
+                bounded = request.enforce_completion_timeout or not request.wait_for_completion
                 try:
-                    async with asyncio.timeout(
-                        None
-                        if getattr(request, "wait_for_completion", False)
-                        else request.timeout_seconds
-                    ):
+                    async with asyncio.timeout(request.timeout_seconds if bounded else None):
                         return await self._call(capability, request, invoke)
                 except TimeoutError as exc:
                     raise AppException(

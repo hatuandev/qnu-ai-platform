@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.review import report
+from qnu.domains.knowledge.compilation.review.literal import assess as assess_literal
+from qnu.domains.knowledge.compilation.review.literal import assess_source_prose
 from qnu.domains.modelops.inference.service import request_input_tokens
 from qnu.platform.errors import AppException
 from qnu.ports.chat_model import ChatMessage
@@ -21,6 +23,9 @@ from qnu.ports.chat_model import ChatMessage
 LEGACY_SEGMENT_PROMPT_VERSION = "qnu.compiler.review.part.prompt/v2"
 # v3 states ownership explicitly and does not depend on the sibling count.
 SEGMENT_PROMPT_VERSION = "qnu.compiler.review.part.prompt/v3"
+CONCISE_SEGMENT_PROMPT_VERSION = "qnu.compiler.review.part.prompt/v4"
+TITLE_REVIEW_PROMPT_VERSION = "qnu.compiler.review.part.prompt/title-v1"
+CONCISE_PROMPTS = {CONCISE_SEGMENT_PROMPT_VERSION, TITLE_REVIEW_PROMPT_VERSION}
 PLANNER_VERSION = "qnu.compiler.review.plan/v2"
 MANIFEST_VERSION = "qnu.compiler.review.segment-manifest/v2"
 TARGET_RATIO = 0.45
@@ -81,6 +86,11 @@ class ReviewPartPlan:
     schema_version: str = report.VERSION
     prompt_sha256: str = ""
     request_total: int = 1
+    # Server-owned assessments for units the planner cannot place in any one call.
+    # They are complete, explicit and stored with the plan; no model reviews them.
+    preassessed_drafts: tuple[dict, ...] = ()
+    literal_only: bool = False
+    source_copy_only: bool = False
 
     def scope_dict(self) -> dict:
         return {
@@ -91,6 +101,13 @@ class ReviewPartPlan:
             "draft_ids": list(self.draft_ids),
             "context_source_ids": list(self.context_source_ids),
             "context_draft_ids": list(self.context_draft_ids),
+            **({"literal_only": True} if self.literal_only else {}),
+            **({"source_copy_only": True} if self.source_copy_only else {}),
+            **(
+                {"preassessed_drafts": [dict(item) for item in self.preassessed_drafts]}
+                if self.preassessed_drafts
+                else {}
+            ),
             "input_sha256": self.input_sha256,
             "input_tokens": self.input_tokens,
             "schema_sha256": self.schema_sha256,
@@ -149,9 +166,7 @@ def output_budget(
     """Compute usable JSON assessment token budget after reserving reasoning and framing headroom."""
     limit = max(1, int(max_output_tokens or DEFAULT_MAX_OUTPUT_TOKENS))
     reasoning_ratio = (
-        REASONING_RESERVE_RATIO
-        if reasoning_shares_budget
-        else REASONING_DISABLED_RESERVE_RATIO
+        REASONING_RESERVE_RATIO if reasoning_shares_budget else REASONING_DISABLED_RESERVE_RATIO
     )
     reasoning_reserve = int(limit * reasoning_ratio)
     framing_reserve = min(
@@ -206,14 +221,10 @@ def estimate_part_output_tokens(
     total = BASE_OUTPUT_TOKENS
     for key in source_ids:
         if key in sources:
-            total += estimate_unit_output_tokens(
-                sources[key], role="source", structured=structured
-            )
+            total += estimate_unit_output_tokens(sources[key], role="source", structured=structured)
     for key in draft_ids:
         if key in drafts:
-            total += estimate_unit_output_tokens(
-                drafts[key], role="draft", structured=structured
-            )
+            total += estimate_unit_output_tokens(drafts[key], role="draft", structured=structured)
     return total
 
 
@@ -269,6 +280,9 @@ def payload_for(
             "origin",
             "requires_review",
             "label",
+            "source_block_id",
+            "start_char",
+            "end_char",
         }
         owned_sources = [
             {key: value for key, value in unit.items() if key in fields} for unit in owned_sources
@@ -310,7 +324,19 @@ def messages_for(
     """Only the legacy prompt embeds ``total``; v3 is independent of sibling count."""
     legacy = prompt_version == LEGACY_SEGMENT_PROMPT_VERSION
     return report.messages_for(
-        payload, structured=structured, segment=(index, total if legacy else None)
+        payload,
+        structured=structured,
+        segment=(index, total if legacy else None),
+        concise=prompt_version in CONCISE_PROMPTS,
+        title_only=prompt_version == TITLE_REVIEW_PROMPT_VERSION,
+    )
+
+
+def schema_for_part(payload: dict, projection: str, prompt_version: str) -> dict:
+    return report.output_schema(
+        payload,
+        require_references=2 if projection == "compact/v3" else int(projection == "compact/v2"),
+        concise=prompt_version in CONCISE_PROMPTS,
     )
 
 
@@ -328,8 +354,13 @@ def build_part(
     capacity: int = 0,
     output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
     reasoning_shares_budget: bool = True,
-    prompt_version: str = SEGMENT_PROMPT_VERSION,
+    prompt_version: str | None = None,
+    preassessed_drafts: tuple[dict, ...] | list[dict] = (),
+    source_copy_only: bool = False,
 ) -> ReviewPartPlan:
+    prompt_version = prompt_version or material.get(
+        "segment_prompt_version", SEGMENT_PROMPT_VERSION
+    )
     payload = payload_for(
         material,
         source_ids,
@@ -342,18 +373,16 @@ def build_part(
         payload, structured=structured, index=index, total=total, prompt_version=prompt_version
     )
     schema = (
-        report.output_schema(
-            payload,
-            require_references=2 if projection == "compact/v3" else int(projection == "compact/v2"),
-        )
-        if structured
+        schema_for_part(payload, projection, prompt_version)
+        if structured and not source_copy_only
         else None
     )
     in_tokens = request_input_tokens(messages, schema)
+    preassessed_ids = {item["draft_id"] for item in preassessed_drafts}
     out_est = estimate_part_output_tokens(
         material,
         source_ids,
-        draft_ids,
+        [key for key in draft_ids if key not in preassessed_ids],
         structured=structured,
     )
     out_budget = output_budget(output_tokens, reasoning_shares_budget=reasoning_shares_budget)
@@ -384,6 +413,8 @@ def build_part(
         schema_version=report.VERSION,
         prompt_sha256=_sha(messages[0].content),
         request_total=total,
+        preassessed_drafts=tuple(dict(item) for item in preassessed_drafts),
+        source_copy_only=source_copy_only,
     )
 
 
@@ -400,6 +431,8 @@ def _source_context(
     owned_ids: set[str],
     cited_ids: set[str],
     order: dict[str, int],
+    *,
+    cited_rows_only: bool = False,
 ) -> list[str]:
     """Repeat cited rows, parent headings, table headers/notes and one neighbour as read-only context."""
     units = material["source_units"]
@@ -444,7 +477,9 @@ def _source_context(
         cells = tables.get(table_id, [])
         header = [cell for cell in cells if cell.get("header")]
         target_row = int(unit.get("row") or 0)
-        target_end = target_row + max(1, int(unit.get("row_span") or 1)) - 1
+        target_end = target_row
+        if not cited_rows_only:
+            target_end += max(1, int(unit.get("row_span") or 1)) - 1
         row_and_spanning = [
             cell
             for cell in cells
@@ -453,9 +488,7 @@ def _source_context(
                 cell.get("row") == unit.get("row")
                 or (
                     int(cell.get("row") or 0) <= target_end
-                    and int(cell.get("row") or 0)
-                    + max(1, int(cell.get("row_span") or 1))
-                    - 1
+                    and int(cell.get("row") or 0) + max(1, int(cell.get("row_span") or 1)) - 1
                     >= target_row
                 )
             )
@@ -481,7 +514,15 @@ def _source_context(
                 not unit.get("table_id")
                 and (unit.get("ocr_run_id"), unit.get("page")) in active_pages
                 and unit.get("kind")
-                in {"title", "heading", "section_header", "page_header", "caption", "footnote", "note"}
+                in {
+                    "title",
+                    "heading",
+                    "section_header",
+                    "page_header",
+                    "caption",
+                    "footnote",
+                    "note",
+                }
                 and _unit_bytes(unit) <= 1024
             ):
                 add(unit["id"], required=True)
@@ -499,6 +540,7 @@ def _source_context(
         unit["id"]
         for unit in units
         if unit.get("ocr_run_id") in tabular_runs
+        and "source_block_id" not in unit
         and (not unit.get("table_id") or unit.get("header"))
     ]
     for key in reversed(closing):
@@ -687,8 +729,7 @@ def _chunks(
             48 if group_units[0].get("kind") == "table_cell" else 76
         )
         if current and (
-            size + width > target_bytes
-            or out_tokens + estimated_step_out > target_output_tokens
+            size + width > target_bytes or out_tokens + estimated_step_out > target_output_tokens
         ):
             chunks.append(current)
             current, size, out_tokens = [], 0, BASE_OUTPUT_TOKENS
@@ -700,9 +741,13 @@ def _chunks(
     return chunks
 
 
-def _expand_source_rows(material: dict, candidate_ids: list[str], owned_sources: set[str]) -> list[str]:
+def _expand_source_rows(
+    material: dict, candidate_ids: list[str], owned_sources: set[str]
+) -> list[str]:
     """Expand any cited table cell to its full unowned atomic source row group."""
-    all_source_ids = [unit["id"] for unit in material["source_units"] if unit["id"] not in owned_sources]
+    all_source_ids = [
+        unit["id"] for unit in material["source_units"] if unit["id"] not in owned_sources
+    ]
     row_groups = _source_row_groups(material, all_source_ids)
     group_by_member: dict[str, list[str]] = {}
     for group in row_groups:
@@ -716,6 +761,86 @@ def _expand_source_rows(material: dict, candidate_ids: list[str], owned_sources:
                 seen.add(member)
                 expanded.append(member)
     return expanded
+
+
+def _limited_part(
+    material: dict,
+    draft_ids: list[str],
+    block_tables: set[str],
+    *,
+    budget_reason: str,
+    index: int,
+    total: int,
+    structured: bool,
+    capacity: int,
+    output_tokens: int,
+    reasoning_shares_budget: bool,
+) -> tuple[ReviewPartPlan | None, list[str]]:
+    """Record an explicit review limit for indivisible drafts citing whole tables.
+
+    The cited cells keep their own source parts, so the caller only gives up source
+    ownership. This part records a server-built ``uncertain`` assessment: it is never
+    sent to the model, never claims support, and never cuts the table. Drafts that do
+    not cite a whole table are returned for the normal path.
+    """
+    drafts = {unit["id"]: unit for unit in material["draft_units"]}
+    limited = [key for key in draft_ids if set(drafts[key].get("citations") or ()) & block_tables]
+    if not limited:
+        return None, draft_ids
+    limited_set = set(limited)
+    # A partially limited draft row cannot be split: the preassessment would have to
+    # speak for cells it never inspected.
+    for group in _draft_row_groups(material, draft_ids):
+        if limited_set.intersection(group) and not set(group) <= limited_set:
+            return None, draft_ids
+    cell_counts: dict[str, int] = {}
+    for unit in material["source_units"]:
+        table_id = unit.get("table_id")
+        if table_id in block_tables:
+            cell_counts[table_id] = cell_counts.get(table_id, 0) + 1
+    if not cell_counts:
+        return None, draft_ids
+    preassessed = []
+    for key in limited:
+        table_ids = [
+            ref for ref in dict.fromkeys(drafts[key].get("citations") or ()) if ref in block_tables
+        ]
+        if not table_ids:
+            return None, draft_ids
+        cell_count = sum(cell_counts.get(table_id, 0) for table_id in table_ids)
+        preassessed.append(
+            {
+                "draft_id": key,
+                "status": "uncertain",
+                "source_ids": [],
+                "explanation": (
+                    f"{budget_reason.capitalize()} vượt ngân sách của một lượt rà soát. "
+                    f"Đoạn dẫn {len(table_ids)} bảng nguồn với {cell_count} ô. "
+                    "Các ô thuộc những phần rà soát nguồn. Cần đối chiếu riêng đoạn này "
+                    "với bảng trước khi duyệt."
+                ),
+                "suggested_action": "Đối chiếu đoạn với bảng nguồn đã dẫn trước khi duyệt.",
+            }
+        )
+    plan = build_part(
+        material,
+        index=index,
+        total=total,
+        source_ids=[],
+        draft_ids=limited,
+        structured=structured,
+        capacity=capacity,
+        output_tokens=output_tokens,
+        reasoning_shares_budget=reasoning_shares_budget,
+        preassessed_drafts=preassessed,
+    )
+    out_budget = output_budget(output_tokens, reasoning_shares_budget=reasoning_shares_budget)
+    if (
+        plan.input_tokens <= capacity
+        and plan.output_tokens_estimate <= out_budget.usable_output_tokens
+    ):
+        return plan, [key for key in draft_ids if key not in limited_set]
+    return None, draft_ids
 
 
 def _build_group(
@@ -738,10 +863,16 @@ def _build_group(
     out_budget = output_budget(output_tokens, reasoning_shares_budget=reasoning_shares_budget)
     raw_owned: list[str] = []
     cited: list[str] = []
+    block_tables: set[str] = set()
     for key in draft_ids:
         # Table-level citations refer to a block, while assessment IDs identify cells.
         # They are mandatory read-only context; ownership stays with cell assessments.
         table_refs = set(drafts[key].get("citations") or [])
+        block_tables |= {
+            unit["table_id"]
+            for unit in material["source_units"]
+            if unit.get("table_id") in table_refs
+        }
         cited.extend(
             unit["id"]
             for unit in material["source_units"]
@@ -754,13 +885,46 @@ def _build_group(
             elif ref not in raw_owned:
                 raw_owned.append(ref)
     new_owned = _expand_source_rows(material, raw_owned, owned_sources)
+    title_only = draft_ids == ["title"] and bool(material.get("verified_source_prose"))
+    if title_only:
+        anchor = next(
+            (
+                unit["id"]
+                for unit in material["source_units"]
+                if unit["id"] in material["verified_source_prose"] and _unit_bytes(unit) <= 1024
+            ),
+            None,
+        )
+        if anchor:
+            cited.append(anchor)
 
-    def attempt(candidate_owned: list[str], extra_cited: list[str]) -> ReviewPartPlan:
+    def attempt(
+        candidate_owned: list[str], extra_cited: list[str], *, cited_rows_only: bool = False
+    ) -> ReviewPartPlan:
         all_cited = set(cited) | set(extra_cited)
         context_sources = _source_context(
-            material, set(candidate_owned), all_cited, source_order
+            material,
+            set(candidate_owned),
+            all_cited,
+            source_order,
+            cited_rows_only=cited_rows_only,
         )
-        context_drafts = _draft_context(material, set(draft_ids), draft_order, set())
+        if title_only:
+            context_sources = list(cited)
+        context_drafts = (
+            [] if title_only else _draft_context(material, set(draft_ids), draft_order, set())
+        )
+        visible_sources = set(candidate_owned) | set(context_sources)
+        # A neighbouring draft span is an exact copy of its cited source span.
+        # Its text is already visible when the matching source is in this request.
+        context_drafts = [
+            key
+            for key in context_drafts
+            if not (
+                drafts[key].get("source_block_id")
+                and drafts[key]["citations"][0] in visible_sources
+            )
+        ]
         return build_part(
             material,
             index=index,
@@ -773,6 +937,7 @@ def _build_group(
             capacity=capacity,
             output_tokens=output_tokens,
             reasoning_shares_budget=reasoning_shares_budget,
+            prompt_version=TITLE_REVIEW_PROMPT_VERSION if title_only else None,
         )
 
     plan = attempt(new_owned, [])
@@ -785,12 +950,14 @@ def _build_group(
     if len(draft_groups) == 1:
         # Single atomic draft group: if co-owned sources push input or output over budget,
         # keep those cited sources as read-only context and defer their ownership to source parts.
+        smallest_request = plan
         if new_owned:
             source_groups = _source_row_groups(material, new_owned)
             for keep_count in range(len(source_groups) - 1, -1, -1):
                 kept = [key for grp in source_groups[:keep_count] for key in grp]
                 deferred = [key for grp in source_groups[keep_count:] for key in grp]
                 trimmed = attempt(kept, deferred)
+                smallest_request = trimmed
                 limit_in = _ceiling(capacity) if keep_count > 0 else capacity
                 if (
                     trimmed.input_tokens <= limit_in
@@ -802,6 +969,56 @@ def _build_group(
             and plan.output_tokens_estimate <= out_budget.usable_output_tokens
         ):
             return [plan], owned_sources | set(new_owned)
+        if assess_literal(material, plan.payload) is not None:
+            return [replace(plan, literal_only=True)], owned_sources | set(new_owned)
+        if not block_tables and all(drafts[key].get("kind") != "table_cell" for key in draft_ids):
+            # A prose citation to one cell can sit in a row linked to many more
+            # rows by a vertically merged cell. Keep the directly cited cells,
+            # their anchor rows and covering spans in view. The full linked
+            # rows retain ownership for separate source assessments.
+            focused = attempt([], raw_owned, cited_rows_only=True)
+            if (
+                focused.input_tokens <= capacity
+                and focused.output_tokens_estimate <= out_budget.usable_output_tokens
+            ):
+                return [focused], owned_sources
+        limited, remaining = _limited_part(
+            material,
+            draft_ids,
+            block_tables,
+            budget_reason=" và ".join(
+                name
+                for name, exceeds in (
+                    ("ngữ cảnh bắt buộc", smallest_request.input_tokens > capacity),
+                    (
+                        "đầu ra dự kiến",
+                        smallest_request.output_tokens_estimate > out_budget.usable_output_tokens,
+                    ),
+                )
+                if exceeds
+            ),
+            index=index,
+            total=total,
+            structured=structured,
+            capacity=capacity,
+            output_tokens=output_tokens,
+            reasoning_shares_budget=reasoning_shares_budget,
+        )
+        if limited is not None:
+            if not remaining:
+                return [limited], owned_sources
+            rest, owned_after = _build_group(
+                material,
+                remaining,
+                owned_sources,
+                index=index + 1,
+                total=total,
+                structured=structured,
+                capacity=capacity,
+                output_tokens=output_tokens,
+                reasoning_shares_budget=reasoning_shares_budget,
+            )
+            return [limited, *rest], owned_after
         raise _invalid(
             "Một đơn vị review vượt ngân sách model; không cắt nội dung.",
             "compilation_review_segment_too_large",
@@ -879,6 +1096,8 @@ def _build_source_group(
             and plan.output_tokens_estimate <= out_budget.usable_output_tokens
         ):
             return [plan]
+        if assess_literal(material, plan.payload) is not None:
+            return [replace(plan, literal_only=True)]
         raise _invalid(
             "Một hàng bảng hoặc đơn vị nguồn review vượt ngân sách model; không cắt nội dung.",
             "compilation_review_segment_too_large",
@@ -916,19 +1135,35 @@ def plan_parts(
     structured: bool,
     output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
     reasoning_shares_budget: bool = True,
+    structural_drafts: tuple[dict, ...] = (),
+    source_copies: dict[str, str] | None = None,
 ) -> list[ReviewPartPlan]:
     if not material["source_units"] and not material["draft_units"]:
         raise _invalid("Bản nháp không có đơn vị để review.", "compilation_review_empty")
+    full_material = material
+    source_copies = source_copies or {}
+    structural_ids = {item["draft_id"] for item in structural_drafts}
+    if structural_ids:
+        material = {
+            **material,
+            "draft_units": [
+                unit for unit in material["draft_units"] if unit["id"] not in structural_ids
+            ],
+        }
+    if source_copies:
+        material = {**material, "verified_source_prose": set(source_copies.values())}
     out_budget = output_budget(output_tokens, reasoning_shares_budget=reasoning_shares_budget)
     target_bytes = max(2048, int(capacity * TARGET_RATIO))
     target_output_tokens = max(1, int(out_budget.usable_output_tokens * 0.75))
     total_estimate = max(2, len(material["draft_units"]))
     plans: list[ReviewPartPlan] = []
-    owned_sources: set[str] = set()
+    owned_sources = set(source_copies.values())
     # A copied table must not share ownership with prose: exact cell checks then
     # remain local, while prose gets the full mandatory citation context.
     batches: list[list[dict]] = []
     for unit in material["draft_units"]:
+        if unit["id"] in source_copies:
+            continue
         if not batches or (unit.get("kind") == "table_cell") != (
             batches[-1][-1].get("kind") == "table_cell"
         ):
@@ -978,9 +1213,42 @@ def plan_parts(
                 reasoning_shares_budget=reasoning_shares_budget,
             )
         )
+    if structural_drafts:
+        plans.append(
+            build_part(
+                full_material,
+                index=len(plans) + 1,
+                total=total_estimate,
+                source_ids=[],
+                draft_ids=[item["draft_id"] for item in structural_drafts],
+                context_source_ids=list(
+                    dict.fromkeys(ref for item in structural_drafts for ref in item["source_ids"])
+                ),
+                structured=structured,
+                capacity=capacity,
+                output_tokens=output_tokens,
+                reasoning_shares_budget=reasoning_shares_budget,
+                preassessed_drafts=structural_drafts,
+            )
+        )
+    if source_copies:
+        plans.append(
+            build_part(
+                full_material,
+                index=len(plans) + 1,
+                total=total_estimate,
+                source_ids=list(source_copies.values()),
+                draft_ids=list(source_copies),
+                structured=structured,
+                capacity=capacity,
+                output_tokens=output_tokens,
+                reasoning_shares_budget=reasoning_shares_budget,
+                source_copy_only=True,
+            )
+        )
     return finalize_parts(
         plans,
-        material,
+        full_material,
         capacity=capacity,
         structured=structured,
         output_tokens=output_tokens,
@@ -1005,18 +1273,13 @@ def _groups_by_bytes(
     for group in groups:
         width = sum(sizes.get(key, 0) for key in group)
         group_out = sum(
-            estimate_unit_output_tokens(
-                units_by_id[key], role="source", structured=structured
-            )
+            estimate_unit_output_tokens(units_by_id[key], role="source", structured=structured)
             for key in group
             if key in units_by_id
         )
         if current and (
             size + width > target_bytes
-            or (
-                target_output_tokens is not None
-                and out_tokens + group_out > target_output_tokens
-            )
+            or (target_output_tokens is not None and out_tokens + group_out > target_output_tokens)
         ):
             chunks.append(current)
             current, size, out_tokens = [], 0, BASE_OUTPUT_TOKENS
@@ -1055,8 +1318,23 @@ def finalize_parts(
             capacity=capacity,
             output_tokens=output_tokens,
             reasoning_shares_budget=reasoning_shares_budget,
+            prompt_version=plan.prompt_version,
+            preassessed_drafts=plan.preassessed_drafts,
+            source_copy_only=plan.source_copy_only,
         )
-        if (
+        if plan.source_copy_only:
+            if assess_source_prose(material, rebuilt.payload) is None:
+                raise _invalid(
+                    "Phần văn bản không khớp khối nguồn.", "compilation_review_plan_invalid"
+                )
+        elif plan.literal_only:
+            if assess_literal(material, rebuilt.payload) is None:
+                raise _invalid(
+                    "Phần đối chiếu cục bộ không còn khớp ô nguồn.",
+                    "compilation_review_plan_invalid",
+                )
+            rebuilt = replace(rebuilt, literal_only=True)
+        elif not plan.preassessed_drafts and (
             rebuilt.input_tokens > capacity
             or rebuilt.output_tokens_estimate > out_budget.usable_output_tokens
         ):
@@ -1103,7 +1381,7 @@ def manifest_for(
     return {
         "schema_version": MANIFEST_VERSION,
         "planner_version": PLANNER_VERSION,
-        "prompt_version": SEGMENT_PROMPT_VERSION,
+        "prompt_version": plans[0].prompt_version,
         "review_schema_version": report.VERSION,
         "review_id": review.id,
         "compilation_run_id": review.compilation_run_id,
@@ -1155,6 +1433,9 @@ def plan_from_scope(scope: dict) -> ReviewPartPlan:
         schema_version=replay_info.get("schema_version", report.VERSION),
         prompt_sha256=replay_info.get("prompt_sha256", ""),
         request_total=int(scope.get("request_total") or 1),
+        preassessed_drafts=tuple(scope.get("preassessed_drafts") or ()),
+        literal_only=bool(scope.get("literal_only")),
+        source_copy_only=bool(scope.get("source_copy_only")),
     )
 
 
@@ -1182,6 +1463,8 @@ def rebuild_part(
         capacity=plan.input_budget_tokens,
         output_tokens=plan.max_output_tokens,
         prompt_version=plan.prompt_version,
+        preassessed_drafts=plan.preassessed_drafts,
+        source_copy_only=plan.source_copy_only,
     )
     messages = messages_for(
         rebuilt.payload,
@@ -1191,13 +1474,8 @@ def rebuild_part(
         prompt_version=plan.prompt_version,
     )
     schema = (
-        report.output_schema(
-            rebuilt.payload,
-            require_references=2
-            if plan.projection == "compact/v3"
-            else int(plan.projection == "compact/v2"),
-        )
-        if structured
+        schema_for_part(rebuilt.payload, plan.projection, plan.prompt_version)
+        if structured and not plan.source_copy_only
         else None
     )
     schema_sha = _sha(json_bytes(schema)) if schema is not None else None
@@ -1211,4 +1489,4 @@ def rebuild_part(
             code="compilation_review_segment_mismatch",
             status_code=409,
         )
-    return rebuilt, messages, schema
+    return replace(rebuilt, literal_only=True) if plan.literal_only else rebuilt, messages, schema

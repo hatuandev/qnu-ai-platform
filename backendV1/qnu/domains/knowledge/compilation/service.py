@@ -29,6 +29,7 @@ from qnu.domains.knowledge.compilation.models import (
 )
 from qnu.domains.knowledge.compilation.reads import (
     progress,
+    progress_summary,
     read_draft_view,
     read_partial_draft,
     read_result,
@@ -71,6 +72,7 @@ __all__ = [
     "get_run",
     "list_runs",
     "progress",
+    "progress_summary",
     "read_draft_view",
     "read_partial_draft",
     "read_result",
@@ -372,7 +374,6 @@ async def request_run(
             "version": 1,
             "max_depth": 4,
             "max_nodes": len(plans) * 31,
-            "max_seconds": 1500,
         },
         "workflow_version": "qnu.compiler.workflow/v2" if plans else "qnu.compiler.workflow/v1",
         "auto_review": auto_review,

@@ -12,6 +12,7 @@ from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.policies.access import READ_ROLES, WRITE_ROLES
 from qnu.domains.knowledge.public_api import resolve_revision_scope
 from qnu.domains.ocr.artifacts.canonical import render_markdown
+from qnu.domains.ocr.config import LEGACY_MARKDOWN_VERSION
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.ocr.models import OcrProcessingRun, utcnow
 from qnu.domains.ocr.review.models import (
@@ -163,10 +164,12 @@ async def load_review(
     units = [
         u.model_copy(update={"original_text": originals[u.evidence_id]}) for u, _ in leaf_units(doc)
     ]
-    markdown = render_markdown(doc).encode("utf-8")
-    if row is not None:
-        await checked_bytes(blob, row.markdown_key, row.markdown_sha256)
-        if sha(markdown) != row.markdown_sha256:
+    if row is None:
+        markdown = await processing_service.read_markdown(db, blob, run)
+    else:
+        markdown = await checked_bytes(blob, row.markdown_key, row.markdown_sha256)
+        is_legacy = markdown.startswith(f"<!-- {LEGACY_MARKDOWN_VERSION} -->\n".encode())
+        if render_markdown(doc, legacy=is_legacy).encode("utf-8") != markdown:
             raise AppException(
                 "Markdown và JSON không đồng bộ.",
                 code="ocr_text_derivative_mismatch",

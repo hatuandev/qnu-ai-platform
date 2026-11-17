@@ -6,7 +6,11 @@ from qnu.domains.rag.answer.cells import catalog
 from qnu.domains.rag.answer.coverage import plan_for
 from qnu.domains.rag.answer.drafting import messages_for
 from qnu.domains.rag.answer.selection import question_needs
-from qnu.domains.rag.answer.table_selection import requested_data_years, select_catalog
+from qnu.domains.rag.answer.table_selection import (
+    requested_data_years,
+    requested_intakes,
+    select_catalog,
+)
 from qnu.platform.errors import AppException
 
 MANDATORY_ADDED_KINDS = frozenset({"clause"})
@@ -43,6 +47,7 @@ def pack_messages(req, sources, context, **options):
             options.get("resolved_question") or req.question,
             context.get("table_links", []),
             data_years=requested_data_years(options.get("metadata_filter")),
+            intakes=requested_intakes(options.get("metadata_filter")),
         )
         messages = messages_for(
             req.question,

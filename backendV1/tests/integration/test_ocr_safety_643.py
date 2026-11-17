@@ -209,6 +209,9 @@ def test_spelling_reconcile_restores_a_completed_run_with_no_check(client):
     try:
         with FakeSpeller() as model:
             chat_provider(client, data, model.base_url)
+            assert client.get(url + "/checks/summary?version=0").json() == {
+                "check": None, "running": True,
+            }
 
             async def age():
                 async with AsyncSessionFactory() as db:
@@ -222,7 +225,7 @@ def test_spelling_reconcile_restores_a_completed_run_with_no_check(client):
             client.portal.call(age)
             assert client.portal.call(spelling_reconcile, ctx) == 1
             job = next(j for j in queue.jobs if j["function"] == "spelling_check_job")
-            assert job["args"] == (data["ocr_run_id"], 0)
+            assert job["args"] == (data["ocr_run_id"], 0, False, True)
             assert job["job_id"].startswith(f"qnu:v1:spelling:{data['ocr_run_id']}:0:recover:")
             assert client.portal.call(spelling_check_job, ctx, *job["args"]) == "completed"
             checks = client.get(url + "/checks?version=0").json()

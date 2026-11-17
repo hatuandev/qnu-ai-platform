@@ -228,8 +228,6 @@ def test_no_findings_is_not_approval_and_includes_every_unit(client):
         "duplicate_draft",
         "foreign_source",
         "foreign_draft",
-        "unsupported_reference",
-        "covered_without_reference",
         "schema",
         "truncated",
         "http_error",
@@ -248,6 +246,32 @@ def test_incomplete_or_invalid_reviews_fail_with_raw_and_never_resend(client, mo
         assert client.get(base + "/report").status_code == 409
         replay = review(client, data)
         assert replay.status_code == 200 and replay.json()["id"] == listing[0]["id"]
+        assert len(chat.requests) == 2
+
+
+@pytest.mark.parametrize(
+    ("mode", "direction"),
+    [
+        ("unsupported_reference", "draft_to_source"),
+        ("covered_without_reference", "source_to_draft"),
+    ],
+)
+def test_review_reports_missing_reference_as_unverified(client, mode, direction):
+    with prepared(client) as (data, chat):
+        chat.mode = mode
+        response = review(client, data)
+        assert response.status_code == 200, response.text
+        result = response.json()
+        assert result["status"] == "completed" and result["verdict"] == "needs_attention"
+        base = data["review_url"] + "/" + result["id"]
+        assert client.get(base + "/raw").content == chat.last_raw
+        checked = client.get(base + "/report").json()
+        assert any(
+            finding["status"] == "uncertain" and finding["direction"] == direction
+            for finding in checked["findings"]
+        )
+        replay = review(client, data)
+        assert replay.status_code == 200 and replay.json()["id"] == result["id"]
         assert len(chat.requests) == 2
 
 

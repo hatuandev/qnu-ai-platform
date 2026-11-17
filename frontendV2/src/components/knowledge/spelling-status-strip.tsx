@@ -41,6 +41,8 @@ export function SpellingStatusStrip({
     isPreparing,
   );
   const check = data?.check;
+  const isSkipped = check?.scope === "skipped";
+  const isSelected = check?.scope === "selected";
   const wasPreparing = useRef(isPreparing);
   useEffect(() => {
     if (wasPreparing.current && !isPreparing && !check && !isLoading) {
@@ -57,11 +59,13 @@ export function SpellingStatusStrip({
   const pending = check?.pending_count ?? 0;
   const ignored = check?.ignored_count ?? 0;
   const complete =
+    !isSkipped &&
     check?.status === "completed" &&
     coverage?.total != null &&
     coverage.checked === coverage.total;
   const reviewed = check?.reviewed_at != null;
-  const running = check?.status === "running";
+  const isWaiting = !check && data?.running === true;
+  const running = isWaiting || check?.status === "running";
   const failed = check?.status === "failed";
   const interrupted = check?.status === "uncertain";
 
@@ -69,25 +73,33 @@ export function SpellingStatusStrip({
     ? "Không tải được kết quả soát chính tả"
     : isLoading
       ? "Đang tải kết quả soát chính tả…"
-      : !check
-        ? "Chưa có kết quả soát chính tả"
-        : running
-          ? "Đang soát chính tả…"
-          : failed
-            ? "Soát chính tả gặp lỗi"
-            : interrupted
-              ? "Soát chính tả bị gián đoạn"
-              : reviewed
-                ? `Đã duyệt chính tả${ignored > 0 ? ` · ${ignored} vị trí bỏ qua` : ""}`
-                : !complete
-                  ? "Chưa soát xong toàn bộ văn bản"
-                  : pending > 0
-                    ? `Có ${pending} vị trí cần xem${ignored > 0 ? ` · ${ignored} đã bỏ qua` : ""}`
-                    : coverage?.total === 0
-                      ? "Không có đoạn văn để soát"
-                      : ignored > 0
-                        ? `Đã bỏ qua ${ignored} vị trí · cần hoàn tất duyệt`
-                        : "Chưa phát hiện lỗi chính tả";
+      : isSkipped
+        ? "Bỏ qua soát tự động theo cài đặt"
+        : !check
+          ? isWaiting
+            ? "Đang chờ soát chính tả…"
+            : "Chưa có kết quả soát chính tả"
+          : running
+            ? isSelected
+              ? "Đang soát các đoạn theo cài đặt…"
+              : "Đang soát chính tả…"
+            : failed
+              ? "Soát chính tả gặp lỗi"
+              : interrupted
+                ? "Soát chính tả bị gián đoạn"
+                : reviewed
+                  ? `${isSelected ? "Đã duyệt phần soát tự động" : "Đã duyệt chính tả"}${ignored > 0 ? ` · ${ignored} vị trí bỏ qua` : ""}`
+                  : !complete
+                    ? "Chưa soát xong toàn bộ văn bản"
+                    : pending > 0
+                      ? `Có ${pending} vị trí cần xem${ignored > 0 ? ` · ${ignored} đã bỏ qua` : ""}`
+                      : coverage?.total === 0
+                        ? "Không có đoạn văn để soát"
+                        : ignored > 0
+                          ? `Đã bỏ qua ${ignored} vị trí · cần hoàn tất duyệt`
+                          : isSelected
+                            ? "Chưa phát hiện lỗi trong phần soát tự động"
+                            : "Chưa phát hiện lỗi chính tả";
 
   const Icon =
     isLoading || running
@@ -104,7 +116,7 @@ export function SpellingStatusStrip({
     ? "Xem kết quả"
     : pending > 0
       ? "Xem gợi ý"
-      : !check
+      : !check || isSkipped
         ? "Mở rà soát"
         : complete
           ? "Duyệt chính tả"
@@ -133,7 +145,7 @@ export function SpellingStatusStrip({
             </span>
           </span>
         )}
-        {coverage && !complete && (
+        {coverage && !complete && !isSkipped && (
           <span className="text-muted-foreground">
             {coverage.total === null
               ? `${coverage.checked} đoạn đã soát`

@@ -1,0 +1,22 @@
+# Phiên 982 — Khôi phục kiểm thử 24 tài liệu tuyển sinh
+
+## Phạm vi và nguyên nhân
+
+- Lượt ban đầu đã kiểm checksum của 24 tệp. Bóc tách tự động đạt 23/24. Tệp PDF bị chặn bởi `embedded_image_too_large` hoàn tất khi thử OCR toàn trang trong cùng revision.
+- Có 9 tệp chưa có kết quả biên dịch khi tiến trình bị dừng. 7 tệp chưa được chạy và 2 tệp có phần đang chờ model. Ba lỗi biên dịch xảy ra trước lúc dừng.
+- Đọc phản hồi đã lưu của bản Quy chế 363. Phần 1 có 1 citation không tồn tại trong nguồn. Phần 2 sai hợp đồng JSON ở 9 đoạn. Biên dịch lại bản OCR này với đầu ra có schema đã hoàn tất.
+- Hai lỗi cũ `compilation_failed` thiếu loại ngoại lệ cụ thể trong log. Khôi phục thử tệp TB học phí K49 từ phần đã hoàn tất trong cơ sở dữ liệu kiểm thử. Backend ráp thành công bản biên dịch có 3 bảng mà không gọi lại model.
+
+## Thay đổi và kiểm chứng
+
+- Compiler phân loại tất cả các phần đang dang dở trước khi kết thúc một lượt hết hạn. Gọi worker với hai lượt bị ngắt thật xác nhận còn 2 phần hoàn tất được giữ, 4 phần đang gửi trước đó được đánh dấu chưa xác định và yêu cầu cũ không bị gửi lại.
+- Compiler trả kết nối PostgreSQL trước khi chạy các phần độc lập và bổ sung loại ngoại lệ vào log khi lượt lỗi. Hạn chế giữ kết nối không cần thiết là một cải tiến riêng, chưa đủ căn cứ để quy cả hai lỗi cũ về một nguyên nhân.
+- Cẩm nang Word đã lưu 8 phần và phần thứ 9 chưa gửi khi ngưỡng cũ chặn ở giây 979. Dùng phần thời gian còn lại cho lượt gọi và giữ trần tổng 1.500 giây. Tái hiện trên bản sao ở thời điểm bị chặn đã hoàn tất 9/9 phần với Qwen. Mỗi phần chỉ có một lượt gửi và bản ghép vượt kiểm tra checksum cùng liên kết nguồn.
+- Hai PDF học phí cho thấy hai lý do một phần bị chặn: các hàng gộp kéo nhiều ô vào phần rà văn bản, và kế hoạch tính cả chi phí model cho các bảng có thể đối chiếu cục bộ. Đã xác nhận lập kế hoạch được với schema trên cả hai tệp bằng chính bản nháp đã thử trước đó. Bảng, hàng và ô vẫn được kiểm đủ quyền sở hữu trong manifest. Nhánh đối chiếu cục bộ đòi ô khớp nguyên văn, vị trí và span với bản nguồn.
+- Phần 2 của báo cáo rà soát TB học phí K49 bị bộ kiểm tra từ chối vì Qwen gửi bốn lần cùng một ID hợp lệ. Chuẩn hóa danh sách dẫn chứng sau khi kiểm phạm vi, giữ nguyên phản hồi thô. Worker đọc lại phần 2 và đánh dấu hoàn tất; số lần gửi phần này vẫn là 1.
+- Trên cả 24 bản giữ nguồn, lập được 374 phần rà soát theo cấu hình model hiện hành và kiểm tra dựng lại scope/hash của từng phần. Có 6 phần bảng chỉ đối chiếu cục bộ và 9 đơn vị được đánh dấu cần đối chiếu riêng. Đây là kiểm tra lập kế hoạch trước khi gửi model.
+- Từ `backendV1`, Ruff theo phạm vi đạt và `python -m pytest -q tests/unit/test_compilation_fencing_744.py tests/unit/test_compilation_review_parts_744.py tests/unit/test_compilation_segments_744.py tests/unit/test_compiler_review_refinement_755.py tests/unit/test_compiler_review_budget_757.py` đạt 61 ca. Từ root, harness `backendV1/scripts/run_isolated_tests.py` với ba tệp integration compiler/segments/review-segments đạt 21 ca. Chạy riêng `tests/integration/test_compiler_review_652.py` đạt 25 ca.
+- `run_isolated_tests.py tests -q --maxfail=2` dừng ở 43 ca đạt và hai ca integration lỗi. Đối chiếu trên commit `8942d310` tái hiện chính xác `tests/integration/test_answer_review_p6.py::test_review_keeps_insufficient_evidence_truthful` và `tests/integration/test_application_api_keys.py::test_openai_gateway_endpoints`. Cổng `tests/unit -q --maxfail=2` dừng sau 561 ca đạt tại hai lỗi nền `test_deleted_source_can_request_new_permanent_preview_but_other_deletes_stay_blocked` và `test_initial_schema_offline_sql_creates_v1_without_touching_legacy`.
+- Qwen rà soát `TB học phí K49.pdf` hoàn tất 14/14 phần với 4 phát hiện và 162.427 token. Hai phần bảng lớn dùng đối chiếu cục bộ, 0 yêu cầu model ở hai phần đó. Quy chế 363 hoàn tất 4/4 phần biên dịch và 12/12 phần rà soát, với 184 phát hiện cần đọc theo báo cáo.
+- Lượt biên dịch AI đầy đủ của `tai_lieu_phuc_tap_kiem_thu_qnu_rag (1).pdf`, khởi chạy trước bản sửa ngân sách, dừng ở giây 1.304 với 4/7 phần đã hoàn tất và 3 phần chưa gửi. Phần thời gian còn lại thấp hơn ngân sách hàng đợi và chưa có bằng chứng đủ để hoàn tất ba lượt gọi. Bản giữ nguồn của cùng PDF đã hoàn tất và qua kiểm bảng.
+- Tái sử dụng OCR và các báo cáo đã có. Lượt mới dùng Qwen theo cấu hình hiện hành, trong DB và thư mục lưu trữ thử nghiệm. Kiểm tra toàn bộ đường dẫn giữ nguồn đã hoàn tất. Báo cáo ghi riêng các tệp còn chờ lượt Qwen. [Kết quả theo tệp](../../backendV1/storage/context982/ket-qua.md).

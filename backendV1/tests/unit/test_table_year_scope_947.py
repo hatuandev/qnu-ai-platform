@@ -10,8 +10,8 @@ from qnu.domains.knowledge.index.query_scope import resolve
 from qnu.domains.knowledge.metadata import MetadataFilter, matches_metadata, validate_annotations
 from qnu.domains.knowledge.publication.automatic_metadata import preview
 from qnu.domains.knowledge.publication.evidence import VersionBundle
-from qnu.domains.rag.answer.cells import catalog
-from qnu.domains.rag.answer.schemas import EvidenceSource
+from qnu.domains.rag.answer.cells import catalog, materialize, prompt_catalog
+from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer
 from qnu.domains.rag.answer.table_selection import select_catalog
 from qnu.platform.errors import AppException
 
@@ -87,6 +87,46 @@ def evidence_source(chunk):
         citations=chunk.citations,
         structure=chunk.structure,
     )
+
+
+def test_conversion_year_requires_a_titled_source_and_local_rule():
+    content, documents = fixture(
+        headers=[["Điểm chứng chỉ", "Điểm quy đổi"]],
+        body=[["6.0", "9.0"]],
+        columns=2,
+        intro="Điểm được quy đổi theo mức điểm như sau:",
+    )
+    blocks = documents[0]["pages"][0]["blocks"]
+    title = {"evidence_id": "ev-title", "text": "THÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026"}
+    blocks.insert(0, title)
+    content["citations"][f"{RUN}:ev-title"] = {"page": 1}
+    listed = list(annotations(content, documents).values())
+    values = [a for a in listed if a["target"].startswith("table:")]
+    assert len(values) == 2
+    assert all(a["values"] == {"data_year": 2026} and len(a["evidence"]) == 2 for a in values)
+    _, chunk = table_chunk(content, documents, listed)
+    assert matches_metadata(chunk.structure, MetadataFilter(data_year=2026))
+    assert not matches_metadata(chunk.structure, MetadataFilter(data_year=2025))
+    source = evidence_source(chunk).model_copy(update={"evidence_id": "E1"})
+    cells = select_catalog(
+        catalog([source]),
+        [source],
+        "So sánh điểm quy đổi năm 2025 và 2026",
+        [],
+        data_years={2025, 2026},
+    )
+    assert prompt_catalog(cells)["tables"][0]["data_year"] == 2026
+    lookup = cells["tables"][0]["cells"][0]["cell_id"]
+    answer = ModelAnswer(status="answered", statements=[], lookups=[{"cell_id": lookup}])
+    result = materialize(answer, [source], cells)
+    assert "Năm 2026 / Điểm quy đổi: 9.0" in result.statements[0].text
+    validate_annotations(values, content, documents, strict_roles=True)
+    with pytest.raises(AppException):
+        validate_annotations(
+            [{**values[0], "evidence": values[0]["evidence"][:1]}], content, documents
+        )
+    blocks[1]["text"] = "Điểm năm trước được quy đổi theo mức điểm như sau:"
+    assert not any(target.startswith("table:") for target in annotations(content, documents))
 
 
 def test_single_year_header_scopes_the_column_not_the_whole_table():
@@ -250,6 +290,69 @@ def test_unmarked_first_row_is_not_treated_as_a_header():
         marked=False,
     )
     assert preview(published(content, documents))["annotations"] == []
+
+
+def test_unmarked_multitier_year_header_scopes_its_child_columns():
+    content, documents = fixture(
+        headers=[
+            [
+                {"text": "Ngành đào tạo", "row_span": 2},
+                {"text": "2024", "col_span": 2},
+            ],
+            ["Chỉ tiêu", "Trúng tuyển"],
+        ],
+        body=[["Công nghệ thông tin", "80", "15"], ["Kỹ thuật phần mềm", "100", "20"]],
+        columns=3,
+        marked=False,
+    )
+    found = annotations(content, documents)
+    for column in (1, 2):
+        annotation = found[f"table:{RUN}:{TABLE}:column:{column}"]
+        assert annotation["values"] == {"data_year": 2024}
+        assert annotation["evidence"] == [
+            {"citation": f"{RUN}:{TABLE}-c0-1", "quote": "2024"}
+        ]
+    listed = preview(published(content, documents))["annotations"]
+    _, chunk = table_chunk(content, documents, listed)
+    assert {item["target"] for item in chunk.structure["retrieval_metadata"]} == {
+        f"table:{RUN}:{TABLE}:column:1",
+        f"table:{RUN}:{TABLE}:column:2",
+    }
+    assert matches_metadata(chunk.structure, MetadataFilter(data_year=2024))
+    assert not matches_metadata(chunk.structure, MetadataFilter(data_year=2025))
+
+
+def test_multitier_parent_year_conflicting_with_a_child_label_stays_unknown():
+    content, documents = fixture(
+        headers=[
+            [
+                {"text": "Ngành đào tạo", "row_span": 2},
+                {"text": "2024", "col_span": 2},
+            ],
+            ["Chỉ tiêu năm 2023", "Trúng tuyển"],
+        ],
+        body=[["Công nghệ thông tin", "80", "15"], ["Kỹ thuật phần mềm", "100", "20"]],
+        columns=3,
+        marked=False,
+    )
+    found = annotations(content, documents)
+    assert f"table:{RUN}:{TABLE}:column:1" not in found
+    assert found[f"table:{RUN}:{TABLE}:column:2"]["values"] == {"data_year": 2024}
+
+
+def test_headerless_table_and_signing_date_never_scope_a_column():
+    content, documents = fixture(
+        headers=[["Ngành đào tạo", "2024"]],
+        body=[["Công nghệ thông tin", "80"], ["Kỹ thuật phần mềm", "90"]],
+        columns=2,
+        intro="Ngày ký: 15/01/2024",
+        marked=False,
+    )
+    assert not [
+        item
+        for item in annotations(content, documents).values()
+        if item["target"].startswith("table:")
+    ]
 
 
 def test_column_annotation_rejects_evidence_from_another_column():

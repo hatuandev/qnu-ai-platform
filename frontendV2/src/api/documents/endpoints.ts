@@ -1,6 +1,12 @@
 export const compiledDocumentPaths = {
   documents: (workspaceId: string, collectionId: string) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/compiled-documents`,
+  registrationMetadata: (
+    workspaceId: string,
+    collectionId: string,
+    runId: string,
+  ) =>
+    `/workspaces/${workspaceId}/collections/${collectionId}/compiled-documents/registration-metadata/${runId}`,
   document: (workspaceId: string, collectionId: string, documentId: string) =>
     `/workspaces/${workspaceId}/collections/${collectionId}/compiled-documents/${documentId}`,
   versions: (workspaceId: string, collectionId: string, documentId: string) =>

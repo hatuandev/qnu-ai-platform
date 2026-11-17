@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getCompilationProgress } from "../compilation/requests";
+import { getCompilationProgressSummary } from "../compilation/requests";
 import { getProcessingProgress } from "../ocr/requests";
 import { preparationKeys } from "./queries";
 import type { PreparationIntent } from "./types";
@@ -16,6 +16,7 @@ export type PreparationProgressData = {
     completed: number;
     total: number;
     segmented?: boolean;
+    elapsedSeconds?: number | null;
   } | null;
 };
 
@@ -64,7 +65,7 @@ export function usePreparationProgressQuery(intent?: PreparationIntent) {
           pagination: run.pagination,
         };
       } else if (compiling && intent.compilation_run_id) {
-        const run = await getCompilationProgress(
+        const run = await getCompilationProgressSummary(
           intent.workspace_id,
           intent.collection_id,
           intent.compilation_run_id,
@@ -74,6 +75,7 @@ export function usePreparationProgressQuery(intent?: PreparationIntent) {
           completed: run.completed,
           total: run.total,
           segmented: run.total > 1,
+          elapsedSeconds: run.elapsed_seconds,
         };
       }
 

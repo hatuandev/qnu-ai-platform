@@ -122,6 +122,40 @@ def test_conflicting_values_remain_unknown_but_unrelated_values_survive():
     ]
 
 
+def test_phone_clusters_and_contact_fields_never_become_data_year():
+    source = bundle(
+        "Tư vấn tuyển sinh: 1800 6357",
+        "Tổng đài tư vấn tuyển sinh: 1900",
+        "Mã hồ sơ: 2025",
+        "Mùa tuyển sinh 2026",
+    )
+    found = preview(source)["annotations"]
+    assert not [
+        item for item in found if item["values"].get("data_year") in {1800, 1900}
+    ]
+    assert [a["values"] for a in found if a["values"].get("data_year")] == [{"data_year": 2026}]
+
+
+def test_old_model_proposal_for_a_hotline_number_is_rechecked():
+    source = bundle("Tư vấn tuyển sinh: 1800 6357")
+    source.content["supplement"] = {
+        "metadata": [
+            {
+                "annotation": {
+                    "target": "paragraph:0:0",
+                    "values": {"data_year": 1800},
+                    "evidence": [
+                        {"citation": "ocr:ev0", "quote": "Tư vấn tuyển sinh: 1800 6357"}
+                    ],
+                }
+            }
+        ]
+    }
+    assert not [
+        item for item in preview(source)["annotations"] if item["values"].get("data_year")
+    ]
+
+
 def test_empty_and_multiple_sources_do_not_invent_global_scope():
     assert preview(bundle("Hướng dẫn chung không ghi năm hoặc ngành."))["annotations"] == []
     source = bundle("Năm dữ liệu: 2026")

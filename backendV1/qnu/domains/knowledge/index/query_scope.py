@@ -15,6 +15,7 @@ from sqlalchemy import select
 from qnu.domains.knowledge.index.models import IndexChunk
 from qnu.domains.knowledge.metadata import (
     MetadataFilter,
+    event_years,
     matches_metadata,
     merge_scope,
     scope_conflicts,
@@ -23,7 +24,12 @@ from qnu.domains.knowledge.publication.evidence import digest
 from qnu.platform.config import get_settings
 from qnu.platform.errors import Conflict
 
-VERSION = "qnu.catalog-scope/v2"
+VERSION = "qnu.catalog-scope/v5"
+
+# A bare four-digit year only scopes when the catalog proves that year and the
+# surrounding text is neither a count nor part of a date/code range.
+BARE_YEAR = re.compile(r"(?<![\w/\-])(?<!\d\.)([12]\d{3})(?![\w/\-])(?!\.\d)")
+COUNT_BEFORE = re.compile(r"\b(?:có|gồm|khoảng|hơn|gần|đạt|chừng)\s+$", re.IGNORECASE)
 
 
 def normalize(value: str) -> str:
@@ -71,6 +77,17 @@ def matched_values(query: str, values) -> list:
     ]
 
 
+def _bare_years(query: str, catalog: dict) -> list[int]:
+    found = set()
+    for match in BARE_YEAR.finditer(query):
+        year = int(match.group(1))
+        if not 1900 <= year <= 2100 or COUNT_BEFORE.search(query[: match.start()]):
+            continue
+        if any(year in (catalog.get(role) or []) for role in ("data_year", "issued_year")):
+            found.add(year)
+    return sorted(found)
+
+
 def year_choices(query: str, catalog: dict) -> dict:
     choices = {}
     labeled = re.findall(
@@ -90,12 +107,20 @@ def year_choices(query: str, catalog: dict) -> dict:
             )
             if re.search(r"(?:" + label + r")\s*[:=]?\s*" + str(year) + r"\b", query, re.IGNORECASE)
         ]
-        if not explicit and not roles:
+        inferred = [role for role in roles if year in catalog[role]] or roles
+        if not explicit and not inferred:
             continue
-        if not explicit and len(roles) != 1:
+        if not explicit and len(inferred) != 1:
             clarify("vai trò năm", ["năm dữ liệu", "năm ban hành"])
-        for role in explicit or roles:
+        for role in explicit or inferred:
             choices.setdefault(role, []).append(year)
+    for year in _bare_years(query, catalog):
+        if year in years:
+            continue
+        present = [role for role in roles if year in catalog[role]]
+        if len(present) > 1:
+            clarify("vai trò năm", ["năm dữ liệu", "năm ban hành"])
+        choices.setdefault(present[0], []).append(year)
     return choices
 
 
@@ -153,6 +178,79 @@ def attribute_scope(query: str, catalog: dict) -> dict:
     return selected
 
 
+def _intakes(values: dict) -> set[str]:
+    # Intakes named only by schedule events still index the source for retrieval;
+    # they are not document-wide scope and never force a clarification alone.
+    found = {values["intake"]} if values.get("intake") is not None else set()
+    for event in values.get("events") or []:
+        if isinstance(event, dict) and event.get("intake"):
+            found.add(event["intake"])
+    return found
+
+
+def scheduled_scope(
+    query: str, units: list[dict], intakes: list[str], fixed: MetadataFilter
+) -> dict:
+    """Temporal questions select a proven event and its calendar year."""
+    text = normalize(query)
+    if re.search(r"\bnăm (?:ban hành|dữ liệu)\b", text):
+        return {}
+    cues = {
+        "registration_deadline": r"\b(?:đăng ký|nhận hồ sơ|nộp hồ sơ)\b",
+        "exam_date": r"\b(?:ngày thi|lịch thi|tổ chức thi)\b",
+        "result_date": r"\b(?:công bố kết quả|thông báo kết quả|công bố điểm chuẩn)\b",
+        "fee_deadline": r"\b(?:nộp|đóng|thanh toán) (?:lệ phí|phí)\b",
+        "enrollment_confirmation": r"\bxác nhận nhập học\b",
+    }
+    if not re.search(r"\b(?:hạn|lịch|thời gian|khi nào|ngày nào|bao giờ|mấy giờ)\b", text):
+        return {}
+    kinds = [kind for kind, pattern in cues.items() if re.search(pattern, text)]
+    if len(kinds) != 1:
+        return {}
+    kind = kinds[0]
+    events = [e for values in units for e in values.get("events") or [] if e.get("kind") == kind]
+    if not events:
+        return {}
+    years = sorted({year for event in events for year in event_years(event)})
+    chosen = year_choices(query, {"data_year": years, "issued_year": []}).get("data_year", [])
+    scope = {"event_kind": [kind], "event_year": chosen}
+    intake_scope = {normalize(item) for item in intakes}
+    year_scope = set(chosen)
+    methods = {
+        event["method"]
+        for event in events
+        if event.get("method")
+        and (not year_scope or year_scope & event_years(event))
+        and (not intake_scope or normalize(event.get("intake") or "") in intake_scope)
+    }
+    if kind == "registration_deadline" and len(methods) > 1:
+        method = matching_event_method(text, methods, fixed.event_method)
+        if method:
+            scope["event_method"] = [method]
+    return scope
+
+
+def matching_event_method(query: str, methods: set[str], fixed: str | None) -> str | None:
+    def named(method: str) -> bool:
+        value = normalize(method)
+        owner = re.search(r"\bcủa\s+.+?(?=\s+https?://|$)", value)
+        url = re.search(r"https?://([^/\s]+)", value)
+        return (
+            mentions(query, value)
+            or bool(owner and mentions(query, owner[0]))
+            or bool(url and mentions(query, url[1]))
+        )
+
+    selected = [method for method in sorted(methods) if named(method)]
+    if len(selected) == 1:
+        return selected[0]
+    if fixed:
+        return None
+    if not re.search(r"\b(?:so sánh|cả hai|tất cả các kênh|các kênh)\b", query):
+        clarify("kênh đăng ký", methods)
+    return None
+
+
 def resolve(
     query: str, fixed: MetadataFilter, structures: list[dict]
 ) -> tuple[str, list[MetadataFilter], dict]:
@@ -160,12 +258,17 @@ def resolve(
     units = [a["values"] for s in structures for a in s.get("retrieval_metadata", [])]
     catalog = {
         key: sorted({u[key] for u in units if u.get(key) is not None}, key=str)
-        for key in ("program", "intake", "data_year", "issued_year")
+        for key in ("program", "data_year", "issued_year")
     }
+    catalog["intake"] = sorted({value for u in units for value in _intakes(u)}, key=str)
     chosen = {key: matched_values(query, catalog[key]) for key in ("program", "intake")}
-    # Numeric counts, scores or course codes are not years merely because they
-    # contain four digits. Require a year label, including for unknown years.
-    chosen.update(year_choices(query, catalog))
+    # Unlabeled numbers qualify only when they occur in the catalog and aren't counts.
+    chosen.update(
+        scheduled_scope(
+            query, units, chosen["intake"] or ([fixed.intake] if fixed.intake else []), fixed
+        )
+        or year_choices(query, catalog)
+    )
     base = fixed.model_dump(mode="json", exclude_none=True)
     attributes = attribute_scope(query, catalog_attributes(structures))
     if attributes:
@@ -224,6 +327,8 @@ def resolve(
     ]
     if not overview:
         for key in ("program", "intake", "data_year"):
+            if key == "data_year" and chosen.get("event_kind"):
+                continue
             values = {u[key] for u in narrowed if u.get(key)}
             if key not in base and not chosen.get(key) and len(values) > 1:
                 clarify(key, values)

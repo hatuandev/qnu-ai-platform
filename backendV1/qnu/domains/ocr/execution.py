@@ -47,6 +47,7 @@ from qnu.domains.ocr.artifacts.render import RenderedDocument, render_async, ren
 from qnu.domains.ocr.artifacts.validate import validate_document
 from qnu.domains.ocr.budget import page_request_budget
 from qnu.domains.ocr.config import (
+    LEGACY_MARKDOWN_VERSION,
     OCR_PROMPT,
     SUPPORTED_PROCESSING_EXTENSIONS,
     ProcessingConfig,
@@ -895,7 +896,10 @@ async def _assemble_result(
     canonical_artifact = await _store_artifact(
         db, blob_store, run, "canonical_json", 0, canonical_bytes
     )
-    markdown_bytes = render_markdown(canonical).encode("utf-8")
+    markdown_version = run.config.get("markdown_version", LEGACY_MARKDOWN_VERSION)
+    markdown_bytes = render_markdown(
+        canonical, legacy=markdown_version == LEGACY_MARKDOWN_VERSION
+    ).encode("utf-8")
     markdown_artifact = await _store_artifact(db, blob_store, run, "markdown", 0, markdown_bytes)
 
     artifacts = [

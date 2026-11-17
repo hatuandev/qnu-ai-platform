@@ -877,7 +877,7 @@ function SpellingReviewWorkspace() {
       return;
     }
     if (!isCheckComplete) {
-      toast.info("Cần soát xong toàn bộ văn bản trước khi duyệt.");
+      toast.info("Cần soát xong các đoạn của lượt này trước khi duyệt.");
       return;
     }
     if (remaining > 0) {
@@ -1059,6 +1059,18 @@ function SpellingReviewWorkspace() {
             </span>
           </Button>
 
+          {latestCheck?.scope === "selected" &&
+            latestCheck.status !== "running" && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => openRecheckDialog(false)}
+                disabled={isRecheckPending || rerunReviewMutation.isPending}
+              >
+                Soát toàn bộ văn bản
+              </Button>
+            )}
           {isReviewed ? (
             <Badge
               variant="outline"
@@ -1085,7 +1097,11 @@ function SpellingReviewWorkspace() {
               ) : (
                 <BadgeCheck className="size-3.5" />
               )}
-              <span>Hoàn tất duyệt</span>
+              <span>
+                {latestCheck?.scope === "selected"
+                  ? "Duyệt phần đã soát"
+                  : "Hoàn tất duyệt"}
+              </span>
             </Button>
           )}
         </div>
@@ -1174,7 +1190,7 @@ function SpellingReviewWorkspace() {
                 ? "Soát chính tả gặp lỗi"
                 : latestCheck?.status === "uncertain"
                   ? "Soát chính tả bị gián đoạn"
-                  : "Chưa soát xong toàn bộ văn bản"}
+                  : "Chưa soát xong các đoạn của lượt này"}
             {percent !== null
               ? ` · ${percent}% (${coverage.checked}/${coverage.total} đoạn)`
               : ` · ${coverage.checked} đoạn đã soát`}
@@ -1697,7 +1713,9 @@ function SpellingReviewWorkspace() {
                     {latestCheck.status === "running"
                       ? "Kết quả sẽ xuất hiện khi model hoàn tất."
                       : isFailed
-                        ? "Có thể soát tiếp các đoạn còn thiếu."
+                        ? latestCheck.scope === "selected"
+                          ? "Có thể chọn soát toàn bộ văn bản."
+                          : "Có thể soát tiếp các đoạn còn thiếu."
                         : isReviewed
                           ? "Mọi thay đổi tiếp theo cần một lượt soát mới."
                           : remaining > 0
@@ -1708,23 +1726,25 @@ function SpellingReviewWorkspace() {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-2">
-                  {isFailed && !isReviewed && (
-                    <Button
-                      size="sm"
-                      className="h-8 gap-1.5 text-xs"
-                      disabled={
-                        isRecheckPending || rerunReviewMutation.isPending
-                      }
-                      onClick={() => openRecheckDialog(true)}
-                    >
-                      {isRecheckPending ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <RotateCcw className="size-3.5" />
-                      )}
-                      <span>Soát lại</span>
-                    </Button>
-                  )}
+                  {isFailed &&
+                    !isReviewed &&
+                    latestCheck.scope !== "selected" && (
+                      <Button
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        disabled={
+                          isRecheckPending || rerunReviewMutation.isPending
+                        }
+                        onClick={() => openRecheckDialog(true)}
+                      >
+                        {isRecheckPending ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <RotateCcw className="size-3.5" />
+                        )}
+                        <span>Soát lại</span>
+                      </Button>
+                    )}
                   {canComplete && (
                     <Button
                       size="sm"

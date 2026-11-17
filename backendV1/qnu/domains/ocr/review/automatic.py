@@ -6,10 +6,11 @@ from collections import deque
 from datetime import timedelta
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.knowledge.public_api import resolve_revision_scope
 from qnu.domains.modelops.inference.service import (
     available_input_tokens,
     input_token_upper_bound,
@@ -17,14 +18,15 @@ from qnu.domains.modelops.inference.service import (
 )
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.ocr.models import OcrProcessingRun, utcnow
-from qnu.domains.ocr.review import detection, service
-from qnu.domains.ocr.review.context import CONTEXT_VERSION, build_context
+from qnu.domains.ocr.review import defaults, detection, service
+from qnu.domains.ocr.review.context import CONTEXT_VERSION, ContextIndex, build_context
 from qnu.domains.ocr.review.models import SpellingRun
 from qnu.domains.ocr.review.schemas import (
     ContextSuggestedText,
     DetectionResponse,
     DetectRequest,
     ReviewDocument,
+    TextUnit,
 )
 from qnu.domains.workspaces.access import actor_ref
 from qnu.platform.config import get_settings
@@ -37,11 +39,46 @@ from qnu.ports.chat_model import ChatMessage, ChatModel
 logger = get_logger(__name__)
 
 BATCH_SIZE = 25
+SCOPE_WAIT_SECONDS = 2
 SPLIT_ERRORS = {
     "model_input_limit_exceeded",
     "model_context_limit_exceeded",
     "chat_output_truncated",
 }
+
+
+async def _latest_selected(
+    db: AsyncSession, run: OcrProcessingRun, version: int, actor: AuthActor
+) -> SpellingRun | None:
+    return await db.scalar(
+        select(SpellingRun)
+        .where(
+            SpellingRun.run_id == run.id,
+            SpellingRun.workspace_id == run.workspace_id,
+            SpellingRun.collection_id == run.collection_id,
+            SpellingRun.version == version,
+            SpellingRun.created_by == actor_ref(actor),
+            SpellingRun.trace["scope"].astext == "selected",
+        )
+        .order_by(SpellingRun.created_at.desc())
+        .limit(1)
+        .execution_options(populate_existing=True)
+    )
+
+
+async def _wait_for_selected(
+    db: AsyncSession, actor: AuthActor, run: OcrProcessingRun, version: int
+) -> tuple[SpellingRun | None, bool]:
+    """Caller holds the source lock. Release it while the earlier task uses ModelOps."""
+    waited = False
+    while selected := await _latest_selected(db, run, version, actor):
+        if selected.status != "running" or selected.expires_at <= utcnow():
+            return selected, waited and selected.status in {"running", "uncertain"}
+        waited = True
+        await db.commit()
+        await asyncio.sleep(SCOPE_WAIT_SECONDS)
+        await service.authorize(db, actor, run, write=True, lock=True)
+    return None, False
 
 
 async def review_document(
@@ -53,14 +90,47 @@ async def review_document(
     version: int,
     *,
     retry: bool = False,
+    automatic: bool = False,
 ) -> str:
     run_id = run.id
     await service.authorize(db, actor, run, write=True, lock=True)
+    selected_review = None
+    if not automatic:
+        selected_review, interrupted = await _wait_for_selected(db, actor, run, version)
+        if interrupted and selected_review is not None:
+            return (await detection.readable_check(db, selected_review)).status
     doc, canonical = await service.load_review(db, blob, run, version)
     if doc.version != version:
         return "version_not_found"
     evidence_ids = list(dict.fromkeys(unit.evidence_id for unit in doc.units))
-    base_key = f"auto:spl:document:{run.id}:{version}:{detection.PROMPT_VERSION}"
+    full_key = f"auto:spl:document:{run.id}:{version}:{detection.PROMPT_VERSION}"
+    base_key = full_key
+    scope = "full"
+    if automatic:
+        revision = await resolve_revision_scope(
+            db, run.workspace_id, run.collection_id, run.source_id, run.revision_id
+        )
+        policy = await defaults.read(db)
+        selected = defaults.eligible_ids(canonical, revision.extension, policy)
+        if not selected:
+            scope = "skipped"
+        elif len(selected) < len(evidence_ids):
+            scope = "selected"
+        evidence_ids = [key for key in evidence_ids if key in selected]
+        if scope != "full":
+            base_key += f":{scope}"
+    same_request = or_(
+        SpellingRun.idempotency_key == base_key,
+        SpellingRun.idempotency_key.startswith(base_key + ":retry:", autoescape=True),
+    )
+    if automatic:
+        # Redelivery must use the scope already recorded before settings changed.
+        same_request = or_(
+            same_request,
+            SpellingRun.trace["automatic_document"].astext == "true",
+            SpellingRun.idempotency_key == full_key,
+            SpellingRun.idempotency_key.startswith(full_key + ":retry:", autoescape=True),
+        )
     existing = await db.scalar(
         select(SpellingRun)
         .where(
@@ -69,7 +139,7 @@ async def review_document(
             SpellingRun.run_id == run.id,
             SpellingRun.version == version,
             SpellingRun.created_by == actor_ref(actor),
-            SpellingRun.idempotency_key.startswith(base_key, autoescape=True),
+            same_request,
         )
         .order_by(SpellingRun.created_at.desc())
         .limit(1)
@@ -100,6 +170,8 @@ async def review_document(
             "prompt_version": detection.PROMPT_VERSION,
             "context_version": CONTEXT_VERSION,
             "total_evidence_count": len(evidence_ids),
+            "scope": scope,
+            **({"automatic_document": True} if automatic else {}),
             "withheld_suggestions": [],
             "rejected_suggestions": [],
             **({"retry_of": retry_of} if retry_of else {}),
@@ -130,16 +202,18 @@ async def review_document(
             "configuration_hash": configuration_hash,
             "routing": list(runtime.routing_trace),
         }
-        inherited = await _resume_results(db, existing, parent)
+        inherited = await _resume_results(db, existing or selected_review, parent)
         positions = {evidence_id: index for index, evidence_id in enumerate(evidence_ids)}
         covered = {
             evidence_id for result in inherited for evidence_id in result.checked_evidence_ids
         }
         await _aggregate(db, parent, inherited, positions)
-        batches = plan_batches(
+        index = await asyncio.to_thread(ContextIndex.from_document, canonical)
+        batches = await asyncio.to_thread(
+            plan_batches,
             [evidence_id for evidence_id in evidence_ids if evidence_id not in covered],
             {unit.evidence_id: unit for unit in doc.units},
-            canonical,
+            index,
             doc.version,
             doc.canonical_sha256,
             runtime.token_limits,
@@ -152,7 +226,7 @@ async def review_document(
             actor,
             run_id,
             doc,
-            canonical,
+            index,
             runtime,
             configuration_hash,
             parent_id,
@@ -220,8 +294,8 @@ async def _resume_results(
 
 def plan_batches(
     evidence_ids: list[str],
-    units: dict[str, object],
-    canonical: dict,
+    units: dict[str, TextUnit],
+    canonical: dict | ContextIndex,
     version: int,
     canonical_sha256: str,
     limits,
@@ -244,30 +318,35 @@ def plan_batches(
     schema_size = len(
         json.dumps(ContextSuggestedText.model_json_schema(), ensure_ascii=False).encode()
     )
+    index = canonical if isinstance(canonical, ContextIndex) else ContextIndex.from_document(canonical)
     batches: list[tuple[int, list[str]]] = []
-    start, current = 0, []
-    for evidence_id in evidence_ids:
-        trial = [*current, evidence_id]
-        fits = (
-            len(trial) <= cap
-            and _upper_bound(trial, units, canonical, version, canonical_sha256, schema_size)
-            <= available
-        )
-        if current and not fits:
-            batches.append((start, current))
-            start += len(current)
-            current = [evidence_id]
-        else:
-            current = trial
-    if current:
-        batches.append((start, current))
+    start = 0
+    while start < len(evidence_ids):
+        size = min(cap, len(evidence_ids) - start)
+        trial = evidence_ids[start : start + size]
+        if size > 1 and _upper_bound(
+            trial, units, index, version, canonical_sha256, schema_size
+        ) > available:
+            low, high = 1, size - 1
+            while low < high:
+                middle = (low + high + 1) // 2
+                estimate = _upper_bound(
+                    trial[:middle], units, index, version, canonical_sha256, schema_size
+                )
+                if estimate <= available:
+                    low = middle
+                else:
+                    high = middle - 1
+            trial = trial[:low]
+        batches.append((start, trial))
+        start += len(trial)
     return batches
 
 
 def _upper_bound(
     evidence_ids: list[str],
-    units: dict[str, object],
-    canonical: dict,
+    units: dict[str, TextUnit],
+    canonical: dict | ContextIndex,
     version: int,
     canonical_sha256: str,
     schema_size: int,
@@ -295,7 +374,7 @@ async def _review_batches(
     actor: AuthActor,
     run_id: str,
     doc: ReviewDocument,
-    canonical: dict,
+    canonical: ContextIndex,
     runtime,
     configuration_hash: str,
     parent_id: str,
@@ -391,7 +470,7 @@ async def _inspect_batch(
     actor: AuthActor,
     run_id: str,
     doc: ReviewDocument,
-    canonical: dict,
+    canonical: ContextIndex,
     runtime,
     configuration_hash: str,
     parent_id: str,

@@ -68,14 +68,18 @@ async def ocr_process_run(ctx: dict, run_id: str) -> str:
                     "spelling_check_job",
                     run_id,
                     0,
-                    job_id=f"qnu:v1:spelling:{run_id}:0",
+                    False,
+                    True,
+                    job_id=f"qnu:v1:spelling:{run_id}:0:auto",
                 )
             except Exception:
                 logger.warning("auto_spelling_enqueue_failed", run_id=run_id)
     return outcome.status
 
 
-async def spelling_check_job(ctx: dict, run_id: str, version: int = 0, retry: bool = False) -> str:
+async def spelling_check_job(
+    ctx: dict, run_id: str, version: int = 0, retry: bool = False, automatic: bool = False
+) -> str:
     """Automatic background spelling review after successful OCR text extraction."""
     container = ctx["container"]
     async with AsyncSessionFactory() as db:
@@ -92,6 +96,7 @@ async def spelling_check_job(ctx: dict, run_id: str, version: int = 0, retry: bo
                 run,
                 version,
                 retry=retry,
+                automatic=automatic,
             )
         except Exception as exc:
             logger.warning(
@@ -142,6 +147,8 @@ async def spelling_reconcile(ctx: dict) -> int:
                 "spelling_check_job",
                 run_id,
                 0,
+                False,
+                True,
                 job_id=f"qnu:v1:spelling:{run_id}:0:recover:{bucket}",
             )
         except Exception:

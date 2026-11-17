@@ -13,7 +13,7 @@ from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer, Statemen
 from qnu.platform.errors import AppException
 
 VERSION = "qnu.answer-cells/v13"
-PROJECTION_VERSION = "qnu.answer-projection/v7"
+PROJECTION_VERSION = "qnu.answer-projection/v8"
 
 _YEAR = re.compile(r"^(?:19|20)\d{2}$")
 _NUMERIC_CODE = re.compile(r"\d[\dA-Z]*(?:[-./]\d[\dA-Z]*)*")
@@ -849,6 +849,9 @@ def materialize(
                 continue
             emitted_lists.add(list_id)
         field = " / ".join(table["fields"][str(cell["column"])])
+        year = cell.get("data_year")
+        if year is not None and str(year) not in _numbers(field):
+            field = f"Năm {year} / {field}"
         text = (
             " ".join(cell["value"].split())
             if cell.get("row_name")
@@ -909,9 +912,11 @@ def prompt_catalog(cells: dict) -> dict:
             else:
                 rows[row]["cells"][cell["cell_id"]] = cell["value"]
         columns = {f"k{column}": " / ".join(path) for column, path in table["fields"].items()}
+        years = {cell.get("data_year") for cell in table["cells"] if not cell.get("row_name")}
         tables.append(
             {
                 "id": table["evidence_id"],
+                **({"data_year": next(iter(years))} if len(years) == 1 and None not in years else {}),
                 "columns": columns,
                 "rows": [
                     {

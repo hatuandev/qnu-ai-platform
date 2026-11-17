@@ -1,5 +1,33 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context1000 — Liên kết JSON và Markdown, giảm ngữ cảnh rà soát.](nhat_ky/2026-11-17_phien_1000_lien_ket_json_markdown.md)
+- [Context999 — Đối chiếu bản nháp theo nội dung đã lưu.](nhat_ky/2026-11-17_phien_999_ra_soat_theo_noi_dung.md)
+- [Context998 — Đo xử lý DOCX phức tạp với Qwen.](nhat_ky/2026-11-17_phien_998_do_qwen_docx_phuc_tap.md)
+- [Context997 — Đối chiếu nguyên văn phía backend trước khi gọi Qwen.](nhat_ky/2026-11-17_phien_997_ra_soat_nguyen_van_qwen.md)
+- [Context996 — Tải mới và rà soát tệp tuyển sinh 02–04 bằng Qwen.](nhat_ky/2026-11-17_phien_996_tai_moi_va_ra_soat_qwen_tep_02_04.md)
+- [Context995 — Rà soát khối văn bản dài theo ngân sách model.](nhat_ky/2026-11-17_phien_995_ra_soat_khoi_van_ban_dai.md)
+- [Context994 — Chạy thử rà soát Qwen trên một tệp tuyển sinh nhỏ.](nhat_ky/2026-11-17_phien_994_thu_ra_soat_qwen_tep_nho.md)
+- [Context993 — Rà soát bản nháp giữ nguyên nguồn, phục hồi theo mục lỗi.](nhat_ky/2026-11-17_phien_993_ra_soat_dung_phan_loi.md)
+- [Context990 — Rà soát và metadata trong lượt chạy lại tài liệu tuyển sinh.](nhat_ky/2026-11-16_phien_990_ra_soat_va_metadata_tuyen_sinh.md)
+
+- [Context989 — Khôi phục lịch qua nhiều khối OCR và đọc đúng bảng trên trang hỗn hợp.](nhat_ky/2026-11-16_phien_989_lich_va_diem_tuyen_sinh.md)
+
+- [Context988 — Gắn năm có dẫn chứng cho hai bảng quy đổi của P2.](nhat_ky/2026-11-16_phien_988_gan_nam_bang_quy_doi.md)
+
+- [Context987 — Sửa kiểm chứng lịch và phạm vi năm sau C3.](nhat_ky/2026-11-16_phien_987_sua_kiem_chung_lich_va_nam.md)
+
+- [Context986 — Triển khai kế hoạch metadata năm và thời gian: A (năm theo vai trò, header bảng nhiều tầng), B (sự kiện đăng ký/thi/kết quả), C1 (FE V2 đăng ký kèm sha metadata), C2 (năm trần theo catalog, intake trong sự kiện, thu hẹp hàng bảng theo đợt; 9 ca mới + 148 ca hồi quy PASS, Ruff PASS); C3 (corpus cô lập 2 PDF + DOCX + PDF hỏng: metadata tự lưu đúng phiên bản, replay cùng version, gửi trùng 409, index gen3 ready; chấm tay 9/14 câu đạt, lỗi nội dung P1a/P5/D3 và guard 502 P7/L1; metadata LLM 0 lượt, token NOT MEASURED; live FE và loại trừ bản chưa xuất bản NOT RUN).](nhat_ky/2026-11-16_phien_986_trien_khai_metadata_nam_chang_A.md)
+
+- [Context985 — Bàn giao kế hoạch metadata năm và thời gian cho V1.](nhat_ky/2026-11-16_phien_985_ke_hoach_metadata_thoi_gian.md)
+
+- [Context984 — Tối ưu tác vụ biên dịch và soát chính tả.](nhat_ky/2026-11-16_phien_984_toi_uu_bien_dich_va_soat_chinh_ta.md)
+
+- [Context983 — Giới hạn biên dịch theo phần và soát chính tả theo nguồn.](nhat_ky/2026-11-16_phien_983_gioi_han_theo_phan_va_soat_chinh_ta.md)
+
+- [Context982 — Khôi phục lượt kiểm thử 24 tài liệu tuyển sinh sau khi dừng đột ngột.](nhat_ky/2026-11-16_phien_982_khoi_phuc_kiem_thu_tuyen_sinh.md)
+
+- [Context981 — Ổn định rà soát bảng lớn và mở đúng vị trí nguồn trong hộp duyệt.](nhat_ky/2026-11-16_phien_981_on_dinh_ra_soat_bang_lon.md)
+
 - [Context980 — Tối ưu truy vấn trang chủ chatbot, ô chính tả và trang Tác vụ.](nhat_ky/2026-11-15_phien_980_toi_uu_truy_van_ba_man_hinh.md)
 
 - [Context979 — Kiểm chứng và sửa tạm dừng chatbot công khai, liên kết bot tạm ngưng trên landing và mặc định tin IP proxy.](nhat_ky/2026-11-15_phien_979_kiem_tra_tam_dung_chatbot_cong_khai.md)

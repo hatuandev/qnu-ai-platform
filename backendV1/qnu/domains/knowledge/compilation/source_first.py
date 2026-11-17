@@ -9,6 +9,7 @@ from qnu.domains.knowledge.compilation.quality import (
     quality_validation,
 )
 from qnu.domains.knowledge.compilation.schemas import DRAFT_PARAGRAPH_TEXT_LIMIT, DraftContent
+from qnu.domains.knowledge.event_schedule import fragmented_windows
 from qnu.platform.errors import AppException
 
 
@@ -18,7 +19,25 @@ def build_source_draft(topic: str, documents: list[dict], run_id: str) -> dict:
     for number, document in enumerate(documents, start=1):
         paragraphs = []
         for page in document["pages"]:
-            for block in page["blocks"]:
+            blocks = page["blocks"]
+            windows = fragmented_windows(blocks)
+            consumed = 0
+            for index, block in enumerate(blocks):
+                if index < consumed:
+                    continue
+                if index in windows:
+                    consumed = windows[index][0]
+                    fragments = blocks[index:consumed]
+                    paragraphs.append(
+                        {
+                            "text": "\n".join(part["text"] for part in fragments),
+                            "citations": [
+                                f"{document['ocr_run_id']}:{part['evidence_id']}"
+                                for part in fragments
+                            ],
+                        }
+                    )
+                    continue
                 ref = f"{document['ocr_run_id']}:{block['evidence_id']}"
                 text = block["text"]
                 table = block.get("table")

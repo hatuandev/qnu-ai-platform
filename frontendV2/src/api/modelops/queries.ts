@@ -10,6 +10,7 @@ import {
   deleteConnection,
   deleteConnectionKey,
   deleteConnectionModel,
+  discoverProvider,
   getCatalog,
   getConnection,
   getModelDefaults,
@@ -18,9 +19,11 @@ import {
   listConnections,
   listProviders,
   probeModel,
+  syncConnectionCapacity,
   testConnection,
   updateConnection,
   updateModelDefaults,
+  updateProviderCapacity,
 } from "./requests";
 import type {
   Capability,
@@ -30,6 +33,7 @@ import type {
   ConnectionUpdateInput,
   DefaultsUpdateRequest,
   KeyCreateRequest,
+  TokenLimits,
 } from "./types";
 
 export const modelopsKeys = {
@@ -173,6 +177,52 @@ export function useDeleteModelMutation(connectionId: string) {
       });
       void queryClient.invalidateQueries({
         queryKey: modelopsKeys.connections(),
+      });
+    },
+  });
+}
+
+export function useSyncModelCapacityMutation(connectionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (modelName: string) => {
+      const check = await discoverProvider(connectionId);
+      if (check.outcome !== "ok") {
+        throw new Error(check.detail || "Không đọc được metadata máy chủ.");
+      }
+      const rows = await syncConnectionCapacity(connectionId, {
+        check_id: check.id,
+        model_names: [modelName],
+      });
+      return rows[0];
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.connectionModels(connectionId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.connections(),
+      });
+    },
+  });
+}
+
+export function useUpdateModelCapacityMutation(connectionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      providerId,
+      tokenLimits,
+    }: {
+      providerId: string;
+      tokenLimits: TokenLimits;
+    }) => updateProviderCapacity(providerId, tokenLimits),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.connectionModels(connectionId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.defaults(),
       });
     },
   });

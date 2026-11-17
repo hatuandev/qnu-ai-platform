@@ -54,7 +54,9 @@ class CompilationRequest(BaseModel):
 class DraftParagraph(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     text: str = Field(min_length=1, max_length=DRAFT_PARAGRAPH_TEXT_LIMIT)
-    citations: list[str] = Field(min_length=1, max_length=100)
+    # Membership is validated against the part's source IDs; a fixed count cap
+    # would reject a faithful paragraph that cites a long table row by row.
+    citations: list[str] = Field(min_length=1)
 
 
 class DraftSection(BaseModel):
@@ -121,6 +123,13 @@ class CompilationSegmentProgress(BaseModel):
     started_at: datetime | None
     finished_at: datetime | None
     duration_seconds: float | None = None
+
+
+class CompilationProgressSummary(BaseModel):
+    status: str
+    completed: int
+    total: int
+    elapsed_seconds: float | None
 
 
 class CompilationProgress(BaseModel):

@@ -9,9 +9,10 @@
 Lượt mới luôn có ít nhất một checkpoint phần. Projection/prompt v4 giữ nguyên; planner v5 bật refinement đã ghim trong config. Chỉ phản hồi `chat_output_truncated` với raw `finish_reason=length` và có visible content mới được chia tiếp. HTTP422 khác, uncertain, timeout hoặc content rỗng không tự chia/gửi lại. Không suy rằng model output4K luôn đủ.
 
 - Chia phần sở hữu thành hai nhóm tại biên unit, tránh cắt rowspan; giữ header/context cha và output ceiling. Đơn vị nhỏ nhất không vừa trả `compilation_refinement_atomic_limit`.
-- Giới hạn ghim: sâu tối đa4, tổng node tối đa31 lần số phần gốc, thời gian1500s cho run. Trước dispatch phải còn đủ queue+deadline inference; không lặp vô hạn. Usage tính cả parent bị cắt và các con.
+- Giới hạn chia sâu tối đa 4 và tổng node tối đa 31 lần số phần gốc. Mỗi phần dùng thời gian chờ hàng đợi của ModelOps và thời gian gọi của provider, tính sau khi vào lượt. Mốc 25 phút hiển thị thông tin trên tác vụ. Khi một phần đã gửi hết thời gian chờ phản hồi, ghi kết quả chưa xác định và giữ các phần đã hoàn tất. Usage tính cả parent bị cắt và các con.
 - Node cha giữ raw lỗi, chỉ completed khi con đủ. Các con có `parent_segment_id`; JSON chứa scope/ID cha/con, Markdown dựng từ JSON và bảng nguồn, không gọi LLM ghép lại. Main JSON chứa `compilation_nodes`, main Markdown liên kết node gốc.
 - API progress thêm `nodes`; `GET .../segments/{index}/artifacts/draft_json|markdown` dùng cùng workspace/collection authorization và checksum reader. E2E in node state, deadline tính cả refinement budget.
+- Ô tác vụ nền dùng `GET .../progress/summary` để đọc số phần hoàn tất, tổng phần và thời gian. Bản nháp gộp cập nhật theo đợt, cách nhau ít nhất 30 giây khi đang chạy. Phần hoàn tất vẫn được lưu ngay. Khi chốt lượt, backend cập nhật bản tạm nếu có thêm kết quả hoặc trạng thái phần thay đổi.
 - Migration0009 thêm liên kết cha và Markdown artifact. Lượt v2/v3/v4 cũ không tự đổi manifest/hash; dữ liệu và lịch sử giữ nguyên.
 - Phục hồi E2E cần `--recover`; run đang chạy hoặc đã xuất bản không bị thay. Run uncertain hoặc run cũ chưa xuất bản được tạo lượt mới có idempotency, dùng nguồn OCR đã có.
 
@@ -23,7 +24,7 @@ Các phần cần model chạy tối đa hai phần đồng thời, mỗi phần
 
 Đối chiếu chỉ đọc với PDF điểm sàn đã có: 16/22 phần của lượt review cũ đủ điều kiện kiểm tra literal. Đây không phải số đo thời gian chạy thật của chính sách mới.
 
-Request mới dùng projection `compact/v3` trong scope từng phần: giữ ID, nội dung, loại, trang, hàng/cột, span, header và cờ chất lượng; hash/identity/bbox đầy đủ vẫn nằm ở snapshot và report do backend phân giải. Scope cũ không có projection được dựng lại bằng `full`; `compact/v1` và `compact/v2` cũng giữ đúng schema cũ. Citation ở cấp bảng mở ra các ô của bảng; citation tới ô luôn mang đủ hàng và header. Đây là context bắt buộc; nếu không vừa sẽ báo lỗi, không cắt ô để vừa ngân sách.
+Request mới dùng projection `compact/v3` trong scope từng phần. ID, nội dung, loại, trang, hàng/cột, span, header và cờ chất lượng đi cùng phần rà soát. Hash, identity và bbox đầy đủ nằm ở snapshot và report do backend phân giải. Scope cũ không có projection được dựng lại bằng `full`. `compact/v1` và `compact/v2` giữ schema cũ. Dẫn chứng cấp bảng mở ra các ô của bảng. Khi một ô gộp dọc kéo quá nhiều hàng vào ngữ cảnh của đoạn văn, đoạn đó dùng các ô đã dẫn, hàng chứa từng ô, các span giao với hàng và header. Các hàng liên kết còn lại vẫn có phần rà soát nguồn riêng với đầy đủ ô. Phần bảng vượt ngân sách có thể chạy đối chiếu cục bộ khi mọi ô thuộc phần đều vượt qua kiểm tra literal và ghi `literal_only` trong manifest. Nếu không chứng minh được đối chiếu đầy đủ, giới hạn model vẫn được áp dụng.
 
 `reference_contract_version=2` ghim schema gồm các nhánh object hoàn chỉnh: covered/supported/contradicted phải có nguồn đối chiếu; mỗi nhánh vẫn cần explanation/suggested_action. Không có nguồn cho phép thì không thể chọn supported/contradicted. Thử synthetic với Qwen thật đạt trong 4.1s; đây là kiểm chứng giao thức, không phải nghiệm thu tài liệu thật.
 
@@ -31,11 +32,43 @@ Compiler dùng ngân sách ModelOps theo model và context còn lại khi ngư�
 
 Planner không trộn phần bảng literal với phần văn xuôi. `--recover` chỉ tạo lại review đã completed theo chính sách cũ nếu chưa xuất bản; giữ review cũ trong lịch sử và dùng key mới. Không thay review running/uncertain bằng nhánh này.
 
+### Rà soát thiếu căn cứ và metadata bổ sung (phiên 990)
+
+- Phản hồi hoàn chỉnh có nhận xét thiếu dẫn chứng được chuyển thành mục **Cần đối chiếu**. Backend ghi cả phản hồi gốc và bản đánh giá đã kiểm tra. Báo cáo có các mục này mang trạng thái `needs_attention`.
+- Mã dẫn chứng sai hoặc thiếu đơn vị đánh giá vẫn đi qua cơ chế chia phần. Khi đã tới giới hạn số lượt, độ sâu hoặc kích thước tối thiểu, worker có thể đọc lại phản hồi `stop` đã lưu để ghi mục cần đối chiếu. Chỉ chấp nhận một mục bị bỏ sót khi mô hình đã đánh giá các mục khác cùng phía. ID đối tượng lạ, trùng hoặc thiếu nhiều mục vẫn là lỗi hợp đồng. Kết quả phân loại lưu cùng mã dừng của phần và giữ mức kiểm tra khi ghép báo cáo.
+- Compiler loại riêng đề xuất metadata sai kiểu ở mức từng mục và ghi số lượng bị loại vào dữ liệu bổ sung. Nội dung, sự kiện do model trả và phạm vi dẫn chứng qua hợp đồng của phần. Không gọi model lại cho trường metadata sai kiểu.
+- Quy tắc metadata v8 đọc năm theo câu nguồn và kiểm cả ngữ cảnh của đoạn trích do AI đề xuất. Lịch nhận thêm hạn nộp lệ phí, xác nhận nhập học, các ngày thi liệt kê có tháng/năm chung và hạn kết thúc ghi rõ “trước”. Các mốc mang dẫn chứng của lịch tương ứng trong bản đăng ký.
+
+### Rà soát bản nháp giữ nguyên nguồn (phiên 993)
+
+- Lượt rà soát mới mặc định dùng phản hồi JSON có khóa theo từng mục và nhận xét ngắn. Nếu QNU dựng lại chính xác các mục từ nguồn đã ghim, tiêu đề phân đoạn được xác minh cục bộ với dẫn chứng thuộc phân đoạn. Tiêu đề không đủ điều kiện được gửi rà soát cùng các mục còn lại.
+- Với phản hồi hoàn chỉnh bị thiếu mục hoặc sai tham chiếu, worker có thể lưu các nhận xét đã xác minh trong phạm vi và giao lại riêng các mục cần xử lý. Dẫn chứng cần thiết vẫn có mặt để đối chiếu. Phản hồi bị cắt, không đọc được hoặc không đủ điều kiện dùng lại đi theo cơ chế xử lý lỗi hiện có.
+- Dữ liệu đầu vào, phiên bản, model và phạm vi rà soát được ghim. Khi ghép báo cáo, hệ thống kiểm lại đủ mục và đúng phạm vi dẫn chứng. Review đã được lập trước đó vẫn thực thi theo prompt và schema đã ghim.
+
+### Khối văn bản dài trong rà soát giữ nguyên nguồn (phiên 995)
+
+- Khi một khối dài làm kế hoạch vượt ngân sách, QNU có thể chia riêng phạm vi gửi đi nếu kiểm được các đoạn bản nháp nối lại khớp nguyên văn với một khối nguồn. Phạm vi gửi có cặp nguồn–bản nháp cùng vị trí và dung lượng dựa trên ngân sách ModelOps. Kế hoạch cuối kiểm lại cả đầu vào và đầu ra.
+- Báo cáo giữ mã khối nguồn và vị trí ký tự từ đầu khối. Các vị trí đánh dấu phạm vi nửa mở `[start_char, end_char)`. Mã đoạn gốc của bản nháp đi cùng mỗi mảnh. Worker khôi phục kế hoạch từ đúng phiên bản và các vị trí đã lưu. Quy tắc bảng và xử lý văn bản không thể ghép khớp tiếp tục theo hợp đồng hiện có.
+
+### Đối chiếu nguyên văn trước khi gọi model (phiên 997)
+
+- Lượt rà soát theo cấu trúc dựng lại các mục từ nguồn đã ghim. Đoạn khớp đúng chữ, thứ tự và dẫn chứng một-một với khối nguồn đủ điều kiện được kiểm tra cục bộ. Khối có cảnh báo, đoạn viết lại hoặc dẫn nhiều khối vẫn theo kế hoạch rà soát hiện hành. Phần cục bộ có phạm vi ghim trong manifest và worker kiểm lại trước khi ghép báo cáo.
+- Khi chỉ còn tên bản nháp cần model, lượt gọi dùng hướng dẫn kiểm tên và ngữ cảnh nguồn phù hợp. Kiểm tra độ phủ ở bước chốt báo cáo áp dụng cho toàn bộ nguồn và bản nháp.
+- Với lượt rà soát mặc định mới, backend kiểm theo nội dung bản nháp đã lưu. Luồng có AI bổ sung vẫn được đối chiếu cục bộ nếu dựng lại được nguyên vẹn các mục từ nguồn. Khi không chứng minh được điều đó, backend lập kế hoạch rà soát hiện hành. Dùng lại khóa của lượt cũ vẫn nhận đúng lượt và kế hoạch đã lưu.
+
+### Liên kết JSON và Markdown theo khối (phiên 1000)
+
+- Markdown nguồn v2 dùng `evidence_id` có sẵn trong JSON để đánh dấu khối và ô bảng. Bản sửa chính tả ghi thêm mã phiên bản văn bản. Backend kiểm hash khi đọc và chọn đúng cách dựng Markdown khi đối chiếu với bản sửa cũ. Lượt bóc tách giữ định dạng Markdown đã chọn khi tạo để chạy lại an toàn.
+- Markdown biên soạn đánh dấu lượt hoặc phần tương ứng, vị trí mục, đoạn và ô. Dẫn chứng nối tới đúng OCR và phiên bản nguồn đã chọn trong JSON. Backend dùng JSON đã ghim làm căn cứ khi dựng dữ liệu gửi model.
+- Đoạn chép nguyên văn khối bảng chỉ được xác nhận cục bộ khi khối nguồn không có cờ cần kiểm tra, cấu trúc và ô bảng khớp JSON đã ghim, còn văn bản khớp từng đoạn theo đúng thứ tự. Từng ô vẫn được tính vào độ phủ ở phần rà soát nguồn. Đoạn nhận xét viết lại hoặc dẫn bảng không đủ căn cứ tiếp tục được xử lý theo ngân sách ModelOps.
+- Khi phát hành, PostgreSQL lưu nội dung, dẫn chứng và cấu trúc của đoạn. Qdrant lưu vector và khóa dẫn tới đoạn thuộc đúng phiên bản đã phát hành.
+
 ### Nền tảng giữ nguyên
 
 - Giữ snapshot đầy đủ và bất biến. Khi request một lượt vượt giới hạn, lập manifest các phần theo block/hàng bảng; bỏ evidence map và ảnh Base64 khỏi request từng phần. Bảng literal do backend ghép từ nguồn, không nhờ model viết lại ô.
 - Mỗi phần có input/schema hash, provider/config, trạng thái, raw response, kết quả dẫn xuất và usage quan sát được. Một phần/hàng không vừa ngân sách sẽ báo lỗi rõ, không tự cắt nguồn.
 - Compiler dùng lease/fencing hiện có; lượt in-flight không có raw giữ `uncertain`, không gửi lại mù quáng.
+- Khi tiếp quản lượt biên dịch hết hạn, worker phân loại mọi phần đang dang dở trước khi trả trạng thái cuối. Phần đã lưu kết quả vẫn được giữ, phần đã gửi nhưng chưa có phản hồi được đánh dấu `uncertain`.
 - MD/JSON tổng hợp tạo từ các phần đã xong; mỗi generation có hai blob đã đọc lại kiểm hash và con trỏ DB; bản partial không đi vào publication.
 - Review nhiều phần kiểm mỗi source/draft unit đúng một lần, giữ nguồn trích dẫn làm context; report và publication gate giữ nguyên.
 

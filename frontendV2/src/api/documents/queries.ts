@@ -9,6 +9,7 @@ import {
   createDecisionPreview,
   getCompiledVersion,
   getDocumentSummary,
+  getRegistrationMetadata,
   getReviewGate,
   listCompiledDocuments,
   registerCompiledDocumentVersion,
@@ -128,6 +129,32 @@ export function useDocumentSummaryQuery(
         (!data.serving_matches_published || data.readiness.status !== "ready");
       return isPublishing ? 3000 : false;
     },
+  });
+}
+
+export function useRegistrationMetadataQuery(
+  workspaceId: string,
+  collectionId: string,
+  runId: string | null,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: [
+      ...documentKeys.all,
+      "registrationMetadata",
+      workspaceId,
+      collectionId,
+      runId,
+    ],
+    queryFn: ({ signal }) => {
+      if (!runId) throw new Error("runId is required");
+      return getRegistrationMetadata(workspaceId, collectionId, runId, {
+        signal,
+      });
+    },
+    enabled: Boolean(workspaceId && collectionId && runId && enabled),
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 }
 
