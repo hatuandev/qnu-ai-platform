@@ -219,7 +219,7 @@ class ProviderService:
                 code="model_required",
             )
         extra = dict(provider.extra_config or {})
-        if policy.mode == "server_default" and not policy.tasks:
+        if policy.mode == "server_default":
             extra.pop(EXTRA_CONFIG_KEY, None)
         else:
             extra[EXTRA_CONFIG_KEY] = policy.model_dump(mode="json")
@@ -229,7 +229,7 @@ class ProviderService:
             actor,
             "provider.reasoning_updated",
             provider.id,
-            ["mode", "parameter", "tasks", "verified"],
+            ["mode", "parameter", "level", "verified"],
         )
         await db.commit()
         await db.refresh(provider)
@@ -295,15 +295,13 @@ def provider_payload(provider: Provider) -> dict[str, Any]:
 
 
 def reasoning_payload(provider: Provider) -> dict[str, Any]:
-    """Current contract plus the effective decision per compiler task."""
+    """Current contract plus the effective decision for every task this model serves."""
     policy = parse_policy((provider.extra_config or {}).get(EXTRA_CONFIG_KEY))
     return {
         "provider_id": provider.id,
         "status": policy.status if policy is not None else "not_configured",
         "policy": policy.model_dump(mode="json") if policy is not None else None,
-        "effective": {
-            task: trace_for(policy, task) for task in ("compiler", "compiler_review")
-        },
+        "effective": trace_for(policy),
     }
 
 

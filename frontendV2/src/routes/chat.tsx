@@ -169,10 +169,12 @@ function PendingRow({ question }: { question: string }) {
 function WelcomePanel({
   assistant,
   isCollectionEmpty,
+  isCollectionUnbound,
   onPick,
 }: {
   assistant: AssistantResponse;
   isCollectionEmpty: boolean;
+  isCollectionUnbound: boolean;
   onPick: (question: string) => void;
 }) {
   return (
@@ -199,6 +201,7 @@ function WelcomePanel({
               key={item.title}
               variant="outline"
               className="h-auto justify-start gap-2 px-3 py-2.5 text-left text-xs font-normal whitespace-normal"
+              disabled={isCollectionUnbound}
               onClick={() => onPick(item.prompt)}
             >
               <item.icon className="size-3.5 shrink-0 text-primary" />
@@ -207,9 +210,11 @@ function WelcomePanel({
           ))}
         </div>
         <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-          {isCollectionEmpty
-            ? "Kho tri thức chưa có tài liệu xuất bản nên hiện chỉ trả lời được câu hỏi chào hỏi, giới thiệu."
-            : "Câu trả lời chỉ dùng nội dung đã xuất bản và kèm nguồn trích dẫn để đối chiếu."}
+          {isCollectionUnbound
+            ? "Trợ lý chưa gắn kho tri thức nên chưa thể trả lời. Gắn kho trong tab Cấu hình của trợ lý trước khi hỏi."
+            : isCollectionEmpty
+              ? "Kho tri thức chưa có tài liệu xuất bản nên hiện chỉ trả lời được câu hỏi chào hỏi, giới thiệu."
+              : "Câu trả lời chỉ dùng nội dung đã xuất bản và kèm nguồn trích dẫn để đối chiếu."}
         </p>
       </div>
     </div>
@@ -292,7 +297,10 @@ function ChatPage() {
 
   const isSending = pendingQuestion !== null;
   const isInactive = assistant ? !assistant.is_active : false;
-  const isCollectionEmpty = readiness?.status === "empty";
+  const isCollectionUnbound =
+    Boolean(assistant) && (assistant?.collection_ids?.length ?? 0) === 0;
+  const isCollectionEmpty =
+    !isCollectionUnbound && readiness?.status === "empty";
   const isIndexWarning =
     readiness?.status === "outdated" ||
     readiness?.status === "not_indexed" ||
@@ -300,7 +308,11 @@ function ChatPage() {
     readiness?.status === "uncertain" ||
     readiness?.status === "syncing";
   const isComposerDisabled =
-    !assistant || isInactive || isSending || !workspaceId;
+    !assistant ||
+    isInactive ||
+    isCollectionUnbound ||
+    isSending ||
+    !workspaceId;
 
   const modelLabel = useMemo(() => {
     if (!assistant) return "";
@@ -659,6 +671,16 @@ function ChatPage() {
             </Alert>
           ) : null}
 
+          {!isInactive && isCollectionUnbound ? (
+            <Alert variant="warning">
+              <AlertTitle>Trợ lý chưa gắn kho tri thức</AlertTitle>
+              <AlertDescription>
+                Trợ lý chưa có kho tri thức nào nên chưa thể trả lời. Mở tab Cấu
+                hình của trợ lý trong trang Trợ lý để gắn ít nhất một kho.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
           {!isInactive && isCollectionEmpty ? (
             <Alert variant="warning">
               <AlertTitle>Kho tri thức chưa có tài liệu xuất bản</AlertTitle>
@@ -676,7 +698,9 @@ function ChatPage() {
                 >
                   <Link
                     to="/knowledge"
-                    search={{ collectionId: assistant.collection_id }}
+                    search={{
+                      collectionId: assistant.collection_id ?? undefined,
+                    }}
                   >
                     <Database className="size-3.5" />
                     <span>Mở kho tri thức</span>
@@ -745,6 +769,7 @@ function ChatPage() {
             <WelcomePanel
               assistant={assistant}
               isCollectionEmpty={Boolean(isCollectionEmpty)}
+              isCollectionUnbound={isCollectionUnbound}
               onPick={(question) => void handleSend(question)}
             />
           ) : (
@@ -779,7 +804,9 @@ function ChatPage() {
               placeholder={
                 isInactive
                   ? "Trợ lý đang tạm dừng nhận câu hỏi..."
-                  : "Nhập câu hỏi cho trợ lý..."
+                  : isCollectionUnbound
+                    ? "Trợ lý chưa gắn kho tri thức..."
+                    : "Nhập câu hỏi cho trợ lý..."
               }
               rows={1}
               maxLength={8000}

@@ -374,7 +374,6 @@ async def request_run(
                 messages_for(req.topic, documents),
                 provider_id=provider_id,
                 task="compiler",
-                reasoning_task="compiler",
                 max_output_tokens=requested_output,
                 output_schema=schema,
             )
@@ -466,7 +465,7 @@ async def request_run(
             if req.selective_supplement and exc.code in OPTIONAL_PLANNING_ERRORS:
                 return await persist_source_draft(exc.code)
             raise
-    reasoning_directive = runtime.reasoning_directive("compiler")
+    reasoning_directive = runtime.reasoning_directive()
     config = {
         **({"ai_supplement": True} if has_supplement else {}),
         **({"selective_supplement": True} if req.selective_supplement else {}),
@@ -485,7 +484,7 @@ async def request_run(
         },
         "provider": {
             **runtime.public_dict(),
-            "reasoning": runtime.reasoning_trace("compiler"),
+            "reasoning": runtime.reasoning_trace(),
         },
         "max_output_tokens": pinned.output_tokens if plans else budget.max_output_tokens,
         **({"document_models": pinned.models} if plans else {}),

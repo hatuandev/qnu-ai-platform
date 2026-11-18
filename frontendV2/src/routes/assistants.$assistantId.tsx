@@ -37,6 +37,7 @@ import { AssistantPublicationTab } from "@/components/assistants/assistant-publi
 import {
   READINESS_MAP,
   readinessHeroLabel,
+  UNBOUND_LABEL,
 } from "@/components/assistants/readiness";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -155,8 +156,13 @@ function AssistantDetailPage() {
   const readinessBadge = readiness
     ? READINESS_MAP[readiness.status]
     : undefined;
+  const boundCollectionCount = assistant.collection_ids?.length ?? 0;
   const collectionName =
-    readiness?.collection_name ?? "Kho tri thức đang liên kết";
+    boundCollectionCount === 0
+      ? "Chưa gắn kho tri thức"
+      : boundCollectionCount > 1
+        ? `${boundCollectionCount} kho tri thức`
+        : (readiness?.collection_name ?? "Kho tri thức đang liên kết");
 
   const handleDelete = async () => {
     try {
@@ -190,7 +196,9 @@ function AssistantDetailPage() {
                 variant={readinessBadge.variant}
                 className="h-5 px-1.5 text-[11px] font-normal"
               >
-                {readinessHeroLabel(readiness?.status ?? "uncertain")}
+                {boundCollectionCount === 0
+                  ? UNBOUND_LABEL
+                  : readinessHeroLabel(readiness?.status ?? "uncertain")}
               </Badge>
             ) : null}
             {publication?.enabled ? (
@@ -265,15 +273,19 @@ function AssistantDetailPage() {
                   <Pencil className="size-3.5" />
                   <span>Chỉnh cấu hình</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link
-                    to="/knowledge"
-                    search={{ collectionId: assistant.collection_id }}
-                  >
-                    <Database className="size-3.5" />
-                    <span>Mở kho tri thức</span>
-                  </Link>
-                </DropdownMenuItem>
+                {assistant.collection_id ? (
+                  <DropdownMenuItem asChild>
+                    <Link
+                      to="/knowledge"
+                      search={{
+                        collectionId: assistant.collection_id ?? undefined,
+                      }}
+                    >
+                      <Database className="size-3.5" />
+                      <span>Mở kho tri thức</span>
+                    </Link>
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive"
@@ -338,6 +350,7 @@ function AssistantDetailPage() {
           <AssistantConfigForm
             workspaceId={workspaceId}
             assistant={assistant}
+            readiness={readiness}
           />
         </TabsContent>
 

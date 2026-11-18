@@ -102,7 +102,6 @@ async def resolve_turn(
         messages,
         provider_id=config["chat_provider_id"],
         task="answer",
-        reasoning_task="answer",
         max_output_tokens=config["max_output_tokens"],
         output_schema=schema,
     )
@@ -131,7 +130,7 @@ async def resolve_turn(
         "model_name": runtime.model_name,
         "configuration_hash": runtime.configuration_hash,
         "inference_configuration_hash": inference_hash,
-        "reasoning": runtime.reasoning_trace("answer"),
+        "reasoning": runtime.reasoning_trace(),
         "prefilter": prefilter,
     }
     if dropped:
@@ -264,7 +263,6 @@ async def _guardrail_reply(
         retry_messages,
         provider_id=config["chat_provider_id"],
         task="answer",
-        reasoning_task="answer",
         max_output_tokens=config["max_output_tokens"],
         output_schema=schema,
     )

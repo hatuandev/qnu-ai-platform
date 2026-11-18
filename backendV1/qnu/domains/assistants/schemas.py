@@ -18,7 +18,8 @@ class AssistantConfig(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     description: str = Field("", max_length=2000)
     persona: str = Field("", max_length=4000)
-    collection_id: str = Field(min_length=1, max_length=64)
+    # Mirrors ``collection_ids[0]`` for older readers; None means no binding yet.
+    collection_id: str | None = Field(None, max_length=64)
     chat_provider_id: str | None = Field(None, min_length=1, max_length=64)
     top_k: int = Field(5, strict=True, ge=1, le=20)
     history_turns: int = Field(3, strict=True, ge=0, le=10)
@@ -45,12 +46,34 @@ class NewAssistantRagPolicy(AssistantRagPolicy):
     context_window: int = Field(1, strict=True, ge=0, le=5)
 
 
+ReadinessStatus = Literal[
+    "empty", "syncing", "ready", "outdated", "not_indexed", "failed", "uncertain"
+]
+
+
+def _normalize_collection_ids(value: list[str] | None) -> list[str] | None:
+    if value is None:
+        return None
+    unique = list(dict.fromkeys(value))
+    if any(not item or len(item) > 64 for item in unique):
+        raise ValueError("Danh sách kho tri thức chứa mã không hợp lệ.")
+    return unique
+
+
 class AssistantCreate(AssistantConfig):
     rag_policy: NewAssistantRagPolicy = Field(default_factory=NewAssistantRagPolicy)
+    # Single source of truth when present; ``collection_id`` then mirrors the first
+    # entry. Older clients that send only ``collection_id`` stay on one collection.
+    collection_ids: list[str] | None = Field(None, max_length=20)
+
+    _collection_ids = field_validator("collection_ids")(_normalize_collection_ids)
 
 
 class AssistantUpdate(AssistantConfig):
     expected_revision: int = Field(strict=True, ge=1)
+    collection_ids: list[str] | None = Field(None, max_length=20)
+
+    _collection_ids = field_validator("collection_ids")(_normalize_collection_ids)
 
 
 class AssistantResponse(AssistantConfig):
@@ -58,22 +81,40 @@ class AssistantResponse(AssistantConfig):
     id: str
     workspace_id: str
     revision: int
+    collection_ids: list[str] = Field(default_factory=list)
     created_by: str
     created_at: datetime
     updated_at: datetime
 
 
-class AssistantReadiness(BaseModel):
-    assistant_id: str
+class AssistantCollectionReadiness(BaseModel):
     collection_id: str
     collection_name: str
-    status: Literal[
-        "empty", "syncing", "ready", "outdated", "not_indexed", "failed", "uncertain"
-    ]
+    status: ReadinessStatus
     published_document_count: int
     served_document_count: int
     index_run_id: str | None = None
     index_generation: int | None = None
     sync_status: str
     sync_error_code: str | None = None
+
+
+class AssistantReadiness(BaseModel):
+    """Scalar fields describe the first collection; ``collections`` covers all.
+
+    A saved-but-unbound assistant has no first collection: ``collection_id`` is
+    None and ``status`` is ``empty``.
+    """
+
+    assistant_id: str
+    collection_id: str | None = None
+    collection_name: str = ""
+    status: ReadinessStatus
+    published_document_count: int
+    served_document_count: int
+    index_run_id: str | None = None
+    index_generation: int | None = None
+    sync_status: str
+    sync_error_code: str | None = None
+    collections: list[AssistantCollectionReadiness] = Field(default_factory=list)
     checked_at: datetime

@@ -110,7 +110,7 @@ class ReasoningPolicyResponse(BaseModel):
     provider_id: str
     status: Literal["not_configured", "server_default", "unverified", "active"]
     policy: ReasoningPolicy | None = None
-    effective: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    effective: dict[str, Any] = Field(default_factory=dict)
 
 
 class KeyCreateRequest(BaseModel):

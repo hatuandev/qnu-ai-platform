@@ -388,7 +388,7 @@ function StatsContent({ stats }: { stats: PublicationStats }) {
 function saveErrorMessage(err: unknown): string {
   if (err instanceof ApiProblemError) {
     if (err.code === "publication_not_ready") {
-      return "Kho tri thức chưa sẵn sàng phục vụ. Hãy hoàn tất xuất bản và nạp chỉ mục trước khi bật công khai.";
+      return "Trợ lý chưa sẵn sàng phục vụ: hãy gắn kho tri thức, hoàn tất xuất bản và nạp chỉ mục trước khi bật công khai.";
     }
     if (err.code === "publication_slug_taken") {
       return "Đường dẫn này đã được trợ lý khác sử dụng. Hãy chọn đường dẫn khác.";

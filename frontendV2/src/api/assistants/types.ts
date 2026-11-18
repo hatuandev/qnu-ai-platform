@@ -23,7 +23,9 @@ export type AssistantResponse = {
   name: string;
   description: string;
   persona: string;
-  collection_id: string;
+  /** Mirrors `collection_ids[0]`; null when no collection is attached. */
+  collection_id: string | null;
+  collection_ids: string[];
   chat_provider_id: string | null;
   top_k: number;
   history_turns: number;
@@ -40,7 +42,8 @@ export type AssistantCreateRequest = {
   name: string;
   description: string;
   persona: string;
-  collection_id: string;
+  collection_id: string | null;
+  collection_ids: string[];
   chat_provider_id: string | null;
   top_k: number;
   history_turns: number;
@@ -62,8 +65,7 @@ export type AssistantReadinessStatus =
   | "failed"
   | "uncertain";
 
-export type AssistantReadiness = {
-  assistant_id: string;
+export type AssistantCollectionReadiness = {
   collection_id: string;
   collection_name: string;
   status: AssistantReadinessStatus;
@@ -73,5 +75,21 @@ export type AssistantReadiness = {
   index_generation: number | null;
   sync_status: string;
   sync_error_code: string | null;
+};
+
+/** Scalar fields describe the first collection; `collections` covers all. */
+export type AssistantReadiness = {
+  assistant_id: string;
+  /** null when the assistant has no collection attached yet. */
+  collection_id: string | null;
+  collection_name: string;
+  status: AssistantReadinessStatus;
+  published_document_count: number;
+  served_document_count: number;
+  index_run_id: string | null;
+  index_generation: number | null;
+  sync_status: string;
+  sync_error_code: string | null;
+  collections: AssistantCollectionReadiness[];
   checked_at: string;
 };

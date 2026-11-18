@@ -24,6 +24,7 @@ export type LifecyclePreviewRequest = {
   resource_id: string;
   action: LifecycleOperation;
   reason: string;
+  include_history?: boolean;
 };
 
 export type LifecycleActionRequest = {

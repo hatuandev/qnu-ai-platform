@@ -3,7 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from qnu.domains.assistants.models import Assistant
+from qnu.domains.assistants.models import Assistant, AssistantCollection
 from qnu.domains.conversations.models import Conversation, ConversationTurn
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import CompilationInput
@@ -240,23 +240,26 @@ async def snapshot(
         )
     if kind in {"collection", "source", "document", "assistant"}:
         collection_id = row.id if kind == "collection" else row.collection_id
-        assistants = select(Assistant.id).where(
-            Assistant.workspace_id == workspace_id, Assistant.collection_id == collection_id
+        assistants = select(AssistantCollection.assistant_id).where(
+            AssistantCollection.workspace_id == workspace_id,
+            AssistantCollection.collection_id == collection_id,
         )
         if kind == "assistant":
-            assistants = assistants.where(Assistant.id == row.id)
-        assistant_ids = list((await db.scalars(assistants.order_by(Assistant.id))).all())
+            assistants = assistants.where(AssistantCollection.assistant_id == row.id)
+        assistant_ids = list(
+            (await db.scalars(assistants.order_by(AssistantCollection.assistant_id))).all()
+        )
+        conversations = select(Conversation.id).where(
+            Conversation.workspace_id == workspace_id
+        )
+        if kind == "collection":
+            # Conversations pin the collection they were created with, so they belong
+            # to this collection even after their assistant moved elsewhere.
+            conversations = conversations.where(Conversation.collection_id == row.id)
+        else:
+            conversations = conversations.where(Conversation.assistant_id.in_(assistant_ids))
         conversation_ids = list(
-            (
-                await db.scalars(
-                    select(Conversation.id)
-                    .where(
-                        Conversation.workspace_id == workspace_id,
-                        Conversation.assistant_id.in_(assistant_ids),
-                    )
-                    .order_by(Conversation.id)
-                )
-            ).all()
+            (await db.scalars(conversations.order_by(Conversation.id))).all()
         )
         current["dependants"] = {"assistants": assistant_ids, "conversations": conversation_ids}
         impact["assistants_affected"] = len(assistant_ids)

@@ -103,7 +103,6 @@ async def prepare_chat_request(
     output_schema: dict | None = None,
     task: Task = "chat",
     reasoning=None,
-    reasoning_task: str | None = None,
     admission_limit: int | None = None,
 ) -> tuple[ChatRuntime, ChatRequest, RequestTokenBudget]:
     await resolve_workspace_access(db, actor, workspace_id)
@@ -119,9 +118,8 @@ async def prepare_chat_request(
     )
     runtime = await resolve_chat_runtime(db, workspace_id, provider_id)
     runtime = replace(runtime, routing_trace=routing)
-    effective_reasoning_task = reasoning_task or (task if isinstance(task, str) else None)
-    if reasoning is None and effective_reasoning_task is not None:
-        reasoning = runtime.reasoning_directive(effective_reasoning_task)
+    if reasoning is None:
+        reasoning = runtime.reasoning_directive()
     current = capacity_identity(
         runtime.provider_id,
         runtime.base_url,

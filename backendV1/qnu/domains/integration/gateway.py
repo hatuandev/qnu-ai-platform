@@ -116,6 +116,19 @@ class OpenAIGatewayService:
         if not assistant.is_active:
             raise openai_error("Trợ lý đang tạm dừng.", 409, "assistant_inactive")
         snapshot = AssistantResponse.model_validate(assistant)
+        collection_ids = list(
+            dict.fromkeys(
+                item
+                for item in [snapshot.collection_id, *(snapshot.collection_ids or [])]
+                if item
+            )
+        )
+        if not collection_ids:
+            raise openai_error(
+                "Trợ lý chưa gắn kho tri thức nên chưa thể trả lời.",
+                409,
+                "assistant_no_collections",
+            )
         key_id, app_id, workspace_id = key.id, app.id, key.workspace_id
 
         async def checkpoint() -> None:
@@ -166,7 +179,7 @@ class OpenAIGatewayService:
                 chat=chat,
                 actor=actor,
                 workspace_id=workspace_id,
-                collection_id=snapshot.collection_id,
+                collection_id=collection_ids[0],
                 req=AnswerRequest(
                     question=question,
                     top_k=snapshot.top_k,
@@ -177,6 +190,7 @@ class OpenAIGatewayService:
                 persona=snapshot.persona,
                 checkpoint=checkpoint,
                 reranker=reranker,
+                collection_ids=collection_ids,
             )
             await checkpoint()
             key.last_used_at = utcnow()

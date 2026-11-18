@@ -22,9 +22,11 @@ from qnu.platform.database import Base
 class Conversation(Base):
     __tablename__ = "chat_conversations"
     __table_args__ = (
+        # A conversation keeps the collection it was created with; the assistant may
+        # later be pointed at another collection without rewriting this history.
         ForeignKeyConstraint(
-            ["assistant_id", "workspace_id", "collection_id"],
-            ["chat_assistants.id", "chat_assistants.workspace_id", "chat_assistants.collection_id"],
+            ["assistant_id", "workspace_id"],
+            ["chat_assistants.id", "chat_assistants.workspace_id"],
             ondelete="RESTRICT",
             name="fk_chat_conversation_assistant",
         ),

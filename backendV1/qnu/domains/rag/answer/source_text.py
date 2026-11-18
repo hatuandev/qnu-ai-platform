@@ -63,13 +63,23 @@ async def _source_titles(db, workspace_id, collection_id, sources) -> dict[str, 
     return dict(rows.all())
 
 
-async def attach_source_text(db, blob, workspace_id, collection_id, sources, *, bundles=None):
+async def attach_source_text(
+    db, blob, workspace_id, collection_id, sources, *, scope=None, bundles=None
+):
     # Caller has authorized and validated the retrieved snapshot. No arbitrary
     # page neighbors: only block IDs already cited by the published chunk.
-    bundles = await pinned_bundles(
-        db, blob, workspace_id, collection_id, [s for s in sources if s.kind != "table"], bundles
-    )
-    titles = await _source_titles(db, workspace_id, collection_id, sources)
+    # ``scope`` names the owning collection when one answer spans several.
+    bundles = bundles if bundles is not None else {}
+    groups: dict[str, list] = {}
+    for source in sources:
+        owner = (scope or {}).get(source.chunk_id, collection_id)
+        groups.setdefault(owner, []).append(source)
+    titles = {}
+    for owner, group in groups.items():
+        await pinned_bundles(
+            db, blob, workspace_id, owner, [s for s in group if s.kind != "table"], bundles
+        )
+        titles.update(await _source_titles(db, workspace_id, owner, group))
     for source in sources:
         source.source_title = titles.get(source.document_id)
         if source.kind == "table":

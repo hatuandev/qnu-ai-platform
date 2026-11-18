@@ -25,9 +25,11 @@ from qnu.platform.database import Base
 class AnswerReview(Base):
     __tablename__ = "kb_answer_reviews"
     __table_args__ = (
+        # A review keeps the collection it was run against; the assistant may later
+        # be pointed at another collection without rewriting this history.
         ForeignKeyConstraint(
-            ["assistant_id", "workspace_id", "collection_id"],
-            ["chat_assistants.id", "chat_assistants.workspace_id", "chat_assistants.collection_id"],
+            ["assistant_id", "workspace_id"],
+            ["chat_assistants.id", "chat_assistants.workspace_id"],
             ondelete="RESTRICT",
             name="fk_answer_review_assistant",
         ),

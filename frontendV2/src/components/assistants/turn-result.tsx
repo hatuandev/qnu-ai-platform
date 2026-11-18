@@ -16,6 +16,8 @@ export const TURN_ERROR_TEXT: Record<string, string> = {
     "Kho tri thức chưa có chỉ mục đang hoạt động nên chưa thể trả lời.",
   conversation_clarification_required:
     "Trợ lý cần bạn làm rõ thêm câu hỏi trước khi trả lời.",
+  answer_scope_clarification_required:
+    "Trợ lý cần bạn nêu rõ phạm vi (ngành/khóa/năm dữ liệu) trước khi trả lời.",
   chat_provider_changed:
     "Mô hình của trợ lý đã thay đổi trong khi xử lý; hãy gửi lại câu hỏi.",
   conversation_route_invalid:

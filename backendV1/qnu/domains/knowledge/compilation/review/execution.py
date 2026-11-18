@@ -135,7 +135,6 @@ async def run_queued(db: AsyncSession, blob: BlobStore, chat: ChatModel, review_
                 task="compiler_review",
                 max_output_tokens=req.max_output_tokens,
                 output_schema=schema,
-                reasoning_task="compiler_review",
             )
             request = replace(request, automatic_output_budget=row.trace["automatic_output_budget"])
             if budget.total_reserved_tokens != row.trace["total_reserved_tokens"]:
@@ -1021,7 +1020,7 @@ async def _run_segment(
                 "Provider review đã thay đổi.", code="compilation_review_provider_changed"
             )
         if recorded:
-            live = current_runtime.reasoning_directive("compiler_review")
+            live = current_runtime.reasoning_directive()
             if (live.public_dict() if live is not None else None) != (
                 reasoning.public_dict() if reasoning is not None else None
             ):

@@ -1,12 +1,13 @@
 from datetime import UTC, datetime
 
 from pydantic import ValidationError
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.answer_review.models import AnswerReview
-from qnu.domains.assistants.models import Assistant
+from qnu.domains.assistants.models import Assistant, AssistantCollection
 from qnu.domains.assistants.schemas import (
+    AssistantCollectionReadiness,
     AssistantConfig,
     AssistantRagPolicy,
     AssistantReadiness,
@@ -30,6 +31,77 @@ from qnu.platform.errors import AppException, Conflict, EntityNotFound
 from qnu.ports.blob_store import BlobStore
 
 
+async def collection_bindings(
+    db: AsyncSession, workspace_id: str, assistant_ids: list[str]
+) -> dict[str, list[str]]:
+    grouped: dict[str, list[str]] = {}
+    if not assistant_ids:
+        return grouped
+    rows = (
+        await db.execute(
+            select(AssistantCollection.assistant_id, AssistantCollection.collection_id)
+            .where(
+                AssistantCollection.workspace_id == workspace_id,
+                AssistantCollection.assistant_id.in_(assistant_ids),
+            )
+            .order_by(AssistantCollection.position)
+        )
+    ).all()
+    for assistant_id, collection_id in rows:
+        grouped.setdefault(assistant_id, []).append(collection_id)
+    return grouped
+
+
+async def _attach_bindings(
+    db: AsyncSession, workspace_id: str, rows: list[Assistant]
+) -> list[Assistant]:
+    grouped = await collection_bindings(db, workspace_id, [row.id for row in rows])
+    for row in rows:
+        bound = grouped.get(row.id)
+        row.collection_ids = (
+            bound if bound is not None else ([row.collection_id] if row.collection_id else [])
+        )
+    return rows
+
+
+async def _replace_bindings(
+    db: AsyncSession,
+    row: Assistant,
+    workspace_id: str,
+    collection_ids: list[str],
+    stored_ids: list[str],
+) -> None:
+    if collection_ids == stored_ids:
+        return
+    existing = {
+        item.collection_id: item
+        for item in (
+            await db.scalars(
+                select(AssistantCollection).where(
+                    AssistantCollection.workspace_id == workspace_id,
+                    AssistantCollection.assistant_id == row.id,
+                )
+            )
+        ).all()
+    }
+    for collection_id, item in existing.items():
+        if collection_id not in collection_ids:
+            await db.delete(item)
+    for position, collection_id in enumerate(collection_ids):
+        item = existing.get(collection_id)
+        if item is None:
+            db.add(
+                AssistantCollection(
+                    assistant_id=row.id,
+                    workspace_id=workspace_id,
+                    collection_id=collection_id,
+                    position=position,
+                )
+            )
+        else:
+            item.position = position
+
+
 async def get_assistant(
     db: AsyncSession, actor: AuthActor, workspace_id: str, assistant_id: str, *, write: bool = False
 ) -> Assistant:
@@ -44,22 +116,52 @@ async def get_assistant(
     if row is None:
         raise EntityNotFound("Không tìm thấy trợ lý.", code="assistant_not_found")
     await require_available(db, workspace_id, "assistant", assistant_id)
-    await load_collection(db, workspace_id, row.collection_id)
+    if row.collection_id:
+        await load_collection(db, workspace_id, row.collection_id)
+    await _attach_bindings(db, workspace_id, [row])
     return row
+
+
+def _usable_binding():
+    state = (
+        select(ResourceState.resource_id)
+        .where(
+            ResourceState.kind == "collection",
+            ResourceState.resource_id == AssistantCollection.collection_id,
+            ResourceState.status != "active",
+        )
+        .correlate(AssistantCollection)
+        .exists()
+    )
+    usable = (
+        select(AssistantCollection.collection_id)
+        .where(AssistantCollection.assistant_id == Assistant.id, ~state)
+        .correlate(Assistant)
+        .exists()
+    )
+    bound = (
+        select(AssistantCollection.collection_id)
+        .where(AssistantCollection.assistant_id == Assistant.id)
+        .correlate(Assistant)
+        .exists()
+    )
+    # An assistant saved before any collection is attached stays listed; it is
+    # hidden only when every binding it has is unavailable.
+    return or_(~bound, usable)
 
 
 async def list_assistants(
     db: AsyncSession, actor: AuthActor, workspace_id: str, limit: int, offset: int
 ) -> list[Assistant]:
     await resolve_workspace_access(db, actor, workspace_id)
-    return list(
+    rows = list(
         (
             await db.scalars(
                 select(Assistant)
                 .where(Assistant.workspace_id == workspace_id)
                 .where(
                     visible("assistant", Assistant.id),
-                    visible("collection", Assistant.collection_id),
+                    _usable_binding(),
                 )
                 .order_by(Assistant.created_at, Assistant.id)
                 .offset(offset)
@@ -67,6 +169,7 @@ async def list_assistants(
             )
         ).all()
     )
+    return await _attach_bindings(db, workspace_id, rows)
 
 
 async def save_assistant(
@@ -79,7 +182,20 @@ async def save_assistant(
     await resolve_workspace_access(
         db, actor, workspace_id, required_roles=("admin",), for_update=True
     )
-    await load_collection(db, workspace_id, req.collection_id)
+    if "collection_ids" in req.model_fields_set:
+        # An explicit empty list unbinds every collection; the assistant still
+        # saves but cannot serve turns until one is attached again.
+        collection_ids = list(getattr(req, "collection_ids", None) or [])
+    elif req.collection_id:
+        collection_ids = [req.collection_id]
+    else:
+        collection_ids = []
+    for collection_id in collection_ids:
+        await load_collection(db, workspace_id, collection_id)
+    # The scalar column mirrors the first binding so older readers keep working.
+    req = req.model_copy(
+        update={"collection_id": collection_ids[0] if collection_ids else None}
+    )
     if assistant_id:
         existing = await get_assistant(db, actor, workspace_id, assistant_id, write=True)
         if "max_output_tokens" not in req.model_fields_set:
@@ -129,18 +245,22 @@ async def save_assistant(
             req.rag_policy.verification_provider_id or req.chat_provider_id,
         )
     cancelled_turns = 0
+    previous_collection_id: str | None = None
+    previous_collection_ids: list[str] | None = None
+    stored_ids: list[str] = []
     if assistant_id:
         row = await get_assistant(db, actor, workspace_id, assistant_id, write=True)
         if not isinstance(req, AssistantUpdate) or row.revision != req.expected_revision:
             raise Conflict("Cấu hình trợ lý đã thay đổi.", code="assistant_revision_conflict")
-        if req.collection_id != row.collection_id:
-            raise Conflict(
-                "Tạo trợ lý mới khi đổi kho tri thức.", code="assistant_collection_immutable"
-            )
+        stored_ids = row.collection_ids
+        if collection_ids != stored_ids:
+            previous_collection_ids = stored_ids
+        if (collection_ids[0] if collection_ids else None) != row.collection_id:
+            previous_collection_id = row.collection_id
         if not req.is_active:
             cancelled_turns = await cancel_related_jobs(db, workspace_id, "assistant", row)
         # Pausing and resuming the same configuration must not strand its conversations.
-        if any(
+        if collection_ids != stored_ids or any(
             (
                 AssistantRagPolicy.model_validate(row.rag_policy).model_dump(mode="json")
                 if key == "rag_policy"
@@ -148,7 +268,7 @@ async def save_assistant(
             )
             != value
             for key, value in req.model_dump(
-                mode="json", exclude={"expected_revision", "is_active"}
+                mode="json", exclude={"expected_revision", "is_active", "collection_ids"}
             ).items()
         ):
             row.revision += 1
@@ -157,8 +277,11 @@ async def save_assistant(
             id=new_id("ast"), workspace_id=workspace_id, created_by=actor_ref(actor), revision=1
         )
         db.add(row)
-    for key, value in req.model_dump(mode="json", exclude={"expected_revision"}).items():
+    for key, value in req.model_dump(
+        mode="json", exclude={"expected_revision", "collection_ids"}
+    ).items():
         setattr(row, key, value)
+    await _replace_bindings(db, row, workspace_id, collection_ids, stored_ids)
     row.updated_at = utcnow()
     await record_workspace_event(
         db,
@@ -169,12 +292,16 @@ async def save_assistant(
             "assistant_id": row.id,
             "revision": row.revision,
             "collection_id": row.collection_id,
+            "collection_ids": collection_ids,
+            "previous_collection_id": previous_collection_id,
+            "previous_collection_ids": previous_collection_ids,
             "provider_id": row.chat_provider_id,
             "cancelled_turns": cancelled_turns,
         },
     )
     await db.commit()
     await db.refresh(row)
+    await _attach_bindings(db, workspace_id, [row])
     return row
 
 
@@ -275,25 +402,20 @@ async def delete_assistant(
     }
 
 
-async def assistant_readiness(
-    db: AsyncSession,
-    blob: BlobStore,
-    actor: AuthActor,
-    workspace_id: str,
-    assistant_id: str,
-) -> AssistantReadiness:
-    assistant = await get_assistant(db, actor, workspace_id, assistant_id)
-    collection = await load_collection(db, workspace_id, assistant.collection_id)
+async def _collection_readiness(
+    db: AsyncSession, blob: BlobStore, actor: AuthActor, workspace_id: str, collection_id: str
+) -> AssistantCollectionReadiness:
+    collection = await load_collection(db, workspace_id, collection_id)
     published = []
     try:
-        published = await current_snapshot(db, blob, actor, workspace_id, assistant.collection_id)
+        published = await current_snapshot(db, blob, actor, workspace_id, collection_id)
     except AppException as exc:
         if exc.code != "index_no_published_documents":
             raise
     active = await db.scalar(
         select(IndexRun).where(
             IndexRun.workspace_id == workspace_id,
-            IndexRun.collection_id == assistant.collection_id,
+            IndexRun.collection_id == collection_id,
             IndexRun.is_active.is_(True),
             IndexRun.status == "completed",
         )
@@ -329,7 +451,7 @@ async def assistant_readiness(
             in bindings
         )
         matches = active.input_sha256 == digest(identities)
-    sync = await db.get(IndexSync, assistant.collection_id)
+    sync = await db.get(IndexSync, collection_id)
     sync_status = sync.status if sync is not None else "not_requested"
     sync_error = sync.error_code if sync is not None else None
     published_count = len(published)
@@ -349,9 +471,8 @@ async def assistant_readiness(
     else:
         status = "outdated"
 
-    return AssistantReadiness(
-        assistant_id=assistant.id,
-        collection_id=assistant.collection_id,
+    return AssistantCollectionReadiness(
+        collection_id=collection_id,
         collection_name=collection.name,
         status=status,
         published_document_count=published_count,
@@ -360,5 +481,43 @@ async def assistant_readiness(
         index_generation=active.generation if active is not None else None,
         sync_status=sync_status,
         sync_error_code=sync_error,
+    )
+
+
+async def assistant_readiness(
+    db: AsyncSession,
+    blob: BlobStore,
+    actor: AuthActor,
+    workspace_id: str,
+    assistant_id: str,
+) -> AssistantReadiness:
+    assistant = await get_assistant(db, actor, workspace_id, assistant_id)
+    if not assistant.collection_ids:
+        return AssistantReadiness(
+            assistant_id=assistant.id,
+            status="empty",
+            published_document_count=0,
+            served_document_count=0,
+            sync_status="not_requested",
+            collections=[],
+            checked_at=datetime.now(UTC),
+        )
+    entries = [
+        await _collection_readiness(db, blob, actor, workspace_id, collection_id)
+        for collection_id in assistant.collection_ids
+    ]
+    first = entries[0]
+    return AssistantReadiness(
+        assistant_id=assistant.id,
+        collection_id=first.collection_id,
+        collection_name=first.collection_name,
+        status=first.status,
+        published_document_count=first.published_document_count,
+        served_document_count=first.served_document_count,
+        index_run_id=first.index_run_id,
+        index_generation=first.index_generation,
+        sync_status=first.sync_status,
+        sync_error_code=first.sync_error_code,
+        collections=entries,
         checked_at=datetime.now(UTC),
     )

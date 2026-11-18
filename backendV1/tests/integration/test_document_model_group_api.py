@@ -292,9 +292,7 @@ def test_reasoning_contract_is_only_applied_after_verification(client):
     assert initial.status_code == 200, initial.text
     assert initial.json()["status"] == "not_configured"
     assert initial.json()["policy"] is None
-    assert initial.json()["effective"]["compiler"]["reason"] == (
-        "provider_keeps_server_default"
-    )
+    assert initial.json()["effective"]["reason"] == "provider_keeps_server_default"
 
     unverified = client.put(
         path,
@@ -304,7 +302,7 @@ def test_reasoning_contract_is_only_applied_after_verification(client):
                 "parameter": "enable_thinking",
                 "low_value": True,
                 "off_value": False,
-                "tasks": {"off": ["compiler"]},
+                "level": "off",
                 "verified": False,
             }
         },
@@ -312,8 +310,8 @@ def test_reasoning_contract_is_only_applied_after_verification(client):
     assert unverified.status_code == 200, unverified.text
     body = unverified.json()
     assert body["status"] == "unverified"
-    assert body["effective"]["compiler"]["applied"] is False
-    assert body["effective"]["compiler"]["reason"] == "capability_not_verified"
+    assert body["effective"]["applied"] is False
+    assert body["effective"]["reason"] == "capability_not_verified"
 
     save_group(client, [{"provider_id": provider["id"], "concurrency": 1}])
     thinking = settings(client)["models"][0]["thinking"]
@@ -333,7 +331,7 @@ def test_reasoning_contract_is_only_applied_after_verification(client):
                 "parameter": "enable_thinking",
                 "low_value": True,
                 "off_value": False,
-                "tasks": {"off": ["compiler"], "low": ["compiler_review"]},
+                "level": "off",
                 "verified": True,
             }
         },
@@ -341,17 +339,13 @@ def test_reasoning_contract_is_only_applied_after_verification(client):
     assert verified.status_code == 200, verified.text
     body = verified.json()
     assert body["status"] == "active"
-    assert body["policy"]["tasks"] == {
-        "off": ["compiler"],
-        "low": ["compiler_review"],
-    }
-    assert body["effective"]["compiler"]["applied"] is True
-    assert body["effective"]["compiler"]["mode"] == "toggle"
-    assert body["effective"]["compiler"]["parameter"] == "enable_thinking"
-    assert body["effective"]["compiler"]["level"] == "off"
-    assert body["effective"]["compiler"]["value"] is False
-    assert body["effective"]["compiler_review"]["level"] == "low"
-    assert body["effective"]["compiler_review"]["value"] is True
+    assert body["policy"]["level"] == "off"
+    assert body["effective"]["applied"] is True
+    assert body["effective"]["mode"] == "toggle"
+    assert body["effective"]["parameter"] == "enable_thinking"
+    assert body["effective"]["level"] == "off"
+    assert body["effective"]["value"] is False
+    assert "compiler" not in body["effective"]  # one level serves every task
     thinking = settings(client)["models"][0]["thinking"]
     assert thinking["configured"] == "off"
     assert thinking["effective"] == "off"

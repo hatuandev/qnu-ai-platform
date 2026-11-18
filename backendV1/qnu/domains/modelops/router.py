@@ -190,7 +190,7 @@ async def get_reasoning(
 @router.put(
     "/providers/{provider_id}/reasoning",
     response_model=ReasoningPolicyResponse,
-    summary="Khai báo reasoning cho tác vụ compiler/review",
+    summary="Khai báo mức suy nghĩ cho model",
 )
 async def set_reasoning(
     provider_id: str,

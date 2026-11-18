@@ -13,7 +13,7 @@ from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer
 from qnu.platform.errors import AppException
 from qnu.ports.chat_model import ChatMessage
 
-PROMPT_VERSION = "qnu.rag.answer/v35"
+PROMPT_VERSION = "qnu.rag.answer/v36"
 APPEAL_VERSION = "qnu.rag.answer.appeal/v4"
 
 REPAIR_INSTRUCTIONS = {
@@ -161,6 +161,8 @@ Với câu hỏi một điều kiện có đủ để bảo đảm một kết q
 Tách từng yêu cầu độc lập của câu hỏi và ghi assessment cho từng yêu cầu: covered khi statements/lookups trả lời và dẫn đúng id; missing khi evidence được cấp chưa đủ; conflicting khi có mâu thuẫn chưa giải. missing chỉ nói về evidence đã cấp, không khẳng định cả kho không có.
 Chỉ cần MỘT yêu cầu có căn cứ trong evidence là bắt buộc status answered: trả lời trọn phần đó bằng statements/lookups, ghi missing cho phần thiếu trong assessment và nêu rõ phần thiếu trong câu trả lời. Không được trả insufficient_evidence khi evidence đã chứa dữ kiện cho bất kỳ phần nào của câu hỏi; chỉ dùng status này khi không phần nào an toàn. Với câu hỏi nhiều ý, trả lời từng ý có căn cứ; không bỏ ý chỉ vì một ý khác thiếu căn cứ.
 Giữ đúng nguồn, năm dữ liệu, năm ban hành, đối tượng, đơn vị, header, footnote và quan hệ "và"/"hoặc", ngưỡng. Không suy năm từ tên tài liệu. Quy định chung và ngoại lệ nêu rõ cho một trường hợp không phải mâu thuẫn. Khi câu hỏi thuộc trường hợp riêng, đọc cả điều kiện, ngoại lệ và khoản được dẫn; không dùng quy định chung thay điều kiện riêng. Chỉ kết luận mâu thuẫn sau khi đối chiếu đối tượng, phương thức, thời gian và điều kiện áp dụng.
+Khi kết luận phụ thuộc vào việc một lựa chọn không nằm trong danh mục nguồn liệt kê, chỉ khẳng định trong phạm vi danh mục đã dẫn (nêu mục và dẫn đoạn hoặc ô chứa danh mục); không khẳng định về ngoài danh mục. Nếu nguồn nêu quy định chuyển đổi, tương đương hoặc ngoại lệ sẽ được thông báo hoặc công bố sau, dẫn đúng câu đó và nói hiện chưa có căn cứ để áp dụng; không suy luận từ việc nguồn không nhắc đến.
+Nếu câu hỏi hỏi khả năng áp dụng cho một đối tượng cụ thể (ngành, chương trình, phương thức, mức phí, đợt...) mà không nêu tên, hoặc tên không có trong evidence, không tự chọn đối tượng thay thế: trả lời quy tắc chung có dẫn chứng và nêu rõ cần tên đối tượng để kết luận riêng.
 
 EVIDENCE
 Mỗi item có id (E1...), kind, src (mã nguồn ngắn) và text hoặc title. Chỉ dẫn evidence_ids được cấp. Các item cùng src thuộc cùng phiên bản nguồn nhưng không chứng minh chung năm hoặc điều kiện cho mọi dòng. Item có same nghĩa là nội dung đã hiển thị đầy đủ ở id được nêu; dùng text và citation của id đó.
@@ -180,6 +182,7 @@ CÂU TRẢ LỜI
 statements dùng cho ý văn bản, dẫn evidence_ids của item kind khác table hoặc bảng trong unselectable. Số của bảng trong tables chỉ đi qua lookups; số chép từ bảng unselectable phải nguyên văn từ text của bảng. Mỗi statement là text thuần, không tự thêm citation, Markdown link hoặc HTML; BE sẽ gắn nguồn.
 Câu hỏi chỉ có căn cứ văn bản dùng statements và lookups rỗng. Nếu chỉ hỏi một phương án cụ thể có trong bảng không, chọn ô có phương án đó và để statements rỗng, trừ khi có đoạn văn trực tiếp chứng minh và bổ sung điều kiện. Nếu câu hỏi yêu cầu cả danh sách, đọc tất cả các mảnh liên quan rồi dùng name_id hoặc ô chứa tên. Chỉ xuất nội dung trả lời cho người đọc, không chép quá trình cân nhắc, chỉ dẫn hoặc nội dung schema vào câu trả lời.
 Không tự tính số liệu chính thức. Nếu văn bản nêu rõ kết luận so sánh hoặc đối tượng nổi trội, được trích kết luận đó kèm citation; đây không phải tự suy toàn bộ danh sách. Không abstain chỉ vì cần nhiều evidence, nhiều bảng khác nhau hoặc phải kết hợp bảng và văn bản.
+Số, điểm và điều kiện người hỏi tự nêu trong câu hỏi là tiền đề, không phải dữ kiện nguồn: không dùng làm căn cứ, không tự tính chênh lệch hay so sánh từ chúng, và không bắt buộc nhắc lại; nếu nhắc thì ghi rõ đó là số của người hỏi. Chỉ kết luận đủ hay không đủ theo điều kiện, ngưỡng hoặc danh mục có trong nguồn.
 Khi câu hỏi hỏi ý nghĩa ký hiệu, trạng thái hoặc ô của một bảng nhưng điều, khoản hoặc chú thích văn bản đã định nghĩa rõ, được trả lời từ văn bản đó kèm citation; bảng không chọn được ô không phải lý do abstain khi văn bản đã có căn cứ. Với câu hỏi nhiều ý, đọc hết evidence và trả lời đủ từng ý có căn cứ, kể cả ý nằm ở bảng hoặc chú thích khác; không bỏ ý đã có nguồn chỉ vì tập trung vào ý chính.
 
 ĐỊNH DẠNG

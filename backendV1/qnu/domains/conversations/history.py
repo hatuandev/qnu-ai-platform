@@ -8,6 +8,7 @@ from qnu.domains.conversations.models import ConversationTurn
 from qnu.domains.conversations.schemas import TurnResponse
 from qnu.domains.conversations.service import expire
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.knowledge.index.multi import validate_collections
 from qnu.domains.knowledge.index.schemas import SearchHit, SearchResponse
 from qnu.domains.knowledge.index.validation import validate_results
 from qnu.domains.rag.answer.schemas import AnswerResponse
@@ -26,6 +27,44 @@ UNAVAILABLE_REASONS = {
     "publication_source_stale": "Nguồn dùng để xuất bản đã thay đổi.",
     "published_compilation_not_found": "Bản xuất bản nguồn không còn tồn tại.",
 }
+
+
+async def _revalidate(
+    db: AsyncSession,
+    blob: BlobStore,
+    vectors: VectorStore,
+    actor: AuthActor,
+    turn: ConversationTurn,
+    retrieved: SearchResponse,
+    document_ids: list[str] | None,
+    retrieval_trace: dict,
+) -> None:
+    """A multi-collection answer carries its served records, one per collection."""
+    served = [
+        item for item in retrieval_trace.get("collections") or [] if item.get("status") == "served"
+    ]
+    if not served:
+        await validate_results(
+            db,
+            blob,
+            vectors,
+            actor,
+            turn.workspace_id,
+            turn.collection_id,
+            retrieved,
+            document_ids,
+        )
+        return
+    await validate_collections(
+        db,
+        blob,
+        vectors,
+        actor,
+        turn.workspace_id,
+        retrieved.model_copy(update={"trace": {"collections": served}}),
+        document_ids,
+        retrieval_trace.get("hit_scope") or {},
+    )
 
 
 async def readable(
@@ -50,15 +89,15 @@ async def readable(
             eligible_documents=len({s.document_id for s in result.sources}),
         )
         try:
-            await validate_results(
+            await _revalidate(
                 db,
                 blob,
                 vectors,
                 actor,
-                turn.workspace_id,
-                turn.collection_id,
+                turn,
                 retrieved,
                 document_ids,
+                result.trace.retrieval or {},
             )
         except AppException as exc:
             if exc.code in {

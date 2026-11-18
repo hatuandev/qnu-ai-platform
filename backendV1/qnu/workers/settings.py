@@ -5,7 +5,9 @@ from __future__ import annotations
 from arq import cron, func
 from arq.connections import RedisSettings
 
-# Register review dependencies for the purge graph when ARQ starts without the API.
+# Register purge-graph tables that the ARQ process would otherwise never import.
+from qnu.domains.answer_review import models as _answer_review_models  # noqa: F401
+from qnu.domains.conversations import models as _conversation_models  # noqa: F401
 from qnu.domains.knowledge.review import models as _review_models  # noqa: F401
 from qnu.domains.lifecycle.purge import source_purge_job
 from qnu.platform.config import get_settings

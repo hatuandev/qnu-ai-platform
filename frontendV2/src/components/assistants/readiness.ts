@@ -16,6 +16,11 @@ export const READINESS_MAP: Record<
   uncertain: { label: "Chưa xác định", variant: "warning" },
 };
 
+/** An unbound assistant also reports readiness "empty"; say what is actually missing. */
+export const UNBOUND_LABEL = "Chưa gắn kho";
+export const UNBOUND_DETAIL =
+  "Trợ lý chưa gắn kho tri thức. Gắn ít nhất một kho trong tab Cấu hình để bắt đầu phục vụ.";
+
 /** Hero wording: a ready assistant serves answers, not just "ready". */
 export function readinessHeroLabel(status: AssistantReadinessStatus): string {
   if (status === "ready") return "Sẵn sàng phục vụ";

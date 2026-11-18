@@ -1,6 +1,7 @@
 """Bounded section windows from the same published input; never use global ordinal adjacency."""
 
 import json
+import re
 from collections import Counter
 
 from sqlalchemy import select
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.index.models import IndexChunk, IndexRun
+from qnu.domains.knowledge.index.multi import pinned_by_collection
 from qnu.domains.knowledge.index.query_scope import result_scopes
 from qnu.domains.knowledge.index.schemas import SearchHit, SearchResponse
 from qnu.domains.knowledge.index.search import _eligible, _hits, manifest
@@ -40,6 +42,37 @@ MIN_DOCUMENT_SHARE = 4096
 # them relevant, but they must not displace a primary or a structural group.
 RANK_BAND = 5
 
+# Items of one source enumeration are one reading unit; a fixed window can strand
+# item 5 of 6 away from the list it belongs to.
+MAX_NUMBERED_RUN = 8
+NUMBERED_LABEL = re.compile(r"^(\d{1,2})[.)]\s+\S")
+
+
+def _numbered_item(chunk: IndexChunk) -> int | None:
+    numbers = set()
+    for annotation in (chunk.structure or {}).get("retrieval_metadata", []):
+        for label in annotation["values"].get("attributes") or {}:
+            match = NUMBERED_LABEL.match(str(label).strip())
+            if match:
+                numbers.add(int(match.group(1)))
+    return numbers.pop() if len(numbers) == 1 else None
+
+
+def _numbered_run(siblings: list[IndexChunk], position: int) -> tuple[int, int] | None:
+    number = _numbered_item(siblings[position])
+    if number is None:
+        return None
+    start = end = position
+    while start > 0 and position - start < MAX_NUMBERED_RUN:
+        if _numbered_item(siblings[start - 1]) != number - (position - start + 1):
+            break
+        start -= 1
+    while end + 1 < len(siblings) and end - position < MAX_NUMBERED_RUN:
+        if _numbered_item(siblings[end + 1]) != number + (end + 1 - position):
+            break
+        end += 1
+    return (start, end) if (start, end) != (position, position) else None
+
 
 def evidence_size(hit: SearchHit) -> int:
     # Two-digit IDs cover top20 plus at most four structural table dependencies.
@@ -61,6 +94,180 @@ def _bounded_single_value(groups: list[dict], anchors: set[str], window: int = 1
         hi = min(len(ids), max(positions) + window + 1)
         bounded.append({**group, "required_ids": ids[lo:hi], "units": [], "bounded": True})
     return bounded
+
+
+LIST_TRACE_KEYS = (
+    "added",
+    "support_ids",
+    "unresolved_support_ids",
+    "table_links",
+    "section_siblings",
+    "rank_band",
+)
+SUM_TRACE_KEYS = (
+    "bytes_used",
+    "narrative_bytes",
+    "skipped_budget",
+    "rank_band_skipped",
+    "clause_skipped_budget",
+    "parts_joined",
+)
+
+
+def merge_context_traces(
+    entries: list[tuple[str, dict]], primary_ids: list[str], budget_bytes: int
+) -> dict:
+    """One reading context from several collections; counts add, ids keep order."""
+    traces = [trace for _, trace in entries]
+    first = traces[0]
+    merged = {
+        "window": first.get("window"),
+        "effective_window": first.get("effective_window"),
+        "question_kind": first.get("question_kind"),
+        "budget_bytes": budget_bytes,
+        "primary_ids": primary_ids,
+        "collections": [{"collection_id": key, **trace} for key, trace in entries],
+    }
+    for key in LIST_TRACE_KEYS:
+        merged[key] = [item for trace in traces for item in trace.get(key) or []]
+    for key in SUM_TRACE_KEYS:
+        merged[key] = sum(trace.get(key) or 0 for trace in traces)
+    merged["status"] = (
+        "expanded"
+        if any(trace.get("status") == "expanded" for trace in traces)
+        else "no_hits"
+        if all(trace.get("status") == "no_hits" for trace in traces)
+        else "disabled"
+    )
+    support = [trace["table_support"] for trace in traces if trace.get("table_support")]
+    if support:
+        merged["table_support"] = "partial" if "partial" in support else support[0]
+    structures = [trace["structure"] for trace in traces if trace.get("structure")]
+    if structures:
+        merged["structure"] = {
+            "version": structures[0]["version"],
+            "groups": [group for item in structures for group in item.get("groups") or []],
+            "enumeration_requested": any(item.get("enumeration_requested") for item in structures),
+            "unresolved_references": [
+                ref for item in structures for ref in item.get("unresolved_references") or []
+            ],
+            "compressed_refs": sum(item.get("compressed_refs") or 0 for item in structures),
+        }
+    expansions = [trace["expansion"] for trace in traces if trace.get("expansion")]
+    if expansions:
+        merged["expansion"] = {
+            "primary_counts": {
+                document_id: count
+                for item in expansions
+                for document_id, count in item.get("primary_counts", {}).items()
+            },
+            "per_document_bytes": {
+                document_id: size
+                for item in expansions
+                for document_id, size in item.get("per_document_bytes", {}).items()
+            },
+            "used": {
+                document_id: size
+                for item in expansions
+                for document_id, size in item.get("used", {}).items()
+            },
+            "skipped_share_count": sum(item.get("skipped_share_count") or 0 for item in expansions),
+            "skipped_share": [
+                entry for item in expansions for entry in item.get("skipped_share") or []
+            ][:20],
+            "skipped_budget": sum(item.get("skipped_budget") or 0 for item in expansions),
+        }
+    return merged
+
+
+async def expand_collections(
+    db: AsyncSession,
+    blob: BlobStore,
+    actor: AuthActor,
+    workspace_id: str,
+    retrieval: SearchResponse,
+    req: AnswerRequest,
+    *,
+    bundles: dict | None = None,
+    resolved_question: str | None = None,
+) -> tuple[SearchResponse, dict]:
+    """Expand each source collection inside its own index, then merge in rank order."""
+    if not retrieval.hits:
+        return retrieval, {
+            "window": req.context_window,
+            "primary_ids": [],
+            "budget_bytes": req.context_max_bytes,
+            "added": [],
+            "status": "no_hits",
+        }
+    hit_scope = dict(retrieval.trace.get("hit_scope") or {})
+    traces = retrieval.trace.get("collection_traces") or {}
+    ranked_ids = retrieval.trace.get("rerank_ranked_ids") or []
+    served_ids = [
+        record["collection_id"]
+        for record in retrieval.trace.get("collections") or []
+        if record.get("status") == "served"
+    ]
+    pinned = await pinned_by_collection(db, workspace_id, served_ids, req.document_ids)
+    entries, owners, additions = [], {}, []
+    for record in retrieval.trace.get("collections") or []:
+        if record.get("status") != "served":
+            continue
+        owner = record["collection_id"]
+        group = [hit for hit in retrieval.hits if hit_scope.get(hit.chunk_id) == owner]
+        if not group:
+            continue
+        trace = dict(traces.get(owner) or {})
+        ranked = [key for key in ranked_ids if hit_scope.get(key) == owner]
+        if ranked:
+            trace["rerank_ranked_ids"] = ranked
+        sub = SearchResponse(
+            index_run_id=record["index_run_id"],
+            generation=record["generation"],
+            status="results",
+            hits=group,
+            eligible_documents=record["eligible_documents"],
+            skipped_documents=[],
+            trace=trace,
+        )
+        # A pinned document only narrows the collection that owns it.
+        scoped = (
+            req.model_copy(update={"document_ids": pinned[owner]}) if pinned is not None else req
+        )
+        expanded, entry = await expand_context(
+            db,
+            blob,
+            actor,
+            workspace_id,
+            owner,
+            sub,
+            scoped,
+            bundles=bundles,
+            resolved_question=resolved_question,
+        )
+        entries.append((owner, entry))
+        for hit in expanded.hits:
+            owners[hit.chunk_id] = owner
+        additions.extend(expanded.hits[len(group) :])
+    primary_ids = [hit.chunk_id for hit in retrieval.hits]
+    merged = (
+        merge_context_traces(entries, primary_ids, req.context_max_bytes)
+        if entries
+        else {
+            "window": req.context_window,
+            "primary_ids": primary_ids,
+            "budget_bytes": req.context_max_bytes,
+            "added": [],
+            "status": "no_hits",
+        }
+    )
+    retrieval = retrieval.model_copy(
+        update={
+            "hits": [*retrieval.hits, *additions],
+            "trace": {**retrieval.trace, "hit_scope": {**hit_scope, **owners}},
+        }
+    )
+    return retrieval, merged
 
 
 async def expand_context(
@@ -422,7 +629,11 @@ async def expand_context(
             neighbors = siblings
         else:
             position = next(i for i, c in enumerate(siblings) if c.id == primary.id)
-            neighbors = siblings[max(0, position - window) : position + window + 1]
+            start, end = max(0, position - window), min(len(siblings) - 1, position + window)
+            span = _numbered_run(siblings, position)
+            if span:
+                start, end = min(start, span[0]), max(end, span[1])
+            neighbors = siblings[start : end + 1]
         shared_scopes = [scope for scope in scopes if matches_metadata(primary.structure, scope)]
         for row in neighbors:
             if row.id in known or not any(

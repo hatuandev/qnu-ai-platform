@@ -239,9 +239,8 @@ async def prepare(
                 task="compiler_review",
                 max_output_tokens=req.max_output_tokens,
                 output_schema=schema,
-                reasoning_task="compiler_review",
             )
-            reasoning_dir = runtime.reasoning_directive("compiler_review")
+            reasoning_dir = runtime.reasoning_directive()
             if not parts.requires_output_segmentation(
                 material.payload,
                 output_tokens=budget.max_output_tokens,
@@ -268,7 +267,7 @@ async def prepare(
                 code="model_capacity_required",
                 status_code=422,
             )
-        reasoning_dir = runtime.reasoning_directive("compiler_review")
+        reasoning_dir = runtime.reasoning_directive()
         reasoning_shares = reasoning_dir is None or reasoning_dir.level != "off"
         if concise:
             structural = assess_source_headings(material.payload, sections)
@@ -293,7 +292,7 @@ async def prepare(
                 structured=structured,
                 reasoning_shares_budget=reasoning_shares,
             )
-    reasoning = runtime.reasoning_directive("compiler_review")
+    reasoning = runtime.reasoning_directive()
     reasoning_shares = reasoning is None or reasoning.level != "off"
     out_budget = parts.output_budget(
         budget.max_output_tokens, reasoning_shares_budget=reasoning_shares
@@ -315,7 +314,7 @@ async def prepare(
         "configuration_hash": runtime.configuration_hash,
         "routing": list(runtime.routing_trace),
         "reasoning": reasoning.public_dict() if reasoning is not None else None,
-        "reasoning_trace": runtime.reasoning_trace("compiler_review"),
+        "reasoning_trace": runtime.reasoning_trace(),
         "compiler_provider_id": run.provider_id,
         "source_unit_count": len(material.payload["source_units"]),
         "draft_unit_count": len(material.payload["draft_units"]),
@@ -448,7 +447,7 @@ async def _store_segments(
     runtime: ChatRuntime,
     budget,
 ) -> None:
-    reasoning_dir = runtime.reasoning_directive("compiler_review")
+    reasoning_dir = runtime.reasoning_directive()
     reasoning_shares = reasoning_dir is None or reasoning_dir.level != "off"
     manifest = parts.manifest_for(
         row,

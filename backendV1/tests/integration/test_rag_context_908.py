@@ -23,7 +23,7 @@ def test_declared_reasoning_reaches_both_generation_and_judge(client, ready, ver
                 "mode": "chat_template_kwarg",
                 "parameter": "enable_thinking",
                 "off_value": False,
-                "tasks": {"off": ["answer"]},
+                "level": "off",
                 "verified": verified,
             }
         },

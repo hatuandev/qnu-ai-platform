@@ -390,7 +390,7 @@ def test_social_call_uses_declared_reasoning_policy_and_records_paid_usage(clien
                 "mode": "chat_template_kwarg",
                 "parameter": "enable_thinking",
                 "off_value": False,
-                "tasks": {"off": ["answer"]},
+                "level": "off",
                 "verified": True,
             }
         },

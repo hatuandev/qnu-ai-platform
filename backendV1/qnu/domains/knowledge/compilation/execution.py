@@ -259,7 +259,7 @@ async def _call(
     if run.config.get("automatic_output_budget"):
         request = replace(request, automatic_output_budget=True)
     if recorded:
-        live = runtime.reasoning_directive("compiler")
+        live = runtime.reasoning_directive()
         if (live.public_dict() if live else None) != run.config["reasoning_directive"]:
             raise Conflict("Chính sách reasoning đã đổi.", code="compilation_reasoning_changed")
     if (
@@ -621,7 +621,7 @@ async def _run_leaf(
                 "Model hoặc prompt đã đổi so với yêu cầu.",
                 code="compilation_provider_changed",
             )
-        live = runtime.reasoning_directive("compiler")
+        live = runtime.reasoning_directive()
         live_public = live.public_dict() if live is not None else None
         if recorded:
             if live_public != (

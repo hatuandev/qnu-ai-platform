@@ -120,8 +120,20 @@ async def create_review(
     assistant = await get_assistant(db, actor, workspace_id, assistant_id)
     if not assistant.is_active:
         raise Conflict("Trợ lý đã tạm dừng; không thể kiểm thử.", code="assistant_inactive")
+    collection_ids = list(
+        dict.fromkeys(
+            item
+            for item in [assistant.collection_id, *(assistant.collection_ids or [])]
+            if item
+        )
+    )
+    if not collection_ids:
+        raise Conflict(
+            "Trợ lý chưa gắn kho tri thức nên chưa thể kiểm thử.",
+            code="assistant_no_collections",
+        )
     readiness = await assistant_readiness(db, blob, actor, workspace_id, assistant_id)
-    if readiness.status == "empty":
+    if all(entry.status == "empty" for entry in readiness.collections):
         raise Conflict(
             "Kho tri thức chưa có tài liệu được xuất bản để kiểm thử.",
             code="assistant_no_published_sources",
@@ -138,9 +150,8 @@ async def create_review(
         if replay.request_sha256 != request_sha256:
             raise Conflict("Idempotency-Key đã dùng cho yêu cầu khác.", code="idempotency_conflict")
         return _response(replay, await _items(db, replay.id)), False
-    config = AssistantConfig.model_validate(assistant, from_attributes=True).model_dump(
-        mode="json"
-    )
+    config = AssistantConfig.model_validate(assistant, from_attributes=True).model_dump(mode="json")
+    config["collection_ids"] = collection_ids
     review_id = new_id("arv")
     review = AnswerReview(
         id=review_id,
@@ -189,7 +200,6 @@ async def create_review(
     policy = AssistantRagPolicy.model_validate(config.get("rag_policy", {})).model_dump(
         mode="json", exclude={"guardrail_policy"}
     )
-    collection_id = assistant.collection_id
     item_ids = [item.id for item in items]
     for item_id, question in zip(item_ids, req.questions, strict=True):
         try:
@@ -201,7 +211,7 @@ async def create_review(
                 chat,
                 actor,
                 workspace_id,
-                collection_id,
+                collection_ids[0],
                 AnswerRequest(
                     question=question,
                     top_k=config["top_k"],
@@ -212,6 +222,7 @@ async def create_review(
                 persona=config["persona"],
                 reranker=reranker,
                 compose_insufficient_message=True,
+                collection_ids=collection_ids,
             )
         except (Exception, asyncio.CancelledError) as exc:
             await db.rollback()
@@ -249,9 +260,7 @@ async def create_review(
     )
 
 
-async def _finish(
-    db: AsyncSession, review_id: str, actor: AuthActor, workspace_id: str
-) -> None:
+async def _finish(db: AsyncSession, review_id: str, actor: AuthActor, workspace_id: str) -> None:
     row = await db.get(AnswerReview, review_id, populate_existing=True)
     if row is None:
         return
@@ -348,7 +357,9 @@ async def label_item(
     review = await _review(db, workspace_id, assistant_id, review_id)
     item = await db.get(AnswerReviewItem, item_id, populate_existing=True)
     if item is None or item.review_id != review.id:
-        raise EntityNotFound("Không tìm thấy câu hỏi kiểm thử.", code="answer_review_item_not_found")
+        raise EntityNotFound(
+            "Không tìm thấy câu hỏi kiểm thử.", code="answer_review_item_not_found"
+        )
     if item.status not in REVIEWED_STATUSES:
         raise Conflict(
             "Chỉ gắn nhãn câu hỏi đã có kết quả trả lời.", code="answer_review_item_not_ready"

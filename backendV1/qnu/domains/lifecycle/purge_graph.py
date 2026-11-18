@@ -1,6 +1,6 @@
 """Explicit, workspace-owned dependency graph for permanent source or collection deletion."""
 
-from sqlalchemy import and_, delete, or_, select, tuple_
+from sqlalchemy import and_, delete, func, or_, select, tuple_
 
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.platform.database import Base
@@ -44,13 +44,17 @@ SOURCE_TABLES = frozenset(
     }
 )
 # A collection purge owns whole index generations and folder rows, so runs and their
-# manifest objects are deleted instead of resealed for surviving content.
+# manifest objects are deleted instead of resealed for surviving content. Chat history
+# and answer reviews pin the collection semantically, so they join only on opt-in.
 COLLECTION_TABLES = SOURCE_TABLES | {
     "kb_collections",
     "kb_folders",
     "kb_index_runs",
     "kb_index_sync",
     "kb_upload_requests",
+    "chat_conversations",
+    "kb_answer_reviews",
+    "kb_answer_review_items",
 }
 TABLES = COLLECTION_TABLES
 MAX_ROWS = 10000
@@ -268,7 +272,83 @@ async def graph_for_source(db, workspace_id, source_id, *, allow_published: bool
     return graph
 
 
-async def graph_for_collection(db, workspace_id, collection_id, *, allow_published: bool = False):
+async def collection_history_counts(db, workspace_id, collection_id):
+    conversations = table("chat_conversations")
+    reviews = table("kb_answer_reviews")
+    return {
+        "conversations": await db.scalar(
+            select(func.count())
+            .select_from(conversations)
+            .where(
+                conversations.c.workspace_id == workspace_id,
+                conversations.c.collection_id == collection_id,
+            )
+        )
+        or 0,
+        "answer_reviews": await db.scalar(
+            select(func.count())
+            .select_from(reviews)
+            .where(
+                reviews.c.workspace_id == workspace_id,
+                reviews.c.collection_id == collection_id,
+            )
+        )
+        or 0,
+    }
+
+
+async def _add_collection_history(db, graph, workspace_id, collection_id):
+    conversations, turns = table("chat_conversations"), table("chat_turns")
+    reviews, items = table("kb_answer_reviews"), table("kb_answer_review_items")
+    await _add(
+        db,
+        graph,
+        conversations.name,
+        select(conversations).where(
+            conversations.c.workspace_id == workspace_id,
+            conversations.c.collection_id == collection_id,
+        ),
+        workspace_id,
+    )
+    conversation_ids = [row["id"] for row in graph.get(conversations.name, {}).values()]
+    if conversation_ids:
+        await _add(
+            db,
+            graph,
+            turns.name,
+            select(turns).where(
+                turns.c.workspace_id == workspace_id,
+                turns.c.conversation_id.in_(conversation_ids),
+            ),
+            workspace_id,
+        )
+    await _add(
+        db,
+        graph,
+        reviews.name,
+        select(reviews).where(
+            reviews.c.workspace_id == workspace_id,
+            reviews.c.collection_id == collection_id,
+        ),
+        workspace_id,
+    )
+    review_ids = [row["id"] for row in graph.get(reviews.name, {}).values()]
+    if review_ids:
+        await _add(
+            db,
+            graph,
+            items.name,
+            select(items).where(
+                items.c.workspace_id == workspace_id,
+                items.c.review_id.in_(review_ids),
+            ),
+            workspace_id,
+        )
+
+
+async def graph_for_collection(
+    db, workspace_id, collection_id, *, allow_published: bool = False, include_history: bool = False
+):
     collections, uploads = table("kb_collections"), table("kb_upload_requests")
     graph = {}
     await _add(
@@ -283,12 +363,12 @@ async def graph_for_collection(db, workspace_id, collection_id, *, allow_publish
     )
     if not graph[collections.name]:
         raise EntityNotFound("Không tìm thấy kho tri thức.", code="collection_not_found")
-    assistants = Base.metadata.tables["chat_assistants"]
+    bindings = Base.metadata.tables["chat_assistant_collections"]
     if await db.scalar(
-        select(assistants.c.id)
+        select(bindings.c.assistant_id)
         .where(
-            assistants.c.workspace_id == workspace_id,
-            assistants.c.collection_id == collection_id,
+            bindings.c.workspace_id == workspace_id,
+            bindings.c.collection_id == collection_id,
         )
         .limit(1)
     ):
@@ -296,6 +376,20 @@ async def graph_for_collection(db, workspace_id, collection_id, *, allow_publish
             "Kho đang được trợ lý sử dụng. Hãy gỡ kho khỏi trợ lý trước khi xóa.",
             code="collection_in_use_by_assistants",
         )
+    # Conversations and answer reviews pin their collection even after the assistant
+    # moved away. They are deleted only when the caller explicitly includes history.
+    if not include_history:
+        history = await collection_history_counts(db, workspace_id, collection_id)
+        if history["conversations"]:
+            raise Conflict(
+                "Kho còn hội thoại cũ đang trỏ vào. Hãy chọn xóa kèm lịch sử hội thoại.",
+                code="collection_in_use_by_conversations",
+            )
+        if history["answer_reviews"]:
+            raise Conflict(
+                "Kho còn bài kiểm thử câu trả lời cũ. Hãy chọn xóa kèm lịch sử hội thoại.",
+                code="collection_in_use_by_answer_reviews",
+            )
     # The upload ledger has no FK to the collection but would replay deleted ids.
     await _add(
         db,
@@ -307,6 +401,8 @@ async def graph_for_collection(db, workspace_id, collection_id, *, allow_publish
         ),
         workspace_id,
     )
+    if include_history:
+        await _add_collection_history(db, graph, workspace_id, collection_id)
     await _close_dependencies(db, graph, workspace_id, COLLECTION_TABLES)
     _check_approved_plan(graph, allow_published)
     await _add_empty_document_containers(db, graph, workspace_id)

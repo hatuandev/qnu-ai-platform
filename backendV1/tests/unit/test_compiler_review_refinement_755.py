@@ -443,7 +443,7 @@ def _setup_segmented_harness(
         live_runtime = SimpleNamespace(
             provider_id=runtime.provider_id,
             configuration_hash=runtime.configuration_hash,
-            reasoning_directive=lambda _task: reasoning,
+            reasoning_directive=lambda: reasoning,
         )
         return live_runtime, req, budget
 

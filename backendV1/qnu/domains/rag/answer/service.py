@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.knowledge.index.multi import validate_collections
 from qnu.domains.knowledge.index.query_scope import result_scopes
 from qnu.domains.knowledge.index.schemas import SearchRequest
 from qnu.domains.knowledge.index.validation import validate_results
@@ -18,7 +19,7 @@ from qnu.domains.modelops.usage.service import usage_service
 from qnu.domains.rag.answer import cache as answer_cache
 from qnu.domains.rag.answer.cells import PROJECTION_VERSION, materialize
 from qnu.domains.rag.answer.cells import VERSION as CELLS_VERSION
-from qnu.domains.rag.answer.context import expand_context
+from qnu.domains.rag.answer.context import expand_collections, expand_context
 from qnu.domains.rag.answer.coverage import VERSION as COVERAGE_VERSION
 from qnu.domains.rag.answer.coverage import assess, plan_for, plan_ready, referenced_ids
 from qnu.domains.rag.answer.drafting import (
@@ -73,8 +74,10 @@ async def answer(
     checkpoint: Callable[[], Awaitable[None]] | None = None,
     reranker: Reranker | None = None,
     compose_insufficient_message: bool = False,
+    collection_ids: list[str] | None = None,
 ) -> AnswerResponse:
     answer_id = "ans_" + uuid.uuid4().hex
+    ids = list(dict.fromkeys(collection_ids or [collection_id]))
     trace = AnswerTrace(
         prompt_version=PROMPT_VERSION,
         verification={"mode": req.verification_mode, "status": "not_run"},
@@ -87,7 +90,7 @@ async def answer(
         vectors,
         actor,
         workspace_id,
-        collection_id,
+        ids,
         SearchRequest(
             query=retrieval_query or req.question,
             top_k=req.top_k,
@@ -136,17 +139,29 @@ async def answer(
 
     context_started = time.monotonic()
     bundles = {}
-    retrieval, trace.context = await expand_context(
-        db,
-        blob,
-        actor,
-        workspace_id,
-        collection_id,
-        retrieval,
-        req,
-        bundles=bundles,
-        resolved_question=retrieval_query,
-    )
+    if len(ids) > 1:
+        retrieval, trace.context = await expand_collections(
+            db,
+            blob,
+            actor,
+            workspace_id,
+            retrieval,
+            req,
+            bundles=bundles,
+            resolved_question=retrieval_query,
+        )
+    else:
+        retrieval, trace.context = await expand_context(
+            db,
+            blob,
+            actor,
+            workspace_id,
+            ids[0],
+            retrieval,
+            req,
+            bundles=bundles,
+            resolved_question=retrieval_query,
+        )
     trace.stage_ms["context"] = round((time.monotonic() - context_started) * 1000, 3)
     if not retrieval.hits:
         response.reason = retrieval.status
@@ -171,7 +186,15 @@ async def answer(
     if len(selected_hits) != len(retrieval.hits):
         retrieval = retrieval.model_copy(update={"hits": selected_hits})
     sources = sources_for(retrieval)
-    await attach_source_text(db, blob, workspace_id, collection_id, sources, bundles=bundles)
+    await attach_source_text(
+        db,
+        blob,
+        workspace_id,
+        ids[0],
+        sources,
+        scope=retrieval.trace.get("hit_scope") if len(ids) > 1 else None,
+        bundles=bundles,
+    )
     packing_started = time.monotonic()
     packing_metadata = (
         {
@@ -220,10 +243,19 @@ async def answer(
         "unresolved_tables": len(cells["issues"]),
         "catalog_sha256": digest(cells),
     }
+    owners = retrieval.trace.get("hit_scope")
+
+    async def evidence_proof() -> str:
+        if len(ids) > 1:
+            return await validate_collections(
+                db, blob, vectors, actor, workspace_id, retrieval, req.document_ids, owners
+            )
+        return await validate_results(
+            db, blob, vectors, actor, workspace_id, ids[0], retrieval, req.document_ids
+        )
+
     proof_started = time.monotonic()
-    proof = await validate_results(
-        db, blob, vectors, actor, workspace_id, collection_id, retrieval, req.document_ids
-    )
+    proof = await evidence_proof()
     trace.stage_ms["proof"] = round((time.monotonic() - proof_started) * 1000, 3)
     answer_schema = output_schema(sources, cells=cells)
     trace.context["packing"] = payload_metrics(messages, answer_schema, evidence_bytes)
@@ -235,55 +267,52 @@ async def answer(
         messages,
         provider_id=req.provider_id,
         task="answer",
-        reasoning_task="answer",
         max_output_tokens=req.max_output_tokens,
         output_schema=answer_schema,
     )
     trace.stage_ms["model_prepare"] = round((time.monotonic() - prepare_started) * 1000, 3)
     inference_hash = runtime.inference_configuration_hash("answer")
     trace.inference_configuration_hash = inference_hash
-    trace.reasoning = runtime.reasoning_trace("answer")
+    trace.reasoning = runtime.reasoning_trace()
     cache_ttl = answer_cache.ttl_seconds()
-    cache_key = (
-        answer_cache.key(
-            {
-                "version": answer_cache.VERSION,
-                "workspace_id": workspace_id,
-                "collection_id": collection_id,
-                "question": req.question,
-                "retrieval_query": retrieval_query,
-                "persona": persona,
-                "document_ids": sorted(req.document_ids or []),
-                "retrieval": {
-                    "mode": req.retrieval_mode,
-                    "top_k": req.top_k,
-                    "candidate_k": req.candidate_k,
-                    "rrf_k": req.rrf_k,
-                    "rerank_provider_id": req.rerank_provider_id,
-                    "scope_resolution": req.scope_resolution,
-                    "context_window": req.context_window,
-                    "context_max_bytes": req.context_max_bytes,
-                    "metadata": packing_metadata,
-                },
-                "index_run_id": retrieval.index_run_id,
-                "generation": retrieval.generation,
-                "manifest_sha256": trace.retrieval.get("manifest_sha256"),
-                "provider_id": runtime.provider_id,
-                "configuration_hash": runtime.configuration_hash,
-                "inference_configuration_hash": inference_hash,
-                "prompt_version": PROMPT_VERSION,
-                "appeal_version": APPEAL_VERSION,
-                "messages_sha256": digest(
-                    [{"role": m.role, "content": m.content} for m in messages]
-                ),
-                "schema_sha256": digest(answer_schema),
-                "evidence_sha256": proof,
-                "catalog_sha256": trace.grounding["catalog_sha256"],
-            }
+    cache_material = {
+        "version": answer_cache.VERSION,
+        "workspace_id": workspace_id,
+        "collection_id": collection_id,
+        "question": req.question,
+        "retrieval_query": retrieval_query,
+        "persona": persona,
+        "document_ids": sorted(req.document_ids or []),
+        "retrieval": {
+            "mode": req.retrieval_mode,
+            "top_k": req.top_k,
+            "candidate_k": req.candidate_k,
+            "rrf_k": req.rrf_k,
+            "rerank_provider_id": req.rerank_provider_id,
+            "scope_resolution": req.scope_resolution,
+            "context_window": req.context_window,
+            "context_max_bytes": req.context_max_bytes,
+            "metadata": packing_metadata,
+        },
+        "index_run_id": retrieval.index_run_id,
+        "generation": retrieval.generation,
+        "manifest_sha256": trace.retrieval.get("manifest_sha256"),
+        "provider_id": runtime.provider_id,
+        "configuration_hash": runtime.configuration_hash,
+        "inference_configuration_hash": inference_hash,
+        "prompt_version": PROMPT_VERSION,
+        "appeal_version": APPEAL_VERSION,
+        "messages_sha256": digest([{"role": m.role, "content": m.content} for m in messages]),
+        "schema_sha256": digest(answer_schema),
+        "evidence_sha256": proof,
+        "catalog_sha256": trace.grounding["catalog_sha256"],
+    }
+    if len(ids) > 1:
+        cache_material["collection_ids"] = sorted(ids)
+        cache_material["collection_manifests"] = sorted(
+            (trace.retrieval.get("manifests") or {}).items()
         )
-        if cache_ttl
-        else None
-    )
+    cache_key = answer_cache.key(cache_material) if cache_ttl else None
     cached = None
     if cache_key is not None:
         lookup_started = time.monotonic()
@@ -306,9 +335,7 @@ async def answer(
     trace.configuration_hash = runtime.configuration_hash
     trace.routing = list(runtime.routing_trace)
     async def safety_check():
-        if proof != await validate_results(
-            db, blob, vectors, actor, workspace_id, collection_id, retrieval, req.document_ids
-        ):
+        if proof != await evidence_proof():
             raise Conflict("Evidence thay đổi khi model trả lời.", code="answer_evidence_changed")
         current = await resolve_chat_runtime(db, workspace_id, runtime.provider_id)
         if current.inference_configuration_hash("answer") != inference_hash:
@@ -456,7 +483,6 @@ async def answer(
                         retry_messages,
                         provider_id=runtime.provider_id,
                         task="answer",
-                        reasoning_task="answer",
                         max_output_tokens=req.max_output_tokens,
                         output_schema=retry_schema,
                     )

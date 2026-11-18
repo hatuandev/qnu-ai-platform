@@ -162,7 +162,6 @@ async def verify(
         messages,
         provider_id=req.verification_provider_id or req.provider_id,
         task="chat",
-        reasoning_task="answer",
         max_output_tokens=req.verification_max_output_tokens,
     )
     inference_hash = runtime.inference_configuration_hash("answer")
@@ -206,7 +205,7 @@ async def verify(
         "model_name": runtime.model_name,
         "configuration_hash": runtime.configuration_hash,
         "inference_configuration_hash": inference_hash,
-        "reasoning": runtime.reasoning_trace("answer"),
+        "reasoning": runtime.reasoning_trace(),
         "usage_id": usage.id,
     }
     try:

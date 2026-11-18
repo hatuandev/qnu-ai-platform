@@ -219,7 +219,7 @@ export type ReasoningPolicy = {
   parameter: string | null;
   low_value: ReasoningScalar;
   off_value: ReasoningScalar;
-  tasks: Partial<Record<ReasoningLevel, string[]>> | null;
+  level: ReasoningLevel | null;
   verified: boolean;
   note: string | null;
 };
@@ -245,5 +245,5 @@ export type ProviderReasoning = {
   provider_id: string;
   status: ReasoningStatus;
   policy: ReasoningPolicy | null;
-  effective: Record<string, ReasoningTrace>;
+  effective: ReasoningTrace;
 };

@@ -31,6 +31,8 @@ import {
   READINESS_MAP,
   readinessDetail,
   readinessHeroLabel,
+  UNBOUND_DETAIL,
+  UNBOUND_LABEL,
 } from "./readiness";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
@@ -118,7 +120,18 @@ export function AssistantOverview({
       (option) => option.value === assistant.rag_policy.verification_mode,
     )?.label ?? "Tắt";
 
+  const isUnbound = (assistant.collection_ids?.length ?? 0) === 0;
   const readinessBadge = readiness ? READINESS_MAP[readiness.status] : null;
+  const readinessCollections = readiness?.collections ?? [];
+  const collectionSummary = isUnbound
+    ? "Chưa gắn kho tri thức"
+    : readinessCollections.length > 1
+      ? `${readinessCollections.length} kho · ${readinessCollections
+          .map((item) => item.collection_name)
+          .join(", ")}`
+      : (readinessCollections[0]?.collection_name ??
+        readiness?.collection_name ??
+        "Kho tri thức liên kết");
   const conversations = (conversationsQuery.data ?? []).slice(0, 5);
   const latestReview = reviewsQuery.data?.[0] ?? null;
   const answeredCount =
@@ -138,18 +151,22 @@ export function AssistantOverview({
                   variant={readinessBadge.variant}
                   className="h-5 px-1.5 text-[11px] font-normal"
                 >
-                  {readinessHeroLabel(readiness?.status ?? "uncertain")}
+                  {isUnbound
+                    ? UNBOUND_LABEL
+                    : readinessHeroLabel(readiness?.status ?? "uncertain")}
                 </Badge>
               ) : null}
             </CardTitle>
             <CardDescription>
-              {readiness
-                ? readinessDetail(
-                    readiness.status,
-                    readiness.served_document_count,
-                    readiness.published_document_count,
-                  )
-                : "Chưa kiểm tra được trạng thái phục vụ."}
+              {isUnbound
+                ? UNBOUND_DETAIL
+                : readiness
+                  ? readinessDetail(
+                      readiness.status,
+                      readiness.served_document_count,
+                      readiness.published_document_count,
+                    )
+                  : "Chưa kiểm tra được trạng thái phục vụ."}
             </CardDescription>
           </div>
           <Button
@@ -190,6 +207,30 @@ export function AssistantOverview({
               value={formatDateTime(readiness?.checked_at)}
             />
           </div>
+          {readinessCollections.length > 1 ? (
+            <div className="space-y-1">
+              {readinessCollections.map((collection) => (
+                <div
+                  key={collection.collection_id}
+                  className="flex items-center justify-between gap-2 rounded-md bg-muted/30 px-2.5 py-1.5"
+                >
+                  <span className="truncate text-[11px] text-foreground">
+                    {collection.collection_name}
+                  </span>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                    {collection.served_document_count}/
+                    {collection.published_document_count} tài liệu
+                  </span>
+                  <Badge
+                    variant={READINESS_MAP[collection.status].variant}
+                    className="h-5 shrink-0 px-1.5 text-[10px] font-normal"
+                  >
+                    {READINESS_MAP[collection.status].label}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          ) : null}
           {readiness?.sync_error_code ? (
             <p className="rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-[11px] text-destructive">
               Đồng bộ chỉ mục báo lỗi: {readiness.sync_error_code}
@@ -205,10 +246,7 @@ export function AssistantOverview({
         </CardHeader>
         <CardContent className="space-y-1">
           <SummaryRow label="Mô hình" value={modelName} />
-          <SummaryRow
-            label="Kho tri thức"
-            value={readiness?.collection_name || "Kho tri thức liên kết"}
-          />
+          <SummaryRow label="Kho tri thức" value={collectionSummary} />
           <SummaryRow label="Truy xuất" value={retrievalLabel} />
           <SummaryRow
             label="Trích dẫn"

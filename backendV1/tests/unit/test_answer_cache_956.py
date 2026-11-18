@@ -36,8 +36,8 @@ class Runtime:
     def inference_configuration_hash(self, task):
         return "inference:" + self.configuration_hash
 
-    def reasoning_trace(self, task):
-        return {"mode": "provider_default", "task": task}
+    def reasoning_trace(self):
+        return {"mode": "provider_default", "applied": False}
 
 
 class Usage:

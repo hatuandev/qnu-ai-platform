@@ -19,7 +19,7 @@ from qnu.domains.modelops.diagnostics.router import get_diagnostic_client
 from qnu.domains.modelops.keys.service import key_service
 from qnu.domains.modelops.models import Provider
 from qnu.domains.modelops.providers.service import provider_service
-from qnu.domains.modelops.reasoning import EXTRA_CONFIG_KEY, REASONING_TASKS, ReasoningPolicy
+from qnu.domains.modelops.reasoning import EXTRA_CONFIG_KEY, ReasoningPolicy
 from qnu.domains.modelops.resilience.service import effective_policy, save_policy
 from qnu.domains.modelops.schemas import DefaultsUpdateRequest, KeyCreateRequest
 from qnu.platform.config import get_settings
@@ -36,7 +36,8 @@ QWEN_REASONING = ReasoningPolicy(
     mode="chat_template_kwarg",
     parameter="enable_thinking",
     off_value=False,
-    tasks={"off": list(REASONING_TASKS)},
+    low_value=True,
+    level="off",
     verified=True,
 )
 PROFILE = (

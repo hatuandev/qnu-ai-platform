@@ -17,11 +17,13 @@ export const NAME_MAX_CHARS = 160;
 export const DESCRIPTION_MAX_CHARS = 2000;
 export const PERSONA_MAX_CHARS = 4000;
 
+export const MAX_COLLECTIONS = 20;
+
 export type AssistantFormState = {
   name: string;
   description: string;
   persona: string;
-  collectionId: string;
+  collectionIds: string[];
   providerId: string;
   topK: string;
   historyTurns: string;
@@ -30,6 +32,12 @@ export type AssistantFormState = {
   policy: RagPolicyFormState;
 };
 
+/** The effective collection set; scalar ``collection_id`` mirrors its first entry. */
+export function collectionIdsOf(assistant: AssistantResponse): string[] {
+  if (assistant.collection_ids?.length) return assistant.collection_ids;
+  return assistant.collection_id ? [assistant.collection_id] : [];
+}
+
 export function initialState(
   assistant?: AssistantResponse | null,
 ): AssistantFormState {
@@ -37,7 +45,7 @@ export function initialState(
     name: assistant?.name ?? "",
     description: assistant?.description ?? "",
     persona: assistant?.persona ?? "",
-    collectionId: assistant?.collection_id ?? "",
+    collectionIds: assistant ? collectionIdsOf(assistant) : [],
     providerId: assistant?.chat_provider_id ?? AUTO_MODEL,
     topK: String(assistant?.top_k ?? 5),
     historyTurns: String(assistant?.history_turns ?? 3),
@@ -61,7 +69,9 @@ export function validateAssistantForm(form: AssistantFormState): string | null {
   if (form.persona.length > PERSONA_MAX_CHARS) {
     return `Chỉ dẫn vai trò tối đa ${PERSONA_MAX_CHARS} ký tự.`;
   }
-  if (!form.collectionId) return "Vui lòng chọn kho tri thức.";
+  if (form.collectionIds.length > MAX_COLLECTIONS) {
+    return `Trợ lý liên kết tối đa ${MAX_COLLECTIONS} kho tri thức.`;
+  }
   const topK = Number(form.topK);
   if (!Number.isInteger(topK) || topK < 1 || topK > 20) {
     return "Số đoạn trích dẫn phải là số nguyên từ 1 đến 20.";
@@ -91,7 +101,8 @@ export function buildAssistantPayload(
     name: form.name.trim(),
     description: form.description.trim(),
     persona: form.persona.trim(),
-    collection_id: form.collectionId,
+    collection_id: form.collectionIds[0] ?? null,
+    collection_ids: form.collectionIds,
     chat_provider_id: form.providerId === AUTO_MODEL ? null : form.providerId,
     top_k: Number(form.topK),
     history_turns: Number(form.historyTurns),

@@ -29,12 +29,12 @@ def request(**kwargs) -> ChatRequest:
 
 def test_server_default_sends_no_parameter_and_says_so():
     policy = ReasoningPolicy()
-    assert resolve_directive(policy, "compiler") is None
+    assert resolve_directive(policy) is None
     payload = build_payload(MESSAGES, request())
     assert "reasoning_effort" not in payload
     assert "enable_thinking" not in payload
     assert "chat_template_kwargs" not in payload
-    trace = trace_for(policy, "compiler")
+    trace = trace_for(policy)
     assert trace["applied"] is False
     assert trace["reason"] == "provider_keeps_server_default"
 
@@ -44,11 +44,11 @@ def test_unverified_capability_is_not_applied():
         mode="toggle",
         parameter="enable_thinking",
         off_value=False,
-        tasks={"off": ["compiler"]},
+        level="off",
         verified=False,
     )
-    assert resolve_directive(policy, "compiler") is None
-    assert trace_for(policy, "compiler")["reason"] == "capability_not_verified"
+    assert resolve_directive(policy) is None
+    assert trace_for(policy)["reason"] == "capability_not_verified"
     assert policy.status == "unverified"
 
 
@@ -57,10 +57,10 @@ def test_verified_toggle_adds_only_the_declared_body_parameter():
         mode="toggle",
         parameter="enable_thinking",
         off_value=False,
-        tasks={"off": ["compiler"]},
+        level="off",
         verified=True,
     )
-    directive = resolve_directive(policy, "compiler")
+    directive = resolve_directive(policy)
     assert directive is not None and directive.level == "off"
     payload = build_payload(MESSAGES, request(reasoning=directive))
     assert payload["enable_thinking"] is False
@@ -68,17 +68,16 @@ def test_verified_toggle_adds_only_the_declared_body_parameter():
     assert payload["max_tokens"] == 8192
 
 
-def test_chat_template_kwarg_location_is_explicit_and_task_scoped():
+def test_chat_template_kwarg_location_is_explicit_and_model_wide():
     policy = ReasoningPolicy(
         mode="chat_template_kwarg",
         parameter="thinking",
         low_value=True,
-        tasks={"low": ["compiler_review"]},
+        level="low",
         verified=True,
     )
-    assert resolve_directive(policy, "compiler") is None
-    directive = resolve_directive(policy, "compiler_review")
-    assert directive is not None
+    directive = resolve_directive(policy)
+    assert directive is not None and directive.level == "low"
     payload = build_payload(MESSAGES, request(reasoning=directive))
     assert payload["chat_template_kwargs"] == {"thinking": True}
     assert "thinking" not in payload
@@ -89,10 +88,10 @@ def test_effort_value_is_sent_under_the_declared_name():
         mode="effort",
         parameter="reasoning_effort",
         low_value="low",
-        tasks={"low": ["compiler"]},
+        level="low",
         verified=True,
     )
-    directive = resolve_directive(policy, "compiler")
+    directive = resolve_directive(policy)
     payload = build_payload(MESSAGES, request(reasoning=directive))
     assert payload["reasoning_effort"] == "low"
 
@@ -100,32 +99,22 @@ def test_effort_value_is_sent_under_the_declared_name():
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"mode": "toggle", "off_value": False, "tasks": {"off": ["compiler"]}},
+        {"mode": "toggle", "off_value": False, "level": "off"},
         {"mode": "server_default", "parameter": "enable_thinking"},
+        {"mode": "toggle", "parameter": "enable_thinking", "level": "off"},
+        {"mode": "toggle", "parameter": "enable_thinking", "level": "low"},
         {
             "mode": "toggle",
             "parameter": "enable_thinking",
             "off_value": False,
-            "tasks": {"off": ["chat"]},
-            "verified": True,
+            "level": "low",
         },
-        {"mode": "toggle", "parameter": "enable_thinking", "tasks": {"off": ["compiler"]}},
-        {"mode": "effort", "parameter": "bad.name", "low_value": "low", "verified": True},
-        # A task may only be declared at one level; a level must name a task.
+        {"mode": "effort", "parameter": "bad.name", "low_value": "low"},
         {
             "mode": "toggle",
             "parameter": "enable_thinking",
             "off_value": False,
-            "low_value": True,
-            "tasks": {"off": ["compiler"], "low": ["compiler"]},
-            "verified": True,
-        },
-        {
-            "mode": "toggle",
-            "parameter": "enable_thinking",
-            "off_value": False,
-            "tasks": {"off": []},
-            "verified": True,
+            "tasks": {"off": ["compiler"]},
         },
     ],
 )
@@ -134,34 +123,66 @@ def test_invalid_policy_is_rejected(kwargs):
         ReasoningPolicy(**kwargs)
 
 
-def test_tasks_map_level_to_task_not_task_to_level():
-    """The dict is keyed by level; the compiler task alone gets the off value."""
+def test_declared_without_a_level_keeps_the_server_default():
     policy = ReasoningPolicy(
         mode="toggle",
         parameter="enable_thinking",
         off_value=False,
-        tasks={"off": ["compiler"]},
+        level=None,
         verified=True,
     )
-    assert policy.level_for("compiler") == "off"
-    assert policy.level_for("compiler_review") is None
-    assert resolve_directive(policy, "compiler_review") is None
-    assert trace_for(policy, "compiler_review")["reason"] == "task_not_configured"
+    assert resolve_directive(policy) is None
+    assert trace_for(policy)["reason"] == "level_not_set"
 
 
-def test_answer_task_supports_reasoning_policy():
-    policy = ReasoningPolicy(
-        mode="chat_template_kwarg",
-        parameter="enable_thinking",
-        off_value=False,
-        tasks={"off": ["answer"]},
-        verified=True,
+def test_legacy_task_map_with_one_level_keeps_that_level():
+    policy = parse_policy(
+        {
+            "mode": "chat_template_kwarg",
+            "parameter": "enable_thinking",
+            "off_value": False,
+            "tasks": {"off": ["compiler", "compiler_review", "answer", "ocr_review"]},
+            "verified": True,
+        }
     )
-    directive = resolve_directive(policy, "answer")
+    assert policy is not None and policy.level == "off"
+    directive = resolve_directive(policy)
     assert directive is not None
-    assert directive.level == "off"
-    payload = build_payload(MESSAGES, request(reasoning=directive))
-    assert payload["chat_template_kwargs"] == {"enable_thinking": False}
+    assert build_payload(MESSAGES, request(reasoning=directive))[
+        "chat_template_kwargs"
+    ] == {"enable_thinking": False}
+    assert "tasks" not in policy.model_dump()
+
+
+def test_legacy_task_map_with_mixed_levels_reads_as_off():
+    policy = parse_policy(
+        {
+            "mode": "toggle",
+            "parameter": "enable_thinking",
+            "off_value": False,
+            "low_value": True,
+            "tasks": {"off": ["compiler"], "low": ["compiler_review"]},
+            "verified": True,
+        }
+    )
+    assert policy is not None and policy.level == "off"
+    directive = resolve_directive(policy)
+    assert directive is not None and directive.value is False
+
+
+def test_legacy_task_map_without_entries_keeps_the_server_default():
+    policy = parse_policy(
+        {
+            "mode": "toggle",
+            "parameter": "enable_thinking",
+            "off_value": False,
+            "tasks": {"off": [], "low": []},
+            "verified": True,
+        }
+    )
+    assert policy is not None and policy.level is None
+    assert resolve_directive(policy) is None
+    assert trace_for(policy)["reason"] == "level_not_set"
 
 
 def test_directive_round_trip_and_corrupt_record():
@@ -169,10 +190,10 @@ def test_directive_round_trip_and_corrupt_record():
         mode="toggle",
         parameter="enable_thinking",
         off_value=False,
-        tasks={"off": ["compiler"]},
+        level="off",
         verified=True,
     )
-    directive = resolve_directive(policy, "compiler")
+    directive = resolve_directive(policy)
     restored = ReasoningDirective.from_public_dict(directive.public_dict())
     assert restored == directive
     assert ReasoningDirective.from_public_dict(None) is None
@@ -185,20 +206,20 @@ def test_invalid_stored_json_is_never_applied():
     assert parse_policy({"mode": "toggle"}) is None
     assert parse_policy("not-a-dict") is None
     assert parse_policy(None) is None
+    assert parse_policy({"mode": "toggle", "parameter": "x", "level": "high"}) is None
 
 
-def test_ocr_spelling_policy_is_explicit_verified_and_task_scoped():
+def test_one_level_serves_every_task_this_model_handles():
     policy = ReasoningPolicy(
         mode="chat_template_kwarg",
         parameter="enable_thinking",
         off_value=False,
-        tasks={"off": ["ocr_review"]},
+        level="off",
         verified=True,
     )
-    directive = resolve_directive(policy, "ocr_review")
+    directive = resolve_directive(policy)
     assert directive is not None and directive.level == "off"
     assert build_payload(MESSAGES, request(reasoning=directive))["chat_template_kwargs"] == {
         "enable_thinking": False,
     }
-    assert resolve_directive(policy, "answer") is None
-    assert resolve_directive(policy.model_copy(update={"verified": False}), "ocr_review") is None
+    assert resolve_directive(policy.model_copy(update={"verified": False})) is None

@@ -1,10 +1,11 @@
 """Declared reasoning control for one provider/model; never inferred from a name.
 
 A provider only receives a reasoning parameter when an administrator declared the
-exact parameter, the value for each level and marked the capability verified by a
-probe. Anything else keeps the server default and says so in the trace. This module
-never guesses ``enable_thinking``/``reasoning_effort``/``chat_template_kwargs`` for
-an endpoint, and it never changes a running request silently.
+exact parameter, the value for the selected level and marked the capability
+verified by a probe. The level applies to every task the model serves; anything
+else keeps the server default and says so in the trace. This module never guesses
+``enable_thinking``/``reasoning_effort``/``chat_template_kwargs`` for an endpoint,
+and it never changes a running request silently.
 """
 
 from __future__ import annotations
@@ -21,8 +22,6 @@ from qnu.platform.errors import AppException
 EXTRA_CONFIG_KEY = "reasoning_policy_v1"
 ReasoningMode = Literal["server_default", "effort", "toggle", "chat_template_kwarg"]
 ReasoningLevel = Literal["off", "low"]
-# Tasks whose prompt is owned by QNU and where reasoning can be tuned safely.
-REASONING_TASKS = ("compiler", "compiler_review", "answer", "ocr_review")
 REASONING_LEVELS = ("off", "low")
 PARAMETER_PATTERN = r"^[a-z][a-z0-9_]{0,63}$"
 
@@ -44,7 +43,7 @@ class ReasoningPolicy(BaseModel):
     parameter: str | None = Field(None, min_length=1, max_length=64)
     low_value: bool | int | float | str | None = None
     off_value: bool | int | float | str | None = None
-    tasks: dict[ReasoningLevel, list[str]] | None = None
+    level: ReasoningLevel | None = None
     verified: bool = False
     note: str | None = Field(None, max_length=300)
 
@@ -62,36 +61,19 @@ class ReasoningPolicy(BaseModel):
     @model_validator(mode="after")
     def coherent(self):
         if self.mode == "server_default":
-            if self.parameter is not None or self.low_value is not None or self.off_value is not None:
+            if any(
+                item is not None
+                for item in (self.parameter, self.low_value, self.off_value, self.level)
+            ):
                 raise ValueError("Chế độ server_default không gửi tham số nào.")
             return self
         if self.parameter is None:
             raise ValueError("Cần khai báo đúng tên tham số do provider hỗ trợ.")
-        levels = self.tasks or {}
-        # ``tasks`` maps a level to the tasks using it; a task may not appear twice.
-        seen: dict[str, str] = {}
-        for level, tasks in levels.items():
-            if level not in REASONING_LEVELS:
-                raise ValueError("Mức reasoning chỉ nhận 'off' hoặc 'low'.")
-            if not tasks:
-                raise ValueError("Mỗi mức reasoning phải nêu ít nhất một tác vụ.")
-            if len(tasks) != len(set(tasks)) or set(tasks) - set(REASONING_TASKS):
-                raise ValueError("Danh sách tác vụ reasoning không hợp lệ hoặc bị trùng.")
-            for task in tasks:
-                if task in seen:
-                    raise ValueError("Một tác vụ chỉ được khai báo ở một mức reasoning.")
-                seen[task] = level
-            if level == "off" and self.off_value is None:
-                raise ValueError("Thiếu giá trị 'off' cho tham số đã khai báo.")
-            if level == "low" and self.low_value is None:
-                raise ValueError("Thiếu giá trị 'low' cho tham số đã khai báo.")
+        if self.level == "off" and self.off_value is None:
+            raise ValueError("Thiếu giá trị 'off' cho tham số đã khai báo.")
+        if self.level == "low" and self.low_value is None:
+            raise ValueError("Thiếu giá trị 'low' cho tham số đã khai báo.")
         return self
-
-    def level_for(self, task: str) -> ReasoningLevel | None:
-        for level, tasks in (self.tasks or {}).items():
-            if task in tasks:
-                return level
-        return None
 
     def value_for(self, level: ReasoningLevel) -> Any:
         return self.off_value if level == "off" else self.low_value
@@ -101,7 +83,7 @@ class ReasoningPolicy(BaseModel):
         return {
             "mode": self.mode,
             "parameter": self.parameter,
-            "tasks": self.tasks or {},
+            "level": self.level,
             "verified": self.verified,
             "status": self.status,
         }
@@ -115,7 +97,7 @@ class ReasoningPolicy(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class ReasoningDirective:
-    """One concrete parameter to add to a request body for a single task."""
+    """One concrete parameter to add to a request body."""
 
     mode: str
     parameter: str
@@ -170,12 +152,30 @@ def policy_digest(policy: ReasoningPolicy) -> str:
         "parameter": policy.parameter,
         "low_value": policy.low_value,
         "off_value": policy.off_value,
-        "tasks": policy.tasks or {},
+        "level": policy.level,
         "verified": policy.verified,
     }
     return hashlib.sha256(
         json.dumps(material, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
+
+
+def _normalize_stored(value: dict[str, Any]) -> dict[str, Any]:
+    """Old records mapped a level to a list of tasks; the model now has one level."""
+    if "tasks" not in value:
+        return value
+    data = {key: item for key, item in value.items() if key != "tasks"}
+    legacy = value.get("tasks")
+    if data.get("level") is None and isinstance(legacy, dict):
+        levels = [
+            level
+            for level, tasks in legacy.items()
+            if level in REASONING_LEVELS and isinstance(tasks, list) and tasks
+        ]
+        # A uniform declaration keeps its level; a mixed one is read as "off",
+        # the conservative interpretation, and is rewritten on the next save.
+        data["level"] = levels[0] if len(levels) == 1 else ("off" if levels else None)
+    return data
 
 
 def parse_policy(value: Any) -> ReasoningPolicy | None:
@@ -185,35 +185,32 @@ def parse_policy(value: Any) -> ReasoningPolicy | None:
     if not isinstance(value, dict):
         return None
     try:
-        return ReasoningPolicy.model_validate(value)
+        return ReasoningPolicy.model_validate(_normalize_stored(value))
     except Exception:  # Invalid stored JSON must not break every request
         return None
 
 
-def resolve_directive(
-    policy: ReasoningPolicy | None, task: str
-) -> ReasoningDirective | None:
+def resolve_directive(policy: ReasoningPolicy | None) -> ReasoningDirective | None:
     """Return the parameter to send, or ``None`` to keep the server default."""
     if policy is None or policy.mode == "server_default" or not policy.verified:
         return None
-    level = policy.level_for(task)
-    if level is None:
+    if policy.level is None:
         return None
-    value = policy.value_for(level)
+    value = policy.value_for(policy.level)
     if value is None or policy.parameter is None:
         return None
     return ReasoningDirective(
         mode=policy.mode,
         parameter=policy.parameter,
         value=value,
-        level=level,
+        level=policy.level,
         policy_sha256=policy_digest(policy),
     )
 
 
-def trace_for(policy: ReasoningPolicy | None, task: str) -> dict[str, Any]:
+def trace_for(policy: ReasoningPolicy | None) -> dict[str, Any]:
     """Always explain the effective decision, including 'server default'."""
-    directive = resolve_directive(policy, task)
+    directive = resolve_directive(policy)
     if directive is not None:
         return {**directive.public_dict(), "applied": True}
     return {
@@ -226,6 +223,6 @@ def trace_for(policy: ReasoningPolicy | None, task: str) -> dict[str, Any]:
             if policy is None or policy.mode == "server_default"
             else "capability_not_verified"
             if not policy.verified
-            else "task_not_configured"
+            else "level_not_set"
         ),
     }

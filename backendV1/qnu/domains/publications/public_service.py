@@ -436,6 +436,15 @@ async def turn(
         assistant: Assistant = await get_assistant(db, actor, row.workspace_id, row.assistant_id)
         if not assistant.is_active:
             raise Conflict(UNAVAILABLE_TEXT, code="public_chatbot_unavailable")
+        collection_ids = list(
+            dict.fromkeys(
+                item
+                for item in [assistant.collection_id, *(assistant.collection_ids or [])]
+                if item
+            )
+        )
+        if not collection_ids:
+            raise Conflict(UNAVAILABLE_TEXT, code="public_chatbot_unavailable")
         policy = AssistantRagPolicy.model_validate(assistant.rag_policy or {}).model_dump(
             mode="json", exclude={"guardrail_policy"}
         )
@@ -449,7 +458,7 @@ async def turn(
                 chat,
                 actor,
                 row.workspace_id,
-                assistant.collection_id,
+                collection_ids[0],
                 AnswerRequest(
                     question=req.question,
                     top_k=assistant.top_k,
@@ -460,6 +469,7 @@ async def turn(
                 persona=assistant.persona,
                 reranker=reranker,
                 compose_insufficient_message=True,
+                collection_ids=collection_ids,
             )
     except (Exception, asyncio.CancelledError):
         try:

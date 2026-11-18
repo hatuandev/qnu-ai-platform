@@ -1,12 +1,14 @@
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ApiProblemError } from "@/api/client";
 import {
   useCommitLifecycleActionMutation,
   useCreateLifecyclePreviewMutation,
 } from "@/api/lifecycle/queries";
 import type { LifecycleActionReceipt } from "@/api/lifecycle/types";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +19,11 @@ import {
 } from "@/components/ui/dialog";
 
 type PurgeKind = "source" | "collection";
+
+const HISTORY_CONFLICT_CODES = new Set([
+  "collection_in_use_by_conversations",
+  "collection_in_use_by_answer_reviews",
+]);
 
 const PURGE_COPY: Record<
   PurgeKind,
@@ -75,6 +82,18 @@ function describeCollectionImpact(
   return `Sẽ xóa vĩnh viễn ${parts.join(", ")} cùng toàn bộ chỉ mục tìm kiếm.`;
 }
 
+function describeHistoryImpact(
+  impact: Record<string, unknown> | undefined,
+): string {
+  const parts: string[] = [];
+  const conversationCount = readImpactCount(impact, "conversations_to_delete");
+  const reviewCount = readImpactCount(impact, "answer_reviews_to_delete");
+  if (conversationCount > 0) parts.push(`${conversationCount} hội thoại`);
+  if (reviewCount > 0) parts.push(`${reviewCount} bài kiểm thử câu trả lời`);
+  if (parts.length === 0) return "Kho không còn hội thoại hay bài kiểm thử cũ.";
+  return `Kèm theo ${parts.join(" và ")} cũng sẽ bị xóa vĩnh viễn.`;
+}
+
 export function LifecycleDeleteDialog({
   open,
   onOpenChange,
@@ -100,6 +119,8 @@ export function LifecycleDeleteDialog({
   const [preview, setPreview] = useState<LifecycleActionReceipt | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [includeHistory, setIncludeHistory] = useState(false);
+  const [historyRequired, setHistoryRequired] = useState(false);
 
   useEffect(() => {
     let isCancelled = false;
@@ -112,29 +133,57 @@ export function LifecycleDeleteDialog({
         kind,
         resource_id: resourceId,
         action: "delete",
-        reason: copy.reason(resourceTitle),
+        reason: includeHistory
+          ? `${copy.reason(resourceTitle)} Bao gồm lịch sử hội thoại và bài kiểm thử cũ.`
+          : copy.reason(resourceTitle),
+        ...(includeHistory ? { include_history: true } : {}),
       })
         .then((res) => {
           if (!isCancelled) {
             setPreview(res);
+            setHistoryRequired(false);
             setIsLoadingPreview(false);
           }
         })
         .catch((err: unknown) => {
-          if (!isCancelled) {
-            const msg =
-              err instanceof Error
+          if (isCancelled) return;
+          const blockedByHistory =
+            kind === "collection" &&
+            err instanceof ApiProblemError &&
+            HISTORY_CONFLICT_CODES.has(err.code);
+          setHistoryRequired(blockedByHistory);
+          setError(
+            blockedByHistory
+              ? null
+              : err instanceof Error
                 ? err.message
-                : "Không thể tạo bản xem trước xóa";
-            setError(msg);
-            setIsLoadingPreview(false);
-          }
+                : "Không thể tạo bản xem trước xóa",
+          );
+          setIsLoadingPreview(false);
         });
     }
     return () => {
       isCancelled = true;
     };
-  }, [open, kind, resourceId, resourceTitle, copy, mutatePreview]);
+  }, [
+    open,
+    kind,
+    resourceId,
+    resourceTitle,
+    includeHistory,
+    copy,
+    mutatePreview,
+  ]);
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) {
+      setIncludeHistory(false);
+      setHistoryRequired(false);
+      setPreview(null);
+      setError(null);
+    }
+    onOpenChange(next);
+  };
 
   const handleConfirmDelete = async () => {
     if (!preview || !canConfirmDelete) return;
@@ -150,7 +199,7 @@ export function LifecycleDeleteDialog({
       });
 
       toast.success(copy.success(resourceTitle));
-      onOpenChange(false);
+      handleOpenChange(false);
       onSuccess?.();
     } catch (err: unknown) {
       const msg =
@@ -170,7 +219,10 @@ export function LifecycleDeleteDialog({
     !error;
 
   return (
-    <Dialog open={open} onOpenChange={isDeleting ? undefined : onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={isDeleting ? undefined : handleOpenChange}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="gap-1.5 text-left">
           <DialogTitle className="text-base font-semibold text-foreground">
@@ -190,6 +242,32 @@ export function LifecycleDeleteDialog({
             <Loader2 className="size-4 animate-spin text-primary" />
             <span>Đang kiểm tra tác động dữ liệu...</span>
           </div>
+        ) : historyRequired ? (
+          <div className="p-3 rounded-lg bg-warning/10 border border-warning/30 text-xs space-y-2">
+            <div className="font-semibold text-foreground flex items-center gap-1.5">
+              <AlertTriangle className="size-4 shrink-0 text-warning" />
+              <span>Kho còn lịch sử hội thoại cũ</span>
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              Hội thoại và bài kiểm thử câu trả lời cũ vẫn trỏ vào kho này. Để
+              xóa kho, bạn cần xóa kèm các lịch sử đó. Trợ lý được giữ nguyên.
+            </p>
+            <label
+              htmlFor="delete-collection-include-history"
+              className="flex cursor-pointer select-none items-start gap-2 pt-0.5"
+            >
+              <Checkbox
+                id="delete-collection-include-history"
+                checked={includeHistory}
+                disabled={isLoadingPreview}
+                onCheckedChange={(value) => setIncludeHistory(value === true)}
+                className="mt-0.5"
+              />
+              <span className="font-medium text-foreground leading-snug">
+                Xóa cả lịch sử hội thoại cũ
+              </span>
+            </label>
+          </div>
         ) : error ? (
           <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive space-y-1">
             <div className="font-semibold flex items-center gap-1.5">
@@ -205,6 +283,11 @@ export function LifecycleDeleteDialog({
                 {describeCollectionImpact(preview.impact)}
               </p>
             ) : null}
+            {kind === "collection" && preview?.impact?.history_included ? (
+              <p className="font-medium text-foreground">
+                {describeHistoryImpact(preview.impact)}
+              </p>
+            ) : null}
             <p>{copy.note}</p>
           </div>
         )}
@@ -214,7 +297,7 @@ export function LifecycleDeleteDialog({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
             disabled={isDeleting}
             className="h-8 text-xs"
           >

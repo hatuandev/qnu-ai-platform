@@ -16,6 +16,7 @@ import {
   useRegistrationMetadataQuery,
   useReviewGateQuery,
 } from "@/api/documents/queries";
+import { getReviewGate } from "@/api/documents/requests";
 import type {
   AutomaticMetadataPreview,
   DecisionFindingResolution,
@@ -26,6 +27,7 @@ import type {
   RetrievalAnnotation,
   ReviewAck,
   ReviewFinding,
+  ReviewGateResponse,
   VersionResponse,
 } from "@/api/documents/types";
 import { getRevisionContentBlob } from "@/api/knowledge/requests";
@@ -46,6 +48,8 @@ type PendingDecision = {
   preview: DecisionPreviewResponse;
   key: string;
 };
+
+type Phase = "idle" | "registering" | "approving" | "publishing";
 
 type SourceLocation = NonNullable<
   ReviewFinding["finding"]["source_locations"]
@@ -270,13 +274,13 @@ function RegistrationMetadataPanel({
       )}
       <p className="text-xs text-muted-foreground">
         Thông tin này được lưu cùng phiên bản và chỉ dùng làm phạm vi tra cứu;
-        hãy đối chiếu nhanh trước khi đăng ký.
+        hãy đối chiếu nhanh trước khi duyệt.
       </p>
     </div>
   );
 }
 
-/** The dialog is keyed by compilation run. Closing it never resets a committed step. */
+/** One confirmation publishes and indexes; the review gate stays explicit. */
 export function PublicationDialog({
   open,
   onOpenChange,
@@ -312,11 +316,10 @@ export function PublicationDialog({
     status: "approved" | "published";
     at: number;
   } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<Phase>("idle");
   const lock = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
-  const [skipReview, setSkipReview] = useState(false);
   const [reason, setReason] = useState("");
   const [resolutions, setResolutions] = useState<
     Record<
@@ -326,7 +329,12 @@ export function PublicationDialog({
       }
     >
   >({});
-  const pending = useRef<PendingDecision | null>(null);
+  const pending = useRef<Record<"approve" | "publish", PendingDecision | null>>(
+    {
+      approve: null,
+      publish: null,
+    },
+  );
   const registration = useRef({
     document_key: `doc_${compilationRunId}`,
     title: sourceTitle,
@@ -362,6 +370,7 @@ export function PublicationDialog({
     open ? compilationRunId : null,
     open && !versionId,
   );
+  const busy = phase !== "idle";
   const version = versionQuery.data ?? registeredVersion;
   const summary = summaryQuery.data;
   const exact =
@@ -390,35 +399,32 @@ export function PublicationDialog({
         Boolean(resolutions[item.finding_id]?.decision) &&
         resolutions[item.finding_id]?.reason.trim().length >= 10,
     ) ?? false;
-  const canApprove =
-    exact &&
-    status === "draft" &&
-    capabilities?.can_approve === true &&
-    confirmed &&
-    (skipReview
-      ? reason.trim().length >= 10
-      : Boolean(
-          gate && gate.bundle_sha256 === version?.bundle_sha256 && resolved,
-        ));
-  const canPublish =
-    exact && status === "approved" && capabilities?.can_publish === true;
+  const reasonReady = reason.trim().length >= 10;
+  const reviewGateReady = gate
+    ? gate.bundle_sha256 === version?.bundle_sha256 && resolved
+    : noReview && reasonReady;
+  const canRegisterNow =
+    canRegister === true || capabilities?.can_register === true;
+  const canApprove = capabilities?.can_approve !== false;
+  const canPublish = capabilities?.can_publish !== false;
 
-  async function register() {
-    if (
-      lock.current ||
-      !(canRegister === true || capabilities?.can_register === true)
-    )
-      return;
+  async function ensureVersion(): Promise<{
+    documentId: string;
+    versionId: string;
+    version: VersionResponse;
+  } | null> {
+    if (documentId && versionId && version) {
+      return { documentId, versionId, version };
+    }
+    if (!canRegisterNow) return null;
     const metadataSha = metadataQuery.data?.sha256;
     if (!metadataSha) {
       setError(
-        "Chưa tải được thông tin tự nhận diện của nguồn. Hãy thử tải lại trước khi đăng ký.",
+        "Chưa tải được thông tin tự nhận diện của nguồn. Hãy thử tải lại trước khi duyệt.",
       );
-      return;
+      return null;
     }
-    lock.current = true;
-    setBusy(true);
-    setError(null);
+    setPhase("registering");
     try {
       const result = documentId
         ? await registerVersion.mutateAsync({
@@ -439,6 +445,12 @@ export function PublicationDialog({
       setDocumentId(result.document.id);
       setVersionId(result.version.id);
       setRegisteredVersion(result.version);
+      void summaryQuery.refetch();
+      return {
+        documentId: result.document.id,
+        versionId: result.version.id,
+        version: result.version,
+      };
     } catch (err) {
       if (
         (err as { code?: string } | null)?.code ===
@@ -446,111 +458,177 @@ export function PublicationDialog({
       ) {
         void metadataQuery.refetch();
         setError(
-          "Thông tin tự nhận diện vừa thay đổi. Bản xem trước đã được tải lại; hãy đối chiếu rồi bấm Tiếp tục.",
+          "Thông tin tự nhận diện vừa thay đổi. Bản xem trước đã được tải lại; hãy đối chiếu rồi bấm lại.",
         );
-      } else {
-        setError(
-          err instanceof Error ? err.message : "Không thể đăng ký tài liệu.",
-        );
+        return null;
       }
-    } finally {
-      lock.current = false;
-      setBusy(false);
+      throw err;
     }
   }
 
-  async function decide(action: "approve" | "publish") {
-    if (!documentId || !versionId || !version || lock.current) return;
-    if (!pending.current && !(action === "approve" ? canApprove : canPublish))
-      return;
+  async function reviewAcknowledgement(
+    docId: string,
+    verId: string,
+    target: VersionResponse,
+  ): Promise<{ skip?: true; ack?: ReviewAck } | "unresolved" | null> {
+    let freshGate: ReviewGateResponse | null = null;
+    try {
+      freshGate = await getReviewGate(workspaceId, collectionId, docId, verId);
+    } catch (err) {
+      const code = (err as { code?: string } | null)?.code;
+      if (code !== "publication_review_required") throw err;
+    }
+    if (!freshGate) {
+      if (!reasonReady) {
+        setError(
+          "Rà soát AI chưa có báo cáo cho phiên bản này. Ghi lý do duyệt (ít nhất 10 ký tự) rồi bấm lại.",
+        );
+        void gateQuery.refetch();
+        return null;
+      }
+      return { skip: true };
+    }
+    const unresolved = freshGate.findings.some((item) => {
+      const resolution = resolutions[item.finding_id];
+      return !resolution?.decision || resolution.reason.trim().length < 10;
+    });
+    if (unresolved) {
+      setError(
+        "Có nhận xét rà soát cần xử lý trước khi duyệt. Hãy chọn cách xử lý và giải trình cho từng nhận xét.",
+      );
+      void gateQuery.refetch();
+      return "unresolved";
+    }
+    const ack: ReviewAck = {
+      review_id: freshGate.review_id,
+      report_sha256: freshGate.report_sha256,
+      confirmed_reviewed: true,
+      retrieval_metadata_sha256: target.retrieval_metadata_sha256,
+      resolutions: freshGate.findings.map((item) => {
+        const resolution = resolutions[item.finding_id];
+        return {
+          finding_id: item.finding_id,
+          reason: resolution?.reason ?? "",
+          decision:
+            resolution?.decision ??
+            ("accepted_risk" as DecisionFindingResolution["decision"]),
+        };
+      }),
+    };
+    return { ack };
+  }
+
+  async function runPublish(docId: string, verId: string) {
+    setPhase("publishing");
+    const receipt = pending.current.publish;
+    let toCommit = receipt;
+    if (!toCommit || toCommit.preview.version_id !== verId) {
+      const result = await preview.mutateAsync({
+        documentId: docId,
+        versionId: verId,
+        data: {
+          action: "publish",
+          reason: "Phát hành bản đã duyệt để phục vụ tra cứu.",
+        },
+      });
+      toCommit = {
+        action: "publish",
+        preview: result,
+        key: `decision_${result.id}`,
+      };
+      pending.current.publish = toCommit;
+    }
+    await commit.mutateAsync({
+      documentId: docId,
+      versionId: verId,
+      data: {
+        preview_id: toCommit.preview.id,
+        preview_sha256: toCommit.preview.preview_sha256,
+      },
+      idempotencyKey: toCommit.key,
+    });
+    pending.current.publish = null;
+    setCommittedStatus({ status: "published", at: Date.now() });
+    void versionQuery.refetch();
+    void summaryQuery.refetch();
+  }
+
+  async function approveAndPublish() {
+    if (lock.current || !confirmed) return;
     lock.current = true;
-    setBusy(true);
     setError(null);
     try {
-      // After a lost commit response, a user retry replays exactly the same receipt.
-      // Never generate a different preview under the old idempotency key.
-      if (!pending.current) {
-        let reviewAck: ReviewAck | undefined;
-        if (action === "approve" && !skipReview) {
-          if (!gate) throw new Error("Chưa tải được báo cáo rà soát.");
-          reviewAck = {
-            review_id: gate.review_id,
-            report_sha256: gate.report_sha256,
-            confirmed_reviewed: true,
-            retrieval_metadata_sha256: version.retrieval_metadata_sha256,
-            resolutions: gate.findings.map((item) => {
-              const resolution = resolutions[item.finding_id];
-              if (!resolution?.decision || resolution.reason.trim().length < 10)
-                throw new Error(
-                  "Cần giải trình từng nhận xét trước khi duyệt.",
-                );
-              return { ...resolution, decision: resolution.decision };
-            }),
-          };
-        }
+      const target = await ensureVersion();
+      if (!target) return;
+      if (target.version.status !== "draft") {
+        void versionQuery.refetch();
+        return;
+      }
+      const approval = await reviewAcknowledgement(
+        target.documentId,
+        target.versionId,
+        target.version,
+      );
+      if (!approval || approval === "unresolved") return;
+
+      setPhase("approving");
+      const receipt = pending.current.approve;
+      let toCommit = receipt;
+      if (!toCommit || toCommit.preview.version_id !== target.versionId) {
         const result = await preview.mutateAsync({
-          documentId,
-          versionId,
+          documentId: target.documentId,
+          versionId: target.versionId,
           data: {
-            action,
-            reason:
-              action === "publish"
-                ? "Phát hành bản đã duyệt để phục vụ tra cứu."
-                : skipReview
-                  ? reason.trim()
-                  : "Đã đối chiếu nội dung và báo cáo rà soát của phiên bản này.",
-            ...(action === "approve"
-              ? skipReview
-                ? {
-                    review_skip: {
-                      confirmed_skip: true,
-                      version_id: versionId,
-                      bundle_sha256: version.bundle_sha256,
-                      retrieval_metadata_sha256:
-                        version.retrieval_metadata_sha256,
-                    },
-                  }
-                : {
-                    review_ack: reviewAck,
-                  }
-              : {}),
+            action: "approve",
+            reason: approval.skip
+              ? reason.trim()
+              : "Đã đối chiếu nội dung và báo cáo rà soát của phiên bản này.",
+            ...(approval.skip
+              ? {
+                  review_skip: {
+                    confirmed_skip: true,
+                    version_id: target.versionId,
+                    bundle_sha256: target.version.bundle_sha256,
+                    retrieval_metadata_sha256:
+                      target.version.retrieval_metadata_sha256,
+                  },
+                }
+              : { review_ack: approval.ack }),
           },
         });
-        pending.current = {
-          action,
+        toCommit = {
+          action: "approve",
           preview: result,
           key: `decision_${result.id}`,
         };
+        pending.current.approve = toCommit;
       }
-      const receipt = pending.current;
       await commit.mutateAsync({
-        documentId,
-        versionId,
+        documentId: target.documentId,
+        versionId: target.versionId,
         data: {
-          preview_id: receipt.preview.id,
-          preview_sha256: receipt.preview.preview_sha256,
+          preview_id: toCommit.preview.id,
+          preview_sha256: toCommit.preview.preview_sha256,
         },
-        idempotencyKey: receipt.key,
+        idempotencyKey: toCommit.key,
       });
-      setCommittedStatus({
-        status: receipt.action === "approve" ? "approved" : "published",
-        at: Date.now(),
-      });
-      pending.current = null;
-      setConfirmed(false);
+      pending.current.approve = null;
+      setCommittedStatus({ status: "approved", at: Date.now() });
       void versionQuery.refetch();
-      void summaryQuery.refetch();
+
+      await runPublish(target.documentId, target.versionId);
     } catch (err) {
       const code = (err as { code?: string } | null)?.code;
       if (
         code === "publication_preview_expired" ||
         code === "publication_preview_stale"
       ) {
-        pending.current = null;
+        pending.current.approve = null;
+        pending.current.publish = null;
         setConfirmed(false);
-        void versionQuery.refetch();
-        void summaryQuery.refetch();
       }
+      void versionQuery.refetch();
+      void summaryQuery.refetch();
       setError(
         err instanceof Error
           ? err.message
@@ -558,11 +636,46 @@ export function PublicationDialog({
       );
     } finally {
       lock.current = false;
-      setBusy(false);
+      setPhase("idle");
     }
   }
 
-  const frozen = busy || Boolean(pending.current);
+  async function publishApproved() {
+    if (lock.current || !documentId || !versionId) return;
+    lock.current = true;
+    setError(null);
+    try {
+      await runPublish(documentId, versionId);
+    } catch (err) {
+      const code = (err as { code?: string } | null)?.code;
+      if (
+        code === "publication_preview_expired" ||
+        code === "publication_preview_stale"
+      ) {
+        pending.current.publish = null;
+      }
+      void versionQuery.refetch();
+      void summaryQuery.refetch();
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Chưa xác định được kết quả. Hãy kiểm tra lại cùng thao tác.",
+      );
+    } finally {
+      lock.current = false;
+      setPhase("idle");
+    }
+  }
+
+  const actionLabel =
+    phase === "registering"
+      ? "Đang lưu…"
+      : phase === "approving"
+        ? "Đang duyệt…"
+        : phase === "publishing"
+          ? "Đang phát hành…"
+          : "Duyệt & phát hành";
+  const frozen = busy;
   return (
     <Dialog open={open} onOpenChange={busy ? undefined : onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[85dvh] overflow-y-auto">
@@ -572,7 +685,8 @@ export function PublicationDialog({
             Duyệt & Phát hành
           </DialogTitle>
           <DialogDescription>
-            {sourceTitle.replace(/_/g, " ")}
+            {sourceTitle.replace(/_/g, " ")} · một lần xác nhận: lưu phiên bản,
+            duyệt, phát hành và tự động index để trợ lý trả lời.
           </DialogDescription>
         </DialogHeader>
         {error && (
@@ -585,8 +699,8 @@ export function PublicationDialog({
           <div className="space-y-3 text-sm">
             <p className="text-muted-foreground">
               Lưu bản đang xem thành{" "}
-              {documentId ? "phiên bản mới của tài liệu" : "tài liệu"} trước khi
-              duyệt.
+              {documentId ? "phiên bản mới của tài liệu" : "tài liệu"} và đưa
+              vào phục vụ.
             </p>
             <RegistrationMetadataPanel
               preview={metadataQuery.data}
@@ -594,6 +708,15 @@ export function PublicationDialog({
               error={metadataQuery.error}
               onRetry={() => void metadataQuery.refetch()}
             />
+            <label className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                disabled={frozen}
+                onChange={(event) => setConfirmed(event.target.checked)}
+              />
+              Tôi đồng ý duyệt và đưa bản này vào trả lời.
+            </label>
           </div>
         ) : versionQuery.isPending && !registeredVersion ? (
           <p role="status" className="text-sm">
@@ -614,133 +737,133 @@ export function PublicationDialog({
                 <p>
                   {findingCount
                     ? `${findingCount} nhận xét cần đối chiếu trước khi duyệt.`
-                    : "Báo cáo rà soát không ghi nhận vấn đề. Bạn vẫn cần kiểm tra nội dung."}
+                    : "Báo cáo rà soát không ghi nhận vấn đề."}
                 </p>
-                {!skipReview &&
-                  gate.findings.map((item, index) => (
-                    <div
-                      key={item.finding_id}
-                      className="space-y-2 border-b pb-3"
-                    >
-                      <p>
-                        {index + 1}.{" "}
-                        {item.finding.explanation ??
-                          "Nhận xét cần đối chiếu với bản gốc."}
-                      </p>
-                      {item.finding.source_locations?.map((location) => (
-                        <ReviewSource
-                          key={`${location.revision_id}:${location.table_number}`}
-                          workspaceId={workspaceId}
-                          collectionId={collectionId}
-                          location={location}
-                        />
-                      ))}
-                      {Boolean(item.finding.source_locations?.length) && (
-                        <details>
-                          <summary className="cursor-pointer font-medium text-primary">
-                            Xem đoạn cần đối chiếu
-                          </summary>
-                          {item.finding.draft_excerpts?.map((draft) => (
-                            <div
-                              className="mt-2 whitespace-pre-wrap"
-                              key={draft.text}
-                            >
-                              {draft.heading && (
-                                <p className="font-medium">{draft.heading}</p>
-                              )}
-                              <p>{draft.text}</p>
-                            </div>
-                          ))}
-                        </details>
-                      )}
-                      <select
-                        aria-label={`Xử lý nhận xét ${index + 1}`}
-                        disabled={frozen}
-                        className="w-full rounded-md border p-2 bg-background"
-                        value={resolutions[item.finding_id]?.decision ?? ""}
-                        onChange={(event) =>
-                          setResolutions((old) => ({
-                            ...old,
-                            [item.finding_id]: {
-                              finding_id: item.finding_id,
-                              reason: old[item.finding_id]?.reason ?? "",
-                              decision: event.target
-                                .value as DecisionFindingResolution["decision"],
-                            },
-                          }))
-                        }
-                      >
-                        <option value="" disabled>
-                          Chọn cách xử lý
-                        </option>
-                        <option value="accepted_risk">
-                          Chấp nhận sau khi đối chiếu
-                        </option>
-                        <option value="not_an_issue">Không phải lỗi</option>
-                      </select>
-                      <Textarea
-                        aria-label={`Giải trình nhận xét ${index + 1}`}
-                        placeholder="Giải trình (ít nhất 10 ký tự)"
-                        maxLength={2000}
-                        disabled={frozen}
-                        value={resolutions[item.finding_id]?.reason ?? ""}
-                        onChange={(event) =>
-                          setResolutions((old) => ({
-                            ...old,
-                            [item.finding_id]: {
-                              finding_id: item.finding_id,
-                              decision: old[item.finding_id]?.decision,
-                              reason: event.target.value,
-                            },
-                          }))
-                        }
+                {gate.findings.map((item, index) => (
+                  <div
+                    key={item.finding_id}
+                    className="space-y-2 border-b pb-3"
+                  >
+                    <p>
+                      {index + 1}.{" "}
+                      {item.finding.explanation ??
+                        "Nhận xét cần đối chiếu với bản gốc."}
+                    </p>
+                    {item.finding.source_locations?.map((location) => (
+                      <ReviewSource
+                        key={`${location.revision_id}:${location.table_number}`}
+                        workspaceId={workspaceId}
+                        collectionId={collectionId}
+                        location={location}
                       />
-                    </div>
-                  ))}
+                    ))}
+                    {Boolean(item.finding.source_locations?.length) && (
+                      <details>
+                        <summary className="cursor-pointer font-medium text-primary">
+                          Xem đoạn cần đối chiếu
+                        </summary>
+                        {item.finding.draft_excerpts?.map((draft) => (
+                          <div
+                            className="mt-2 whitespace-pre-wrap"
+                            key={draft.text}
+                          >
+                            {draft.heading && (
+                              <p className="font-medium">{draft.heading}</p>
+                            )}
+                            <p>{draft.text}</p>
+                          </div>
+                        ))}
+                      </details>
+                    )}
+                    <select
+                      aria-label={`Xử lý nhận xét ${index + 1}`}
+                      disabled={frozen}
+                      className="w-full rounded-md border p-2 bg-background"
+                      value={resolutions[item.finding_id]?.decision ?? ""}
+                      onChange={(event) =>
+                        setResolutions((old) => ({
+                          ...old,
+                          [item.finding_id]: {
+                            finding_id: item.finding_id,
+                            reason: old[item.finding_id]?.reason ?? "",
+                            decision: event.target
+                              .value as DecisionFindingResolution["decision"],
+                          },
+                        }))
+                      }
+                    >
+                      <option value="" disabled>
+                        Chọn cách xử lý
+                      </option>
+                      <option value="accepted_risk">
+                        Chấp nhận sau khi đối chiếu
+                      </option>
+                      <option value="not_an_issue">Không phải lỗi</option>
+                    </select>
+                    <Textarea
+                      aria-label={`Giải trình nhận xét ${index + 1}`}
+                      placeholder="Giải trình (ít nhất 10 ký tự)"
+                      maxLength={2000}
+                      disabled={frozen}
+                      value={resolutions[item.finding_id]?.reason ?? ""}
+                      onChange={(event) =>
+                        setResolutions((old) => ({
+                          ...old,
+                          [item.finding_id]: {
+                            finding_id: item.finding_id,
+                            decision: old[item.finding_id]?.decision,
+                            reason: event.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
               </>
-            )}
-            {noReview && (
-              <p>Chưa có báo cáo rà soát hoàn tất cho phiên bản này.</p>
             )}
             {gateQuery.error && !noReview && (
               <p role="alert" className="text-destructive">
                 {gateQuery.error.message}
               </p>
             )}
-            {(gate || noReview) && (
+            {gateQuery.error && noReview && (
               <>
-                <label className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={skipReview}
-                    disabled={frozen}
-                    onChange={(event) => {
-                      setSkipReview(event.target.checked);
-                      setConfirmed(false);
-                    }}
-                  />
-                  Duyệt không dùng báo cáo AI
-                </label>
-                {skipReview && (
-                  <Textarea
-                    aria-label="Lý do duyệt không dùng báo cáo AI"
-                    placeholder="Lý do (ít nhất 10 ký tự)"
-                    maxLength={1000}
-                    value={reason}
-                    disabled={frozen}
-                    onChange={(event) => setReason(event.target.value)}
-                  />
-                )}
-                <label className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={confirmed}
-                    disabled={frozen}
-                    onChange={(event) => setConfirmed(event.target.checked)}
-                  />
-                  Tôi đã đối chiếu và xác nhận nội dung của phiên bản này.
-                </label>
+                <p className="text-muted-foreground">
+                  Rà soát AI chưa có báo cáo cho phiên bản này. Ghi lý do để
+                  duyệt không kèm báo cáo rà soát; phiên bản sẽ được ghi nhận là
+                  chưa qua rà soát.
+                </p>
+                <Textarea
+                  aria-label="Lý do duyệt không kèm báo cáo rà soát"
+                  placeholder="Lý do (ít nhất 10 ký tự)"
+                  maxLength={1000}
+                  value={reason}
+                  disabled={frozen}
+                  onChange={(event) => setReason(event.target.value)}
+                />
               </>
+            )}
+            {gateQuery.error && !noReview && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={frozen}
+                onClick={() => void gateQuery.refetch()}
+              >
+                <RefreshCw className="size-3.5" />
+                Thử lại
+              </Button>
+            )}
+            {(gate || noReview) && (
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={confirmed}
+                  disabled={frozen}
+                  onChange={(event) => setConfirmed(event.target.checked)}
+                />
+                Tôi đã đối chiếu và xác nhận nội dung của phiên bản này.
+              </label>
             )}
             {capabilities?.can_approve === false && (
               <p className="text-muted-foreground">
@@ -750,7 +873,7 @@ export function PublicationDialog({
           </div>
         ) : status === "approved" ? (
           <p className="text-sm">
-            Đã duyệt. Phát hành để hệ thống tự đưa bản này vào tra cứu.
+            Đã duyệt. Bấm phát hành để hệ thống tự đưa bản này vào tra cứu.
           </p>
         ) : status === "published" ? (
           <p role="status" className="flex gap-2 text-sm">
@@ -760,8 +883,8 @@ export function PublicationDialog({
               <Loader2 className="size-4 animate-spin" />
             )}
             {served
-              ? "Sẵn sàng phục vụ hỏi đáp."
-              : "Đã phát hành. Hệ thống đang đồng bộ; bạn có thể đóng cửa sổ này."}
+              ? "Đã phát hành và index xong. Trợ lý có thể trả lời từ bản này."
+              : "Đã phát hành. Hệ thống đang index vào cơ sở dữ liệu vector; cửa sổ này tự cập nhật khi xong."}
           </p>
         ) : (
           <p className="text-sm">
@@ -784,40 +907,26 @@ export function PublicationDialog({
           >
             Đóng
           </Button>
-          {!versionId && (
+          {(!versionId || (versionId && status === "draft")) && (
             <Button
               disabled={
                 busy ||
-                !metadataQuery.data ||
-                !(canRegister === true || capabilities?.can_register === true)
+                !confirmed ||
+                (versionId
+                  ? !canApprove || !reviewGateReady
+                  : !metadataQuery.data || !canRegisterNow)
               }
-              onClick={register}
+              onClick={() => void approveAndPublish()}
             >
-              {busy ? "Đang lưu…" : "Tiếp tục"}
-            </Button>
-          )}
-          {versionId && status === "draft" && (
-            <Button
-              disabled={busy || (!pending.current && !canApprove)}
-              onClick={() => decide("approve")}
-            >
-              {busy
-                ? "Đang duyệt…"
-                : pending.current
-                  ? "Thử lại cùng thao tác"
-                  : "Xác nhận duyệt"}
+              {actionLabel}
             </Button>
           )}
           {status === "approved" && (
             <Button
-              disabled={busy || (!pending.current && !canPublish)}
-              onClick={() => decide("publish")}
+              disabled={busy || !canPublish}
+              onClick={() => void publishApproved()}
             >
-              {busy
-                ? "Đang phát hành…"
-                : pending.current
-                  ? "Thử lại cùng thao tác"
-                  : "Phát hành"}
+              {busy ? actionLabel : "Phát hành"}
             </Button>
           )}
         </DialogFooter>

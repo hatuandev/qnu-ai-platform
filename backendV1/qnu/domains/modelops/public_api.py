@@ -122,13 +122,13 @@ class OcrRuntime:
             ),
         }
 
-    def reasoning_directive(self, task: str):
-        """Declared parameter for one task, or None to keep the server default."""
-        return resolve_directive(self.reasoning_policy, task)
+    def reasoning_directive(self):
+        """Declared parameter for this model, or None to keep the server default."""
+        return resolve_directive(self.reasoning_policy)
 
-    def reasoning_trace(self, task: str) -> dict[str, Any]:
+    def reasoning_trace(self) -> dict[str, Any]:
         """Explain what was sent: applied parameter or the reason it was not."""
-        return trace_for(self.reasoning_policy, task)
+        return trace_for(self.reasoning_policy)
 
 
 async def visible_providers(
@@ -247,7 +247,7 @@ class ChatRuntime(OcrRuntime):
             "version": "qnu.chat.inference/v1",
             "configuration_hash": self.configuration_hash,
             "task": task,
-            "reasoning": self.reasoning_trace(task),
+            "reasoning": self.reasoning_trace(),
         }
         return hashlib.sha256(
             json.dumps(material, sort_keys=True, separators=(",", ":")).encode()

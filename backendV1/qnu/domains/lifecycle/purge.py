@@ -21,6 +21,7 @@ from qnu.domains.knowledge.preparation.models import (
 from qnu.domains.lifecycle import effects
 from qnu.domains.lifecycle.models import LifecycleAction, ResourceState
 from qnu.domains.lifecycle.purge_graph import (
+    collection_history_counts,
     delete_rows,
     graph_for_collection,
     graph_for_source,
@@ -50,17 +51,34 @@ def _resource_detail(row) -> dict:
 
 
 async def _graph_for(db, row):
-    loader = graph_for_collection if row.kind == "collection" else graph_for_source
-    return await loader(db, row.workspace_id, row.resource_id, allow_published=True)
+    if row.kind == "collection":
+        return await graph_for_collection(
+            db,
+            row.workspace_id,
+            row.resource_id,
+            allow_published=True,
+            include_history=bool((row.parameters or {}).get("include_history")),
+        )
+    return await graph_for_source(db, row.workspace_id, row.resource_id, allow_published=True)
 
 
-async def inspect_purge(db, kind, resource, blob):
+async def inspect_purge(db, kind, resource, blob, parameters=None):
+    include_history = kind == "collection" and bool((parameters or {}).get("include_history"))
     loader = graph_for_collection if kind == "collection" else graph_for_source
-    graph = await loader(db, resource.workspace_id, resource.id, allow_published=True)
+    if kind == "collection":
+        graph = await loader(
+            db,
+            resource.workspace_id,
+            resource.id,
+            allow_published=True,
+            include_history=include_history,
+        )
+    else:
+        graph = await loader(db, resource.workspace_id, resource.id, allow_published=True)
     plan = graph_plan(graph)
     versions = graph.get("kb_compiled_versions", {}).values()
     published = [row["id"] for row in versions if row["status"] == "published"]
-    return plan, {
+    impact = {
         "collection_id": resource.id if kind == "collection" else resource.collection_id,
         "resource_label": resource.name if kind == "collection" else resource.title,
         "permanent": True,
@@ -75,6 +93,15 @@ async def inspect_purge(db, kind, resource, blob):
         "backups_retained": True,
         "blob_target_hash": blob.target_hash,
     }
+    if kind == "collection":
+        history = await collection_history_counts(db, resource.workspace_id, resource.id)
+        impact |= {
+            "history_included": include_history,
+            "conversations_to_delete": len(graph.get("chat_conversations", {})),
+            "answer_reviews_to_delete": len(graph.get("kb_answer_reviews", {})),
+            "history_available_to_delete": history["conversations"] + history["answer_reviews"],
+        }
+    return plan, impact
 
 
 JOB_TABLES = {

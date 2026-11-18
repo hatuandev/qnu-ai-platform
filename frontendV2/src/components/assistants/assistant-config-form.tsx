@@ -1,8 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Database, Loader2, Save, Undo2 } from "lucide-react";
+import { ChevronDown, Loader2, Save, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  type AssistantReadiness,
   type AssistantResponse,
   assistantKeys,
   useUpdateAssistantMutation,
@@ -10,6 +11,7 @@ import {
 import { ApiProblemError } from "@/api/client";
 import { useCollectionsQuery } from "@/api/knowledge";
 import { useCatalogQuery } from "@/api/modelops";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/admin/field";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -49,9 +51,14 @@ import {
   VerificationFields,
 } from "./assistant-advanced-fields";
 import {
+  AssistantCollectionPicker,
+  type CollectionOption,
+} from "./assistant-collection-picker";
+import {
   type AssistantFormState,
   AUTO_MODEL,
   buildAssistantPayload,
+  collectionIdsOf,
   DESCRIPTION_MAX_CHARS,
   initialState,
   NAME_MAX_CHARS,
@@ -59,6 +66,7 @@ import {
   validateAssistantForm,
 } from "./assistant-form-state";
 import { localityLabel, providerLabel } from "./model-label";
+import { READINESS_MAP } from "./readiness";
 
 type Baseline = { revision: number; data: AssistantResponse };
 
@@ -73,9 +81,11 @@ function formatTokenK(tokens: number): string {
 export function AssistantConfigForm({
   workspaceId,
   assistant,
+  readiness,
 }: {
   workspaceId: string;
   assistant: AssistantResponse;
+  readiness?: AssistantReadiness;
 }) {
   const queryClient = useQueryClient();
   const updateMutation = useUpdateAssistantMutation(workspaceId);
@@ -93,9 +103,6 @@ export function AssistantConfigForm({
     [catalog],
   );
   const collections = collectionsPage?.items ?? [];
-  const currentCollectionName =
-    collections.find((item) => item.id === assistant.collection_id)?.name ??
-    assistant.collection_id;
 
   const [baseline, setBaseline] = useState<Baseline>({
     revision: assistant.revision,
@@ -106,6 +113,40 @@ export function AssistantConfigForm({
   );
   const [error, setError] = useState<string | null>(null);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [isCollectionConfirmOpen, setIsCollectionConfirmOpen] = useState(false);
+
+  const baselineCollectionIds = useMemo(
+    () => collectionIdsOf(baseline.data),
+    [baseline.data],
+  );
+  const collectionOptions = useMemo<CollectionOption[]>(() => {
+    const options: CollectionOption[] = collections.map((item) => ({
+      id: item.id,
+      name: item.name,
+      source_count: item.source_count,
+    }));
+    const missing = form.collectionIds
+      .filter((id) => !options.some((item) => item.id === id))
+      .map((id) => ({
+        id,
+        name: "Kho ngoài danh sách tải",
+        source_count: 0,
+      }));
+    return [...missing, ...options];
+  }, [collections, form.collectionIds]);
+  const isCollectionChanged =
+    form.collectionIds.length !== baselineCollectionIds.length ||
+    form.collectionIds.some((id, index) => id !== baselineCollectionIds[index]);
+  const selectedCollectionNames =
+    form.collectionIds
+      .map((id) => collectionOptions.find((item) => item.id === id)?.name)
+      .filter((name): name is string => Boolean(name))
+      .join(", ") || "bộ kho đã chọn";
+  const degradedCollections = (readiness?.collections ?? []).filter(
+    (item) =>
+      item.status !== "ready" &&
+      form.collectionIds.includes(item.collection_id),
+  );
 
   const initialForm = useMemo(() => initialState(baseline.data), [baseline]);
   const isDirty = useMemo(
@@ -138,13 +179,7 @@ export function AssistantConfigForm({
     setError(null);
   };
 
-  const handleSave = async () => {
-    const message = validateAssistantForm(form);
-    if (message) {
-      setError(message);
-      return;
-    }
-    setError(null);
+  const runSave = async () => {
     try {
       const updated = await updateMutation.mutateAsync({
         assistantId: assistant.id,
@@ -155,8 +190,10 @@ export function AssistantConfigForm({
       });
       setBaseline({ revision: updated.revision, data: updated });
       setForm(initialState(updated));
+      setIsCollectionConfirmOpen(false);
       toast.success(`Đã lưu cấu hình "${updated.name}"`);
     } catch (err: unknown) {
+      setIsCollectionConfirmOpen(false);
       if (err instanceof ApiProblemError) {
         if (err.code === "assistant_revision_conflict") {
           await queryClient.invalidateQueries({
@@ -176,6 +213,20 @@ export function AssistantConfigForm({
       }
       setError("Có lỗi xảy ra. Vui lòng thử lại.");
     }
+  };
+
+  const handleSave = () => {
+    const message = validateAssistantForm(form);
+    if (message) {
+      setError(message);
+      return;
+    }
+    setError(null);
+    if (isCollectionChanged) {
+      setIsCollectionConfirmOpen(true);
+      return;
+    }
+    void runSave();
   };
 
   const verificationLabel =
@@ -211,6 +262,46 @@ export function AssistantConfigForm({
         <Alert variant="destructive">
           <AlertTitle>Chưa lưu được cấu hình</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {isCollectionChanged ? (
+        <Alert variant="warning">
+          <AlertTitle>Trợ lý sẽ đổi bộ kho tri thức</AlertTitle>
+          <AlertDescription>
+            {`Sau khi lưu, lượt hỏi mới sẽ tra cứu trong: ${selectedCollectionNames}. Hội thoại đã có giữ bộ kho cũ, vẫn đọc lại được, nhưng hỏi tiếp cần hội thoại mới.`}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {form.collectionIds.length === 0 ? (
+        <Alert variant="warning">
+          <AlertTitle>Trợ lý chưa gắn kho tri thức</AlertTitle>
+          <AlertDescription>
+            Vẫn lưu được để hoàn thiện chỉ dẫn và mô hình, nhưng trợ lý chưa trả
+            lời được, chưa hỏi thử được và không thể bật kênh công khai cho tới
+            khi gắn lại ít nhất một kho tri thức.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {degradedCollections.length > 0 ? (
+        <Alert variant="warning">
+          <AlertTitle>Có kho tri thức chưa sẵn sàng</AlertTitle>
+          <AlertDescription>
+            <span className="block">
+              {degradedCollections
+                .map(
+                  (item) =>
+                    `${item.collection_name}: ${READINESS_MAP[item.status].label.toLowerCase()}`,
+                )
+                .join(" · ")}
+            </span>
+            <span className="mt-1 block text-[11px]">
+              Trợ lý vẫn trả lời bằng các kho còn lại; câu hỏi chỉ có đáp án
+              trong kho chưa sẵn sàng sẽ được báo là thiếu căn cứ.
+            </span>
+          </AlertDescription>
         </Alert>
       ) : null}
 
@@ -301,17 +392,17 @@ export function AssistantConfigForm({
                   <FieldLabel className="text-xs font-medium">
                     Kho tri thức liên kết
                   </FieldLabel>
-                  <div className="relative">
-                    <Input
-                      value={currentCollectionName}
-                      readOnly
-                      disabled
-                      className="h-9 bg-muted/40 pl-8 text-xs font-medium text-foreground cursor-not-allowed"
-                    />
-                    <Database className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                  </div>
+                  <AssistantCollectionPicker
+                    collections={collectionOptions}
+                    selectedIds={form.collectionIds}
+                    onChange={(ids) => patch({ collectionIds: ids })}
+                    disabled={isPending}
+                    readiness={readiness}
+                  />
                   <FieldDescription>
-                    Cố định với trợ lý để đảm bảo toàn vẹn dữ liệu.
+                    Trợ lý tra cứu trong tất cả kho đã chọn. Đổi bộ kho áp dụng
+                    ngay khi lưu; hội thoại đã có giữ bộ kho cũ và cần hội thoại
+                    mới để hỏi tiếp.
                   </FieldDescription>
                 </Field>
 
@@ -750,6 +841,26 @@ export function AssistantConfigForm({
           </Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={isCollectionConfirmOpen}
+        onOpenChange={setIsCollectionConfirmOpen}
+        title={
+          form.collectionIds.length === 0
+            ? "Bỏ toàn bộ kho tri thức của trợ lý?"
+            : "Đổi bộ kho tri thức của trợ lý?"
+        }
+        description={
+          form.collectionIds.length === 0
+            ? "Sau khi lưu, trợ lý không còn kho tri thức nào: mọi lượt hỏi mới và lượt kiểm thử sẽ bị chặn, kênh công khai phải tắt, cho tới khi bạn gắn lại ít nhất một kho."
+            : `Trợ lý sẽ tra cứu trong ${form.collectionIds.length} kho (${selectedCollectionNames}) ngay sau khi lưu. Hội thoại đã có vẫn giữ bộ kho cũ; muốn hỏi tiếp cần tạo hội thoại mới.`
+        }
+        confirmLabel={
+          form.collectionIds.length === 0 ? "Bỏ kho và lưu" : "Đổi kho và lưu"
+        }
+        isLoading={isPending}
+        onConfirm={() => void runSave()}
+      />
     </div>
   );
 }

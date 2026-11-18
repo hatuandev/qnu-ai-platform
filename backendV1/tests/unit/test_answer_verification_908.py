@@ -36,7 +36,7 @@ async def test_verifier_uses_answer_policy_only_when_declared_and_verified(monke
             mode="chat_template_kwarg",
             parameter="enable_thinking",
             off_value=False,
-            tasks={"off": ["answer"]},
+            level="off",
             verified=verified,
         ),
     )
@@ -52,7 +52,7 @@ async def test_verifier_uses_answer_policy_only_when_declared_and_verified(monke
                 max_output_tokens=8192,
                 timeout_seconds=5,
                 api_key="test-only",
-                reasoning=target.reasoning_directive(kwargs.get("reasoning_task", "chat")),
+                reasoning=target.reasoning_directive(),
             ),
             SimpleNamespace(total_reserved_tokens=8192),
         )
@@ -105,7 +105,7 @@ async def test_verifier_uses_answer_policy_only_when_declared_and_verified(monke
         [source],
         AsyncMock(),
     )
-    assert prepared[0]["reasoning_task"] == "answer"
+    assert "reasoning" not in prepared[0]
     directive = chat.complete.await_args.args[1].reasoning
     assert (directive is not None) is verified
     assert report["reasoning"]["applied"] is verified
@@ -122,7 +122,7 @@ async def test_reasoning_drift_before_verification_releases_unsent_usage(monkeyp
             mode="chat_template_kwarg",
             parameter="enable_thinking",
             off_value=False,
-            tasks={"off": ["answer"]},
+            level="off",
             verified=True,
         ),
     )

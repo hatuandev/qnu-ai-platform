@@ -1,5 +1,7 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên 1013 — Câu hỏi luật: prompt v36 và chèn dòng bảng theo tổ hợp (Chặng 2).](2026-11-18_phien_1013_prompt_v36_va_chan_2.md)
+- [Phiên 1012 — Xóa kho tri thức kèm lịch sử hội thoại.](2026-11-18_phien_1012_xoa_kho_kem_lich_su.md)
 - [Phiên 1009 — Model và số lượt xử lý văn bản.](2026-11-17_phien_1009_model_xu_ly_van_ban.md)
 - [Phiên 1008 — Khởi tạo gọn migration Backend V1.](2026-11-17_phien_1008_khoi_tao_gon_migration_v1.md)
 - [Phiên 1007 — Mặc định xử lý văn bản một phần tại một thời điểm.](2026-11-17_phien_1007_mac_dinh_mot_luot_xu_ly_van_ban.md)

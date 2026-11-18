@@ -128,8 +128,8 @@ def bounded_limit(requested: int | None) -> int:
 
 def thinking_for(extra_config: dict | None) -> DocumentThinking:
     policy = parse_policy((extra_config or {}).get(EXTRA_CONFIG_KEY))
-    trace = trace_for(policy, "compiler")
-    level = policy.level_for("compiler") if policy is not None else None
+    trace = trace_for(policy)
+    level = policy.level if policy is not None else None
     applied = bool(trace.get("applied"))
     return DocumentThinking(
         configured="server" if level is None else level,

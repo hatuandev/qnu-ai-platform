@@ -2,6 +2,7 @@
 
 import re
 
+from qnu.domains.knowledge.index.multi import search_collections
 from qnu.domains.knowledge.index.search import search as search_single
 from qnu.platform.errors import Conflict
 
@@ -50,46 +51,80 @@ def interleave(results, limit):
     return hits
 
 
+def run_identity(result) -> tuple:
+    """Active index identity that must not change between clauses of one question."""
+    served = [
+        item for item in result.trace.get("collections") or [] if item.get("status") == "served"
+    ]
+    if not served:
+        return result.index_run_id, result.generation
+    return tuple(sorted((c["collection_id"], c["index_run_id"], c["generation"]) for c in served))
+
+
+def config_identity(result) -> tuple:
+    served = [
+        item for item in result.trace.get("collections") or [] if item.get("status") == "served"
+    ]
+    manifests = (
+        tuple(sorted((c["collection_id"], c.get("manifest_sha256")) for c in served))
+        if served
+        else result.trace.get("manifest_sha256")
+    )
+    return manifests, result.trace.get("rerank_provider")
+
+
 async def search(
-    db, blob, model, vectors, actor, workspace_id, collection_id, req, *, reranker=None, verify=True
+    db,
+    blob,
+    model,
+    vectors,
+    actor,
+    workspace_id,
+    collection_ids,
+    req,
+    *,
+    reranker=None,
+    verify=True,
 ):
     facets = question_facets(req.query)
-    if len(facets) == 1 or req.top_k < len(facets):
-        return await search_single(
+    ids = list(dict.fromkeys(collection_ids))
+
+    async def run(query):
+        scoped = req.model_copy(update={"query": query})
+        if len(ids) == 1:
+            return await search_single(
+                db,
+                blob,
+                model,
+                vectors,
+                actor,
+                workspace_id,
+                ids[0],
+                scoped,
+                reranker=reranker,
+                verify=verify,
+            )
+        return await search_collections(
             db,
             blob,
             model,
             vectors,
             actor,
             workspace_id,
-            collection_id,
-            req,
+            ids,
+            scoped,
             reranker=reranker,
             verify=verify,
         )
+
+    if len(facets) == 1 or req.top_k < len(facets):
+        return await run(req.query)
     results = []
     for query in facets:
-        result = await search_single(
-            db,
-            blob,
-            model,
-            vectors,
-            actor,
-            workspace_id,
-            collection_id,
-            req.model_copy(update={"query": query}),
-            reranker=reranker,
-            verify=verify,
-        )
-        if results and (result.index_run_id, result.generation) != (
-            results[0].index_run_id,
-            results[0].generation,
-        ):
+        result = await run(query)
+        if results and run_identity(result) != run_identity(results[0]):
             raise Conflict("Index đổi giữa các ý hỏi.", code="answer_evidence_changed")
-        if results and any(
-            result.trace.get(key) != results[0].trace.get(key)
-            for key in ("manifest_sha256", "rerank_provider")
-        ):
+        if results and config_identity(result) != config_identity(results[0]):
             raise Conflict("Cấu hình tìm kiếm đổi giữa các ý hỏi.", code="answer_evidence_changed")
         results.append(result)
     # Each clause keeps its own retrieved top_k; the shared context budget,
@@ -101,6 +136,12 @@ async def search(
         "facets": [r.trace for r in results],
         "selected_ids": [h.chunk_id for h in hits],
     }
+    if any("hit_scope" in r.trace for r in results):
+        trace["hit_scope"] = {
+            chunk_id: owner
+            for result in results
+            for chunk_id, owner in (result.trace.get("hit_scope") or {}).items()
+        }
     return results[0].model_copy(
         update={
             "hits": hits,

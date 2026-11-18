@@ -86,7 +86,6 @@ async def compose(
         messages,
         provider_id=provider_id,
         task="answer",
-        reasoning_task="answer",
         max_output_tokens=512,
         output_schema=FallbackMessage.model_json_schema(),
     )

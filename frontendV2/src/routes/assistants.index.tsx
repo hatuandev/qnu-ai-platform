@@ -24,6 +24,22 @@ export const Route = createFileRoute("/assistants/")({
   component: AssistantsPage,
 });
 
+function boundCollectionLabel(
+  assistant: AssistantResponse,
+  names: Map<string, string>,
+): string {
+  const ids = assistant.collection_ids?.length
+    ? assistant.collection_ids
+    : assistant.collection_id
+      ? [assistant.collection_id]
+      : [];
+  if (!ids.length) return "Chưa gắn kho tri thức";
+  const labels = ids
+    .map((id) => names.get(id))
+    .filter((name): name is string => Boolean(name));
+  return labels.length ? labels.join(" · ") : "Kho tri thức không khả dụng";
+}
+
 function updatePayload(
   assistant: AssistantResponse,
   overrides?: { is_active?: boolean },
@@ -33,6 +49,11 @@ function updatePayload(
     description: assistant.description,
     persona: assistant.persona,
     collection_id: assistant.collection_id,
+    collection_ids: assistant.collection_ids?.length
+      ? assistant.collection_ids
+      : assistant.collection_id
+        ? [assistant.collection_id]
+        : [],
     chat_provider_id: assistant.chat_provider_id,
     top_k: assistant.top_k,
     history_turns: assistant.history_turns,
@@ -187,10 +208,7 @@ function AssistantsPage() {
               key={assistant.id}
               workspaceId={workspaceId}
               assistant={assistant}
-              collectionName={
-                collectionNames.get(assistant.collection_id) ??
-                "Kho tri thức không khả dụng"
-              }
+              collectionName={boundCollectionLabel(assistant, collectionNames)}
               model={
                 assistant.chat_provider_id
                   ? models.get(assistant.chat_provider_id)

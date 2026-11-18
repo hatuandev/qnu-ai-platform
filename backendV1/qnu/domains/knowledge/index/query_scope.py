@@ -24,7 +24,7 @@ from qnu.domains.knowledge.publication.evidence import digest
 from qnu.platform.config import get_settings
 from qnu.platform.errors import Conflict
 
-VERSION = "qnu.catalog-scope/v5"
+VERSION = "qnu.catalog-scope/v6"
 
 # A bare four-digit year only scopes when the catalog proves that year and the
 # surrounding text is neither a count nor part of a date/code range.
@@ -168,8 +168,10 @@ def attribute_scope(query: str, catalog: dict) -> dict:
                 join = join_pattern.match(text, match.end())
                 match = value_pattern.match(text, join.end()) if join else None
         matches = [value for key in found for value in by_label[key]]
-        overview = re.search(r"\b(?:liệt kê|tất cả|các|những|nào|list|all|overview)\b", text)
-        if len(matches) > 1 or (not matches and not overview):
+        # A label mentioned without an assigned catalog value names the topic,
+        # not a scope selector: "số điện thoại" must not scope to an attribute
+        # labeled "Số", and "tổng quan" questions select a value only when named.
+        if len(matches) > 1:
             clarify(label, values)
         if matches:
             selected[label] = matches[0]
@@ -326,12 +328,17 @@ def resolve(
         if any(matches_metadata({"retrieval_metadata": [{"values": u}]}, f) for f in filters)
     ]
     if not overview:
-        for key in ("program", "intake", "data_year"):
-            if key == "data_year" and chosen.get("event_kind"):
-                continue
+        for key in ("program", "intake"):
             values = {u[key] for u in narrowed if u.get(key)}
             if key not in base and not chosen.get(key) and len(values) > 1:
                 clarify(key, values)
+        # A multi-year column inside one publication is answerable reading, not a
+        # scope choice; ask only when separate issued documents cover those years.
+        if "data_year" not in base and not chosen.get("data_year") and not chosen.get("event_kind"):
+            years = {u["data_year"] for u in narrowed if u.get("data_year")}
+            issued = {u.get("issued_year") for u in narrowed if u.get("data_year")}
+            if len(years) > 1 and len(issued) != 1:
+                clarify("data_year", years)
     return (
         expanded,
         filters,
@@ -371,8 +378,11 @@ async def plan(db, run, allowed, sealed, query, fixed):
 
 def result_scopes(result, fallback):
     plans = result.trace.get("facets", [result.trace])
+    scopes = [
+        scope
+        for plan in plans
+        for scope in (plan.get("collection_scopes") or [plan.get("scope_resolution") or {}])
+    ]
     return [
-        MetadataFilter.model_validate(f)
-        for p in plans
-        for f in p.get("scope_resolution", {}).get("filters", [])
+        MetadataFilter.model_validate(f) for scope in scopes for f in scope.get("filters", [])
     ] or [fallback]

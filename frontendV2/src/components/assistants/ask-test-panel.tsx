@@ -40,8 +40,9 @@ export function AskTestPanel({
   const [lastReview, setLastReview] = useState<AnswerReview | null>(null);
 
   const isInactive = !assistant.is_active;
-  const isEmptyCollection = readiness?.status === "empty";
-  const isBlocked = isInactive || isEmptyCollection;
+  const isUnbound = (assistant.collection_ids?.length ?? 0) === 0;
+  const isEmptyCollection = !isUnbound && readiness?.status === "empty";
+  const isBlocked = isInactive || isUnbound || isEmptyCollection;
   const isPending = createMutation.isPending;
 
   const handleRun = async () => {
@@ -103,6 +104,16 @@ export function AskTestPanel({
         </Alert>
       ) : null}
 
+      {!isInactive && isUnbound ? (
+        <Alert variant="warning">
+          <AlertTitle>Trợ lý chưa gắn kho tri thức</AlertTitle>
+          <AlertDescription>
+            Trợ lý chưa có kho tri thức nào nên chưa thể kiểm thử. Gắn ít nhất
+            một kho trong tab Cấu hình trước khi hỏi thử.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {!isInactive && isEmptyCollection ? (
         <Alert variant="warning">
           <AlertTitle>Kho tri thức chưa có tài liệu xuất bản</AlertTitle>
@@ -119,7 +130,7 @@ export function AskTestPanel({
             >
               <Link
                 to="/knowledge"
-                search={{ collectionId: assistant.collection_id }}
+                search={{ collectionId: assistant.collection_id ?? undefined }}
               >
                 <Database className="size-3.5" />
                 <span>Mở kho tri thức</span>

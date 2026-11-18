@@ -148,7 +148,7 @@ def test_inference_identity_tracks_reasoning_without_invalidating_old_run_hashes
         mode="chat_template_kwarg",
         parameter="enable_thinking",
         off_value=False,
-        tasks={"off": ["answer"]},
+        level="off",
         verified=True,
     )
     after = replace(before, reasoning_policy=policy)

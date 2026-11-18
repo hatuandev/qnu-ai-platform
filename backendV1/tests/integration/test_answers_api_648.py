@@ -489,7 +489,7 @@ def test_answer_trace_records_the_exact_reasoning_contract(client, ready):
                 "mode": "chat_template_kwarg",
                 "parameter": "enable_thinking",
                 "off_value": False,
-                "tasks": {"off": ["answer"]},
+                "level": "off",
                 "verified": True,
             }
         },

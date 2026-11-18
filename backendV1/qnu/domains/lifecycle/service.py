@@ -91,7 +91,7 @@ async def inspect(
     current, impact = await targets.snapshot(db, workspace_id, kind, row, parameters)
     impact.update(impact_note)
     if action == "delete" and kind in purge.PURGE_KINDS:
-        plan, permanent_impact = await purge.inspect_purge(db, kind, row, blob)
+        plan, permanent_impact = await purge.inspect_purge(db, kind, row, blob, parameters)
         current["purge_graph_sha256"] = plan["graph_sha256"]
         impact.update(permanent_impact)
     if action == "replace":
@@ -132,6 +132,8 @@ async def preview(
     parameters = body.model_dump(
         exclude={"kind", "resource_id", "action", "reason"}, exclude_none=True
     )
+    if not parameters.get("include_history"):
+        parameters.pop("include_history", None)
     await authorize(db, actor, workspace_id, body.kind, body.action, parameters)
     _, state_hash, impact = await inspect(
         db, blob, actor, workspace_id, body.kind, body.resource_id, body.action, parameters

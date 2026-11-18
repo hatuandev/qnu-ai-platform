@@ -21,7 +21,22 @@ from qnu.domains.ocr.ids import new_id
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.config import get_settings
-from qnu.platform.errors import Conflict
+from qnu.platform.errors import Conflict, EntityNotFound
+
+
+async def _require_document(
+    db: AsyncSession, workspace_id: str, collection_ids: list[str], document_id: str
+) -> None:
+    """A pinned document only has to exist in one of the assistant's collections."""
+    for collection_id in collection_ids:
+        try:
+            await document(db, workspace_id, collection_id, document_id)
+        except EntityNotFound as exc:
+            if exc.code != "compiled_document_not_found":
+                raise
+            continue
+        return
+    raise EntityNotFound("Không tìm thấy tài liệu biên soạn.", code="compiled_document_not_found")
 
 
 async def create(
@@ -30,17 +45,31 @@ async def create(
     assistant = await get_assistant(db, actor, workspace_id, req.assistant_id)
     if not assistant.is_active:
         raise Conflict("Trợ lý đã tạm dừng.", code="assistant_inactive")
+    collection_ids = list(
+        dict.fromkeys(
+            item
+            for item in [assistant.collection_id, *(assistant.collection_ids or [])]
+            if item
+        )
+    )
+    if not collection_ids:
+        raise Conflict(
+            "Trợ lý chưa gắn kho tri thức nên chưa thể bắt đầu hội thoại.",
+            code="assistant_no_collections",
+        )
     for document_id in req.document_ids or []:
-        await document(db, workspace_id, assistant.collection_id, document_id)
+        await _require_document(db, workspace_id, collection_ids, document_id)
+    snapshot = AssistantConfig.model_validate(assistant, from_attributes=True).model_dump(
+        mode="json"
+    )
+    snapshot["collection_ids"] = collection_ids
     row = Conversation(
         id=new_id("cnv"),
         workspace_id=workspace_id,
-        collection_id=assistant.collection_id,
+        collection_id=collection_ids[0],
         assistant_id=assistant.id,
         assistant_revision=assistant.revision,
-        assistant_snapshot=AssistantConfig.model_validate(
-            assistant, from_attributes=True
-        ).model_dump(mode="json"),
+        assistant_snapshot=snapshot,
         owner_ref=actor_ref(actor),
         title=req.title,
         document_ids=req.document_ids,

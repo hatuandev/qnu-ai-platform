@@ -60,7 +60,7 @@ async def test_recovery_cannot_downgrade_observed_usage_to_unknown(monkeypatch):
 async def test_single_call_compiler_passes_the_pinned_reasoning(monkeypatch):
     directive = ReasoningDirective("toggle", "thinking", False, "off", "policy")
     runtime = SimpleNamespace(
-        configuration_hash="provider", reasoning_directive=lambda task: directive
+        configuration_hash="provider", reasoning_directive=lambda: directive
     )
     request, budget = object(), SimpleNamespace(total_reserved_tokens=100)
     prepare = AsyncMock(return_value=(runtime, request, budget))

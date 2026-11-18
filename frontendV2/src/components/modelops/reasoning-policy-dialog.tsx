@@ -26,36 +26,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 
-const TASKS = [
-  {
-    key: "compiler",
-    label: "Biên soạn",
-    hint: "Áp dụng khi biên dịch văn bản.",
-  },
-  {
-    key: "compiler_review",
-    label: "Rà soát",
-    hint: "Áp dụng khi rà soát bản biên soạn.",
-  },
-] as const;
-
-type TaskKey = (typeof TASKS)[number]["key"];
-type TaskLevel = ReasoningLevel | "server";
-type Levels = Record<TaskKey, TaskLevel>;
-
-const LEVEL_LABEL: Record<TaskLevel, string> = {
-  server: "Theo máy chủ",
-  low: "Thấp",
+const LEVEL_LABEL: Record<ReasoningLevel, string> = {
   off: "Tắt",
+  low: "Thấp",
 };
 
 const STATUS_LABEL: Record<ReasoningStatus, string> = {
@@ -68,43 +44,18 @@ const STATUS_LABEL: Record<ReasoningStatus, string> = {
 const REASON_LABEL: Record<string, string> = {
   provider_keeps_server_default: "giữ mặc định máy chủ",
   capability_not_verified: "tham số chưa được xác minh",
-  task_not_configured: "tác vụ chưa khai báo mức",
+  level_not_set: "chưa chọn mức",
 };
 
-function declaredLevels(policy: ReasoningPolicy | null): Levels {
-  const tasks = policy?.tasks ?? {};
-  const find = (task: TaskKey): TaskLevel => {
-    if (tasks.off?.includes(task)) return "off";
-    if (tasks.low?.includes(task)) return "low";
-    return "server";
-  };
-  return {
-    compiler: find("compiler"),
-    compiler_review: find("compiler_review"),
-  };
+function declaredLevels(policy: ReasoningPolicy | null): ReasoningLevel[] {
+  if (!policy) return [];
+  return [
+    ...(policy.off_value !== null ? (["off"] as const) : []),
+    ...(policy.low_value !== null ? (["low"] as const) : []),
+  ];
 }
 
-function withTaskLevels(
-  policy: ReasoningPolicy,
-  levels: Levels,
-): ReasoningPolicy {
-  const tasks: Partial<Record<ReasoningLevel, string[]>> = {};
-  for (const level of ["off", "low"] as const) {
-    const kept = (policy.tasks?.[level] ?? []).filter(
-      (task) => !TASKS.some((item) => item.key === task),
-    );
-    if (kept.length > 0) tasks[level] = kept;
-  }
-  for (const task of TASKS) {
-    const level = levels[task.key];
-    if (level === "server") continue;
-    tasks[level] = [...(tasks[level] ?? []), task.key];
-  }
-  return { ...policy, tasks };
-}
-
-function effectiveLabel(trace: ReasoningTrace | undefined): string {
-  if (!trace) return "Chưa có";
+function effectiveLabel(trace: ReasoningTrace): string {
   if (trace.applied && trace.level) return LEVEL_LABEL[trace.level];
   const reason = trace.reason
     ? (REASON_LABEL[trace.reason] ?? trace.reason)
@@ -133,7 +84,7 @@ export function ReasoningPolicyDialog({
           </DialogTitle>
           <DialogDescription>
             {model
-              ? `${model.model_name} · chỉ áp dụng cho biên soạn và rà soát của đúng endpoint này.`
+              ? `${model.model_name} · áp dụng cho mọi tác vụ dùng model này.`
               : ""}
           </DialogDescription>
         </DialogHeader>
@@ -161,7 +112,7 @@ function ReasoningPolicyForm({
   const update = useSetProviderReasoningMutation(model.id, connectionId);
   const [draft, setDraft] = useState<{
     base: ProviderReasoning;
-    levels: Levels;
+    level: ReasoningLevel;
   } | null>(null);
 
   if (query.isPending) return <Skeleton className="h-48 w-full" />;
@@ -188,15 +139,12 @@ function ReasoningPolicyForm({
     policy.mode !== "server_default" &&
     policy.parameter !== null;
   const canTune = hasContract && policy?.verified === true;
-  const serverLevels = declaredLevels(policy);
-  const levels = draft?.base === data ? draft.levels : serverLevels;
-  const isDirty = TASKS.some(
-    (task) => levels[task.key] !== serverLevels[task.key],
-  );
-
-  const setLevel = (task: TaskKey, level: TaskLevel) => {
-    setDraft({ base: data, levels: { ...levels, [task]: level } });
-  };
+  const levels = declaredLevels(policy);
+  const canTurnOn = levels.includes("low");
+  const storedLevel = policy?.level ?? "off";
+  const level = draft?.base === data ? draft.level : storedLevel;
+  const isDirty = level !== storedLevel;
+  const switchId = `${fieldId}-thinking`;
 
   return (
     <>
@@ -227,59 +175,41 @@ function ReasoningPolicyForm({
           </Alert>
         )}
 
-        {TASKS.map((task) => {
-          const htmlId = `${fieldId}-${task.key}`;
-          return (
-            <div
-              key={task.key}
-              className="space-y-2 border-t border-border pt-3"
-            >
-              <div className="flex flex-wrap items-end justify-between gap-2">
-                <div className="space-y-0.5">
-                  <Label htmlFor={htmlId}>{task.label}</Label>
-                  <p className="text-xs text-muted-foreground">{task.hint}</p>
-                </div>
-                <Select
-                  value={levels[task.key]}
-                  disabled={update.isPending}
-                  onValueChange={(value) =>
-                    setLevel(task.key, value as TaskLevel)
-                  }
-                >
-                  <SelectTrigger id={htmlId} className="w-40 shrink-0">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="server">Theo máy chủ</SelectItem>
-                    <SelectItem value="low" disabled={!canTune}>
-                      Thấp
-                    </SelectItem>
-                    <SelectItem value="off" disabled={!canTune}>
-                      Tắt
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        <div className="space-y-3 border-t border-border pt-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <Label htmlFor={switchId}>Suy nghĩ</Label>
               <p className="text-xs text-muted-foreground">
-                Đã khai báo:{" "}
-                <span className="text-foreground">
-                  {LEVEL_LABEL[levels[task.key]]}
-                </span>
-                {" · "}Hiệu lực:{" "}
-                <span className="text-foreground">
-                  {effectiveLabel(data.effective[task.key])}
-                </span>
+                Bật để gửi tham số suy nghĩ, tắt để gửi giá trị tắt.
               </p>
             </div>
-          );
-        })}
+            <Switch
+              id={switchId}
+              checked={level === "low"}
+              disabled={!canTune || update.isPending || !canTurnOn}
+              onCheckedChange={(checked) =>
+                setDraft({ base: data, level: checked ? "low" : "off" })
+              }
+            />
+          </div>
 
-        {!canTune && hasContract && (
           <p className="text-xs text-muted-foreground">
-            Chỉ chọn được Thấp hoặc Tắt sau khi tham số đã được xác minh với
-            endpoint này.
+            Hiệu lực hiện tại:{" "}
+            <span className="text-foreground">
+              {effectiveLabel(data.effective)}
+            </span>
           </p>
-        )}
+          {canTune && !canTurnOn && (
+            <p className="text-xs text-muted-foreground">
+              Endpoint chỉ khai báo giá trị tắt cho tham số này.
+            </p>
+          )}
+          {!canTune && hasContract && (
+            <p className="text-xs text-muted-foreground">
+              Chỉ chỉnh được sau khi tham số đã được xác minh với endpoint này.
+            </p>
+          )}
+        </div>
       </div>
       <DialogFooter>
         <Button
@@ -292,21 +222,24 @@ function ReasoningPolicyForm({
         </Button>
         <Button
           type="button"
-          disabled={!isDirty || update.isPending || policy === null}
+          disabled={!canTune || !isDirty || update.isPending}
           onClick={() => {
             if (policy === null) return;
-            update.mutate(withTaskLevels(policy, levels), {
-              onSuccess: () => {
-                setDraft(null);
-                toast.success("Đã lưu mức suy nghĩ cho biên soạn và rà soát.");
+            update.mutate(
+              { ...policy, level },
+              {
+                onSuccess: () => {
+                  setDraft(null);
+                  toast.success("Đã lưu mức suy nghĩ cho model.");
+                },
+                onError: (error) =>
+                  toast.error(
+                    error instanceof ApiProblemError
+                      ? error.message
+                      : "Chưa lưu được mức suy nghĩ.",
+                  ),
               },
-              onError: (error) =>
-                toast.error(
-                  error instanceof ApiProblemError
-                    ? error.message
-                    : "Chưa lưu được mức suy nghĩ.",
-                ),
-            });
+            );
           }}
         >
           {update.isPending ? "Đang lưu…" : "Lưu thay đổi"}

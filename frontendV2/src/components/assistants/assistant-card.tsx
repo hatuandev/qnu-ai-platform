@@ -32,7 +32,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { READINESS_MAP, readinessDetail } from "./readiness";
+import {
+  READINESS_MAP,
+  readinessDetail,
+  UNBOUND_DETAIL,
+  UNBOUND_LABEL,
+} from "./readiness";
 
 const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit",
@@ -77,6 +82,7 @@ export function AssistantCard({
     workspaceId,
     assistant.id,
   );
+  const isUnbound = (assistant.collection_ids?.length ?? 0) === 0;
   const readinessBadge = readiness ? READINESS_MAP[readiness.status] : null;
   const isPubliclyLive =
     Boolean(publication?.configured) &&
@@ -182,7 +188,7 @@ export function AssistantCard({
               variant={readinessBadge.variant}
               className="h-4 px-1.5 text-[10px] font-normal"
             >
-              {readinessBadge.label}
+              {isUnbound ? UNBOUND_LABEL : readinessBadge.label}
             </Badge>
           )}
           {publication?.configured && publication.enabled && (
@@ -197,11 +203,13 @@ export function AssistantCard({
         </div>
         {readiness && (
           <p className="text-[11px] text-muted-foreground">
-            {readinessDetail(
-              readiness.status,
-              readiness.served_document_count,
-              readiness.published_document_count,
-            )}
+            {isUnbound
+              ? UNBOUND_DETAIL
+              : readinessDetail(
+                  readiness.status,
+                  readiness.served_document_count,
+                  readiness.published_document_count,
+                )}
           </p>
         )}
       </CardContent>

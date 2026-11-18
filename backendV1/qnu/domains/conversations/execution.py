@@ -57,15 +57,18 @@ async def send(
         return value
     try:
         config = conversation.assistant_snapshot
+        # Conversations created before multi-collection snapshots only carry the scalar
+        # column; keep them answering from that single collection.
+        collection_ids = config.get("collection_ids") or [conversation.collection_id]
 
         async def check():
             await checkpoint(db, actor, turn)
 
         reply, provider_id = await resolve_turn(db, actor, conversation, turn, chat)
         if reply is None:
-            policy = AssistantRagPolicy.model_validate(
-                config.get("rag_policy", {})
-            ).model_dump(mode="json", exclude={"guardrail_policy"})
+            policy = AssistantRagPolicy.model_validate(config.get("rag_policy", {})).model_dump(
+                mode="json", exclude={"guardrail_policy"}
+            )
             policy["metadata_filter"] = turn.metadata_filter or {}
             result = await answer(
                 db,
@@ -92,6 +95,7 @@ async def send(
                 checkpoint=check,
                 reranker=reranker,
                 compose_insufficient_message=True,
+                collection_ids=collection_ids,
             )
         else:
             result = reply

@@ -36,6 +36,7 @@ class PreviewRequest(BaseModel):
         Literal["ocr", "compiler", "index", "auto_review", "review", "spelling", "turn"] | None
     ) = None
     replacement_version_id: str | None = Field(None, min_length=1, max_length=64)
+    include_history: bool = False
 
     @model_validator(mode="after")
     def matching_parameters(self) -> Self:
@@ -43,6 +44,8 @@ class PreviewRequest(BaseModel):
             raise ValueError("job_kind chỉ dùng và bắt buộc cho tác vụ.")
         if (self.action == "replace") != (self.replacement_version_id is not None):
             raise ValueError("Phiên bản thay thế chỉ dùng và bắt buộc khi thay văn bản.")
+        if self.include_history and (self.kind, self.action) != ("collection", "delete"):
+            raise ValueError("include_history chỉ dùng khi xóa kho tri thức.")
         return self
 
     @field_validator("reason")

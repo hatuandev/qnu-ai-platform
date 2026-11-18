@@ -38,6 +38,7 @@ import {
   NEW_ASSISTANT_POLICY,
   type RagPolicyFormState,
 } from "./assistant-advanced-fields";
+import { AssistantCollectionPicker } from "./assistant-collection-picker";
 import {
   type AssistantFormState,
   AUTO_MODEL,
@@ -153,8 +154,8 @@ export function AssistantFormDialog({
               <span>{isEdit ? "Chỉnh sửa trợ lý" : "Tạo trợ lý mới"}</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Trợ lý trả lời trong phạm vi một kho tri thức và chỉ dẫn được nêu
-              bên dưới.
+              Trợ lý trả lời trong phạm vi các kho tri thức đã chọn và chỉ dẫn
+              được nêu bên dưới.
             </DialogDescription>
           </DialogHeader>
 
@@ -227,26 +228,16 @@ export function AssistantFormDialog({
                     <FieldLabel required className="text-xs font-medium">
                       Kho tri thức
                     </FieldLabel>
-                    <Select
-                      value={form.collectionId}
-                      onValueChange={(value) => patch({ collectionId: value })}
+                    <AssistantCollectionPicker
+                      collections={collections}
+                      selectedIds={form.collectionIds}
+                      onChange={(ids) => patch({ collectionIds: ids })}
                       disabled={isPending || isEdit}
-                    >
-                      <SelectTrigger className="h-9 bg-background text-xs">
-                        <SelectValue placeholder="Chọn kho tri thức" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {collections.map((collection) => (
-                          <SelectItem key={collection.id} value={collection.id}>
-                            {collection.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                     <FieldDescription>
                       {isEdit
-                        ? "Không thể đổi kho sau khi tạo; hãy tạo trợ lý mới nếu cần."
-                        : "Phạm vi tài liệu trợ lý được phép trả lời."}
+                        ? "Đổi bộ kho ở tab Cấu hình kèm xác nhận."
+                        : "Chọn một hoặc nhiều kho; trợ lý tra cứu trong tất cả kho đã chọn."}
                     </FieldDescription>
                   </Field>
 

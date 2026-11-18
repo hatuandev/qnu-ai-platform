@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     String,
     Text,
     UniqueConstraint,
@@ -21,13 +22,11 @@ from qnu.platform.database import Base
 class Assistant(Base):
     __tablename__ = "chat_assistants"
     __table_args__ = (
-        ForeignKeyConstraint(
-            ["collection_id", "workspace_id"],
-            ["kb_collections.id", "kb_collections.workspace_id"],
-            ondelete="RESTRICT",
-            name="fk_chat_assistant_collection",
-        ),
+        # Bindings live in ``chat_assistant_collections`` and enforce existence;
+        # ``collection_id`` is only a mirror of the first one, so it may be NULL
+        # for an assistant saved before any collection is attached.
         UniqueConstraint("id", "workspace_id", "collection_id", name="uq_chat_assistant_scope"),
+        UniqueConstraint("id", "workspace_id", name="uq_chat_assistant_identity"),
         CheckConstraint(
             "revision >= 1 AND top_k BETWEEN 1 AND 20 AND history_turns BETWEEN 0 AND 10 AND max_output_tokens > 0",
             name="ck_chat_assistant_config",
@@ -35,7 +34,7 @@ class Assistant(Base):
     )
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     workspace_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    collection_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    collection_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     persona: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -57,3 +56,32 @@ class Assistant(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
     )
+
+
+class AssistantCollection(Base):
+    """Collections an assistant answers from; ``position`` keeps the request order.
+
+    ``chat_assistants.collection_id`` stays as the first binding so older readers and
+    pinned history keep working; this table is the authoritative set.
+    """
+
+    __tablename__ = "chat_assistant_collections"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["assistant_id", "workspace_id"],
+            ["chat_assistants.id", "chat_assistants.workspace_id"],
+            ondelete="CASCADE",
+            name="fk_assistant_collection_link",
+        ),
+        ForeignKeyConstraint(
+            ["collection_id", "workspace_id"],
+            ["kb_collections.id", "kb_collections.workspace_id"],
+            ondelete="RESTRICT",
+            name="fk_assistant_collection_target",
+        ),
+        Index("ix_chat_assistant_collections_collection", "workspace_id", "collection_id"),
+    )
+    assistant_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    collection_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    position: Mapped[int] = mapped_column(nullable=False, default=0, server_default="0")
