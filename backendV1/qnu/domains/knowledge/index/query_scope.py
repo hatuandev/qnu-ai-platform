@@ -24,7 +24,7 @@ from qnu.domains.knowledge.publication.evidence import digest
 from qnu.platform.config import get_settings
 from qnu.platform.errors import Conflict
 
-VERSION = "qnu.catalog-scope/v6"
+VERSION = "qnu.catalog-scope/v8"
 
 # A bare four-digit year only scopes when the catalog proves that year and the
 # surrounding text is neither a count nor part of a date/code range.
@@ -125,27 +125,107 @@ def year_choices(query: str, catalog: dict) -> dict:
 
 
 def catalog_attributes(structures: list[dict]) -> dict:
+    """Attribute vocabulary, expanding '; '-joined list values into elements."""
     catalog: dict[str, dict] = {}
     for structure in structures:
         for annotation in structure.get("retrieval_metadata", []):
             for key, value in (annotation["values"].get("attributes") or {}).items():
                 typed_value = (type(value) if isinstance(value, (str, bool)) else int, value)
                 catalog.setdefault(key, {})[typed_value] = value
-    return {key: list(values.values()) for key, values in sorted(catalog.items())}
+    expanded = {}
+    for key, values in sorted(catalog.items()):
+        elements: dict[tuple[type, object], object] = {}
+        for value in values.values():
+            parts = value.split(";") if isinstance(value, str) else [value]
+            for part in parts:
+                part = part.strip() if isinstance(part, str) else part
+                if part != "":
+                    elements.setdefault((str if isinstance(part, str) else type(part), part), part)
+        expanded[key] = list(elements.values())
+    return expanded
 
 
-def attribute_scope(query: str, catalog: dict) -> dict:
+def catalog_sets(structures: list[dict]) -> dict[str, set[frozenset[str]]]:
+    """Stored comma lists as order-insensitive sets, for request matching."""
+    sets: dict[str, set[frozenset[str]]] = {}
+    for structure in structures:
+        for annotation in structure.get("retrieval_metadata", []):
+            for key, value in (annotation["values"].get("attributes") or {}).items():
+                if not isinstance(value, str):
+                    continue
+                for item in value.split(";"):
+                    parts = tuple(part for part in (normalize(p) for p in item.split(",")) if part)
+                    if len(parts) > 1:
+                        sets.setdefault(key, set()).add(frozenset(parts))
+    return sets
+
+
+SELECTION_CUE = re.compile(r"\bnào\b|\bliệt\s+kê\b|\bdanh\s+sách\b|\bkể\s+tên\b")
+
+
+def _run_value(text: str, start: int, parts: dict[str, str]) -> str | None:
+    """Greedy list run of known elements; a truncated run selects nothing."""
+    options = "|".join(re.escape(key) for key in sorted(parts, key=len, reverse=True))
+    pattern = re.compile(r"\s*(" + options + r")(?!\w|[.,]\d)")
+    join = re.compile(r"\s*(?:,|và\b|hoặc\b|với\b)\s*")
+    found, match, end = [], pattern.match(text, start), start
+    while match:
+        found.append(parts[match[1]])
+        end = match.end()
+        separator = join.match(text, end)
+        match = pattern.match(text, separator.end()) if separator else None
+    if len(found) < 2:
+        return None
+    look = text[end:].lstrip()
+    if look and (look[0].isalnum() or look[0] in ",;_"):
+        return None
+    return ", ".join(found)
+
+
+def attribute_scope(query: str, catalog: dict, sets: dict) -> dict:
     text = normalize(query)
     selected = {}
     for label, values in catalog.items():
+        folded = normalize(label)
         label_pattern = (
             r"(?<!\w)"
-            + re.escape(normalize(label))
+            + re.escape(folded)
             + r"(?!\w)\s*(?:(?P<explicit>[:=])\s*|là\b\s*)?"
         )
         selectors = list(re.finditer(label_pattern, text))
-        if not selectors:
+        parts = {}
+        if label in sets:
+            for value in values:
+                for part in (str(value).split(", ") if isinstance(value, str) else []):
+                    parts.setdefault(normalize(part), part)
+        selected_value = None
+        if parts:
+            starts = [selector.end() for selector in selectors]
+            if not selectors and SELECTION_CUE.search(text):
+                words = folded.split()
+                for size in range(len(words) - 1, 1, -1):
+                    prefix = re.escape(" ".join(words[:size]))
+                    for match in re.finditer(r"(?<!\w)" + prefix + r"(?!\w)", text):
+                        position = match.end()
+                        for word in words[size:]:
+                            step = re.match(
+                                r"\s+" + re.escape(word) + r"(?!\w)", text[position:]
+                            )
+                            if step is None:
+                                break
+                            position += step.end()
+                        starts.append(position)
+            for start in starts:
+                value = _run_value(text, start, parts)
+                if value and frozenset(normalize(p) for p in value.split(", ")) in sets[label]:
+                    selected_value = value
+                    break
+        if selected_value is not None:
+            selected[label] = selected_value
             continue
+        # A label mentioned without an assigned catalog value names the topic,
+        # not a scope selector: "số điện thoại" must not scope to an attribute
+        # labeled "Số", and "tổng quan" questions select a value only when named.
         by_label = {}
         for value in values:
             if isinstance(value, bool):
@@ -168,9 +248,6 @@ def attribute_scope(query: str, catalog: dict) -> dict:
                 join = join_pattern.match(text, match.end())
                 match = value_pattern.match(text, join.end()) if join else None
         matches = [value for key in found for value in by_label[key]]
-        # A label mentioned without an assigned catalog value names the topic,
-        # not a scope selector: "số điện thoại" must not scope to an attribute
-        # labeled "Số", and "tổng quan" questions select a value only when named.
         if len(matches) > 1:
             clarify(label, values)
         if matches:
@@ -272,7 +349,7 @@ def resolve(
         or year_choices(query, catalog)
     )
     base = fixed.model_dump(mode="json", exclude_none=True)
-    attributes = attribute_scope(query, catalog_attributes(structures))
+    attributes = attribute_scope(query, catalog_attributes(structures), catalog_sets(structures))
     if attributes:
         requested = {"attributes": attributes}
         if scope_conflicts(base, requested):

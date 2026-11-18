@@ -22,12 +22,15 @@ from qnu.domains.knowledge.event_schedule import (
     extract_events,
     fragmented_proofs,
 )
-from qnu.domains.knowledge.index.table_layout import layout, table_structure
+from qnu.domains.knowledge.index.table_dependencies import multitier_header, typed_header
+from qnu.domains.knowledge.index.table_layout import header_rows, layout, table_structure
 from qnu.domains.knowledge.metadata import (
     EventValue,
     RetrievalAnnotation,
     _invalid,
     attribute_in_quote,
+    list_value,
+    table_chain_labels,
 )
 from qnu.domains.knowledge.source_sections import source_sections
 
@@ -64,7 +67,7 @@ mà tiêu đề bao quát và dẫn đúng các khối liên quan. Không chép 
 không đề xuất tiêu đề đã có. Khi thiếu căn cứ để bổ sung, trả danh sách rỗng.
 """
 )
-RULE_VERSION = "qnu.compiler.metadata-rules/v10"
+RULE_VERSION = "qnu.compiler.metadata-rules/v11"
 KNOWN_FIELDS = {
     "issued_year",
     "data_year",
@@ -470,6 +473,81 @@ def _event_annotation(proposal: EventProposal, target: str) -> dict | None:
     return item.model_dump(mode="json", exclude_none=True)
 
 
+def _table_attribute_entries(draft: dict, documents: list[dict]) -> list[dict]:
+    """Row attributes for tables whose chain header labels a list-shaped cell.
+
+    One annotation per row keeps the row the unit; each attribute cites the
+    governing header cell and the value cell it was read from.
+    """
+    chain = table_chain_labels(draft["source_tables"])
+    entries = []
+    for entry in draft["source_tables"]:
+        columns = chain.get(entry["citation"])
+        if not columns or entry["table"].get("status") != "parsed":
+            continue
+        shape = table_structure(entry["table"])
+        positions, errors = layout(shape)
+        if errors or any(
+            position.cell.get("row_span") != 1 or position.cell.get("col_span") != 1
+            for position in positions
+        ):
+            continue
+        rows: dict[int, dict[int, dict]] = defaultdict(dict)
+        for position in positions:
+            rows[position.row][position.column] = position.cell
+        run = entry["citation"].split(":", 1)[0]
+        headers = set(
+            header_rows(shape)
+            or multitier_header(entry["table"])
+            or ([0] if typed_header(entry["table"]) else [])
+        )
+        for row, cells in sorted(rows.items()):
+            if row in headers or not cells.get(0, {}).get("text", "").strip():
+                continue
+            attributes, evidence, source = {}, [], None
+            for column, (label_ref, label) in sorted(columns.items()):
+                cell = cells.get(column)
+                if cell is None:
+                    continue
+                text = cell.get("text", "")
+                value = list_value(text)
+                ref = run + ":" + cell["evidence_id"]
+                if value is None or len(text) > 2000:
+                    continue
+                if label_ref not in draft["citations"] or ref not in draft["citations"]:
+                    continue
+                attributes[label] = value
+                source = source or ref
+                for citation, quote in ((label_ref, label), (ref, text)):
+                    item = {"citation": citation, "quote": quote}
+                    if quote and item not in evidence:
+                        evidence.append(item)
+            if not attributes:
+                continue
+            try:
+                item = RetrievalAnnotation.model_validate(
+                    {
+                        "target": f"table:{entry['citation']}:row:{row}",
+                        "values": {"attributes": attributes},
+                        "evidence": evidence,
+                    }
+                ).model_dump(mode="json", exclude_none=True)
+            except ValidationError:
+                continue
+            key = hashlib.sha256(json_bytes(item)).hexdigest()
+            entries.append(
+                {
+                    "id": key,
+                    "status": "proposed",
+                    "annotation": item,
+                    "origin": "rules",
+                    "segment": None,
+                    "source": draft["citations"][source],
+                }
+            )
+    return entries
+
+
 def _proposal_entries(
     draft: dict, documents: list[dict], parts: list[tuple[int, dict]]
 ) -> list[dict]:
@@ -601,6 +679,8 @@ def _proposal_entries(
     entries.update(_conversion_year_entries(draft, documents))
     if entry := _issued_line_entry(draft, documents):
         entries[entry["id"]] = entry
+    for entry in _table_attribute_entries(draft, documents):
+        entries.setdefault(entry["id"], entry)
     for event, proof in fragmented_proofs(documents):
         refs = [part["citation"] for part in proof]
         if not all(ref in draft["citations"] for ref in refs):

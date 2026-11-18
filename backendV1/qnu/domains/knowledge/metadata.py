@@ -13,7 +13,7 @@ from qnu.domains.knowledge.compilation.table_year import (
     table_year_headers,
     year_mentions,
 )
-from qnu.domains.knowledge.index.table_dependencies import multitier_header
+from qnu.domains.knowledge.index.table_dependencies import multitier_header, typed_header
 from qnu.domains.knowledge.index.table_layout import header_rows, layout, table_structure
 from qnu.domains.knowledge.source_sections import source_sections
 from qnu.platform.errors import AppException
@@ -36,6 +36,64 @@ def same_attribute(left: object, right: object) -> bool:
     return left == right
 
 
+def value_parts(text: str) -> tuple[str, ...] | None:
+    parts = tuple(" ".join(part.split()).casefold() for part in text.split(","))
+    return parts if len(parts) > 1 and all(parts) else None
+
+
+def same_listed(left: str, right: str) -> bool:
+    left_parts, right_parts = value_parts(left), value_parts(right)
+    return (
+        left_parts is not None
+        and right_parts is not None
+        and frozenset(left_parts) == frozenset(right_parts)
+    )
+
+
+def attribute_contains(stored: object, requested: object) -> bool:
+    """A stored list value contains a requested element in any order.
+
+    Exact scalars keep type-sensitive equality; a '; '-joined value matches
+    each of its elements, and a comma list matches as an unordered set.
+    """
+    if same_attribute(stored, requested):
+        return True
+    if not isinstance(stored, str) or not isinstance(requested, str):
+        return False
+    return any(
+        element and (same_attribute(element, requested) or same_listed(element, requested))
+        for element in (part.strip() for part in stored.split(";"))
+    )
+
+
+def list_value(text: str) -> str | None:
+    """Canonical '; '-joined value when every item is a comma list of short names.
+
+    A shape rule only: it recognizes combination-list structure and never
+    consults a subject dictionary. Single names, numeric lists and long
+    parenthesized names stay out.
+    """
+    items = []
+    for raw in re.split(r"[\n;]+", text):
+        item = raw.strip()
+        if len(item) >= 2 and item.startswith("(") and item.endswith(")"):
+            item = item[1:-1]
+        parts = [" ".join(part.split()) for part in item.split(",")]
+        if len(parts) < 2:
+            return None
+        for part in parts:
+            if (
+                not 1 <= len(part) <= 30
+                or len(part.split()) > 6
+                or any(ch.isdigit() for ch in part)
+                or not any(ch.isalpha() for ch in part)
+            ):
+                return None
+        items.append(", ".join(parts))
+    canonical = "; ".join(items)
+    return canonical if canonical and len(canonical) <= 500 else None
+
+
 def merge_scope(base: dict, extra: dict) -> dict:
     scope = {**base, **extra}
     if "attributes" in scope:
@@ -50,8 +108,8 @@ def scope_conflicts(fixed: dict, requested: dict) -> bool:
         for key, value in requested.items()
         if key != "attributes"
     ) or any(
-        key in pinned and not same_attribute(pinned[key], value)
-        for key, value in requested.get("attributes", {}).items()
+        key in pinned and not attribute_contains(pinned[key], requested_value)
+        for key, requested_value in requested.get("attributes", {}).items()
     )
 
 
@@ -419,6 +477,91 @@ def _header_refs(entry: dict, index: int) -> set[str]:
     }
 
 
+def _carried_first_row(table: dict) -> bool:
+    rows = table.get("rows") or []
+    return bool(rows and rows[0] and not rows[0][0]["text"].strip())
+
+
+def _continues_numbering(previous: dict, table: dict) -> bool:
+    """Identity column resumes one number after the previous table's last row."""
+    before, rows = previous.get("rows") or [], table.get("rows") or []
+    if not before or not rows or not before[-1] or not rows[0]:
+        return False
+    last = before[-1][0]["text"].strip()
+    first = rows[0][0]["text"].strip()
+    return last.isdigit() and first.isdigit() and int(first) == int(last) + 1
+
+
+def _local_header_labels(entry: dict) -> dict[int, tuple[str, str]]:
+    """Header label text and citation per physical column, local to one table.
+
+    Only single-tier labels are kept: a joined multi-tier label has no single
+    source quote to prove, so those columns stay without an attribute path.
+    """
+    shape, positions = _grid(entry)
+    if positions is None:
+        return {}
+    headers = (
+        header_rows(shape)
+        or multitier_header(entry["table"])
+        or ([0] if typed_header(entry["table"]) else [])
+    )
+    if not headers:
+        return {}
+    run = entry["citation"].split(":", 1)[0]
+    pieces: dict[int, list[str]] = {}
+    refs: dict[int, str] = {}
+    for position in positions:
+        if position.row not in headers:
+            continue
+        text = " ".join(position.cell["text"].split())
+        if not text:
+            continue
+        for column in range(position.column, position.column + position.cell["col_span"]):
+            pieces.setdefault(column, []).append(text)
+            refs.setdefault(column, run + ":" + position.cell["evidence_id"])
+    return {
+        column: (refs[column], texts[0])
+        for column, texts in pieces.items()
+        if len(texts) == 1 and len(texts[0]) <= 80
+    }
+
+
+def table_chain_labels(tables: list[dict]) -> dict[str, dict[int, tuple[str, str]]]:
+    """Header labels inherited down page-adjacent continuation tables of one run.
+
+    Continuation proof needs the same run and width, the next page, and either
+    a carried first row whose identity cells are empty, or an identity column
+    that resumes one number after the previous table's last row.
+    """
+    labels_by_table: dict[str, dict[int, tuple[str, str]]] = {}
+    previous: tuple[str, int | None, int, dict[int, tuple[str, str]], dict] | None = None
+    for entry in tables:
+        citation = entry["citation"]
+        run, columns = citation.split(":", 1)[0], entry["table"].get("column_count") or 0
+        labels = _local_header_labels(entry)
+        if not labels and previous is not None:
+            previous_run, previous_page, previous_columns, previous_labels, previous_table = (
+                previous
+            )
+            if (
+                previous_run == run
+                and previous_page is not None
+                and previous_page + 1 == entry.get("page_number")
+                and previous_columns == columns
+                and previous_labels
+                and (
+                    _carried_first_row(entry["table"])
+                    or _continues_numbering(previous_table, entry["table"])
+                )
+            ):
+                labels = previous_labels
+        if labels:
+            labels_by_table[citation] = labels
+        previous = (run, entry.get("page_number"), columns, labels, entry["table"])
+    return labels_by_table
+
+
 def target_refs(content: dict, target: str, outline: dict | None = None) -> set[str]:
     if target == "document":
         return set(content["citations"])
@@ -468,6 +611,49 @@ def attribute_in_quote(label: str, value: str | float | bool, quote: str) -> boo
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return re.search(r"(?<![\w.,])" + literal + r"(?!\w|[.,]\d)", folded) is not None
     return re.search(r"(?<!\w)" + literal + r"(?!\w)", folded) is not None
+
+
+def _structural_attribute_proof(
+    item: RetrievalAnnotation,
+    label: str,
+    value: str,
+    content: dict,
+    labels: dict[str, dict[int, tuple[str, str]]],
+) -> bool:
+    """A row attribute is proven by the chain header governing a matching list cell.
+
+    Evidence must cite that header cell with exactly the stored label; the
+    value itself is proven by the cell's canonical list form.
+    """
+    target = re.fullmatch(r"table:(.+):row:(\d+)", item.target)
+    if target is None or not isinstance(value, str):
+        return False
+    citation, row = target.group(1), int(target.group(2))
+    entry = _table_entry(content, citation)
+    if entry is None:
+        return False
+    columns = labels.get(citation) or {}
+    _, positions = _grid(entry)
+    if positions is None:
+        return False
+    for position in positions:
+        cell = position.cell
+        if (
+            position.row != row
+            or cell.get("row_span") != 1
+            or cell.get("col_span") != 1
+            or list_value(cell.get("text", "")) != value
+        ):
+            continue
+        header = columns.get(position.column)
+        if header is None or header[1] != label:
+            continue
+        if any(
+            evidence.citation == header[0] and " ".join(evidence.quote.split()) == label
+            for evidence in item.evidence
+        ):
+            return True
+    return False
 
 
 def _mentions_year(text: str, year: int) -> bool:
@@ -592,6 +778,7 @@ def validate_annotations(
     seen = set()
     conversion = None
     fragmented = None
+    chain_labels = None
     global_values = next((a["values"] for a in annotations if a["target"] == "document"), {})
     for raw in annotations:
         item = RetrievalAnnotation.model_validate(raw)
@@ -608,8 +795,16 @@ def validate_annotations(
             r"table:(.+):row:(\d+)(?::column:(\d+))?", item.target
         ) or re.fullmatch(r"table:(.+):column:(\d+)", item.target)
         conversion_bound = False
+        structural = table is not None and bool(item.values.attributes)
+        structural_refs: set[str] = set()
         if table:
             table_ref = table.group(1)
+            if structural:
+                if chain_labels is None:
+                    chain_labels = table_chain_labels(content["source_tables"])
+                structural_refs = {
+                    header[0] for header in (chain_labels.get(table_ref) or {}).values()
+                }
             if item.values.data_year is not None and any(
                 e.citation not in refs for e in item.evidence
             ):
@@ -625,7 +820,7 @@ def validate_annotations(
         for evidence in item.evidence:
             if (
                 evidence.citation not in content["citations"]
-                or evidence.citation not in refs
+                or (evidence.citation not in refs and evidence.citation not in structural_refs)
                 or evidence.quote not in texts.get(evidence.citation, "")
                 or evidence.quote not in local_texts.get(evidence.citation, "")
             ):
@@ -644,7 +839,14 @@ def validate_annotations(
                         or global_attributes[label] != entry
                     ):
                         raise _invalid("Thuộc tính mâu thuẫn với metadata toàn văn bản.")
-                    if not any(attribute_in_quote(label, entry, e.quote) for e in item.evidence):
+                    if not any(
+                        attribute_in_quote(label, entry, e.quote) for e in item.evidence
+                    ) and not (
+                        structural
+                        and _structural_attribute_proof(
+                            item, label, entry, content, chain_labels or {}
+                        )
+                    ):
                         raise _invalid("Nhãn và giá trị metadata cần có trong trích đoạn nguồn.")
                 continue
             alternatives = [str(value)]
@@ -767,7 +969,7 @@ def matches_metadata(structure: dict | None, scope: MetadataFilter) -> bool:
         for key, value in wanted.items():
             if key == "attributes":
                 current = values.get("attributes") or {}
-                matches &= all(same_attribute(current.get(k), v) for k, v in value.items())
+                matches &= all(attribute_contains(current.get(k), v) for k, v in value.items())
             elif key == "effective_on":
                 # An annotated validity interval is open-ended on a missing side.
                 # A unit with neither boundary stays unknown and never matches.

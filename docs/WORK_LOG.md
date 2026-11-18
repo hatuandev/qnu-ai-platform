@@ -1,5 +1,7 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context1015 — Chặng 4: hợp đồng trả lời eligibility tính sẵn từ bảng (closed-set facts).](nhat_ky/2026-11-18_phien_1015_hop_dong_eligibility.md)
+- [Context1014 — Chặng 3: tổ hợp môn từng dòng bảng vào metadata và lọc theo thuộc tính.](nhat_ky/2026-11-18_phien_1014_chan_3_to_hop_vao_metadata.md)
 - [Context1013 — Câu hỏi luật: prompt v36 và chèn dòng bảng theo tổ hợp (Chặng 2).](nhat_ky/2026-11-18_phien_1013_prompt_v36_va_chan_2.md)
 - [Context1012 — Xóa kho tri thức kèm lịch sử hội thoại.](nhat_ky/2026-11-18_phien_1012_xoa_kho_kem_lich_su.md)
 - [Context1009 — Model và số lượt xử lý văn bản.](nhat_ky/2026-11-17_phien_1009_model_xu_ly_van_ban.md)

@@ -2,7 +2,9 @@
 
 import json
 
+from qnu.domains.knowledge.index.query_scope import SELECTION_CUE
 from qnu.domains.rag.answer.cells import catalog
+from qnu.domains.rag.answer.closed_set import computed_facts
 from qnu.domains.rag.answer.coverage import plan_for
 from qnu.domains.rag.answer.drafting import messages_for
 from qnu.domains.rag.answer.selection import question_needs
@@ -38,7 +40,9 @@ def pack_messages(req, sources, context, **options):
     }
     rank = _anchor_rank(context)
     skipped = []
-    include_names = question_needs(req.question)["enumeration"]
+    needs = question_needs(req.question)
+    include_names = needs["enumeration"]
+    enumeration_requested = include_names or bool(SELECTION_CUE.search(req.question.casefold()))
     while True:
         cells = catalog(sources, context.get("table_links"), include_names=include_names)
         cells = select_catalog(
@@ -49,22 +53,33 @@ def pack_messages(req, sources, context, **options):
             data_years=requested_data_years(options.get("metadata_filter")),
             intakes=requested_intakes(options.get("metadata_filter")),
         )
+        selectable = {table["evidence_id"] for table in cells["tables"] if table["cells"]}
+        selectable.update(cells.get("selection", {}).get("omitted_tables", []))
+        # Selectable tables keep the cell contract, so prose-only facts skip them.
+        computed, computed_summary = computed_facts(
+            req.question,
+            sources,
+            enumeration_requested=enumeration_requested,
+            exclude_evidence_ids=selectable,
+        )
         messages = messages_for(
             req.question,
             sources,
             table_context=context.get("table_links"),
             table_cells=cells,
             answer_plan=plan_for(sources, context),
+            computed=computed,
             **options,
         )
         envelope = json.loads(messages[-1].content)
         evidence = {
             key: envelope[key]
-            for key in ("evidence", "tables", "unselectable", "reading", "joins", "plan")
+            for key in ("evidence", "tables", "unselectable", "reading", "joins", "plan", "computed")
             if key in envelope
         }
         size = len(json.dumps(evidence, ensure_ascii=False, separators=(",", ":")).encode())
         if size <= req.context_max_bytes:
+            context["computed"] = computed_summary
             return messages, cells, evidence, size, skipped
         trimmable = [index for index, source in enumerate(sources) if source.chunk_id in optional]
         if not sources or not trimmable:

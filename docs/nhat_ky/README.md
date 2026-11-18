@@ -1,5 +1,7 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên 1015 — Chặng 4: hợp đồng trả lời eligibility tính sẵn từ bảng (closed-set facts).](2026-11-18_phien_1015_hop_dong_eligibility.md)
+- [Phiên 1014 — Chặng 3: tổ hợp môn từng dòng bảng vào metadata và lọc theo thuộc tính.](2026-11-18_phien_1014_chan_3_to_hop_vao_metadata.md)
 - [Phiên 1013 — Câu hỏi luật: prompt v36 và chèn dòng bảng theo tổ hợp (Chặng 2).](2026-11-18_phien_1013_prompt_v36_va_chan_2.md)
 - [Phiên 1012 — Xóa kho tri thức kèm lịch sử hội thoại.](2026-11-18_phien_1012_xoa_kho_kem_lich_su.md)
 - [Phiên 1009 — Model và số lượt xử lý văn bản.](2026-11-17_phien_1009_model_xu_ly_van_ban.md)

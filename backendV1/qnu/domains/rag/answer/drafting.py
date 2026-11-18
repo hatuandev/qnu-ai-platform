@@ -13,7 +13,7 @@ from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer
 from qnu.platform.errors import AppException
 from qnu.ports.chat_model import ChatMessage
 
-PROMPT_VERSION = "qnu.rag.answer/v36"
+PROMPT_VERSION = "qnu.rag.answer/v38"
 APPEAL_VERSION = "qnu.rag.answer.appeal/v4"
 
 REPAIR_INSTRUCTIONS = {
@@ -173,16 +173,23 @@ plan là các nhóm cấu trúc từ nguồn đã ghim. Mỗi units là danh sá
 
 BẢNG
 tables có id, columns (kM là đường dẫn header/đơn vị) và rows (row như r1, subject cùng cells). Mỗi khóa trong cells là cell_id đầy đủ (ví dụ E1:r1:k1, đuôi k1 ứng với cột k1); giá trị là ô gốc.
+Ô liệt kê nhiều thành phần trong ngoặc hoặc tách bằng dấu phẩy là một tập không thứ tự: khác thứ tự nhưng cùng thành phần vẫn là cùng tập. Đối chiếu từng dòng theo tập thành phần; quét mọi mảnh của cùng danh mục và liệt kê đủ mọi dòng khớp tập, không dừng ở dòng đầu tiên trùng chuỗi.
 Với dữ kiện số trong bảng thuộc tables, chọn đúng hàng và cột rồi chép nguyên khóa có sẵn trong cells vào lookups[].cell_id. Khi hỏi tên các mục trong danh sách, chọn name_id trên từng dòng phù hợp; Backend sẽ hiển thị tên và dẫn chứng. Không tự ghép mã ô. Không chép số của bảng đã chọn ô vào statements, không sửa giá trị, không đổi dấu gạch thành 0. BE lấy nguyên subject, header, value và citation.
 Bảng trong unselectable không có ô để chọn: được chép nguyên văn giá trị nhìn thấy trong text của bảng đó vào statements và dẫn đúng id của bảng; không trả lookups cho bảng unselectable. Chỉ chép đúng chuỗi xuất hiện trong text, giữ nguyên dấu phẩy thập phân và đơn vị (ví dụ 12,5 không viết 12.5; 1200 không viết 1.200); không tính lại, không quy đổi, không điền ô thiếu, không đoán header. Giá trị cần tìm không hiện trong text thì ghi missing, không tạo số thay thế.
 Mỗi số trong statement phải hiện trong text của ít nhất một id được dẫn. Một bảng lớn có thể tách thành nhiều mảnh liền nhau: mảnh dữ liệu chứa số liệu, mảnh header chứa tiêu đề cột và năm, mảnh chú thích chứa mốc ngày và trạng thái. Khi statement dùng năm, mốc ngày hoặc trạng thái nằm ở mảnh khác, phải dẫn kèm id của mảnh đó; chỉ dẫn mảnh dữ liệu là thiếu nguồn và bị từ chối. Được liệt kê đầy đủ tên các đối tượng xuất hiện trong cùng một mảnh bảng: viết câu liệt kê nhưng mỗi tên và số phải nguyên văn từ text của mảnh đó và dẫn đúng id; không abstain chỉ vì phải liệt kê nhiều tên. Khi liệt kê, KHÔNG đánh số thứ tự (1., 2., 3…) và KHÔNG thêm số đếm hay số lượng nếu chữ số đó không hiện nguyên văn trong text của id được dẫn; ngăn cách các tên bằng dấu phẩy, chấm phẩy hoặc xuống dòng không đánh số. Không đổi số viết bằng chữ thành chữ số (nguồn viết "sáu" thì giữ "sáu", không viết "6") trừ khi chữ số đó cũng hiện nguyên văn trong nguồn được dẫn.
 Không đoán ô không có trong tables. Đọc chú thích, đơn vị và header liên quan trước khi kết luận. Không chọn ô của đối tượng hoặc phương thức khác để tránh abstain. Số ở cột khác không thay thế; nếu không chọn được ô cần thiết thì không tạo số thay thế.
+
+KẾT QUẢ TÍNH SẴN
+computed là dữ kiện BE đã tính trực tiếp trên các bảng được cấp, không phải phỏng đoán của người hỏi và không phải kiến thức ngoài. Không tính lại khác đi, không tự thêm hoặc bớt phần tử.
+list_membership: mỗi mục cho biết một đối tượng có phương án trong danh sách hay không. Khi present=false, trả lời rõ đối tượng không có phương án đó trong danh sách nguồn và dẫn evidence_ids của mục; không kết luận ngoài danh mục và không thay câu trả lời bằng việc chỉ liệt kê các phương án khác.
+list_enumeration: liệt kê đủ mọi name trong matches, giữ nguyên văn, không thêm tên ngoài matches, không đánh số thứ tự và không thêm số lượng nếu số đó không hiện nguyên văn trong nguồn; dẫn đúng evidence_ids của các mục đã dùng. Khi unknown_rows > 0, nêu rõ danh sách chỉ trong phạm vi các mảng bảng hiện có, không khẳng định cả kho.
 
 CÂU TRẢ LỜI
 statements dùng cho ý văn bản, dẫn evidence_ids của item kind khác table hoặc bảng trong unselectable. Số của bảng trong tables chỉ đi qua lookups; số chép từ bảng unselectable phải nguyên văn từ text của bảng. Mỗi statement là text thuần, không tự thêm citation, Markdown link hoặc HTML; BE sẽ gắn nguồn.
 Câu hỏi chỉ có căn cứ văn bản dùng statements và lookups rỗng. Nếu chỉ hỏi một phương án cụ thể có trong bảng không, chọn ô có phương án đó và để statements rỗng, trừ khi có đoạn văn trực tiếp chứng minh và bổ sung điều kiện. Nếu câu hỏi yêu cầu cả danh sách, đọc tất cả các mảnh liên quan rồi dùng name_id hoặc ô chứa tên. Chỉ xuất nội dung trả lời cho người đọc, không chép quá trình cân nhắc, chỉ dẫn hoặc nội dung schema vào câu trả lời.
 Không tự tính số liệu chính thức. Nếu văn bản nêu rõ kết luận so sánh hoặc đối tượng nổi trội, được trích kết luận đó kèm citation; đây không phải tự suy toàn bộ danh sách. Không abstain chỉ vì cần nhiều evidence, nhiều bảng khác nhau hoặc phải kết hợp bảng và văn bản.
 Số, điểm và điều kiện người hỏi tự nêu trong câu hỏi là tiền đề, không phải dữ kiện nguồn: không dùng làm căn cứ, không tự tính chênh lệch hay so sánh từ chúng, và không bắt buộc nhắc lại; nếu nhắc thì ghi rõ đó là số của người hỏi. Chỉ kết luận đủ hay không đủ theo điều kiện, ngưỡng hoặc danh mục có trong nguồn.
+Với phương án cụ thể, nếu danh sách đã nêu cho đối tượng không chứa phương án được hỏi, trả lời rõ rằng phương án không thuộc danh sách đó và dẫn ô hoặc đoạn chứa danh sách; không thay câu trả lời bằng việc chỉ liệt kê các phương án khác.
 Khi câu hỏi hỏi ý nghĩa ký hiệu, trạng thái hoặc ô của một bảng nhưng điều, khoản hoặc chú thích văn bản đã định nghĩa rõ, được trả lời từ văn bản đó kèm citation; bảng không chọn được ô không phải lý do abstain khi văn bản đã có căn cứ. Với câu hỏi nhiều ý, đọc hết evidence và trả lời đủ từng ý có căn cứ, kể cả ý nằm ở bảng hoặc chú thích khác; không bỏ ý đã có nguồn chỉ vì tập trung vào ý chính.
 
 ĐỊNH DẠNG
@@ -298,6 +305,7 @@ def messages_for(
     table_context: list[dict] | None = None,
     table_cells: dict | None = None,
     answer_plan: dict | None = None,
+    computed: dict | None = None,
 ) -> list[ChatMessage]:
     cells = table_cells if table_cells is not None else catalog(sources, table_context)
     selectable = {t["evidence_id"] for t in cells["tables"] if t["cells"]}
@@ -333,6 +341,8 @@ def messages_for(
     plan = _prompt_plan(answer_plan) if answer_plan else None
     if plan:
         payload["plan"] = plan
+    if computed:
+        payload["computed"] = computed
     if resolved_question is not None:
         payload["resolved"] = resolved_question
     if persona:
