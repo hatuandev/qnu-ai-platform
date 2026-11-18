@@ -60,7 +60,7 @@ async def test_facets_preserve_scope_filter_and_cap_context(monkeypatch):
         document_ids=["doc"],
         metadata_filter={"data_year": 2031},
     )
-    result = await retrieval.search(None, None, None, None, None, "ws", "col", req)
+    result = await retrieval.search(None, None, None, None, None, "ws", ["col"], req)
     assert [h.chunk_id for h in result.hits] == ["E1", "E2"]
     for call in mock.call_args_list:
         scoped = call.args[-1]
@@ -77,7 +77,7 @@ async def test_answer_retrieval_forwards_skipped_final_validation(monkeypatch):
     )
     monkeypatch.setattr(retrieval, "search_single", mock)
     req = SearchRequest(query="What is the quota?", top_k=2)
-    await retrieval.search(None, None, None, None, None, "ws", "col", req, verify=False)
+    await retrieval.search(None, None, None, None, None, "ws", ["col"], req, verify=False)
     assert mock.await_args.kwargs["verify"] is False
 
 
@@ -101,4 +101,4 @@ async def test_generation_change_between_facets_blocks(monkeypatch):
         query="What is the population of city A? What is the population of city B?", top_k=2
     )
     with pytest.raises(Conflict):
-        await retrieval.search(None, None, None, None, None, "ws", "col", req)
+        await retrieval.search(None, None, None, None, None, "ws", ["col"], req)

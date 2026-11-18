@@ -101,7 +101,7 @@ def test_catalog_resolves_explicit_scope_and_never_guesses_unknown_year():
     corpus = [scoped(), scoped(program="Khí tượng học", year=2032)]
     _, filters, trace = resolve("Hải dương học năm 2031", MetadataFilter(), corpus)
     assert filters == [MetadataFilter(program="Hải dương học", data_year=2031)]
-    assert trace["version"] == "qnu.catalog-scope/v5"
+    assert trace["version"] == "qnu.catalog-scope/v8"
     _, unknown, _ = resolve("Hải dương học năm 2099", MetadataFilter(), corpus)
     assert unknown[0].data_year == 2099  # Caller applies this even when it matches no units.
 

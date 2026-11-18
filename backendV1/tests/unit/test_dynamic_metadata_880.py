@@ -92,7 +92,7 @@ def test_query_resolves_only_labeled_catalog_values():
     assert scopes == [MetadataFilter()]
     for text in (
         "Cơ sở: Chưa công bố",
-        "Cơ sở Chưa rõ",
+        "Cơ sở: Chưa rõ",
         "Cơ sở Quy Nhơn và Gia Lai",
         "Cơ sở: Quy Nhơn; Cơ sở: X",
     ):

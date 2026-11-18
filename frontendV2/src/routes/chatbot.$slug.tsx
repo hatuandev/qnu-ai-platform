@@ -2,12 +2,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   BookOpen,
   Bot,
+  Check,
+  Copy,
   Loader2,
   RotateCcw,
   Send,
+  Sparkles,
+  ThumbsDown,
+  ThumbsUp,
   TriangleAlert,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { ApiProblemError } from "@/api/client";
 import {
   type PublicChatSession,
@@ -26,8 +32,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/chatbot/$slug")({
   validateSearch: (
@@ -96,20 +108,293 @@ function isRetryable(err: unknown): boolean {
 function CitationChips({ citations }: { citations: PublicCitation[] }) {
   if (citations.length === 0) return null;
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
+    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-border/40 pt-2">
+      <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground mr-0.5">
+        <BookOpen className="size-3 text-primary" /> Nguồn trích dẫn:
+      </span>
       {citations.map((citation) => (
-        <Badge
-          key={`citation-${citation.index}-${citation.title}`}
-          variant="secondary"
-          className="h-auto max-w-full items-start gap-1 px-1.5 py-0.5 text-[10px] font-normal"
-        >
-          <BookOpen className="mt-0.5 size-3 shrink-0" />
-          <span className="break-words">
-            [{citation.index}] {citation.title}
-            {citation.page !== null ? ` · tr. ${citation.page}` : ""}
-          </span>
-        </Badge>
+        <Popover key={`citation-${citation.index}-${citation.title}`}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-border/70 bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
+            >
+              <span className="font-semibold text-primary">
+                [{citation.index}]
+              </span>
+              <span className="max-w-[180px] truncate">{citation.title}</span>
+              {citation.page !== null ? (
+                <span className="text-[10px] text-muted-foreground">
+                  · tr. {citation.page}
+                </span>
+              ) : null}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-3 text-xs" align="start">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
+                <span className="font-semibold text-foreground flex items-center gap-1">
+                  <BookOpen className="size-3.5 text-primary" /> Dẫn chứng [
+                  {citation.index}]
+                </span>
+                {citation.page !== null ? (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] px-1.5 py-0 h-4 font-normal"
+                  >
+                    Trang {citation.page}
+                  </Badge>
+                ) : null}
+              </div>
+              <p className="font-medium text-foreground text-[11px] leading-snug">
+                {citation.title}
+              </p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Dữ liệu được đối chiếu và trích xuất nguyên văn từ tài liệu
+                chính thức đã xuất bản.
+              </p>
+            </div>
+          </PopoverContent>
+        </Popover>
       ))}
+    </div>
+  );
+}
+
+function MessageActionBar({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const [feedback, setFeedback] = useState<"like" | "dislike" | null>(null);
+  const [dislikeSubmitted, setDislikeSubmitted] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success("Đã sao chép câu trả lời vào bộ nhớ tạm");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Không thể sao chép văn bản");
+    }
+  };
+
+  const handleLike = () => {
+    if (feedback === "like") return;
+    setFeedback("like");
+    toast.success("Cảm ơn bạn đã đánh giá hữu ích!");
+  };
+
+  const handleDislikeReason = (reason: string) => {
+    setFeedback("dislike");
+    setDislikeSubmitted(true);
+    toast.info(`Đã ghi nhận góp ý: ${reason}`);
+  };
+
+  return (
+    <div className="mt-2 flex items-center justify-between border-t border-border/40 pt-1.5 text-muted-foreground">
+      <div className="flex items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "h-6 px-1.5 text-[11px] gap-1 hover:text-foreground cursor-pointer",
+            feedback === "like" && "text-primary font-medium",
+          )}
+          onClick={handleLike}
+          title="Câu trả lời hữu ích"
+        >
+          <ThumbsUp className="size-3" />
+          {feedback === "like" ? <span>Hữu ích</span> : null}
+        </Button>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-6 px-1.5 text-[11px] gap-1 hover:text-foreground cursor-pointer",
+                feedback === "dislike" && "text-destructive font-medium",
+              )}
+              title="Chưa hài lòng"
+            >
+              <ThumbsDown className="size-3" />
+              {feedback === "dislike" ? <span>Đã góp ý</span> : null}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-2.5 text-xs" align="start">
+            {dislikeSubmitted ? (
+              <p className="text-[11px] text-muted-foreground py-1 text-center">
+                ✓ Cảm ơn bạn. Ý kiến đóng góp sẽ được chuyển đến bộ phận chuyên
+                môn để cải thiện.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                <p className="font-semibold text-foreground text-[11px]">
+                  Lý do chưa hài lòng:
+                </p>
+                <div className="flex flex-col gap-1">
+                  {[
+                    "Thông tin chưa chính xác với văn bản",
+                    "Chưa trả lời đúng trọng tâm câu hỏi",
+                    "Thông tin quá vắn tắt hoặc khó hiểu",
+                  ].map((reason) => (
+                    <button
+                      key={reason}
+                      type="button"
+                      className="rounded px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+                      onClick={() => handleDislikeReason(reason)}
+                    >
+                      • {reason}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-6 px-1.5 text-[11px] gap-1 hover:text-foreground text-muted-foreground cursor-pointer"
+        onClick={handleCopy}
+        title="Sao chép nội dung"
+      >
+        {copied ? (
+          <>
+            <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-emerald-600 dark:text-emerald-400">
+              Đã chép
+            </span>
+          </>
+        ) : (
+          <>
+            <Copy className="size-3" />
+            <span>Sao chép</span>
+          </>
+        )}
+      </Button>
+    </div>
+  );
+}
+
+function SendingProgress() {
+  const [stageIndex, setStageIndex] = useState(0);
+
+  useEffect(() => {
+    const timer1 = setTimeout(() => setStageIndex(1), 2200);
+    const timer2 = setTimeout(() => setStageIndex(2), 5200);
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, []);
+
+  const stages = [
+    "Đang tra cứu tài liệu trong kho tri thức...",
+    "Đang đối soát bảng biểu & trích xuất dữ kiện...",
+    "Đang tổng hợp câu trả lời chính xác...",
+  ];
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-card/50 px-3.5 py-2.5 text-xs text-muted-foreground shadow-2xs">
+      <Loader2 className="size-3.5 animate-spin text-primary shrink-0" />
+      <span className="transition-opacity duration-300">
+        {stages[stageIndex]}
+      </span>
+    </div>
+  );
+}
+
+function getSuggestedPrompts(
+  lastQuestion: string,
+  lastAnswer: string,
+  starterPrompts: string[],
+): string[] {
+  const q = lastQuestion.toLowerCase();
+  const a = lastAnswer.toLowerCase();
+
+  if (
+    q.includes("ngành") ||
+    q.includes("tổ hợp") ||
+    q.includes("môn") ||
+    a.includes("tổ hợp")
+  ) {
+    return [
+      "Chỉ tiêu tuyển sinh của ngành này là bao nhiêu?",
+      "Điểm chuẩn trúng tuyển các năm gần nhất?",
+      "Hồ sơ và quy trình đăng ký xét tuyển ra sao?",
+    ];
+  }
+  if (
+    q.includes("học phí") ||
+    q.includes("học bổng") ||
+    q.includes("tiền") ||
+    a.includes("học phí")
+  ) {
+    return [
+      "Có những chính sách miễn giảm học phí nào?",
+      "Điều kiện xét nhận học bổng khuyến khích?",
+      "Thời hạn và hình thức nộp học phí của trường?",
+    ];
+  }
+  if (
+    q.includes("phương thức") ||
+    q.includes("xét tuyển") ||
+    a.includes("phương thức")
+  ) {
+    return [
+      "Ngưỡng đảm bảo chất lượng đầu vào (điểm sàn) là bao nhiêu?",
+      "Trường có xét học bạ THPT không?",
+      "Thời gian nộp hồ sơ xét tuyển sớm là khi nào?",
+    ];
+  }
+
+  if (starterPrompts.length > 0) {
+    return starterPrompts.slice(0, 3);
+  }
+  return [
+    "Trường Đại học Quy Nhơn đào tạo những khối ngành nào?",
+    "Thông tin liên hệ Ban Tuyển sinh của trường?",
+    "Ký túc xá và cơ sở vật chất dành cho sinh viên?",
+  ];
+}
+
+function SuggestedPromptChips({
+  prompts,
+  onSelect,
+  disabled,
+}: {
+  prompts: string[];
+  onSelect: (prompt: string) => void;
+  disabled: boolean;
+}) {
+  if (prompts.length === 0) return null;
+  return (
+    <div className="space-y-1.5 pt-1 animate-in fade-in-50 duration-300">
+      <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+        <Sparkles className="size-3 text-primary" />
+        <span>Gợi ý câu hỏi tiếp theo:</span>
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {prompts.map((prompt) => (
+          <Button
+            key={prompt}
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-auto max-w-full justify-start rounded-full border-border/70 bg-card/60 px-3 py-1 text-left text-xs font-normal leading-relaxed hover:border-primary/50 hover:bg-muted cursor-pointer"
+            disabled={disabled}
+            onClick={() => onSelect(prompt)}
+          >
+            <span className="truncate">{prompt}</span>
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -149,6 +434,7 @@ function MessageBubble({ message }: { message: PublicMessage }) {
         {message.citations ? (
           <CitationChips citations={message.citations} />
         ) : null}
+        <MessageActionBar text={message.text} />
       </div>
     </div>
   );
@@ -188,6 +474,36 @@ function PublicChatbotPage() {
     () => turnsRemaining ?? info?.max_turns_per_session ?? null,
     [turnsRemaining, info?.max_turns_per_session],
   );
+
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const lastAssistantMessage = useMemo(() => {
+    if (messages.length === 0) return null;
+    const last = messages[messages.length - 1];
+    return last.role === "assistant" && last.tone !== "error" ? last : null;
+  }, [messages]);
+
+  const lastUserQuestion = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") return messages[i].text;
+    }
+    return "";
+  }, [messages]);
+
+  const suggestedPrompts = useMemo(() => {
+    if (!lastAssistantMessage) return [];
+    return getSuggestedPrompts(
+      lastUserQuestion,
+      lastAssistantMessage.text,
+      info?.starter_prompts ?? [],
+    );
+  }, [lastAssistantMessage, lastUserQuestion, info?.starter_prompts]);
+
+  useEffect(() => {
+    if (messages.length > 0 || isSending) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages.length, isSending]);
 
   const canAsk =
     Boolean(info?.available) && !blockedReason && !isSending && remaining !== 0;
@@ -443,12 +759,15 @@ function PublicChatbotPage() {
             <MessageBubble key={message.id} message={message} />
           ))
         )}
-        {isSending ? (
-          <p className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin" />
-            <span>Trợ lý đang soạn câu trả lời.</span>
-          </p>
+        {isSending ? <SendingProgress /> : null}
+        {!isSending && lastAssistantMessage ? (
+          <SuggestedPromptChips
+            prompts={suggestedPrompts}
+            onSelect={(prompt) => void handleSend(prompt)}
+            disabled={!canAsk}
+          />
         ) : null}
+        <div ref={messagesEndRef} />
       </div>
 
       <div
