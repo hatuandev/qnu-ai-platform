@@ -17,6 +17,9 @@ class AnswerRequest(RagPolicy):
     document_ids: list[str] | None = Field(None, min_length=1, max_length=100)
     provider_id: str | None = Field(None, min_length=1, max_length=64)
     max_output_tokens: int | None = Field(None, strict=True, gt=0)
+    fact_query: dict | None = Field(default=None)
+    history: list[dict] | None = Field(default=None)
+    calculation: dict | None = Field(default=None)
 
     @model_validator(mode="after")
     def retrieval_contract(self) -> "AnswerRequest":
@@ -119,6 +122,8 @@ class AnswerTrace(BaseModel):
     cache: dict = Field(default_factory=dict)
     fallback: dict = Field(default_factory=dict)
     appeal: dict = Field(default_factory=dict)
+    rewriting: dict = Field(default_factory=dict)
+    calculator: dict = Field(default_factory=dict)
 
 
 class AnswerResponse(BaseModel):

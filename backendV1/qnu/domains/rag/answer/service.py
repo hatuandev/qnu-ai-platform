@@ -36,9 +36,11 @@ from qnu.domains.rag.answer.drafting import (
 )
 from qnu.domains.rag.answer.fallback import compose as compose_fallback
 from qnu.domains.rag.answer.hygiene import clean_model_answer
+from qnu.domains.rag.answer.intent_router import classify_intent
 from qnu.domains.rag.answer.narrative import continuation_supports
 from qnu.domains.rag.answer.packing import pack_messages as _pack_messages
 from qnu.domains.rag.answer.projection import PAYLOAD_VERSION
+from qnu.domains.rag.answer.reasoning import split_reasoning_and_answer
 from qnu.domains.rag.answer.retrieval import search
 from qnu.domains.rag.answer.schemas import AnswerRequest, AnswerResponse, AnswerTrace
 from qnu.domains.rag.answer.selection import select_hits
@@ -83,6 +85,25 @@ async def answer(
         verification={"mode": req.verification_mode, "status": "not_run"},
     )
     request_started = time.monotonic()
+
+    # Slice 5: Multi-turn Contextual Query Rewriter
+    effective_query = retrieval_query or req.question
+    if req.history and len(req.history) >= 2:
+        from qnu.domains.rag.answer.rewriter import rewrite_contextual_query
+
+        effective_query, rewrite_trace = rewrite_contextual_query(
+            effective_query, req.history
+        )
+        trace.rewriting = rewrite_trace
+
+    # Slice 5: Deterministic Calculator
+    if req.calculation is not None:
+        from qnu.domains.rag.answer.calculator import CalculationRequest, evaluate_expression
+
+        calc_req = CalculationRequest.model_validate(req.calculation)
+        calc_result = evaluate_expression(calc_req)
+        trace.calculator = calc_result.model_dump(mode="json")
+
     retrieval = await search(
         db,
         blob,
@@ -92,7 +113,7 @@ async def answer(
         workspace_id,
         ids,
         SearchRequest(
-            query=retrieval_query or req.question,
+            query=effective_query,
             top_k=req.top_k,
             document_ids=req.document_ids,
             mode=req.retrieval_mode,
@@ -148,7 +169,7 @@ async def answer(
             retrieval,
             req,
             bundles=bundles,
-            resolved_question=retrieval_query,
+            resolved_question=effective_query,
         )
     else:
         retrieval, trace.context = await expand_context(
@@ -160,21 +181,29 @@ async def answer(
             retrieval,
             req,
             bundles=bundles,
-            resolved_question=retrieval_query,
+            resolved_question=effective_query,
         )
     trace.stage_ms["context"] = round((time.monotonic() - context_started) * 1000, 3)
+    trace.context["intent"] = classify_intent(effective_query)
+    if req.calculation is not None:
+        trace.context["calculation"] = trace.calculator
     if not retrieval.hits:
-        response.reason = retrieval.status
-        trace.verification["skip_reason"] = "no_evidence"
-        if compose_insufficient_message:
-            await compose_message(response.reason)
+        if trace.calculator.get("status") == "missing_variables":
+            response.reason = "missing_calculation_variables"
+            response.message = trace.calculator.get("error")
+            trace.verification["skip_reason"] = "missing_calculation_variables"
+        else:
+            response.reason = retrieval.status
+            trace.verification["skip_reason"] = "no_evidence"
+            if compose_insufficient_message:
+                await compose_message(response.reason)
         trace.stage_ms["total"] = round((time.monotonic() - request_started) * 1000, 3)
         return response
     selected_hits, selection = select_hits(
         retrieval.hits,
         trace.context,
         req.question,
-        resolved_question=retrieval_query,
+        resolved_question=effective_query,
     )
     ranking = trace.retrieval.get("ranking") or {}
     selection["candidate_count"] = len(
@@ -210,7 +239,7 @@ async def answer(
         req,
         sources,
         trace.context,
-        resolved_question=retrieval_query,
+        resolved_question=effective_query,
         persona=persona,
         metadata_filter=packing_metadata,
     )
@@ -273,14 +302,14 @@ async def answer(
     trace.stage_ms["model_prepare"] = round((time.monotonic() - prepare_started) * 1000, 3)
     inference_hash = runtime.inference_configuration_hash("answer")
     trace.inference_configuration_hash = inference_hash
-    trace.reasoning = runtime.reasoning_trace()
+    trace.reasoning = runtime.reasoning_trace() or {}
     cache_ttl = answer_cache.ttl_seconds()
     cache_material = {
         "version": answer_cache.VERSION,
         "workspace_id": workspace_id,
         "collection_id": collection_id,
         "question": req.question,
-        "retrieval_query": retrieval_query,
+        "retrieval_query": effective_query,
         "persona": persona,
         "document_ids": sorted(req.document_ids or []),
         "retrieval": {
@@ -322,7 +351,10 @@ async def answer(
     if cached is not None:
         # Derived values are rebuilt from this request's sources, cells and scope.
         try:
-            proposed = parse_answer(cached.content, sources)
+            internal_reasoning, clean_content = split_reasoning_and_answer(cached.content)
+            if internal_reasoning:
+                trace.reasoning["irac_analysis"] = internal_reasoning
+            proposed = parse_answer(clean_content, sources)
             proposed, hygiene = clean_model_answer(proposed, req.question)
             draft = materialize(proposed, sources, cells, report=materialization)
             coverage = assess(draft, sources, trace.context, report=materialization)
@@ -345,110 +377,145 @@ async def answer(
 
     usage = None
     if cached is None:
-        usage = await usage_service.reserve(
-            db,
-            actor,
-            workspace_id,
-            "chat",
-            answer_id,
-            digest(
-                {
-                    "question": req.question,
-                    "evidence": proof,
-                    "config": runtime.configuration_hash,
-                    "inference_config": inference_hash,
-                    "prompt_version": PROMPT_VERSION,
-                    "cell_catalog_sha256": trace.grounding["catalog_sha256"],
-                    "metadata_filter": req.metadata_filter.model_dump(
-                        mode="json", exclude_none=True
-                    ),
-                }
-            ),
-            budget.total_reserved_tokens,
-            runtime.provider_id,
-        )
-        trace.usage_id = usage.id
-        try:
-            # Reservation commits. Recheck before HTTP, then release locks during inference.
-            await safety_check()
-            await db.commit()
-        except (Exception, asyncio.CancelledError):
-            # No chat request was sent; this reservation consumed zero chat tokens.
-            await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
-            raise
-        try:
-            started = time.monotonic()
-            result = await chat.complete(messages, bind_usage(request, usage.id))
-        except ChatResponseError as exc:
-            await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
-            raise
-        except (Exception, asyncio.CancelledError):
-            await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
-            raise
-        trace.stage_ms["generation"] = round((time.monotonic() - started) * 1000, 3)
-        await usage_service.settle(db, usage.id, total_tokens=result.total_tokens)
-        trace.prompt_tokens, trace.completion_tokens, trace.total_tokens = (
-            result.prompt_tokens,
-            result.completion_tokens,
-            result.total_tokens,
-        )
-        trace.contract = {
-            "schema_sha256": digest(answer_schema),
-            "finish_reason": result.finish_reason,
-            "output_budget": result.budget_trace,
-            **response_observation(result),
-        }
-        materialization = {}
-        first_error = None
-        try:
-            proposed = parse_answer(result.content, sources)
-            proposed, hygiene = clean_model_answer(proposed, req.question)
-            draft = materialize(proposed, sources, cells, report=materialization)
-            coverage = assess(draft, sources, trace.context, report=materialization)
-            trace.grounding["hygiene"] = {"stage": "generation", **hygiene}
-        except AppException as exc:
-            first_error = exc
-            await record_workspace_event(
-                db,
-                workspace_id=workspace_id,
-                actor=actor,
-                action="answer.validation_failed",
-                detail={
-                    "answer_id": answer_id,
-                    "usage_id": usage.id,
-                    "code": exc.code,
-                    "issues": getattr(exc, "validation_issues", []),
-                    "output_sha256": digest(result.content),
-                    "finish_reason": result.finish_reason,
-                    "prompt_tokens": result.prompt_tokens,
-                    "completion_tokens": result.completion_tokens,
-                    "total_tokens": result.total_tokens,
-                    "max_output_tokens": request.max_output_tokens,
-                    "inference_configuration_hash": inference_hash,
-                    "prompt_version": PROMPT_VERSION,
-                    "reasoning": trace.reasoning,
-                    "contract": trace.contract,
-                    # IDs, counts and hashes only: a failed turn keeps the
-                    # evidence shape without storing private source text.
-                    "context_trace": {
-                        "primary_ids": trace.context.get("primary_ids", []),
-                        "added": trace.context.get("added", []),
-                        "rank_band": trace.context.get("rank_band", []),
-                        "table_support": trace.context.get("table_support"),
-                        "unresolved_support_ids": trace.context.get("unresolved_support_ids", []),
-                        "selection": trace.context.get("selection", {}),
-                        "bytes_used": trace.context.get("bytes_used"),
-                        "packing": trace.context.get("packing", {}),
-                        "materialization": materialization,
-                    },
-                    "grounding": trace.grounding,
-                },
+        if req.fact_query is not None:
+            from qnu.domains.rag.answer.fact_query import (
+                FactQueryRequest,
+                materialize_fact_query_answer,
+                query_facts,
             )
-            await db.commit()
-            if first_error.code not in REPAIR_INSTRUCTIONS:
+
+            fact_req = FactQueryRequest.model_validate(req.fact_query)
+            fact_result = await query_facts(db, actor, workspace_id, ids, fact_req)
+            trace.context["fact_query"] = {
+                "table_id": fact_req.table_id,
+                "aggregation": fact_req.aggregation,
+                "matched_rows": fact_result.total_matched_rows,
+            }
+            materialization = {}
+            draft = materialize_fact_query_answer(
+                fact_result, sources, cells, report=materialization
+            )
+            coverage = assess(draft, sources, trace.context, report=materialization)
+            proposed = draft
+            first_error = None
+            trace.stage_ms["generation"] = 0.0
+            trace.prompt_tokens, trace.completion_tokens, trace.total_tokens = 0, 0, 0
+            trace.contract = {
+                "schema_sha256": digest(answer_schema),
+                "finish_reason": "deterministic_facts",
+                "output_budget": {},
+            }
+            trace.appeal = {"attempted": False}
+        else:
+            usage = await usage_service.reserve(
+                db,
+                actor,
+                workspace_id,
+                "chat",
+                answer_id,
+                digest(
+                    {
+                        "question": req.question,
+                        "evidence": proof,
+                        "config": runtime.configuration_hash,
+                        "inference_config": inference_hash,
+                        "prompt_version": PROMPT_VERSION,
+                        "cell_catalog_sha256": trace.grounding["catalog_sha256"],
+                        "metadata_filter": req.metadata_filter.model_dump(
+                            mode="json", exclude_none=True
+                        ),
+                    }
+                ),
+                budget.total_reserved_tokens,
+                runtime.provider_id,
+            )
+            trace.usage_id = usage.id
+            try:
+                # Reservation commits. Recheck before HTTP, then release locks during inference.
+                await safety_check()
+                await db.commit()
+            except (Exception, asyncio.CancelledError):
+                # No chat request was sent; this reservation consumed zero chat tokens.
+                await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
                 raise
-        trace.appeal = {"attempted": False}
-        if first_error is not None or draft.status == "insufficient_evidence":
+            try:
+                started = time.monotonic()
+                result = await chat.complete(messages, bind_usage(request, usage.id))
+            except ChatResponseError as exc:
+                await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
+                raise
+            except (Exception, asyncio.CancelledError):
+                await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
+                raise
+            trace.stage_ms["generation"] = round((time.monotonic() - started) * 1000, 3)
+            await usage_service.settle(db, usage.id, total_tokens=result.total_tokens)
+            trace.prompt_tokens, trace.completion_tokens, trace.total_tokens = (
+                result.prompt_tokens,
+                result.completion_tokens,
+                result.total_tokens,
+            )
+            trace.contract = {
+                "schema_sha256": digest(answer_schema),
+                "finish_reason": result.finish_reason,
+                "output_budget": result.budget_trace,
+                **response_observation(result),
+            }
+            materialization = {}
+            first_error = None
+            try:
+                internal_reasoning, clean_content = split_reasoning_and_answer(result.content)
+                if internal_reasoning:
+                    trace.reasoning["irac_analysis"] = internal_reasoning
+                proposed = parse_answer(clean_content, sources)
+                proposed, hygiene = clean_model_answer(proposed, req.question)
+                draft = materialize(proposed, sources, cells, report=materialization)
+                coverage = assess(draft, sources, trace.context, report=materialization)
+                trace.grounding["hygiene"] = {"stage": "generation", **hygiene}
+            except AppException as exc:
+                first_error = exc
+                await record_workspace_event(
+                    db,
+                    workspace_id=workspace_id,
+                    actor=actor,
+                    action="answer.validation_failed",
+                    detail={
+                        "answer_id": answer_id,
+                        "usage_id": usage.id,
+                        "code": exc.code,
+                        "issues": getattr(exc, "validation_issues", []),
+                        "output_sha256": digest(result.content),
+                        "finish_reason": result.finish_reason,
+                        "prompt_tokens": result.prompt_tokens,
+                        "completion_tokens": result.completion_tokens,
+                        "total_tokens": result.total_tokens,
+                        "max_output_tokens": request.max_output_tokens,
+                        "inference_configuration_hash": inference_hash,
+                        "prompt_version": PROMPT_VERSION,
+                        "reasoning": trace.reasoning,
+                        "contract": trace.contract,
+                        # IDs, counts and hashes only: a failed turn keeps the
+                        # evidence shape without storing private source text.
+                        "context_trace": {
+                            "primary_ids": trace.context.get("primary_ids", []),
+                            "added": trace.context.get("added", []),
+                            "rank_band": trace.context.get("rank_band", []),
+                            "table_support": trace.context.get("table_support"),
+                            "unresolved_support_ids": trace.context.get("unresolved_support_ids", []),
+                            "selection": trace.context.get("selection", {}),
+                            "bytes_used": trace.context.get("bytes_used"),
+                            "packing": trace.context.get("packing", {}),
+                            "materialization": materialization,
+                        },
+                        "grounding": trace.grounding,
+                    },
+                )
+                await db.commit()
+                if first_error.code not in REPAIR_INSTRUCTIONS:
+                    raise
+            trace.appeal = {"attempted": False}
+        if req.fact_query is None and (
+            first_error is not None or draft.status == "insufficient_evidence"
+        ):
             repair_code = first_error.code if first_error is not None else None
             trace.appeal = {
                 "version": APPEAL_VERSION,
@@ -561,7 +628,10 @@ async def answer(
                 appeal_report = {}
                 appeal_hygiene = {}
                 try:
-                    appeal_proposed = parse_answer(appeal_result.content, sources)
+                    appeal_reasoning, appeal_clean = split_reasoning_and_answer(appeal_result.content)
+                    if appeal_reasoning:
+                        trace.appeal["irac_analysis"] = appeal_reasoning
+                    appeal_proposed = parse_answer(appeal_clean, sources)
                     appeal_proposed, appeal_hygiene = clean_model_answer(
                         appeal_proposed, req.question
                     )
@@ -726,6 +796,7 @@ async def answer(
     if (
         cache_key is not None
         and cached is None
+        and req.fact_query is None
         and response.status == "answered"
         and trace.verification["status"] in {"not_run", "supported"}
     ):

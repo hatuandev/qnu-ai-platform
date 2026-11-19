@@ -5,6 +5,7 @@ import re
 
 import pytest
 
+from qnu.domains.rag.answer.drafting import PROMPT_VERSION
 from tests.integration.index_support import execute_index
 from tests.integration.knowledge_support import API, EDITOR, PLATFORM, as_actor
 from tests.integration.ocr_support import FakeNemotron
@@ -208,7 +209,7 @@ def test_answer_projection_preserves_published_table_and_prompt_contract(client,
     response = ask(client, ready)
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["trace"]["prompt_version"] == "qnu.rag.answer/v35"
+    assert body["trace"]["prompt_version"] == PROMPT_VERSION
     assert body["trace"]["grounding"]["selected_cells"]
     selection = body["trace"]["context"]["selection"]
     packing = body["trace"]["context"]["packing"]

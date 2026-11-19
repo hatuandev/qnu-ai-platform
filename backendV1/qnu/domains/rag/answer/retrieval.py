@@ -86,7 +86,13 @@ async def search(
     reranker=None,
     verify=True,
 ):
-    facets = question_facets(req.query)
+    from qnu.domains.rag.answer.decomposition import decompose_query, needs_decomposition
+
+    decomposed = needs_decomposition(req.query)
+    if decomposed:
+        facets = decompose_query(req.query)
+    else:
+        facets = question_facets(req.query)
     if isinstance(collection_ids, str):
         ids = [collection_ids]
     else:
@@ -135,7 +141,7 @@ async def search(
     hits = interleave(results, req.top_k * len(results))
     trace = {
         **results[0].trace,
-        "query_plan": "explicit_interrogative_clauses/v2",
+        "query_plan": "query_decomposition/v1" if decomposed else "explicit_interrogative_clauses/v2",
         "facets": [r.trace for r in results],
         "selected_ids": [h.chunk_id for h in hits],
     }

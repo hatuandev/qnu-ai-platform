@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import re
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +23,11 @@ from qnu.domains.knowledge.index.lease import (
     heartbeat,
 )
 from qnu.domains.knowledge.index.models import IndexChunk, IndexInput, IndexRun, IndexTableFact
-from qnu.domains.knowledge.index.row_cards import DocumentCardMeta, render_projection_to_cards
+from qnu.domains.knowledge.index.row_cards import (
+    DocumentCardMeta,
+    column_years_for_table,
+    render_projection_to_cards,
+)
 from qnu.domains.knowledge.index.snapshots import assert_snapshot, publication_identity
 from qnu.domains.knowledge.publication.access import authorize
 from qnu.domains.knowledge.publication.evidence import digest
@@ -187,19 +190,7 @@ async def _write_vectors(db, blob, run, actor, vectors: VectorStore) -> None:
     await commit_owned(db, run)
 
 
-_COL_YEAR_RE = re.compile(r"^table:(.+):column:(\d+)$")
-
-
-def _column_years_for_table(citation: str, annotations: list[dict]) -> dict[int, int]:
-    years: dict[int, int] = {}
-    for ann in annotations:
-        match = _COL_YEAR_RE.fullmatch(ann.get("target") or "")
-        if not match or match.group(1) != citation:
-            continue
-        year = (ann.get("values") or {}).get("data_year")
-        if type(year) is int:
-            years[int(match.group(2))] = year
-    return years
+_column_years_for_table = column_years_for_table
 
 
 async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, actor: AuthActor) -> None:
@@ -234,7 +225,7 @@ async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, a
                 table_id=citation,
                 source_table_citation=citation,
                 title=entry.get("title") or publication.document.title,
-                column_years=_column_years_for_table(citation, annotations),
+                column_years=column_years_for_table(citation, annotations),
             )
             if not projected.facts:
                 continue

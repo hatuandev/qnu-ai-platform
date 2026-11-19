@@ -1,0 +1,92 @@
+"""Unit tests for Phase 2 Slice 5: Multi-turn Contextual Query Rewriter."""
+
+from __future__ import annotations
+
+from qnu.domains.rag.answer.rewriter import rewrite_contextual_query
+
+
+def test_rewrite_single_turn_or_empty_history():
+    q = "Ngành Công nghệ thông tin học phí bao nhiêu?"
+    # No history
+    res, trace = rewrite_contextual_query(q, None)
+    assert res == q
+    assert not trace["rewritten"]
+    assert trace["reason"] == "insufficient_history"
+
+    # History < 2 turns
+    res2, trace2 = rewrite_contextual_query(q, [{"question": "Chào bạn", "answer": "Chào bạn!"}])
+    assert res2 == q
+    assert not trace2["rewritten"]
+    assert trace2["reason"] == "insufficient_history"
+
+
+def test_rewrite_clarification_response():
+    history = [
+        {"question": "Xin chào", "answer": "Chào bạn! Tôi có thể giúp gì cho bạn?"},
+        {
+            "question": "Điều kiện xét tuyển và chỉ tiêu như thế nào?",
+            "answer": "Bạn muốn hỏi về ngành nào và năm nào?",
+        },
+    ]
+    user_reply = "Ngành CNTT năm 2026 ạ"
+    resolved, trace = rewrite_contextual_query(user_reply, history)
+
+    assert trace["rewritten"] is True
+    assert trace["mode"] == "clarification_synthesis"
+    assert "Điều kiện xét tuyển và chỉ tiêu" in resolved
+    assert "CNTT" in resolved
+    assert "2026" in resolved
+
+
+def test_rewrite_anaphora_replacement():
+    history = [
+        {"question": "Xin chào", "answer": "Chào bạn!"},
+        {
+            "question": "Điểm chuẩn ngành Công nghệ thông tin năm 2026 là bao nhiêu?",
+            "answer": "Điểm chuẩn ngành Công nghệ thông tin năm 2026 là 25.5 điểm.",
+        },
+    ]
+    follow_up = "Thế còn học phí ngành đó như thế nào?"
+    resolved, trace = rewrite_contextual_query(follow_up, history)
+
+    assert trace["rewritten"] is True
+    assert trace["mode"] == "anaphora_substitution"
+    assert "ngành đó" not in resolved
+    assert "Công nghệ thông tin" in resolved
+
+
+def test_rewrite_preserves_identifiers_and_zero_prefixes():
+    history = [
+        {"question": "Xin chào", "answer": "Chào bạn!"},
+        {
+            "question": "Thí sinh có mã hồ sơ 0012 và mã ngành 7480201 có được xét tuyển không?",
+            "answer": "Bạn muốn hỏi về phương thức nào hay năm nào?",
+        },
+    ]
+    follow_up = "Phương thức xét học bạ năm 2026"
+    resolved, trace = rewrite_contextual_query(follow_up, history)
+
+    assert trace["rewritten"] is True
+    assert "0012" in trace["preserved_codes"]
+    assert "7480201" in trace["preserved_codes"]
+    assert "0012" in resolved
+    assert "7480201" in resolved
+
+
+def test_rewrite_no_hallucination_of_unmentioned_facts():
+    history = [
+        {"question": "Xin chào", "answer": "Chào bạn!"},
+        {
+            "question": "Quy định về học bổng khuyến khích học tập",
+            "answer": "Bạn muốn hỏi điều kiện xét học bổng loại nào?",
+        },
+    ]
+    follow_up = "Loại xuất sắc"
+    resolved, trace = rewrite_contextual_query(follow_up, history)
+
+    assert trace["rewritten"] is True
+    assert "học bổng khuyến khích học tập" in resolved
+    assert "Loại xuất sắc" in resolved
+    # Verify no external unmentioned school/year was invented
+    assert "Đại học Bách Khoa" not in resolved
+    assert "2024" not in resolved

@@ -7,7 +7,13 @@ tables, and expands detail_md_pointers / cross_references within byte budgets.
 
 from __future__ import annotations
 
+import re
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from qnu.domains.knowledge.index.chunking import Chunk
 
 from qnu.domains.knowledge.index.facts import (
     FactAttributeValue,
@@ -331,3 +337,73 @@ def expand_cards_context(
         )
         for state in states
     ]
+
+
+_COL_YEAR_RE = re.compile(r"^table:(.+):column:(\d+)$")
+
+
+def column_years_for_table(citation: str, annotations: list[dict]) -> dict[int, int]:
+    years: dict[int, int] = {}
+    for ann in annotations:
+        match = _COL_YEAR_RE.fullmatch(ann.get("target") or "")
+        if not match or match.group(1) != citation:
+            continue
+        year = (ann.get("values") or {}).get("data_year")
+        if type(year) is int:
+            years[int(match.group(2))] = year
+    return years
+
+
+def row_card_to_chunk(card: RowCard) -> Chunk:
+    from qnu.domains.knowledge.index.chunking import Chunk
+
+    citations = {ref: ref for ref in card.source_cell_refs}
+    structure = {
+        "card_id": card.card_id,
+        "table_id": card.table_id,
+        "source_table_citation": card.source_table_citation,
+        "fact_ids": card.fact_ids,
+        "row_kind": card.row_kind,
+        "data_years": card.data_years,
+        "detail_md_pointers": card.detail_md_pointers,
+        "cross_references": card.cross_references,
+        "source_cell_refs": card.source_cell_refs,
+        "table": True,
+    }
+    return Chunk(
+        kind="row_card",
+        text=card.text,
+        citations=citations,
+        structure=structure,
+    )
+
+
+def build_row_card_chunks(
+    tables: list[dict],
+    doc_title: str,
+    annotations: list[dict] | None = None,
+) -> list[Chunk]:
+    from qnu.domains.knowledge.index.facts import project_table
+
+    chunks = []
+    doc_meta = DocumentCardMeta(title=doc_title)
+    annotations = annotations or []
+    for entry in tables:
+        table = entry.get("table") or {}
+        citation = entry.get("citation") or ""
+        if table.get("status") != "parsed" or not table.get("rows") or not citation:
+            continue
+        column_years = column_years_for_table(citation, annotations)
+        projected = project_table(
+            table,
+            table_id=citation,
+            source_table_citation=citation,
+            title=entry.get("title") or doc_title,
+            column_years=column_years,
+        )
+        if not projected.facts:
+            continue
+        cards = render_projection_to_cards(projected, document_meta=doc_meta)
+        for card in cards:
+            chunks.append(row_card_to_chunk(card))
+    return chunks

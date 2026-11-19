@@ -87,7 +87,7 @@ def test_arbitrary_json_in_table_text_is_not_removed():
 
 
 def test_new_answer_contract_has_a_distinct_prompt_version():
-    assert PROMPT_VERSION == "qnu.rag.answer/v39"
+    assert PROMPT_VERSION == "qnu.rag.answer/v40"
 
 
 def test_list_repair_only_allows_proven_names_and_leaves_original_schema_intact():

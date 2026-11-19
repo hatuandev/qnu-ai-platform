@@ -17,6 +17,7 @@ from qnu.domains.knowledge.index import abbreviations
 from qnu.domains.knowledge.index.chunking import CHUNKER_VERSION, build_chunks
 from qnu.domains.knowledge.index.contextual import VERSION, contextual_size, enrich
 from qnu.domains.knowledge.index.models import IndexChunk, IndexInput, IndexRun
+from qnu.domains.knowledge.index.row_cards import build_row_card_chunks
 from qnu.domains.knowledge.index.schemas import IndexRequest
 from qnu.domains.knowledge.index.snapshots import current_snapshot, publication_identity
 from qnu.domains.knowledge.publication.access import authorize
@@ -184,18 +185,25 @@ async def request_index(
             if req.contextual_search
             else {}
         )
+        annotations = [
+            a.model_dump(mode="json", exclude_none=True)
+            for a in publication.version.retrieval_metadata
+        ]
         chunks = build_chunks(
             publication.content,
             documents,
             maximum,
-            [
-                a.model_dump(mode="json", exclude_none=True)
-                for a in publication.version.retrieval_metadata
-            ],
+            annotations,
             **sizing,
         )
         if req.contextual_search:
             chunks = enrich(chunks, publication.content, documents, maximum)
+        card_chunks = build_row_card_chunks(
+            publication.content.get("tables") or [],
+            publication.document.title,
+            annotations,
+        )
+        chunks.extend(card_chunks)
         reports = [
             c.structure["reading_quality"]
             for c in chunks

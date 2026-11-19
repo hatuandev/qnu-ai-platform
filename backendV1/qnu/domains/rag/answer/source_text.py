@@ -82,7 +82,7 @@ async def attach_source_text(
         titles.update(await _source_titles(db, workspace_id, owner, group))
     for source in sources:
         source.source_title = titles.get(source.document_id)
-        if source.kind == "table":
+        if source.kind in {"table", "row_card"}:
             continue
         source.source_passages = passages(source, bundles[source.version_id].documents)
     return sources
