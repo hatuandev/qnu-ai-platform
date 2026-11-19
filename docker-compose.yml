@@ -70,8 +70,8 @@ services:
       disable: true
   bootstrap:
     <<: *api
-    # Only the V1 migration chain. No legacy bootstrap or implicit data/model seed.
-    command: ["alembic", "upgrade", "head"]
+    # Create database if missing and apply V1 migration chain.
+    command: ["sh", "-c", "python -m qnu.platform.database_init && alembic upgrade head"]
     restart: "no"
     healthcheck:
       disable: true
