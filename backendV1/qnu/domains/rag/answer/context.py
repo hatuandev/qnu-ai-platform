@@ -460,13 +460,13 @@ async def expand_context(
             trace["rank_band_tables_skipped"] = skipped_tables
         if not band:
             return
-        version = {b.id: b.version_id for b in allowed}
+        version = {b.id: getattr(b, "version_id", None) or getattr(b, "id", "") for b in allowed}
         candidates = await _hits(
             db,
             run,
             allowed,
             [
-                _neighbor_hit(rows[key], run, version[rows[key].input_id])
+                _neighbor_hit(rows[key], run, version.get(rows[key].input_id, ""))
                 for key in band
                 if key in rows
                 and any(matches_metadata(rows[key].structure, scope) for scope in scopes)
@@ -498,7 +498,7 @@ async def expand_context(
             by_ordinal.setdefault(row.input_id, {})[row.ordinal] = row
         owners = {hit.chunk_id: hit.document_id for hit in result.hits}
         owners.update({hit.chunk_id: hit.document_id for hit in additions})
-        version = {b.id: b.version_id for b in allowed}
+        version = {b.id: getattr(b, "version_id", None) or getattr(b, "id", "") for b in allowed}
         pending: dict[str, tuple[IndexChunk, str]] = {}
         per_anchor: Counter = Counter()
 
@@ -537,7 +537,7 @@ async def expand_context(
             db,
             run,
             allowed,
-            [_neighbor_hit(row, run, version[row.input_id]) for row, _ in pending.values()],
+            [_neighbor_hit(row, run, version.get(row.input_id, "")) for row, _ in pending.values()],
             sealed,
         )
         taken = []

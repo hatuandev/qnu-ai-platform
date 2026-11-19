@@ -87,7 +87,10 @@ async def search(
     verify=True,
 ):
     facets = question_facets(req.query)
-    ids = list(dict.fromkeys(collection_ids))
+    if isinstance(collection_ids, str):
+        ids = [collection_ids]
+    else:
+        ids = list(dict.fromkeys(collection_ids))
 
     async def run(query):
         scoped = req.model_copy(update={"query": query})

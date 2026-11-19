@@ -23,31 +23,78 @@ class CompatibilityChat(FakeChat):
             return super()._respond(index)
         sources = incoming["source_units"]
         drafts = incoming["draft_units"]
-        source_checks = [
-            {
-                "source_id": unit["id"],
-                "status": "covered",
-                "draft_ids": [
-                    next(
-                        (draft["id"] for draft in drafts if draft.get("source_id") == unit["id"]),
-                        drafts[0]["id"],
-                    )
-                ],
-                "explanation": "Đã đối chiếu trong fixture.",
-                "suggested_action": "",
+        allowed_sources = incoming.get("allowed_source_ids") or [u["id"] for u in sources]
+        allowed_drafts = incoming.get("allowed_draft_ids") or [u["id"] for u in drafts]
+        fallback_source_id = allowed_sources[0] if allowed_sources else ""
+        fallback_draft_id = allowed_drafts[0] if allowed_drafts else ""
+        messages = self.requests[index]["body"].get("messages", [])
+        is_keyed = any("keyed/v1" in m.get("content", "") for m in messages)
+        if is_keyed:
+            source_checks = {
+                unit["id"]: {
+                    "status": "covered" if allowed_drafts else "uncertain",
+                    "draft_ids": [
+                        next(
+                            (draft["id"] for draft in drafts if draft.get("source_id") == unit["id"]),
+                            fallback_draft_id,
+                        )
+                    ]
+                    if allowed_drafts
+                    else [],
+                    "explanation": "Đã đối chiếu trong fixture.",
+                    "suggested_action": "",
+                }
+                for unit in sources
             }
-            for unit in sources
-        ]
-        draft_checks = [
-            {
-                "draft_id": unit["id"],
-                "status": "supported",
-                "source_ids": [unit.get("source_id") or sources[0]["id"]],
-                "explanation": "Có nguồn tương ứng trong fixture.",
-                "suggested_action": "",
+            draft_checks = {
+                unit["id"]: {
+                    "status": "supported" if allowed_sources else "uncertain",
+                    "source_ids": [
+                        unit["source_id"]
+                        if unit.get("source_id") in allowed_sources
+                        else fallback_source_id
+                    ]
+                    if allowed_sources
+                    else [],
+                    "explanation": "Có nguồn tương ứng trong fixture.",
+                    "suggested_action": "",
+                }
+                for unit in drafts
             }
-            for unit in drafts
-        ]
+        else:
+            source_checks = [
+                {
+                    "source_id": unit["id"],
+                    "status": "covered" if allowed_drafts else "uncertain",
+                    "draft_ids": [
+                        next(
+                            (draft["id"] for draft in drafts if draft.get("source_id") == unit["id"]),
+                            fallback_draft_id,
+                        )
+                    ]
+                    if allowed_drafts
+                    else [],
+                    "explanation": "Đã đối chiếu trong fixture.",
+                    "suggested_action": "",
+                }
+                for unit in sources
+            ]
+            draft_checks = [
+                {
+                    "draft_id": unit["id"],
+                    "status": "supported" if allowed_sources else "uncertain",
+                    "source_ids": [
+                        unit["source_id"]
+                        if unit.get("source_id") in allowed_sources
+                        else fallback_source_id
+                    ]
+                    if allowed_sources
+                    else [],
+                    "explanation": "Có nguồn tương ứng trong fixture.",
+                    "suggested_action": "",
+                }
+                for unit in drafts
+            ]
         body = {
             "choices": [
                 {
