@@ -71,10 +71,9 @@ def _owners(rows: list[IndexChunk], input_id: str, document: dict) -> dict[str, 
                 and locator.get("canonical_sha256") != document["canonical_sha256"]
             ):
                 continue
-            if (
-                document.get("identity", {}).get("revision_id")
-                and locator.get("revision_id") != document["identity"]["revision_id"]
-            ):
+            doc_identity = document.get("identity") or {}
+            rev_id = doc_identity.get("revision_id")
+            if rev_id and locator.get("revision_id") != rev_id:
                 continue
             owners.setdefault(ref, []).append(row.id)
     return owners

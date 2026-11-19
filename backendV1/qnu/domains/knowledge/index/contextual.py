@@ -35,7 +35,7 @@ def _prefix(chunk: Chunk, content: dict, definitions: list[dict]) -> str:
     metadata = structure.get("retrieval_metadata", [])
     context = {
         "version": VERSION,
-        "title": content["title"],
+        "title": content.get("title", ""),
         "heading": structure.get("context", {}).get("heading"),
         "units": [{"target": a["target"], "values": a["values"]} for a in metadata],
         "definitions": [

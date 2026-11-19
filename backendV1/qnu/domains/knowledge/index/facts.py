@@ -504,9 +504,7 @@ def project_table(
         multi = multitier_header(candidate_tbl)
         if multi is not None:
             headers = multi
-        elif typed_header(candidate_tbl):
-            headers = [0]
-        elif header_row(candidate_tbl):
+        elif typed_header(candidate_tbl) or header_row(candidate_tbl):
             headers = [0]
 
     if not headers and inherited_header_rows:

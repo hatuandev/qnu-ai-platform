@@ -24,14 +24,17 @@ def _support_link(source, tables, relationships, scopes):
     needed = []
     for ref, is_header in refs:
         options = tables.get((source.input_id, ref), [])
-        if not options:
+        valid_options = [
+            r for r in options if r.structure and r.structure.get("row_indices")
+        ]
+        if not valid_options:
             return None
         if is_header:
-            row = min(options, key=lambda r: min(r.structure["row_indices"]))
+            row = min(valid_options, key=lambda r: min(r.structure["row_indices"]))
             if 0 not in row.structure["row_indices"]:
                 return None
         else:
-            row = max(options, key=lambda r: max(r.structure["row_indices"]))
+            row = max(valid_options, key=lambda r: max(r.structure["row_indices"]))
         shared = [scope for scope in shared if matches_metadata(row.structure, scope)]
         if not shared:
             return None
@@ -78,7 +81,7 @@ def supports(primary, rows, relationships, metadata_filter, scopes=None, *, enum
             (
                 row
                 for row in tables.get((source.input_id, next_table), [])
-                if 0 in row.structure["row_indices"]
+                if 0 in (row.structure or {}).get("row_indices", [])
             ),
             None,
         )

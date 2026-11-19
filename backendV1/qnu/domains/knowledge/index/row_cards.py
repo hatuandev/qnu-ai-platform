@@ -429,9 +429,7 @@ def build_row_card_chunks(
                 multi = multitier_header(table)
                 if multi is not None:
                     hr = multi
-                elif typed_header(table):
-                    hr = [0]
-                elif header_row(table):
+                elif typed_header(table) or header_row(table):
                     hr = [0]
             if hr:
                 last_opening_headers[cols] = [table["rows"][r] for r in hr]

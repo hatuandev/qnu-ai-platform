@@ -254,17 +254,19 @@ def build_chunks(
     *,
     size: Callable[[Chunk], int] = _chunk_size,
 ) -> list[Chunk]:
-    index = content["citations"]
+    index = content.get("citations") or content.get("index") or {}
     annotations = annotations or []
     relations = {ref: link for doc in documents for ref, link in dependencies(doc).items()}
     source_outline = source_sections(documents)
     source_copy = content.get("validation", {}).get("source_copy") == "retained"
-    table_copies = _table_text_copies(content["source_tables"])
+    source_tables = content.get("source_tables") or content.get("tables") or []
+    table_copies = _table_text_copies(source_tables)
+    title = content.get("title") or ""
     chunks = []
-    for section_no, section in enumerate(content["sections"]):
-        for paragraph_no, paragraph in enumerate(section["paragraphs"]):
-            citations = paragraph["citations"]
-            refs = {r: index[r] for r in citations}
+    for section_no, section in enumerate(content.get("sections") or []):
+        for paragraph_no, paragraph in enumerate(section.get("paragraphs") or []):
+            citations = paragraph.get("citations") or []
+            refs = {r: index[r] for r in citations if r in index}
             target = f"paragraph:{section_no}:{paragraph_no}"
             source = shared_section(citations, source_outline)
             targets = {target}
@@ -273,14 +275,15 @@ def build_chunks(
             metadata = chunk_metadata(annotations, targets)
             if (
                 len(citations) == 1
-                and paragraph["text"] in table_copies.get(citations[0], ())
+                and paragraph.get("text", "") in table_copies.get(citations[0], ())
                 and not any(item["target"] == target for item in metadata)
             ):
                 continue
+            heading_text = section.get("heading") or ""
             fallback = (
                 ""
-                if source_copy and section["heading"].startswith("Nguồn ")
-                else section["heading"]
+                if source_copy and heading_text.startswith("Nguồn ")
+                else heading_text
             )
             heading = (source.heading if source else "") or fallback
             structure = {
@@ -288,7 +291,7 @@ def build_chunks(
                     "parent": f"section:{section_no}",
                     "position": paragraph_no,
                     "part": 0,
-                    "title": content["title"],
+                    "title": title,
                     "heading": heading,
                     **(
                         {"source_heading_citation": source.citation}
@@ -302,12 +305,13 @@ def build_chunks(
             def text_size(text: str, *, refs: dict = refs, structure: dict = structure) -> int:
                 return size(Chunk("paragraph", text, refs, structure))
 
-            prefix = f"{content['title']}\n{heading}\n"
+            prefix = f"{title}\n{heading}\n"
+            p_text = paragraph.get("text") or ""
             if heading != fallback and any(
                 text_size(prefix + word) > maximum
-                for word in re.findall(r"\S+\s*", paragraph["text"])
+                for word in re.findall(r"\S+\s*", p_text)
             ):
-                prefix = f"{content['title']}\n{fallback}\n"
+                prefix = f"{title}\n{fallback}\n"
             chunks += [
                 Chunk(
                     "paragraph",
@@ -315,10 +319,10 @@ def build_chunks(
                     refs,
                     {**structure, "context": {**structure["context"], "part": part}},
                 )
-                for part, t in enumerate(_split_text(prefix, paragraph["text"], maximum, text_size))
+                for part, t in enumerate(_split_text(prefix, p_text, maximum, text_size))
             ]
-    for table in content["source_tables"]:
-        source = source_outline.get(table["citation"])
+    for table in source_tables:
+        source = source_outline.get(table.get("citation", ""))
 
         def prepare(
             fragment: Chunk,
@@ -327,20 +331,23 @@ def build_chunks(
             table: dict = table,
             source: SourceSection | None = source,
         ) -> Chunk:
-            parent = "table:" + table["citation"]
+            cit = table.get("citation", "")
+            parent = "table:" + cit
             structure = fragment.structure
+            tbl_info = table.get("table") or {}
+            col_count = tbl_info.get("column_count", 0)
             targets = {f"{parent}:row:{r}" for r in structure.get("row_indices", [])}
             targets.update(
                 f"{parent}:row:{r}:column:{c}"
                 for r in structure.get("row_indices", [])
-                for c in range(table["table"]["column_count"])
+                for c in range(col_count)
             )
-            targets.update(f"{parent}:column:{c}" for c in range(table["table"]["column_count"]))
+            targets.update(f"{parent}:column:{c}" for c in range(col_count))
             structure["context"] = {
                 "parent": parent,
                 "position": part,
                 "part": 0,
-                "title": content["title"],
+                "title": title,
             }
             if source and source.citation:
                 targets.add(f"section:{source.citation}")
@@ -353,11 +360,11 @@ def build_chunks(
                 if size(replace(fragment, text=prefix + fragment.text)) <= maximum:
                     fragment = replace(fragment, text=prefix + fragment.text)
             structure["reading_quality"] = quality(structure)
-            if table["citation"] in relations:
-                structure["source_dependencies"] = relations[table["citation"]]
+            if cit in relations:
+                structure["source_dependencies"] = relations[cit]
             return fragment
 
-        chunks += _table_chunks(content["title"], table, documents, index, maximum, prepare, size)
+        chunks += _table_chunks(title, table, documents, index, maximum, prepare, size)
     if not chunks:
         raise AppException(
             "Bản xuất bản không có chunk.", code="index_chunks_empty", status_code=422
@@ -365,5 +372,7 @@ def build_chunks(
     for chunk in chunks:
         for annotation in (chunk.structure or {}).get("retrieval_metadata", []):
             for proof in annotation.get("evidence", []):
-                chunk.citations[proof["citation"]] = index[proof["citation"]]
+                proof_cit = proof.get("citation")
+                if proof_cit and proof_cit in index:
+                    chunk.citations[proof_cit] = index[proof_cit]
     return chunks

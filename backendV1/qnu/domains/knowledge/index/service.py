@@ -204,7 +204,9 @@ async def request_index(
             or [],
             publication.document.title,
             annotations,
-            index=publication.content.get("index"),
+            index=publication.content.get("citations")
+            or publication.content.get("index")
+            or {},
         )
         chunks.extend(card_chunks)
         reports = [

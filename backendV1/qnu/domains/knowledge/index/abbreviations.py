@@ -24,12 +24,13 @@ _ALIAS = re.compile(r"[A-ZÀ-ỴĐ][A-ZÀ-ỴĐ0-9-]{1,15}")
 
 def parenthetical(content: dict, documents: list[dict]) -> list[dict]:
     definitions = {}
+    citations = content.get("citations") or content.get("index") or {}
     # Definitions must themselves be reachable through the pinned citation map.
     for document in documents:
         for page in document["pages"]:
             for block in page["blocks"]:
                 citation = document["ocr_run_id"] + ":" + block["evidence_id"]
-                if citation not in content["citations"]:
+                if citation not in citations:
                     continue
                 for match in _PARENTHETICAL.finditer(block["text"]):
                     expansion, alias = match.groups()
@@ -67,8 +68,8 @@ def _defines(alias: str, expansion: str) -> str | None:
 
 def _table_rows(content: dict) -> list[dict]:
     definitions = {}
-    citations = content["citations"]
-    for table in content.get("source_tables", []):
+    citations = content.get("citations") or content.get("index") or {}
+    for table in (content.get("source_tables") or content.get("tables") or []):
         body = table["table"]
         if body.get("status") != "parsed" or not body.get("rows"):
             continue

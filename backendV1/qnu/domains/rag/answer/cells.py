@@ -57,7 +57,7 @@ def _same_input(left, right):
 
 def _ref(source, position):
     evidence = position.cell.get("evidence_id")
-    table = source.structure.get("source_table_citation", "")
+    table = (source.structure or {}).get("source_table_citation", "")
     ref = table.split(":", 1)[0] + ":" + str(evidence)
     return ref if evidence and ref in source.citations else None
 
@@ -129,15 +129,15 @@ def catalog(
                 and _same_input(source, by_chunk[key])
                 and (by_chunk[key].structure or {}).get("source_table_citation")
                 == header_link["header"]
-                and 0 in by_chunk[key].structure.get("row_indices", [])
+                and 0 in (by_chunk[key].structure or {}).get("row_indices", [])
             ]
             if candidates:
                 header_source = candidates[0]
-                header_positions, errors = layout(header_source.structure)
+                header_positions, errors = layout(header_source.structure or {})
                 # A proven dependency supplies the header rows the source lacks.
-                headers = header_rows(header_source.structure)
+                headers = header_rows(header_source.structure or {})
                 if proven and all(
-                    row in header_source.structure.get("row_indices", []) for row in proven
+                    row in (header_source.structure or {}).get("row_indices", []) for row in proven
                 ):
                     headers = sorted(set(proven))
                 if not headers:

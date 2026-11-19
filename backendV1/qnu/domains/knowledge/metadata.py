@@ -426,7 +426,8 @@ def _invalid(message: str) -> AppException:
 
 
 def _table_entry(content: dict, citation: str) -> dict | None:
-    return next((t for t in content["source_tables"] if t["citation"] == citation), None)
+    tables = content.get("source_tables") or content.get("tables") or []
+    return next((t for t in tables if t.get("citation") == citation), None)
 
 
 def _grid(entry: dict) -> tuple[dict, list | None]:
@@ -591,8 +592,9 @@ def table_chain_labels(tables: list[dict]) -> dict[str, dict[int, tuple[str, str
 
 
 def target_refs(content: dict, target: str, outline: dict | None = None) -> set[str]:
+    citations = content.get("citations") or content.get("index") or {}
     if target == "document":
-        return set(content["citations"])
+        return set(citations)
     if target.startswith("section:"):
         ref = target.removeprefix("section:")
         section = (outline or {}).get(ref)
@@ -829,7 +831,8 @@ def validate_annotations(
             table_ref = table.group(1)
             if structural:
                 if chain_labels is None:
-                    chain_labels = table_chain_labels(content["source_tables"])
+                    chain_tables = content.get("source_tables") or content.get("tables") or []
+                    chain_labels = table_chain_labels(chain_tables)
                 structural_refs = {
                     header[0] for header in (chain_labels.get(table_ref) or {}).values()
                 }
@@ -845,9 +848,10 @@ def validate_annotations(
                 **texts,
                 table_ref: "\n".join(texts.get(r, "") for r in sorted(refs - {table_ref})),
             }
+        citations_index = content.get("citations") or content.get("index") or {}
         for evidence in item.evidence:
             if (
-                evidence.citation not in content["citations"]
+                evidence.citation not in citations_index
                 or (evidence.citation not in refs and evidence.citation not in structural_refs)
                 or evidence.quote not in texts.get(evidence.citation, "")
                 or evidence.quote not in local_texts.get(evidence.citation, "")
