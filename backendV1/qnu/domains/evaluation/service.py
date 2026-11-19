@@ -6,6 +6,7 @@ from functools import partial
 
 from sqlalchemy import select
 
+from qnu.domains.evaluation.answer_eval import evaluate_answer
 from qnu.domains.evaluation.metrics import aggregate, retrieval_metrics
 from qnu.domains.knowledge.index import hybrid
 from qnu.domains.knowledge.index.models import IndexChunk, IndexRun
@@ -14,6 +15,8 @@ from qnu.domains.knowledge.index.search import _eligible, search
 from qnu.domains.knowledge.index.validation import validate_results
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.operations.service import authorize
+from qnu.domains.rag.answer.schemas import AnswerRequest
+from qnu.domains.rag.answer.service import answer as run_answer
 from qnu.platform.errors import AppException, Conflict, DependencyUnavailable
 from qnu.ports.reranker import Reranker
 
@@ -29,10 +32,15 @@ async def evaluate(
     req,
     *,
     reranker: Reranker | None = None,
+    chat_model=None,
 ):
     await authorize(db, actor, workspace_id, write=True)
     if req.include_rerank and reranker is None:
         raise DependencyUnavailable("Chưa có adapter rerank.", code="reranker_unavailable")
+    if req.include_answer_evaluation and chat_model is None:
+        raise DependencyUnavailable(
+            "Chưa có adapter language model cho answer evaluation.", code="model_unavailable"
+        )
     run = await db.scalar(
         select(IndexRun).where(
             IndexRun.id == req.index_run_id,
@@ -98,8 +106,37 @@ async def evaluate(
                 "shared_retrieval_ms": round((time.monotonic() - started) * 1000, 3),
                 "trace": candidates.trace,
             }
-            for strategy, ranked in (("dense", dense_ids), ("hybrid", hybrid_ids)):
-                records.append(record(query, strategy, ranked, req.top_k, common))
+
+            ans_eval = None
+            if req.include_answer_evaluation and query.expected_answer is not None:
+                ans_res = await run_answer(
+                    db,
+                    blob,
+                    embedding,
+                    vectors,
+                    chat_model,
+                    actor,
+                    workspace_id,
+                    collection_id,
+                    AnswerRequest(
+                        question=query.query,
+                        top_k=req.top_k,
+                        document_ids=query.document_ids,
+                        history=query.history,
+                        calculation=query.calculation,
+                        fact_query=query.fact_query,
+                    ),
+                    reranker=reranker,
+                )
+                ans_eval = evaluate_answer(ans_res, query.expected_answer)
+
+            # dense is retrieval-only baseline
+            records.append(record(query, "dense", dense_ids, req.top_k, common))
+            # hybrid uses answer evaluation if requested
+            records.append(
+                record(query, "hybrid", hybrid_ids, req.top_k, common, answer_eval=ans_eval)
+            )
+
             if req.include_rerank:
                 trace = {"ranking": {}, "score_kinds": {}}
 
@@ -153,6 +190,7 @@ async def evaluate(
                         [h.chunk_id for h in reranked],
                         req.top_k,
                         {**common, "rerank": trace},
+                        answer_eval=ans_eval,
                     )
                 )
         except AppException as exc:
@@ -171,6 +209,34 @@ async def evaluate(
                             "metrics": None,
                         }
                     )
+
+    if req.include_answer_evaluation:
+        answer_records = [
+            r for r in records
+            if r.get("metrics") and r["metrics"].get("answer_passed") is not None
+        ]
+        total_eval = len(answer_records)
+        passed_eval = sum(1 for r in answer_records if r["metrics"]["answer_passed"])
+        failures_list = [
+            {
+                "query_id": r["query_id"],
+                "strategy": r["strategy"],
+                "failures": r["metrics"].get("answer_failures", []),
+            }
+            for r in answer_records
+            if not r["metrics"]["answer_passed"]
+        ]
+        answer_eval_summary = {
+            "status": "completed",
+            "total_evaluated": total_eval,
+            "passed_count": passed_eval,
+            "failed_count": total_eval - passed_eval,
+            "pass_rate": round(passed_eval / total_eval, 4) if total_eval else 0.0,
+            "failures": failures_list,
+        }
+    else:
+        answer_eval_summary = "NOT RUN"
+
     return {
         "schema_version": "qnu.retrieval-evaluation/v1",
         "id": "eval_" + uuid.uuid4().hex,
@@ -183,13 +249,13 @@ async def evaluate(
         "candidate_k": req.candidate_k,
         "records": records,
         "summary": aggregate(records),
-        "answer_evaluation": "NOT RUN",
+        "answer_evaluation": answer_eval_summary,
         "publication_approval": False,
         "timing_boundary": "one shared embedding+dense+FTS+fusion per query; rerank incremental; no independent dense latency",
     }
 
 
-def record(query, strategy, ranked, top_k, trace):
+def record(query, strategy, ranked, top_k, trace, *, answer_eval=None):
     return {
         "query_id": query.id,
         "group": query.group,
@@ -197,5 +263,13 @@ def record(query, strategy, ranked, top_k, trace):
         "status": "completed",
         "ranked_ids": ranked[:top_k],
         "candidate_trace": trace,
-        "metrics": retrieval_metrics(ranked, query.gold_chunk_ids, top_k),
+        "metrics": retrieval_metrics(
+            ranked,
+            query.gold_chunk_ids,
+            top_k,
+            answer_correctness=answer_eval.correctness_score if answer_eval else None,
+            answer_groundedness=answer_eval.groundedness_score if answer_eval else None,
+            answer_passed=answer_eval.passed if answer_eval else None,
+            answer_failures=answer_eval.failures if answer_eval else None,
+        ),
     }

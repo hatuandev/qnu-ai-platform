@@ -40,4 +40,5 @@ async def compare(
         collection_id,
         body,
         reranker=container.reranker,
+        chat_model=getattr(container, "chat_model", None),
     )

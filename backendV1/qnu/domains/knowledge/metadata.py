@@ -326,6 +326,29 @@ def event_proved(event: EventValue, quotes: list[str]) -> bool:
     return all(stated(value) for value in _scope_literals(event))
 
 
+LifecycleStatus = Literal["active", "amended", "superseded", "deprecated"]
+
+
+class LifecycleMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    status: LifecycleStatus = "active"
+    effective_from: Date | None = None
+    effective_until: Date | None = None
+    amends_ref: str | None = Field(None, min_length=1, max_length=200)
+    superseded_by_ref: str | None = Field(None, min_length=1, max_length=200)
+    amendment_summary: str | None = Field(None, max_length=1000)
+
+    @model_validator(mode="after")
+    def interval(self):
+        if (
+            self.effective_from
+            and self.effective_until
+            and self.effective_from > self.effective_until
+        ):
+            raise ValueError("Khoảng hiệu lực lifecycle không hợp lệ.")
+        return self
+
+
 class MetadataValues(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     data_year: int | None = Field(None, strict=True, ge=1000, le=9999)
@@ -336,6 +359,8 @@ class MetadataValues(BaseModel):
     intake: str | None = Field(None, min_length=1, max_length=160)
     attributes: MetadataAttributes | None = None
     events: list[EventValue] | None = Field(None, min_length=1, max_length=20)
+    lifecycle: LifecycleMetadata | None = None
+    scope_facets: MetadataAttributes | None = None
 
     @model_validator(mode="after")
     def interval(self):
@@ -364,6 +389,9 @@ class MetadataFilter(BaseModel):
     intake: str | None = Field(None, min_length=1, max_length=160)
 
     attributes: MetadataAttributes | None = Field(None, exclude_if=lambda value: value is None)
+    lifecycle_status: LifecycleStatus | None = Field(None, exclude_if=lambda value: value is None)
+    scope_facets: MetadataAttributes | None = Field(None, exclude_if=lambda value: value is None)
+    include_superseded: bool = False
 
 
 class MetadataEvidence(BaseModel):
@@ -945,12 +973,40 @@ def matches_metadata(structure: dict | None, scope: MetadataFilter) -> bool:
     event_kind = wanted.pop("event_kind", None)
     event_year = wanted.pop("event_year", None)
     event_method = wanted.pop("event_method", None)
+    include_superseded = wanted.pop("include_superseded", False)
+    lifecycle_status = wanted.pop("lifecycle_status", None)
+    scope_facets = wanted.pop("scope_facets", None)
     event_scope = any(value is not None for value in (event_kind, event_year, event_method))
     event_intake = wanted.pop("intake", None) if event_scope else None
-    if not wanted and not event_scope:
-        return True
-    for annotation in (structure or {}).get("retrieval_metadata", []):
+
+    annotations = (structure or {}).get("retrieval_metadata", [])
+    if not annotations:
+        struct = structure or {}
+        lifecycle = struct.get("lifecycle") or {}
+        status = lifecycle.get("status", "active")
+        if not include_superseded and lifecycle_status is None and status == "superseded":
+            return False
+        if lifecycle_status is not None and status != lifecycle_status:
+            return False
+        if scope_facets:
+            facets = struct.get("scope_facets") or struct.get("attributes") or {}
+            if not all(attribute_contains(facets.get(k), v) for k, v in scope_facets.items()):
+                return False
+        if not wanted and not event_scope:
+            return True
+
+    for annotation in annotations:
         values = annotation["values"]
+        lifecycle = values.get("lifecycle") or {}
+        status = lifecycle.get("status", "active")
+        if not include_superseded and lifecycle_status is None and status == "superseded":
+            continue
+        if lifecycle_status is not None and status != lifecycle_status:
+            continue
+        if scope_facets:
+            facets = values.get("scope_facets") or values.get("attributes") or {}
+            if not all(attribute_contains(facets.get(k), v) for k, v in scope_facets.items()):
+                continue
         if event_scope and not any(
             (event_kind is None or event.get("kind") == event_kind)
             and (event_year is None or event_year in event_years(event))

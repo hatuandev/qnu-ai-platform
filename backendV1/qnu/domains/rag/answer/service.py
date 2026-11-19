@@ -236,6 +236,21 @@ async def answer(
     if constraints:
         trace.context["rule_constraints"] = constraints
 
+    # Slice 6B: Partial Amendments Resolution & Scope Facets
+    from qnu.domains.rag.answer.amendments import (
+        detect_amendment_inquiry,
+        filter_by_scope_facets,
+        resolve_amendments,
+    )
+
+    is_amend_inq = detect_amendment_inquiry(effective_query)
+    sources, amend_trace = resolve_amendments(sources, is_amendment_inquiry=is_amend_inq)
+    if amend_trace.get("amendments_detected"):
+        trace.context["amendments"] = amend_trace
+
+    if req.metadata_filter and getattr(req.metadata_filter, "scope_facets", None):
+        sources = filter_by_scope_facets(sources, req.metadata_filter.scope_facets)
+
     packing_started = time.monotonic()
     packing_metadata = (
         {
@@ -374,6 +389,46 @@ async def answer(
         except AppException:
             await answer_cache.discard(cache_key)
             cached = None
+
+    # Slice 6C: Semantic Cache tied to (workspace_id, active_index_run_id)
+    from qnu.domains.rag.answer.semantic_cache import (
+        SemanticCacheEntry,
+        get_semantic_cache,
+        normalize_for_semantic_cache,
+        semantic_cache_key,
+        store_semantic_cache,
+    )
+
+    norm_q = normalize_for_semantic_cache(effective_query)
+    sem_key = semantic_cache_key(workspace_id, collection_id, retrieval.index_run_id, norm_q)
+    if cached is None and cache_ttl:
+        sem_cached = await get_semantic_cache(sem_key)
+        if sem_cached is not None:
+            try:
+                internal_reasoning, clean_content = split_reasoning_and_answer(
+                    sem_cached.raw_answer
+                )
+                if internal_reasoning:
+                    trace.reasoning["irac_analysis"] = internal_reasoning
+                proposed = parse_answer(clean_content, sources)
+                proposed, hygiene = clean_model_answer(proposed, req.question)
+                draft = materialize(proposed, sources, cells, report=materialization)
+                coverage = assess(draft, sources, trace.context, report=materialization)
+                trace.grounding["hygiene"] = {"stage": "semantic_cache", **hygiene}
+                trace.semantic_cache = {
+                    "status": "hit",
+                    "key": sem_key,
+                    "normalized_query": norm_q,
+                    "saved_tokens": sem_cached.saved_tokens,
+                }
+                cached = answer_cache.Entry(
+                    version=answer_cache.VERSION,
+                    content=sem_cached.raw_answer,
+                    contract=trace.contract,
+                    total_tokens=sem_cached.saved_tokens,
+                )
+            except AppException:
+                sem_cached = None
     trace.evidence_sha256 = proof
     trace.provider_id, trace.model_name = runtime.provider_id, runtime.model_name
     trace.configuration_hash = runtime.configuration_hash
@@ -403,6 +458,13 @@ async def answer(
                 "aggregation": fact_req.aggregation,
                 "matched_rows": fact_result.total_matched_rows,
             }
+            trace.tools.append(
+                {
+                    "tool_name": "query_facts",
+                    "params": {"table_id": fact_req.table_id, "aggregation": fact_req.aggregation},
+                    "matched_items": fact_result.total_matched_rows,
+                }
+            )
             materialization = {}
             draft = materialize_fact_query_answer(
                 fact_result, sources, cells, report=materialization
@@ -822,11 +884,28 @@ async def answer(
             ),
             cache_ttl,
         )
+        await store_semantic_cache(
+            sem_key,
+            SemanticCacheEntry(
+                workspace_id=workspace_id,
+                collection_id=collection_id,
+                index_run_id=retrieval.index_run_id,
+                normalized_query=norm_q,
+                raw_answer=result.content,
+                saved_tokens=result.total_tokens,
+            ),
+            cache_ttl,
+        )
         logger.info(
             "rag_answer_cache_stored",
             answer_id=answer_id,
             total_tokens=result.total_tokens,
         )
+    if not trace.semantic_cache:
+        trace.semantic_cache = {
+            "status": "miss" if cache_ttl else "disabled",
+            "normalized_query": norm_q,
+        }
     trace.stage_ms["total"] = round((time.monotonic() - request_started) * 1000, 3)
     logger.info(
         "rag_answer_completed",

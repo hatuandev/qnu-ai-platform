@@ -124,6 +124,8 @@ class AnswerTrace(BaseModel):
     appeal: dict = Field(default_factory=dict)
     rewriting: dict = Field(default_factory=dict)
     calculator: dict = Field(default_factory=dict)
+    tools: list[dict] = Field(default_factory=list)
+    semantic_cache: dict = Field(default_factory=dict)
 
 
 class AnswerResponse(BaseModel):
