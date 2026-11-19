@@ -17,11 +17,13 @@ import unicodedata
 from typing import Any
 
 # Anaphoric references / elliptical indicators in Vietnamese
+_ANAPHORA_PRONOUN_RE = re.compile(
+    r"\b(?:(?:hồ sơ nghiệm thu|hồ sơ|nhiệm vụ|phần|mục|bảng|điều|trường hợp|ngành|mã)\s+(?:này|đó|trên)|nó|cái đó)\b",
+    re.IGNORECASE,
+)
+
 _ANAPHORA_PATTERNS = [
-    re.compile(
-        r"\b(?:ngành đó|ngành này|ngành trên|mã đó|mã này|nó|cái đó|trường hợp này)\b",
-        re.IGNORECASE,
-    ),
+    _ANAPHORA_PRONOUN_RE,
     re.compile(r"^(?:thế còn|còn|vậy còn|thế|vậy|nếu là|với)\s+", re.IGNORECASE),
     re.compile(r"\b(?:ở trên|đã nêu|vừa hỏi)\b", re.IGNORECASE),
 ]
@@ -43,7 +45,7 @@ _BOT_CLARIFICATION_KEYWORDS = (
 
 # Extract core subjects from text (major names, codes, year, scores)
 _YEAR_RE = re.compile(r"\b(202[0-9])\b")
-_CODE_RE = re.compile(r"\b([A-Z]{2,4}-?\d{4,7}|\d{7}|\b0\d{3}\b)\b")
+_CODE_RE = re.compile(r"\b([A-Z]{2,4}-?\d{1,7}|\d{7}|\b0\d{1,5}\b)\b")
 _SCORE_RE = re.compile(r"\b(\d{1,2}(?:[.,]\d{1,2})?)\s*(?:điểm|đ)\b", re.IGNORECASE)
 
 _CERT_PATTERNS = {
@@ -102,6 +104,7 @@ def _extract_cumulative_history_context(pairs: list[tuple[str, str]]) -> dict[st
     last_year: str | None = None
     last_major: str | None = None
     all_codes: list[str] = []
+    user_codes: list[str] = []
     has_conversion: bool = False
     has_eng_subject: bool = False
 
@@ -128,7 +131,9 @@ def _extract_cumulative_history_context(pairs: list[tuple[str, str]]) -> dict[st
             last_major = f"ngành {major_match.group(1).strip()}"
 
         # Codes
-        all_codes.extend(_CODE_RE.findall(combined_turn))
+        q_codes = _CODE_RE.findall(user_q)
+        user_codes.extend(q_codes)
+        all_codes.extend(q_codes + _CODE_RE.findall(bot_a))
 
         # Topics
         if _ACTION_CONVERSION_RE.search(combined_turn):
@@ -140,7 +145,8 @@ def _extract_cumulative_history_context(pairs: list[tuple[str, str]]) -> dict[st
         "certificate": last_certificate,
         "year": last_year,
         "major": last_major,
-        "codes": list(dict.fromkeys(all_codes)),
+        "codes": list(dict.fromkeys(user_codes + all_codes)),
+        "user_codes": list(dict.fromkeys(user_codes)),
         "has_conversion": has_conversion,
         "has_eng_subject": has_eng_subject,
     }
@@ -181,11 +187,7 @@ def rewrite_contextual_query(
     has_leading_connector = bool(
         re.match(r"^(?:thế còn|còn|vậy còn|thế|vậy|nếu là|với)\s+", clean_current, re.IGNORECASE)
     )
-    pronoun_match = re.search(
-        r"\b(?:ngành đó|ngành này|ngành trên|mã đó|mã này|nó|cái đó|trường hợp này)\b",
-        clean_current,
-        re.IGNORECASE,
-    )
+    pronoun_match = _ANAPHORA_PRONOUN_RE.search(clean_current)
     has_score_or_tier = bool(
         re.match(
             r"^(?:thế còn|còn|vậy còn|thế|vậy|nếu là|với\s+)?(\d+(?:[.,]\d+)?|bậc\s+\d+)\b",
@@ -287,20 +289,34 @@ def rewrite_contextual_query(
                 rewritten = True
                 rewrite_mode = "conversion_continuity"
 
-    # Case 3: Anaphoric references with pronoun ("ngành đó", "mã đó", "nó")
+    # Case 3: Anaphoric references with pronoun or contextual noun phrase
     if not rewritten and pronoun_match:
         subject_matches: list[str] = []
-        if ctx.get("codes"):
+        if ctx.get("user_codes"):
+            subject_matches.extend(ctx["user_codes"])
+        elif ctx.get("codes"):
             subject_matches.extend(ctx["codes"])
         if ctx.get("major"):
             subject_matches.append(ctx["major"])
 
         if subject_matches:
-            resolved = re.sub(
-                r"\b(?:ngành đó|ngành này|ngành trên|mã đó|mã này|nó|cái đó|trường hợp này)\b",
-                subject_matches[0],
-                clean_current,
-                flags=re.IGNORECASE,
+            target_sub = subject_matches[0]
+            matched_text = pronoun_match.group(0)
+            noun_prefix = re.sub(
+                r"\s+(?:này|đó|trên)$", "", matched_text, flags=re.IGNORECASE
+            ).strip()
+            if (
+                noun_prefix.lower() in ("nó", "cái đó")
+                or target_sub.lower().startswith(noun_prefix.lower())
+            ):
+                replacement = target_sub
+            else:
+                replacement = f"{noun_prefix} {target_sub}"
+
+            resolved = (
+                clean_current[: pronoun_match.start()]
+                + replacement
+                + clean_current[pronoun_match.end() :]
             )
             resolved = re.sub(
                 r"^(?:thế còn|còn|vậy còn)\s+", "", resolved, flags=re.IGNORECASE
@@ -346,14 +362,13 @@ def rewrite_contextual_query(
             rewritten = True
             rewrite_mode = "anaphora_substitution"
 
-    # Safety check: ensure essential codes and zero-prefixed IDs from both inputs are preserved
-    prev_entities = _extract_entities_from_text(prev_user_q)
-    curr_entities = _extract_entities_from_text(clean_current)
-    preserved_codes = list(
-        dict.fromkeys(ctx.get("codes", []) + prev_entities["codes"] + curr_entities["codes"])
-    )
+    # Safety check: ensure essential codes and zero-prefixed IDs from user inputs are preserved
+    prev_user_codes = _CODE_RE.findall(prev_user_q)
+    curr_codes = _CODE_RE.findall(clean_current)
+    user_history_codes = ctx.get("user_codes", [])
+    preserved_codes = list(dict.fromkeys(user_history_codes + prev_user_codes + curr_codes))
 
-    # Ensure zero-prefixed codes like 0012 or major codes are present in resolved query
+    # Ensure zero-prefixed codes like 0012 or user codes are present in resolved query
     for code in preserved_codes:
         if code not in resolved:
             resolved = f"{resolved} {code}"

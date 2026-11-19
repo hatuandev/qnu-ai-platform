@@ -391,7 +391,7 @@ class MetadataFilter(BaseModel):
     attributes: MetadataAttributes | None = Field(None, exclude_if=lambda value: value is None)
     lifecycle_status: LifecycleStatus | None = Field(None, exclude_if=lambda value: value is None)
     scope_facets: MetadataAttributes | None = Field(None, exclude_if=lambda value: value is None)
-    include_superseded: bool = False
+    include_superseded: bool = Field(default=False, exclude_if=lambda value: value is False)
 
 
 class MetadataEvidence(BaseModel):

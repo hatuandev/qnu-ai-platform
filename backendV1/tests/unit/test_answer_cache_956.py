@@ -109,6 +109,10 @@ class Harness:
         )
         set_(service, "usage_service", self.usage)
         set_(answer_cache, "ttl_seconds", lambda: self.ttl)
+        from qnu.domains.rag.answer import semantic_cache
+
+        set_(semantic_cache, "ttl_seconds", lambda: 0)
+        semantic_cache._LOCAL_SEMANTIC_CACHE.clear()
         set_(platform_cache, "get_json", self._get_json)
         set_(platform_cache, "set_json", self._set_json)
 

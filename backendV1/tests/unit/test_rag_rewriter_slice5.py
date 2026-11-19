@@ -90,3 +90,32 @@ def test_rewrite_no_hallucination_of_unmentioned_facts():
     # Verify no external unmentioned school/year was invented
     assert "Đại học Bách Khoa" not in resolved
     assert "2024" not in resolved
+
+
+def test_rewrite_task_codes_and_anaphoric_noun_phrases():
+    # Test case matching C9_T1 -> C9_T2 on complex task documents
+    history = [
+        {
+            "question": "Nhiệm vụ NV-30 đối soát những gì và có điều kiện gì?",
+            "answer": "NV-30 có nhiệm vụ đối soát nhật ký ngoại lệ liên nguồn với 7 thành phần...",
+        }
+    ]
+    follow_up = "Phần thứ tư và phần thứ sáu của hồ sơ nghiệm thu này quy định gì, có áp dụng cho nhóm I không?"
+    resolved, trace = rewrite_contextual_query(follow_up, history)
+
+    assert trace["rewritten"] is True
+    assert trace["mode"] == "anaphora_substitution"
+    assert "hồ sơ nghiệm thu NV-30" in resolved
+    assert "NV-30" in trace["preserved_codes"]
+
+    # Test short codes like NV-01, CT-06
+    history2 = [
+        {
+            "question": "Mã trạng thái CT-06 có ý nghĩa gì?",
+            "answer": "CT-06 đang ở trạng thái chờ quy ước.",
+        }
+    ]
+    follow_up2 = "Nhiệm vụ này ai chịu trách nhiệm?"
+    resolved2, trace2 = rewrite_contextual_query(follow_up2, history2)
+    assert trace2["rewritten"] is True
+    assert "CT-06" in resolved2
