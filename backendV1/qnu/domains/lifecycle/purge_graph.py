@@ -39,6 +39,7 @@ SOURCE_TABLES = frozenset(
         "kb_publication_decisions",
         "kb_index_inputs",
         "kb_index_chunks",
+        "kb_index_table_facts",
         "kb_compiled_documents",
         "chat_turns",
     }

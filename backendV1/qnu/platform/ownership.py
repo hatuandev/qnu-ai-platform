@@ -112,6 +112,7 @@ V1_TABLES = frozenset(
         "kb_index_sync",
         "kb_index_inputs",
         "kb_index_chunks",
+        "kb_index_table_facts",
         "chat_assistants",
         "chat_assistant_collections",
         "assistant_publications",

@@ -204,3 +204,80 @@ class IndexChunk(Base):
     citations: Mapped[dict] = mapped_column(JSONB, nullable=False)
     structure: Mapped[dict | None] = mapped_column(JSONB)
     vector: Mapped[list | None] = mapped_column(JSONB)
+
+
+class IndexTableFact(Base):
+    """Structured Universal Facts scoped to one active IndexRun for deterministic query_facts."""
+
+    __tablename__ = "kb_index_table_facts"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["input_id", "index_run_id", "workspace_id", "collection_id"],
+            [
+                "kb_index_inputs.id",
+                "kb_index_inputs.run_id",
+                "kb_index_inputs.workspace_id",
+                "kb_index_inputs.collection_id",
+            ],
+            ondelete="CASCADE",
+            name="fk_index_table_fact_input",
+        ),
+        ForeignKeyConstraint(
+            ["index_run_id", "workspace_id", "collection_id"],
+            ["kb_index_runs.id", "kb_index_runs.workspace_id", "kb_index_runs.collection_id"],
+            ondelete="CASCADE",
+            name="fk_index_table_fact_run",
+        ),
+        UniqueConstraint("index_run_id", "fact_id", name="uq_index_table_fact_id"),
+        CheckConstraint(
+            "row_kind IN ('data','summary','group_header','inline_note')",
+            name="ck_index_table_fact_row_kind",
+        ),
+        CheckConstraint(
+            "data_status IN ('locked','interim','planned','unknown')",
+            name="ck_index_table_fact_data_status",
+        ),
+        CheckConstraint("row_index >= 0", name="ck_index_table_fact_row_index"),
+        Index(
+            "ix_kb_index_table_facts_scope",
+            "workspace_id",
+            "index_run_id",
+            "table_id",
+            "data_year",
+            "row_kind",
+        ),
+        Index(
+            "ix_kb_index_table_facts_attributes_gin",
+            "attributes",
+            postgresql_using="gin",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    input_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    index_run_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    collection_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    document_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    version_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    publication_decision_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    table_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    source_table_citation: Mapped[str] = mapped_column(String(256), nullable=False)
+    table_title: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    has_header: Mapped[bool] = mapped_column(nullable=False, default=True)
+    keep_whole_in_chunk: Mapped[bool] = mapped_column(nullable=False, default=False)
+    column_keys: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    scoped_notes: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    fact_id: Mapped[str] = mapped_column(String(192), nullable=False)
+    row_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    row_kind: Mapped[str] = mapped_column(String(24), nullable=False, default="data")
+    row_pointer: Mapped[str] = mapped_column(String(256), nullable=False)
+    group_name: Mapped[str | None] = mapped_column(Text)
+    subject_code: Mapped[str | None] = mapped_column(String(128))
+    subject_name: Mapped[str | None] = mapped_column(Text)
+    data_year: Mapped[int | None] = mapped_column(Integer)
+    data_status: Mapped[str] = mapped_column(String(16), nullable=False, default="unknown")
+    attributes: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    detail_md_pointers: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    applicable_note_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    source_cell_refs: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    cross_references: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)

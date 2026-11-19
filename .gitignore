@@ -113,6 +113,8 @@ frontendV2/test-results/
 
 # Local orchestration, runtime data and generated QA evidence (never source code)
 .antigravity-bridge/
+graphify-out/
+.graphify/
 backend/.pytest*/
 backend/pytest_temp_dir/
 backend/storage/*

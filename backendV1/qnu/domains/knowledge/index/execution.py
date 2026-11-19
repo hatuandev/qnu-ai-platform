@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import re
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
@@ -14,6 +15,7 @@ from qnu.domains.knowledge.compilation.artifacts import json_bytes
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.index.chunking import READABLE_CHUNKER_VERSIONS
 from qnu.domains.knowledge.index.contextual import VERSION as CONTEXT_VERSION
+from qnu.domains.knowledge.index.facts import project_table
 from qnu.domains.knowledge.index.lease import (
     ClaimLost,
     assert_claim,
@@ -21,12 +23,14 @@ from qnu.domains.knowledge.index.lease import (
     commit_owned,
     heartbeat,
 )
-from qnu.domains.knowledge.index.models import IndexChunk, IndexInput, IndexRun
+from qnu.domains.knowledge.index.models import IndexChunk, IndexInput, IndexRun, IndexTableFact
+from qnu.domains.knowledge.index.row_cards import DocumentCardMeta, render_projection_to_cards
 from qnu.domains.knowledge.index.snapshots import assert_snapshot, publication_identity
 from qnu.domains.knowledge.publication.access import authorize
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.modelops.embedding.runtime import resolve_embedding_runtime
 from qnu.domains.modelops.usage.service import usage_service
+from qnu.domains.ocr.ids import new_id
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException, Conflict, DependencyUnavailable
@@ -183,6 +187,107 @@ async def _write_vectors(db, blob, run, actor, vectors: VectorStore) -> None:
     await commit_owned(db, run)
 
 
+_COL_YEAR_RE = re.compile(r"^table:(.+):column:(\d+)$")
+
+
+def _column_years_for_table(citation: str, annotations: list[dict]) -> dict[int, int]:
+    years: dict[int, int] = {}
+    for ann in annotations:
+        match = _COL_YEAR_RE.fullmatch(ann.get("target") or "")
+        if not match or match.group(1) != citation:
+            continue
+        year = (ann.get("values") or {}).get("data_year")
+        if type(year) is int:
+            years[int(match.group(2))] = year
+    return years
+
+
+async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, actor: AuthActor) -> None:
+    """Persist kb_index_table_facts + RowCard projection before atomic is_active=True swap."""
+    published = await assert_snapshot(db, blob, actor, run)
+    await assert_claim(db, run)
+    bindings = {
+        binding.document_id: binding
+        for binding in (
+            await db.scalars(select(IndexInput).where(IndexInput.run_id == run.id))
+        ).all()
+    }
+    await db.execute(delete(IndexTableFact).where(IndexTableFact.index_run_id == run.id))
+    total_facts = 0
+    total_cards = 0
+    for publication in published:
+        binding = bindings.get(publication.document.id)
+        if binding is None:
+            continue
+        annotations = [
+            a.model_dump(mode="json", exclude_none=True)
+            for a in publication.version.retrieval_metadata
+        ]
+        doc_meta = DocumentCardMeta(title=publication.document.title)
+        for entry in publication.content.get("tables") or []:
+            table = entry.get("table") or {}
+            citation = entry.get("citation") or ""
+            if table.get("status") != "parsed" or not table.get("rows") or not citation:
+                continue
+            projected = project_table(
+                table,
+                table_id=citation,
+                source_table_citation=citation,
+                title=entry.get("title") or publication.document.title,
+                column_years=_column_years_for_table(citation, annotations),
+            )
+            if not projected.facts:
+                continue
+            cards = render_projection_to_cards(projected, document_meta=doc_meta)
+            total_cards += len(cards)
+            serialized_notes = [note.model_dump(mode="json") for note in projected.scoped_notes]
+            for fact in projected.facts:
+                db.add(
+                    IndexTableFact(
+                        id=new_id("ft"),
+                        input_id=binding.id,
+                        index_run_id=run.id,
+                        workspace_id=run.workspace_id,
+                        collection_id=run.collection_id,
+                        document_id=binding.document_id,
+                        version_id=binding.version_id,
+                        publication_decision_id=binding.publication_decision_id,
+                        table_id=projected.table_id,
+                        source_table_citation=projected.source_table_citation,
+                        table_title=projected.title,
+                        has_header=projected.has_header,
+                        keep_whole_in_chunk=projected.keep_whole_in_chunk,
+                        column_keys=list(projected.column_keys),
+                        scoped_notes=serialized_notes,
+                        fact_id=fact.fact_id,
+                        row_index=fact.row_index,
+                        row_kind=fact.row_kind,
+                        row_pointer=fact.row_pointer,
+                        group_name=fact.group,
+                        subject_code=fact.subject_code,
+                        subject_name=fact.subject_name,
+                        data_year=fact.data_year,
+                        data_status=fact.data_status,
+                        attributes={
+                            k: v.model_dump(mode="json") for k, v in fact.attributes.items()
+                        },
+                        detail_md_pointers=dict(fact.detail_md_pointers),
+                        applicable_note_ids=list(fact.applicable_note_ids),
+                        source_cell_refs=list(fact.source_cell_refs),
+                        cross_references=list(fact.cross_references),
+                    )
+                )
+                total_facts += 1
+    await commit_owned(db, run)
+    if total_facts:
+        logger.info(
+            "index_table_facts_written",
+            run_id=run.id,
+            facts=total_facts,
+            row_cards=total_cards,
+        )
+
+
 async def _activate(db, blob, run, actor, vectors: VectorStore) -> str:
     await validate_target(db, run, actor, vectors)
     published = await assert_snapshot(db, blob, actor, run)
@@ -286,6 +391,7 @@ async def execute_run(
                 )
             await _embed_pending(db, blob, run, actor, model, vectors)
             await _write_vectors(db, blob, run, actor, vectors)
+            await _write_table_facts(db, blob, run, actor)
             status = await _activate(db, blob, run, actor, vectors)
             logger.info(
                 "index_completed", run_id=run.id, generation=run.generation, chunks=run.chunks_total

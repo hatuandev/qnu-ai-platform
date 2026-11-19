@@ -1,3 +1,3 @@
 """Schema supported by this API/worker/recovery build."""
 
-SCHEMA_HEAD = "0035_assistant_without_collections"
+SCHEMA_HEAD = "0036_kb_index_table_facts"
