@@ -224,6 +224,18 @@ async def answer(
         scope=retrieval.trace.get("hit_scope") if len(ids) > 1 else None,
         bundles=bundles,
     )
+    # Slice 5: Confusable siblings detection & rule constraints extraction
+    from qnu.domains.rag.answer.confusable_siblings import scan_for_confusables
+    from qnu.domains.rag.answer.rule_constraints import extract_constraints_for_sources
+
+    confusables = scan_for_confusables(effective_query, sources)
+    if confusables:
+        trace.context["confusable_siblings"] = confusables
+
+    constraints = extract_constraints_for_sources(sources)
+    if constraints:
+        trace.context["rule_constraints"] = constraints
+
     packing_started = time.monotonic()
     packing_metadata = (
         {
