@@ -48,7 +48,9 @@ def supports(primary, rows, relationships, metadata_filter, scopes=None, *, enum
     selected, links, tables = {}, {}, {}
     by_id = {r.id: r for r in rows}
     for row in rows:
-        if table := (row.structure or {}).get("source_table_citation"):
+        if not row.structure or "row_indices" not in row.structure:
+            continue
+        if table := row.structure.get("source_table_citation"):
             tables.setdefault((row.input_id, table), []).append(row)
     continuations = {
         (binding, link["previous"]): ref
@@ -58,6 +60,8 @@ def supports(primary, rows, relationships, metadata_filter, scopes=None, *, enum
     scopes = scopes or [metadata_filter]
     for hit in primary:
         source = by_id[hit.chunk_id]
+        if not source.structure or "row_indices" not in source.structure:
+            continue
         matched = _support_link(source, tables, relationships, scopes)
         if not matched:
             continue

@@ -62,7 +62,9 @@ def _owners(rows: list[IndexChunk], input_id: str, document: dict) -> dict[str, 
         if row.input_id != input_id:
             continue
         for ref, locator in row.citations.items():
-            if locator.get("run_id") != document["ocr_run_id"]:
+            if not isinstance(locator, dict):
+                continue
+            if locator.get("run_id") != document.get("ocr_run_id"):
                 continue
             if (
                 document.get("canonical_sha256")

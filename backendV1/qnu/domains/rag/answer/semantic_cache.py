@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.platform import cache
+from qnu.platform.config import get_settings
 from qnu.platform.logging import get_logger
 
 logger = get_logger(__name__)
@@ -22,37 +23,64 @@ VERSION = "qnu.rag.semantic-cache/v1"
 _FILLER_PHRASES = [
     "thầy cô cho em hỏi",
     "thầy cô cho tôi hỏi",
+    "dạ cho em hỏi",
     "cho em hỏi",
     "cho tôi hỏi",
     "cho mình hỏi",
+    "xin cho hỏi",
+    "xin hỏi",
     "làm phiền bạn",
     "vui lòng cho biết",
     "vui lòng cho em hỏi",
     "nhờ bot tư vấn",
     "nhờ ad tư vấn",
+    "nhờ tư vấn",
+    "giúp em với",
+    "giúp mình với",
+    "được không ạ",
+    "có đúng không ạ",
     "thế ạ",
     "vậy ạ",
     "với ạ",
+    "xin chào",
+    "chào bạn",
+    "chào bot",
+    "chào ad",
     "dạ",
     "ạ",
     "nhỉ",
     "hả",
     "nhé",
+    "nha",
 ]
 
-_PUNCTUATION_RE = re.compile(r"[?!.,:;\"'()\[\]{}–—\-]+")
+_PUNCTUATION_RE = re.compile(r"(?<!\d)\.|\.(?!\d)|[?!,:;\"'()\[\]{}–—\-]+")
+
+
+def ttl_seconds() -> int:
+    """Get configured TTL for semantic cache (default 3600 seconds = 1 hour)."""
+    settings = get_settings()
+    if not getattr(settings, "SEMANTIC_CACHE_ENABLED", True):
+        return 0
+    return getattr(settings, "SEMANTIC_CACHE_TTL_SECONDS", 3600)
 
 
 def normalize_for_semantic_cache(query: str) -> str:
     """Normalize a natural query into a canonical semantic query representation.
 
-    Strips polite conversational fillers and punctuation while preserving
-    entity codes (0012, 7480201, AM-0007), years, numbers and subject names.
+    Strips polite conversational fillers and punctuation while strictly preserving:
+    - Condition keywords (ví dụ 'chính quy', 'liên thông', 'ngoại lệ', 'không áp dụng')
+    - Years and historical periods ('2024', '2025', '2026')
+    - Decimal numbers and scales ('6.0', '7.0', '25.5')
+    - Entity codes and identifiers ('0012', '7480201', 'AM-0007').
     """
     normalized = unicodedata.normalize("NFC", query).casefold()
     for phrase in sorted(_FILLER_PHRASES, key=len, reverse=True):
         pattern = r"(?<!\w)" + re.escape(phrase) + r"(?!\w)"
         normalized = re.sub(pattern, " ", normalized, flags=re.IGNORECASE)
+    # Convert decimal comma between digits to dot (6,0 -> 6.0)
+    normalized = re.sub(r"(?<=\d),(?=\d)", ".", normalized)
+    # Strip punctuation except decimal dots
     normalized = _PUNCTUATION_RE.sub(" ", normalized)
     tokens = [t for t in normalized.split() if t]
     return " ".join(tokens)

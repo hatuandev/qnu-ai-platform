@@ -354,10 +354,16 @@ def column_years_for_table(citation: str, annotations: list[dict]) -> dict[int, 
     return years
 
 
-def row_card_to_chunk(card: RowCard) -> Chunk:
+def row_card_to_chunk(card: RowCard, index: dict | None = None) -> Chunk:
     from qnu.domains.knowledge.index.chunking import Chunk
 
-    citations = {ref: ref for ref in card.source_cell_refs}
+    if index:
+        citations = {
+            ref: (index[ref] if isinstance(index.get(ref), dict) else ref)
+            for ref in card.source_cell_refs
+        }
+    else:
+        citations = {ref: ref for ref in card.source_cell_refs}
     structure = {
         "card_id": card.card_id,
         "table_id": card.table_id,
@@ -382,17 +388,21 @@ def build_row_card_chunks(
     tables: list[dict],
     doc_title: str,
     annotations: list[dict] | None = None,
+    index: dict | None = None,
 ) -> list[Chunk]:
     from qnu.domains.knowledge.index.facts import project_table
 
     chunks = []
     doc_meta = DocumentCardMeta(title=doc_title)
     annotations = annotations or []
+    last_opening_headers: dict[int, list[list[dict]]] = {}
     for entry in tables:
         table = entry.get("table") or {}
         citation = entry.get("citation") or ""
         if table.get("status") != "parsed" or not table.get("rows") or not citation:
             continue
+        cols = table.get("column_count", 0)
+        inherited = last_opening_headers.get(cols)
         column_years = column_years_for_table(citation, annotations)
         projected = project_table(
             table,
@@ -400,10 +410,33 @@ def build_row_card_chunks(
             source_table_citation=citation,
             title=entry.get("title") or doc_title,
             column_years=column_years,
+            inherited_header_rows=inherited,
         )
         if not projected.facts:
             continue
+        if projected.has_header and projected.storage_mode == "facts" and not inherited:
+            from qnu.domains.knowledge.index.table_layout import header_rows, table_structure
+
+            st = table_structure(table)
+            hr = header_rows(st)
+            if not hr:
+                from qnu.domains.knowledge.index.table_dependencies import (
+                    header_row,
+                    multitier_header,
+                    typed_header,
+                )
+
+                multi = multitier_header(table)
+                if multi is not None:
+                    hr = multi
+                elif typed_header(table):
+                    hr = [0]
+                elif header_row(table):
+                    hr = [0]
+            if hr:
+                last_opening_headers[cols] = [table["rows"][r] for r in hr]
+
         cards = render_projection_to_cards(projected, document_meta=doc_meta)
         for card in cards:
-            chunks.append(row_card_to_chunk(card))
+            chunks.append(row_card_to_chunk(card, index=index))
     return chunks

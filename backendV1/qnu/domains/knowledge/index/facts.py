@@ -470,6 +470,7 @@ def project_table(
     long_cell_word_limit: int = DEFAULT_LONG_CELL_WORDS,
     small_table_row_limit: int = DEFAULT_SMALL_TABLE_ROWS,
     cross_references: list[str] | None = None,
+    inherited_header_rows: list[list[dict]] | None = None,
 ) -> UniversalTableProjection:
     """Project one canonical table into Universal Facts (all headed tables) or raw_rows."""
     structure = table if "row_indices" in table else table_structure(table)
@@ -489,6 +490,54 @@ def project_table(
         )
 
     headers = header_rows(structure)
+    candidate_tbl = table
+    if "column_count" not in candidate_tbl and "original_column_count" in candidate_tbl:
+        candidate_tbl = {**candidate_tbl, "column_count": candidate_tbl["original_column_count"]}
+
+    if not headers and "rows" in candidate_tbl and "column_count" in candidate_tbl:
+        from qnu.domains.knowledge.index.table_dependencies import (
+            header_row,
+            multitier_header,
+            typed_header,
+        )
+
+        multi = multitier_header(candidate_tbl)
+        if multi is not None:
+            headers = multi
+        elif typed_header(candidate_tbl):
+            headers = [0]
+        elif header_row(candidate_tbl):
+            headers = [0]
+
+    if not headers and inherited_header_rows:
+        col_count = candidate_tbl.get("column_count") or structure.get("original_column_count", 0)
+        if col_count and len(inherited_header_rows[0]) == col_count:
+            import copy
+
+            prepended_rows = [copy.deepcopy(r) for r in inherited_header_rows]
+            for r in prepended_rows:
+                for c in r:
+                    c["header"] = True
+            synth_tbl = {
+                "rows": prepended_rows + copy.deepcopy(candidate_tbl["rows"]),
+                "column_count": col_count,
+            }
+            return project_table(
+                synth_tbl,
+                table_id=table_id,
+                source_table_citation=source_table_citation,
+                title=title,
+                lead_in_pointer=lead_in_pointer,
+                column_years=column_years,
+                year_statuses=year_statuses,
+                scoped_notes=scoped_notes,
+                defined_symbols=defined_symbols,
+                long_cell_word_limit=long_cell_word_limit,
+                small_table_row_limit=small_table_row_limit,
+                cross_references=cross_references,
+                inherited_header_rows=None,
+            )
+
     if not headers:
         return UniversalTableProjection(
             table_id=table_id,

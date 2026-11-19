@@ -215,20 +215,50 @@ async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, a
             for a in publication.version.retrieval_metadata
         ]
         doc_meta = DocumentCardMeta(title=publication.document.title)
-        for entry in publication.content.get("tables") or []:
+        tables = (
+            publication.content.get("source_tables")
+            or publication.content.get("tables")
+            or []
+        )
+        last_opening_headers: dict[int, list[list[dict]]] = {}
+        for entry in tables:
             table = entry.get("table") or {}
             citation = entry.get("citation") or ""
             if table.get("status") != "parsed" or not table.get("rows") or not citation:
                 continue
+            cols = table.get("column_count", 0)
+            inherited = last_opening_headers.get(cols)
             projected = project_table(
                 table,
                 table_id=citation,
                 source_table_citation=citation,
                 title=entry.get("title") or publication.document.title,
                 column_years=column_years_for_table(citation, annotations),
+                inherited_header_rows=inherited,
             )
             if not projected.facts:
                 continue
+            if projected.has_header and projected.storage_mode == "facts" and not inherited:
+                from qnu.domains.knowledge.index.table_layout import header_rows, table_structure
+
+                st = table_structure(table)
+                hr = header_rows(st)
+                if not hr:
+                    from qnu.domains.knowledge.index.table_dependencies import (
+                        header_row,
+                        multitier_header,
+                        typed_header,
+                    )
+
+                    multi = multitier_header(table)
+                    if multi is not None:
+                        hr = multi
+                    elif typed_header(table):
+                        hr = [0]
+                    elif header_row(table):
+                        hr = [0]
+                if hr:
+                    last_opening_headers[cols] = [table["rows"][r] for r in hr]
             cards = render_projection_to_cards(projected, document_meta=doc_meta)
             total_cards += len(cards)
             serialized_notes = [note.model_dump(mode="json") for note in projected.scoped_notes]

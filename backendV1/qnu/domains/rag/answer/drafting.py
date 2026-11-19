@@ -1,6 +1,7 @@
 """Build bounded evidence messages and validate every model-proposed citation ID."""
 
 import json
+import re
 from copy import deepcopy
 
 from pydantic import ValidationError
@@ -22,6 +23,15 @@ REPAIR_INSTRUCTIONS = {
     "answer_table_value_not_extractive": (
         "statements[].text có giá trị số chưa được đúng hàng, cột và nguồn dẫn chứng minh. "
         "Chỉ đưa giá trị khớp nguyên văn với nguồn của đúng đối tượng; bỏ phần chưa xác minh."
+    ),
+    "answer_response_invalid": (
+        "Cấu trúc JSON phản hồi không đúng schema quy định. "
+        "Bắt buộc trả JSON chuẩn đúng các khóa: status, statements, lookups, assessment, message. "
+        "Không bọc markdown ngoài JSON sau thẻ </phan_tich>."
+    ),
+    "answer_citation_invalid": (
+        "Citations trong evidence_ids chứa mã không thuộc danh sách bằng chứng được cấp. "
+        "Chỉ dùng các mã [E1, E2...] đã xuất hiện trong phần evidence; tuyệt đối không tự tạo mã mới."
     ),
 }
 
@@ -392,12 +402,74 @@ def payload_metrics(messages: list[ChatMessage], schema: dict, evidence_bytes: i
     }
 
 
+def _extract_json_text(text: str) -> str:
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+        cleaned = cleaned.strip()
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return cleaned[start : end + 1]
+    return cleaned
+
+
 def parse_answer(content: str, sources: list[EvidenceSource]) -> ModelAnswer:
     from qnu.domains.rag.answer.reasoning import split_reasoning_and_answer
 
     _, clean_content = split_reasoning_and_answer(content)
+    clean_json_str = _extract_json_text(clean_content)
+    allowed = {s.evidence_id for s in sources}
+
     try:
-        result = ModelAnswer.model_validate_json(clean_content)
+        raw_dict = json.loads(clean_json_str)
+        if isinstance(raw_dict, dict):
+            # Normalize nullable lists
+            if raw_dict.get("lookups") is None:
+                raw_dict["lookups"] = []
+            if raw_dict.get("statements") is None:
+                raw_dict["statements"] = []
+            if raw_dict.get("assessment") is None:
+                raw_dict["assessment"] = []
+
+            # Pre-sanitize statements: strip bracket citations [E1] from text and merge into evidence_ids
+            for stmt in raw_dict.get("statements", []):
+                if isinstance(stmt, dict):
+                    stmt_text = stmt.get("text", "")
+                    if isinstance(stmt_text, str):
+                        # Find inline bracket citations like [E1], [E2, E3]
+                        inline_ids = re.findall(r"\[([Ee]\d+)\]", stmt_text)
+                        # Strip inline citations from statement text
+                        cleaned_text = re.sub(
+                            r"\s*\[[Ee]\d+(?:\s*,\s*[Ee]\d+)*\]", "", stmt_text
+                        ).strip()
+                        stmt["text"] = cleaned_text
+
+                        raw_eids = stmt.get("evidence_ids") or []
+                        if isinstance(raw_eids, list):
+                            combined = [str(eid) for eid in raw_eids] + [
+                                eid.upper() for eid in inline_ids
+                            ]
+                        else:
+                            combined = [eid.upper() for eid in inline_ids]
+                        stmt["evidence_ids"] = list(dict.fromkeys(combined))
+
+            # Only coerce status if status is answered, statements/lookups are empty, BUT model provided an explicit refusal message
+            if (
+                raw_dict.get("status") == "answered"
+                and not raw_dict.get("statements")
+                and not raw_dict.get("lookups")
+                and raw_dict.get("message")
+            ):
+                raw_dict["status"] = "insufficient_evidence"
+
+            clean_json_str = json.dumps(raw_dict, ensure_ascii=False)
+    except Exception:
+        pass
+
+    try:
+        result = ModelAnswer.model_validate_json(clean_json_str)
     except ValidationError as exc:
         error = AppException(
             "Model trả cấu trúc câu trả lời không hợp lệ.",
@@ -420,7 +492,7 @@ def parse_answer(content: str, sources: list[EvidenceSource]) -> ModelAnswer:
             for item in exc.errors(include_input=False, include_context=False)[:20]
         ]
         raise error from exc
-    allowed = {s.evidence_id for s in sources}
+
     issues = []
     for index, statement in enumerate(result.statements):
         # Repeating an allowed alias adds no evidence; keep first order and judge only membership.

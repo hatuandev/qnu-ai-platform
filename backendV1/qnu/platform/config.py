@@ -100,6 +100,9 @@ class Settings(BaseSettings):
     PUBLIC_CHATBOT_SESSION_TTL_SECONDS: int = Field(default=1800, ge=60, le=86400)
     # 0 disables exact answer reuse; keep it off until callers are rate limited.
     ANSWER_CACHE_TTL_SECONDS: int = Field(default=0, ge=0, le=86400)
+    # Semantic Cache: reuse answers for equivalent queries bound to (workspace, index_run).
+    SEMANTIC_CACHE_ENABLED: bool = True
+    SEMANTIC_CACHE_TTL_SECONDS: int = Field(default=3600, ge=0, le=86400)
     # Optional operator override; otherwise chunk sizing follows the embedding runtime.
     INDEX_CHUNK_MAX_BYTES: int | None = Field(default=None, ge=256)
     INDEX_EMBED_BATCH_SIZE: int = Field(default=16, ge=1, le=128)

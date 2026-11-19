@@ -11,16 +11,14 @@ def typed_header(table: dict) -> bool:
     """Single native header proven by repeated column type contrast, not vocabulary.
 
     Cross-page joins still require the numbered boundary proof below. This rule
-    only labels row zero of one complete, rectangular, unmerged source table.
+    labels row zero of one complete rectangular table or a table whose body merges
+    resolve cleanly via layout.
     """
-    rows, columns = table["rows"], table["column_count"]
-    if (
-        len(rows) < 3
-        or columns < 2
-        or any(
-            len(row) != columns or any(c["row_span"] != 1 or c["col_span"] != 1 for c in row)
-            for row in rows
-        )
+    rows, columns = table.get("rows", []), table.get("column_count", 0)
+    if len(rows) < 3 or columns < 2 or not rows[0]:
+        return False
+    if len(rows[0]) != columns or any(
+        c.get("row_span", 1) != 1 or c.get("col_span", 1) != 1 for c in rows[0]
     ):
         return False
     if not all(
@@ -30,15 +28,37 @@ def typed_header(table: dict) -> bool:
         for c in rows[0]
     ):
         return False
-    # At least one column has repeated numeric observations where row zero is a label.
-    return any(
-        all(
-            any(ch.isdigit() for ch in row[col]["text"])
-            and not any(ch.isalpha() for ch in row[col]["text"])
-            for row in rows[1:]
-        )
-        for col in range(columns)
+
+    is_simple = not any(
+        len(row) != columns or any(c.get("row_span", 1) != 1 or c.get("col_span", 1) != 1 for c in row)
+        for row in rows[1:]
     )
+    if is_simple:
+        return any(
+            all(
+                any(ch.isdigit() for ch in row[col]["text"])
+                and not any(ch.isalpha() for ch in row[col]["text"])
+                for row in rows[1:]
+            )
+            for col in range(columns)
+        )
+
+    from qnu.domains.knowledge.index.table_layout import layout, table_structure
+
+    structure = table if "row_indices" in table else table_structure(table)
+    positions, errors = layout(structure)
+    if errors:
+        return False
+    for col in range(columns):
+        col_data = [p.cell for p in positions if p.row > 0 and p.column == col]
+        if col_data and all(
+            any(ch.isdigit() for ch in c["text"])
+            and not any(ch.isalpha() for ch in c["text"])
+            for c in col_data
+            if c["text"].strip()
+        ):
+            return True
+    return False
 
 
 def _horizontal_metric_tier(rows: list[list[dict]], identity_width: int) -> bool:
@@ -164,7 +184,7 @@ def adjoining(left: dict, right: dict) -> bool:
 
 def dependencies(document: dict) -> dict[str, dict]:
     result, previous, header, chain = {}, None, None, []
-    run = document["ocr_run_id"]
+    run = document.get("ocr_run_id") or document.get("identity", {}).get("run_id") or ""
     for page in document["pages"]:
         blocks = page["blocks"]
         tables = [b for b in blocks if b.get("table")]

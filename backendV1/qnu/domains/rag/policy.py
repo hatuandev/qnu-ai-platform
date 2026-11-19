@@ -20,6 +20,7 @@ class RagPolicy(BaseModel):
     verification_mode: Literal["off", "observe", "enforce"] = "off"
     verification_provider_id: str | None = Field(None, min_length=1, max_length=64)
     verification_max_output_tokens: int | None = Field(None, strict=True, gt=0)
+    semantic_cache: bool = Field(default=True)
 
     @model_validator(mode="after")
     def compatible(self):

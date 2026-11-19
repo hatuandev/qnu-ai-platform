@@ -88,7 +88,7 @@ async def answer(
 
     # Slice 5: Multi-turn Contextual Query Rewriter
     effective_query = retrieval_query or req.question
-    if req.history and len(req.history) >= 2:
+    if req.history and len(req.history) >= 1:
         from qnu.domains.rag.answer.rewriter import rewrite_contextual_query
 
         effective_query, rewrite_trace = rewrite_contextual_query(
@@ -398,10 +398,17 @@ async def answer(
         semantic_cache_key,
         store_semantic_cache,
     )
+    from qnu.domains.rag.answer.semantic_cache import (
+        ttl_seconds as semantic_cache_ttl_seconds,
+    )
 
     norm_q = normalize_for_semantic_cache(effective_query)
     sem_key = semantic_cache_key(workspace_id, collection_id, retrieval.index_run_id, norm_q)
-    if cached is None and cache_ttl:
+    sem_cache_enabled = (
+        getattr(req, "semantic_cache", True) and semantic_cache_ttl_seconds() > 0
+    )
+    sem_cache_ttl = semantic_cache_ttl_seconds() if sem_cache_enabled else 0
+    if cached is None and sem_cache_ttl > 0:
         sem_cached = await get_semantic_cache(sem_key)
         if sem_cached is not None:
             try:
@@ -597,7 +604,7 @@ async def answer(
                 "trigger": repair_code or "insufficient_evidence",
                 "outcome": "skipped_structure",
             }
-            if plan_ready(plan_for(sources, trace.context)):
+            if plan_ready(plan_for(sources, trace.context)) or first_error is not None:
                 needs = selection.get("needs", {})
                 list_names = (
                     repair_code == "answer_table_value_not_extractive"
@@ -780,7 +787,7 @@ async def answer(
         trace.cache = {
             "version": answer_cache.VERSION,
             "status": "hit",
-            "key": cache_key,
+            "key": cache_key or sem_key,
             "saved_tokens": cached.total_tokens,
         }
         trace.contract = dict(cached.contract)
@@ -867,6 +874,7 @@ async def answer(
             trace.fallback = {"source": "draft", "version": PROMPT_VERSION}
         elif compose_insufficient_message:
             await compose_message(response.reason)
+    # Store exact answer cache
     if (
         cache_key is not None
         and cached is None
@@ -884,6 +892,20 @@ async def answer(
             ),
             cache_ttl,
         )
+        logger.info(
+            "rag_answer_cache_stored",
+            answer_id=answer_id,
+            total_tokens=result.total_tokens,
+        )
+
+    # Store semantic cache bound to (workspace_id, active_index_run_id, normalized_query)
+    if (
+        sem_cache_ttl > 0
+        and cached is None
+        and req.fact_query is None
+        and response.status == "answered"
+        and trace.verification["status"] in {"not_run", "supported"}
+    ):
         await store_semantic_cache(
             sem_key,
             SemanticCacheEntry(
@@ -894,16 +916,16 @@ async def answer(
                 raw_answer=result.content,
                 saved_tokens=result.total_tokens,
             ),
-            cache_ttl,
+            sem_cache_ttl,
         )
         logger.info(
-            "rag_answer_cache_stored",
+            "rag_semantic_cache_stored",
             answer_id=answer_id,
             total_tokens=result.total_tokens,
         )
     if not trace.semantic_cache:
         trace.semantic_cache = {
-            "status": "miss" if cache_ttl else "disabled",
+            "status": "miss" if sem_cache_ttl > 0 else "disabled",
             "normalized_query": norm_q,
         }
     trace.stage_ms["total"] = round((time.monotonic() - request_started) * 1000, 3)

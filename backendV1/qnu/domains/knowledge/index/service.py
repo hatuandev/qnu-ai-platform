@@ -199,9 +199,12 @@ async def request_index(
         if req.contextual_search:
             chunks = enrich(chunks, publication.content, documents, maximum)
         card_chunks = build_row_card_chunks(
-            publication.content.get("tables") or [],
+            publication.content.get("source_tables")
+            or publication.content.get("tables")
+            or [],
             publication.document.title,
             annotations,
+            index=publication.content.get("index"),
         )
         chunks.extend(card_chunks)
         reports = [
