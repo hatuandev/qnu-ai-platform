@@ -74,9 +74,10 @@ async def check_database(url: str, head: str) -> tuple[bool, str]:
         await engine.dispose()
 
 
-async def check_qdrant(url: str) -> tuple[bool, str]:
+async def check_qdrant(url: str, api_key: str = "") -> tuple[bool, str]:
+    headers = {"api-key": api_key} if api_key else {}
     try:
-        async with httpx.AsyncClient(timeout=2, trust_env=False) as client:
+        async with httpx.AsyncClient(timeout=2, trust_env=False, headers=headers) as client:
             response = await client.get(url.rstrip("/") + "/collections")
         return response.status_code == 200, "Qdrant GET /collections"
     except (httpx.HTTPError, httpx.InvalidURL, OSError, ValueError):
@@ -92,7 +93,7 @@ async def inspect(
     checks = await asyncio.gather(
         check_redis(settings.REDIS_URL),
         check_database(settings.DATABASE_URL, head),
-        check_qdrant(settings.QDRANT_URL),
+        check_qdrant(settings.QDRANT_URL, getattr(settings, "QDRANT_API_KEY", "")),
         check_storage(settings),
     )
     results = dict(

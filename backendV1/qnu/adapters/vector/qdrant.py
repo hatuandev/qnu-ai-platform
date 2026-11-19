@@ -59,12 +59,17 @@ class QdrantVectorStore:
     async def _request(self, method: str, path: str, *, body: dict | None = None) -> httpx.Response:
         # Infrastructure address comes only from server settings, never request/model input.
         assert_allowed_endpoint(self._base, allow_private=True)
+        headers = {}
+        api_key = get_settings().QDRANT_API_KEY
+        if api_key:
+            headers["api-key"] = api_key
         try:
             async with httpx.AsyncClient(
                 timeout=get_settings().HTTP_TIMEOUT_SECONDS,
                 follow_redirects=False,
                 trust_env=False,
                 transport=self._transport,
+                headers=headers,
             ) as client:
                 result = await client.request(method, self._base + path, json=body)
         except httpx.RequestError as exc:
