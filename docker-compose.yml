@@ -8,7 +8,7 @@ x-logging: &logging
     max-file: "5"
 
 x-runtime: &runtime
-  ENVIRONMENT: ${ENVIRONMENT:-production}
+  ENVIRONMENT: ${ENVIRONMENT:-staging}
   SERVICE_NAME: qnu-backend-v1
   API_PREFIX: /platform/v1alpha1
   PORT: "8002"
@@ -31,9 +31,10 @@ x-runtime: &runtime
   SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
   PROVIDER_ENCRYPTION_KEY: ${PROVIDER_ENCRYPTION_KEY:?Keep the existing provider encryption key}
   INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
-  DEV_AUTH_ENABLED: ${DEV_AUTH_ENABLED:-false}
-  SSO_ENABLED: ${SSO_ENABLED:-true}
-  SSO_AUTHORITY: ${SSO_AUTHORITY:?Set SSO_AUTHORITY}
+  DEV_AUTH_ENABLED: ${DEV_AUTH_ENABLED:-true}
+  DEV_ACCESS_PASSWORD: ${DEV_ACCESS_PASSWORD:-QNU@2026}
+  SSO_ENABLED: ${SSO_ENABLED:-false}
+  SSO_AUTHORITY: ${SSO_AUTHORITY:-}
   SSO_AUDIENCE: ${SSO_AUDIENCE:-ai_api}
   SSO_JWKS_URL: ${SSO_JWKS_URL:-}
   ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Set comma-separated ALLOWED_ORIGINS}
@@ -109,6 +110,9 @@ services:
     build:
       context: ./frontendV2
       dockerfile: Dockerfile
+      args:
+        VITE_SSO_ENABLED: ${VITE_SSO_ENABLED:-false}
+        VITE_PUBLIC_CHATBOT_SLUG: ${VITE_PUBLIC_CHATBOT_SLUG:-}
     networks: [dokploy-network]
     expose: ["80"]
     restart: unless-stopped

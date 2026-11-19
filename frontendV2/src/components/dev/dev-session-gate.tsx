@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   Building2,
+  KeyRound,
   Loader2,
   LogIn,
   RefreshCw,
@@ -15,10 +16,12 @@ import {
 } from "@/api/session-token";
 import {
   getWorkspace,
+  listWorkspaces,
   resolveWorkspaceRoute,
   type Workspace,
 } from "@/api/workspaces";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useUiStore } from "@/lib/ui-store";
 
 export type DevSessionStatus =
@@ -30,6 +33,7 @@ export type DevSessionStatus =
   | "error";
 
 const SIGNED_OUT_KEY = "qnu.dev.signedOut";
+const DEV_TOKEN_STORAGE_KEY = "qnu.dev.token";
 
 function isSignedOut(): boolean {
   try {
@@ -54,13 +58,22 @@ function setSignedOut(value: boolean): void {
 export function logoutDevSession(): void {
   setSignedOut(true);
   clearAccessToken();
-  window.location.reload();
+  try {
+    window.sessionStorage.removeItem(DEV_TOKEN_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+  window.location.href = "/";
 }
 
 function DevSessionGateInner({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<DevSessionStatus>("checking");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorHint, setErrorHint] = useState<string | null>(null);
+
+  const [accessKey, setAccessKey] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { setActiveWorkspace, setIsSingleUnitMode, setDevActor } = useUiStore();
 
@@ -83,6 +96,18 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
       let currentActor: AuthActor | null = null;
       let existingToken = getAccessToken();
 
+      if (!existingToken) {
+        try {
+          const stored = window.sessionStorage.getItem(DEV_TOKEN_STORAGE_KEY);
+          if (stored) {
+            setAccessToken(stored);
+            existingToken = stored;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       if (existingToken) {
         try {
           const meRes = await getMe();
@@ -90,8 +115,13 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
             currentActor = meRes.actor;
           }
         } catch {
-          // Token is invalid/expired; clear it and call dev bridge
           existingToken = null;
+          clearAccessToken();
+          try {
+            window.sessionStorage.removeItem(DEV_TOKEN_STORAGE_KEY);
+          } catch {
+            // ignore
+          }
         }
       }
 
@@ -101,77 +131,65 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
         )?.trim() || null;
 
       if (!currentActor) {
-        // Call dev auto-login bridge served by Vite dev server
-        let bridgeResponse: Response;
-        try {
-          bridgeResponse = await fetch("/__qnu_dev/auto-login", {
-            method: "POST",
-            headers: {
-              Accept: "application/json",
-            },
-          });
-        } catch {
-          throw new Error(
-            "Không thể kết nối đến cầu nối dev server tại /__qnu_dev/auto-login. Kiểm tra dev server Vite đang chạy.",
-          );
+        if (isSignedOut()) {
+          setStatus("signed_out");
+          return;
         }
 
-        const payload = (await bridgeResponse.json().catch(() => null)) as {
-          access_token?: string;
-          code?: string;
-          message?: string;
-          default_workspace_code?: string;
-        } | null;
-
-        if (!bridgeResponse.ok) {
-          const detail =
-            payload?.message ||
-            `Lỗi HTTP ${bridgeResponse.status} từ cầu nối dev auto-login.`;
-          const code = payload?.code;
-
-          let hint = "Kiểm tra cấu hình dev trong frontendV2/.env.local.";
-          if (code === "backend_unreachable") {
-            hint =
-              "BackendV1 chưa khởi chạy hoặc cổng 8002 không phản hồi. Hãy khởi động backendV1 (cd backendV1 && uv run ...).";
-          } else if (code === "invalid_credentials") {
-            hint =
-              "Mật khẩu dev không đúng. Kiểm tra DEV_ACCESS_PASSWORD trong file .env và QNU_DEV_ACCESS_KEY trong frontendV2/.env.local.";
-          } else if (code === "dev_gate_disabled") {
-            hint =
-              "Dev gate ở backend đang tắt. Đặt DEV_AUTH_ENABLED=true trong file .env của backendV1.";
+        // Try Vite dev auto-login bridge if in dev mode
+        let autoLoggedIn = false;
+        if (import.meta.env.DEV) {
+          try {
+            const bridgeResponse = await fetch("/__qnu_dev/auto-login", {
+              method: "POST",
+              headers: { Accept: "application/json" },
+            });
+            if (bridgeResponse.ok) {
+              const payload = (await bridgeResponse.json().catch(() => null)) as {
+                access_token?: string;
+                default_workspace_code?: string;
+              } | null;
+              if (payload?.access_token) {
+                setAccessToken(payload.access_token);
+                try {
+                  window.sessionStorage.setItem(
+                    DEV_TOKEN_STORAGE_KEY,
+                    payload.access_token,
+                  );
+                } catch {
+                  // ignore
+                }
+                if (payload.default_workspace_code) {
+                  configuredWorkspaceCode = payload.default_workspace_code;
+                }
+                const meRes = await getMe();
+                if (meRes?.actor?.authenticated) {
+                  currentActor = meRes.actor;
+                  autoLoggedIn = true;
+                }
+              }
+            }
+          } catch {
+            // bridge not reachable
           }
-
-          setErrorHint(hint);
-          throw new Error(detail);
         }
 
-        const token = payload?.access_token;
-        if (!token) {
-          throw new Error(
-            "Cầu nối đăng nhập thành công nhưng không trả access_token.",
-          );
+        if (!autoLoggedIn) {
+          setStatus("signed_out");
+          return;
         }
+      }
 
-        setAccessToken(token);
-
-        if (payload?.default_workspace_code) {
-          configuredWorkspaceCode = payload.default_workspace_code;
-        }
-
-        // Validate actor via GET /auth/me
-        const meRes = await getMe();
-        if (!meRes?.actor?.authenticated) {
-          throw new Error("Không thể xác nhận danh tính actor từ /auth/me.");
-        }
-        currentActor = meRes.actor;
+      if (!currentActor) {
+        setStatus("signed_out");
+        return;
       }
 
       setDevActor(currentActor);
       setSignedOut(false);
 
-      // 2. Resolve default workspace code
-      if (!configuredWorkspaceCode) {
-        // Query dev server config if not provided yet
+      // 2. Resolve default workspace code if available from dev config
+      if (!configuredWorkspaceCode && import.meta.env.DEV) {
         try {
           const cfgRes = await fetch("/__qnu_dev/config");
           if (cfgRes.ok) {
@@ -185,60 +203,30 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
         }
       }
 
-      if (!configuredWorkspaceCode) {
-        setErrorHint(
-          "Đặt QNU_DEV_WORKSPACE_CODE=shl hoặc VITE_DEV_WORKSPACE_CODE=shl trong frontendV2/.env.local.",
-        );
-        throw new Error(
-          "Cấu hình thiếu mã đơn vị dev. Không tự chọn đơn vị mẫu.",
-        );
-      }
-
       setStatus("resolving");
 
-      // 3. Resolve workspace ID via GET /workspaces/resolve-route?code=...
-      let resolved: { workspace_id: string; code: string };
-      try {
-        resolved = await resolveWorkspaceRoute(configuredWorkspaceCode);
-      } catch (err: unknown) {
-        const errorText = err instanceof Error ? err.message : String(err);
-        if (
-          errorText.includes("workspace_not_found") ||
-          errorText.includes("404") ||
-          errorText.includes("Không tìm thấy")
-        ) {
-          setErrorHint(
-            `Đơn vị "${configuredWorkspaceCode}" chưa tồn tại trong cơ sở dữ liệu. Hãy chạy seed backend: cd backendV1 && uv run --frozen python -m scripts.seed_shl_pilot`,
-          );
-          throw new Error(
-            `Không tìm thấy đơn vị với mã "${configuredWorkspaceCode}".`,
-          );
+      // 3. Resolve workspace: configured code first, fallback to first available workspace
+      let realWorkspace: Workspace | null = null;
+      if (configuredWorkspaceCode) {
+        try {
+          const resolved = await resolveWorkspaceRoute(configuredWorkspaceCode);
+          realWorkspace = await getWorkspace(resolved.workspace_id);
+        } catch {
+          // fallback to listWorkspaces
         }
-        if (
-          errorText.includes("permission_denied") ||
-          errorText.includes("403")
-        ) {
-          setErrorHint(
-            `Tài khoản dev "${currentActor.username}" chưa được gán quyền trong đơn vị "${configuredWorkspaceCode}".`,
-          );
-          throw new Error(
-            `Tài khoản không có quyền truy cập đơn vị "${configuredWorkspaceCode}".`,
-          );
-        }
-        throw err;
       }
 
-      // 4. Fetch full workspace detail
-      let realWorkspace: Workspace;
-      try {
-        realWorkspace = await getWorkspace(resolved.workspace_id);
-      } catch {
-        throw new Error(
-          `Không thể tải thông tin chi tiết của đơn vị ID: ${resolved.workspace_id}.`,
-        );
+      if (!realWorkspace) {
+        try {
+          const wsList = await listWorkspaces();
+          if (wsList.items.length > 0) {
+            realWorkspace = wsList.items[0];
+          }
+        } catch {
+          // ignore
+        }
       }
 
-      // 5. Commit to dev state
       setActiveWorkspace(realWorkspace);
       setIsSingleUnitMode(false);
       setStatus("ready");
@@ -258,6 +246,47 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
     initDevSession();
   }, [initDevSession]);
 
+  const handleDevLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const key = accessKey.trim();
+    if (!key) return;
+    setIsSubmitting(true);
+    setLoginError(null);
+    try {
+      const res = await fetch("/platform/v1alpha1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_key: key }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        access_token?: string;
+        detail?: string;
+        message?: string;
+      } | null;
+      if (!res.ok) {
+        throw new Error(
+          data?.detail || data?.message || "Khóa truy cập không chính xác.",
+        );
+      }
+      if (!data?.access_token) {
+        throw new Error("Không nhận được token xác thực từ server.");
+      }
+      setAccessToken(data.access_token);
+      try {
+        window.sessionStorage.setItem(DEV_TOKEN_STORAGE_KEY, data.access_token);
+      } catch {
+        // ignore
+      }
+      setSignedOut(false);
+      isExecutingRef.current = false;
+      await initDevSession();
+    } catch (err: unknown) {
+      setLoginError(err instanceof Error ? err.message : "Đăng nhập thất bại.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (status === "ready") {
     return <>{children}</>;
   }
@@ -265,30 +294,74 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
   if (status === "signed_out") {
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center bg-background px-4 text-foreground antialiased select-none">
-        <div className="w-full max-w-md rounded-xl border border-border/80 bg-card p-6 shadow-sm space-y-5">
+        <div className="w-full max-w-sm rounded-xl border border-border/80 bg-card p-6 shadow-sm space-y-5">
           <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <LogIn className="size-6" />
+            <KeyRound className="size-6" />
           </div>
           <div className="space-y-1.5">
-            <h2 className="text-sm font-semibold text-foreground">
-              Đã đăng xuất
+            <h2 className="text-base font-semibold text-foreground tracking-tight">
+              Đăng nhập Quản trị
             </h2>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Phiên làm việc dev đã kết thúc. Bấm Đăng nhập lại để vào nền tảng
-              bằng cầu nối dev hiện hành.
+              Nhập khóa truy cập nội bộ (Access Key) để đăng nhập vào bảng điều khiển quản trị QNU AI.
             </p>
           </div>
-          <Button
-            size="sm"
-            className="w-full h-9 text-xs font-medium gap-2"
-            onClick={() => {
-              setSignedOut(false);
-              initDevSession();
-            }}
-          >
-            <LogIn className="size-3.5" />
-            <span>Đăng nhập lại</span>
-          </Button>
+
+          <form onSubmit={handleDevLogin} className="space-y-4">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="dev-access-key"
+                className="text-xs font-medium text-foreground"
+              >
+                Khóa truy cập
+              </label>
+              <Input
+                id="dev-access-key"
+                type="password"
+                autoFocus
+                disabled={isSubmitting}
+                placeholder="Nhập khóa quản trị (ví dụ: QNU@2026)"
+                value={accessKey}
+                onChange={(e) => setAccessKey(e.target.value)}
+                className="text-xs"
+              />
+            </div>
+
+            {loginError && (
+              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-2.5 text-xs text-destructive flex items-center gap-2">
+                <AlertTriangle className="size-3.5 shrink-0" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSubmitting || !accessKey.trim()}
+              className="w-full h-9 text-xs font-medium gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  <span>Đang xác thực...</span>
+                </>
+              ) : (
+                <>
+                  <LogIn className="size-3.5" />
+                  <span>Đăng nhập</span>
+                </>
+              )}
+            </Button>
+          </form>
+
+          <div className="pt-2 border-t border-border/40 text-center">
+            <a
+              href="/"
+              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              ← Quay lại Cổng tư vấn công khai
+            </a>
+          </div>
         </div>
       </div>
     );
@@ -352,11 +425,11 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
             <div className="space-y-1">
               <h3 className="text-sm font-semibold text-foreground">
                 {status === "authenticating"
-                  ? "Đang xác thực phiên dev qua loopback..."
-                  : "Đang định tuyến đơn vị làm việc thật..."}
+                  ? "Đang xác thực phiên dev..."
+                  : "Đang định tuyến đơn vị làm việc..."}
               </h3>
               <p className="text-xs text-muted-foreground">
-                Kết nối tới BackendV1 tại 127.0.0.1:8002
+                Kết nối tới Backend QNU AI
               </p>
             </div>
           </div>
@@ -367,8 +440,5 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
 }
 
 export function DevSessionGate({ children }: { children: React.ReactNode }) {
-  if (!import.meta.env.DEV) {
-    return <>{children}</>;
-  }
   return <DevSessionGateInner>{children}</DevSessionGateInner>;
 }

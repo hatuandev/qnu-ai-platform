@@ -31,9 +31,7 @@ export function AppTopbar() {
       void logoutSso();
       return;
     }
-    if (import.meta.env.DEV) {
-      logoutDevSession();
-    }
+    logoutDevSession();
   };
 
   return (

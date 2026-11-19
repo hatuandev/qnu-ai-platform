@@ -8,6 +8,12 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+
+ARG VITE_SSO_ENABLED=false
+ARG VITE_PUBLIC_CHATBOT_SLUG=""
+ENV VITE_SSO_ENABLED=$VITE_SSO_ENABLED
+ENV VITE_PUBLIC_CHATBOT_SLUG=$VITE_PUBLIC_CHATBOT_SLUG
+
 RUN npm run build
 
 FROM nginx:1.29-alpine
