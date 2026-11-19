@@ -105,7 +105,6 @@ services:
       bootstrap:
         condition: service_completed_successfully
   frontend:
-    profiles: ["frontend"]
     image: qnu-ai-platform-frontend-v2:${APP_IMAGE_TAG:-latest}
     build:
       context: ./frontendV2
