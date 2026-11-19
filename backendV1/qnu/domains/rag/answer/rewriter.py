@@ -46,7 +46,45 @@ _BOT_CLARIFICATION_KEYWORDS = (
 # Extract core subjects from text (major names, codes, year, scores)
 _YEAR_RE = re.compile(r"\b(202[0-9])\b")
 _CODE_RE = re.compile(r"\b([A-Z]{2,4}-?\d{1,7}|\d{7}|\b0\d{1,5}\b)\b")
+_SECTION_RE = re.compile(r"\b(?:\d+\.\d+(?:\.\d+)?)\b")
 _SCORE_RE = re.compile(r"\b(\d{1,2}(?:[.,]\d{1,2})?)\s*(?:điểm|đ)\b", re.IGNORECASE)
+
+_ENTITY_TYPE_RE = re.compile(
+    r"\b(tiêu\s+chí|nhiệm\s+vụ|chương\s+trình\s+mã|chương\s+trình|ngành|mã\s+xét\s+tuyển|mã\s+việc|mã\s+ngành|mã|mục|điều|bảng)\b",
+    re.IGNORECASE,
+)
+
+_COMMON_PREDICATES = (
+    "tính điểm và mức độ",
+    "tính điểm",
+    "cách tính điểm",
+    "mức độ",
+    "điều kiện",
+    "tiêu chuẩn",
+    "yêu cầu",
+    "hồ sơ",
+    "thủ tục",
+    "chỉ tiêu",
+    "kinh phí",
+    "thời gian thực hiện",
+    "thời gian",
+    "tiến độ",
+    "đơn vị chủ trì",
+    "ai chủ trì",
+    "đơn vị phối hợp",
+    "sản phẩm",
+    "kết quả",
+    "nội dung thực hiện",
+    "nội dung",
+    "quy định gì",
+    "điều kiện gì",
+)
+
+
+def _extract_identifiers(text: str) -> list[str]:
+    codes = _CODE_RE.findall(text)
+    sections = _SECTION_RE.findall(text)
+    return list(dict.fromkeys(codes + sections))
 
 _CERT_PATTERNS = {
     "VSTEP": re.compile(r"\b(?:VSTEP|V-STEP)\b", re.IGNORECASE),
@@ -329,6 +367,11 @@ def rewrite_contextual_query(
         clean_follow_up = re.sub(
             r"^(?:thế còn|còn|vậy còn)\s+", "", clean_current, flags=re.IGNORECASE
         ).strip()
+
+        curr_ids = _extract_identifiers(clean_follow_up)
+        prev_ids = _extract_identifiers(prev_user_q)
+        has_new_identifier = bool(curr_ids and any(cid not in prev_ids for cid in curr_ids))
+
         # If user asks about a new year (e.g., "Thế còn năm 2025?")
         new_year_match = _YEAR_RE.search(clean_follow_up)
         if new_year_match and not any(
@@ -342,6 +385,101 @@ def rewrite_contextual_query(
                 flags=re.IGNORECASE,
             ).strip()
             resolved = f"{base} {clean_follow_up}".strip()
+            rewritten = True
+            rewrite_mode = "anaphora_substitution"
+        elif has_new_identifier:
+            # Ca biên 2: When follow-up introduces a new code/criterion/section distinct from previous turn,
+            # do not blindly prepend the previous turn's base which contains the old entity.
+            clean_core = re.sub(
+                r"\s*(?:thì\s+sao|thế\s+nào|như\s+thế\s+nào|bao\s+nhiêu|là\s+gì|có\s+không|\?)+\s*$",
+                "",
+                clean_follow_up,
+                flags=re.IGNORECASE,
+            ).strip()
+
+            entity_prefix = ""
+            ent_match = _ENTITY_TYPE_RE.search(prev_user_q)
+            if ent_match:
+                kw = ent_match.group(0)
+                if not re.search(r"\b" + re.escape(kw) + r"\b", clean_core, re.IGNORECASE):
+                    entity_prefix = kw.capitalize() + " "
+
+            subject_part = f"{entity_prefix}{clean_core}".strip()
+
+            has_own_predicate = any(
+                w in clean_core.lower()
+                for w in (
+                    "ai",
+                    "ở đâu",
+                    "khi nào",
+                    "bao nhiêu",
+                    "yêu cầu",
+                    "điều kiện",
+                    "chủ trì",
+                    "thời gian",
+                    "sản phẩm",
+                    "tính điểm",
+                )
+            )
+
+            predicate_part = ""
+            if not has_own_predicate:
+                for pred in _COMMON_PREDICATES:
+                    if re.search(r"\b" + re.escape(pred) + r"\b", prev_user_q, re.IGNORECASE):
+                        predicate_part = f" {pred}"
+                        break
+                if not predicate_part:
+                    prev_base = prev_user_q
+                    if prev_ids:
+                        pattern = (
+                            r"(?:(?:tiêu chí|nhiệm vụ|chương trình|mã|mục|điều)\s+)?(?:[\w\s]{0,30})?"
+                            + re.escape(prev_ids[0])
+                            + r"\)?"
+                        )
+                        prev_base = re.sub(pattern, "", prev_base, flags=re.IGNORECASE)
+                    prev_base = re.sub(
+                        r"\s*(?:như thế nào|thế nào|bao nhiêu|là gì|có không|\?)+\s*$",
+                        "",
+                        prev_base,
+                        flags=re.IGNORECASE,
+                    ).strip()
+                    if prev_base:
+                        predicate_part = f" {prev_base}"
+
+            doc_match = re.search(
+                r"\b(?:theo\s+)?(Quyết định\s+\d+[\w/.-]*|QĐ\s+\d+[\w/.-]*|Kế hoạch\s+\d+[\w/.-]*|KH\s+\d+[\w/.-]*)\b",
+                prev_user_q,
+                re.IGNORECASE,
+            )
+            doc_part = ""
+            if doc_match:
+                doc_str = doc_match.group(0)
+                if not doc_str.lower().startswith("theo"):
+                    doc_str = f"theo {doc_str}"
+                if (
+                    doc_str.lower() not in subject_part.lower()
+                    and doc_str.lower() not in predicate_part.lower()
+                ):
+                    doc_part = f" {doc_str}"
+
+            resolved = f"{subject_part}{predicate_part}{doc_part}".strip()
+            if not resolved.endswith("?"):
+                if any(
+                    w in resolved.lower()
+                    for w in (
+                        "ai",
+                        "nào",
+                        "gì",
+                        "đâu",
+                        "bao nhiêu",
+                        "sao",
+                        "thế nào",
+                        "như thế nào",
+                    )
+                ):
+                    resolved += "?"
+                else:
+                    resolved += " như thế nào?"
             rewritten = True
             rewrite_mode = "anaphora_substitution"
         elif ctx.get("major") and "ngành" not in clean_follow_up.lower():
@@ -366,7 +504,13 @@ def rewrite_contextual_query(
     prev_user_codes = _CODE_RE.findall(prev_user_q)
     curr_codes = _CODE_RE.findall(clean_current)
     user_history_codes = ctx.get("user_codes", [])
-    preserved_codes = list(dict.fromkeys(user_history_codes + prev_user_codes + curr_codes))
+
+    # If the current user question provided its own codes distinct from history,
+    # preserve ONLY current codes to prevent cross-turn entity conflict
+    if curr_codes:
+        preserved_codes = list(dict.fromkeys(curr_codes))
+    else:
+        preserved_codes = list(dict.fromkeys(user_history_codes + prev_user_codes))
 
     # Ensure zero-prefixed codes like 0012 or user codes are present in resolved query
     for code in preserved_codes:

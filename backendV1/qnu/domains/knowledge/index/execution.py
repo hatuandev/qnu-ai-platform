@@ -245,6 +245,7 @@ async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, a
                 hr = header_rows(st)
                 if not hr:
                     from qnu.domains.knowledge.index.table_dependencies import (
+                        administrative_header,
                         header_row,
                         multitier_header,
                         typed_header,
@@ -253,7 +254,11 @@ async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, a
                     multi = multitier_header(table)
                     if multi is not None:
                         hr = multi
-                    elif typed_header(table) or header_row(table):
+                    elif (
+                        typed_header(table)
+                        or header_row(table)
+                        or administrative_header(table)
+                    ):
                         hr = [0]
                 if hr:
                     last_opening_headers[cols] = [table["rows"][r] for r in hr]

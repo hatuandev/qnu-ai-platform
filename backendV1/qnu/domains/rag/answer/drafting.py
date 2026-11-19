@@ -14,8 +14,8 @@ from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer
 from qnu.platform.errors import AppException
 from qnu.ports.chat_model import ChatMessage
 
-PROMPT_VERSION = "qnu.rag.answer/v40"
-APPEAL_VERSION = "qnu.rag.answer.appeal/v4"
+PROMPT_VERSION = "qnu.rag.answer/v41"
+APPEAL_VERSION = "qnu.rag.answer.appeal/v5"
 
 REPAIR_INSTRUCTIONS = {
     "answer_cell_invalid": "lookups[].cell_id có mã không hợp lệ. Chỉ chép khóa đã có trong cells.",
@@ -47,6 +47,9 @@ APPEAL_INSTRUCTION = (
     "statements cho ý văn bản, lookups cho ô bảng, assessment covered cho từng ý đã trả lời; "
     "phần chưa có căn cứ ghi missing và nêu rõ trong câu trả lời. Chỉ cần một phần có căn cứ "
     "là bắt buộc status answered, không được insufficient_evidence.\n"
+    "Đặc biệt với câu hỏi nhiều ý/nhiệm vụ hoặc so sánh/thống kê/tư vấn: nếu evidence có dữ kiện cho bất kỳ mục nào "
+    "(như mốc thời gian, đơn vị chủ trì/phối hợp, điểm tiêu chí), bắt buộc trả lời các mục đó vào statements và ghi "
+    "missing cho mục còn lại; không được từ chối toàn bộ câu hỏi khi đã có một phần căn cứ.\n"
     "Chỉ giữ insufficient_evidence khi đọc lại mà thật sự không phần nào có căn cứ; khi đó "
     "giữ message theo quy định. Trả đúng cùng JSON schema, không thêm khóa."
 )
@@ -207,6 +210,12 @@ Số, điểm và điều kiện người hỏi tự nêu trong câu hỏi là t
 Với phương án cụ thể, nếu danh sách đã nêu cho đối tượng không chứa phương án được hỏi, trả lời rõ rằng phương án không thuộc danh sách đó và dẫn ô hoặc đoạn chứa danh sách; không thay câu trả lời bằng việc chỉ liệt kê các phương án khác.
 Khi người hỏi đề nghị dùng kết quả, điểm hoặc chứng chỉ của một phương án cho vị trí của một phương án khác của cùng đối tượng, đây là câu hỏi danh mục: phương án được dùng chỉ thay được khi thuộc danh sách đã nêu của đối tượng hoặc nguồn nêu rõ quy tắc cho phép thay thế; nếu không, kết luận rõ là không được dùng thay và dẫn ô hoặc đoạn chứa danh mục. Quy định quy đổi, tương đương hoặc ngoại lệ được công bố sau không làm thay đổi kết luận theo danh mục và không phải lý do insufficient_evidence; nếu hữu ích, nêu thêm quy định quy đổi chưa có căn cứ áp dụng. Kết luận chung này không phụ thuộc việc người hỏi có nêu tên đối tượng; thiếu tên thì vẫn trả lời quy tắc kèm dẫn chứng và nêu cần tên để kết luận riêng.
 Khi câu hỏi hỏi ý nghĩa ký hiệu, trạng thái hoặc ô của một bảng nhưng điều, khoản hoặc chú thích văn bản đã định nghĩa rõ, được trả lời từ văn bản đó kèm citation; bảng không chọn được ô không phải lý do abstain khi văn bản đã có căn cứ. Với câu hỏi nhiều ý, đọc hết evidence và trả lời đủ từng ý có căn cứ, kể cả ý nằm ở bảng hoặc chú thích khác; không bỏ ý đã có nguồn chỉ vì tập trung vào ý chính.
+
+SO SÁNH, THỐNG KÊ, TƯ VẤN VÀ CÂU HỎI GHÉP NHIỀU MỤC
+- SO SÁNH: Đối chiếu trực tiếp từng thuộc tính (điểm số, điều kiện áp dụng, mốc thời gian, đơn vị chủ trì, đơn vị phối hợp) có trong evidence của từng bên. Nếu một bên hoặc một khía cạnh thiếu căn cứ, nêu rõ phần thiếu trong câu trả lời; tuyệt đối không suy đoán thuộc tính còn khuyết và không từ chối trắng cả câu khi một bên đã có căn cứ.
+- THỐNG KÊ & TỔNG HỢP: Liệt kê đầy đủ, chính xác mọi nội dung, phân hệ, dịch vụ hoặc mốc thời gian xuất hiện trong evidence được cấp theo đúng tên gọi và phân loại của văn bản. Giữ nguyên đơn vị tính, mốc thời gian và trách nhiệm phân công. Nêu rõ phạm vi trích xuất từ tài liệu; không tự đếm gộp hoặc tự tính tổng nếu không có số liệu chính thức trong evidence.
+- TƯ VẤN & ĐỊNH HƯỚNG: Bám sát 100% các tiêu chí, điều kiện bắt buộc, thang điểm, hoặc lộ trình và mốc hạn có trong văn bản (như QĐ 4740/QĐ-BGDĐT hoặc KH 130/KH-ĐHQN). Trình bày rõ ràng theo từng nhóm yêu cầu hoặc lộ trình thời gian. Tuyệt đối không bổ sung quy định, khuyến nghị ngoài văn bản hoặc con số ước tính không có trong evidence.
+- CÂU HỎI GHÉP NHIỀU MỤC / ĐẦU VIỆC: Tách câu trả lời thành từng mục tương ứng; trả lời đầy đủ từng vế có căn cứ trong các đoạn hoặc mảng bảng được cấp. Chỉ cần một vế có căn cứ là bắt buộc status answered; phần vế chưa có căn cứ ghi rõ chưa có dữ liệu trong tài liệu.
 
 ĐỊNH DẠNG
 Trước khi trả JSON, mở thẻ <phan_tich> và đối chiếu nhanh theo 4 bước IRAC (ngắn gọn, gạch đầu dòng, tối đa 250 từ):

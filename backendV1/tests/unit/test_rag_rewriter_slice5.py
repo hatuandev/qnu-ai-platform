@@ -119,3 +119,38 @@ def test_rewrite_task_codes_and_anaphoric_noun_phrases():
     resolved2, trace2 = rewrite_contextual_query(follow_up2, history2)
     assert trace2["rewritten"] is True
     assert "CT-06" in resolved2
+
+
+def test_rewrite_distinct_identifier_switch_no_entity_conflict():
+    # Ca biên 2: When follow-up introduces a new criterion/code, avoid prepending previous turn entity
+    history = [
+        {
+            "question": "Tiêu chí phát triển nguồn nhân lực chuyển đổi số (1.7) tính điểm và mức độ thế nào theo Quyết định 4740?",
+            "answer": "Tiêu chí 1.7 có điểm tối đa là 10 điểm, gồm mức bắt buộc 5 điểm và nâng cao 5 điểm...",
+        }
+    ]
+    follow_up = "Còn hệ thống hỗ trợ đào tạo trực tuyến (1.8) thì sao?"
+    resolved, trace = rewrite_contextual_query(follow_up, history)
+
+    assert trace["rewritten"] is True
+    assert "1.8" in resolved
+    # Must NOT contain the old criterion 1.7 or its previous entity name
+    assert "1.7" not in resolved
+    assert "nguồn nhân lực" not in resolved
+    # Must preserve the topic/predicate and doc reference
+    assert "tính điểm và mức độ" in resolved
+    assert "4740" in resolved
+
+    # Test code identifier switch: AM-0007 -> AM-0070
+    history2 = [
+        {
+            "question": "Chương trình mã AM-0007 có điều kiện gì?",
+            "answer": "AM-0007 yêu cầu đối chiếu chứng cứ thực hành...",
+        }
+    ]
+    follow_up2 = "Còn AM-0070 thì sao?"
+    resolved2, trace2 = rewrite_contextual_query(follow_up2, history2)
+    assert trace2["rewritten"] is True
+    assert "AM-0070" in resolved2
+    assert "AM-0007" not in resolved2
+    assert "AM-0007" not in trace2["preserved_codes"]

@@ -496,6 +496,7 @@ def project_table(
 
     if not headers and "rows" in candidate_tbl and "column_count" in candidate_tbl:
         from qnu.domains.knowledge.index.table_dependencies import (
+            administrative_header,
             header_row,
             multitier_header,
             typed_header,
@@ -504,7 +505,11 @@ def project_table(
         multi = multitier_header(candidate_tbl)
         if multi is not None:
             headers = multi
-        elif typed_header(candidate_tbl) or header_row(candidate_tbl):
+        elif (
+            typed_header(candidate_tbl)
+            or header_row(candidate_tbl)
+            or administrative_header(candidate_tbl)
+        ):
             headers = [0]
 
     if not headers and inherited_header_rows:

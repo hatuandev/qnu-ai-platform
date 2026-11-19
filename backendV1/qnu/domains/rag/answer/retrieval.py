@@ -6,6 +6,38 @@ from qnu.domains.knowledge.index.multi import search_collections
 from qnu.domains.knowledge.index.search import search as search_single
 from qnu.platform.errors import Conflict
 
+_INTERROGATIVE_RE = re.compile(
+    r"bao nhiêu|như thế nào|thế nào|ra sao|ở đâu|khi nào|bao giờ|"
+    r"\b(gì|nào|mấy|ai|đâu|sao|what|which|how|who|whom|where|when)\b",
+    re.IGNORECASE,
+)
+
+_CONJUNCTION_SPLIT_RE = re.compile(
+    r"(?:,\s*(?:và|còn|đồng thời|and)\b|\s+(?:và|còn|đồng thời|and)\s+)",
+    re.IGNORECASE,
+)
+
+
+def _find_independent_clause_split(text: str) -> list[str] | None:
+    """Find a split point at a conjunction where BOTH sides are valid interrogative clauses."""
+    for m in _CONJUNCTION_SPLIT_RE.finditer(text):
+        after = text[m.end() :].lstrip()
+        # Don't split if immediately followed by an uppercase acronym (e.g. "và BĐCL") or short code
+        if re.match(r"^[A-ZĐ]{2,}\b", after):
+            continue
+        left = text[: m.start()].strip(" ?;\n,")
+        right = text[m.end() :].strip(" ?;\n,")
+        left_words = left.split()
+        right_words = right.split()
+        if (
+            len(left_words) >= 4
+            and len(right_words) >= 4
+            and _INTERROGATIVE_RE.search(left)
+            and _INTERROGATIVE_RE.search(right)
+        ):
+            return [left, right]
+    return None
+
 
 def question_facets(query: str) -> list[str]:
     """Split explicit independent interrogatives; never invent a topic/year/filter.
@@ -16,24 +48,40 @@ def question_facets(query: str) -> list[str]:
     prefix, sep, body = query.partition(":")
     lead = prefix + ": " if sep and len(prefix) <= 200 else ""
     text = body if lead else query
-    parts = [
-        p.strip(" ?;\n")
-        for p in re.split(r"[?;]+\s*|\s+(?:và|còn|and)\s+", text, flags=re.IGNORECASE)
-        if p.strip(" ?;\n")
-    ]
-    interrogative = r"bao nhiêu|như thế nào|\b(gì|nào|mấy|what|which|how)\b"
-    if not 2 <= len(parts) <= 3 or not all(
-        len(p.split()) >= 4 and re.search(interrogative, p, re.IGNORECASE) for p in parts
+
+    # 1. Prefer explicit punctuation boundaries (semicolons, question marks)
+    p_parts = [p.strip(" ?;\n") for p in re.split(r"[?;]+\s*", text) if p.strip(" ?;\n")]
+    if 2 <= len(p_parts) <= 3 and all(
+        len(p.split()) >= 4 and _INTERROGATIVE_RE.search(p) for p in p_parts
     ):
-        return [query]
+        parts = p_parts
+    else:
+        # 2. Try independent clause split at conjunction where BOTH sides are valid interrogatives
+        split_parts = _find_independent_clause_split(text)
+        if split_parts:
+            parts = split_parts
+        else:
+            return [query]
+
     # Retain the original antecedent for referential clauses, without guessing
     # entities, years or scope. Keep the existing search request size bound.
-    facets = [
-        f"{lead}{p}\nContext: {query}"
-        if i and re.search(r"\b(?:này|đó|this|that|same|its|their)\b", p, re.IGNORECASE)
-        else lead + p
-        for i, p in enumerate(parts)
-    ]
+    facets = []
+    for i, p in enumerate(parts):
+        if i:
+            needs_context = bool(
+                re.search(r"\b(?:này|đó|this|that|same|its|their)\b", p, re.IGNORECASE)
+            ) or (
+                len(p.split()) <= 10
+                and not re.search(
+                    r"\b(?:cơ sở|trường|bộ|khoa|phòng|tiêu chí|kế hoạch|quyết định)\b",
+                    p,
+                    re.IGNORECASE,
+                )
+            )
+            if needs_context:
+                facets.append(f"{lead}{p}\nContext: {query}")
+                continue
+        facets.append(lead + p)
     return facets if all(len(p) <= 8000 for p in facets) else [query]
 
 

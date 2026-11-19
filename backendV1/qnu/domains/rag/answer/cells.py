@@ -20,10 +20,11 @@ _NUMERIC_CODE = re.compile(r"\d[\dA-Z]*(?:[-./]\d[\dA-Z]*)*")
 _CODE_HEADER = re.compile(r"^(?:mã|id|code|identifier)\b")
 _PARENTHESIZED_LIST = re.compile(r"(?:\([^()\n]+\)\s*)+")
 _ORDINAL = re.compile(r"(?m)(?:^|(?<=[;\n]))\s*\d{1,2}[.)](?=\s)")
-# "Bảng 7", "Điều 14" name a document object; the digits are not data.
+# "Bảng 7", "Điều 14", "Tiêu chí 2.4" name a document object; the digits are not data.
 _STRUCTURAL_REF = re.compile(
-    r"(?iu)\b(?:bảng(?:\s+số)?|hình(?:\s+số)?|sơ\s+đồ(?:\s+số)?|biểu\s+đồ(?:\s+số)?|"
-    r"phụ\s+lục(?:\s+số)?|điều|khoản|mục|chương|phần|công\s+thức)\s*(?:số\s*)?\d+(?:[.,]\d+)*"
+    r"(?iu)\b(?:bảng(?:\s+số)?|tiêu\s+chí(?:\s+số)?|chỉ\s+số(?:\s+số)?|hình(?:\s+số)?|"
+    r"sơ\s+đồ(?:\s+số)?|biểu\s+đồ(?:\s+số)?|phụ\s+lục(?:\s+số)?|điều|khoản|mục|chương|"
+    r"phần|công\s+thức)\s*(?:số\s*)?\d+(?:[.,]\d+)*"
 )
 # "không đồng nghĩa số 0" denies a meaning; it does not claim a value.
 _NEGATED_VALUE = re.compile(
@@ -377,6 +378,9 @@ def _fields(structure: dict, positions: list) -> dict[int, list[str]]:
     return fields
 
 
+_ORDINAL_OR_CODE_RE = re.compile(r"^\d+(?:\.\d+)*\.?$|^[A-Za-z0-9_.-]+$")
+
+
 def _row_facts(source: EvidenceSource) -> list[dict]:
     """Canonical rows with explicit labels, numeric cells and column paths."""
     structure = source.structure or {}
@@ -388,16 +392,42 @@ def _row_facts(source: EvidenceSource) -> list[dict]:
     for row in structure.get("row_indices", []):
         body = [p for p in positions if p.row <= row < p.row + p.cell["row_span"]]
         filled = [p for p in body if p.cell["text"].strip()]
-        labels = [p for p in filled if any(ch.isalpha() for ch in p.cell["text"])]
+        min_col = min((c.column for c in filled), default=0)
+        labels = [
+            p
+            for p in filled
+            if any(ch.isalpha() for ch in p.cell["text"])
+            or (
+                p.column == min_col
+                and len(p.cell["text"].strip()) <= 20
+                and _ORDINAL_OR_CODE_RE.match(p.cell["text"].strip())
+            )
+        ]
         numeric = [p for p in filled if _numbers(p.cell["text"])]
+        row_labels = []
+        for p in labels:
+            text = p.cell["text"].strip()
+            norm = _normalized(text)
+            if norm:
+                row_labels.append((p, norm))
+            stripped = norm.rstrip(".")
+            if stripped and stripped != norm and len(stripped) >= 2:
+                row_labels.append((p, stripped))
+            # For long criterion/task texts (> 35 chars), also index core head phrases
+            if len(norm) >= 35:
+                for sep in ("(", ":", " - "):
+                    if sep in text:
+                        head = _normalized(text.split(sep)[0])
+                        if len(head) >= 10 and (p, head) not in row_labels:
+                            row_labels.append((p, head))
         facts.append(
             {
-                "labels": [(p, _normalized(p.cell["text"])) for p in labels],
+                "labels": row_labels,
                 "numeric": numeric,
                 # Header marks can be partial after OCR review; any mark keeps
                 # the row out of numeric proof instead of leaking a header value.
                 "header_like": any(p.cell.get("header") for p in filled)
-                or not labels
+                or not row_labels
                 or not numeric,
                 "fields": fields,
             }

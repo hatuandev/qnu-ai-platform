@@ -1,10 +1,84 @@
 """Derived native table boundaries; never change canonical evidence."""
 
+import re
+import unicodedata
+
 from qnu.domains.knowledge.index.table_layout import layout
 
 BASIS = "native_numbered_table_boundary/v1"
 TYPED_BASIS = "native_typed_columns/v1"
 MULTITIER_BASIS = "native_multitier_header/v1"
+ADMINISTRATIVE_BASIS = "native_administrative_header/v1"
+
+_ADMIN_HEADER_KEYWORDS = (
+    "tt",
+    "stt",
+    "số tt",
+    "số thứ tự",
+    "mã",
+    "mã việc",
+    "mã số",
+    "mã ct",
+    "mã ngành",
+    "nội dung",
+    "nhiệm vụ",
+    "công việc",
+    "hoạt động",
+    "hạng mục",
+    "tiêu chí",
+    "chỉ tiêu",
+    "chủ trì",
+    "đơn vị chủ trì",
+    "phối hợp",
+    "đơn vị phối hợp",
+    "thời gian",
+    "thời hạn",
+    "tiến độ",
+    "sản phẩm",
+    "kết quả",
+    "đầu ra",
+    "minh chứng",
+    "ghi chú",
+    "kinh phí",
+    "nguồn kinh phí",
+    "điều kiện",
+    "nghiệm thu",
+    "trách nhiệm",
+)
+
+
+def administrative_header(table: dict) -> bool:
+    """Detect header row for administrative tables where OCR did not flag cells as headers.
+
+    Matches column label keywords (TT/STT, Nội dung, Thời gian, Chủ trì, Phối hợp,
+    Sản phẩm, Ghi chú, etc.) on Row 0. Requires at least 2 distinct administrative
+    keywords and text-based cells, preserving headerless data tables as raw rows.
+    """
+    rows = table.get("rows", [])
+    columns = table.get("column_count", 0)
+    if len(rows) < 2 or columns < 2 or not rows[0]:
+        return False
+    if len(rows[0]) != columns:
+        return False
+    if any(c.get("row_span", 1) != 1 or c.get("col_span", 1) != 1 for c in rows[0]):
+        return False
+
+    cell_texts = [
+        unicodedata.normalize("NFC", c.get("text", "").strip().lower())
+        for c in rows[0]
+    ]
+    if not all(t and any(ch.isalpha() for ch in t) for t in cell_texts):
+        return False
+    if any(t.isdecimal() for t in cell_texts):
+        return False
+
+    matched_keywords = set()
+    for text in cell_texts:
+        for kw in _ADMIN_HEADER_KEYWORDS:
+            if kw == text or re.search(r"\b" + re.escape(kw) + r"\b", text):
+                matched_keywords.add(kw)
+                break
+    return len(matched_keywords) >= 2
 
 
 def typed_header(table: dict) -> bool:
@@ -203,9 +277,13 @@ def dependencies(document: dict) -> dict[str, dict]:
                 previous, header, chain = None, None, []
                 continue
             ref = run + ":" + block["evidence_id"]
-            if block.get("bbox") and not header_row(table) and typed_header(table):
+            if (
+                block.get("bbox")
+                and not header_row(table)
+                and (typed_header(table) or administrative_header(table))
+            ):
                 result[ref] = {
-                    "basis": TYPED_BASIS,
+                    "basis": TYPED_BASIS if typed_header(table) else ADMINISTRATIVE_BASIS,
                     "header": ref,
                     "chain": [ref],
                     "previous": None,
