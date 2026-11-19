@@ -11,6 +11,8 @@ Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thu�
 
 ## Kế hoạch QNU V1 hiện tại
 
+- [19/11/2026 — Facts tất định v2, prompt v40 và khôi phục Q11/Q02](2026-11-19_ke_hoach_facts_v2_prompt_v40_q01.md) — Q01 kết luận thay thế bằng facts có dẫn chứng dòng bảng; bỏ gate selectable (#425); đo Q01/Q02/Q11 và hồi quy 12 câu. **Chờ duyệt triển khai.**
+
 - [16/11/2026 — Metadata năm và thời gian cho QNU V1](2026-11-16_metadata_nam_va_thoi_gian_v1.md) — nhận diện năm theo bảng, lịch và hạn theo sự kiện, tự lưu khi phát hành và kiểm thử RAG trọng tâm. **Sẵn sàng bàn giao triển khai.**
 
 - [15/11/2026 — Mở rộng QNU: soạn thảo, học liệu và hỗ trợ công việc](./2026-11-15_mo_rong_qnu_soan_thao_hoc_lieu_va_cong_viec.md) — P0–P6 bao gồm agent soạn thảo P2, agent tạo câu hỏi P3, hướng dẫn tuyển sinh công khai P5, ngân hàng đề và báo cáo xuyên suốt. **Kế hoạch đề xuất.**

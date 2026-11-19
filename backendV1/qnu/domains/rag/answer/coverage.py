@@ -62,9 +62,13 @@ def plan_for(sources: list["EvidenceSource"], context: dict) -> dict:
 
 
 def plan_ready(plan: dict) -> bool:
-    """The envelope already carries every unit the plan can prove it requires."""
+    """The envelope already carries every unit the plan can prove it requires.
+
+    Continuation groups only complete a clipped sentence; they are optional,
+    never question requirements, and packing may drop them.
+    """
     return not plan["unresolved_references"] and all(
-        not group["unprovided_units"] for group in plan["groups"]
+        not group["unprovided_units"] for group in plan["groups"] if group["kind"] != "continuation"
     )
 
 

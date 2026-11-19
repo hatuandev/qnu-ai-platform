@@ -89,13 +89,17 @@ def enrich(chunks, content: dict, documents: list[dict], maximum: int):
 
 
 def original_text(hit) -> str:
-    context = (hit.structure or {}).get("search_context")
+    return original_text_fields(hit.text, hit.structure or {})
+
+
+def original_text_fields(text: str, structure: dict) -> str:
+    context = structure.get("search_context")
     if not context:
-        return hit.text
+        return text
     original = context.get("original_text", "")
     if (
         context.get("version") != VERSION
-        or hit.text != context.get("prefix", "") + original
+        or text != context.get("prefix", "") + original
         or digest_text(original) != context.get("original_sha256")
     ):
         raise AppException(

@@ -13,7 +13,7 @@ from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer
 from qnu.platform.errors import AppException
 from qnu.ports.chat_model import ChatMessage
 
-PROMPT_VERSION = "qnu.rag.answer/v38"
+PROMPT_VERSION = "qnu.rag.answer/v39"
 APPEAL_VERSION = "qnu.rag.answer.appeal/v4"
 
 REPAIR_INSTRUCTIONS = {
@@ -190,6 +190,7 @@ Câu hỏi chỉ có căn cứ văn bản dùng statements và lookups rỗng. N
 Không tự tính số liệu chính thức. Nếu văn bản nêu rõ kết luận so sánh hoặc đối tượng nổi trội, được trích kết luận đó kèm citation; đây không phải tự suy toàn bộ danh sách. Không abstain chỉ vì cần nhiều evidence, nhiều bảng khác nhau hoặc phải kết hợp bảng và văn bản.
 Số, điểm và điều kiện người hỏi tự nêu trong câu hỏi là tiền đề, không phải dữ kiện nguồn: không dùng làm căn cứ, không tự tính chênh lệch hay so sánh từ chúng, và không bắt buộc nhắc lại; nếu nhắc thì ghi rõ đó là số của người hỏi. Chỉ kết luận đủ hay không đủ theo điều kiện, ngưỡng hoặc danh mục có trong nguồn.
 Với phương án cụ thể, nếu danh sách đã nêu cho đối tượng không chứa phương án được hỏi, trả lời rõ rằng phương án không thuộc danh sách đó và dẫn ô hoặc đoạn chứa danh sách; không thay câu trả lời bằng việc chỉ liệt kê các phương án khác.
+Khi người hỏi đề nghị dùng kết quả, điểm hoặc chứng chỉ của một phương án cho vị trí của một phương án khác của cùng đối tượng, đây là câu hỏi danh mục: phương án được dùng chỉ thay được khi thuộc danh sách đã nêu của đối tượng hoặc nguồn nêu rõ quy tắc cho phép thay thế; nếu không, kết luận rõ là không được dùng thay và dẫn ô hoặc đoạn chứa danh mục. Quy định quy đổi, tương đương hoặc ngoại lệ được công bố sau không làm thay đổi kết luận theo danh mục và không phải lý do insufficient_evidence; nếu hữu ích, nêu thêm quy định quy đổi chưa có căn cứ áp dụng. Kết luận chung này không phụ thuộc việc người hỏi có nêu tên đối tượng; thiếu tên thì vẫn trả lời quy tắc kèm dẫn chứng và nêu cần tên để kết luận riêng.
 Khi câu hỏi hỏi ý nghĩa ký hiệu, trạng thái hoặc ô của một bảng nhưng điều, khoản hoặc chú thích văn bản đã định nghĩa rõ, được trả lời từ văn bản đó kèm citation; bảng không chọn được ô không phải lý do abstain khi văn bản đã có căn cứ. Với câu hỏi nhiều ý, đọc hết evidence và trả lời đủ từng ý có căn cứ, kể cả ý nằm ở bảng hoặc chú thích khác; không bỏ ý đã có nguồn chỉ vì tập trung vào ý chính.
 
 ĐỊNH DẠNG

@@ -47,6 +47,12 @@ RANK_BAND = 5
 MAX_NUMBERED_RUN = 8
 NUMBERED_LABEL = re.compile(r"^(\d{1,2})[.)]\s+\S")
 
+# A wrapped source line is its own paragraph chunk; the model reads the whole
+# sentence only when the line neighbours ride along as trimmable reading.
+MAX_STITCH_LINES = 4
+SENTENCE_END = ".!?…"
+TRAILING_CLOSERS = "\"'”’)]}» \t"
+
 
 def _numbered_item(chunk: IndexChunk) -> int | None:
     numbers = set()
@@ -72,6 +78,38 @@ def _numbered_run(siblings: list[IndexChunk], position: int) -> tuple[int, int] 
             break
         end += 1
     return (start, end) if (start, end) != (position, position) else None
+
+
+def _visible_text(text: str) -> str:
+    """Chunk body without its own header line and repeated title/heading lines."""
+    lines = text.split("\n")
+    title = heading = None
+    if lines[0].startswith("{"):
+        try:
+            header = json.loads(lines.pop(0))
+        except json.JSONDecodeError:
+            header = {}
+        title, heading = header.get("title"), header.get("heading")
+    for expected in (title, heading):
+        if expected is not None and lines and lines[0].strip() == expected.strip():
+            lines.pop(0)
+    return "\n".join(lines).strip()
+
+
+def _ends_sentence(text: str) -> bool:
+    visible = _visible_text(text)
+    while visible and visible[-1] in TRAILING_CLOSERS:
+        visible = visible[:-1].rstrip()
+    return bool(visible) and visible[-1] in SENTENCE_END
+
+
+def _starts_continued(text: str) -> bool:
+    for char in _visible_text(text):
+        if char.isdigit():
+            return False
+        if char.isalpha():
+            return char.islower()
+    return False
 
 
 def evidence_size(hit: SearchHit) -> int:
@@ -103,6 +141,7 @@ LIST_TRACE_KEYS = (
     "table_links",
     "section_siblings",
     "rank_band",
+    "stitch",
 )
 SUM_TRACE_KEYS = (
     "bytes_used",
@@ -452,6 +491,75 @@ async def expand_context(
         )
         trace["rank_band"] = [candidate.chunk_id for candidate in taken]
 
+    async def stitch_sentence_fragments() -> None:
+        """Line neighbours of a split sentence ride along as trimmable reading."""
+        by_ordinal: dict[str, dict[int, IndexChunk]] = {}
+        for row in rows:
+            by_ordinal.setdefault(row.input_id, {})[row.ordinal] = row
+        owners = {hit.chunk_id: hit.document_id for hit in result.hits}
+        owners.update({hit.chunk_id: hit.document_id for hit in additions})
+        version = {b.id: b.version_id for b in allowed}
+        pending: dict[str, tuple[IndexChunk, str]] = {}
+        per_anchor: Counter = Counter()
+
+        def queue(row: IndexChunk | None, anchor: IndexChunk) -> bool:
+            if row is None or row.kind != "paragraph" or row.id in known or row.id in pending:
+                return False
+            if per_anchor[anchor.id] >= MAX_STITCH_LINES:
+                return False
+            shared = [scope for scope in scopes if matches_metadata(anchor.structure, scope)]
+            if not any(matches_metadata(row.structure, scope) for scope in shared):
+                return False
+            pending[row.id] = (row, anchor.id)
+            per_anchor[anchor.id] += 1
+            return True
+
+        for anchor_id in list(owners):
+            anchor = by_id.get(anchor_id)
+            if anchor is None or anchor.kind != "paragraph" or not _visible_text(anchor.text):
+                continue
+            table = by_ordinal.get(anchor.input_id, {})
+            if not _ends_sentence(anchor.text):
+                row = table.get(anchor.ordinal + 1)
+                while queue(row, anchor):
+                    if _ends_sentence(row.text):
+                        break
+                    row = table.get(row.ordinal + 1)
+            if _starts_continued(anchor.text):
+                row = table.get(anchor.ordinal - 1)
+                while queue(row, anchor):
+                    if not _starts_continued(row.text):
+                        break
+                    row = table.get(row.ordinal - 1)
+        if not pending:
+            return
+        candidates = await _hits(
+            db,
+            run,
+            allowed,
+            [_neighbor_hit(row, run, version[row.input_id]) for row, _ in pending.values()],
+            sealed,
+        )
+        taken = []
+        for candidate in candidates:
+            anchor_id = pending[candidate.chunk_id][1]
+            if candidate.chunk_id in known:
+                continue
+            if claim(owners[anchor_id], evidence_size(candidate)) != "ok":
+                trace["stitch_skipped"] = trace.get("stitch_skipped", 0) + 1
+                continue
+            known.add(candidate.chunk_id)
+            owners[candidate.chunk_id] = candidate.document_id
+            taken.append((candidate, anchor_id))
+        if not taken:
+            return
+        additions.extend(candidate for candidate, _ in taken)
+        trace["added"].extend(
+            {"chunk_id": candidate.chunk_id, "primary_chunk_id": anchor_id, "kind": "stitch"}
+            for candidate, anchor_id in taken
+        )
+        trace["stitch"] = [candidate.chunk_id for candidate, _ in taken]
+
     structural = []
     question = resolved_question or req.question
     bundles = await pinned_bundles(db, blob, workspace_id, collection_id, result.hits, bundles)
@@ -605,6 +713,7 @@ async def expand_context(
         truncated += part_truncated
     if not window:
         await append_rank_band(additions)
+        await stitch_sentence_fragments()
         trace.update(status="expanded" if additions else "disabled", bytes_used=consumed)
         trace["expansion"] = {
             "primary_counts": dict(counts),
@@ -663,6 +772,7 @@ async def expand_context(
             {"chunk_id": candidate.chunk_id, "primary_chunk_id": primary_id, "parent": parent}
         )
     await append_rank_band(additions)
+    await stitch_sentence_fragments()
     trace.update(status="expanded", bytes_used=consumed, skipped_budget=truncated)
     trace["expansion"] = {
         "primary_counts": dict(counts),

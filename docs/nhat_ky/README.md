@@ -1,5 +1,8 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên 1018 — Báo cáo Q01: vấn đề gặp phải, việc đã làm, việc còn lại.](2026-11-18_phien_1018_bao_cao_Q01_quy_tac_thay_the.md)
+- [Phiên 1017 — Chặng C: prompt v39 và mở cổng gọi lại khi chỉ thiếu nhóm nối câu.](2026-11-18_phien_1017_quy_tac_thay_the_phuong_an.md)
+- [Phiên 1016 — Chặng A: ghép mảnh câu cho đầu vào rerank (không reindex).](2026-11-18_phien_1016_ghep_manh_cau_rerank.md)
 - [Phiên 1015 — Chặng 4: hợp đồng trả lời eligibility tính sẵn từ bảng (closed-set facts).](2026-11-18_phien_1015_hop_dong_eligibility.md)
 - [Phiên 1014 — Chặng 3: tổ hợp môn từng dòng bảng vào metadata và lọc theo thuộc tính.](2026-11-18_phien_1014_chan_3_to_hop_vao_metadata.md)
 - [Phiên 1013 — Câu hỏi luật: prompt v36 và chèn dòng bảng theo tổ hợp (Chặng 2).](2026-11-18_phien_1013_prompt_v36_va_chan_2.md)

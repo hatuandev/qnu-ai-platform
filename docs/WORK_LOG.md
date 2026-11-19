@@ -1,5 +1,7 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context1017 — Chặng C: prompt v39 và mở cổng gọi lại khi chỉ thiếu nhóm nối câu.](nhat_ky/2026-11-18_phien_1017_quy_tac_thay_the_phuong_an.md)
+- [Context1016 — Chặng A: ghép mảnh câu cho đầu vào rerank (không reindex).](nhat_ky/2026-11-18_phien_1016_ghep_manh_cau_rerank.md)
 - [Context1015 — Chặng 4: hợp đồng trả lời eligibility tính sẵn từ bảng (closed-set facts).](nhat_ky/2026-11-18_phien_1015_hop_dong_eligibility.md)
 - [Context1014 — Chặng 3: tổ hợp môn từng dòng bảng vào metadata và lọc theo thuộc tính.](nhat_ky/2026-11-18_phien_1014_chan_3_to_hop_vao_metadata.md)
 - [Context1013 — Câu hỏi luật: prompt v36 và chèn dòng bảng theo tổ hợp (Chặng 2).](nhat_ky/2026-11-18_phien_1013_prompt_v36_va_chan_2.md)

@@ -155,10 +155,10 @@ def select_reranked(hits, reranked, count: int):
     return selected
 
 
-async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint):
+async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint, prepared=None):
     runtime = await runtime_service.resolve(db, workspace_id, req.rerank_provider_id)
     proof = await checkpoint()
-    documents = [rerank_text(h) for h in hits]
+    documents = [(prepared or {}).get(h.chunk_id) or rerank_text(h) for h in hits]
     trace["rerank_presentation"] = PRESENTATION_VERSION
     trace["rerank_input"] = runtime_service.measure(runtime, req.query, documents)
     documents, truncation = runtime_service.fit(runtime, req.query, documents)

@@ -4,6 +4,7 @@ from pydantic import ValidationError
 
 from qnu.domains.knowledge.compilation.drafting import validated_draft
 from qnu.domains.knowledge.compilation.issued_line import recover_issued_line
+from qnu.domains.knowledge.compilation.line_wrap import wrapped_line_windows
 from qnu.domains.knowledge.compilation.quality import (
     CONFIRMED_BY_SOURCE,
     PARTIALLY_CHECKED,
@@ -23,6 +24,10 @@ def build_source_draft(topic: str, documents: list[dict], run_id: str) -> dict:
             blocks = page["blocks"]
             windows = fragmented_windows(blocks)
             issued = recover_issued_line(blocks) if page.get("page_number") == 1 else None
+            blocked = set(issued.positions) if issued else set()
+            for start, (stop, _event) in windows.items():
+                blocked.update(range(start, stop))
+            wraps = wrapped_line_windows(blocks, blocked)
             consumed = 0
             for index, block in enumerate(blocks):
                 if index < consumed:
@@ -45,6 +50,19 @@ def build_source_draft(topic: str, documents: list[dict], run_id: str) -> dict:
                     paragraphs.append(
                         {
                             "text": "\n".join(part["text"] for part in fragments),
+                            "citations": [
+                                f"{document['ocr_run_id']}:{part['evidence_id']}"
+                                for part in fragments
+                            ],
+                        }
+                    )
+                    continue
+                if index in wraps:
+                    consumed = wraps[index]
+                    fragments = blocks[index:consumed]
+                    paragraphs.append(
+                        {
+                            "text": " ".join(part["text"].strip() for part in fragments),
                             "citations": [
                                 f"{document['ocr_run_id']}:{part['evidence_id']}"
                                 for part in fragments

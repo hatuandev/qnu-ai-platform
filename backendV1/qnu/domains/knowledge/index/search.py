@@ -13,6 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.index.abbreviations import expand as expand_abbreviations
 from qnu.domains.knowledge.index.models import IndexChunk, IndexInput, IndexRun
+from qnu.domains.knowledge.index.presentation import (
+    STITCH_MAX_SIDE,
+    paragraph_body,
+    paragraph_title,
+    stitch_window,
+)
 from qnu.domains.knowledge.index.query_scope import catalog_attributes, plan, verified_structures
 from qnu.domains.knowledge.index.schemas import SearchHit, SearchRequest, SearchResponse
 from qnu.domains.knowledge.index.scope import metadata_chunk_ids
@@ -193,6 +199,62 @@ async def _hits(
             )
         )
     return result
+
+
+async def _stitch_documents(
+    db: AsyncSession, run: IndexRun, hits: list[SearchHit]
+) -> dict[str, str]:
+    """Rerank reading for paragraph fragments joined with same-input neighbors.
+
+    One PDF line per chunk splits a sentence across ordinals; the reranker reads
+    a bounded window of contiguous paragraph fragments instead of one line.
+    """
+    anchors = {
+        h.chunk_id: h
+        for h in hits
+        if paragraph_body(h.kind, h.text, h.structure or {}) is not None
+    }
+    if not anchors:
+        return {}
+    located = {
+        chunk_id: (input_id, ordinal)
+        for chunk_id, input_id, ordinal in (
+            await db.execute(
+                select(IndexChunk.id, IndexChunk.input_id, IndexChunk.ordinal).where(
+                    IndexChunk.run_id == run.id, IndexChunk.id.in_(list(anchors))
+                )
+            )
+        ).all()
+    }
+    spans: dict[str, list[int]] = {}
+    for input_id, ordinal in located.values():
+        spans.setdefault(input_id, []).append(ordinal)
+    bodies: dict[str, dict[int, str]] = {}
+    for input_id, ordinals in spans.items():
+        neighbors = await db.execute(
+            select(
+                IndexChunk.kind, IndexChunk.ordinal, IndexChunk.text, IndexChunk.structure
+            ).where(
+                IndexChunk.run_id == run.id,
+                IndexChunk.input_id == input_id,
+                IndexChunk.ordinal.between(
+                    min(ordinals) - STITCH_MAX_SIDE, max(ordinals) + STITCH_MAX_SIDE
+                ),
+            )
+        )
+        bodies[input_id] = {
+            ordinal: body
+            for kind, ordinal, text, structure in neighbors.all()
+            if (body := paragraph_body(kind, text, structure or {})) is not None
+        }
+    prepared = {}
+    for chunk_id, (input_id, ordinal) in located.items():
+        window = stitch_window(bodies.get(input_id, {}), ordinal)
+        if window is None:
+            continue
+        title = paragraph_title(anchors[chunk_id].structure or {})
+        prepared[chunk_id] = " ".join((f"{title} {window}" if title else window).split())
+    return prepared
 
 
 async def metadata_facets(db, blob, actor, workspace_id, collection_id, document_ids):
@@ -501,8 +563,11 @@ async def search(
                 )
 
             try:
+                prepared = await _stitch_documents(db, run, hits)
+                trace["rerank_stitched"] = len(prepared)
                 hits = await hybrid.rerank(
-                    db, actor, workspace_id, req, hits, reranker, trace, checkpoint
+                    db, actor, workspace_id, req, hits, reranker, trace, checkpoint,
+                    prepared=prepared,
                 )
             except Conflict as exc:
                 # Only "no rerank model configured" degrades to hybrid fusion;
