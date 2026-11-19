@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     S3_SECURE: bool = False
 
     QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_API_KEY: str = ""
 
     SECRET_KEY: str = ""
     INTERNAL_API_KEY: str = ""
