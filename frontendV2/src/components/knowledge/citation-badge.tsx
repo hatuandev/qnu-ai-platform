@@ -1,5 +1,8 @@
-import { FileText } from "lucide-react";
+import { Check, Copy, FileText } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
@@ -13,6 +16,7 @@ export interface CitationBadgeProps {
   sourceFile?: string;
   location?: string;
   excerpt?: string;
+  fullText?: string;
   className?: string;
 }
 
@@ -20,6 +24,7 @@ export interface CitationBadgeProps {
  * Renders a clean, accessible sequential citation chip (e.g. [1], [2]).
  * Clicking reveals the source provenance and location in a popover,
  * keeping raw technical evidence keys tucked away cleanly.
+ * Supports viewing full table rows / long excerpts with expandable toggle.
  */
 export function CitationBadge({
   index,
@@ -27,8 +32,29 @@ export function CitationBadge({
   sourceFile,
   location,
   excerpt,
+  fullText,
   className,
 }: CitationBadgeProps) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const targetText = (fullText || excerpt || "").trim();
+  const isLong = targetText.length > 240;
+  const displayText =
+    isLong && !expanded ? `${targetText.slice(0, 240)}…` : targetText;
+
+  const handleCopy = async () => {
+    if (!targetText) return;
+    try {
+      await navigator.clipboard.writeText(targetText);
+      setCopied(true);
+      toast.success("Đã sao chép nội dung đối chiếu.");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Không thể sao chép văn bản.");
+    }
+  };
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -47,7 +73,7 @@ export function CitationBadge({
       <PopoverContent
         align="start"
         sideOffset={6}
-        className="w-80 p-3.5 space-y-2.5 text-xs bg-card border border-border/70 shadow-md rounded-xl select-text"
+        className="w-84 sm:w-96 max-w-[92vw] p-3.5 space-y-2.5 text-xs bg-card border border-border/70 shadow-md rounded-xl select-text"
       >
         <div className="flex items-center justify-between border-b border-border/50 pb-2">
           <div className="font-semibold text-foreground flex items-center gap-1.5">
@@ -57,7 +83,8 @@ export function CitationBadge({
           {location && (
             <Badge
               variant="outline"
-              className="text-[10px] px-1.5 py-0 font-medium"
+              className="text-[10px] px-1.5 py-0 font-medium max-w-[180px] truncate"
+              title={location}
             >
               {location}
             </Badge>
@@ -70,14 +97,52 @@ export function CitationBadge({
             <span className="break-all">{sourceFile || "Tài liệu gốc"}</span>
           </div>
 
-          {excerpt && (
-            <div className="pt-1">
-              <div className="font-medium text-foreground mb-1">
-                Nội dung đối chiếu:
+          {targetText && (
+            <div className="pt-1 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-foreground">
+                  Nội dung đối chiếu:
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {isLong && (
+                    <button
+                      type="button"
+                      onClick={() => setExpanded((prev) => !prev)}
+                      className="text-[10px] text-primary hover:underline font-medium cursor-pointer"
+                    >
+                      {expanded
+                        ? "Thu gọn"
+                        : `Xem trọn vẹn (${targetText.length} ký tự)`}
+                    </button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 px-1 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
+                    onClick={handleCopy}
+                    title="Sao chép trích đoạn"
+                  >
+                    {copied ? (
+                      <Check className="size-3 text-emerald-600" />
+                    ) : (
+                      <Copy className="size-3" />
+                    )}
+                    <span className="sr-only">Sao chép</span>
+                  </Button>
+                </div>
               </div>
-              <p className="p-2 rounded-md bg-muted/40 italic text-foreground/80 text-[11px] leading-relaxed border border-border/40">
-                "{excerpt}"
-              </p>
+
+              <div
+                className={cn(
+                  "p-2 rounded-md bg-muted/40 text-foreground/90 text-[11px] leading-relaxed border border-border/40 select-text",
+                  expanded
+                    ? "max-h-60 overflow-y-auto whitespace-pre-wrap font-mono text-[10.5px]"
+                    : "italic whitespace-pre-wrap",
+                )}
+              >
+                "{displayText}"
+              </div>
             </div>
           )}
         </div>

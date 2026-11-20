@@ -1,10 +1,11 @@
 import { Check, Code2, Copy, Download, Eye, FileText } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { downloadBlob } from "@/lib/download-blob";
 import type { CitationInfo } from "@/lib/knowledge-studio-helpers";
 import { cn } from "@/lib/utils";
+import { MarkdownContent } from "./markdown-content";
 
 interface MarkdownViewProps {
   content: string | null | undefined;
@@ -15,27 +16,6 @@ interface MarkdownViewProps {
   sourceTitle?: string;
   lifecycleStatus?: string;
   citations: ReadonlyMap<string, CitationInfo>;
-}
-
-interface MarkdownBlock {
-  id: string;
-  type:
-    | "h1"
-    | "h2"
-    | "h3"
-    | "h4"
-    | "p"
-    | "ul"
-    | "ol"
-    | "table"
-    | "quote"
-    | "divider";
-  content: string;
-  items?: Array<{ id: string; text: string }>;
-  tableData?: {
-    headers: Array<{ id: string; text: string }>;
-    rows: Array<{ id: string; cells: Array<{ id: string; text: string }> }>;
-  };
 }
 
 export function MarkdownView({
@@ -71,192 +51,10 @@ export function MarkdownView({
       );
   };
 
-  // Render markdown lines into formatted blocks for preview
-  const renderedBlocks = useMemo(() => {
-    if (!content) return null;
-
-    const lines = content.split("\n");
-    const preamble = lines.findIndex(
-      (line, index) => index > 0 && line.trim().length > 0,
-    );
-    const blocks: MarkdownBlock[] = [];
-
-    let currentList: {
-      type: "ul" | "ol";
-      items: Array<{ id: string; text: string }>;
-    } | null = null;
-    let tableLines: string[] = [];
-
-    const flushList = () => {
-      if (currentList) {
-        blocks.push({
-          id: `list_${blocks.length}_${currentList.type}`,
-          type: currentList.type,
-          content: "",
-          items: currentList.items,
-        });
-        currentList = null;
-      }
-    };
-
-    const flushTable = () => {
-      if (tableLines.length >= 2) {
-        const parseRow = (line: string) =>
-          line
-            .replace(/^\|/, "")
-            .replace(/\|$/, "")
-            .split("|")
-            .map((c) => c.trim());
-
-        const rawHeaders = parseRow(tableLines[0]);
-        const headers = rawHeaders.map((h, i) => ({
-          id: `th_${i}_${h.slice(0, 8)}`,
-          text: h,
-        }));
-
-        const rows: Array<{
-          id: string;
-          cells: Array<{ id: string; text: string }>;
-        }> = [];
-
-        for (let i = 2; i < tableLines.length; i++) {
-          if (tableLines[i].includes("|")) {
-            const rawCells = parseRow(tableLines[i]);
-            rows.push({
-              id: `tr_${i}`,
-              cells: rawCells.map((c, cellIdx) => ({
-                id: `td_${i}_${cellIdx}`,
-                text: c,
-              })),
-            });
-          }
-        }
-
-        blocks.push({
-          id: `tbl_${blocks.length}`,
-          type: "table",
-          content: "",
-          tableData: { headers, rows },
-        });
-      }
-      tableLines = [];
-    };
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trimEnd();
-      const trimmed = line.trim();
-      if (i === preamble && trimmed === "> Bản nháp chưa duyệt.") continue;
-
-      // Check table row
-      if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
-        flushList();
-        tableLines.push(trimmed);
-        continue;
-      } else if (tableLines.length > 0) {
-        flushTable();
-      }
-
-      if (!trimmed) {
-        flushList();
-        continue;
-      }
-
-      // Check headings
-      if (trimmed.startsWith("# ")) {
-        flushList();
-        blocks.push({
-          id: `h1_${blocks.length}`,
-          type: "h1",
-          content: trimmed.replace(/^#\s+/, ""),
-        });
-      } else if (trimmed.startsWith("## ")) {
-        flushList();
-        blocks.push({
-          id: `h2_${blocks.length}`,
-          type: "h2",
-          content: trimmed.replace(/^##\s+/, ""),
-        });
-      } else if (trimmed.startsWith("### ")) {
-        flushList();
-        blocks.push({
-          id: `h3_${blocks.length}`,
-          type: "h3",
-          content: trimmed.replace(/^###\s+/, ""),
-        });
-      } else if (trimmed.startsWith("#### ")) {
-        flushList();
-        blocks.push({
-          id: `h4_${blocks.length}`,
-          type: "h4",
-          content: trimmed.replace(/^####\s+/, ""),
-        });
-      } else if (trimmed.startsWith("---") || trimmed.startsWith("***")) {
-        flushList();
-        blocks.push({
-          id: `div_${blocks.length}`,
-          type: "divider",
-          content: "",
-        });
-      } else if (trimmed.startsWith("> ")) {
-        flushList();
-        blocks.push({
-          id: `quote_${blocks.length}`,
-          type: "quote",
-          content: trimmed.replace(/^>\s+/, ""),
-        });
-      } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-        const itemText = trimmed.replace(/^[-*]\s+/, "");
-        if (currentList && currentList.type === "ul") {
-          currentList.items.push({
-            id: `ul_item_${currentList.items.length}`,
-            text: itemText,
-          });
-        } else {
-          flushList();
-          currentList = {
-            type: "ul",
-            items: [{ id: "ul_item_0", text: itemText }],
-          };
-        }
-      } else if (/^\d+\.\s+/.test(trimmed)) {
-        const itemText = trimmed.replace(/^\d+\.\s+/, "");
-        if (currentList && currentList.type === "ol") {
-          currentList.items.push({
-            id: `ol_item_${currentList.items.length}`,
-            text: itemText,
-          });
-        } else {
-          flushList();
-          currentList = {
-            type: "ol",
-            items: [{ id: "ol_item_0", text: itemText }],
-          };
-        }
-      } else {
-        flushList();
-        blocks.push({
-          id: `p_${blocks.length}`,
-          type: "p",
-          content: trimmed,
-        });
-      }
-    }
-
-    flushList();
-    flushTable();
-
-    return blocks;
-  }, [content]);
-
-  // Clean inline citations and bold/code text
-  const renderFormattedText = (text: string, prefix: string) => {
-    const parts = text.split(/(\[[A-Za-z0-9_:-]+\])/g);
-    let counter = 0;
-    return parts.map((part) => {
-      counter++;
-      const tokenKey = `${prefix}_tok_${counter}`;
+  const renderCitationToken = useCallback(
+    (part: string, tokenKey: string) => {
       const citation = citations.get(part.slice(1, -1));
-      if (part.startsWith("[") && part.endsWith("]") && citation) {
+      if (citation) {
         return (
           <span
             key={tokenKey}
@@ -267,9 +65,10 @@ export function MarkdownView({
           </span>
         );
       }
-      return <span key={tokenKey}>{part}</span>;
-    });
-  };
+      return null;
+    },
+    [citations],
+  );
 
   if (isLoading) {
     return (
@@ -374,133 +173,10 @@ export function MarkdownView({
             </div>
           )}
 
-          {renderedBlocks?.map((block) => {
-            switch (block.type) {
-              case "h1":
-                return (
-                  <h1
-                    key={block.id}
-                    className="text-lg font-bold text-foreground pt-2 border-b border-border/50 pb-1.5"
-                  >
-                    {renderFormattedText(block.content, block.id)}
-                  </h1>
-                );
-              case "h2":
-                return (
-                  <h2
-                    key={block.id}
-                    className="text-base font-semibold text-foreground pt-2 text-primary"
-                  >
-                    {renderFormattedText(block.content, block.id)}
-                  </h2>
-                );
-              case "h3":
-                return (
-                  <h3
-                    key={block.id}
-                    className="text-sm font-semibold text-foreground pt-1.5"
-                  >
-                    {renderFormattedText(block.content, block.id)}
-                  </h3>
-                );
-              case "h4":
-                return (
-                  <h4
-                    key={block.id}
-                    className="text-xs font-semibold text-muted-foreground pt-1 uppercase tracking-wider"
-                  >
-                    {renderFormattedText(block.content, block.id)}
-                  </h4>
-                );
-              case "quote":
-                return (
-                  <blockquote
-                    key={block.id}
-                    className="border-l-3 border-primary/60 bg-muted/30 px-3.5 py-2 rounded-r text-xs italic text-foreground/90 my-2"
-                  >
-                    {renderFormattedText(block.content, block.id)}
-                  </blockquote>
-                );
-              case "ul":
-                return (
-                  <ul
-                    key={block.id}
-                    className="list-disc pl-5 space-y-1 text-xs text-foreground/90"
-                  >
-                    {block.items?.map((item) => (
-                      <li key={item.id}>
-                        {renderFormattedText(item.text, item.id)}
-                      </li>
-                    ))}
-                  </ul>
-                );
-              case "ol":
-                return (
-                  <ol
-                    key={block.id}
-                    className="list-decimal pl-5 space-y-1 text-xs text-foreground/90"
-                  >
-                    {block.items?.map((item) => (
-                      <li key={item.id}>
-                        {renderFormattedText(item.text, item.id)}
-                      </li>
-                    ))}
-                  </ol>
-                );
-              case "table":
-                return (
-                  <div
-                    key={block.id}
-                    className="rounded-lg border border-border/70 overflow-x-auto shadow-2xs my-3 bg-background"
-                  >
-                    <table className="w-full text-xs text-left border-collapse">
-                      {block.tableData?.headers && (
-                        <thead>
-                          <tr className="bg-muted/60 border-b border-border/60">
-                            {block.tableData.headers.map((h) => (
-                              <th
-                                key={h.id}
-                                className="p-2.5 font-semibold text-foreground border-r border-border/40 last:border-0"
-                              >
-                                {renderFormattedText(h.text, h.id)}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                      )}
-                      <tbody>
-                        {block.tableData?.rows.map((row) => (
-                          <tr
-                            key={row.id}
-                            className="border-b border-border/40 last:border-0 hover:bg-muted/20"
-                          >
-                            {row.cells.map((cell) => (
-                              <td
-                                key={cell.id}
-                                className="p-2.5 text-foreground/90 border-r border-border/40 last:border-0"
-                              >
-                                {renderFormattedText(cell.text, cell.id)}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              case "divider":
-                return <hr key={block.id} className="border-border/60 my-4" />;
-              default:
-                return (
-                  <p
-                    key={block.id}
-                    className="text-xs leading-relaxed text-foreground/90 my-1.5"
-                  >
-                    {renderFormattedText(block.content, block.id)}
-                  </p>
-                );
-            }
-          })}
+          <MarkdownContent
+            content={content}
+            renderToken={renderCitationToken}
+          />
         </article>
       ) : (
         <div className="relative rounded-xl border border-border/70 bg-muted/20 overflow-hidden shadow-2xs">

@@ -154,3 +154,61 @@ def test_rewrite_distinct_identifier_switch_no_entity_conflict():
     assert "AM-0070" in resolved2
     assert "AM-0007" not in resolved2
     assert "AM-0007" not in trace2["preserved_codes"]
+
+
+def test_rewrite_cross_turn_comparison():
+    # Multi-turn sequence: Turn 1 (Criteria 1.7) -> Turn 2 (Criteria 1.8) -> Turn 3 (Comparison)
+    history = [
+        {
+            "question": "Tiêu chí phát triển nguồn nhân lực chuyển đổi số (1.7) tính điểm và mức độ thế nào theo Quyết định 4740?",
+            "answer": "Tiêu chí 1.7 có điểm tối đa là 10 điểm...",
+        },
+        {
+            "question": "Còn hệ thống hỗ trợ đào tạo trực tuyến (1.8) thì sao?",
+            "answer": "Tiêu chí 1.8 quy định mức tối đa 10 điểm...",
+        },
+    ]
+    follow_up = "Tóm lại so với mục trước thì thế nào?"
+    resolved, trace = rewrite_contextual_query(follow_up, history)
+
+    assert trace["rewritten"] is True
+    assert trace["mode"] == "cross_turn_comparison"
+    assert "So sánh" in resolved
+    assert "1.8" in resolved
+    assert "1.7" in resolved
+    assert "4740" in resolved
+
+
+def test_rewrite_new_property_of_same_task():
+    # Multi-turn: Turn 1 asks time of task -> Turn 2 asks responsible/coordinating unit
+    history = [
+        {
+            "question": "Thời gian thực hiện nhiệm vụ 2 trong Kế hoạch 130/KH-ĐHQN là khi nào?",
+            "answer": "Nhiệm vụ 2 được thực hiện từ tháng 01/2026 đến tháng 03/2026.",
+        }
+    ]
+    follow_up = "Thế còn đơn vị nào chủ trì và phối hợp?"
+    resolved, trace = rewrite_contextual_query(follow_up, history)
+
+    assert trace["rewritten"] is True
+    assert trace["mode"] == "property_followup"
+    assert "đơn vị nào chủ trì và phối hợp" in resolved
+    assert "Nhiệm vụ 2" in resolved
+    assert "130/KH-ĐHQN" in resolved
+    # Must NOT conflate with previous predicate "Thời gian thực hiện"
+    assert "Thời gian thực hiện" not in resolved
+
+
+def test_rewrite_anaphoric_clause_and_milestone():
+    history = [
+        {
+            "question": "Kế hoạch 130/KH-ĐHQN quy định mốc thời gian hoàn thành tự đánh giá SAR là khi nào?",
+            "answer": "Mốc hoàn thành báo cáo SAR là trước ngày 15/04/2026.",
+        }
+    ]
+    follow_up = "Nếu xét theo mốc đó thì hồ sơ minh chứng cần gửi khi nào?"
+    resolved, trace = rewrite_contextual_query(follow_up, history)
+
+    assert trace["rewritten"] is True
+    assert "130/KH-ĐHQN" in resolved
+    assert "hồ sơ minh chứng" in resolved

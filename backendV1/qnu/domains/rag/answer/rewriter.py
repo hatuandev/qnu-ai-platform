@@ -18,7 +18,12 @@ from typing import Any
 
 # Anaphoric references / elliptical indicators in Vietnamese
 _ANAPHORA_PRONOUN_RE = re.compile(
-    r"\b(?:(?:hồ sơ nghiệm thu|hồ sơ|nhiệm vụ|phần|mục|bảng|điều|trường hợp|ngành|mã)\s+(?:này|đó|trên)|nó|cái đó)\b",
+    r"\b(?:(?:hồ sơ nghiệm thu|hồ sơ|nhiệm vụ|tiêu chí|ý|mục|phần|bảng|điều|mốc|thời gian|trường hợp|ngành|mã)\s+(?:này|đó|trên)|nó|cái đó)\b",
+    re.IGNORECASE,
+)
+
+_COMPARE_PREVIOUS_RE = re.compile(
+    r"\b(?:tóm lại\s+)?so với\s+(?:mục|tiêu chí|nhiệm vụ|phần|nội dung)?\s*(?:trước|vừa rồi|đó|trên)\b",
     re.IGNORECASE,
 )
 
@@ -45,7 +50,7 @@ _BOT_CLARIFICATION_KEYWORDS = (
 
 # Extract core subjects from text (major names, codes, year, scores)
 _YEAR_RE = re.compile(r"\b(202[0-9])\b")
-_CODE_RE = re.compile(r"\b([A-Z]{2,4}-?\d{1,7}|\d{7}|\b0\d{1,5}\b)\b")
+_CODE_RE = re.compile(r"(?<!/)\b([A-Z]{2,4}-?\d{1,7}|\d{7}|0\d{2,5})\b(?!/)")
 _SECTION_RE = re.compile(r"\b(?:\d+\.\d+(?:\.\d+)?)\b")
 _SCORE_RE = re.compile(r"\b(\d{1,2}(?:[.,]\d{1,2})?)\s*(?:điểm|đ)\b", re.IGNORECASE)
 
@@ -136,18 +141,54 @@ def _extract_entities_from_text(text: str) -> dict[str, list[str]]:
     }
 
 
+_DOC_REF_RE = re.compile(
+    r"\b(?:theo\s+)?(Quyết định\s+\d+[\w/.-]*|QĐ\s+\d+[\w/.-]*|Kế hoạch\s+\d+[\w/.-]*|KH\s+\d+[\w/.-]*|\d+/(?:QĐ-BGDĐT|KH-ĐHQN|KH-AM))\b",
+    re.IGNORECASE,
+)
+_CRITERIA_MATCH_RE = re.compile(r"\b(tiêu\s+chí\s+\d+\.\d+(?:\.\d+)?)\b", re.IGNORECASE)
+_TASK_MATCH_RE = re.compile(r"\b(nhiệm\s+vụ\s+(?:\d+(?:\.\d+)?|[A-Z]{2,4}-?\d{1,5}))\b", re.IGNORECASE)
+
+
 def _extract_cumulative_history_context(pairs: list[tuple[str, str]]) -> dict[str, Any]:
-    """Scan history from earliest to latest to preserve entities and ongoing topics."""
+    """Scan history from earliest to latest to preserve entities, documents, and ongoing topics."""
     last_certificate: str | None = None
     last_year: str | None = None
     last_major: str | None = None
+    last_document: str | None = None
     all_codes: list[str] = []
     user_codes: list[str] = []
+    entities_history: list[str] = []
     has_conversion: bool = False
     has_eng_subject: bool = False
 
     for user_q, bot_a in pairs:
         combined_turn = f"{user_q} {bot_a}"
+
+        # Detect document reference
+        doc_m = _DOC_REF_RE.search(user_q) or _DOC_REF_RE.search(bot_a)
+        if doc_m:
+            last_document = doc_m.group(0).strip()
+            if last_document.lower().startswith("theo "):
+                last_document = last_document[5:].strip()
+
+        # Detect specific entities (criteria, tasks)
+        crit_m = _CRITERIA_MATCH_RE.search(user_q)
+        if crit_m:
+            entities_history.append(crit_m.group(1).capitalize())
+        else:
+            task_m = _TASK_MATCH_RE.search(user_q)
+            if task_m:
+                entities_history.append(task_m.group(1).capitalize())
+            else:
+                secs = _SECTION_RE.findall(user_q)
+                if secs:
+                    prefix = (
+                        "Tiêu chí"
+                        if "tiêu chí" in user_q.lower() or "tiêu chí" in bot_a.lower()
+                        else "Mục"
+                    )
+                    for s in secs:
+                        entities_history.append(f"{prefix} {s}")
 
         # Detect certificate (latest user mention takes precedence, then bot)
         for cert_name, pattern in _CERT_PATTERNS.items():
@@ -179,10 +220,25 @@ def _extract_cumulative_history_context(pairs: list[tuple[str, str]]) -> dict[st
         if _SUBJECT_ENG_RE.search(combined_turn):
             has_eng_subject = True
 
+    unique_entities = []
+    for ent in entities_history:
+        if not unique_entities or unique_entities[-1] != ent:
+            unique_entities.append(ent)
+
+    last_entity = unique_entities[-1] if unique_entities else None
+    prior_entity = (
+        unique_entities[-2]
+        if len(unique_entities) >= 2 and unique_entities[-2] != last_entity
+        else None
+    )
+
     return {
         "certificate": last_certificate,
         "year": last_year,
         "major": last_major,
+        "document": last_document,
+        "last_entity": last_entity,
+        "prior_entity": prior_entity,
         "codes": list(dict.fromkeys(user_codes + all_codes)),
         "user_codes": list(dict.fromkeys(user_codes)),
         "has_conversion": has_conversion,
@@ -233,7 +289,13 @@ def rewrite_contextual_query(
             re.IGNORECASE,
         )
     )
-    is_anaphoric = has_leading_connector or bool(pronoun_match) or has_score_or_tier
+    is_compare_previous = bool(_COMPARE_PREVIOUS_RE.search(clean_current))
+    is_anaphoric = (
+        has_leading_connector
+        or bool(pronoun_match)
+        or has_score_or_tier
+        or is_compare_previous
+    )
 
     # If < 2 turns and no anaphoric indication, preserve insufficient_history contract
     if len(pairs) < 2 and not is_anaphoric:
@@ -337,12 +399,17 @@ def rewrite_contextual_query(
         if ctx.get("major"):
             subject_matches.append(ctx["major"])
 
-        if subject_matches:
+        matched_text = pronoun_match.group(0)
+        noun_prefix = re.sub(
+            r"\s+(?:này|đó|trên)$", "", matched_text, flags=re.IGNORECASE
+        ).strip()
+
+        if noun_prefix.lower() in ("mốc", "thời gian", "mốc thời gian"):
+            resolved = clean_current
+            rewritten = True
+            rewrite_mode = "anaphora_substitution"
+        elif subject_matches:
             target_sub = subject_matches[0]
-            matched_text = pronoun_match.group(0)
-            noun_prefix = re.sub(
-                r"\s+(?:này|đó|trên)$", "", matched_text, flags=re.IGNORECASE
-            ).strip()
             if (
                 noun_prefix.lower() in ("nó", "cái đó")
                 or target_sub.lower().startswith(noun_prefix.lower())
@@ -361,6 +428,39 @@ def rewrite_contextual_query(
             ).strip()
             rewritten = True
             rewrite_mode = "anaphora_substitution"
+
+        if (
+            rewritten
+            and ctx.get("document")
+            and ctx["document"].lower() not in resolved.lower()
+        ):
+            if resolved.endswith("?"):
+                resolved = f"{resolved[:-1].strip()} theo {ctx['document']}?"
+            else:
+                resolved = f"{resolved} theo {ctx['document']}"
+
+    # Case 3.5: Cross-turn comparison (e.g. "Tóm lại so với mục trước thì thế nào?", "So với tiêu chí trước thì sao?")
+    if not rewritten and _COMPARE_PREVIOUS_RE.search(clean_current):
+        last_ent = ctx.get("last_entity")
+        prior_ent = ctx.get("prior_entity")
+        doc_str = ctx.get("document")
+        doc_clause = (
+            f" theo {doc_str}"
+            if doc_str and doc_str.lower() not in clean_current.lower()
+            else ""
+        )
+        if last_ent and prior_ent:
+            cleaned_comp = _COMPARE_PREVIOUS_RE.sub("", clean_current).strip()
+            cleaned_comp = re.sub(
+                r"^(?:thì\s+sao|thế\s+nào|như\s+thế\s+nào|\?)+",
+                "",
+                cleaned_comp,
+                flags=re.IGNORECASE,
+            ).strip()
+            predicate = f" {cleaned_comp}" if cleaned_comp else " như thế nào"
+            resolved = f"So sánh {last_ent} với {prior_ent}{doc_clause}{predicate}?"
+            rewritten = True
+            rewrite_mode = "cross_turn_comparison"
 
     # Case 4: Elliptical follow-up starting with "Thế còn...", "Còn..."
     if not rewritten and has_leading_connector:
@@ -488,6 +588,48 @@ def rewrite_contextual_query(
                 resolved = f"{resolved} năm {ctx['year']}"
             rewritten = True
             rewrite_mode = "anaphora_substitution"
+        elif any(
+            w in clean_follow_up.lower()
+            for w in (
+                "chủ trì",
+                "phối hợp",
+                "sản phẩm",
+                "kết quả",
+                "thời gian",
+                "tiến độ",
+                "kinh phí",
+                "chi phí",
+                "trách nhiệm",
+                "ai",
+                "ở đâu",
+                "khi nào",
+                "bao nhiêu",
+                "điều kiện",
+                "yêu cầu",
+            )
+        ) and ctx.get("last_entity"):
+            last_ent = ctx["last_entity"]
+            doc_str = ctx.get("document")
+            doc_clause = (
+                f" theo {doc_str}"
+                if doc_str and doc_str.lower() not in clean_follow_up.lower()
+                else ""
+            )
+            clean_core_prop = re.sub(
+                r"\s*(?:thì\s+sao|thế\s+nào|như\s+thế\s+nào|\?)+\s*$",
+                "",
+                clean_follow_up,
+                flags=re.IGNORECASE,
+            ).strip()
+            if any(
+                w in clean_follow_up.lower()
+                for w in ("ai", "nào", "gì", "đâu", "bao nhiêu", "khi nào")
+            ):
+                resolved = f"{clean_core_prop} của {last_ent}{doc_clause}?"
+            else:
+                resolved = f"{clean_core_prop} của {last_ent}{doc_clause} như thế nào?"
+            rewritten = True
+            rewrite_mode = "property_followup"
         else:
             base = re.sub(r"\b202[0-9]\b", "", prev_user_q).strip()
             base = re.sub(

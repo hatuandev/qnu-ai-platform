@@ -269,7 +269,10 @@ async def answer(
         resolved_question=effective_query,
         persona=persona,
         metadata_filter=packing_metadata,
+        conversation_memory=req.conversation_memory,
     )
+    if req.conversation_memory:
+        trace.context["conversation_memory"] = req.conversation_memory
     trace.stage_ms["packing"] = round((time.monotonic() - packing_started) * 1000, 3)
     if skipped:
         retrieval = retrieval.model_copy(update={"hits": retrieval.hits[: len(sources)]})

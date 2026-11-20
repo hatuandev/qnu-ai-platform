@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.conversations import guardrails
 from qnu.domains.conversations.access import checkpoint
+from qnu.domains.conversations.memory import extract_safe_conversation_memory
 from qnu.domains.conversations.models import Conversation, ConversationTurn
 from qnu.domains.conversations.prefilter import classify_turn, compare_route
 from qnu.domains.conversations.routing import (
@@ -83,6 +84,7 @@ async def resolve_turn(
     turn.history_turn_ids = [row.id for row, _, _ in turns]
     history = [question for _, question, _ in turns]
     answers = [answer for _, _, answer in turns]
+    conv_memory = extract_safe_conversation_memory(rows)
     prefilter = classify_turn(turn.question, has_history=bool(turns))
     guard_categories = guardrails.categories(config)
     schema = routed_turn_schema(guardrail=bool(guard_categories))
@@ -132,6 +134,7 @@ async def resolve_turn(
         "inference_configuration_hash": inference_hash,
         "reasoning": runtime.reasoning_trace(),
         "prefilter": prefilter,
+        "conversation_memory": conv_memory,
     }
     if dropped:
         turn.rewrite_trace["history"] = {

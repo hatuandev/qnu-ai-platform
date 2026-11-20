@@ -20,6 +20,7 @@ class AnswerRequest(RagPolicy):
     fact_query: dict | None = Field(default=None)
     history: list[dict] | None = Field(default=None)
     calculation: dict | None = Field(default=None)
+    conversation_memory: dict | None = Field(default=None)
 
     @model_validator(mode="after")
     def retrieval_contract(self) -> "AnswerRequest":

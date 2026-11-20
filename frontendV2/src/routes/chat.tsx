@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Send,
   Sparkles,
+  Square,
   User,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -31,10 +32,12 @@ import {
 import { useCatalogQuery } from "@/api/modelops";
 import { EmptyState } from "@/components/admin/empty-state";
 import { providerLabel } from "@/components/assistants/model-label";
+import { TurnFeedback } from "@/components/assistants/turn-feedback";
 import {
   TURN_ERROR_TEXT,
   TurnResult,
 } from "@/components/assistants/turn-result";
+import { TurnTraceDetails } from "@/components/assistants/turn-trace";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -118,6 +121,11 @@ function TurnRow({
   onCopy: (text: string) => void;
 }) {
   const copyText = turnAnswerText(turn);
+  const trace =
+    turn.result && turn.result.status !== "direct_reply"
+      ? turn.result.trace
+      : null;
+
   return (
     <div className="space-y-3">
       <UserBubble question={turn.question} />
@@ -125,22 +133,28 @@ function TurnRow({
         <AssistantAvatar />
         <div className="min-w-0 flex-1 space-y-2.5 rounded-2xl rounded-tl-xs border border-border/60 bg-card px-4 py-3 shadow-2xs">
           <TurnResult turn={turn} />
-          <div className="flex items-center justify-between border-t border-border/30 pt-1.5 text-[10px] text-muted-foreground">
-            <span>
-              {formatTime(turn.created_at)} · Lượt {turn.turn_no}
-            </span>
-            {copyText ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-7 p-0 text-muted-foreground hover:text-foreground"
-                title="Sao chép câu trả lời"
-                onClick={() => onCopy(copyText)}
-              >
-                <Copy className="size-3.5" />
-                <span className="sr-only">Sao chép câu trả lời</span>
-              </Button>
-            ) : null}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-1.5 text-[10px] text-muted-foreground">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span>
+                {formatTime(turn.created_at)} · Lượt {turn.turn_no}
+              </span>
+              {trace ? <TurnTraceDetails turn={turn} trace={trace} /> : null}
+            </div>
+            <div className="flex items-center gap-1">
+              <TurnFeedback turnId={turn.id} />
+              {copyText ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="size-6 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                  title="Sao chép câu trả lời"
+                  onClick={() => onCopy(copyText)}
+                >
+                  <Copy className="size-3" />
+                  <span className="sr-only">Sao chép câu trả lời</span>
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -148,18 +162,56 @@ function TurnRow({
   );
 }
 
-function PendingRow({ question }: { question: string }) {
+function PendingRow({
+  question,
+  onCancel,
+}: {
+  question: string;
+  onCancel?: () => void;
+}) {
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const stageText = useMemo(() => {
+    if (seconds < 3) return "Đang phân tích câu hỏi & tra cứu kho tri thức...";
+    if (seconds < 8) return "Đang đối soát bảng biểu & trích xuất dẫn chứng...";
+    if (seconds < 16)
+      return "Đang tổng hợp câu trả lời & kiểm chứng số liệu...";
+    return "Câu hỏi phức tạp nhiều vế; đang hoàn tất câu trả lời...";
+  }, [seconds]);
+
   return (
     <div className="space-y-3">
       <UserBubble question={question} />
       <div className="flex gap-2.5">
         <AssistantAvatar />
-        <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl rounded-tl-xs border border-border/60 bg-card px-4 py-3 text-xs text-muted-foreground shadow-2xs">
-          <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
-          <span>
-            Đang truy xuất nguồn và tổng hợp câu trả lời. Lượt hỏi thường mất
-            1–3 phút.
-          </span>
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-2xl rounded-tl-xs border border-border/60 bg-card px-4 py-3 text-xs text-muted-foreground shadow-2xs">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
+            <span className="truncate">{stageText}</span>
+            <span className="font-mono text-[10px] text-muted-foreground/70 shrink-0">
+              ({seconds}s)
+            </span>
+          </div>
+          {onCancel ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-[11px] gap-1 text-muted-foreground hover:text-destructive hover:border-destructive/40 cursor-pointer shrink-0"
+              onClick={onCancel}
+              title="Hủy lượt hỏi này"
+            >
+              <Square className="size-2.5 fill-current" />
+              <span>Hủy</span>
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>
@@ -226,6 +278,13 @@ function ChatPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const [selectedAssistantId, setSelectedAssistantId] = useState<string | null>(
     null,
@@ -395,9 +454,22 @@ function ChatPage() {
     );
   };
 
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setPendingQuestion(null);
+    toast.info("Đã hủy lượt hỏi.");
+  };
+
   const handleSendError = (error: unknown) => {
     setLocalTurn(null);
     if (!(error instanceof ApiProblemError)) {
+      if (error instanceof Error && error.name === "AbortError") {
+        toast.info("Đã hủy lượt hỏi.");
+        return;
+      }
       toast.error(
         error instanceof Error ? error.message : "Không gửi được câu hỏi.",
       );
@@ -420,7 +492,7 @@ function ChatPage() {
       return;
     }
     if (error.code === "request_aborted") {
-      toast.error("Yêu cầu bị hủy trước khi máy chủ phản hồi.");
+      toast.info("Đã hủy lượt hỏi.");
       return;
     }
     const mapped = TURN_ERROR_TEXT[error.code];
@@ -444,6 +516,10 @@ function ChatPage() {
     setPendingQuestion(question);
     const assistantId = assistant.id;
 
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       let conversation = activeConversation;
       if (!conversation) {
@@ -465,6 +541,7 @@ function ChatPage() {
         conversationId,
         question,
         expectedTurnNo,
+        signal: controller.signal,
       });
 
       appendTurnToCache(conversationId, turn);
@@ -480,6 +557,9 @@ function ChatPage() {
     } catch (error) {
       handleSendError(error);
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setPendingQuestion(null);
     }
   };
@@ -782,7 +862,10 @@ function ChatPage() {
                 />
               ))}
               {pendingQuestion ? (
-                <PendingRow question={pendingQuestion} />
+                <PendingRow
+                  question={pendingQuestion}
+                  onCancel={handleCancel}
+                />
               ) : null}
             </>
           )}

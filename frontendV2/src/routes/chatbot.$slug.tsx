@@ -22,6 +22,7 @@ import {
   usePublicChatbotInfoQuery,
   useSendPublicTurnMutation,
 } from "@/api/publications";
+import { MarkdownContent } from "@/components/knowledge/markdown-content";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -422,15 +423,15 @@ function MessageBubble({ message }: { message: PublicMessage }) {
   return (
     <div className="max-w-[92%] space-y-1.5">
       <div className="rounded-lg rounded-bl-sm border border-border/60 bg-card px-3.5 py-2.5 shadow-2xs">
-        <p
+        <MarkdownContent
+          content={message.text}
+          compact
           className={
             message.tone === "insufficient"
-              ? "whitespace-pre-wrap text-sm italic leading-relaxed text-muted-foreground"
-              : "whitespace-pre-wrap text-sm leading-relaxed text-foreground"
+              ? "italic text-muted-foreground"
+              : undefined
           }
-        >
-          {message.text}
-        </p>
+        />
         {message.citations ? (
           <CitationChips citations={message.citations} />
         ) : null}

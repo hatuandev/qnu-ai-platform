@@ -70,6 +70,7 @@ async def send(
                 mode="json", exclude={"guardrail_policy"}
             )
             policy["metadata_filter"] = turn.metadata_filter or {}
+            conv_mem = (turn.rewrite_trace or {}).get("conversation_memory")
             result = await answer(
                 db,
                 blob,
@@ -85,6 +86,7 @@ async def send(
                     document_ids=conversation.document_ids,
                     provider_id=provider_id,
                     max_output_tokens=config["max_output_tokens"],
+                    conversation_memory=conv_mem,
                     **policy,
                 ),
                 retrieval_query=turn.resolved_question,

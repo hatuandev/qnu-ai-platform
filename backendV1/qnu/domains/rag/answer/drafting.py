@@ -217,6 +217,13 @@ SO SÁNH, THỐNG KÊ, TƯ VẤN VÀ CÂU HỎI GHÉP NHIỀU MỤC
 - TƯ VẤN & ĐỊNH HƯỚNG: Bám sát 100% các tiêu chí, điều kiện bắt buộc, thang điểm, hoặc lộ trình và mốc hạn có trong văn bản (như QĐ 4740/QĐ-BGDĐT hoặc KH 130/KH-ĐHQN). Trình bày rõ ràng theo từng nhóm yêu cầu hoặc lộ trình thời gian. Tuyệt đối không bổ sung quy định, khuyến nghị ngoài văn bản hoặc con số ước tính không có trong evidence.
 - CÂU HỎI GHÉP NHIỀU MỤC / ĐẦU VIỆC: Tách câu trả lời thành từng mục tương ứng; trả lời đầy đủ từng vế có căn cứ trong các đoạn hoặc mảng bảng được cấp. Chỉ cần một vế có căn cứ là bắt buộc status answered; phần vế chưa có căn cứ ghi rõ chưa có dữ liệu trong tài liệu.
 
+MẠCH HỘI THOẠI & NỐI TIẾP TỰ NHIÊN (dialogue_context)
+Khi payload có dialogue_context, trợ lý được phép diễn đạt lời đáp nối tiếp tự nhiên, liên kết mạch lạc với chủ đề, thực thể hoặc ý đã trao đổi ở lượt trước (ví dụ: 'Tiếp nối nội dung về...', 'Đối với nhiệm vụ... đã nêu, đơn vị chủ trì là...', 'So với tiêu chí... thì tiêu chí...').
+NGUYÊN TẮC BẢO VỆ TUYỆT ĐỐI:
+1. dialogue_context CHỈ DÙNG ĐỂ GIỮ MẠCH DIỄN ĐẠT TỰ NHIÊN; TUYỆT ĐỐI KHÔNG DÙNG LÀM BẰNG CHỨNG DỮ KIỆN CHO CÂU TRẢ LỜI HIỆN TẠI.
+2. Mọi số liệu, mốc thời gian, đơn vị chủ trì/phối hợp, điều kiện, quy định MỚI bắt buộc phải có mặt trực tiếp trong evidence được cấp cho lượt hiện tại và phải được chứng minh bằng evidence_ids hoặc lookups.
+3. Nếu câu hỏi chuyển sang khía cạnh mới hoặc đối tượng mới mà evidence được cấp không có dữ kiện, bắt buộc trả lời rằng tài liệu chưa có thông tin về phần đó (assessment missing); TUYỆT ĐỐI KHÔNG suy đoán từ mạch hội thoại cũ hay trí nhớ của mô hình.
+
 ĐỊNH DẠNG
 Trước khi trả JSON, mở thẻ <phan_tich> và đối chiếu nhanh theo 4 bước IRAC (ngắn gọn, gạch đầu dòng, tối đa 250 từ):
 - Bước 1 (Quy định gốc & Ngoại lệ): Liệt kê các câu quy định, điều kiện áp dụng, vế phủ định và năm hiệu lực trong evidence.
@@ -338,6 +345,7 @@ def messages_for(
     table_cells: dict | None = None,
     answer_plan: dict | None = None,
     computed: dict | None = None,
+    conversation_memory: dict | None = None,
 ) -> list[ChatMessage]:
     cells = table_cells if table_cells is not None else catalog(sources, table_context)
     selectable = {t["evidence_id"] for t in cells["tables"] if t["cells"]}
@@ -381,6 +389,22 @@ def messages_for(
         payload["style"] = persona
     if metadata_filter:
         payload["scope"] = metadata_filter
+    if conversation_memory and any(conversation_memory.values()):
+        dialogue_ctx = {}
+        if conversation_memory.get("active_document"):
+            dialogue_ctx["active_document"] = conversation_memory["active_document"]
+        if conversation_memory.get("last_entity"):
+            dialogue_ctx["prior_entity"] = conversation_memory["last_entity"]
+        if conversation_memory.get("prior_entity"):
+            dialogue_ctx["comparison_entity"] = conversation_memory["prior_entity"]
+        if conversation_memory.get("grounded_conclusions"):
+            dialogue_ctx["prior_conclusions"] = [
+                c["conclusion"] for c in conversation_memory["grounded_conclusions"]
+            ]
+        if conversation_memory.get("summary_text"):
+            dialogue_ctx["flow_summary"] = conversation_memory["summary_text"]
+        if dialogue_ctx:
+            payload["dialogue_context"] = dialogue_ctx
     return [
         ChatMessage("system", SYSTEM_PROMPT),
         ChatMessage("user", json.dumps(payload, ensure_ascii=False, separators=(",", ":"))),

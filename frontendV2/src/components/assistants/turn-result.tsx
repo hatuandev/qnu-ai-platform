@@ -1,4 +1,10 @@
-import { CircleHelp, Loader2, TriangleAlert, XCircle } from "lucide-react";
+import {
+  CircleHelp,
+  Loader2,
+  Sparkles,
+  TriangleAlert,
+  XCircle,
+} from "lucide-react";
 import type { ConversationTurn, DirectReply } from "@/api/conversations";
 import { AnswerBody } from "@/components/assistants/answer-body";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +37,32 @@ const DIRECT_ROUTE_TEXT: Record<DirectReply["route"], string> = {
   protected_request: "Yêu cầu cần bảo vệ",
   guardrail: "Ngoài phạm vi hỗ trợ",
 };
+
+export function ResolvedContextNotice({
+  originalQuestion,
+  resolvedQuestion,
+}: {
+  originalQuestion: string;
+  resolvedQuestion?: string | null;
+}) {
+  if (!resolvedQuestion) return null;
+  const orig = originalQuestion.trim().toLowerCase();
+  const res = resolvedQuestion.trim().toLowerCase();
+  if (!res || orig === res) return null;
+
+  return (
+    <div className="flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] text-muted-foreground animate-in fade-in-50 duration-200">
+      <Sparkles className="size-3 text-primary shrink-0" />
+      <span className="font-medium text-foreground">Ngữ cảnh làm rõ:</span>
+      <span
+        className="italic text-foreground/80 truncate max-w-[480px]"
+        title={resolvedQuestion}
+      >
+        "{resolvedQuestion}"
+      </span>
+    </div>
+  );
+}
 
 function directReplyBody(reply: DirectReply) {
   return (
@@ -113,9 +145,20 @@ export function TurnResult({ turn }: { turn: ConversationTurn }) {
     );
   }
 
-  if (turn.result.status === "direct_reply") {
-    return directReplyBody(turn.result);
-  }
+  const replyContent =
+    turn.result.status === "direct_reply" ? (
+      directReplyBody(turn.result)
+    ) : (
+      <AnswerBody result={turn.result} />
+    );
 
-  return <AnswerBody result={turn.result} />;
+  return (
+    <div className="space-y-2">
+      <ResolvedContextNotice
+        originalQuestion={turn.question}
+        resolvedQuestion={turn.resolved_question}
+      />
+      {replyContent}
+    </div>
+  );
 }
