@@ -194,7 +194,15 @@ async def rerun_checks(
         job_id += f":retry:{retry_of}"
     try:
         await job_queue.enqueue(
-            "spelling_check_job", run.id, body.version, retry_of is not None, job_id=job_id
+            "spelling_check_job",
+            run.id,
+            body.version,
+            retry_of is not None,
+            True,
+            1,
+            None,
+            None,
+            job_id=job_id,
         )
     except Exception as exc:
         raise AppException(

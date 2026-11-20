@@ -30,6 +30,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.identity.background import background_actor
+from qnu.domains.knowledge.index.artifact_cache import (
+    get_artifact_payload,
+    set_artifact_payload,
+)
 from qnu.domains.knowledge.public_api import (
     WRITE_ROLES,
     read_revision_bytes,
@@ -229,6 +233,9 @@ async def _read_artifact(
         raise AppException(
             "Chưa có artifact cho yêu cầu này.", code="artifact_not_found", status_code=404
         )
+    cached_payload = get_artifact_payload(record.blob_key, record.sha256)
+    if cached_payload is not None:
+        return record, cached_payload
     try:
         payload = await blob_store.get_bytes(record.blob_key)
     except FileNotFoundError as exc:
@@ -245,6 +252,7 @@ async def _read_artifact(
             code="artifact_integrity_failed",
             status_code=502,
         )
+    set_artifact_payload(record.blob_key, record.sha256, payload)
     return record, payload
 
 

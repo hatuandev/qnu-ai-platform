@@ -19,7 +19,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
@@ -574,8 +574,25 @@ async def query_facts(
     if not request.include_non_data:
         stmt = stmt.where(IndexTableFact.row_kind == "data")
     if request.data_year is not None:
-        stmt = stmt.where(IndexTableFact.data_year == request.data_year)
-    rows = (await db.execute(stmt)).scalars().all()
+        stmt = stmt.where(
+            or_(
+                IndexTableFact.data_year == request.data_year,
+                IndexTableFact.data_year.is_(None),
+            )
+        )
+    rows = list((await db.execute(stmt)).scalars().all())
+    if request.data_year is not None:
+        filtered_rows = []
+        for r in rows:
+            if r.data_year == request.data_year:
+                filtered_rows.append(r)
+            elif r.data_year is None:
+                attrs = r.attributes or {}
+                meta_years = (attrs.get("_data_years") or {}).get("years", [])
+                has_year_col = any(k.startswith(f"{request.data_year} > ") for k in attrs)
+                if request.data_year in meta_years or has_year_col:
+                    filtered_rows.append(r)
+        rows = filtered_rows
     facts = [_row_to_fact(r) for r in rows]
     return execute_fact_query(facts, schema, request)
 

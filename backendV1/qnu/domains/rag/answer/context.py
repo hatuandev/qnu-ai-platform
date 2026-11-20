@@ -349,7 +349,7 @@ async def expand_context(
             status_code=422,
         )
     result, support_trace = await attach_table_support(
-        db, blob, actor, workspace_id, collection_id, result, req
+        db, blob, actor, workspace_id, collection_id, result, req, bundles=bundles
     )
     trace.update(support_trace)
     consumed = 2 + sum(evidence_size(h) for h in result.hits)

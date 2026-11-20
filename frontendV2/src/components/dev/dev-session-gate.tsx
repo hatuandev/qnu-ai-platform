@@ -145,7 +145,9 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
               headers: { Accept: "application/json" },
             });
             if (bridgeResponse.ok) {
-              const payload = (await bridgeResponse.json().catch(() => null)) as {
+              const payload = (await bridgeResponse
+                .json()
+                .catch(() => null)) as {
                 access_token?: string;
                 default_workspace_code?: string;
               } | null;
@@ -303,7 +305,8 @@ function DevSessionGateInner({ children }: { children: React.ReactNode }) {
               Đăng nhập Quản trị
             </h2>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Nhập khóa truy cập nội bộ (Access Key) để đăng nhập vào bảng điều khiển quản trị QNU AI.
+              Nhập khóa truy cập nội bộ (Access Key) để đăng nhập vào bảng điều
+              khiển quản trị QNU AI.
             </p>
           </div>
 

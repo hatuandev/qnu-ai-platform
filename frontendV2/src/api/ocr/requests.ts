@@ -125,6 +125,7 @@ export type Suggestion = {
   context_before?: string | null;
   context_after?: string | null;
   review_reason?: string | null;
+  pass_number?: number;
 };
 
 export type IgnoredSuggestion = {
@@ -162,6 +163,12 @@ export type DetectionResponse = {
   canonical_sha256: string;
   suggestions: Suggestion[];
   withheld_suggestions?: Suggestion[];
+  rejected_suggestions?: {
+    evidence_id: string;
+    reason: string;
+    start?: number | null;
+    end?: number | null;
+  }[];
   ignored_suggestions?: IgnoredSuggestion[];
   checked_evidence_ids: string[];
   total_evidence_count?: number | null;
@@ -173,10 +180,18 @@ export type DetectionResponse = {
   reviewed_version?: number | null;
   reviewed_sha256?: string | null;
   reviewed_by?: string | null;
+  pass_number?: number;
+  total_passes?: number;
+  pass_name?: string;
+  parent_run_id?: string | null;
+  batch_group_id?: string | null;
 };
 
 export type SpellingStatusSummary = {
   running: boolean;
+  pass_number?: number | null;
+  total_passes?: number | null;
+  pass_name?: string | null;
   check: {
     status: string;
     reviewed_at: string | null;
@@ -185,6 +200,9 @@ export type SpellingStatusSummary = {
     pending_count: number;
     ignored_count: number;
     scope?: "full" | "selected" | "skipped";
+    pass_number?: number;
+    total_passes?: number;
+    pass_name?: string;
   } | null;
 };
 

@@ -110,6 +110,8 @@ class Suggestion(BaseModel):
     context_before: str | None = Field(None, max_length=6000)
     context_after: str | None = Field(None, max_length=6000)
     review_reason: str | None = None
+    pass_number: int | None = None
+    provider_id: str | None = None
 
 
 class ContextSuggestion(Suggestion):
@@ -185,6 +187,11 @@ class DetectionResponse(BaseModel):
     reviewed_version: int | None = None
     reviewed_sha256: str | None = None
     reviewed_by: str | None = None
+    pass_number: int = 1
+    total_passes: int = 2
+    pass_name: str = "char_ocr"
+    parent_run_id: str | None = None
+    batch_group_id: str | None = None
 
 
 class SpellingCheckSummary(BaseModel):
@@ -195,8 +202,14 @@ class SpellingCheckSummary(BaseModel):
     pending_count: int
     ignored_count: int
     scope: Literal["full", "selected", "skipped"] = "full"
+    pass_number: int = 1
+    total_passes: int = 2
+    pass_name: str = "char_ocr"
 
 
 class SpellingStatusSummary(BaseModel):
     check: SpellingCheckSummary | None = None
     running: bool = False
+    pass_number: int | None = None
+    total_passes: int | None = None
+    pass_name: str | None = None

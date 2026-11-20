@@ -69,6 +69,14 @@ export function SpellingStatusStrip({
   const failed = check?.status === "failed";
   const interrupted = check?.status === "uncertain";
 
+  const passNumber = check?.pass_number ?? data?.pass_number ?? 1;
+  const totalPasses = check?.total_passes ?? data?.total_passes ?? 2;
+  const passName = check?.pass_name ?? data?.pass_name ?? "char_ocr";
+  const passLabel =
+    passName === "context_terminology"
+      ? "Ngữ cảnh & bảng biểu"
+      : "Ký tự & dấu OCR";
+
   const label = isError
     ? "Không tải được kết quả soát chính tả"
     : isLoading
@@ -77,29 +85,29 @@ export function SpellingStatusStrip({
         ? "Bỏ qua soát tự động theo cài đặt"
         : !check
           ? isWaiting
-            ? "Đang chờ soát chính tả…"
+            ? `Đang chờ soát chính tả đa lượt (Lượt ${passNumber}/${totalPasses})…`
             : "Chưa có kết quả soát chính tả"
           : running
             ? isSelected
-              ? "Đang soát các đoạn theo cài đặt…"
-              : "Đang soát chính tả…"
+              ? `Đang soát đoạn theo cài đặt (Lượt ${passNumber}/${totalPasses})…`
+              : `Đang soát Lượt ${passNumber}/${totalPasses}: ${passLabel}…`
             : failed
-              ? "Soát chính tả gặp lỗi"
+              ? `Soát chính tả Lượt ${passNumber}/${totalPasses} gặp lỗi`
               : interrupted
-                ? "Soát chính tả bị gián đoạn"
+                ? `Soát chính tả Lượt ${passNumber}/${totalPasses} bị gián đoạn`
                 : reviewed
                   ? `${isSelected ? "Đã duyệt phần soát tự động" : "Đã duyệt chính tả"}${ignored > 0 ? ` · ${ignored} vị trí bỏ qua` : ""}`
                   : !complete
-                    ? "Chưa soát xong toàn bộ văn bản"
+                    ? `Chưa hoàn tất Lượt ${passNumber}/${totalPasses}`
                     : pending > 0
-                      ? `Có ${pending} vị trí cần xem${ignored > 0 ? ` · ${ignored} đã bỏ qua` : ""}`
+                      ? `Lượt ${passNumber}/${totalPasses}: Có ${pending} vị trí cần xem${ignored > 0 ? ` · ${ignored} đã bỏ qua` : ""}`
                       : coverage?.total === 0
                         ? "Không có đoạn văn để soát"
                         : ignored > 0
                           ? `Đã bỏ qua ${ignored} vị trí · cần hoàn tất duyệt`
                           : isSelected
                             ? "Chưa phát hiện lỗi trong phần soát tự động"
-                            : "Chưa phát hiện lỗi chính tả";
+                            : `Lượt ${passNumber}/${totalPasses}: Chưa phát hiện lỗi chính tả`;
 
   const Icon =
     isLoading || running
@@ -129,6 +137,9 @@ export function SpellingStatusStrip({
           className={isLoading || running ? "size-4 animate-spin" : "size-4"}
         />
         <span>{label}</span>
+        <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-[10px] text-primary">
+          Lượt {passNumber}/{totalPasses}
+        </span>
         {coverage && !complete && percent !== null && (
           <span className="flex items-center gap-1.5">
             <Progress

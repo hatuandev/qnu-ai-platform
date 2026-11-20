@@ -87,6 +87,7 @@ def _header_line(
     document_meta: DocumentCardMeta | None = None,
     data_year: int | None = None,
     data_status: str | None = None,
+    data_years: list[int] | None = None,
 ) -> str:
     parts: list[str] = []
     if document_meta and (document_meta.doc_number or document_meta.title):
@@ -98,8 +99,11 @@ def _header_line(
     if data_year is not None:
         status_part = f" ({data_status})" if data_status and data_status != "unknown" else ""
         parts.append(f"Dữ liệu năm: {data_year}{status_part}")
+    elif data_years:
+        years_str = ", ".join(str(y) for y in sorted(set(data_years)))
+        parts.append(f"Dữ liệu năm: {years_str}")
     elif projection.data_years:
-        years_str = ", ".join(str(y) for y in projection.data_years)
+        years_str = ", ".join(str(y) for y in sorted(set(projection.data_years)))
         parts.append(f"Dữ liệu năm: {years_str}")
     table_label = projection.title or projection.table_id
     parts.append(f"Bảng: {table_label}")
@@ -155,11 +159,13 @@ def render_fact_to_row_card(
 ) -> RowCard:
     """Render one UniversalFact into a Self-Contained Row-Card."""
     note_index = {note.note_id: note for note in projection.scoped_notes}
+    card_years = fact.data_years or ([fact.data_year] if fact.data_year is not None else list(projection.data_years))
     header = _header_line(
         projection,
         document_meta=document_meta,
         data_year=fact.data_year,
         data_status=fact.data_status,
+        data_years=card_years,
     )
     body = _format_fact_body(fact, note_index)
     text = f"{header}\n{body}" if body else header
@@ -170,7 +176,7 @@ def render_fact_to_row_card(
         fact_ids=[fact.fact_id],
         row_kind=fact.row_kind,
         keep_whole_in_chunk=False,
-        data_years=[fact.data_year] if fact.data_year is not None else [],
+        data_years=card_years,
         text=text,
         detail_md_pointers=dict(fact.detail_md_pointers),
         cross_references=list(fact.cross_references),
@@ -393,7 +399,14 @@ def build_row_card_chunks(
     from qnu.domains.knowledge.index.facts import project_table
 
     chunks = []
-    doc_meta = DocumentCardMeta(title=doc_title)
+    # Extract document number and year from doc_title if possible for richer breadcrumbs
+    doc_num_match = re.search(r"\b(\d+/[A-ZĐ]+(?:-[A-ZĐ]+)*)\b", doc_title)
+    doc_year_match = re.search(r"\b(19\d\d|20\d\d)\b", doc_title)
+    doc_meta = DocumentCardMeta(
+        title=doc_title,
+        doc_number=doc_num_match.group(1) if doc_num_match else "",
+        doc_year=int(doc_year_match.group(1)) if doc_year_match else None,
+    )
     annotations = annotations or []
     last_opening_headers: dict[int, list[list[dict]]] = {}
     for entry in tables:

@@ -5,6 +5,7 @@ export type SpellingDefaults = {
   ocr: boolean;
   pdf_text: boolean;
   word_text: boolean;
+  total_passes: number;
 };
 
 const path = "/settings/spelling";

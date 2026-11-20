@@ -68,6 +68,27 @@ async def create_preview(
     transition(target, req.action)
     if req.action == "publish":
         await assert_approval_receipt(db, target, blob)
+    if req.action == "approve":
+        spelling_in_prog = False
+        spelling_details = None
+        if req.review_skip is not None:
+            spelling_details = await review_gate.check_spelling_in_progress(db, target)
+            spelling_in_prog = spelling_details is not None
+        else:
+            gate_info = await review_gate.material(db, blob, target)
+            spelling_in_prog = gate_info.get("spelling_in_progress", False)
+            spelling_details = gate_info.get("spelling_details")
+
+        if spelling_in_prog and not req.confirm_spelling_in_progress:
+            pass_info = (
+                f" (Lượt {spelling_details.get('pass_number', 1)}/{spelling_details.get('total_passes', 2)}: {spelling_details.get('pass_name', 'char_ocr')})"
+                if spelling_details
+                else ""
+            )
+            raise Conflict(
+                f"Có lượt soát chính tả đa lượt đang chạy ngầm{pass_info}. Vui lòng chờ hoàn tất hoặc đánh dấu xác nhận tiếp tục duyệt.",
+                code="publication_spelling_in_progress",
+            )
     acknowledgement = (
         (
             review_gate.acknowledge_skip(target, req.review_skip, req.reason)

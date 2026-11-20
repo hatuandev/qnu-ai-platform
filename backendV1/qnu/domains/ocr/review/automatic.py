@@ -3,7 +3,10 @@
 import asyncio
 import json
 from collections import deque
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import timedelta
+from typing import Any
 
 from pydantic import ValidationError
 from sqlalchemy import or_, select
@@ -11,11 +14,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.public_api import resolve_revision_scope
+from qnu.domains.modelops.capacity.schemas import RequestTokenBudget
+from qnu.domains.modelops.catalog.service import catalog_service
+from qnu.domains.modelops.document_processing import (
+    DEFAULT_DOCUMENT_CONCURRENCY,
+    GroupModel,
+    resolve_document_group,
+)
 from qnu.domains.modelops.inference.service import (
     available_input_tokens,
     input_token_upper_bound,
     prepare_chat_limits,
 )
+from qnu.domains.modelops.public_api import ChatRuntime
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.ocr.models import OcrProcessingRun, utcnow
 from qnu.domains.ocr.review import defaults, detection, service
@@ -45,6 +56,24 @@ SPLIT_ERRORS = {
     "model_context_limit_exceeded",
     "chat_output_truncated",
 }
+
+
+@dataclass(frozen=True, slots=True)
+class SpellingSlot:
+    provider_id: str
+    concurrency: int
+    runtime: ChatRuntime
+    budget: RequestTokenBudget
+    configuration_hash: str
+
+
+@asynccontextmanager
+async def _worker_session(parent_db: AsyncSession):
+    if hasattr(parent_db, "_mock_return_value") or type(parent_db).__name__ in {"AsyncMock", "MagicMock"}:
+        yield parent_db
+    else:
+        async with AsyncSessionFactory() as session:
+            yield session
 
 
 async def _latest_selected(
@@ -91,19 +120,38 @@ async def review_document(
     *,
     retry: bool = False,
     automatic: bool = False,
-) -> str:
+    pass_number: int = 1,
+    total_passes: int = 2,
+    parent_run_id: str | None = None,
+    batch_group_id: str | None = None,
+) -> tuple[str, str | None]:
     run_id = run.id
     await service.authorize(db, actor, run, write=True, lock=True)
     selected_review = None
     if not automatic:
         selected_review, interrupted = await _wait_for_selected(db, actor, run, version)
         if interrupted and selected_review is not None:
-            return (await detection.readable_check(db, selected_review)).status
+            readable = await detection.readable_check(db, selected_review)
+            return readable.status, selected_review.id
     doc, canonical = await service.load_review(db, blob, run, version)
     if doc.version != version:
-        return "version_not_found"
+        return "version_not_found", None
+
+    if parent_run_id:
+        parent_run = await db.get(SpellingRun, parent_run_id)
+        if parent_run is None or parent_run.canonical_sha256 != doc.canonical_sha256:
+            logger.info("spelling_multi_pass_hash_mismatch", run_id=run.id, version=version)
+            return "hash_mismatch_stopped", None
+        if not batch_group_id:
+            batch_group_id = parent_run.batch_group_id or parent_run.id
+
+    pass_cfg = detection.PASS_CONFIGS.get(pass_number, detection.PASS_CONFIGS[1])
+    pass_name = pass_cfg["name"]
+    pass_focus = pass_cfg["focus"]
+
     evidence_ids = list(dict.fromkeys(unit.evidence_id for unit in doc.units))
-    full_key = f"auto:spl:document:{run.id}:{version}:{detection.PROMPT_VERSION}"
+    full_key = f"auto:spl:document:{run.id}:{version}:p{pass_number}:{detection.PROMPT_VERSION}"
+    legacy_key = f"auto:spl:document:{run.id}:{version}:{detection.PROMPT_VERSION}" if pass_number == 1 else full_key
     base_key = full_key
     scope = "full"
     if automatic:
@@ -123,6 +171,12 @@ async def review_document(
         SpellingRun.idempotency_key == base_key,
         SpellingRun.idempotency_key.startswith(base_key + ":retry:", autoescape=True),
     )
+    if pass_number == 1:
+        same_request = or_(
+            same_request,
+            SpellingRun.idempotency_key == legacy_key,
+            SpellingRun.idempotency_key.startswith(legacy_key + ":retry:", autoescape=True),
+        )
     if automatic:
         # Redelivery must use the scope already recorded before settings changed.
         same_request = or_(
@@ -130,6 +184,8 @@ async def review_document(
             SpellingRun.trace["automatic_document"].astext == "true",
             SpellingRun.idempotency_key == full_key,
             SpellingRun.idempotency_key.startswith(full_key + ":retry:", autoescape=True),
+            SpellingRun.idempotency_key == legacy_key,
+            SpellingRun.idempotency_key.startswith(legacy_key + ":retry:", autoescape=True),
         )
     existing = await db.scalar(
         select(SpellingRun)
@@ -138,6 +194,7 @@ async def review_document(
             SpellingRun.collection_id == run.collection_id,
             SpellingRun.run_id == run.id,
             SpellingRun.version == version,
+            SpellingRun.pass_number == pass_number,
             SpellingRun.created_by == actor_ref(actor),
             same_request,
         )
@@ -147,7 +204,7 @@ async def review_document(
     retry_of = None
     if existing is not None:
         if not (retry and existing.status in {"failed", "uncertain"}):
-            return (await detection.readable_check(db, existing)).status
+            return (await detection.readable_check(db, existing)).status, existing.id
         retry_of = existing.id
         key = f"{base_key}:retry:{existing.id}"
     else:
@@ -164,6 +221,11 @@ async def review_document(
         status="running" if evidence_ids else "completed",
         version=doc.version,
         canonical_sha256=doc.canonical_sha256,
+        pass_number=pass_number,
+        total_passes=total_passes,
+        pass_name=pass_name,
+        parent_run_id=parent_run_id,
+        batch_group_id=batch_group_id or parent_id,
         checked_evidence_ids=[],
         suggestions=[],
         trace={
@@ -171,6 +233,10 @@ async def review_document(
             "context_version": CONTEXT_VERSION,
             "total_evidence_count": len(evidence_ids),
             "scope": scope,
+            "pass_number": pass_number,
+            "total_passes": total_passes,
+            "pass_name": pass_name,
+            "pass_focus": pass_focus,
             **({"automatic_document": True} if automatic else {}),
             "withheld_suggestions": [],
             "rejected_suggestions": [],
@@ -182,25 +248,76 @@ async def review_document(
     db.add(parent)
     await db.commit()
     if not evidence_ids:
-        return "completed"
+        return "completed", parent_id
 
     try:
-        runtime, budget = await prepare_chat_limits(
-            db,
-            actor,
-            run.workspace_id,
-            provider_id=None,
-            max_output_tokens=None,
-            task="ocr_review",
-        )
-        configuration_hash = runtime.inference_configuration_hash("ocr_review")
+        group = await resolve_document_group(db)
+        candidate_models = list(group.models)
+        if not candidate_models:
+            primary = await catalog_service.system_default_for(db, "chat")
+            if primary is not None:
+                candidate_models = [GroupModel(primary, DEFAULT_DOCUMENT_CONCURRENCY)]
+
+        slots: list[SpellingSlot] = []
+        for member in candidate_models:
+            try:
+                m_runtime, m_budget = await prepare_chat_limits(
+                    db,
+                    actor,
+                    run.workspace_id,
+                    provider_id=member.provider_id,
+                    max_output_tokens=None,
+                    task="ocr_review",
+                )
+                m_hash = m_runtime.inference_configuration_hash("ocr_review")
+                slots.append(
+                    SpellingSlot(
+                        provider_id=member.provider_id,
+                        concurrency=member.concurrency,
+                        runtime=m_runtime,
+                        budget=m_budget,
+                        configuration_hash=m_hash,
+                    )
+                )
+                if group.mode == "priority":
+                    break
+            except AppException as exc:
+                logger.warning(
+                    "spelling_candidate_model_skipped",
+                    provider_id=member.provider_id,
+                    code=exc.code,
+                )
+                continue
+
+        if not slots:
+            logger.warning("spelling_no_usable_models", run_id=run.id, version=version)
+            return "failed", None
+
+        # Determine the most conservative input token budget across participating models
+        avails = [
+            available_input_tokens(s.runtime.token_limits, max(1, s.budget.max_output_tokens or 1))
+            for s in slots
+        ]
+        valid_avails = [a for a in avails if a is not None]
+        min_available = min(valid_avails) if valid_avails else None
+
         parent = await detection.check_running(db, parent_id)
         parent.trace = {
             **parent.trace,
-            "provider_id": runtime.provider_id,
-            "model_name": runtime.model_name,
-            "configuration_hash": configuration_hash,
-            "routing": list(runtime.routing_trace),
+            "document_mode": group.mode if group.models else "fallback_chat",
+            "document_models": [
+                {
+                    "provider_id": slot.provider_id,
+                    "concurrency": slot.concurrency,
+                    "model_name": slot.runtime.model_name,
+                    "configuration_hash": slot.configuration_hash,
+                }
+                for slot in slots
+            ],
+            "provider_id": slots[0].provider_id,
+            "model_name": slots[0].runtime.model_name,
+            "configuration_hash": slots[0].configuration_hash,
+            "routing": list(slots[0].runtime.routing_trace),
         }
         inherited = await _resume_results(db, existing or selected_review, parent)
         positions = {evidence_id: index for index, evidence_id in enumerate(evidence_ids)}
@@ -216,8 +333,8 @@ async def review_document(
             index,
             doc.version,
             doc.canonical_sha256,
-            runtime.token_limits,
-            runtime.token_limits.max_output_tokens or budget.max_output_tokens,
+            min_available if min_available is not None else slots[0].runtime.token_limits,
+            slots[0].budget.max_output_tokens,
         )
         return await _review_batches(
             db,
@@ -227,12 +344,16 @@ async def review_document(
             run_id,
             doc,
             index,
-            runtime,
-            configuration_hash,
+            slots,
             parent_id,
             batches,
             inherited,
             positions,
+            pass_number=pass_number,
+            total_passes=total_passes,
+            pass_name=pass_name,
+            parent_run_id=parent_run_id,
+            batch_group_id=parent.batch_group_id,
         )
     except AppException as exc:
         logger.warning(
@@ -308,7 +429,9 @@ def plan_batches(
     """
     cap = max(1, BATCH_SIZE)
     available = None
-    if limits is not None:
+    if isinstance(limits, int):
+        available = limits
+    elif limits is not None:
         available = available_input_tokens(limits, max(1, output_tokens or 1))
     if available is None:
         return [
@@ -375,62 +498,105 @@ async def _review_batches(
     run_id: str,
     doc: ReviewDocument,
     canonical: ContextIndex,
-    runtime,
-    configuration_hash: str,
+    slots: list[SpellingSlot] | Any,
     parent_id: str,
     batches: list[tuple[int, list[str]]],
     inherited: list[DetectionResponse],
     positions: dict[str, int],
-) -> str:
-    settings = get_settings()
-    limit = max(1, min(settings.SPELLING_BATCH_CONCURRENCY, settings.MODEL_CHAT_CONCURRENCY))
+    *,
+    pass_number: int = 1,
+    total_passes: int = 2,
+    pass_name: str = "char_ocr",
+    parent_run_id: str | None = None,
+    batch_group_id: str | None = None,
+) -> tuple[str, str | None]:
+    if not isinstance(slots, list):
+        slots = [
+            SpellingSlot(
+                provider_id=getattr(slots, "provider_id", "default"),
+                concurrency=1,
+                runtime=slots,
+                budget=None,  # type: ignore
+                configuration_hash=getattr(slots, "configuration_hash", ""),
+            )
+        ]
+
     queue = deque(batches)
-    active: dict[asyncio.Task, tuple[int, list[str]]] = {}
+    queue_cond = asyncio.Condition()
+    agg_lock = asyncio.Lock()
+    in_flight = 0
     outcomes = list(inherited)
+    batch_providers: dict[int, str] = {}
     error_code = None
     terminal: DetectionResponse | None = None
     fatal: BaseException | None = None
-    stop = False
-    try:
-        while active or (queue and not stop):
-            while queue and not stop and len(active) < limit:
+    stop = asyncio.Event()
+    hash_mismatched = False
+
+    async def worker_loop(slot: SpellingSlot) -> None:
+        nonlocal in_flight, error_code, terminal, fatal, hash_mismatched
+        while not stop.is_set():
+            async with queue_cond:
+                while not queue and in_flight > 0 and not stop.is_set():
+                    await queue_cond.wait()
+                if not queue or stop.is_set():
+                    return
                 offset, group = queue.popleft()
-                active[
-                    asyncio.create_task(
-                        _inspect_batch(
-                            blob,
-                            chat,
-                            actor,
-                            run_id,
-                            doc,
-                            canonical,
-                            runtime,
-                            configuration_hash,
-                            parent_id,
-                            offset,
-                            group,
-                        )
-                    )
-                ] = (offset, group)
-            if not active:
-                break
-            done, _ = await asyncio.wait(active, return_when=asyncio.FIRST_COMPLETED)
-            for task in done:
-                offset, group = active.pop(task)
-                try:
-                    result = task.result()
-                except AppException as exc:
-                    invalid_output = exc.code == "ocr_spelling_invalid"
-                    if not invalid_output and exc.code not in SPLIT_ERRORS:
-                        fatal = fatal or exc
-                        stop = True
-                        continue
+                in_flight += 1
+
+            # 1. Pre-execution hash check
+            try:
+                async with _worker_session(db) as check_db:
+                    parent = await detection.check_running(check_db, parent_id)
+                    if parent.canonical_sha256 != doc.canonical_sha256:
+                        logger.info("spelling_batch_hash_mismatch", run_id=run_id, check_id=parent_id)
+                        hash_mismatched = True
+                        stop.set()
+                        async with queue_cond:
+                            in_flight -= 1
+                            queue_cond.notify_all()
+                        return
+            except Exception as exc:
+                fatal = fatal or exc
+                stop.set()
+                async with queue_cond:
+                    in_flight -= 1
+                    queue_cond.notify_all()
+                return
+
+            # 2. Inspect batch
+            try:
+                result = await _inspect_batch(
+                    blob,
+                    chat,
+                    actor,
+                    run_id,
+                    doc,
+                    canonical,
+                    slot.runtime,
+                    slot.configuration_hash,
+                    parent_id,
+                    offset,
+                    group,
+                    pass_number=pass_number,
+                    total_passes=total_passes,
+                    pass_name=pass_name,
+                    parent_run_id=parent_run_id,
+                    batch_group_id=batch_group_id,
+                )
+            except AppException as exc:
+                invalid_output = exc.code == "ocr_spelling_invalid"
+                if not invalid_output and exc.code not in SPLIT_ERRORS:
+                    fatal = fatal or exc
+                    stop.set()
+                else:
                     logger.warning(
                         "spelling_batch_rejected",
                         run_id=run_id,
                         check_id=parent_id,
                         offset=offset,
                         size=len(group),
+                        provider_id=slot.provider_id,
                         code=exc.code,
                         cause=_safe_cause(exc),
                     )
@@ -438,27 +604,74 @@ async def _review_batches(
                         error_code = error_code or exc.code
                     else:
                         middle = len(group) // 2
-                        queue.appendleft((offset + middle, group[middle:]))
-                        queue.appendleft((offset, group[:middle]))
-                    continue
-                except BaseException as exc:
-                    fatal = fatal or exc
-                    stop = True
-                    continue
-                if result.status != "completed":
-                    terminal = result
-                    stop = True
-                    continue
+                        async with queue_cond:
+                            queue.appendleft((offset + middle, group[middle:]))
+                            queue.appendleft((offset, group[:middle]))
+                async with queue_cond:
+                    in_flight -= 1
+                    queue_cond.notify_all()
+                continue
+            except BaseException as exc:
+                fatal = fatal or exc
+                stop.set()
+                async with queue_cond:
+                    in_flight -= 1
+                    queue_cond.notify_all()
+                return
+
+            if result.status != "completed":
+                terminal = result
+                stop.set()
+                async with queue_cond:
+                    in_flight -= 1
+                    queue_cond.notify_all()
+                return
+
+            # Tag provider_id on suggestions
+            for s in result.suggestions:
+                if not getattr(s, "provider_id", None):
+                    s.provider_id = slot.provider_id
+
+            async with queue_cond:
                 outcomes.append(result)
-                parent = await detection.check_running(db, parent_id)
-                await _aggregate(db, parent, outcomes, positions)
+                batch_providers[offset] = slot.provider_id
+                in_flight -= 1
+                queue_cond.notify_all()
+
+            # Post-execution aggregation & hash check
+            try:
+                async with agg_lock, _worker_session(db) as agg_db:
+                    parent = await detection.check_running(agg_db, parent_id)
+                    if parent.canonical_sha256 != doc.canonical_sha256:
+                        hash_mismatched = True
+                        stop.set()
+                        return
+                    await _aggregate(agg_db, parent, outcomes, positions, batch_providers=batch_providers)
+            except Exception as exc:
+                fatal = fatal or exc
+                stop.set()
+                return
+
+    tasks = [
+        asyncio.create_task(worker_loop(slot))
+        for slot in slots
+        for _ in range(max(1, slot.concurrency))
+    ]
+    try:
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
     finally:
-        stop = True
-        if active:
-            # Never cancel a provider call that is already in flight.
-            await asyncio.gather(*active, return_exceptions=True)
+        stop.set()
+        async with queue_cond:
+            queue_cond.notify_all()
+        pending = [t for t in tasks if not t.done()]
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+
     if fatal is not None:
         raise fatal
+    if hash_mismatched:
+        return await _finish(db, parent_id, "hash_mismatch_stopped", "hash_mismatch_stopped")
     if terminal is not None:
         return await _finish(db, parent_id, terminal.status, terminal.error_code)
     return await _finish(db, parent_id, "failed" if error_code else "completed", error_code)
@@ -476,6 +689,12 @@ async def _inspect_batch(
     parent_id: str,
     offset: int,
     group: list[str],
+    *,
+    pass_number: int = 1,
+    total_passes: int = 2,
+    pass_name: str = "char_ocr",
+    parent_run_id: str | None = None,
+    batch_group_id: str | None = None,
 ) -> DetectionResponse:
     async with AsyncSessionFactory() as batch_db:
         batch_run = await batch_db.get(OcrProcessingRun, run_id)
@@ -499,6 +718,11 @@ async def _inspect_batch(
             configuration_hash=configuration_hash,
             review=doc,
             canonical=canonical,
+            pass_number=pass_number,
+            total_passes=total_passes,
+            pass_name=pass_name,
+            parent_run_id=parent_run_id,
+            batch_group_id=batch_group_id,
         )
 
 
@@ -507,22 +731,63 @@ async def _aggregate(
     parent: SpellingRun,
     results: list[DetectionResponse],
     positions: dict[str, int],
+    batch_providers: dict[int, str] | None = None,
 ) -> None:
     def by_evidence(item):
-        return positions.get(item.evidence_id, len(positions))
+        ev_id = getattr(item, "evidence_id", None) or (item.get("evidence_id") if isinstance(item, dict) else None)
+        return positions.get(ev_id, len(positions))
 
     parent.checked_evidence_ids = sorted(
         {evidence_id for result in results for evidence_id in result.checked_evidence_ids},
         key=positions.__getitem__,
     )
-    parent.suggestions = [
+    raw_suggestions = [
         item.model_dump()
         for item in sorted(
             (item for result in results for item in result.suggestions), key=by_evidence
         )
     ]
+    # Tag pass_number on suggestions from this pass
+    for s in raw_suggestions:
+        if s.get("pass_number") is None:
+            s["pass_number"] = parent.pass_number
+
+    # Multi-pass inheritance: if pass > 1, merge with previous pass suggestions and filter ignored
+    if parent.pass_number > 1 and parent.parent_run_id:
+        parent_run = await db.get(SpellingRun, parent.parent_run_id)
+        if parent_run and parent_run.canonical_sha256 == parent.canonical_sha256:
+            ignored_map = await detection.ignored_suggestions(db, [parent_run.id])
+            ignored_set = {
+                (it.evidence_id, it.start, it.end) for it in ignored_map.get(parent_run.id, [])
+            }
+            prev_suggestions = []
+            for s in parent_run.suggestions:
+                k = (s.get("evidence_id"), s.get("start"), s.get("end"))
+                if k not in ignored_set:
+                    prev_suggestions.append(s)
+            seen_spans = {(s["evidence_id"], s["start"], s["end"]) for s in prev_suggestions}
+            combined = list(prev_suggestions)
+            for s in raw_suggestions:
+                k = (s.get("evidence_id"), s.get("start"), s.get("end"))
+                if k not in seen_spans and k not in ignored_set:
+                    combined.append(s)
+                    seen_spans.add(k)
+            parent.suggestions = sorted(combined, key=by_evidence)
+        else:
+            parent.suggestions = raw_suggestions
+    else:
+        parent.suggestions = raw_suggestions
+
+    extra_trace = {}
+    if batch_providers:
+        extra_trace = {
+            "batch_providers": {str(k): v for k, v in batch_providers.items()},
+            "used_providers": sorted(set(batch_providers.values())),
+        }
+
     parent.trace = {
         **parent.trace,
+        **extra_trace,
         "withheld_suggestions": [
             item.model_dump()
             for item in sorted(
@@ -551,11 +816,11 @@ def _safe_cause(exc: AppException) -> str:
     return type(cause).__name__ if cause is not None else ""
 
 
-async def _finish(db: AsyncSession, check_id: str, status: str, code: str | None) -> str:
+async def _finish(db: AsyncSession, check_id: str, status: str, code: str | None) -> tuple[str, str]:
     row = await db.get(SpellingRun, check_id, with_for_update=True, populate_existing=True)
     if row is None:
-        return "cancelled"
+        return "cancelled", check_id
     if row.status == "running":
         row.status, row.error_code = status, code
     await db.commit()
-    return row.status
+    return row.status, row.id

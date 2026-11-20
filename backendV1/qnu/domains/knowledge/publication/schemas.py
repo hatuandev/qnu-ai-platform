@@ -83,6 +83,7 @@ class PreviewRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=1000)
     review_ack: ReviewAcknowledgement | None = None
     review_skip: ReviewSkipAcknowledgement | None = None
+    confirm_spelling_in_progress: bool = False
 
     @model_validator(mode="after")
     def explicit_skip(self):

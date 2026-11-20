@@ -8,6 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.knowledge.compilation.models import CompilationInput
+from qnu.domains.knowledge.index.artifact_cache import (
+    get_canonical_json,
+    set_canonical_json,
+)
 from qnu.domains.knowledge.public_api import resolve_revision_scope
 from qnu.domains.ocr.models import OcrProcessingRun
 from qnu.domains.ocr.review import service as text_service
@@ -45,8 +49,14 @@ async def load_documents(
             run.revision_id,
         )
         snapshot = await processing_service.snapshot(db, blob, run)
-        sha, payload = await processing_service.read_document(db, blob, run)
-        canonical = json.loads(payload)
+        cached_canonical = get_canonical_json(run.id, snapshot["canonical_sha256"])
+        if cached_canonical is not None:
+            canonical = cached_canonical
+            sha = snapshot["canonical_sha256"]
+        else:
+            sha, payload = await processing_service.read_document(db, blob, run)
+            canonical = json.loads(payload)
+            set_canonical_json(run.id, sha, canonical)
         if (
             canonical["identity"]["source_sha256"] != scope.sha256
             or canonical["identity"]["revision_id"] != scope.revision_id

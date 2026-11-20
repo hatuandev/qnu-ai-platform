@@ -32,7 +32,7 @@ logger = get_logger(__name__)
 
 DEFAULT_DOCUMENT_CONCURRENCY = 1
 MAX_DOCUMENT_MODELS = 8
-MAX_DOCUMENT_CONCURRENCY = 64
+MAX_DOCUMENT_CONCURRENCY = 16
 DocumentMode = Literal["priority", "parallel"]
 ThinkingLevel = Literal["server", "low", "off"]
 ModelID = Annotated[str, Field(min_length=1, max_length=64)]

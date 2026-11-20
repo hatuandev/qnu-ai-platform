@@ -17,6 +17,38 @@ from qnu.platform.errors import Conflict, DependencyUnavailable
 from qnu.ports.blob_store import BlobStore
 
 
+async def check_spelling_in_progress(db: AsyncSession, target: CompiledVersion) -> dict | None:
+    from qnu.domains.knowledge.compilation.models import CompilationInput
+    from qnu.domains.ocr.models import utcnow
+    from qnu.domains.ocr.review.models import SpellingRun
+
+    inputs = (
+        await db.scalars(
+            select(CompilationInput).where(CompilationInput.run_id == target.compilation_run_id)
+        )
+    ).all()
+    if inputs:
+        active_spelling = await db.scalar(
+            select(SpellingRun)
+            .where(
+                SpellingRun.run_id.in_([inp.ocr_run_id for inp in inputs]),
+                SpellingRun.canonical_sha256.in_([inp.canonical_sha256 for inp in inputs]),
+                SpellingRun.status == "running",
+                SpellingRun.expires_at > utcnow(),
+            )
+            .order_by(SpellingRun.pass_number.desc(), SpellingRun.created_at.desc())
+            .limit(1)
+        )
+        if active_spelling is not None:
+            return {
+                "pass_number": active_spelling.pass_number,
+                "total_passes": active_spelling.total_passes,
+                "pass_name": active_spelling.pass_name,
+                "check_id": active_spelling.id,
+            }
+    return None
+
+
 async def material(db: AsyncSession, blob: BlobStore, target: CompiledVersion) -> dict:
     compiler_hash = target.bundle_sha256
     if target.retrieval_metadata:
@@ -58,12 +90,16 @@ async def material(db: AsyncSession, blob: BlobStore, target: CompiledVersion) -
         raise DependencyUnavailable(
             "Báo cáo review không khớp phiên bản.", code="publication_review_invalid"
         ) from exc
+
+    spelling_details = await check_spelling_in_progress(db, target)
     return {
         "review_id": row.id,
         "report_sha256": artifact.sha256,
         "bundle_sha256": target.bundle_sha256,
         "verdict": row.verdict,
         "findings": findings,
+        "spelling_in_progress": spelling_details is not None,
+        "spelling_details": spelling_details,
     }
 
 

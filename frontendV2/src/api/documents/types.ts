@@ -123,6 +123,13 @@ export type ReviewGateResponse = {
   bundle_sha256: string;
   verdict: "passed" | "flagged" | "failed";
   findings: ReviewFinding[];
+  spelling_in_progress?: boolean;
+  spelling_details?: {
+    pass_number: number;
+    total_passes: number;
+    pass_name: string;
+    check_id: string;
+  } | null;
 };
 
 export type DecisionFindingResolution = {
@@ -151,6 +158,7 @@ export type DecisionPreviewRequest = {
   reason: string;
   review_ack?: ReviewAck;
   review_skip?: ReviewSkip;
+  confirm_spelling_in_progress?: boolean;
 };
 
 export type DecisionPreviewResponse = {

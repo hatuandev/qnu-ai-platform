@@ -88,11 +88,11 @@ async def answer(
 
     # Slice 5: Multi-turn Contextual Query Rewriter
     effective_query = retrieval_query or req.question
-    if req.history and len(req.history) >= 1:
+    if (req.history and len(req.history) >= 1) or req.conversation_memory:
         from qnu.domains.rag.answer.rewriter import rewrite_contextual_query
 
         effective_query, rewrite_trace = rewrite_contextual_query(
-            effective_query, req.history
+            effective_query, req.history, conversation_memory=req.conversation_memory
         )
         trace.rewriting = rewrite_trace
 
@@ -276,9 +276,10 @@ async def answer(
     trace.stage_ms["packing"] = round((time.monotonic() - packing_started) * 1000, 3)
     if skipped:
         retrieval = retrieval.model_copy(update={"hits": retrieval.hits[: len(sources)]})
-        trace.context["added"] = [
-            item for item in trace.context["added"] if item["chunk_id"] not in skipped
-        ]
+        if "added" in trace.context:
+            trace.context["added"] = [
+                item for item in trace.context["added"] if item["chunk_id"] not in skipped
+            ]
         trace.context["skipped_envelope_budget"] = skipped
     trace.context["selection"]["envelope_skipped"] = skipped
     trace.context["selection"]["selected_count"] = len(sources)

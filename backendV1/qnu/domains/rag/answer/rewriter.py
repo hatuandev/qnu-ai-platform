@@ -147,9 +147,36 @@ _DOC_REF_RE = re.compile(
 )
 _CRITERIA_MATCH_RE = re.compile(r"\b(tiêu\s+chí\s+\d+\.\d+(?:\.\d+)?)\b", re.IGNORECASE)
 _TASK_MATCH_RE = re.compile(r"\b(nhiệm\s+vụ\s+(?:\d+(?:\.\d+)?|[A-Z]{2,4}-?\d{1,5}))\b", re.IGNORECASE)
+_MUC_RE = re.compile(r"\b(mục\s+\d+(?:\.\d+)*)\b", re.IGNORECASE)
+
+_PROPERTY_FOLLOWUP_KEYWORDS = (
+    "đơn vị chủ trì",
+    "chủ trì",
+    "đơn vị phối hợp",
+    "phối hợp",
+    "thời gian thực hiện",
+    "thời gian",
+    "tiến độ",
+    "mốc thời gian",
+    "sản phẩm",
+    "kết quả",
+    "kinh phí",
+    "chi phí",
+    "ngân sách",
+    "trách nhiệm",
+    "ai thực hiện",
+    "ai",
+    "khi nào",
+    "ở đâu",
+    "hồ sơ",
+    "thủ tục",
+)
 
 
-def _extract_cumulative_history_context(pairs: list[tuple[str, str]]) -> dict[str, Any]:
+def _extract_cumulative_history_context(
+    pairs: list[tuple[str, str]],
+    conversation_memory: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Scan history from earliest to latest to preserve entities, documents, and ongoing topics."""
     last_certificate: str | None = None
     last_year: str | None = None
@@ -171,7 +198,7 @@ def _extract_cumulative_history_context(pairs: list[tuple[str, str]]) -> dict[st
             if last_document.lower().startswith("theo "):
                 last_document = last_document[5:].strip()
 
-        # Detect specific entities (criteria, tasks)
+        # Detect specific entities (criteria, tasks, sections)
         crit_m = _CRITERIA_MATCH_RE.search(user_q)
         if crit_m:
             entities_history.append(crit_m.group(1).capitalize())
@@ -189,6 +216,10 @@ def _extract_cumulative_history_context(pairs: list[tuple[str, str]]) -> dict[st
                     )
                     for s in secs:
                         entities_history.append(f"{prefix} {s}")
+                else:
+                    muc_m = _MUC_RE.search(user_q)
+                    if muc_m:
+                        entities_history.append(muc_m.group(1).capitalize())
 
         # Detect certificate (latest user mention takes precedence, then bot)
         for cert_name, pattern in _CERT_PATTERNS.items():
@@ -232,6 +263,18 @@ def _extract_cumulative_history_context(pairs: list[tuple[str, str]]) -> dict[st
         else None
     )
 
+    if conversation_memory:
+        if last_document is None and conversation_memory.get("active_document"):
+            last_document = str(conversation_memory["active_document"])
+        if last_entity is None and conversation_memory.get("last_entity"):
+            last_entity = str(conversation_memory["last_entity"])
+        if last_year is None and conversation_memory.get("year"):
+            last_year = str(conversation_memory["year"])
+        if conversation_memory.get("codes"):
+            mem_codes = [str(c) for c in conversation_memory["codes"]]
+            user_codes.extend(mem_codes)
+            all_codes.extend(mem_codes)
+
     return {
         "certificate": last_certificate,
         "year": last_year,
@@ -249,6 +292,7 @@ def _extract_cumulative_history_context(pairs: list[tuple[str, str]]) -> dict[st
 def rewrite_contextual_query(
     current_question: str,
     history: list[dict[str, Any] | tuple[str, str]] | None,
+    conversation_memory: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Rewrite a follow-up question into a standalone query using conversation history.
 
@@ -259,15 +303,13 @@ def rewrite_contextual_query(
     if not clean_current:
         return clean_current, {"rewritten": False, "reason": "empty_question"}
 
-    if not history:
-        return clean_current, {"rewritten": False, "reason": "insufficient_history"}
-
-    pairs = _extract_history_pairs(history)
-    if not pairs:
+    pairs = _extract_history_pairs(history) if history else []
+    if not pairs and not conversation_memory:
         return clean_current, {"rewritten": False, "reason": "insufficient_history"}
 
     # Last turn context
-    prev_user_q, prev_bot_a = pairs[-1]
+    prev_user_q = pairs[-1][0] if pairs else ""
+    prev_bot_a = pairs[-1][1] if pairs else ""
     prev_bot_norm = prev_bot_a.casefold()
 
     rewritten = False
@@ -275,7 +317,7 @@ def rewrite_contextual_query(
     rewrite_mode = "none"
 
     # Cumulative context across all turns
-    ctx = _extract_cumulative_history_context(pairs)
+    ctx = _extract_cumulative_history_context(pairs, conversation_memory=conversation_memory)
 
     # Detect anaphora/ellipsis in current question
     has_leading_connector = bool(
@@ -290,11 +332,30 @@ def rewrite_contextual_query(
         )
     )
     is_compare_previous = bool(_COMPARE_PREVIOUS_RE.search(clean_current))
+
+    # Detect elliptical property questions (e.g. "Đơn vị nào chủ trì và phối hợp?", "Thời gian thực hiện khi nào?")
+    curr_codes = _CODE_RE.findall(clean_current)
+    has_own_entity = bool(
+        curr_codes
+        or _DOC_REF_RE.search(clean_current)
+        or _CRITERIA_MATCH_RE.search(clean_current)
+        or _TASK_MATCH_RE.search(clean_current)
+    )
+    is_property_followup = (
+        not has_own_entity
+        and any(
+            re.search(r"\b" + re.escape(w) + r"\b", clean_current, re.IGNORECASE)
+            for w in _PROPERTY_FOLLOWUP_KEYWORDS
+        )
+        and bool(ctx.get("last_entity") or ctx.get("document"))
+    )
+
     is_anaphoric = (
         has_leading_connector
         or bool(pronoun_match)
         or has_score_or_tier
         or is_compare_previous
+        or is_property_followup
     )
 
     # If < 2 turns and no anaphoric indication, preserve insufficient_history contract
@@ -461,6 +522,36 @@ def rewrite_contextual_query(
             resolved = f"So sánh {last_ent} với {prior_ent}{doc_clause}{predicate}?"
             rewritten = True
             rewrite_mode = "cross_turn_comparison"
+
+    # Case 3.6: Elliptical property follow-up (e.g. "Đơn vị nào chủ trì và phối hợp?", "Thời gian thực hiện khi nào?")
+    if not rewritten and is_property_followup:
+        last_ent = ctx.get("last_entity")
+        doc_str = ctx.get("document")
+        doc_clause = (
+            f" theo {doc_str}"
+            if doc_str and doc_str.lower() not in clean_current.lower()
+            else ""
+        )
+        entity_clause = (
+            f" của {last_ent}"
+            if last_ent and last_ent.lower() not in clean_current.lower()
+            else ""
+        )
+        clean_core = re.sub(
+            r"\s*(?:thì\s+sao|thế\s+nào|như\s+thế\s+nào|\?)+\s*$",
+            "",
+            clean_current,
+            flags=re.IGNORECASE,
+        ).strip()
+        if any(
+            w in clean_current.lower()
+            for w in ("ai", "nào", "gì", "đâu", "bao nhiêu", "khi nào")
+        ):
+            resolved = f"{clean_core}{entity_clause}{doc_clause}?"
+        else:
+            resolved = f"{clean_core}{entity_clause}{doc_clause} như thế nào?"
+        rewritten = True
+        rewrite_mode = "property_followup"
 
     # Case 4: Elliptical follow-up starting with "Thế còn...", "Còn..."
     if not rewritten and has_leading_connector:

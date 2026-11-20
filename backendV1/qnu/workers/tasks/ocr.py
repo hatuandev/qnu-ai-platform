@@ -13,6 +13,7 @@ from qnu.domains.identity.background import background_actor
 from qnu.domains.knowledge.preparation import service as preparation
 from qnu.domains.ocr.execution import execute_run, job_id_for
 from qnu.domains.ocr.models import OcrProcessingRun, utcnow
+from qnu.domains.ocr.review import defaults
 from qnu.domains.ocr.review.automatic import review_document
 from qnu.domains.ocr.review.models import SpellingRun
 from qnu.platform.config import get_settings
@@ -26,6 +27,9 @@ RECONCILE_BATCH = 50
 SPELLING_RECOVERY_BATCH = 20
 SPELLING_RECOVERY_GRACE = timedelta(minutes=10)
 SPELLING_RECOVERY_WINDOW = timedelta(hours=24)
+
+
+TOTAL_SPELLING_PASSES = 2
 
 
 async def startup(ctx: dict) -> None:
@@ -70,7 +74,10 @@ async def ocr_process_run(ctx: dict, run_id: str) -> str:
                     0,
                     False,
                     True,
-                    job_id=f"qnu:v1:spelling:{run_id}:0:auto",
+                    1,
+                    None,
+                    None,
+                    job_id=f"qnu:v1:spelling:{run_id}:0:p1:auto",
                 )
             except Exception:
                 logger.warning("auto_spelling_enqueue_failed", run_id=run_id)
@@ -78,17 +85,26 @@ async def ocr_process_run(ctx: dict, run_id: str) -> str:
 
 
 async def spelling_check_job(
-    ctx: dict, run_id: str, version: int = 0, retry: bool = False, automatic: bool = False
+    ctx: dict,
+    run_id: str,
+    version: int = 0,
+    retry: bool = False,
+    automatic: bool = False,
+    pass_number: int = 1,
+    parent_run_id: str | None = None,
+    batch_group_id: str | None = None,
 ) -> str:
-    """Automatic background spelling review after successful OCR text extraction."""
+    """Automatic background spelling review with multi-pass chaining."""
     container = ctx["container"]
     async with AsyncSessionFactory() as db:
         run = await db.get(OcrProcessingRun, run_id)
         if run is None or run.status not in {"completed", "completed_with_warnings"}:
             return "run_not_ready"
         actor = background_actor(run.requested_by)
+        policy = await defaults.read(db)
+        total_passes = policy.total_passes
         try:
-            return await review_document(
+            status, check_id = await review_document(
                 db,
                 container.blob_store,
                 container.chat_model,
@@ -97,35 +113,76 @@ async def spelling_check_job(
                 version,
                 retry=retry,
                 automatic=automatic,
+                pass_number=pass_number,
+                total_passes=total_passes,
+                parent_run_id=parent_run_id,
+                batch_group_id=batch_group_id,
             )
+            # Multi-pass chaining: when current pass finishes successfully and there is a next pass
+            if (
+                status in {"completed", "completed_with_warnings"}
+                and automatic
+                and pass_number < total_passes
+                and check_id is not None
+                and container.job_queue
+            ):
+                next_pass = pass_number + 1
+                next_job_id = f"qnu:v1:spelling:{run_id}:{version}:p{next_pass}:auto"
+                try:
+                    await container.job_queue.enqueue(
+                        "spelling_check_job",
+                        run_id,
+                        version,
+                        False,
+                        True,
+                        next_pass,
+                        check_id,
+                        batch_group_id or check_id,
+                        job_id=next_job_id,
+                    )
+                    logger.info(
+                        "spelling_next_pass_enqueued",
+                        run_id=run_id,
+                        version=version,
+                        next_pass=next_pass,
+                        parent_check_id=check_id,
+                    )
+                except Exception:
+                    logger.warning(
+                        "spelling_next_pass_enqueue_failed",
+                        run_id=run_id,
+                        version=version,
+                        next_pass=next_pass,
+                    )
+            return status
         except Exception as exc:
             logger.warning(
                 "auto_spelling_job_failed",
                 run_id=run_id,
                 version=version,
+                pass_number=pass_number,
                 error=type(exc).__name__,
             )
             return "failed"
 
 
 async def spelling_reconcile(ctx: dict) -> int:
-    """Re-deliver an automatic check whose first delivery never created one.
-
-    The completion enqueue is one-shot. A lost delivery or a worker that died before
-    the parent row existed leaves a completed run with no check at all, so recover it
-    from the run row instead of relying on the user to notice.
-    """
+    """Re-deliver an automatic check whose first delivery or next pass never completed."""
     container = ctx["container"]
     now = utcnow()
+    requeued = 0
+    bucket = int(now.timestamp()) // 300
     async with AsyncSessionFactory() as db:
-        has_check = exists(
+        # 1. Runs completed without Pass 1
+        has_pass1 = exists(
             select(SpellingRun.id).where(
                 SpellingRun.run_id == OcrProcessingRun.id,
                 SpellingRun.version == 0,
+                SpellingRun.pass_number == 1,
                 SpellingRun.idempotency_key.startswith("auto:spl:document:"),
             )
         )
-        rows = (
+        pass1_missing = (
             await db.scalars(
                 select(OcrProcessingRun.id)
                 .where(
@@ -133,29 +190,74 @@ async def spelling_reconcile(ctx: dict) -> int:
                     OcrProcessingRun.finished_at.is_not(None),
                     OcrProcessingRun.finished_at < now - SPELLING_RECOVERY_GRACE,
                     OcrProcessingRun.finished_at > now - SPELLING_RECOVERY_WINDOW,
-                    ~has_check,
+                    ~has_pass1,
                 )
                 .order_by(OcrProcessingRun.finished_at)
                 .limit(SPELLING_RECOVERY_BATCH)
             )
         ).all()
-    bucket = int(now.timestamp()) // 300
-    requeued = 0
-    for run_id in rows:
-        try:
-            queued = await container.job_queue.enqueue(
-                "spelling_check_job",
-                run_id,
-                0,
-                False,
-                True,
-                job_id=f"qnu:v1:spelling:{run_id}:0:recover:{bucket}",
+        for run_id in pass1_missing:
+            try:
+                queued = await container.job_queue.enqueue(
+                    "spelling_check_job",
+                    run_id,
+                    0,
+                    False,
+                    True,
+                    1,
+                    None,
+                    None,
+                    job_id=f"qnu:v1:spelling:{run_id}:0:p1:recover:{bucket}",
+                )
+                if queued:
+                    requeued += 1
+            except Exception:
+                logger.warning("spelling_reconcile_pass1_failed", run_id=run_id)
+
+        # 2. Runs where Pass k completed, but Pass k+1 was never enqueued/created (k < total_passes)
+        pass_completed = (
+            await db.scalars(
+                select(SpellingRun)
+                .where(
+                    SpellingRun.version == 0,
+                    SpellingRun.pass_number < SpellingRun.total_passes,
+                    SpellingRun.status.in_(("completed", "completed_with_warnings")),
+                    SpellingRun.idempotency_key.startswith("auto:spl:document:"),
+                    SpellingRun.created_at < now - SPELLING_RECOVERY_GRACE,
+                    SpellingRun.created_at > now - SPELLING_RECOVERY_WINDOW,
+                )
+                .order_by(SpellingRun.created_at)
+                .limit(SPELLING_RECOVERY_BATCH)
             )
-        except Exception:
-            logger.warning("spelling_reconcile_enqueue_failed", run_id=run_id)
-            continue
-        if queued:
-            requeued += 1
+        ).all()
+        for pass_cur in pass_completed:
+            next_pass_num = pass_cur.pass_number + 1
+            has_next_pass = await db.scalar(
+                select(SpellingRun.id).where(
+                    SpellingRun.run_id == pass_cur.run_id,
+                    SpellingRun.version == pass_cur.version,
+                    SpellingRun.pass_number == next_pass_num,
+                    SpellingRun.canonical_sha256 == pass_cur.canonical_sha256,
+                )
+            )
+            if not has_next_pass:
+                try:
+                    queued = await container.job_queue.enqueue(
+                        "spelling_check_job",
+                        pass_cur.run_id,
+                        pass_cur.version,
+                        False,
+                        True,
+                        next_pass_num,
+                        pass_cur.id,
+                        pass_cur.batch_group_id or pass_cur.id,
+                        job_id=f"qnu:v1:spelling:{pass_cur.run_id}:{pass_cur.version}:p{next_pass_num}:recover:{bucket}",
+                    )
+                    if queued:
+                        requeued += 1
+                except Exception:
+                    logger.warning("spelling_reconcile_next_pass_failed", run_id=pass_cur.run_id, next_pass=next_pass_num)
+
     if requeued:
         logger.info("spelling_reconcile_requeued", count=requeued)
     return requeued

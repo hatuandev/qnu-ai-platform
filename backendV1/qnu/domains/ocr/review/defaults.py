@@ -1,7 +1,7 @@
 """Persist and apply the system policy for automatic spelling checks."""
 
-from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Boolean, CheckConstraint
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import Boolean, CheckConstraint, Integer
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
@@ -15,16 +15,21 @@ class SpellingDefaults(BaseModel):
     ocr: bool = True
     pdf_text: bool = False
     word_text: bool = False
+    total_passes: int = Field(2, ge=1, le=4)
 
 
 class SpellingDefaultsRow(Base):
     __tablename__ = "ocr_spelling_defaults"
-    __table_args__ = (CheckConstraint("id = 1", name="ck_ocr_spelling_defaults_singleton"),)
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_ocr_spelling_defaults_singleton"),
+        CheckConstraint("total_passes >= 1 AND total_passes <= 4", name="ck_ocr_spelling_defaults_passes"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     ocr: Mapped[bool] = mapped_column(Boolean)
     pdf_text: Mapped[bool] = mapped_column(Boolean)
     word_text: Mapped[bool] = mapped_column(Boolean)
+    total_passes: Mapped[int] = mapped_column(Integer, nullable=False, default=2, server_default="2")
 
 
 async def read(db: AsyncSession) -> SpellingDefaults:

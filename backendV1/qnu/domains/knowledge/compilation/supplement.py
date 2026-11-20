@@ -243,9 +243,24 @@ def _rules(citation: str, quote: str, boundary: bool) -> list[MetadataCandidate]
         return result
     issued = []
     if boundary:
-        issued = [int(year) for year in re.findall(ISSUED_YEAR, quote, re.IGNORECASE)]
-        issued.extend(int(day[:4]) for day in _dates(quote, ISSUED_DATE))
-        issued.extend(int(day[:4]) for day in _dates(quote, PLACE_DATE))
+        is_legal_basis = bool(
+            re.search(
+                r"^\s*căn\s+cứ\b|\bcăn\s+cứ\s+(?:luật|nghị\s+định|quyết\s+định|thông\s+tư|kế\s+hoạch|công\s+văn|quy\s+chế)\b",
+                quote,
+                re.IGNORECASE,
+            )
+        )
+        is_signature_block = bool(
+            re.search(
+                r"^\s*(?:nơi\s+nhận|kt\.|quyền\s+|tl\.|người\s+ký|thứ\s+trưởng|hiệu\s+trưởng|trưởng\s+đoàn)\b",
+                quote,
+                re.IGNORECASE,
+            )
+        )
+        if not is_legal_basis and not is_signature_block:
+            issued = [int(year) for year in re.findall(ISSUED_YEAR, quote, re.IGNORECASE)]
+            issued.extend(int(day[:4]) for day in _dates(quote, ISSUED_DATE))
+            issued.extend(int(day[:4]) for day in _dates(quote, PLACE_DATE))
     data_years = [year for year, _, _ in _data_year_matches(quote)]
     for field, values in (
         ("issued_year", issued),

@@ -108,7 +108,7 @@ def page_continuations(document: dict, proven: dict[str, dict]) -> dict[str, dic
 
 
 async def bound_dependencies(
-    db, blob, allowed, rows: list[IndexChunk]
+    db, blob, allowed, rows: list[IndexChunk], bundles: dict | None = None
 ) -> dict[tuple[str, str], dict]:
     """Only pinned, serving publications; never read a client-supplied source path."""
     result = {}
@@ -118,16 +118,21 @@ async def bound_dependencies(
         version = await db.get(CompiledVersion, binding.version_id)
         if version is None:
             raise Conflict("Phiên bản nguồn không còn khả dụng.", code="answer_evidence_changed")
-        bundle = await load_bundle(
-            db,
-            blob,
-            binding.workspace_id,
-            binding.collection_id,
-            version.compilation_run_id,
-            require_current=True,
-            serving=True,
-        )
-        assert_pinned(version, bundle)
+        if bundles is not None and binding.version_id in bundles:
+            bundle = bundles[binding.version_id]
+        else:
+            bundle = await load_bundle(
+                db,
+                blob,
+                binding.workspace_id,
+                binding.collection_id,
+                version.compilation_run_id,
+                require_current=True,
+                serving=True,
+            )
+            assert_pinned(version, bundle)
+            if bundles is not None:
+                bundles[binding.version_id] = bundle
         for document in bundle.documents:
             links = dependencies(document)
             for ref, link in page_continuations(document, links).items():

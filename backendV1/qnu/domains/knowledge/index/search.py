@@ -12,6 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.index.abbreviations import expand as expand_abbreviations
+from qnu.domains.knowledge.index.artifact_cache import (
+    get_index_manifest,
+    set_index_manifest,
+)
 from qnu.domains.knowledge.index.models import IndexChunk, IndexInput, IndexRun
 from qnu.domains.knowledge.index.presentation import (
     STITCH_MAX_SIDE,
@@ -43,6 +47,9 @@ logger = get_logger(__name__)
 async def manifest(db: AsyncSession, blob: BlobStore, run: IndexRun) -> dict:
     if not run.manifest_key or not run.manifest_sha256:
         raise Conflict("Index chưa có manifest.", code="index_manifest_not_ready")
+    cached = get_index_manifest(run.manifest_key, run.manifest_sha256)
+    if cached is not None:
+        return cached
     try:
         payload = await blob.get_bytes(run.manifest_key)
     except Exception as exc:
@@ -62,6 +69,7 @@ async def manifest(db: AsyncSession, blob: BlobStore, run: IndexRun) -> dict:
         raise DependencyUnavailable(
             "Index manifest không khớp generation.", code="index_manifest_invalid"
         )
+    set_index_manifest(run.manifest_key, run.manifest_sha256, data)
     return data
 
 
@@ -536,16 +544,28 @@ async def search(
                 "rrf_k": req.rrf_k,
             }
         )
+        is_single_doc = hybrid.is_single_document_scope(
+            req.query,
+            document_ids=req.document_ids,
+            metadata_filter=req.metadata_filter,
+        )
+        trace["single_doc_target"] = is_single_doc
         if req.mode == "hybrid_rerank" and hits:
             from qnu.domains.knowledge.index.validation import validate_results
 
             if reranker is None:
                 raise DependencyUnavailable("Chưa có adapter rerank.", code="reranker_unavailable")
+            rerank_candidates = (
+                hits[: hybrid.SINGLE_DOC_CANDIDATE_K]
+                if (is_single_doc and len(hits) > hybrid.SINGLE_DOC_CANDIDATE_K)
+                else hits
+            )
+            trace["rerank_candidate_pool_size"] = len(rerank_candidates)
             candidates = SearchResponse(
                 index_run_id=run.id,
                 generation=run.generation,
                 status="results",
-                hits=hits,
+                hits=rerank_candidates,
                 eligible_documents=len(allowed),
                 skipped_documents=skipped,
             )
@@ -563,11 +583,19 @@ async def search(
                 )
 
             try:
-                prepared = await _stitch_documents(db, run, hits)
+                prepared = await _stitch_documents(db, run, rerank_candidates)
                 trace["rerank_stitched"] = len(prepared)
                 hits = await hybrid.rerank(
-                    db, actor, workspace_id, req, hits, reranker, trace, checkpoint,
+                    db,
+                    actor,
+                    workspace_id,
+                    req,
+                    rerank_candidates,
+                    reranker,
+                    trace,
+                    checkpoint,
                     prepared=prepared,
+                    is_single_doc_target=is_single_doc,
                 )
             except Conflict as exc:
                 # Only "no rerank model configured" degrades to hybrid fusion;
@@ -575,9 +603,13 @@ async def search(
                 if exc.code != "model_not_configured":
                     raise
                 trace["rerank_skipped"] = "model_not_configured"
-                hits = hits[: req.top_k]
+                hits = hybrid.apply_source_diversity(
+                    hits, req.top_k, is_single_doc_target=is_single_doc
+                )
         else:
-            hits = hits[: req.top_k]
+            hits = hybrid.apply_source_diversity(
+                hits, req.top_k, is_single_doc_target=is_single_doc
+            )
     logger.info(
         "dense_search_completed",
         run_id=run.id,

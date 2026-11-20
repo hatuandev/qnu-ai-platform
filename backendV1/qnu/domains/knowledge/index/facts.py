@@ -55,8 +55,12 @@ _NOT_APPLICABLE = frozenset({"không áp dụng", "n/a", "na", "k/a"})
 _CODE_HEADER_RE = re.compile(r"^(?:mã|code|id|số hiệu|ký hiệu)\b", re.IGNORECASE)
 _GROUP_HEADER_RE = re.compile(r"^(?:nhóm|khối|lĩnh vực|phân nhóm|khoa)\b", re.IGNORECASE)
 _NAME_HEADER_RE = re.compile(
-    r"^(?:tên|ngành|chương trình|đối tượng|nội dung|môn|hạng mục|"
-    r"nhiệm vụ|công việc|chỉ tiêu|trường hợp)\b",
+    r"^(?:tiêu\s+chí|tên|ngành|chương\s+trình|đối\s+tượng|nội\s+dung|môn|hạng\s+mục|"
+    r"nhiệm\s+vụ|công\s+việc|chỉ\s+tiêu|trường\s+hợp)\b",
+    re.IGNORECASE,
+)
+_QUANTITATIVE_HEADER_RE = re.compile(
+    r"^(?:điểm|mức|số\s+lượng|tỷ\s+lệ|kinh\s+phí|ngân\s+sách|thời\s+gian|kết\s+quả|tổng|ghi\s+chú|minh\s+chứng)\b",
     re.IGNORECASE,
 )
 _ORDINAL_HEADER_RE = re.compile(r"^(?:stt|tt|no\.?|#)$", re.IGNORECASE)
@@ -71,6 +75,11 @@ _INLINE_NOTE_RE = re.compile(
     re.IGNORECASE,
 )
 _GROUP_PREFIX_RE = re.compile(r"^(?:[ivxlcdm]+|\d+|[a-z])[.)]\s+", re.IGNORECASE)
+_ROMAN_ORDINAL_RE = re.compile(r"^[IVXLCDMivxlcdm]+[.)]?$")
+_ALPHA_ORDINAL_RE = re.compile(r"^[A-Za-z][.)]$")
+_SECTION_ORDINAL_RE = re.compile(
+    r"^(?:phần|mục|khối|nhóm|bước|giai\s+đoạn)?\s*[IVXLCDMivxlcdm\d]+[.)]?$", re.IGNORECASE
+)
 _MAX_FALLBACK_NAME_CHARS = 120
 
 
@@ -105,6 +114,7 @@ class UniversalFact(BaseModel):
     subject_code: str | None = None
     subject_name: str | None = None
     data_year: int | None = None
+    data_years: list[int] = Field(default_factory=list)
     data_status: DataStatus = "unknown"
     attributes: dict[str, FactAttributeValue] = Field(default_factory=dict)
     detail_md_pointers: dict[str, str] = Field(default_factory=dict)
@@ -306,7 +316,7 @@ def _classify_row_kind(
         return "data", None
 
     # Full-width (or single-cell wide colspan) row inside table body
-    if len(non_empty) == 1 and non_empty[0].cell["col_span"] == col_count and col_count > 1:
+    if len(non_empty) == 1 and non_empty[0].cell["col_span"] >= max(2, col_count - 1) and col_count > 1:
         banner_text = _clean(non_empty[0].cell["text"])
         if _INLINE_NOTE_RE.search(banner_text):
             return "inline_note", banner_text
@@ -315,6 +325,29 @@ def _classify_row_kind(
         if len(banner_text) > 80 or banner_text.endswith("."):
             return "inline_note", banner_text
         return "group_header", banner_text
+
+    # Two-cell row where cell 0 is an ordinal/Roman prefix and cell 1 spans across the rest of the row
+    if len(non_empty) == 2 and col_count >= 3:
+        pos0, pos1 = non_empty[0], non_empty[1]
+        text0 = _clean(pos0.cell["text"])
+        text1 = _clean(pos1.cell["text"])
+        is_ordinal_c0 = bool(
+            _ROMAN_ORDINAL_RE.match(text0)
+            or _ALPHA_ORDINAL_RE.match(text0)
+            or _SECTION_ORDINAL_RE.match(text0)
+            or (pos0.column == 0 and len(text0) <= 8 and text0.isalnum())
+        )
+        spans_rest = (pos0.cell["col_span"] + pos1.cell["col_span"] >= col_count) or (
+            pos1.cell["col_span"] >= max(2, col_count - 2)
+        )
+        if is_ordinal_c0 and spans_rest:
+            combined_banner = f"{text0}. {text1}" if not text0.endswith(".") else f"{text0} {text1}"
+            combined_banner = combined_banner.strip()
+            if _INLINE_NOTE_RE.search(text1):
+                return "inline_note", combined_banner
+            if _SUMMARY_ROW_RE.search(text1):
+                return "summary", combined_banner
+            return "group_header", combined_banner
 
     # Summary row check on leading textual cells (e.g. "Tổng cộng", "Cộng", "Total")
     for pos in non_empty[:2]:
@@ -370,9 +403,17 @@ def _detect_role_columns(
             for c in non_year_cols
             if c not in {code_col, group_col} and not _ORDINAL_HEADER_RE.fullmatch(paths[c][-1])
         ]
-        # Never pick a long prose column (e.g. 400-word description) as subject_name;
-        # pick the first short textual column with alphabetic labels instead.
-        for col in candidates:
+        # Prioritize columns that do NOT match quantitative/metric headers first
+        preferred_candidates = [
+            c for c in candidates if not _QUANTITATIVE_HEADER_RE.search(paths[c][-1])
+        ]
+        remaining_candidates = [
+            c for c in candidates if _QUANTITATIVE_HEADER_RE.search(paths[c][-1])
+        ]
+        sorted_candidates = preferred_candidates + remaining_candidates
+
+        # In fallback, pick textual columns with alphabetic labels within _MAX_FALLBACK_NAME_CHARS
+        for col in sorted_candidates:
             texts = [
                 _clean(grid[r, col].cell["text"])
                 for r in data_rows
@@ -558,6 +599,17 @@ def project_table(
     col_count = structure["original_column_count"]
     paths = _column_paths(grid, headers, col_count)
     body_rows = [r for r in structure["row_indices"] if r not in headers]
+
+    # Detect years appearing in column header paths (e.g. ['2024', 'Chỉ tiêu'], ['2025', 'Điểm trúng tuyển'])
+    header_path_years: list[int] = []
+    for parts in paths.values():
+        for p in parts:
+            for y_str in re.findall(r"\b(19\d\d|20\d\d)\b", p):
+                y_val = int(y_str)
+                if 1950 <= y_val <= 2100 and y_val not in header_path_years:
+                    header_path_years.append(y_val)
+    header_path_years.sort()
+
     col_year_map = {
         col: year for col, year in (column_years or {}).items() if 0 <= col < col_count
     }
@@ -651,11 +703,22 @@ def project_table(
             if code_col is not None and (row_idx, code_col) in grid
             else None
         ) or None
-        name_val = (
+        raw_name = (
             _clean(grid[row_idx, name_col].cell["text"])
             if name_col is not None and (row_idx, name_col) in grid
             else None
         ) or (banner_text if row_kind == "summary" else None)
+
+        name_val: str | None = None
+        if raw_name:
+            if len(raw_name) > 120:
+                truncated = raw_name[:117]
+                last_space = truncated.rfind(" ")
+                if last_space > 60:
+                    truncated = truncated[:last_space]
+                name_val = f"{truncated.rstrip('.,;:')}..."
+            else:
+                name_val = raw_name
 
         for year, cols_for_year, year_names in year_groups:
             attributes: dict[str, FactAttributeValue] = {}
@@ -696,6 +759,7 @@ def project_table(
                 row_index=row_idx,
                 data_year=year,
             )
+            fact_data_years = [year] if year is not None else list(header_path_years)
             facts.append(
                 UniversalFact(
                     fact_id=fact_id,
@@ -706,6 +770,7 @@ def project_table(
                     subject_code=code_val,
                     subject_name=name_val,
                     data_year=year,
+                    data_years=fact_data_years,
                     data_status=status,
                     attributes=attributes,
                     detail_md_pointers=detail_pointers,
@@ -723,7 +788,7 @@ def project_table(
         storage_mode="facts",
         keep_whole_in_chunk=keep_whole,
         lead_in_pointer=lead_in_pointer,
-        data_years=distinct_years,
+        data_years=distinct_years or header_path_years,
         column_keys=all_column_keys,
         scoped_notes=notes,
         facts=facts,

@@ -208,6 +208,12 @@ async def main():
         c, actor, WORKSPACE_ID, COLLECTION_ID, q_oos1, "OOS-1"
     )
 
+    # 12. AMBIG-1 (Câu hỏi mơ hồ/dùng thuật ngữ chung 'phương thức' qua nhiều văn bản -> Tách bạch nguồn)
+    q_ambig1 = "Trong các tài liệu có những phương thức nào được quy định?"
+    results["AMBIG-1"] = await run_single_query(
+        c, actor, WORKSPACE_ID, COLLECTION_ID, q_ambig1, "AMBIG-1"
+    )
+
     # Serialize results to file
     out_file = Path("unified_4docs_eval_results.json")
     clean_results = {}

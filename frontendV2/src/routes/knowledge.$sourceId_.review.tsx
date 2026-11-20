@@ -233,16 +233,22 @@ function SpellingReviewWorkspace() {
     if (!latestCheck) return;
     if (seededCheckIdRef.current === latestCheck.id) return;
     seededCheckIdRef.current = latestCheck.id;
-    const restored = new Map<string, SuggestionDecision>();
-    for (const ignored of latestCheck.ignored_suggestions ?? []) {
-      restored.set(`${ignored.evidence_id}:${ignored.start}:${ignored.end}`, {
-        status: "ignored",
-      });
+    setDecisions((prev) => {
+      const restored = new Map(prev);
+      for (const ignored of latestCheck.ignored_suggestions ?? []) {
+        const key = `${ignored.evidence_id}:${ignored.start}:${ignored.end}`;
+        if (!restored.has(key)) {
+          restored.set(key, { status: "ignored" });
+        }
+      }
+      return restored;
+    });
+    // Multi-pass update: Do NOT overwrite user's in-progress manual edit
+    if (!isEditingManually) {
+      setSelectedIndex(0);
+      setIsEditingManually(false);
     }
-    setDecisions(restored);
-    setSelectedIndex(0);
-    setIsEditingManually(false);
-  }, [latestCheck]);
+  }, [latestCheck, isEditingManually]);
 
   // Completion state
   const [isSaving, setIsSaving] = useState(false);
@@ -1022,6 +1028,27 @@ function SpellingReviewWorkspace() {
             <Badge variant="outline" className="text-xs h-5 px-2 font-medium">
               Rà soát chính tả
             </Badge>
+
+            <Badge
+              variant="outline"
+              className="text-xs h-5 px-2 font-medium bg-primary/10 text-primary border-primary/20"
+            >
+              Lượt {latestCheck?.pass_number ?? 1}/
+              {latestCheck?.total_passes ?? 2}:{" "}
+              {latestCheck?.pass_name === "context_terminology"
+                ? "Ngữ cảnh & bảng biểu"
+                : "Ký tự & dấu OCR"}
+            </Badge>
+
+            {checks?.some((c) => c.status === "running") && (
+              <Badge
+                variant="outline"
+                className="text-xs h-5 px-2 font-medium border-primary/40 bg-primary/10 text-primary gap-1"
+              >
+                <Loader2 className="size-3 animate-spin" />
+                Đang soát ngầm
+              </Badge>
+            )}
 
             {isReviewed && (
               <Badge

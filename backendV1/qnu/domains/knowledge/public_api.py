@@ -13,6 +13,10 @@ from pathlib import PurePosixPath
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from qnu.domains.knowledge.index.artifact_cache import (
+    get_revision_bytes,
+    set_revision_bytes,
+)
 from qnu.domains.knowledge.policies.access import (
     WRITE_ROLES,
     load_collection,
@@ -77,6 +81,9 @@ async def resolve_revision_scope(
 
 async def read_revision_bytes(blob_store: BlobStore, scope: RevisionScope) -> bytes:
     """Return the stored bytes only after the checksum matches the recorded revision."""
+    cached = get_revision_bytes(scope.storage_key, scope.sha256)
+    if cached is not None:
+        return cached
     try:
         payload = await blob_store.get_bytes(scope.storage_key)
     except FileNotFoundError as exc:
@@ -97,6 +104,7 @@ async def read_revision_bytes(blob_store: BlobStore, scope: RevisionScope) -> by
             status_code=502,
             title="Tệp gốc không toàn vẹn",
         )
+    set_revision_bytes(scope.storage_key, scope.sha256, payload)
     return payload
 
 

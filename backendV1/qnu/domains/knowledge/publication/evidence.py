@@ -16,6 +16,10 @@ from qnu.domains.knowledge.compilation.evidence import (
     load_bound_documents,
 )
 from qnu.domains.knowledge.compilation.models import CompilationInput, CompilationRun
+from qnu.domains.knowledge.index.artifact_cache import (
+    get_version_bundle,
+    set_version_bundle,
+)
 from qnu.domains.knowledge.models import KBSource
 from qnu.domains.knowledge.public_api import read_revision_bytes, resolve_revision_scope
 from qnu.domains.knowledge.publication.models import CompiledVersion
@@ -67,6 +71,18 @@ async def load_bundle(
         )
     if run.status != "completed":
         raise Conflict("Compiler chưa hoàn tất.", code="compilation_not_completed")
+    cached_bundle = get_version_bundle(run.id, run.input_sha256)
+    if cached_bundle is not None and not require_warning_ack:
+        if require_current:
+            await assert_current_sources(
+                db,
+                workspace_id,
+                collection_id,
+                cached_bundle.documents,
+                allow_staged=allow_staged,
+                serving=serving,
+            )
+        return cached_bundle
     bindings = list(
         (
             await db.scalars(
@@ -156,7 +172,7 @@ async def load_bundle(
         provenance["origin"] = run.origin
         provenance["parent_run_id"] = run.parent_run_id
         provenance["edit"] = run.config["edit"]
-    return VersionBundle(
+    result_bundle = VersionBundle(
         run.input_sha256,
         draft_row.sha256,
         markdown_row.sha256,
@@ -166,6 +182,8 @@ async def load_bundle(
         markdown,
         documents,
     )
+    set_version_bundle(run.id, run.input_sha256, result_bundle)
+    return result_bundle
 
 
 async def _require_warning_ack(db: AsyncSession, documents: list[dict]) -> None:

@@ -2,9 +2,11 @@
 
 import re
 import time
+import unicodedata
 import uuid
 from collections import defaultdict
 from itertools import pairwise
+from typing import Any
 
 from sqlalchemy import func, literal_column, select
 
@@ -94,7 +96,7 @@ def exact_anchors(query: str) -> list[str]:
     for token in _ANCHOR_TOKEN.findall(query):
         term = token.strip(".").casefold()
         identifier = bool(re.search(r"[^\W\d_]", term)) and bool(re.search(r"\d", term))
-        if identifier or re.fullmatch(r"0\d{3,}", term):
+        if identifier or re.fullmatch(r"0\d{3,}", term) or re.fullmatch(r"\d{7}", term):
             anchors.append(term)
     return list(dict.fromkeys(anchors))
 
@@ -141,21 +143,179 @@ def fuse(
     return [hits[key].model_copy(update={"score": scores[key]}) for key in ranked]
 
 
-def select_reranked(hits, reranked, count: int):
+SINGLE_DOC_CANDIDATE_K = 15
+MULTI_DOC_CANDIDATE_K = 30
+
+COMPARISON_KEYWORDS = re.compile(
+    r"\b(?:so sánh|đối chiếu|khác nhau|phân biệt|giữa\s+.+\s+và|các văn bản|tất cả văn bản|toàn bộ kế hoạch|văn bản nào.+văn bản nào|cả hai)\b",
+    re.IGNORECASE,
+)
+DOC_CODE_PATTERN = re.compile(r"\b\d+/[A-ZĐa-zđ]+(?:-[A-ZĐa-zđ]+)*\b")
+DOC_NUM_PATTERN = re.compile(r"\b(?:QĐ|Quyết định|KH|Kế hoạch|TT|Thông tư)\s*(\d{1,5})\b", re.IGNORECASE)
+TUYEN_SINH_PATTERN = re.compile(
+    r"\b(?:tuyển sinh|xét tuyển|đề án tuyển sinh|chỉ tiêu|tổ hợp môn|điểm chuẩn|ngành sư phạm|mã xét tuyển|7140\d{3})\b",
+    re.IGNORECASE,
+)
+
+
+def is_single_document_scope(
+    query: str,
+    document_ids: list[str] | None = None,
+    metadata_filter: Any = None,
+) -> bool:
+    """Determine whether the query targets a single specific document scope or is open/cross-doc."""
+    if document_ids and len(document_ids) == 1:
+        return True
+    if metadata_filter and getattr(metadata_filter, "document_ids", None) and len(metadata_filter.document_ids) == 1:
+        return True
+
+    norm = " ".join(unicodedata.normalize("NFC", query or "").split()).casefold()
+    if COMPARISON_KEYWORDS.search(norm):
+        return False
+
+    matched_buckets: set[str] = set()
+
+    # Doc codes (e.g. 4740/QĐ-BGDĐT, 130/KH-ĐHQN, 07/KH-AM)
+    codes = [c.upper() for c in DOC_CODE_PATTERN.findall(query)]
+    for c in codes:
+        if "4740" in c or "BGDĐT" in c or "BGĐĐT" in c:
+            matched_buckets.add("4740")
+        elif "130" in c or "ĐHQN" in c or "DHQN" in c:
+            matched_buckets.add("130")
+        elif "07" in c or "AM" in c:
+            matched_buckets.add("07")
+        else:
+            matched_buckets.add(c)
+
+    # Doc numbers (e.g. QĐ 4740, KH 130, KH 07)
+    for num in DOC_NUM_PATTERN.findall(query):
+        if num == "4740":
+            matched_buckets.add("4740")
+        elif num == "130":
+            matched_buckets.add("130")
+        elif num in ("07", "7"):
+            matched_buckets.add("07")
+        else:
+            matched_buckets.add(num)
+
+    # Bare document number tokens (e.g. 'theo QĐ 4740', 'trong KH 130')
+    if not matched_buckets:
+        for bare in re.findall(r"(?<!\d)(4740|130|07)(?!\d)", query):
+            matched_buckets.add(bare)
+
+    # Standalone domain if no doc code matched (e.g. Tuyển sinh)
+    if not matched_buckets and TUYEN_SINH_PATTERN.search(norm):
+        matched_buckets.add("tuyensinh")
+
+    return len(matched_buckets) == 1
+
+
+def apply_source_diversity(
+    candidates: list,
+    count: int,
+    *,
+    is_single_doc_target: bool = False,
+) -> list:
+    """Select top `count` hits while preventing a single document from starving others in open multi-doc queries."""
+    if len(candidates) <= count:
+        return candidates
+
+    docs_in_candidates = {h.document_id for h in candidates if getattr(h, "document_id", None)}
+    if len(docs_in_candidates) <= 1 or is_single_doc_target:
+        return candidates[:count]
+
+    max_per_doc = max(2, int(count * 0.5))
+    selected = []
+    seen_chunk_ids = set()
+    doc_counts: dict[str, int] = {}
+    deferred = []
+
+    top_score = getattr(candidates[0], "score", None)
+    min_score_threshold = (
+        top_score * 0.2 if (isinstance(top_score, (int, float)) and top_score > 0.4) else None
+    )
+
+    for hit in candidates:
+        if hit.chunk_id in seen_chunk_ids:
+            continue
+        doc_id = getattr(hit, "document_id", "") or ""
+        curr_count = doc_counts.get(doc_id, 0)
+
+        # Relevance threshold check: don't give immediate quota slot to negligible score
+        hit_score = getattr(hit, "score", None)
+        if (
+            min_score_threshold is not None
+            and isinstance(hit_score, (int, float))
+            and hit_score < min_score_threshold
+            and hit_score < 0.15
+        ):
+            deferred.append(hit)
+            continue
+
+        if curr_count < max_per_doc and len(selected) < count:
+            selected.append(hit)
+            seen_chunk_ids.add(hit.chunk_id)
+            doc_counts[doc_id] = curr_count + 1
+        else:
+            deferred.append(hit)
+
+    for hit in deferred:
+        if len(selected) >= count:
+            break
+        if hit.chunk_id not in seen_chunk_ids:
+            hit_score = getattr(hit, "score", None)
+            if (
+                min_score_threshold is not None
+                and isinstance(hit_score, (int, float))
+                and hit_score < min_score_threshold
+                and hit_score < 0.15
+            ):
+                continue
+            selected.append(hit)
+            seen_chunk_ids.add(hit.chunk_id)
+
+    if len(selected) < count:
+        for hit in deferred:
+            if len(selected) >= count:
+                break
+            if hit.chunk_id not in seen_chunk_ids:
+                selected.append(hit)
+                seen_chunk_ids.add(hit.chunk_id)
+
+    return selected
+
+
+def select_reranked(
+    hits,
+    reranked,
+    count: int,
+    *,
+    is_single_doc_target: bool = False,
+):
     """Cross-encoder order is authoritative; base fusion only built the pool."""
     known = {hit.chunk_id for hit in hits}
-    selected, seen = [], set()
+    candidates, seen = [], set()
     for hit in reranked:
         if hit.chunk_id in seen or hit.chunk_id not in known:
             continue
         seen.add(hit.chunk_id)
-        selected.append(hit)
-        if len(selected) == count:
-            break
-    return selected
+        candidates.append(hit)
+    return apply_source_diversity(candidates, count, is_single_doc_target=is_single_doc_target)
 
 
-async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint, prepared=None):
+async def rerank(
+    db,
+    actor,
+    workspace_id,
+    req,
+    hits,
+    model,
+    trace,
+    checkpoint,
+    prepared=None,
+    *,
+    is_single_doc_target: bool = False,
+):
     runtime = await runtime_service.resolve(db, workspace_id, req.rerank_provider_id)
     proof = await checkpoint()
     documents = [(prepared or {}).get(h.chunk_id) or rerank_text(h) for h in hits]
@@ -210,7 +370,7 @@ async def rerank(db, actor, workspace_id, req, hits, model, trace, checkpoint, p
     if current.configuration_hash != runtime.configuration_hash:
         raise Conflict("Provider rerank đã thay đổi.", code="rerank_configuration_changed")
     reranked = [hits[h.index].model_copy(update={"score": h.score}) for h in result.hits]
-    selected = select_reranked(hits, reranked, req.top_k)
+    selected = select_reranked(hits, reranked, req.top_k, is_single_doc_target=is_single_doc_target)
     trace["ranking"]["rerank"] = [
         {"chunk_id": h.chunk_id, "score": h.score} for h in reranked
     ]

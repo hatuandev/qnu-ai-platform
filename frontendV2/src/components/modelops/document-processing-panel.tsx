@@ -73,7 +73,7 @@ const MODE_OPTIONS: {
     value: "parallel",
     title: "Nhiều model song song",
     description:
-      "Các phần độc lập chạy trên nhiều model theo số lượt đã đặt; model xong trước nhận phần tiếp theo.",
+      "Các phần độc lập chạy trên nhiều model theo số lượt đã đặt; model xong trước nhận phần tiếp theo (work-stealing). Áp dụng cho biên soạn và soát chính tả.",
   },
 ];
 
@@ -137,7 +137,7 @@ export function DocumentProcessingPanel({
     (model) => !model.available,
   ).length;
   const limits = Array.from(
-    { length: policy.max_concurrency },
+    { length: Math.min(policy.max_concurrency, 16) },
     (_, i) => i + 1,
   );
 
@@ -202,8 +202,9 @@ export function DocumentProcessingPanel({
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Danh sách theo thứ tự ưu tiên. Mỗi model chạy đúng số lượt bạn chọn ở
-          đây, tối đa {policy.max_concurrency} lượt.
+          Danh sách theo thứ tự ưu tiên. Mỗi model chạy đúng số lượt đồng thời
+          bạn chọn ở đây, tối đa {Math.min(policy.max_concurrency, 16)} lượt
+          (khuyến nghị 1–4 để tránh quá tải GPU/VRAM).
         </p>
         {currentModels.length === 0 ? (
           <EmptyState
@@ -499,7 +500,8 @@ function AddDocumentModelDialog({
   }, [models, connections, taken]);
 
   const selectedGroup = groups.find((group) => group.id === connectionId);
-  const limits = Array.from({ length: maxConcurrency }, (_, i) => i + 1);
+  const safeMax = Math.min(maxConcurrency, 16);
+  const limits = Array.from({ length: safeMax }, (_, i) => i + 1);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -580,7 +582,8 @@ function AddDocumentModelDialog({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Tối đa {maxConcurrency} lượt cho mỗi model. Mặc định 1.
+                Tối đa {safeMax} luồng đồng thời cho mỗi model (khuyến nghị
+                1–4). Mặc định 1.
               </p>
             </div>
           </div>

@@ -320,6 +320,7 @@ export function PublicationDialog({
   const lock = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [confirmSpelling, setConfirmSpelling] = useState(false);
   const [reason, setReason] = useState("");
   const [resolutions, setResolutions] = useState<
     Record<
@@ -571,6 +572,13 @@ export function PublicationDialog({
       );
       if (!approval || approval === "unresolved") return;
 
+      if (gate?.spelling_in_progress && !confirmSpelling) {
+        setError(
+          "Đang có lượt soát chính tả đa lượt chạy ngầm. Vui lòng chờ hoàn tất hoặc đánh dấu xác nhận tiếp tục duyệt.",
+        );
+        return;
+      }
+
       setPhase("approving");
       const receipt = pending.current.approve;
       let toCommit = receipt;
@@ -583,6 +591,7 @@ export function PublicationDialog({
             reason: approval.skip
               ? reason.trim()
               : "Đã đối chiếu nội dung và báo cáo rà soát của phiên bản này.",
+            confirm_spelling_in_progress: confirmSpelling,
             ...(approval.skip
               ? {
                   review_skip: {
@@ -731,6 +740,35 @@ export function PublicationDialog({
           <div className="space-y-4 text-sm">
             {gateQuery.isPending && (
               <p role="status">Đang tải báo cáo rà soát…</p>
+            )}
+            {gate?.spelling_in_progress && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300 space-y-2">
+                <div className="flex items-center gap-2 font-medium">
+                  <AlertCircle className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>Đang chạy soát chính tả đa lượt ngầm</span>
+                </div>
+                <p>
+                  Hệ thống đang thực hiện soát chính tả Lượt{" "}
+                  {gate.spelling_details?.pass_number ?? 1}/
+                  {gate.spelling_details?.total_passes ?? 2} (
+                  {gate.spelling_details?.pass_name === "context_terminology"
+                    ? "Ngữ cảnh & bảng biểu"
+                    : "Ký tự & dấu OCR"}
+                  ). Việc duyệt ngay có thể bỏ sót các đề xuất chuẩn hóa mới
+                  nhất.
+                </p>
+                <label className="flex items-center gap-2 font-normal cursor-pointer pt-1">
+                  <input
+                    type="checkbox"
+                    checked={confirmSpelling}
+                    disabled={frozen}
+                    onChange={(e) => setConfirmSpelling(e.target.checked)}
+                  />
+                  <span>
+                    Xác nhận tiếp tục duyệt khi soát chính tả chưa hoàn tất
+                  </span>
+                </label>
+              </div>
             )}
             {gate && (
               <>

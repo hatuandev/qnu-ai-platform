@@ -155,7 +155,9 @@ def section_siblings(primary, rows, relationships, scopes, excluded):
     return selected, links
 
 
-async def attach_table_support(db, blob, actor, workspace_id, collection_id, result, req):
+async def attach_table_support(
+    db, blob, actor, workspace_id, collection_id, result, req, *, bundles=None
+):
     if not any((h.structure or {}).get("source_table_citation") for h in result.hits):
         return result, {}
     await authorize(db, actor, workspace_id, collection_id)
@@ -170,7 +172,7 @@ async def attach_table_support(db, blob, actor, workspace_id, collection_id, res
             )
         )
     )
-    relationships = await bound_dependencies(db, blob, allowed, rows)
+    relationships = await bound_dependencies(db, blob, allowed, rows, bundles=bundles)
     scopes = result_scopes(result, req.metadata_filter)
     needs = question_needs(req.question)
     needed, links = supports(

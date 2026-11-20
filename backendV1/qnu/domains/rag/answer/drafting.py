@@ -216,6 +216,9 @@ SO SÁNH, THỐNG KÊ, TƯ VẤN VÀ CÂU HỎI GHÉP NHIỀU MỤC
 - THỐNG KÊ & TỔNG HỢP: Liệt kê đầy đủ, chính xác mọi nội dung, phân hệ, dịch vụ hoặc mốc thời gian xuất hiện trong evidence được cấp theo đúng tên gọi và phân loại của văn bản. Giữ nguyên đơn vị tính, mốc thời gian và trách nhiệm phân công. Nêu rõ phạm vi trích xuất từ tài liệu; không tự đếm gộp hoặc tự tính tổng nếu không có số liệu chính thức trong evidence.
 - TƯ VẤN & ĐỊNH HƯỚNG: Bám sát 100% các tiêu chí, điều kiện bắt buộc, thang điểm, hoặc lộ trình và mốc hạn có trong văn bản (như QĐ 4740/QĐ-BGDĐT hoặc KH 130/KH-ĐHQN). Trình bày rõ ràng theo từng nhóm yêu cầu hoặc lộ trình thời gian. Tuyệt đối không bổ sung quy định, khuyến nghị ngoài văn bản hoặc con số ước tính không có trong evidence.
 - CÂU HỎI GHÉP NHIỀU MỤC / ĐẦU VIỆC: Tách câu trả lời thành từng mục tương ứng; trả lời đầy đủ từng vế có căn cứ trong các đoạn hoặc mảng bảng được cấp. Chỉ cần một vế có căn cứ là bắt buộc status answered; phần vế chưa có căn cứ ghi rõ chưa có dữ liệu trong tài liệu.
+- TÁCH BẠCH NGUỒN KHI CÂU HỎI MƠ HỒ HOẶC CÓ NHIỀU VĂN BẢN ĐỀ CẬP THUẬT NGỮ TRÙNG LẶP: Nếu người dùng hỏi chung chung (ví dụ: 'có những phương thức nào?', 'tiêu chí đánh giá gồm những gì?') mà trong evidence có nhiều văn bản đề cập các đối tượng/phương thức riêng biệt (ví dụ 'phương thức tuyển sinh' trong đề án tuyển sinh vs 'phương thức kiểm tra/đánh giá' trong kế hoạch bảo đảm chất lượng) và người dùng chưa xác định rõ văn bản nào:
+  1. BẮT BUỘC trình bày tách bạch rõ từng văn bản nguồn (ví dụ: 'Theo Đề án Tuyển sinh... gồm có các phương thức tuyển sinh sau: ...; Còn theo Kế hoạch Bảo đảm chất lượng... gồm có các phương thức kiểm tra/đánh giá sau: ...').
+  2. TUYỆT ĐỐI KHÔNG trộn lẫn nội dung giữa các văn bản thành một câu trả lời chung duy nhất hoặc tự ý đoán mò chọn một văn bản.
 
 MẠCH HỘI THOẠI & NỐI TIẾP TỰ NHIÊN (dialogue_context)
 Khi payload có dialogue_context, trợ lý được phép diễn đạt lời đáp nối tiếp tự nhiên, liên kết mạch lạc với chủ đề, thực thể hoặc ý đã trao đổi ở lượt trước (ví dụ: 'Tiếp nối nội dung về...', 'Đối với nhiệm vụ... đã nêu, đơn vị chủ trì là...', 'So với tiêu chí... thì tiêu chí...').
@@ -488,14 +491,30 @@ def parse_answer(content: str, sources: list[EvidenceSource]) -> ModelAnswer:
                             combined = [eid.upper() for eid in inline_ids]
                         stmt["evidence_ids"] = list(dict.fromkeys(combined))
 
-            # Only coerce status if status is answered, statements/lookups are empty, BUT model provided an explicit refusal message
+            # Filter out empty or whitespace-only statements
+            cleaned_stmts = []
+            for stmt in raw_dict.get("statements", []):
+                if isinstance(stmt, dict) and stmt.get("text", "").strip():
+                    cleaned_stmts.append(stmt)
+            raw_dict["statements"] = cleaned_stmts
+
+            has_substantive_content = bool(raw_dict.get("statements") or raw_dict.get("lookups"))
+
+            # Harmonize status and statements/lookups:
+            # 1. If model answered with an explicit refusal message and empty content, coerce to insufficient_evidence
             if (
                 raw_dict.get("status") == "answered"
-                and not raw_dict.get("statements")
-                and not raw_dict.get("lookups")
+                and not has_substantive_content
                 and raw_dict.get("message")
             ):
                 raw_dict["status"] = "insufficient_evidence"
+            # 2. If model drafted substantive statements/lookups but kept insufficient_evidence by momentum, harmonize to answered
+            elif raw_dict.get("status") == "insufficient_evidence" and has_substantive_content:
+                raw_dict["status"] = "answered"
+                raw_dict["message"] = None
+            # 3. If model provided answered content, strip any contradictory refusal message
+            elif raw_dict.get("status") == "answered" and raw_dict.get("message") and has_substantive_content:
+                raw_dict["message"] = None
 
             clean_json_str = json.dumps(raw_dict, ensure_ascii=False)
     except Exception:

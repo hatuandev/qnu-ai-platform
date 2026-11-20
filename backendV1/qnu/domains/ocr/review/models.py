@@ -71,6 +71,10 @@ class SpellingRun(Base):
             "status IN ('running','completed','failed','uncertain','cancelled')",
             name="ck_ocr_spelling_status",
         ),
+        CheckConstraint(
+            "pass_number >= 1 AND total_passes >= pass_number",
+            name="ck_ocr_spelling_passes",
+        ),
     )
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     run_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
@@ -82,6 +86,11 @@ class SpellingRun(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     canonical_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    pass_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    total_passes: Mapped[int] = mapped_column(Integer, nullable=False, default=2, server_default="2")
+    pass_name: Mapped[str] = mapped_column(String(64), nullable=False, default="char_ocr", server_default="char_ocr")
+    parent_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    batch_group_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     checked_evidence_ids: Mapped[list] = mapped_column(JSONB, nullable=False)
     suggestions: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     trace: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)

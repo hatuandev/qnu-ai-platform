@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import re
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -214,7 +215,14 @@ async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, a
             a.model_dump(mode="json", exclude_none=True)
             for a in publication.version.retrieval_metadata
         ]
-        doc_meta = DocumentCardMeta(title=publication.document.title)
+        doc_title = publication.document.title
+        doc_num_match = re.search(r"\b(\d+/[A-ZĐ]+(?:-[A-ZĐ]+)*)\b", doc_title)
+        doc_year_match = re.search(r"\b(19\d\d|20\d\d)\b", doc_title)
+        doc_meta = DocumentCardMeta(
+            title=doc_title,
+            doc_number=doc_num_match.group(1) if doc_num_match else "",
+            doc_year=int(doc_year_match.group(1)) if doc_year_match else None,
+        )
         tables = (
             publication.content.get("source_tables")
             or publication.content.get("tables")
@@ -293,7 +301,18 @@ async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, a
                         data_year=fact.data_year,
                         data_status=fact.data_status,
                         attributes={
-                            k: v.model_dump(mode="json") for k, v in fact.attributes.items()
+                            **{k: v.model_dump(mode="json") for k, v in fact.attributes.items()},
+                            **(
+                                {
+                                    "_data_years": {
+                                        "raw": ", ".join(str(y) for y in fact.data_years),
+                                        "value_kind": "normal",
+                                        "years": fact.data_years,
+                                    }
+                                }
+                                if fact.data_years and len(fact.data_years) > 1
+                                else {}
+                            ),
                         },
                         detail_md_pointers=dict(fact.detail_md_pointers),
                         applicable_note_ids=list(fact.applicable_note_ids),
