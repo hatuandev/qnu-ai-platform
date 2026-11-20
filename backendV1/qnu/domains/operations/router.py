@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.api.dependencies import get_actor, get_blob_store, get_db, get_job_queue
 from qnu.domains.identity.actor import AuthActor
-from qnu.domains.operations import gc, readiness, service
+from qnu.domains.identity.permissions import require_permission
+from qnu.domains.operations import gc, readiness, reset, service
 from qnu.domains.operations.backups import service as backups
 from qnu.domains.operations.jobs import actions
 from qnu.domains.operations.schemas import (
@@ -18,6 +19,8 @@ from qnu.domains.operations.schemas import (
     JobKind,
     JobView,
     RecoveryPreviewRequest,
+    SystemResetRequest,
+    SystemResetResponse,
 )
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.job_queue import JobQueue
@@ -176,3 +179,30 @@ async def storage_cleanup_accept(
 @router.get("/storage-cleanups/actions/{action_id}")
 async def storage_cleanup_status(workspace_id: str, action_id: str, db: DB, actor: Actor):
     return gc.response(await gc.load(db, actor, workspace_id, action_id))
+
+
+system_router = APIRouter(
+    prefix="/operations",
+    tags=["Operations · System"],
+    dependencies=[Depends(no_store)],
+)
+
+
+@system_router.post("/system-reset-and-seed", response_model=SystemResetResponse)
+async def system_reset_and_seed(
+    body: SystemResetRequest,
+    db: DB,
+    actor: Annotated[AuthActor, Depends(require_permission("ai.admin"))],
+    blob: Blob,
+    request: Request,
+):
+    container = getattr(request.app.state, "container", None)
+    vectors = getattr(container, "vector_store", None)
+    return await reset.perform_system_reset_and_seed(
+        db=db,
+        actor=actor,
+        blob=blob,
+        vectors=vectors,
+        request=body,
+    )
+

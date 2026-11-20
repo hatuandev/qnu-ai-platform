@@ -72,3 +72,21 @@ class BackupView(BaseModel):
     sha256: str | None
     size_bytes: int | None
     error_code: str | None
+
+
+class SystemResetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    confirm_phrase: str = Field(..., description="Phải nhập chính xác 'RESET_AND_SEED'")
+    seed_workspace: bool = Field(default=True, description="Tự động nạp workspace SHL mặc định")
+    seed_modelops: bool = Field(default=True, description="Tự động nạp cấu hình ModelOps mặc định")
+    seed_assistant: bool = Field(default=True, description="Tự động tạo Trợ lý Tuyển sinh 2026 mẫu")
+
+
+class SystemResetResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    success: bool
+    message: str
+    workspace_id: str | None = None
+    assistant_id: str | None = None
+    stats: dict[str, object] = Field(default_factory=dict)
+
