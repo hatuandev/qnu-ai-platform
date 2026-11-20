@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     # System kill-switch: off hides every public chatbot link regardless of the
     # per-assistant publication flag an admin set.
     PUBLIC_CHATBOTS_ENABLED: bool = True
+    ALLOW_SYSTEM_RESET: bool = Field(
+        default=False,
+        description="Cho phép xóa sạch toàn bộ dữ liệu hệ thống và nạp lại dữ liệu mẫu.",
+    )
     PUBLIC_CHATBOT_SESSION_TTL_SECONDS: int = Field(default=1800, ge=60, le=86400)
     # 0 disables exact answer reuse; keep it off until callers are rate limited.
     ANSWER_CACHE_TTL_SECONDS: int = Field(default=0, ge=0, le=86400)
