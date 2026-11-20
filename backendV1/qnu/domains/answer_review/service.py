@@ -198,7 +198,7 @@ async def create_review(
     await db.commit()
 
     policy = AssistantRagPolicy.model_validate(config.get("rag_policy", {})).model_dump(
-        mode="json", exclude={"guardrail_policy"}
+        mode="json", exclude={"guardrail_policy", "suggested_prompts"}
     )
     item_ids = [item.id for item in items]
     for item_id, question in zip(item_ids, req.questions, strict=True):

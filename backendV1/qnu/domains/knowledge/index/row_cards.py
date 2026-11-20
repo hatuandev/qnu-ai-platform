@@ -88,6 +88,7 @@ def _header_line(
     data_year: int | None = None,
     data_status: str | None = None,
     data_years: list[int] | None = None,
+    page_numbers: list[int] | None = None,
 ) -> str:
     parts: list[str] = []
     if document_meta and (document_meta.doc_number or document_meta.title):
@@ -96,6 +97,12 @@ def _header_line(
             parts.append(f"Nguồn: {label} (Ban hành {document_meta.doc_year})")
         else:
             parts.append(f"Nguồn: {label}")
+    if page_numbers:
+        unique_pages = sorted(set(page_numbers))
+        if len(unique_pages) == 1:
+            parts.append(f"Trang: {unique_pages[0]}")
+        elif len(unique_pages) > 1:
+            parts.append(f"Trang: {unique_pages[0]}–{unique_pages[-1]}")
     if data_year is not None:
         status_part = f" ({data_status})" if data_status and data_status != "unknown" else ""
         parts.append(f"Dữ liệu năm: {data_year}{status_part}")
@@ -156,16 +163,31 @@ def render_fact_to_row_card(
     projection: UniversalTableProjection,
     *,
     document_meta: DocumentCardMeta | None = None,
+    page_numbers: list[int] | None = None,
 ) -> RowCard:
     """Render one UniversalFact into a Self-Contained Row-Card."""
     note_index = {note.note_id: note for note in projection.scoped_notes}
     card_years = fact.data_years or ([fact.data_year] if fact.data_year is not None else list(projection.data_years))
+
+    fact_pages: list[int] = []
+    for ref in fact.source_cell_refs:
+        m = re.search(r"_p(\d+)_", ref)
+        if m:
+            fact_pages.append(int(m.group(1)))
+    if not fact_pages:
+        m = re.search(r"_p(\d+)_", projection.table_id)
+        if m:
+            fact_pages.append(int(m.group(1)))
+    if not fact_pages and page_numbers:
+        fact_pages = list(page_numbers)
+
     header = _header_line(
         projection,
         document_meta=document_meta,
         data_year=fact.data_year,
         data_status=fact.data_status,
         data_years=card_years,
+        page_numbers=fact_pages or None,
     )
     body = _format_fact_body(fact, note_index)
     text = f"{header}\n{body}" if body else header
@@ -188,17 +210,29 @@ def render_projection_to_cards(
     projection: UniversalTableProjection,
     *,
     document_meta: DocumentCardMeta | None = None,
+    page_numbers: list[int] | None = None,
 ) -> list[RowCard]:
     """Project a table into either 1 whole-table card (small/raw) or per-row Row-Cards."""
     if projection.storage_mode == "invalid":
         return []
 
     if not projection.has_header or projection.storage_mode == "raw_rows":
-        header = _header_line(projection, document_meta=document_meta)
-        row_lines = [" | ".join(row.cells) for row in projection.raw_rows]
         refs = list(
             dict.fromkeys(ref for row in projection.raw_rows for ref in row.source_cell_refs)
         )
+        whole_pages = list(page_numbers or [])
+        if not whole_pages:
+            for ref in refs:
+                m = re.search(r"_p(\d+)_", ref)
+                if m:
+                    whole_pages.append(int(m.group(1)))
+            if not whole_pages:
+                m = re.search(r"_p(\d+)_", projection.table_id)
+                if m:
+                    whole_pages.append(int(m.group(1)))
+
+        header = _header_line(projection, document_meta=document_meta, page_numbers=whole_pages or None)
+        row_lines = [" | ".join(row.cells) for row in projection.raw_rows]
         note_lines = [f"{n.note_id}: {n.text}" for n in projection.scoped_notes]
         sections = [header, *row_lines]
         if note_lines:
@@ -219,7 +253,6 @@ def render_projection_to_cards(
 
     if projection.keep_whole_in_chunk:
         note_index = {note.note_id: note for note in projection.scoped_notes}
-        header = _header_line(projection, document_meta=document_meta)
         body_blocks: list[str] = []
         fact_ids: list[str] = []
         detail_pointers: dict[str, str] = {}
@@ -242,6 +275,18 @@ def render_projection_to_cards(
                 if cref not in cell_refs:
                     cell_refs.append(cref)
 
+        whole_pages = list(page_numbers or [])
+        if not whole_pages:
+            for ref in cell_refs:
+                m = re.search(r"_p(\d+)_", ref)
+                if m:
+                    whole_pages.append(int(m.group(1)))
+            if not whole_pages:
+                m = re.search(r"_p(\d+)_", projection.table_id)
+                if m:
+                    whole_pages.append(int(m.group(1)))
+
+        header = _header_line(projection, document_meta=document_meta, page_numbers=whole_pages or None)
         text = "\n".join([header, *body_blocks])
         return [
             RowCard(
@@ -262,7 +307,14 @@ def render_projection_to_cards(
     cards: list[RowCard] = []
     for fact in projection.facts:
         if fact.row_kind in {"data", "summary", "inline_note"}:
-            cards.append(render_fact_to_row_card(fact, projection, document_meta=document_meta))
+            cards.append(
+                render_fact_to_row_card(
+                    fact,
+                    projection,
+                    document_meta=document_meta,
+                    page_numbers=page_numbers,
+                )
+            )
     return cards
 
 
@@ -395,6 +447,7 @@ def build_row_card_chunks(
     doc_title: str,
     annotations: list[dict] | None = None,
     index: dict | None = None,
+    headings: dict[str, str] | None = None,
 ) -> list[Chunk]:
     from qnu.domains.knowledge.index.facts import project_table
 
@@ -417,11 +470,35 @@ def build_row_card_chunks(
         cols = table.get("column_count", 0)
         inherited = last_opening_headers.get(cols)
         column_years = column_years_for_table(citation, annotations)
+
+        heading_prefix = (
+            (headings or {}).get(citation)
+            or entry.get("heading")
+            or entry.get("section_heading")
+            or ""
+        )
+        base_title = entry.get("title") or ""
+        if heading_prefix and base_title and base_title != doc_title:
+            table_title = f"{heading_prefix}: {base_title}"
+        elif heading_prefix:
+            table_title = heading_prefix
+        elif base_title:
+            table_title = base_title
+        else:
+            table_title = doc_title
+
+        p_num = entry.get("page_number") or entry.get("page")
+        page_list = (
+            [p_num]
+            if isinstance(p_num, int)
+            else (p_num if isinstance(p_num, list) else [])
+        )
+
         projected = project_table(
             table,
             table_id=citation,
             source_table_citation=citation,
-            title=entry.get("title") or doc_title,
+            title=table_title,
             column_years=column_years,
             inherited_header_rows=inherited,
         )
@@ -452,7 +529,9 @@ def build_row_card_chunks(
             if hr:
                 last_opening_headers[cols] = [table["rows"][r] for r in hr]
 
-        cards = render_projection_to_cards(projected, document_meta=doc_meta)
+        cards = render_projection_to_cards(
+            projected, document_meta=doc_meta, page_numbers=page_list
+        )
         for card in cards:
             chunks.append(row_card_to_chunk(card, index=index))
     return chunks

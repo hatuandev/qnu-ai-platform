@@ -22,6 +22,7 @@ from qnu.domains.knowledge.index.schemas import IndexRequest
 from qnu.domains.knowledge.index.snapshots import current_snapshot, publication_identity
 from qnu.domains.knowledge.publication.access import authorize
 from qnu.domains.knowledge.publication.evidence import digest
+from qnu.domains.knowledge.source_sections import source_sections
 from qnu.domains.modelops.embedding.runtime import resolve_embedding_runtime
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.workspaces.access import actor_ref
@@ -198,6 +199,10 @@ async def request_index(
         )
         if req.contextual_search:
             chunks = enrich(chunks, publication.content, documents, maximum)
+        source_outline = source_sections(documents)
+        table_headings = {
+            cit: s.heading for cit, s in source_outline.items() if s and s.heading
+        }
         card_chunks = build_row_card_chunks(
             publication.content.get("source_tables")
             or publication.content.get("tables")
@@ -207,6 +212,7 @@ async def request_index(
             index=publication.content.get("citations")
             or publication.content.get("index")
             or {},
+            headings=table_headings,
         )
         chunks.extend(card_chunks)
         reports = [

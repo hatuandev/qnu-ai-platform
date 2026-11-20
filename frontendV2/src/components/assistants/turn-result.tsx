@@ -51,11 +51,11 @@ export function ResolvedContextNotice({
   if (!res || orig === res) return null;
 
   return (
-    <div className="flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] text-muted-foreground animate-in fade-in-50 duration-200">
+    <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] text-muted-foreground animate-in fade-in-50 duration-200">
       <Sparkles className="size-3 text-primary shrink-0" />
-      <span className="font-medium text-foreground">Ngữ cảnh làm rõ:</span>
+      <span className="font-medium text-foreground">Ngữ cảnh làm rõ:</span>{" "}
       <span
-        className="italic text-foreground/80 truncate max-w-[480px]"
+        className="italic text-foreground/80 truncate max-w-[500px]"
         title={resolvedQuestion}
       >
         "{resolvedQuestion}"
@@ -64,26 +64,85 @@ export function ResolvedContextNotice({
   );
 }
 
-function directReplyBody(reply: DirectReply) {
+function directReplyBody(
+  reply: DirectReply,
+  onPromptClick?: (prompt: string) => void,
+) {
+  const isSocial = reply.route === "greeting" || reply.route === "courtesy";
+
   return (
-    <div className="space-y-2">
-      <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-normal">
-        Trả lời trực tiếp · {DIRECT_ROUTE_TEXT[reply.route]}
-      </Badge>
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-        {reply.answer}
-      </p>
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-normal">
+          Trả lời trực tiếp · {DIRECT_ROUTE_TEXT[reply.route]}
+        </Badge>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+          {reply.answer}
+        </p>
+      </div>
+
+      {isSocial && onPromptClick && (
+        <div className="pt-1.5 space-y-1.5 border-t border-border/40">
+          <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+            <Sparkles className="size-3 text-primary" />
+            <span>Chủ đề nổi bật bạn có thể tra cứu ngay:</span>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                onPromptClick(
+                  "Chỉ tiêu tuyển sinh ngành Sư phạm Lịch sử - Địa lý năm 2024 và 2025 là bao nhiêu?",
+                )
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2.5 py-1 text-xs text-foreground/90 hover:bg-muted hover:border-primary/40 transition-colors cursor-pointer shadow-2xs"
+            >
+              <span>Chỉ tiêu tuyển sinh SP Lịch sử - Địa lý</span>
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                onPromptClick(
+                  "Tiêu chí chấm điểm LMS/LCMS theo Quyết định 4740 gồm những chức năng nào?",
+                )
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2.5 py-1 text-xs text-foreground/90 hover:bg-muted hover:border-primary/40 transition-colors cursor-pointer shadow-2xs"
+            >
+              <span>Tiêu chí LMS/LCMS (QĐ 4740)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                onPromptClick(
+                  "Phương thức xét tuyển bằng học bạ năm 2025 có những điều kiện gì?",
+                )
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2.5 py-1 text-xs text-foreground/90 hover:bg-muted hover:border-primary/40 transition-colors cursor-pointer shadow-2xs"
+            >
+              <span>Điều kiện xét tuyển học bạ 2025</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-export function TurnResult({ turn }: { turn: ConversationTurn }) {
+export function TurnResult({
+  turn,
+  onSelectEvidence,
+  onPromptClick,
+}: {
+  turn: ConversationTurn;
+  onSelectEvidence?: (evidenceId: string, index: number) => void;
+  onPromptClick?: (prompt: string) => void;
+}) {
   if (turn.status === "running") {
     return (
-      <p className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Loader2 className="size-3.5 animate-spin" />
-        <span>Đang xử lý câu trả lời.</span>
-      </p>
+      <div className="flex items-center gap-2.5 py-1 text-xs text-muted-foreground animate-pulse">
+        <Loader2 className="size-3.5 animate-spin text-primary shrink-0" />
+        <span>Đang phân tích câu hỏi & đối soát kho tri thức...</span>
+      </div>
     );
   }
 
@@ -147,9 +206,9 @@ export function TurnResult({ turn }: { turn: ConversationTurn }) {
 
   const replyContent =
     turn.result.status === "direct_reply" ? (
-      directReplyBody(turn.result)
+      directReplyBody(turn.result, onPromptClick)
     ) : (
-      <AnswerBody result={turn.result} />
+      <AnswerBody result={turn.result} onSelectEvidence={onSelectEvidence} />
     );
 
   return (

@@ -27,6 +27,13 @@ _COMPARE_PREVIOUS_RE = re.compile(
     re.IGNORECASE,
 )
 
+_USER_SCORE_FOLLOWUP_RE = re.compile(
+    r"\b(?:mức\s+điểm|điểm|số\s+điểm)\s*(?:của\s+)?(?:tôi|em|mình|đó|này)\b"
+    r"|\b(?:với\s+)?(?:mức\s+)?điểm\s+(?:này|đó|trên|của\s+(?:tôi|em|mình))\b"
+    r"|\b(?:điểm\s+này|điểm\s+đó|điểm\s+trên)\s+(?:có\s+)?(?:đỗ|xét\s+tuyển|vào|trúng\s+tuyển|được\s+không)\b",
+    re.IGNORECASE,
+)
+
 _ANAPHORA_PATTERNS = [
     _ANAPHORA_PRONOUN_RE,
     re.compile(r"^(?:thế còn|còn|vậy còn|thế|vậy|nếu là|với)\s+", re.IGNORECASE),
@@ -274,6 +281,17 @@ def _extract_cumulative_history_context(
             mem_codes = [str(c) for c in conversation_memory["codes"]]
             user_codes.extend(mem_codes)
             all_codes.extend(mem_codes)
+        # Inherit session facts (user attributes)
+        session_facts = conversation_memory.get("session_facts")
+        if session_facts and isinstance(session_facts, dict):
+            if last_major is None and session_facts.get("target_major"):
+                last_major = f"ngành {session_facts['target_major']}"
+            if session_facts.get("target_major_code"):
+                mcode = str(session_facts["target_major_code"])
+                user_codes.append(mcode)
+                all_codes.append(mcode)
+            if last_year is None and session_facts.get("target_year"):
+                last_year = str(session_facts["target_year"])
 
     return {
         "certificate": last_certificate,
@@ -286,6 +304,7 @@ def _extract_cumulative_history_context(
         "user_codes": list(dict.fromkeys(user_codes)),
         "has_conversion": has_conversion,
         "has_eng_subject": has_eng_subject,
+        "session_facts": conversation_memory.get("session_facts") if conversation_memory else None,
     }
 
 
@@ -449,6 +468,51 @@ def rewrite_contextual_query(
                         resolved = f"{resolved} năm {ctx['year']}"
                 rewritten = True
                 rewrite_mode = "conversion_continuity"
+
+    # Case 2.5: User score follow-up question
+    # e.g., "Vậy với mức điểm của tôi thì sao?", "Với điểm đó em có cơ hội không?"
+    session_facts = ctx.get("session_facts") or (
+        conversation_memory.get("session_facts") if conversation_memory else None
+    )
+    if (
+        not rewritten
+        and _USER_SCORE_FOLLOWUP_RE.search(clean_current)
+        and session_facts
+        and session_facts.get("user_score")
+    ):
+        u_score = session_facts["user_score"]
+        u_comb = session_facts.get("user_combination")
+        u_major = session_facts.get("target_major") or ctx.get("major")
+        u_major_code = session_facts.get("target_major_code")
+        u_year = session_facts.get("target_year") or ctx.get("year")
+        doc_str = ctx.get("document")
+
+        major_clause = ""
+        if u_major:
+            major_clause = (
+                f" ngành {u_major}"
+                if not str(u_major).lower().startswith("ngành")
+                else f" {u_major}"
+            )
+            if u_major_code and u_major_code not in major_clause:
+                major_clause += f" (mã {u_major_code})"
+        elif u_major_code:
+            major_clause = f" ngành mã {u_major_code}"
+
+        score_clause = f"mức điểm {u_score}"
+        if u_comb:
+            score_clause += f" tổ hợp {u_comb}"
+
+        year_clause = f" năm {u_year}" if u_year else ""
+        doc_clause = (
+            f" theo {doc_str}" if doc_str and doc_str.lower() not in clean_current.lower() else ""
+        )
+
+        resolved = (
+            f"Điều kiện xét tuyển và điểm chuẩn trúng tuyển{major_clause} đối với {score_clause}{year_clause}{doc_clause} như thế nào?"
+        ).strip()
+        rewritten = True
+        rewrite_mode = "user_score_followup"
 
     # Case 3: Anaphoric references with pronoun or contextual noun phrase
     if not rewritten and pronoun_match:

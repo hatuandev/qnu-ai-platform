@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { sanitizeDisplayText } from "@/lib/utils";
 import {
   RETRIEVAL_OPTIONS,
   VERIFICATION_OPTIONS,
@@ -127,11 +128,13 @@ export function AssistantOverview({
     ? "Chưa gắn kho tri thức"
     : readinessCollections.length > 1
       ? `${readinessCollections.length} kho · ${readinessCollections
-          .map((item) => item.collection_name)
+          .map((item) => sanitizeDisplayText(item.collection_name))
           .join(", ")}`
-      : (readinessCollections[0]?.collection_name ??
-        readiness?.collection_name ??
-        "Kho tri thức liên kết");
+      : sanitizeDisplayText(
+          readinessCollections[0]?.collection_name ??
+            readiness?.collection_name ??
+            "Kho tri thức liên kết",
+        );
   const conversations = (conversationsQuery.data ?? []).slice(0, 5);
   const latestReview = reviewsQuery.data?.[0] ?? null;
   const answeredCount =
@@ -215,7 +218,7 @@ export function AssistantOverview({
                   className="flex items-center justify-between gap-2 rounded-md bg-muted/30 px-2.5 py-1.5"
                 >
                   <span className="truncate text-[11px] text-foreground">
-                    {collection.collection_name}
+                    {sanitizeDisplayText(collection.collection_name)}
                   </span>
                   <span className="shrink-0 text-[11px] text-muted-foreground">
                     {collection.served_document_count}/

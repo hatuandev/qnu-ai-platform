@@ -57,6 +57,18 @@ class Assistant(Base):
         DateTime(timezone=True), nullable=False, default=utcnow
     )
 
+    @property
+    def suggested_prompts(self) -> list[str]:
+        if isinstance(self.rag_policy, dict):
+            return self.rag_policy.get("suggested_prompts") or []
+        return []
+
+    @property
+    def temperature(self) -> float | None:
+        if isinstance(self.rag_policy, dict):
+            return self.rag_policy.get("temperature")
+        return None
+
 
 class AssistantCollection(Base):
     """Collections an assistant answers from; ``position`` keeps the request order.

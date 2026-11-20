@@ -9,7 +9,7 @@ import {
   listConversationTurns,
   sendConversationTurn,
 } from "./requests";
-import type { Conversation } from "./types";
+import type { Conversation, ConversationTurn } from "./types";
 
 export const conversationKeys = {
   all: ["v1", "conversations"] as const,
@@ -19,7 +19,7 @@ export const conversationKeys = {
     [...conversationKeys.all, "turns", workspaceId, conversationId] as const,
 };
 
-const RUNNING_POLL_MS = 4000;
+const RUNNING_POLL_MS = 1500;
 
 export function useAssistantConversationsQuery(
   workspaceId?: string | null,
@@ -130,13 +130,25 @@ export function useSendTurnMutation(workspaceId?: string | null) {
         { signal },
       );
     },
-    onSettled: (_data, _error, variables) => {
+    onSuccess: (turn, variables) => {
       if (!workspaceId) return;
-      void queryClient.invalidateQueries({
-        queryKey: conversationKeys.turns(workspaceId, variables.conversationId),
+      const key = conversationKeys.turns(workspaceId, variables.conversationId);
+      queryClient.setQueryData<ConversationTurn[]>(key, (previous) => {
+        if (!previous) return [turn];
+        const exists = previous.some((item) => item.id === turn.id);
+        if (exists) {
+          return previous.map((item) => (item.id === turn.id ? turn : item));
+        }
+        return [...previous, turn].sort((left, right) => left.turn_no - right.turn_no);
       });
       void queryClient.invalidateQueries({
         queryKey: [...conversationKeys.all, "list", workspaceId],
+      });
+    },
+    onError: (_error, variables) => {
+      if (!workspaceId) return;
+      void queryClient.invalidateQueries({
+        queryKey: conversationKeys.turns(workspaceId, variables.conversationId),
       });
     },
   });

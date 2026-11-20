@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { sanitizeDisplayText } from "@/lib/utils";
 import { useUiStore } from "@/lib/ui-store";
 
 const assistantDetailSearchSchema = z.object({
@@ -157,12 +158,13 @@ function AssistantDetailPage() {
     ? READINESS_MAP[readiness.status]
     : undefined;
   const boundCollectionCount = assistant.collection_ids?.length ?? 0;
-  const collectionName =
+  const rawCollectionName =
     boundCollectionCount === 0
       ? "Chưa gắn kho tri thức"
       : boundCollectionCount > 1
         ? `${boundCollectionCount} kho tri thức`
         : (readiness?.collection_name ?? "Kho tri thức đang liên kết");
+  const collectionName = sanitizeDisplayText(rawCollectionName);
 
   const handleDelete = async () => {
     try {
@@ -223,7 +225,7 @@ function AssistantDetailPage() {
         description={
           <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
             {assistant.description ? (
-              <span>{assistant.description}</span>
+              <span>{sanitizeDisplayText(assistant.description)}</span>
             ) : (
               <span>Chưa có mô tả.</span>
             )}

@@ -15,6 +15,8 @@ export type RagPolicy = {
   verification_mode: "off" | "observe" | "enforce";
   verification_provider_id: string | null;
   verification_max_output_tokens: number | null;
+  temperature?: number | null;
+  suggested_prompts?: string[];
 };
 
 export type AssistantResponse = {
@@ -32,6 +34,7 @@ export type AssistantResponse = {
   max_output_tokens: number | null;
   is_active: boolean;
   rag_policy: RagPolicy;
+  suggested_prompts?: string[];
   revision: number;
   created_by: string;
   created_at: string;

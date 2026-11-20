@@ -54,25 +54,19 @@ async def resolve_turn(
 ) -> tuple[DirectReply | None, str]:
     config = conversation.assistant_snapshot
     count = config["history_turns"]
-    rows = (
-        list(
-            (
-                await db.scalars(
-                    select(ConversationTurn)
-                    .where(
-                        ConversationTurn.conversation_id == conversation.id,
-                        ConversationTurn.turn_no < turn.turn_no,
-                        ConversationTurn.status == "completed",
-                    )
-                    .order_by(ConversationTurn.turn_no.desc())
-                    .limit(count)
+    all_turns = list(
+        (
+            await db.scalars(
+                select(ConversationTurn)
+                .where(
+                    ConversationTurn.conversation_id == conversation.id,
+                    ConversationTurn.turn_no < turn.turn_no,
                 )
-            ).all()
-        )
-        if count
-        else []
+                .order_by(ConversationTurn.turn_no.asc())
+            )
+        ).all()
     )
-    rows.reverse()
+    rows = [t for t in all_turns if t.status == "completed"][-count:] if count else []
     turns = list(zip(rows, [r.question for r in rows], [_history_answer(r.result) for r in rows]))
     limit = get_settings().CONVERSATION_HISTORY_MAX_BYTES
     total = sum(len(q.encode()) + len(a.encode()) for _, q, a in turns)
@@ -84,7 +78,7 @@ async def resolve_turn(
     turn.history_turn_ids = [row.id for row, _, _ in turns]
     history = [question for _, question, _ in turns]
     answers = [answer for _, _, answer in turns]
-    conv_memory = extract_safe_conversation_memory(rows)
+    conv_memory = extract_safe_conversation_memory(rows, all_turns=all_turns)
     prefilter = classify_turn(turn.question, has_history=bool(turns))
     guard_categories = guardrails.categories(config)
     schema = routed_turn_schema(guardrail=bool(guard_categories))
@@ -95,6 +89,7 @@ async def resolve_turn(
         config,
         HISTORY_NOTE if dropped else None,
         guard_categories or None,
+        session_facts=conv_memory.get("session_facts"),
     )
     await checkpoint(db, actor, turn)
     runtime, request, budget = await prepare_chat_request(

@@ -33,6 +33,7 @@ export type RagPolicyFormState = {
   verificationMode: RagPolicy["verification_mode"];
   verificationProviderId: string;
   verificationMaxOutputTokens: string;
+  temperature: string;
 };
 
 /** Creation defaults match `NewAssistantRagPolicy` in the backend schema. */
@@ -48,6 +49,8 @@ export const NEW_ASSISTANT_POLICY: RagPolicy = {
   verification_mode: "off",
   verification_provider_id: null,
   verification_max_output_tokens: null,
+  temperature: null,
+  suggested_prompts: [],
 };
 
 type ChoiceOption<T extends string> = {
@@ -137,6 +140,7 @@ export function ragPolicyToForm(policy: RagPolicy): RagPolicyFormState {
       policy.verification_max_output_tokens != null
         ? String(policy.verification_max_output_tokens)
         : "",
+    temperature: policy.temperature != null ? String(policy.temperature) : "auto",
   };
 }
 
@@ -186,6 +190,11 @@ export function formToRagPolicy(
     verification_max_output_tokens: form.verificationMaxOutputTokens.trim()
       ? Number(form.verificationMaxOutputTokens)
       : null,
+    temperature:
+      form.temperature === "auto" || !form.temperature.trim()
+        ? null
+        : Number(form.temperature),
+    suggested_prompts: base.suggested_prompts ?? [],
   };
 }
 
@@ -233,6 +242,12 @@ export function validateRagPolicy(
     const tokens = Number(form.verificationMaxOutputTokens);
     if (!Number.isInteger(tokens) || tokens <= 0) {
       return "Giới hạn token kiểm chứng phải là số nguyên dương hoặc để trống.";
+    }
+  }
+  if (form.temperature !== "auto" && form.temperature.trim()) {
+    const temp = Number(form.temperature);
+    if (Number.isNaN(temp) || temp < 0 || temp > 2) {
+      return "Độ linh hoạt (Temperature) phải là số từ 0.0 đến 2.0 hoặc chọn Tự động.";
     }
   }
   return null;

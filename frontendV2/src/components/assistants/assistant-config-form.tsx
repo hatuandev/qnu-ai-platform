@@ -1,5 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Loader2, Save, Undo2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  Loader2,
+  Plus,
+  Save,
+  Sparkles,
+  Trash2,
+  Undo2,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -41,7 +51,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { cn, sanitizeDisplayText } from "@/lib/utils";
 import {
   ContextFields,
   MetadataScopeFields,
@@ -122,7 +132,7 @@ export function AssistantConfigForm({
   const collectionOptions = useMemo<CollectionOption[]>(() => {
     const options: CollectionOption[] = collections.map((item) => ({
       id: item.id,
-      name: item.name,
+      name: sanitizeDisplayText(item.name),
       source_count: item.source_count,
     }));
     const missing = form.collectionIds
@@ -168,6 +178,43 @@ export function AssistantConfigForm({
   const patchPolicy = (values: Partial<RagPolicyFormState>) =>
     setForm((prev) => ({ ...prev, policy: { ...prev.policy, ...values } }));
 
+  const handleAddPrompt = () => {
+    if (form.suggestedPrompts.length >= 10) return;
+    patch({ suggestedPrompts: [...form.suggestedPrompts, ""] });
+  };
+
+  const handleUpdatePrompt = (index: number, val: string) => {
+    const next = [...form.suggestedPrompts];
+    next[index] = val;
+    patch({ suggestedPrompts: next });
+  };
+
+  const handleRemovePrompt = (index: number) => {
+    const next = form.suggestedPrompts.filter((_, i) => i !== index);
+    patch({ suggestedPrompts: next });
+  };
+
+  const handleMovePrompt = (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= form.suggestedPrompts.length) return;
+    const next = [...form.suggestedPrompts];
+    const temp = next[index];
+    next[index] = next[targetIndex];
+    next[targetIndex] = temp;
+    patch({ suggestedPrompts: next });
+  };
+
+  const handleLoadDefaultPrompts = () => {
+    patch({
+      suggestedPrompts: [
+        "Chỉ tiêu tuyển sinh ngành Sư phạm Lịch sử - Địa lý năm 2024 và 2025 là bao nhiêu?",
+        "Tiêu chí chấm điểm LMS/LCMS theo Quyết định 4740 gồm những chức năng nào và điểm tối đa là bao nhiêu?",
+        "So sánh vai trò và nhiệm vụ của Phòng Đào tạo giữa KH 130/KH-ĐHQN và KH 07/KH-AM?",
+        "Phương thức xét tuyển bằng học bạ năm 2025 có những điều kiện và mốc thời gian nào?",
+      ],
+    });
+  };
+
   const handleReset = () => {
     setForm(initialForm);
     setError(null);
@@ -206,6 +253,13 @@ export function AssistantConfigForm({
         }
         if (err.kind === "forbidden") {
           setError("Chỉ quản trị viên của đơn vị mới có thể thay đổi trợ lý.");
+          return;
+        }
+        if (err.problem?.errors) {
+          const fieldMsgs = Object.entries(err.problem.errors)
+            .map(([field, msgs]) => `${field}: ${msgs.join(", ")}`)
+            .join("; ");
+          setError(`${err.message} (${fieldMsgs})`);
           return;
         }
         setError(err.message);
@@ -372,6 +426,110 @@ export function AssistantConfigForm({
                   luôn được trích xuất từ kho tri thức.
                 </FieldDescription>
               </Field>
+
+              <Field className="border-t border-border/50 pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <FieldLabel className="text-xs font-medium">
+                      Câu hỏi gợi ý mở đầu (Suggested Prompts)
+                    </FieldLabel>
+                    <FieldDescription>
+                      Hiển thị dưới dạng thẻ bấm nhanh khi người dùng mở hội thoại mới ({form.suggestedPrompts.length}/10 câu).
+                    </FieldDescription>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {form.suggestedPrompts.length === 0 ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-[11px] gap-1 cursor-pointer"
+                        disabled={isPending}
+                        onClick={handleLoadDefaultPrompts}
+                      >
+                        <Sparkles className="size-3 text-primary" />
+                        <span>Nạp 4 câu mẫu</span>
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-[11px] gap-1 cursor-pointer"
+                      disabled={isPending || form.suggestedPrompts.length >= 10}
+                      onClick={handleAddPrompt}
+                    >
+                      <Plus className="size-3" />
+                      <span>Thêm gợi ý</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {form.suggestedPrompts.length === 0 ? (
+                  <div className="mt-2 rounded-lg border border-dashed border-border/70 p-3 text-center text-xs text-muted-foreground">
+                    Chưa có câu hỏi gợi ý riêng cho trợ lý này. Màn hình chat sẽ dùng bộ gợi ý thông minh mặc định của hệ thống.
+                  </div>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    {form.suggestedPrompts.map((promptText, idx) => (
+                      <div
+                        key={`suggested-prompt-${idx}-${promptText.slice(0, 15)}`}
+                        className="flex items-center gap-2"
+                      >
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold text-muted-foreground">
+                          {idx + 1}
+                        </span>
+                        <Input
+                          value={promptText}
+                          onChange={(e) => handleUpdatePrompt(idx, e.target.value)}
+                          placeholder={`Câu hỏi gợi ý số ${idx + 1}...`}
+                          className="h-8 bg-background text-xs"
+                          disabled={isPending}
+                          maxLength={200}
+                        />
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="size-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                            disabled={isPending || idx === 0}
+                            onClick={() => handleMovePrompt(idx, "up")}
+                            title="Di chuyển lên"
+                          >
+                            <ArrowUp className="size-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="size-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                            disabled={
+                              isPending ||
+                              idx === form.suggestedPrompts.length - 1
+                            }
+                            onClick={() => handleMovePrompt(idx, "down")}
+                            title="Di chuyển xuống"
+                          >
+                            <ArrowDown className="size-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="size-7 p-0 text-muted-foreground hover:text-destructive cursor-pointer"
+                            disabled={isPending}
+                            onClick={() => handleRemovePrompt(idx)}
+                            title="Xóa gợi ý này"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Field>
             </CardContent>
           </Card>
 
@@ -387,8 +545,8 @@ export function AssistantConfigForm({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field>
+              <div className="grid gap-6 sm:grid-cols-2">
+                <Field className="min-w-0">
                   <FieldLabel className="text-xs font-medium">
                     Kho tri thức liên kết
                   </FieldLabel>
@@ -399,14 +557,14 @@ export function AssistantConfigForm({
                     disabled={isPending}
                     readiness={readiness}
                   />
-                  <FieldDescription>
+                  <FieldDescription className="mt-1.5 text-xs leading-relaxed">
                     Trợ lý tra cứu trong tất cả kho đã chọn. Đổi bộ kho áp dụng
                     ngay khi lưu; hội thoại đã có giữ bộ kho cũ và cần hội thoại
                     mới để hỏi tiếp.
                   </FieldDescription>
                 </Field>
 
-                <Field>
+                <Field className="min-w-0">
                   <FieldLabel className="text-xs font-medium">
                     Mô hình trả lời
                   </FieldLabel>
@@ -438,7 +596,7 @@ export function AssistantConfigForm({
                       ))}
                     </SelectContent>
                   </Select>
-                  <FieldDescription>
+                  <FieldDescription className="mt-1.5 text-xs leading-relaxed">
                     Mô hình điều phối qua ModelOps; tự động sẽ dùng cấu hình
                     trường.
                   </FieldDescription>
@@ -478,6 +636,33 @@ export function AssistantConfigForm({
                     <span>10 đoạn</span>
                     <span>20 đoạn (chi tiết)</span>
                   </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[10px] text-muted-foreground">Mốc gợi ý:</span>
+                    {[
+                      { label: "5 đoạn (chuẩn)", val: "5" },
+                      { label: "8 đoạn (bảng/phụ lục)", val: "8" },
+                      { label: "12 đoạn (đa văn bản)", val: "12" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.val}
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => patch({ topK: preset.val })}
+                        className={cn(
+                          "h-5 cursor-pointer rounded px-1.5 text-[10px] font-medium transition-colors",
+                          form.topK === preset.val
+                            ? "bg-primary text-primary-foreground font-semibold shadow-2xs"
+                            : "border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                        )}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] leading-relaxed text-muted-foreground/80">
+                    Khuyến nghị mức <strong className="text-foreground">8 đoạn</strong> khi tra cứu văn bản có nhiều bảng biểu ngắt trang hoặc so sánh chéo.
+                  </p>
                 </div>
 
                 {/* Thanh kéo Lượt ghi nhớ */}
@@ -587,6 +772,87 @@ export function AssistantConfigForm({
                   nhập số cụ thể tùy ý.
                 </FieldDescription>
               </Field>
+
+              {/* Độ linh hoạt diễn đạt (Temperature) */}
+              <div className="space-y-2.5 rounded-lg border border-border/60 bg-muted/20 p-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <FieldLabel className="text-xs font-medium text-foreground">
+                      Độ linh hoạt diễn đạt (Temperature)
+                    </FieldLabel>
+                    <p className="text-[11px] text-muted-foreground">
+                      Độ tự nhiên của văn phong và mức độ bám sát dữ kiện
+                    </p>
+                  </div>
+                  <span className="flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
+                    {form.temperature === "auto" || !form.temperature.trim()
+                      ? "Tự động (Hệ thống)"
+                      : Number(form.temperature).toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="pt-2">
+                  <Slider
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={[
+                      form.temperature === "auto" || !form.temperature.trim()
+                        ? 0.2
+                        : Number(form.temperature),
+                    ]}
+                    onValueChange={([val]) =>
+                      patch({
+                        temperature: String(val),
+                        policy: { ...form.policy, temperature: String(val) },
+                      })
+                    }
+                    disabled={isPending || form.temperature === "auto"}
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="mr-1 text-[11px] font-medium text-muted-foreground">
+                    Mức khuyến nghị:
+                  </span>
+                  {[
+                    { label: "Tự động", val: "auto" },
+                    { label: "0.0 (Chính xác số liệu)", val: "0" },
+                    { label: "0.2 (Khuyến nghị RAG)", val: "0.2" },
+                    { label: "0.5 (Tự nhiên)", val: "0.5" },
+                    { label: "0.7 (Sáng tạo)", val: "0.7" },
+                  ].map((preset) => {
+                    const isSelected =
+                      preset.val === "auto"
+                        ? form.temperature === "auto" || !form.temperature.trim()
+                        : form.temperature === preset.val;
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        disabled={isPending}
+                        onClick={() =>
+                          patch({
+                            temperature: preset.val,
+                            policy: { ...form.policy, temperature: preset.val },
+                          })
+                        }
+                        className={cn(
+                          "h-6 cursor-pointer rounded-md px-2 text-[11px] font-medium transition-colors",
+                          isSelected
+                            ? "bg-primary font-semibold text-primary-foreground shadow-2xs"
+                            : "border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                        )}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <FieldDescription>
+                  Khuyến nghị mức <strong className="text-foreground">0.0 – 0.2</strong> cho văn bản hành chính, quyết định, kế hoạch và bảng biểu tuyển sinh nhằm đảm bảo độ chính xác dữ kiện và loại trừ hoàn toàn ảo giác.
+                </FieldDescription>
+              </div>
             </CardContent>
           </Card>
 
@@ -782,6 +1048,22 @@ export function AssistantConfigForm({
                 <span className="text-muted-foreground">Trích dẫn (Top-K)</span>
                 <span className="font-medium text-foreground">
                   {form.topK} đoạn
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-b border-border/40 py-1.5">
+                <span className="text-muted-foreground">Linh hoạt (Temp)</span>
+                <span className="font-medium text-foreground">
+                  {form.temperature === "auto" || !form.temperature.trim()
+                    ? "Tự động"
+                    : form.temperature}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-b border-border/40 py-1.5">
+                <span className="text-muted-foreground">Gợi ý mở đầu</span>
+                <span className="font-medium text-foreground">
+                  {form.suggestedPrompts.length > 0
+                    ? `${form.suggestedPrompts.length} câu`
+                    : "Mặc định"}
                 </span>
               </div>
               <div className="flex items-center justify-between py-1.5">

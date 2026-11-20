@@ -48,6 +48,8 @@ def build_payload(messages: list[ChatMessage], request: ChatRequest) -> dict:
         payload["response_format"] = {"type": "json_object"}
     if request.reasoning is not None:
         request.reasoning.apply(payload)
+    if request.temperature is not None:
+        payload["temperature"] = request.temperature
     return payload
 
 

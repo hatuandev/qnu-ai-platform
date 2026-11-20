@@ -1,12 +1,16 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
+  BookOpen,
   Bot,
+  CheckCircle2,
   Copy,
   Database,
+  GraduationCap,
   Loader2,
   MessageCircle,
   Plus,
+  Quote,
   RefreshCw,
   Send,
   Sparkles,
@@ -31,6 +35,7 @@ import {
 } from "@/api/conversations";
 import { useCatalogQuery } from "@/api/modelops";
 import { EmptyState } from "@/components/admin/empty-state";
+import { EvidenceDrawer } from "@/components/assistants/evidence-drawer";
 import { providerLabel } from "@/components/assistants/model-label";
 import { TurnFeedback } from "@/components/assistants/turn-feedback";
 import {
@@ -51,7 +56,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useUiStore } from "@/lib/ui-store";
-import { cn } from "@/lib/utils";
+import { cn, sanitizeDisplayText } from "@/lib/utils";
 
 export const Route = createFileRoute("/chat")({
   component: ChatPage,
@@ -63,13 +68,34 @@ export const Route = createFileRoute("/chat")({
 
 const DRAFT_VALUE = "__draft__";
 
-const STARTER_PROMPTS = [
-  { icon: MessageCircle, title: "Xin chào", prompt: "Xin chào" },
-  { icon: Bot, title: "Bạn là trợ lý gì?", prompt: "Bạn là trợ lý gì?" },
+const SMART_STARTER_PROMPTS = [
+  {
+    icon: GraduationCap,
+    tag: "Tuyển sinh 2025",
+    title: "Chỉ tiêu SP Lịch sử - Địa lý",
+    prompt:
+      "Chỉ tiêu tuyển sinh ngành Sư phạm Lịch sử - Địa lý năm 2024 và 2025 là bao nhiêu?",
+  },
+  {
+    icon: CheckCircle2,
+    tag: "Quy chuẩn & Tiêu chí",
+    title: "Tiêu chí chấm điểm LMS/LCMS",
+    prompt:
+      "Tiêu chí chấm điểm LMS/LCMS theo Quyết định 4740 gồm những chức năng nào và điểm tối đa là bao nhiêu?",
+  },
+  {
+    icon: BookOpen,
+    tag: "Phương thức",
+    title: "Điều kiện xét tuyển học bạ",
+    prompt:
+      "Phương thức xét tuyển bằng học bạ năm 2025 có những điều kiện và mốc thời gian nào?",
+  },
   {
     icon: Sparkles,
-    title: "Bạn có thể giúp gì?",
-    prompt: "Bạn có thể giúp gì cho tôi?",
+    tag: "Tra cứu kho",
+    title: "Tài liệu đang có trong kho",
+    prompt:
+      "Trong kho tri thức hiện có những tài liệu, quyết định và kế hoạch nào đã được ban hành?",
   },
 ];
 
@@ -116,9 +142,13 @@ function AssistantAvatar() {
 function TurnRow({
   turn,
   onCopy,
+  onOpenEvidence,
+  onPromptClick,
 }: {
   turn: ConversationTurn;
   onCopy: (text: string) => void;
+  onOpenEvidence?: (evidenceId?: string, index?: number) => void;
+  onPromptClick?: (prompt: string) => void;
 }) {
   const copyText = turnAnswerText(turn);
   const trace =
@@ -126,19 +156,53 @@ function TurnRow({
       ? turn.result.trace
       : null;
 
+  const durationSec = useMemo(() => {
+    if (!turn.finished_at || !turn.created_at) return null;
+    const diff =
+      (new Date(turn.finished_at).getTime() -
+        new Date(turn.created_at).getTime()) /
+      1000;
+    return diff > 0 ? `${diff.toFixed(1)}s` : null;
+  }, [turn.finished_at, turn.created_at]);
+
+  const sourcesCount =
+    turn.result && turn.result.status !== "direct_reply"
+      ? turn.result.sources?.length ?? 0
+      : 0;
+
   return (
     <div className="space-y-3">
       <UserBubble question={turn.question} />
       <div className="flex gap-2.5">
         <AssistantAvatar />
-        <div className="min-w-0 flex-1 space-y-2.5 rounded-2xl rounded-tl-xs border border-border/60 bg-card px-4 py-3 shadow-2xs">
-          <TurnResult turn={turn} />
+        <div className="min-w-0 flex-1 space-y-2.5 rounded-2xl rounded-tl-xs border border-border/50 bg-card px-4 py-3 shadow-2xs">
+          <TurnResult
+            turn={turn}
+            onSelectEvidence={(evidenceId, idx) =>
+              onOpenEvidence?.(evidenceId, idx)
+            }
+            onPromptClick={onPromptClick}
+          />
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-1.5 text-[10px] text-muted-foreground">
             <div className="flex items-center gap-2 flex-wrap">
               <span>
-                {formatTime(turn.created_at)} · Lượt {turn.turn_no}
+                {formatTime(turn.created_at)}
+                {durationSec ? ` (${durationSec})` : ""} · Lượt {turn.turn_no}
               </span>
               {trace ? <TurnTraceDetails turn={turn} trace={trace} /> : null}
+              {sourcesCount > 0 && onOpenEvidence ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-5 px-1.5 text-[10px] gap-1 text-primary border-primary/30 hover:bg-primary/10 cursor-pointer shadow-2xs"
+                  onClick={() => onOpenEvidence(undefined, 1)}
+                  title="Mở ngăn đối soát nguồn dẫn chứng"
+                >
+                  <Quote className="size-2.5" />
+                  <span>{sourcesCount} căn cứ đối soát</span>
+                </Button>
+              ) : null}
             </div>
             <div className="flex items-center gap-1">
               <TurnFeedback turnId={turn.id} />
@@ -191,7 +255,7 @@ function PendingRow({
       <UserBubble question={question} />
       <div className="flex gap-2.5">
         <AssistantAvatar />
-        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-2xl rounded-tl-xs border border-border/60 bg-card px-4 py-3 text-xs text-muted-foreground shadow-2xs">
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-2xl rounded-tl-xs border border-border/50 bg-card px-4 py-3 text-xs text-muted-foreground shadow-2xs">
           <div className="flex min-w-0 items-center gap-2.5">
             <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
             <span className="truncate">{stageText}</span>
@@ -229,44 +293,115 @@ function WelcomePanel({
   isCollectionUnbound: boolean;
   onPick: (question: string) => void;
 }) {
+  const customPrompts = useMemo(() => {
+    const prompts =
+      assistant.rag_policy?.suggested_prompts ??
+      (assistant.suggested_prompts ?? []);
+    return prompts.map((p) => p.trim()).filter(Boolean);
+  }, [assistant]);
+
   return (
-    <div className="animate-in space-y-6 py-8 duration-300 fade-in-50">
+    <div className="animate-in space-y-6 py-6 duration-300 fade-in-50 max-w-2xl mx-auto">
       <div className="space-y-2 text-center">
         <div className="mx-auto flex size-12 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-2xs">
           <Bot className="size-6" />
         </div>
-        <h2 className="text-base font-semibold text-foreground">
-          {assistant.name}
-        </h2>
-        <p className="mx-auto max-w-md text-xs leading-relaxed text-muted-foreground">
-          {assistant.description ||
-            "Đặt câu hỏi để trợ lý tra cứu kho tri thức đã xuất bản và trả lời kèm nguồn trích dẫn."}
-        </p>
-      </div>
-      <div className="space-y-2.5">
-        <p className="px-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-          Bắt đầu nhanh
-        </p>
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-          {STARTER_PROMPTS.map((item) => (
-            <Button
-              key={item.title}
-              variant="outline"
-              className="h-auto justify-start gap-2 px-3 py-2.5 text-left text-xs font-normal whitespace-normal"
-              disabled={isCollectionUnbound}
-              onClick={() => onPick(item.prompt)}
+        <div className="space-y-1">
+          <div className="flex items-center justify-center gap-2">
+            <h2 className="text-base font-semibold text-foreground">
+              {assistant.name}
+            </h2>
+            <Badge
+              variant={assistant.is_active ? "success" : "secondary"}
+              className="h-4 px-1.5 text-[10px] font-normal"
             >
-              <item.icon className="size-3.5 shrink-0 text-primary" />
-              <span>{item.title}</span>
-            </Button>
-          ))}
+              {assistant.is_active ? "Sẵn sàng" : "Tạm dừng"}
+            </Badge>
+          </div>
+          <p className="mx-auto max-w-md text-xs leading-relaxed text-muted-foreground">
+            {sanitizeDisplayText(assistant.description) ||
+              "Hệ thống trợ lý AI hỗ trợ tra cứu văn bản, đối chiếu số liệu bảng biểu và trích xuất nguồn dẫn chứng chính thức."}
+          </p>
         </div>
-        <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase flex items-center gap-1.5">
+            <Sparkles className="size-3 text-primary" />
+            <span>Câu hỏi gợi ý mở đầu</span>
+          </p>
+          <span className="text-[11px] text-muted-foreground/75">
+            Bấm để gửi ngay
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {customPrompts.length > 0
+            ? customPrompts.map((promptText, idx) => (
+                <button
+                  key={`custom-prompt-${promptText.slice(0, 30)}-${idx}`}
+                  type="button"
+                  disabled={isCollectionUnbound}
+                  onClick={() => onPick(promptText)}
+                  className={cn(
+                    "group flex flex-col items-start gap-1.5 rounded-xl border border-border/60 bg-card p-3 text-left transition-all duration-200 shadow-2xs hover:border-primary/40 hover:bg-muted/30 cursor-pointer",
+                    isCollectionUnbound && "opacity-50 cursor-not-allowed",
+                  )}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                      <Sparkles className="size-3.5 text-primary shrink-0" />
+                      <span>Gợi ý {idx + 1}</span>
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="h-4 px-1 text-[9px] font-normal text-muted-foreground border-border/50"
+                    >
+                      Mẫu câu
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
+                    "{promptText}"
+                  </p>
+                </button>
+              ))
+            : SMART_STARTER_PROMPTS.map((item) => (
+                <button
+                  key={item.title}
+                  type="button"
+                  disabled={isCollectionUnbound}
+                  onClick={() => onPick(item.prompt)}
+                  className={cn(
+                    "group flex flex-col items-start gap-1.5 rounded-xl border border-border/60 bg-card p-3 text-left transition-all duration-200 shadow-2xs hover:border-primary/40 hover:bg-muted/30 cursor-pointer",
+                    isCollectionUnbound && "opacity-50 cursor-not-allowed",
+                  )}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                      <item.icon className="size-3.5 text-primary shrink-0" />
+                      <span>{item.title}</span>
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="h-4 px-1 text-[9px] font-normal text-muted-foreground border-border/50"
+                    >
+                      {item.tag}
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
+                    "{item.prompt}"
+                  </p>
+                </button>
+              ))}
+        </div>
+
+        <p className="px-1 text-center text-[11px] leading-relaxed text-muted-foreground">
           {isCollectionUnbound
             ? "Trợ lý chưa gắn kho tri thức nên chưa thể trả lời. Gắn kho trong tab Cấu hình của trợ lý trước khi hỏi."
             : isCollectionEmpty
               ? "Kho tri thức chưa có tài liệu xuất bản nên hiện chỉ trả lời được câu hỏi chào hỏi, giới thiệu."
-              : "Câu trả lời chỉ dùng nội dung đã xuất bản và kèm nguồn trích dẫn để đối chiếu."}
+              : "Câu trả lời được đối soát trực tiếp từ kho tri thức và có trích dẫn [1], [2] để kiểm chứng."}
         </p>
       </div>
     </div>
@@ -301,6 +436,18 @@ function ChatPage() {
   const [input, setInput] = useState("");
   const { q: presetQuestion } = Route.useSearch();
 
+  const [evidenceState, setEvidenceState] = useState<{
+    open: boolean;
+    sources: any[];
+    selectedEvidenceId?: string | null;
+    selectedIndex?: number | null;
+    turnNo?: number;
+    question?: string;
+  }>({
+    open: false,
+    sources: [],
+  });
+
   // A question handed over from the landing page prefills the composer once,
   // then the query param is dropped so a reload starts a clean conversation.
   useEffect(() => {
@@ -328,17 +475,20 @@ function ChatPage() {
   );
   const conversations = conversationsQuery.data ?? [];
 
+  const activeConversationId = isDraftMode
+    ? null
+    : selectedConversationId ?? conversations[0]?.id ?? null;
+
   const activeConversation = useMemo(() => {
-    if (isDraftMode) return null;
-    const selected = conversations.find(
-      (item) => item.id === selectedConversationId,
+    if (isDraftMode || !activeConversationId) return null;
+    return (
+      conversations.find((item) => item.id === activeConversationId) ?? null
     );
-    return selected ?? conversations[0] ?? null;
-  }, [conversations, isDraftMode, selectedConversationId]);
+  }, [conversations, isDraftMode, activeConversationId]);
 
   const turnsQuery = useConversationTurnsQuery(
     workspaceId,
-    activeConversation?.id,
+    activeConversationId,
     !isDraftMode,
   );
   const turns = turnsQuery.data ?? [];
@@ -384,7 +534,6 @@ function ChatPage() {
     return item ? `Mô hình: ${providerLabel(item)}` : "Mô hình đã cấu hình";
   }, [assistant, catalogQuery.data]);
 
-  const activeConversationId = activeConversation?.id;
   const turnCount = turns.length;
 
   useEffect(() => {
@@ -859,9 +1008,24 @@ function ChatPage() {
                   key={turn.id}
                   turn={turn}
                   onCopy={(text) => void handleCopy(text)}
+                  onOpenEvidence={(evidenceId, idx) => {
+                    const sources =
+                      turn.result && turn.result.status !== "direct_reply"
+                        ? turn.result.sources
+                        : [];
+                    setEvidenceState({
+                      open: true,
+                      sources,
+                      selectedEvidenceId: evidenceId,
+                      selectedIndex: idx,
+                      turnNo: turn.turn_no,
+                      question: turn.question,
+                    });
+                  }}
+                  onPromptClick={(prompt) => void handleSend(prompt)}
                 />
               ))}
-              {pendingQuestion ? (
+              {pendingQuestion && !turns.some((t) => t.status === "running") ? (
                 <PendingRow
                   question={pendingQuestion}
                   onCancel={handleCancel}
@@ -889,7 +1053,7 @@ function ChatPage() {
                   ? "Trợ lý đang tạm dừng nhận câu hỏi..."
                   : isCollectionUnbound
                     ? "Trợ lý chưa gắn kho tri thức..."
-                    : "Nhập câu hỏi cho trợ lý..."
+                    : "Nhập câu hỏi cho trợ lý (Enter để gửi, Shift+Enter xuống dòng)..."
               }
               rows={1}
               maxLength={8000}
@@ -915,10 +1079,22 @@ function ChatPage() {
           <p className="text-center text-[10px] text-muted-foreground/80">
             {isInactive
               ? "Bật lại trợ lý trong trang Trợ lý để tiếp tục hội thoại."
-              : "Câu trả lời chỉ dùng nội dung đã xuất bản của kho tri thức gắn với trợ lý. Lượt hỏi thường mất 1–3 phút."}
+              : "Câu trả lời được đối soát trực tiếp từ kho tri thức đã xuất bản. Nhấn vào các trích dẫn [1], [2] để mở ngăn đối chiếu nguồn."}
           </p>
         </div>
       </div>
+
+      <EvidenceDrawer
+        open={evidenceState.open}
+        onOpenChange={(open) =>
+          setEvidenceState((prev) => ({ ...prev, open }))
+        }
+        sources={evidenceState.sources}
+        selectedEvidenceId={evidenceState.selectedEvidenceId}
+        selectedIndex={evidenceState.selectedIndex}
+        turnNo={evidenceState.turnNo}
+        question={evidenceState.question}
+      />
     </div>
   );
 }

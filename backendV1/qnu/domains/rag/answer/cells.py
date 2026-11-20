@@ -860,53 +860,64 @@ def materialize(
         s.model_copy(deep=True)
         for index, s in enumerate(answer.statements)
         if index not in dropped_indexes
-        and (not selected or not selectable.intersection(s.evidence_ids))
+        and (not selected or len(selected) > 3 or not selectable.intersection(s.evidence_ids))
     ]
     complete_citations(statements, sources)
     emitted_names, emitted_lists = set(), set()
     by_evidence = {source.evidence_id: source for source in sources}
-    for key in selected:
-        table, cell = allowed[key]
-        if cell.get("row_name"):
-            source = by_evidence[table["evidence_id"]]
-            name_key = (
-                source.document_id,
-                source.version_id,
-                source.publication_decision_id,
-                _normalized(cell["value"]),
-            )
-            if name_key in emitted_names:
-                continue
-            emitted_names.add(name_key)
-        if list_id := cell.get("joined_list_id"):
-            if list_id in emitted_lists:
-                continue
-            emitted_lists.add(list_id)
-        field = " / ".join(table["fields"][str(cell["column"])])
-        year = cell.get("data_year")
-        if year is not None and str(year) not in _numbers(field):
-            field = f"Năm {year} / {field}"
-        text = (
-            " ".join(cell["value"].split())
-            if cell.get("row_name")
-            else f"{cell['subject']} — {field}: {cell['value']}"
-        )
-        try:
-            statements.append(
-                Statement(
-                    text=text,
-                    evidence_ids=cell["evidence_ids"],
+    should_project_lookups = not statements if len(selected) > 3 else True
+    if should_project_lookups:
+        for key in selected:
+            table, cell = allowed[key]
+            if cell.get("row_name"):
+                source = by_evidence[table["evidence_id"]]
+                name_key = (
+                    source.document_id,
+                    source.version_id,
+                    source.publication_decision_id,
+                    _normalized(cell["value"]),
                 )
+                if name_key in emitted_names:
+                    continue
+                emitted_names.add(name_key)
+            if list_id := cell.get("joined_list_id"):
+                if list_id in emitted_lists:
+                    continue
+                emitted_lists.add(list_id)
+            field = " / ".join(table["fields"][str(cell["column"])])
+            year = cell.get("data_year")
+            if year is not None and str(year) not in _numbers(field):
+                field = f"Năm {year} / {field}"
+            text = (
+                " ".join(cell["value"].split())
+                if cell.get("row_name")
+                else f"{cell['subject']} — {field}: {cell['value']}"
             )
-        except ValidationError as exc:
-            error = AppException(
-                "Ô nguồn không thể hiển thị dưới dạng text thuần.",
-                code="answer_source_text_invalid",
-                status_code=502,
-                title="Ô bảng mô hình chọn không hợp lệ",
-            )
-            error.validation_issues = [{"path": ["lookups"], "type": "source_cell_not_displayable"}]
-            raise error from exc
+            try:
+                statements.append(
+                    Statement(
+                        text=text,
+                        evidence_ids=cell["evidence_ids"],
+                    )
+                )
+            except ValidationError as exc:
+                error = AppException(
+                    "Ô nguồn không thể hiển thị dưới dạng text thuần.",
+                    code="answer_source_text_invalid",
+                    status_code=502,
+                    title="Ô bảng mô hình chọn không hợp lệ",
+                )
+                error.validation_issues = [{"path": ["lookups"], "type": "source_cell_not_displayable"}]
+                raise error from exc
+    else:
+        # Merge citations from selected cells into existing statements so provenance is preserved
+        all_cell_eids = list(dict.fromkeys(
+            eid for key in selected for eid in allowed[key][1]["evidence_ids"]
+        ))
+        if statements and all_cell_eids:
+            for st in statements:
+                combined = list(dict.fromkeys(st.evidence_ids + [e for e in all_cell_eids if e not in st.evidence_ids]))
+                st.evidence_ids = combined[:20]
     if len(statements) > 20:
         error = AppException(
             "Quá nhiều ý trong câu trả lời.",

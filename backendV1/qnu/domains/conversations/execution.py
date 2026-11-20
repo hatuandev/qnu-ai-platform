@@ -67,7 +67,7 @@ async def send(
         reply, provider_id = await resolve_turn(db, actor, conversation, turn, chat)
         if reply is None:
             policy = AssistantRagPolicy.model_validate(config.get("rag_policy", {})).model_dump(
-                mode="json", exclude={"guardrail_policy"}
+                mode="json", exclude={"guardrail_policy", "suggested_prompts"}
             )
             policy["metadata_filter"] = turn.metadata_filter or {}
             conv_mem = (turn.rewrite_trace or {}).get("conversation_memory")

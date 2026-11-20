@@ -320,6 +320,7 @@ async def answer(
     answer_schema = output_schema(sources, cells=cells)
     trace.context["packing"] = payload_metrics(messages, answer_schema, evidence_bytes)
     prepare_started = time.monotonic()
+    req_temperature = getattr(req, "temperature", None)
     runtime, request, budget = await prepare_chat_request(
         db,
         actor,
@@ -329,6 +330,7 @@ async def answer(
         task="answer",
         max_output_tokens=req.max_output_tokens,
         output_schema=answer_schema,
+        temperature=req_temperature,
     )
     trace.stage_ms["model_prepare"] = round((time.monotonic() - prepare_started) * 1000, 3)
     inference_hash = runtime.inference_configuration_hash("answer")
@@ -366,6 +368,7 @@ async def answer(
         "schema_sha256": digest(answer_schema),
         "evidence_sha256": proof,
         "catalog_sha256": trace.grounding["catalog_sha256"],
+        "temperature": req_temperature,
     }
     if len(ids) > 1:
         cache_material["collection_ids"] = sorted(ids)

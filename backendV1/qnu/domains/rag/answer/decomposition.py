@@ -57,10 +57,18 @@ _SPLIT_PATTERN = re.compile(
 )
 
 _MULTI_CRITERIA_RE = re.compile(
-    r"\b(tiêu chí|mục|điều|bảng|chương trình|mã|nhiệm vụ)(?:\s+số)?\s+([A-Za-z0-9_.-]+(?:\s*\([^)]+\))?)"
-    r"\s+(?:và|cùng với|cũng như)\s+"
-    r"(?:(?:tiêu chí|mục|điều|bảng|chương trình|mã|nhiệm vụ)(?:\s+số)?\s+)?([A-Za-z0-9_.-]+(?:\s*\([^)]+\))?)"
+    r"\b(tiêu chí|mục|điều|khoản|bảng|chương trình|mã|nhiệm vụ|phụ lục)(?:\s+số)?\s+([A-Za-z0-9_.-]+(?:\s*\([^)]+\))?)"
+    r"\s+(?:và|cùng với|cũng như|so với)\s+"
+    r"(?:(?:tiêu chí|mục|điều|khoản|bảng|chương trình|mã|nhiệm vụ|phụ lục)(?:\s+số)?\s+)?([A-Za-z0-9_.-]+(?:\s*\([^)]+\))?)"
     r"(?=[?,;:\s]|$)",
+    re.IGNORECASE,
+)
+
+_MULTI_NAMED_ENTITY_RE = re.compile(
+    r"\b(ngành|mã ngành|chuyên ngành|tiêu chí|mục|điều|khoản|bảng|chương trình|mã|nhiệm vụ|phụ lục)"
+    r"(?:\s+số)?\s+([^,;?]+?)\s+(?:và|cùng với|cũng như|so với)\s+"
+    r"(?:(?:ngành|mã ngành|chuyên ngành|tiêu chí|mục|điều|khoản|bảng|chương trình|mã|nhiệm vụ|phụ lục)(?:\s+số)?\s+)?([^,;?]+?)"
+    r"(?=\s+(?:có|về|được|theo|thuộc|là|trong|năm|\?|;|,)|$)",
     re.IGNORECASE,
 )
 
@@ -81,12 +89,12 @@ _AGGREGATION_MULTI_RE = re.compile(
 )
 
 _COMPARISON_RE = re.compile(
-    r"^So sánh(?:\s+giữa)?\s+(.+?)\s+(?:và|với)\s+(.+?)(?:\s+về\s+(.+?))?[?.]?$",
+    r"^So sánh(?:\s+(?:giữa\s+)?(.+?)\s+giữa|\s+giữa)?\s+(.+?)\s+(?:và|với)\s+(.+?)(?:\s+về\s+(.+?))?(?:\s+\btheo\s+(.+?))?[?.]?$",
     re.IGNORECASE,
 )
 
 _YEAR_RE = re.compile(r"\b(202[0-9])\b")
-_CODE_RE = re.compile(r"\b([A-Z]{2,4}-?\d{4,7}|\d{7}|\b0\d{1,4}\b)\b")
+_CODE_RE = re.compile(r"\b(7\d{6}[A-Za-z0-9]*|[A-Z]{2,4}-?\d{2,7}|\d{7}|\b0\d{1,4}\b)\b")
 _MAJOR_RE = re.compile(
     r"\b(ngành\s+[A-ZÀ-Ỹa-zà-ỹ0-9\s]+?)(?:\s+(?:năm|học phí|điểm|chỉ tiêu|xét tuyển|như thế nào)|\?|,|;|$)",
     re.IGNORECASE,
@@ -138,6 +146,34 @@ def _normalize_text(text: str) -> str:
     return " ".join(unicodedata.normalize("NFC", text or "").split()).casefold()
 
 
+_INTERROGATIVE_WORDS = (
+    "bao nhiêu",
+    "như thế nào",
+    "thế nào",
+    "ra sao",
+    "ở đâu",
+    "khi nào",
+    "mấy",
+    "là gì",
+    "những gì",
+    "ai chủ trì",
+)
+
+
+def _match_multi_named_entity(query: str) -> re.Match | None:
+    for m in _MULTI_NAMED_ENTITY_RE.finditer(query):
+        e1 = m.group(2).strip()
+        e2 = m.group(3).strip()
+        if (
+            len(e1.split()) <= 10
+            and len(e2.split()) <= 10
+            and not any(iw in e1.lower() for iw in _INTERROGATIVE_WORDS)
+            and not any(iw in e2.lower() for iw in _INTERROGATIVE_WORDS)
+        ):
+            return m
+    return None
+
+
 def needs_decomposition(query: str) -> bool:
     """Return True if query has conditional/comparison/exception keywords, multi-criteria, or >= 2 clauses."""
     norm = _normalize_text(query)
@@ -145,7 +181,7 @@ def needs_decomposition(query: str) -> bool:
         return True
     if any(kw in norm for kw in _CONDITION_KEYWORDS):
         return True
-    if bool(_MULTI_CRITERIA_RE.search(query)):
+    if bool(_MULTI_CRITERIA_RE.search(query)) or (_match_multi_named_entity(query) is not None):
         return True
     if bool(_COMPOUND_TASK_RE.search(query)):
         return True
@@ -153,7 +189,10 @@ def needs_decomposition(query: str) -> bool:
         return True
     if bool(_AGGREGATION_MULTI_RE.search(query)):
         return True
-    return bool(_COMPARISON_RE.search(query))
+    if bool(_COMPARISON_RE.search(query)):
+        return True
+    codes = list(dict.fromkeys(_CODE_RE.findall(query)))
+    return len(codes) >= 2
 
 
 def decompose_query(query: str) -> list[str]:
@@ -202,30 +241,55 @@ def decompose_query(query: str) -> list[str]:
         q2 = f"Quy định {m_agg.group(2).strip()} {tail}".strip()
         return [q1, q2]
 
-    # Pattern D: Multiple criteria / codes / programs (e.g. "tiêu chí 2.4 và 2.5", "tiêu chí 1.4 (LMS/LCMS) và tiêu chí 1.5 (Thư viện số)")
-    match = _MULTI_CRITERIA_RE.search(clean_query)
-    if match:
-        kind = match.group(1)
-        code1 = match.group(2).rstrip(".,;:? ")
-        code2 = match.group(3).rstrip(".,;:? ")
-        q1 = clean_query[: match.start()] + f"{kind} {code1}" + clean_query[match.end() :]
-        q2 = clean_query[: match.start()] + f"{kind} {code2}" + clean_query[match.end() :]
-        # Clean up dangling "giữa" if present before match
-        q1 = re.sub(r"\bgiữa\s+", "", q1, flags=re.IGNORECASE)
-        q2 = re.sub(r"\bgiữa\s+", "", q2, flags=re.IGNORECASE)
-        return [q1.strip(), q2.strip()]
-
-    # Pattern E: Comparison questions (e.g. "So sánh trách nhiệm giữa cơ sở giáo dục đại học và Cục Công nghệ thông tin theo QĐ 4740")
+    # Pattern D1: Comparison questions starting with "So sánh"
     m_comp = _COMPARISON_RE.search(clean_query)
     if m_comp:
-        e1 = m_comp.group(1).strip()
-        e2 = m_comp.group(2).strip()
-        aspect = m_comp.group(3).strip() if m_comp.group(3) else ""
-        if len(e1.split()) >= 2 or len(e2.split()) >= 2:
-            return [
-                f"Quy định {aspect} {e1}".strip(),
-                f"Quy định {aspect} {e2}".strip(),
-            ]
+        pre_aspect = m_comp.group(1).strip() if m_comp.group(1) else ""
+        e1 = m_comp.group(2).strip()
+        e2 = m_comp.group(3).strip()
+        post_aspect = m_comp.group(4).strip() if m_comp.group(4) else ""
+        doc = m_comp.group(5).strip() if m_comp.group(5) else ""
+        aspect = f"{pre_aspect} {post_aspect}".strip()
+        aspect = re.sub(r"\bgiữa\s*$", "", aspect, flags=re.IGNORECASE).strip()
+        doc_part = f"theo {doc}" if doc else ""
+        q1_parts = [aspect, e1, doc_part]
+        q2_parts = [aspect, e2, doc_part]
+        q1 = " ".join(p for p in q1_parts if p).strip()
+        q2 = " ".join(p for p in q2_parts if p).strip()
+        if q1 and q2:
+            return [q1, q2]
+
+    # Pattern D2: Multiple criteria / codes / programs / majors
+    match = _match_multi_named_entity(clean_query) or _MULTI_CRITERIA_RE.search(clean_query)
+    if match:
+        kind = match.group(1).strip()
+        code1 = match.group(2).rstrip(".,;:? ").strip()
+        code2 = match.group(3).rstrip(".,;:? ").strip()
+        q1 = clean_query[: match.start()] + f"{kind} {code1}" + clean_query[match.end() :]
+        q2 = clean_query[: match.start()] + f"{kind} {code2}" + clean_query[match.end() :]
+        # Clean up dangling "giữa" or "So sánh" if present
+        q1 = re.sub(r"\bgiữa\s+", "", q1, flags=re.IGNORECASE).strip()
+        q2 = re.sub(r"\bgiữa\s+", "", q2, flags=re.IGNORECASE).strip()
+        q1 = re.sub(r"^So sánh\s+", "", q1, flags=re.IGNORECASE).strip()
+        q2 = re.sub(r"^So sánh\s+", "", q2, flags=re.IGNORECASE).strip()
+        return [q1.strip(), q2.strip()]
+
+    # Pattern F: Explicit multiple codes / majors without structured conjunction
+    codes = list(dict.fromkeys(_CODE_RE.findall(clean_query)))
+    if len(codes) >= 2:
+        sub_queries = []
+        for code in codes[:3]:
+            other_codes = [c for c in codes if c != code]
+            focused = clean_query
+            for oc in other_codes:
+                focused = re.sub(rf"\b{re.escape(oc)}\b\s*(?:và|với|,)?\s*", "", focused, flags=re.IGNORECASE)
+            focused = re.sub(r"^So sánh\s+", "", focused, flags=re.IGNORECASE)
+            focused = re.sub(r"\s*(?:và|với|,)?\s*$", "", focused).strip()
+            if code not in focused:
+                focused = f"Mã {code} {focused}".strip()
+            sub_queries.append(focused)
+        if sub_queries:
+            return sub_queries[:3]
 
     # Rule-based syntactic/clause extraction
     clauses = [c.strip() for c in _SPLIT_PATTERN.split(clean_query) if c.strip()]

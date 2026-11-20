@@ -236,11 +236,28 @@ async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, a
                 continue
             cols = table.get("column_count", 0)
             inherited = last_opening_headers.get(cols)
+            p_num = entry.get("page_number") or entry.get("page")
+            page_list = (
+                [p_num]
+                if isinstance(p_num, int)
+                else (p_num if isinstance(p_num, list) else [])
+            )
+            heading_prefix = entry.get("heading") or entry.get("section_heading") or ""
+            base_title = entry.get("title") or ""
+            if heading_prefix and base_title and base_title != publication.document.title:
+                table_title = f"{heading_prefix}: {base_title}"
+            elif heading_prefix:
+                table_title = heading_prefix
+            elif base_title:
+                table_title = base_title
+            else:
+                table_title = publication.document.title
+
             projected = project_table(
                 table,
                 table_id=citation,
                 source_table_citation=citation,
-                title=entry.get("title") or publication.document.title,
+                title=table_title,
                 column_years=column_years_for_table(citation, annotations),
                 inherited_header_rows=inherited,
             )
@@ -270,7 +287,9 @@ async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, a
                         hr = [0]
                 if hr:
                     last_opening_headers[cols] = [table["rows"][r] for r in hr]
-            cards = render_projection_to_cards(projected, document_meta=doc_meta)
+            cards = render_projection_to_cards(
+                projected, document_meta=doc_meta, page_numbers=page_list
+            )
             total_cards += len(cards)
             serialized_notes = [note.model_dump(mode="json") for note in projected.scoped_notes]
             for fact in projected.facts:

@@ -30,6 +30,8 @@ export type AssistantFormState = {
   maxOutputTokens: string;
   isActive: boolean;
   policy: RagPolicyFormState;
+  suggestedPrompts: string[];
+  temperature: string;
 };
 
 /** The effective collection set; scalar ``collection_id`` mirrors its first entry. */
@@ -41,6 +43,9 @@ export function collectionIdsOf(assistant: AssistantResponse): string[] {
 export function initialState(
   assistant?: AssistantResponse | null,
 ): AssistantFormState {
+  const policyForm = ragPolicyToForm(
+    assistant?.rag_policy ?? NEW_ASSISTANT_POLICY,
+  );
   return {
     name: assistant?.name ?? "",
     description: assistant?.description ?? "",
@@ -54,7 +59,14 @@ export function initialState(
         ? String(assistant.max_output_tokens)
         : "",
     isActive: assistant?.is_active ?? true,
-    policy: ragPolicyToForm(assistant?.rag_policy ?? NEW_ASSISTANT_POLICY),
+    policy: policyForm,
+    suggestedPrompts:
+      assistant?.rag_policy?.suggested_prompts ??
+      (assistant?.suggested_prompts ?? []),
+    temperature:
+      assistant?.rag_policy?.temperature != null
+        ? String(assistant.rag_policy.temperature)
+        : policyForm.temperature || "auto",
   };
 }
 
@@ -90,6 +102,12 @@ export function validateAssistantForm(form: AssistantFormState): string | null {
       return "Giới hạn token đầu ra phải là số nguyên dương hoặc để trống.";
     }
   }
+  if (form.temperature !== "auto" && form.temperature.trim()) {
+    const temp = Number(form.temperature);
+    if (Number.isNaN(temp) || temp < 0 || temp > 2) {
+      return "Độ linh hoạt diễn đạt (Temperature) phải từ 0.0 đến 2.0 hoặc chọn Tự động.";
+    }
+  }
   return validateRagPolicy(form.policy, topK);
 }
 
@@ -97,6 +115,15 @@ export function buildAssistantPayload(
   form: AssistantFormState,
   basePolicy: RagPolicy,
 ): AssistantCreateRequest {
+  const policy = formToRagPolicy(form.policy, basePolicy);
+  policy.temperature =
+    form.temperature === "auto" || !form.temperature.trim()
+      ? null
+      : Number(form.temperature);
+  policy.suggested_prompts = form.suggestedPrompts
+    .map((p) => p.trim())
+    .filter(Boolean);
+
   return {
     name: form.name.trim(),
     description: form.description.trim(),
@@ -110,6 +137,6 @@ export function buildAssistantPayload(
       ? Number(form.maxOutputTokens)
       : null,
     is_active: form.isActive,
-    rag_policy: formToRagPolicy(form.policy, basePolicy),
+    rag_policy: policy,
   };
 }

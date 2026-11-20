@@ -99,11 +99,39 @@ def test_retrieval_facets_context_enrichment():
 
 
 def test_drafting_guidelines_and_version():
-    """Verify prompt version v41 and guidelines for comparison, aggregation, and advisory."""
-    assert PROMPT_VERSION == "qnu.rag.answer/v41"
+    """Verify prompt version v42 and guidelines for comparison, aggregation, and advisory."""
+    assert PROMPT_VERSION == "qnu.rag.answer/v42"
     assert "SO SÁNH, THỐNG KÊ, TƯ VẤN VÀ CÂU HỎI GHÉP NHIỀU MỤC" in SYSTEM_PROMPT
     assert "SO SÁNH:" in SYSTEM_PROMPT
+    assert "ĐỐI SOÁT LIÊN VĂN BẢN (giữa A và B):" in SYSTEM_PROMPT
     assert "THỐNG KÊ & TỔNG HỢP:" in SYSTEM_PROMPT
     assert "TƯ VẤN & ĐỊNH HƯỚNG:" in SYSTEM_PROMPT
     assert "CÂU HỎI GHÉP NHIỀU MỤC / ĐẦU VIỆC:" in SYSTEM_PROMPT
     assert "so sánh/thống kê/tư vấn" in APPEAL_INSTRUCTION
+
+
+def test_multi_major_and_codes_decomposition():
+    """Verify queries comparing or querying multiple majors/codes split into sub-queries."""
+    q_majors = (
+        "Ngành Kế toán (mã 7340301) và ngành Kiểm toán (mã 7340302) có số liệu chỉ tiêu, "
+        "số trúng tuyển nhập học và điểm trúng tuyển năm 2024 và 2025 như thế nào?"
+    )
+    assert needs_decomposition(q_majors) is True
+    subs_majors = decompose_query(q_majors)
+    assert len(subs_majors) == 2
+    assert "7340301" in subs_majors[0]
+    assert "7340302" in subs_majors[1]
+
+    q_compare_codes = "So sánh 7340201 và 7340301 về chỉ tiêu 2024 và 2025"
+    assert needs_decomposition(q_compare_codes) is True
+    subs_codes = decompose_query(q_compare_codes)
+    assert len(subs_codes) == 2
+    assert "7340201" in subs_codes[0]
+    assert "7340301" in subs_codes[1]
+
+    q_cross_doc = "So sánh vai trò và nhiệm vụ của Phòng Đào tạo giữa KH 130/KH-ĐHQN và KH 07/KH-AM"
+    assert needs_decomposition(q_cross_doc) is True
+    subs_doc = decompose_query(q_cross_doc)
+    assert len(subs_doc) == 2
+    assert "KH 130/KH-ĐHQN" in subs_doc[0]
+    assert "KH 07/KH-AM" in subs_doc[1]

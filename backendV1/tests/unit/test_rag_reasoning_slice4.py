@@ -215,7 +215,7 @@ def test_build_row_card_chunks_integration():
 # ============================================================================
 
 def test_prompt_version_and_system_instructions():
-    assert PROMPT_VERSION == "qnu.rag.answer/v41"
+    assert PROMPT_VERSION == "qnu.rag.answer/v42"
     assert "<phan_tich>" in SYSTEM_PROMPT
     assert "</phan_tich>" in SYSTEM_PROMPT
     assert "Bước 1" in SYSTEM_PROMPT

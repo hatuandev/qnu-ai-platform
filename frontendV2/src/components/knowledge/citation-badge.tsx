@@ -1,4 +1,4 @@
-import { Check, Copy, FileText } from "lucide-react";
+import { Check, Copy, ExternalLink, FileText } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ export interface CitationBadgeProps {
   excerpt?: string;
   fullText?: string;
   className?: string;
+  onSelect?: (index: number, rawKey: string) => void;
 }
 
 /**
@@ -34,6 +35,7 @@ export function CitationBadge({
   excerpt,
   fullText,
   className,
+  onSelect,
 }: CitationBadgeProps) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -61,11 +63,16 @@ export function CitationBadge({
         <button
           type="button"
           aria-label={`Xem nguồn trích dẫn số [${index}]`}
+          onClick={() => {
+            if (onSelect) {
+              onSelect(index, rawKey);
+            }
+          }}
           className={cn(
             "inline-flex items-center justify-center font-mono text-[11px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 hover:text-primary px-1.5 py-0.5 rounded transition-colors ml-1 align-baseline cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary shadow-2xs",
             className,
           )}
-          title={`Căn cứ [${index}]: Bấm để xem nguồn trích dẫn`}
+          title={`Căn cứ [${index}]: Bấm để mở ngăn đối soát nguồn trích dẫn`}
         >
           [{index}]
         </button>
@@ -73,22 +80,37 @@ export function CitationBadge({
       <PopoverContent
         align="start"
         sideOffset={6}
-        className="w-84 sm:w-96 max-w-[92vw] p-3.5 space-y-2.5 text-xs bg-card border border-border/70 shadow-md rounded-xl select-text"
+        className="w-84 sm:w-96 max-w-[92vw] p-3.5 space-y-2.5 text-xs bg-card border border-border/70 shadow-md rounded-xl select-text z-50"
       >
         <div className="flex items-center justify-between border-b border-border/50 pb-2">
           <div className="font-semibold text-foreground flex items-center gap-1.5">
             <FileText className="size-4 text-primary" />
             <span>Căn cứ trích dẫn [{index}]</span>
           </div>
-          {location && (
-            <Badge
-              variant="outline"
-              className="text-[10px] px-1.5 py-0 font-medium max-w-[180px] truncate"
-              title={location}
-            >
-              {location}
-            </Badge>
-          )}
+          <div className="flex items-center gap-1.5">
+            {onSelect && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-5 px-1.5 text-[10px] gap-1 text-primary hover:bg-primary/10 cursor-pointer"
+                onClick={() => onSelect(index, rawKey)}
+                title="Mở ngăn đối chiếu bên phải"
+              >
+                <ExternalLink className="size-2.5" />
+                <span>Xem chi tiết</span>
+              </Button>
+            )}
+            {location && (
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 font-medium max-w-[150px] truncate"
+                title={location}
+              >
+                {location}
+              </Badge>
+            )}
+          </div>
         </div>
 
         <div className="space-y-1.5 text-muted-foreground">

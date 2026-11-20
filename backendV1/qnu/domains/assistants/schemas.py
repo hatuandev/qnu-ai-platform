@@ -11,6 +11,13 @@ class AssistantRagPolicy(RagPolicy):
     """RAG policy plus assistant-only behavior; stored in the existing JSONB column."""
 
     guardrail_policy: GuardrailPolicy = Field(default_factory=GuardrailPolicy)
+    suggested_prompts: list[str] = Field(default_factory=list, max_length=10)
+
+    @field_validator("suggested_prompts")
+    @classmethod
+    def clean_suggested_prompts(cls, values: list[str]) -> list[str]:
+        cleaned = [v.strip() for v in values if isinstance(v, str) and v.strip()]
+        return cleaned[:10]
 
 
 class AssistantConfig(BaseModel):

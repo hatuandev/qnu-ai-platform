@@ -59,9 +59,11 @@ function sourceKindLabel(kind: string): string {
 function StatementList({
   statements,
   sources,
+  onSelectEvidence,
 }: {
   statements: { text: string; evidence_ids: string[] }[];
   sources: AnswerSource[];
+  onSelectEvidence?: (evidenceId: string, index: number) => void;
 }) {
   const indexByEvidence = new Map(
     sources.map((source, index) => [source.evidence_id, index + 1]),
@@ -86,6 +88,7 @@ function StatementList({
               location={source ? sourceLocation(source) : undefined}
               excerpt={fullText}
               fullText={fullText}
+              onSelect={(idx, key) => onSelectEvidence?.(key, idx)}
             />
           );
         });
@@ -273,7 +276,13 @@ function InsufficientEvidenceCallout({ result }: { result: AnswerResult }) {
   );
 }
 
-export function AnswerBody({ result }: { result: AnswerResult }) {
+export function AnswerBody({
+  result,
+  onSelectEvidence,
+}: {
+  result: AnswerResult;
+  onSelectEvidence?: (evidenceId: string, index: number) => void;
+}) {
   if (result.status === "insufficient_evidence") {
     return <InsufficientEvidenceCallout result={result} />;
   }
@@ -293,6 +302,7 @@ export function AnswerBody({ result }: { result: AnswerResult }) {
         <StatementList
           statements={result.statements}
           sources={result.sources}
+          onSelectEvidence={onSelectEvidence}
         />
       ) : result.message ? (
         <MarkdownContent content={result.message} compact />
@@ -300,22 +310,35 @@ export function AnswerBody({ result }: { result: AnswerResult }) {
         <MarkdownContent content={result.answer} compact />
       ) : null}
       {result.sources.length > 0 ? (
-        <Collapsible>
-          <CollapsibleTrigger asChild>
+        <div className="flex items-center gap-2 pt-1 flex-wrap">
+          {onSelectEvidence && (
             <Button
-              variant="ghost"
+              type="button"
+              variant="outline"
               size="sm"
-              className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground cursor-pointer hover:text-foreground"
+              className="h-7 gap-1.5 px-2.5 text-[11px] font-medium text-primary border-primary/30 hover:bg-primary/10 cursor-pointer shadow-2xs"
+              onClick={() => onSelectEvidence(result.sources[0]?.evidence_id, 1)}
             >
-              <Quote className="size-3.5" />
-              <span>{result.sources.length} nguồn trích dẫn</span>
-              <ChevronDown className="size-3.5 transition-transform data-[state=open]:rotate-180" />
+              <Quote className="size-3" />
+              <span>Xem {result.sources.length} nguồn dẫn chứng đối soát</span>
             </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2">
-            <SourceList sources={result.sources} />
-          </CollapsibleContent>
-        </Collapsible>
+          )}
+          <Collapsible className={onSelectEvidence ? "inline-block" : "w-full"}>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-[11px] text-muted-foreground cursor-pointer hover:text-foreground"
+              >
+                <span>{onSelectEvidence ? "Xem nhanh tại chỗ" : `${result.sources.length} nguồn trích dẫn`}</span>
+                <ChevronDown className="size-3 transition-transform data-[state=open]:rotate-180" />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <SourceList sources={result.sources} />
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
       ) : null}
     </div>
   );

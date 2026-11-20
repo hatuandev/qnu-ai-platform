@@ -223,6 +223,31 @@ def test_supported_report_requires_resolving_quotes_and_numeric_support():
     )
 
 
+def test_rag_policy_temperature_and_assistant_suggested_prompts():
+    policy = RagPolicy.model_validate({"temperature": 0.2})
+    assert policy.temperature == 0.2
+    none_policy = RagPolicy.model_validate({"temperature": None})
+    assert none_policy.temperature is None
+    with pytest.raises(ValidationError):
+        RagPolicy.model_validate({"temperature": -0.1})
+    with pytest.raises(ValidationError):
+        RagPolicy.model_validate({"temperature": 2.5})
+
+    config = AssistantCreate(
+        name="Test",
+        collection_id="collection",
+        rag_policy={
+            "temperature": 0.1,
+            "suggested_prompts": [
+                "  Chỉ tiêu năm 2025?  ",
+                "Tiêu chí LMS?",
+            ],
+        },
+    )
+    assert config.rag_policy.temperature == 0.1
+    assert config.rag_policy.suggested_prompts == ["Chỉ tiêu năm 2025?", "Tiêu chí LMS?"]
+
+
 @pytest.mark.parametrize(
     "case", ["missing", "duplicate", "foreign_id", "invented_quote", "no_quotes", "wrong_index"]
 )

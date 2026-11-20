@@ -18,6 +18,7 @@ import { AssistantCard } from "@/components/assistants/assistant-card";
 import { AssistantFormDialog } from "@/components/assistants/assistant-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { sanitizeDisplayText } from "@/lib/utils";
 import { useUiStore } from "@/lib/ui-store";
 
 export const Route = createFileRoute("/assistants/")({
@@ -36,7 +37,8 @@ function boundCollectionLabel(
   if (!ids.length) return "Chưa gắn kho tri thức";
   const labels = ids
     .map((id) => names.get(id))
-    .filter((name): name is string => Boolean(name));
+    .filter((name): name is string => Boolean(name))
+    .map((name) => sanitizeDisplayText(name));
   return labels.length ? labels.join(" · ") : "Kho tri thức không khả dụng";
 }
 

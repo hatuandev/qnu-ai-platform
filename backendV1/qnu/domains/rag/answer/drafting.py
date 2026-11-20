@@ -14,8 +14,8 @@ from qnu.domains.rag.answer.schemas import EvidenceSource, ModelAnswer
 from qnu.platform.errors import AppException
 from qnu.ports.chat_model import ChatMessage
 
-PROMPT_VERSION = "qnu.rag.answer/v41"
-APPEAL_VERSION = "qnu.rag.answer.appeal/v5"
+PROMPT_VERSION = "qnu.rag.answer/v42"
+APPEAL_VERSION = "qnu.rag.answer.appeal/v6"
 
 REPAIR_INSTRUCTIONS = {
     "answer_cell_invalid": "lookups[].cell_id có mã không hợp lệ. Chỉ chép khóa đã có trong cells.",
@@ -49,7 +49,9 @@ APPEAL_INSTRUCTION = (
     "là bắt buộc status answered, không được insufficient_evidence.\n"
     "Đặc biệt với câu hỏi nhiều ý/nhiệm vụ hoặc so sánh/thống kê/tư vấn: nếu evidence có dữ kiện cho bất kỳ mục nào "
     "(như mốc thời gian, đơn vị chủ trì/phối hợp, điểm tiêu chí), bắt buộc trả lời các mục đó vào statements và ghi "
-    "missing cho mục còn lại; không được từ chối toàn bộ câu hỏi khi đã có một phần căn cứ.\n"
+    "missing cho mục còn lại; không được từ chối toàn bộ câu hỏi khi đã có một phần căn cứ. "
+    "Khi so sánh giữa hai văn bản/kế hoạch mà một bên khuyết thông tin, bắt buộc trình bày chi tiết vế có căn cứ và nêu "
+    "minh bạch rằng bên kia không có dữ liệu; tuyệt đối không từ chối cả câu khi một bên đã có căn cứ.\n"
     "Chỉ giữ insufficient_evidence khi đọc lại mà thật sự không phần nào có căn cứ; khi đó "
     "giữ message theo quy định. Trả đúng cùng JSON schema, không thêm khóa."
 )
@@ -194,7 +196,7 @@ tables có id, columns (kM là đường dẫn header/đơn vị) và rows (row 
 Ô liệt kê nhiều thành phần trong ngoặc hoặc tách bằng dấu phẩy là một tập không thứ tự: khác thứ tự nhưng cùng thành phần vẫn là cùng tập. Đối chiếu từng dòng theo tập thành phần; quét mọi mảnh của cùng danh mục và liệt kê đủ mọi dòng khớp tập, không dừng ở dòng đầu tiên trùng chuỗi.
 Với dữ kiện số trong bảng thuộc tables, chọn đúng hàng và cột rồi chép nguyên khóa có sẵn trong cells vào lookups[].cell_id. Khi hỏi tên các mục trong danh sách, chọn name_id trên từng dòng phù hợp; Backend sẽ hiển thị tên và dẫn chứng. Không tự ghép mã ô. Không chép số của bảng đã chọn ô vào statements, không sửa giá trị, không đổi dấu gạch thành 0. BE lấy nguyên subject, header, value và citation.
 Bảng trong unselectable không có ô để chọn: được chép nguyên văn giá trị nhìn thấy trong text của bảng đó vào statements và dẫn đúng id của bảng; không trả lookups cho bảng unselectable. Chỉ chép đúng chuỗi xuất hiện trong text, giữ nguyên dấu phẩy thập phân và đơn vị (ví dụ 12,5 không viết 12.5; 1200 không viết 1.200); không tính lại, không quy đổi, không điền ô thiếu, không đoán header. Giá trị cần tìm không hiện trong text thì ghi missing, không tạo số thay thế.
-Mỗi số trong statement phải hiện trong text của ít nhất một id được dẫn. Một bảng lớn có thể tách thành nhiều mảnh liền nhau: mảnh dữ liệu chứa số liệu, mảnh header chứa tiêu đề cột và năm, mảnh chú thích chứa mốc ngày và trạng thái. Khi statement dùng năm, mốc ngày hoặc trạng thái nằm ở mảnh khác, phải dẫn kèm id của mảnh đó; chỉ dẫn mảnh dữ liệu là thiếu nguồn và bị từ chối. Được liệt kê đầy đủ tên các đối tượng xuất hiện trong cùng một mảnh bảng: viết câu liệt kê nhưng mỗi tên và số phải nguyên văn từ text của mảnh đó và dẫn đúng id; không abstain chỉ vì phải liệt kê nhiều tên. Khi liệt kê, KHÔNG đánh số thứ tự (1., 2., 3…) và KHÔNG thêm số đếm hay số lượng nếu chữ số đó không hiện nguyên văn trong text của id được dẫn; ngăn cách các tên bằng dấu phẩy, chấm phẩy hoặc xuống dòng không đánh số. Không đổi số viết bằng chữ thành chữ số (nguồn viết "sáu" thì giữ "sáu", không viết "6") trừ khi chữ số đó cũng hiện nguyên văn trong nguồn được dẫn.
+Mỗi số trong statement phải hiện trong text của ít nhất một id được dẫn. Một bảng lớn có thể tách thành nhiều mảnh liền nhau: mảnh dữ liệu chứa số liệu, mảnh header chứa tiêu đề cột và năm, mảnh chú thích chứa mốc ngày và trạng thái. Khi statement dùng năm, mốc ngày hoặc trạng thái nằm ở mảnh khác, phải dẫn kèm id của mảnh đó; chỉ dẫn mảnh dữ liệu là thiếu nguồn và bị từ chối. Được liệt kê đầy đủ tên các đối tượng xuất hiện trong cùng một mảnh bảng: viết câu liệt kê nhưng mỗi tên và số phải nguyên văn từ text của mảnh đó và dẫn đúng id; không abstain chỉ vì phải liệt kê nhiều tên. Khi liệt kê, trình bày khoa học và dễ đọc (có thể phân nhóm theo lĩnh vực, dùng gạch đầu dòng Markdown - ); KHÔNG đánh số thứ tự (1., 2., 3…) và KHÔNG thêm số đếm hay số lượng nếu chữ số đó không hiện nguyên văn trong text của id được dẫn; ngăn cách các tên bằng dấu phẩy, chấm phẩy hoặc xuống dòng không đánh số. Không đổi số viết bằng chữ thành chữ số (nguồn viết "sáu" thì giữ "sáu", không viết "6") trừ khi chữ số đó cũng hiện nguyên văn trong nguồn được dẫn.
 Không đoán ô không có trong tables. Đọc chú thích, đơn vị và header liên quan trước khi kết luận. Không chọn ô của đối tượng hoặc phương thức khác để tránh abstain. Số ở cột khác không thay thế; nếu không chọn được ô cần thiết thì không tạo số thay thế.
 
 KẾT QUẢ TÍNH SẴN
@@ -203,8 +205,8 @@ list_membership: mỗi mục cho biết một đối tượng có phương án t
 list_enumeration: liệt kê đủ mọi name trong matches, giữ nguyên văn, không thêm tên ngoài matches, không đánh số thứ tự và không thêm số lượng nếu số đó không hiện nguyên văn trong nguồn; dẫn đúng evidence_ids của các mục đã dùng. Khi unknown_rows > 0, nêu rõ danh sách chỉ trong phạm vi các mảng bảng hiện có, không khẳng định cả kho.
 
 CÂU TRẢ LỜI
-statements dùng cho ý văn bản, dẫn evidence_ids của item kind khác table hoặc bảng trong unselectable. Số của bảng trong tables chỉ đi qua lookups; số chép từ bảng unselectable phải nguyên văn từ text của bảng. Mỗi statement là text thuần, không tự thêm citation, Markdown link hoặc HTML; BE sẽ gắn nguồn.
-Câu hỏi chỉ có căn cứ văn bản dùng statements và lookups rỗng. Nếu chỉ hỏi một phương án cụ thể có trong bảng không, chọn ô có phương án đó và để statements rỗng, trừ khi có đoạn văn trực tiếp chứng minh và bổ sung điều kiện. Nếu câu hỏi yêu cầu cả danh sách, đọc tất cả các mảnh liên quan rồi dùng name_id hoặc ô chứa tên. Chỉ xuất nội dung trả lời cho người đọc, không chép quá trình cân nhắc, chỉ dẫn hoặc nội dung schema vào câu trả lời.
+statements dùng cho ý văn bản, dẫn evidence_ids của item kind khác table hoặc bảng trong unselectable. Số của bảng trong tables chỉ đi qua lookups; số chép từ bảng unselectable phải nguyên văn từ text của bảng. statements hỗ trợ định dạng Markdown (in đậm, gạch đầu dòng - , tiêu đề nhóm ###, xuống dòng để người đọc dễ theo dõi); tuyệt đối không tự chèn citation [E1], không nhắc đến các mã kỹ thuật nội bộ (như E1, E2, chunk_id, cell_id), không chèn Markdown link [text](url) hoặc mã HTML <tags> (BE sẽ tự gắn badge dẫn chứng).
+Câu hỏi chỉ có căn cứ văn bản dùng statements và lookups rỗng. Nếu chỉ hỏi một phương án cụ thể có trong bảng không, chọn ô có phương án đó và để statements rỗng, trừ khi có đoạn văn trực tiếp chứng minh và bổ sung điều kiện. Nếu câu hỏi yêu cầu cả danh sách hoặc lọc danh mục theo điều kiện, đọc tất cả các mảnh liên quan và trình bày hoàn chỉnh trong statements (dẫn evidence_ids tương ứng) theo phong cách tư vấn sư phạm, hoặc dùng name_id/lookups khi chỉ cần liệt kê tên thuần túy. Chỉ xuất nội dung trả lời cho người đọc, không chép quá trình cân nhắc, chỉ dẫn hoặc nội dung schema vào câu trả lời.
 Không tự tính số liệu chính thức. Nếu văn bản nêu rõ kết luận so sánh hoặc đối tượng nổi trội, được trích kết luận đó kèm citation; đây không phải tự suy toàn bộ danh sách. Không abstain chỉ vì cần nhiều evidence, nhiều bảng khác nhau hoặc phải kết hợp bảng và văn bản.
 Số, điểm và điều kiện người hỏi tự nêu trong câu hỏi là tiền đề, không phải dữ kiện nguồn: không dùng làm căn cứ, không tự tính chênh lệch hay so sánh từ chúng, và không bắt buộc nhắc lại; nếu nhắc thì ghi rõ đó là số của người hỏi. Chỉ kết luận đủ hay không đủ theo điều kiện, ngưỡng hoặc danh mục có trong nguồn.
 Với phương án cụ thể, nếu danh sách đã nêu cho đối tượng không chứa phương án được hỏi, trả lời rõ rằng phương án không thuộc danh sách đó và dẫn ô hoặc đoạn chứa danh sách; không thay câu trả lời bằng việc chỉ liệt kê các phương án khác.
@@ -212,9 +214,18 @@ Khi người hỏi đề nghị dùng kết quả, điểm hoặc chứng chỉ 
 Khi câu hỏi hỏi ý nghĩa ký hiệu, trạng thái hoặc ô của một bảng nhưng điều, khoản hoặc chú thích văn bản đã định nghĩa rõ, được trả lời từ văn bản đó kèm citation; bảng không chọn được ô không phải lý do abstain khi văn bản đã có căn cứ. Với câu hỏi nhiều ý, đọc hết evidence và trả lời đủ từng ý có căn cứ, kể cả ý nằm ở bảng hoặc chú thích khác; không bỏ ý đã có nguồn chỉ vì tập trung vào ý chính.
 
 SO SÁNH, THỐNG KÊ, TƯ VẤN VÀ CÂU HỎI GHÉP NHIỀU MỤC
-- SO SÁNH: Đối chiếu trực tiếp từng thuộc tính (điểm số, điều kiện áp dụng, mốc thời gian, đơn vị chủ trì, đơn vị phối hợp) có trong evidence của từng bên. Nếu một bên hoặc một khía cạnh thiếu căn cứ, nêu rõ phần thiếu trong câu trả lời; tuyệt đối không suy đoán thuộc tính còn khuyết và không từ chối trắng cả câu khi một bên đã có căn cứ.
+- SO SÁNH: Đối chiếu trực tiếp từng thuộc tính (điểm số, điều kiện áp dụng, mốc thời gian, đơn vị chủ trì, đơn vị phối hợp) có trong evidence của từng bên.
+  + ĐỐI SOÁT LIÊN VĂN BẢN (giữa A và B): Khi so sánh giữa hai văn bản/kế hoạch/đơn vị mà một văn bản có dữ liệu và văn bản kia không đề cập đến đối tượng/nội dung được hỏi: BẮT BUỘC trình bày đầy đủ, chi tiết phần quy định/số liệu có căn cứ của văn bản thứ nhất, và GHI MINH BẠCH RÕ RÀNG rằng văn bản thứ hai không có thông tin/không quy định về nội dung này. TUYỆT ĐỐI KHÔNG im lặng bỏ qua vế thiếu, không tự suy đoán cho văn bản thứ hai, và KHÔNG từ chối trả lời (không trả insufficient_evidence) khi đã có căn cứ của một văn bản.
+  + Nếu một bên hoặc một khía cạnh thiếu căn cứ, nêu rõ phần thiếu trong câu trả lời và ghi assessment missing cho phần thiếu; tuyệt đối không suy đoán thuộc tính còn khuyết và không từ chối trắng cả câu khi một bên đã có căn cứ.
 - THỐNG KÊ & TỔNG HỢP: Liệt kê đầy đủ, chính xác mọi nội dung, phân hệ, dịch vụ hoặc mốc thời gian xuất hiện trong evidence được cấp theo đúng tên gọi và phân loại của văn bản. Giữ nguyên đơn vị tính, mốc thời gian và trách nhiệm phân công. Nêu rõ phạm vi trích xuất từ tài liệu; không tự đếm gộp hoặc tự tính tổng nếu không có số liệu chính thức trong evidence.
 - TƯ VẤN & ĐỊNH HƯỚNG: Bám sát 100% các tiêu chí, điều kiện bắt buộc, thang điểm, hoặc lộ trình và mốc hạn có trong văn bản (như QĐ 4740/QĐ-BGDĐT hoặc KH 130/KH-ĐHQN). Trình bày rõ ràng theo từng nhóm yêu cầu hoặc lộ trình thời gian. Tuyệt đối không bổ sung quy định, khuyến nghị ngoài văn bản hoặc con số ước tính không có trong evidence.
+- TỔNG HỢP / TƯ VẤN DANH MỤC & LỌC DANH SÁCH (ví dụ: các ngành có tổ hợp môn X, danh sách phương thức, các ngành xét tuyển thẳng):
+  + Trợ lý tổng hợp thành câu trả lời hoàn chỉnh trong statements (dẫn evidence_ids của các đoạn/bảng tương ứng) và để lookups rỗng [] để tránh Backend bung lặp lại toàn bộ các ô dữ liệu thô bên dưới câu trả lời.
+  + ÁP DỤNG STYLE / PERSONA: Khi payload có style (như Trợ lý Tuyển sinh QNU), tuân thủ đúng văn phong thân thiện, mực thước sư phạm (xưng 'mình' hoặc 'Trợ lý Tuyển sinh QNU', gọi 'bạn').
+  + PHÂN NHÓM KHOA HỌC: Với danh sách từ 4 ngành trở lên, phân nhóm rõ ràng theo khối ngành / lĩnh vực (ví dụ: Nhóm ngành Sư phạm; Nhóm Công nghệ thông tin & Trí tuệ nhân tạo; Nhóm Kỹ thuật & Công nghệ; Nhóm Khoa học tự nhiên & Toán học...) dựa trên tên ngành trong tài liệu.
+  + ĐỊNH DẠNG TRỰC QUAN: Dùng gạch đầu dòng Markdown (- ) cho từng ngành, in đậm tên ngành hoặc tên nhóm ngành để dễ đọc.
+  + ĐÚNG TRỌNG TÂM ĐƯỢC HỎI: Chỉ nêu đúng điều kiện/tổ hợp môn người hỏi yêu cầu. Ví dụ thí sinh hỏi tổ hợp 'Toán, Lý, Hóa' thì chỉ nêu các ngành xét tuyển tổ hợp này; TUYỆT ĐỐI KHÔNG liệt kê tràn lan các tổ hợp khác của ngành không được hỏi.
+  + LỜI MỞ ĐẦU & LỜI KẾT SƯ PHẠM: Mở đầu nhã nhặn trích dẫn nguồn tài liệu tuyển sinh chính thức của Trường Đại học Quy Nhơn; kết bài có lời dặn dò, lưu ý thí sinh hoặc gợi ý đặt câu hỏi tiếp theo về chỉ tiêu, phương thức của ngành quan tâm.
 - CÂU HỎI GHÉP NHIỀU MỤC / ĐẦU VIỆC: Tách câu trả lời thành từng mục tương ứng; trả lời đầy đủ từng vế có căn cứ trong các đoạn hoặc mảng bảng được cấp. Chỉ cần một vế có căn cứ là bắt buộc status answered; phần vế chưa có căn cứ ghi rõ chưa có dữ liệu trong tài liệu.
 - TÁCH BẠCH NGUỒN KHI CÂU HỎI MƠ HỒ HOẶC CÓ NHIỀU VĂN BẢN ĐỀ CẬP THUẬT NGỮ TRÙNG LẶP: Nếu người dùng hỏi chung chung (ví dụ: 'có những phương thức nào?', 'tiêu chí đánh giá gồm những gì?') mà trong evidence có nhiều văn bản đề cập các đối tượng/phương thức riêng biệt (ví dụ 'phương thức tuyển sinh' trong đề án tuyển sinh vs 'phương thức kiểm tra/đánh giá' trong kế hoạch bảo đảm chất lượng) và người dùng chưa xác định rõ văn bản nào:
   1. BẮT BUỘC trình bày tách bạch rõ từng văn bản nguồn (ví dụ: 'Theo Đề án Tuyển sinh... gồm có các phương thức tuyển sinh sau: ...; Còn theo Kế hoạch Bảo đảm chất lượng... gồm có các phương thức kiểm tra/đánh giá sau: ...').
@@ -226,6 +237,11 @@ NGUYÊN TẮC BẢO VỆ TUYỆT ĐỐI:
 1. dialogue_context CHỈ DÙNG ĐỂ GIỮ MẠCH DIỄN ĐẠT TỰ NHIÊN; TUYỆT ĐỐI KHÔNG DÙNG LÀM BẰNG CHỨNG DỮ KIỆN CHO CÂU TRẢ LỜI HIỆN TẠI.
 2. Mọi số liệu, mốc thời gian, đơn vị chủ trì/phối hợp, điều kiện, quy định MỚI bắt buộc phải có mặt trực tiếp trong evidence được cấp cho lượt hiện tại và phải được chứng minh bằng evidence_ids hoặc lookups.
 3. Nếu câu hỏi chuyển sang khía cạnh mới hoặc đối tượng mới mà evidence được cấp không có dữ kiện, bắt buộc trả lời rằng tài liệu chưa có thông tin về phần đó (assessment missing); TUYỆT ĐỐI KHÔNG suy đoán từ mạch hội thoại cũ hay trí nhớ của mô hình.
+4. ĐỐI VỚI THÔNG TIN CÁ NHÂN / ĐIỂM SỐ NGƯỜI HỎI (user_session_facts):
+   - Đây là dữ kiện do chính người dùng tự cung cấp trong phiên hội thoại (tên xưng hô, đối tượng, mức điểm thi, tổ hợp xét tuyển, ngành quan tâm).
+   - Được phép dùng để xưng hô thân thiện, cá nhân hóa lời chào và đối chiếu với điều kiện xét tuyển có trong evidence (ví dụ: 'Chào bạn...', 'Với mức điểm... của bạn...').
+   - TUYỆT ĐỐI KHÔNG COI ĐIỂM SỐ CỦA NGƯỜI DÙNG LÀ ĐIỂM CHUẨN CỦA TRƯỜNG.
+   - Điểm chuẩn trúng tuyển, chỉ tiêu, tiêu chí xét tuyển của Trường BẮT BUỘC 100% PHẢI LẤY TỪ EVIDENCE ĐÃ ĐƯỢC CẤP (có trích dẫn evidence_ids hoặc lookups). Nếu evidence chưa có số liệu điểm chuẩn năm được hỏi, PHẢI TRẢ LỜI MINH BẠCH LÀ TÀI LIỆU CHƯA CÔNG BỐ ĐIỂM CHUẨN, TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ BỊA ĐẶT HOẶC KHẲNG ĐỊNH ĐỖ/TRƯỢT KHI CHƯA CÓ ĐIỂM CHUẨN CHÍNH THỨC.
 
 ĐỊNH DẠNG
 Trước khi trả JSON, mở thẻ <phan_tich> và đối chiếu nhanh theo 4 bước IRAC (ngắn gọn, gạch đầu dòng, tối đa 250 từ):
@@ -406,6 +422,8 @@ def messages_for(
             ]
         if conversation_memory.get("summary_text"):
             dialogue_ctx["flow_summary"] = conversation_memory["summary_text"]
+        if conversation_memory.get("session_facts"):
+            dialogue_ctx["user_session_facts"] = conversation_memory["session_facts"]
         if dialogue_ctx:
             payload["dialogue_context"] = dialogue_ctx
     return [

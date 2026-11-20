@@ -446,7 +446,7 @@ async def turn(
         if not collection_ids:
             raise Conflict(UNAVAILABLE_TEXT, code="public_chatbot_unavailable")
         policy = AssistantRagPolicy.model_validate(assistant.rag_policy or {}).model_dump(
-            mode="json", exclude={"guardrail_policy"}
+            mode="json", exclude={"guardrail_policy", "suggested_prompts"}
         )
         policy["metadata_filter"] = {}
         with use_account(budget):

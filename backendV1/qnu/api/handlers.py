@@ -106,13 +106,23 @@ def register_exception_handlers(app: FastAPI) -> None:
             return _openai_response(
                 400, "Body hoặc tham số không được hỗ trợ/không đúng định dạng.", "invalid_request"
             )
+        field_errors: dict[str, list[str]] = {}
+        for err in exc.errors():
+            loc = ".".join(str(x) for x in err.get("loc", []) if x != "body")
+            field_errors.setdefault(loc or "body", []).append(str(err.get("msg", "invalid")))
+        print(f"REQUEST_VALIDATION_ERROR on {_.url.path}: {exc.errors()}", flush=True)
+        detail_msg = "Một hoặc nhiều trường không đúng định dạng."
+        if field_errors:
+            fields_str = ", ".join(field_errors.keys())
+            detail_msg = f"Một hoặc nhiều trường không đúng định dạng ({fields_str})."
         problem = ProblemDetail(
             type=problem_type("validation_error"),
             title="Dữ liệu không hợp lệ",
             status=422,
-            detail="Một hoặc nhiều trường không đúng định dạng.",
+            detail=detail_msg,
             code="validation_error",
             correlation_id=current_correlation_id(),
+            errors=field_errors or None,
         )
         return JSONResponse(
             status_code=422,

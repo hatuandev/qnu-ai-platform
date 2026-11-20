@@ -36,6 +36,44 @@ _SOCIAL_PREFIXES = (
     "ừ",
     "u",
 )
+_ACKNOWLEDGMENT_PHRASES = (
+    "tôi biết rồi",
+    "tôi biet roi",
+    "tôi hiểu rồi",
+    "toi hieu roi",
+    "mình biết rồi",
+    "minh biet roi",
+    "mình hiểu rồi",
+    "minh hieu roi",
+    "em hiểu rồi",
+    "em hieu roi",
+    "em biết rồi",
+    "em biet roi",
+    "dạ hiểu",
+    "da hieu",
+    "dạ em hiểu",
+    "da em hieu",
+    "dạ rõ rồi",
+    "da ro roi",
+    "rõ rồi",
+    "ro roi",
+    "ok rồi",
+    "ok roi",
+    "được rồi",
+    "duoc roi",
+    "cảm ơn",
+    "cam on",
+    "cảm ơn bạn",
+    "cam on ban",
+    "cảm ơn trợ lý",
+    "cam on tro ly",
+    "cảm ơn nhiều",
+    "cam on nhieu",
+    "thanks",
+    "thank you",
+    "ok",
+    "oke",
+)
 _WH = frozenset(
     {
         "gì",
@@ -121,6 +159,15 @@ def _hint(question: str, *, has_history: bool) -> dict:
     request_cue = next((cue for cue in _REQUEST_CUES if cue in text), None)
     if request_cue:
         signals.append("request_cue")
+    ack_match = next(
+        (ack for ack in _ACKNOWLEDGMENT_PHRASES if _starts_with(text, ack) or text == ack),
+        None,
+    )
+    if ack_match:
+        signals.append("acknowledgment")
+    # Acknowledgment phrases in ongoing conversations are directly recognized as courtesy/social
+    if ack_match and not has_wh and not has_digit and request_cue is None and len(tokens) <= 8:
+        return {"verdict": "social", "confidence": "high", "signals": signals}
     social = (
         not has_history
         and social_prefix is not None
