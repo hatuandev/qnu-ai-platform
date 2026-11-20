@@ -82,7 +82,17 @@ def pack_messages(req, sources, context, **options):
             context["computed"] = computed_summary
             return messages, cells, evidence, size, skipped
         trimmable = [index for index, source in enumerate(sources) if source.chunk_id in optional]
-        if not sources or not trimmable:
+        if not sources:
+            raise AppException(
+                "Bằng chứng bắt buộc vượt ngân sách context.",
+                code="answer_context_budget_exceeded",
+                status_code=422,
+            )
+        if not trimmable:
+            if len(sources) > 1:
+                worst = len(sources) - 1
+                skipped.append(sources.pop(worst).chunk_id)
+                continue
             raise AppException(
                 "Bằng chứng bắt buộc vượt ngân sách context.",
                 code="answer_context_budget_exceeded",

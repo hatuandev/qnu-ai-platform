@@ -156,6 +156,14 @@ TUYEN_SINH_PATTERN = re.compile(
     r"\b(?:tuyển sinh|xét tuyển|đề án tuyển sinh|chỉ tiêu|tổ hợp môn|điểm chuẩn|ngành sư phạm|mã xét tuyển|7140\d{3})\b",
     re.IGNORECASE,
 )
+CDS_PATTERN = re.compile(
+    r"\b(?:chuyển đổi số|bộ chỉ số cđs|cđs|lms|lcms|thư viện điện tử|thư viện số|học tập trực tuyến)\b",
+    re.IGNORECASE,
+)
+AUN_PATTERN = re.compile(
+    r"\b(?:aun-qa|aun qa|tự đánh giá sar|báo cáo sar|đánh giá ngoài ctđt|dgn ctđt|chuẩn kiểm định)\b",
+    re.IGNORECASE,
+)
 
 
 def is_single_document_scope(
@@ -203,9 +211,14 @@ def is_single_document_scope(
         for bare in re.findall(r"(?<!\d)(4740|130|07)(?!\d)", query):
             matched_buckets.add(bare)
 
-    # Standalone domain if no doc code matched (e.g. Tuyển sinh)
-    if not matched_buckets and TUYEN_SINH_PATTERN.search(norm):
-        matched_buckets.add("tuyensinh")
+    # Standalone domain if no doc code matched (e.g. Tuyển sinh, CĐS, AUN-QA)
+    if not matched_buckets:
+        if CDS_PATTERN.search(norm):
+            matched_buckets.add("4740")
+        elif AUN_PATTERN.search(norm):
+            matched_buckets.add("130")
+        elif TUYEN_SINH_PATTERN.search(norm):
+            matched_buckets.add("tuyensinh")
 
     return len(matched_buckets) == 1
 
@@ -232,7 +245,7 @@ def apply_source_diversity(
 
     top_score = getattr(candidates[0], "score", None)
     min_score_threshold = (
-        top_score * 0.2 if (isinstance(top_score, (int, float)) and top_score > 0.4) else None
+        top_score * 0.25 if (isinstance(top_score, (int, float)) and top_score > 0.4) else None
     )
 
     for hit in candidates:
@@ -247,7 +260,6 @@ def apply_source_diversity(
             min_score_threshold is not None
             and isinstance(hit_score, (int, float))
             and hit_score < min_score_threshold
-            and hit_score < 0.15
         ):
             deferred.append(hit)
             continue
@@ -268,7 +280,6 @@ def apply_source_diversity(
                 min_score_threshold is not None
                 and isinstance(hit_score, (int, float))
                 and hit_score < min_score_threshold
-                and hit_score < 0.15
             ):
                 continue
             selected.append(hit)
