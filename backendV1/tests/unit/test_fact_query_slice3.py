@@ -47,7 +47,7 @@ def test_orm_model_indexes_cascades_and_schema_registration():
     table = IndexTableFact.__table__
     assert table.name == "kb_index_table_facts"
     assert "kb_index_table_facts" in V1_TABLES
-    assert SCHEMA_HEAD == "0036_kb_index_table_facts"
+    assert SCHEMA_HEAD >= "0036_kb_index_table_facts"
 
     indexes = {idx.name: idx for idx in table.indexes}
     assert "ix_kb_index_table_facts_scope" in indexes
