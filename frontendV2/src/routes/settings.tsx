@@ -8,6 +8,7 @@ import {
   Loader2,
   Moon,
   Palette,
+  RotateCcw,
   RotateCw,
   Save,
   ShieldAlert,
@@ -31,6 +32,7 @@ import type {
   ModelProvider,
 } from "@/api/modelops/types";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { SystemResetPanel } from "@/components/admin/system-reset-panel";
 import { SpellingDefaultsPanel } from "@/components/knowledge/spelling-defaults-panel";
 import { DocumentProcessingPanel } from "@/components/modelops/document-processing-panel";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +72,7 @@ type SettingsTab =
   | "models"
   | "documents"
   | "spelling"
+  | "system"
   | "account";
 
 const NAV_ITEMS: {
@@ -98,6 +101,11 @@ const NAV_ITEMS: {
     icon: SpellCheck,
   },
   {
+    id: "system",
+    title: "Đặt lại hệ thống",
+    icon: RotateCcw,
+  },
+  {
     id: "account",
     title: "Tài khoản",
     icon: User,
@@ -113,6 +121,7 @@ function SettingsPage() {
       if (window.location.search.includes("models")) return "models";
       if (window.location.search.includes("documents")) return "documents";
       if (window.location.search.includes("spelling")) return "spelling";
+      if (window.location.search.includes("system")) return "system";
       if (window.location.search.includes("account")) return "account";
     }
     return "appearance";
@@ -313,7 +322,9 @@ function SettingsPage() {
           <nav className="flex flex-wrap gap-1 md:flex-col">
             {NAV_ITEMS.filter(
               (item) =>
-                (item.id !== "spelling" && item.id !== "documents") ||
+                (item.id !== "spelling" &&
+                  item.id !== "documents" &&
+                  item.id !== "system") ||
                 canManageSystem,
             ).map((item) => {
               const Icon = item.icon;
@@ -813,6 +824,9 @@ function SettingsPage() {
               )}
             </div>
           )}
+
+          {/* TAB 6: ĐẶT LẠI HỆ THỐNG (SYSTEM RESET & SEED) */}
+          {activeTab === "system" && canManageSystem && <SystemResetPanel />}
         </div>
       </div>
 

@@ -121,7 +121,7 @@ function turnAnswerText(turn: ConversationTurn): string | null {
 function UserBubble({ question }: { question: string }) {
   return (
     <div className="flex justify-end gap-2.5">
-      <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-xs bg-primary px-4 py-2.5 text-xs leading-relaxed text-primary-foreground shadow-2xs">
+      <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-xs bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-2xs">
         {question}
       </div>
       <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted text-muted-foreground">

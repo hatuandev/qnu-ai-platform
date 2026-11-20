@@ -43,7 +43,7 @@ class KeyService:
         key = ProviderKey(
             id=_new_id("key"),
             provider_id=owner.id,
-            model_ids=[provider.id] if provider.parent_id else None,
+            model_ids=[provider.id] if getattr(provider, "parent_id", None) else None,
             name=req.name,
             secret_encrypted=encrypt(req.secret),
             masked_hint=mask_secret(req.secret),

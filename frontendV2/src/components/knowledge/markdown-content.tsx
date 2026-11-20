@@ -104,7 +104,7 @@ export function MarkdownContent({
     if (suffix) {
       return (
         <div
-          className={cn("text-xs leading-relaxed text-foreground", className)}
+          className={cn("text-sm leading-relaxed text-foreground", className)}
         >
           {suffix}
         </div>
@@ -153,7 +153,7 @@ export function MarkdownContent({
                 key={block.id}
                 className={cn(
                   "font-semibold text-foreground",
-                  compact ? "text-xs pt-0.5" : "text-sm pt-1.5",
+                  compact ? "text-sm pt-1" : "text-sm pt-1.5",
                 )}
               >
                 {renderInlineMarkdown(block.content, block.id, renderToken)}
@@ -165,7 +165,7 @@ export function MarkdownContent({
             return (
               <h4
                 key={block.id}
-                className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider pt-0.5"
+                className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-0.5"
               >
                 {renderInlineMarkdown(block.content, block.id, renderToken)}
                 {isLastBlock && suffix}
@@ -176,7 +176,7 @@ export function MarkdownContent({
             return (
               <blockquote
                 key={block.id}
-                className="border-l-2 border-primary/60 bg-muted/20 px-3 py-1.5 rounded-r text-xs italic text-foreground/90 my-1.5"
+                className="border-l-2 border-primary/60 bg-muted/20 px-3 py-1.5 rounded-r text-sm italic text-foreground/90 my-1.5 leading-relaxed"
               >
                 {renderInlineMarkdown(block.content, block.id, renderToken)}
                 {isLastBlock && suffix}
@@ -187,7 +187,7 @@ export function MarkdownContent({
             return (
               <ul
                 key={block.id}
-                className="list-disc pl-5 space-y-1 text-xs text-foreground/90 my-1.5"
+                className="list-disc pl-5 space-y-1 text-sm text-foreground/90 my-1.5 leading-relaxed"
               >
                 {block.items?.map((item, itemIdx) => {
                   const isLastItem =
@@ -206,7 +206,7 @@ export function MarkdownContent({
             return (
               <ol
                 key={block.id}
-                className="list-decimal pl-5 space-y-1 text-xs text-foreground/90 my-1.5"
+                className="list-decimal pl-5 space-y-1 text-sm text-foreground/90 my-1.5 leading-relaxed"
               >
                 {block.items?.map((item, itemIdx) => {
                   const isLastItem =
@@ -278,10 +278,7 @@ export function MarkdownContent({
             return (
               <p
                 key={block.id}
-                className={cn(
-                  "leading-relaxed text-foreground/90 my-1 whitespace-pre-wrap",
-                  compact ? "text-xs sm:text-sm" : "text-sm",
-                )}
+                className="text-sm leading-relaxed text-foreground/90 my-1 whitespace-pre-wrap"
               >
                 {renderInlineMarkdown(block.content, block.id, renderToken)}
                 {isLastBlock && suffix}

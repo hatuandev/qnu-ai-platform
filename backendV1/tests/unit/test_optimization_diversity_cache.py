@@ -140,10 +140,19 @@ def test_is_single_document_scope_queries():
 
 
 class DummyHit:
-    def __init__(self, chunk_id: str, document_id: str, score: float = 1.0):
+    def __init__(
+        self,
+        chunk_id: str,
+        document_id: str,
+        score: float = 1.0,
+        citations: dict | None = None,
+        text: str = "",
+    ):
         self.chunk_id = chunk_id
         self.document_id = document_id
         self.score = score
+        self.citations = citations or {}
+        self.text = text
 
     def model_copy(self, update=None):
         update = update or {}
@@ -151,7 +160,31 @@ class DummyHit:
             self.chunk_id,
             self.document_id,
             update.get("score", self.score),
+            self.citations,
+            self.text,
         )
+
+
+def test_apply_source_diversity_page_targeting():
+    # 6 candidates on page 12, 4 on page 11
+    candidates = [
+        DummyHit(f"p12_{i}", "doc_1", 0.99 - i * 0.01, citations={"e": {"page": 12}})
+        for i in range(6)
+    ] + [
+        DummyHit(f"p11_{i}", "doc_1", 0.90 - i * 0.01, citations={"e": {"page": 11}})
+        for i in range(4)
+    ]
+
+    # Query targeting both page 11 and page 12
+    query = "Ngành nằm ở cuối trang 11 trước khi sang trang 12 có số liệu như thế nào?"
+    selected = apply_source_diversity(candidates, 6, is_single_doc_target=True, query=query)
+    assert len(selected) == 6
+    p11_selected = [h for h in selected if h.chunk_id.startswith("p11_")]
+    p12_selected = [h for h in selected if h.chunk_id.startswith("p12_")]
+    assert len(p11_selected) == 3
+    assert len(p12_selected) == 3
+    assert p11_selected[0].chunk_id == "p11_0"
+    assert p12_selected[0].chunk_id == "p12_0"
 
 
 def test_apply_source_diversity_single_doc_target():

@@ -50,7 +50,12 @@ def test_tables_to_truncate_contains_core_domains():
 
 @pytest.mark.asyncio
 async def test_system_reset_refuses_in_production_without_flag():
-    actor = AuthActor(username="admin", roles=["AI.Admin"], permissions=["ai.access.admin"])
+    actor = AuthActor(
+        actor_id="usr_admin",
+        username="admin",
+        roles=["AI.Admin"],
+        permissions=["ai.access.admin"],
+    )
     req = SystemResetRequest(confirm_phrase="RESET_AND_SEED")
     db = AsyncMock()
 
@@ -67,7 +72,12 @@ async def test_system_reset_refuses_in_production_without_flag():
 
 @pytest.mark.asyncio
 async def test_system_reset_refuses_invalid_confirm_phrase():
-    actor = AuthActor(username="admin", roles=["AI.Admin"], permissions=["ai.access.admin"])
+    actor = AuthActor(
+        actor_id="usr_admin",
+        username="admin",
+        roles=["AI.Admin"],
+        permissions=["ai.access.admin"],
+    )
     req = SystemResetRequest(confirm_phrase="WRONG_PHRASE")
     db = AsyncMock()
 
@@ -123,7 +133,12 @@ async def test_purge_storage_objects():
 
 @pytest.mark.asyncio
 async def test_perform_system_reset_and_seed_success():
-    actor = AuthActor(username="admin", roles=["AI.Admin"], permissions=["ai.access.admin"])
+    actor = AuthActor(
+        actor_id="usr_admin",
+        username="admin",
+        roles=["AI.Admin"],
+        permissions=["ai.access.admin"],
+    )
     req = SystemResetRequest(confirm_phrase="RESET_AND_SEED", seed_workspace=True, seed_modelops=True, seed_assistant=True)
     db = AsyncMock()
     mock_blob = MagicMock()
@@ -166,6 +181,7 @@ async def test_perform_system_reset_and_seed_success():
 
 def test_system_reset_endpoint_requires_auth():
     from fastapi.testclient import TestClient
+
     from qnu.main import app
 
     with TestClient(app) as client:
@@ -175,5 +191,34 @@ def test_system_reset_endpoint_requires_auth():
         )
         # Without auth header, it should be 401
         assert res.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_key_service_add_key_handles_provider_without_parent_id():
+    from unittest.mock import MagicMock, patch
+
+    from qnu.domains.modelops.keys.service import key_service
+    from qnu.domains.modelops.schemas import KeyCreateRequest
+
+    actor = AuthActor(
+        actor_id="usr_admin",
+        username="admin",
+        roles=["AI.Admin"],
+        permissions=["ai.access.admin"],
+    )
+    req = KeyCreateRequest(name="Test Key", secret="test_secret_123")
+
+    # Object without parent_id attribute
+    provider_mock = MagicMock(spec=["id"])
+    provider_mock.id = "conn_12345"
+
+    db = AsyncMock()
+    owner_mock = MagicMock(id="conn_12345")
+
+    with patch("qnu.domains.modelops.keys.service.credential_owner", new_callable=AsyncMock) as mock_owner:
+        mock_owner.return_value = owner_mock
+        key = await key_service.add_key(db, provider_mock, req, actor)
+        assert key.provider_id == "conn_12345"
+        assert key.model_ids is None
 
 

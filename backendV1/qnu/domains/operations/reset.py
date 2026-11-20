@@ -10,8 +10,10 @@ from __future__ import annotations
 import logging
 import os
 import uuid
+from pathlib import Path
 from typing import Any
 
+from dotenv import dotenv_values
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -220,7 +222,7 @@ async def seed_shl_workspace(db: AsyncSession, actor: AuthActor) -> Workspace:
     )
 
     # Add standard pilot profiles
-    for name, (actor_id, display_name, role) in SHL_PILOT_PROFILES.items():
+    for actor_id, display_name, role in SHL_PILOT_PROFILES.values():
         if actor_id != actor.actor_id:
             db.add(
                 WorkspaceMember(
@@ -237,10 +239,27 @@ async def seed_shl_workspace(db: AsyncSession, actor: AuthActor) -> Workspace:
     return workspace
 
 
+def _load_e2e_keys() -> tuple[str, str]:
+    """Read E2E keys from environment variables or .env at repository root."""
+    qnu_key = os.getenv("E2E_QNU_API_KEY", "").strip()
+    router_key = os.getenv("E2E_9ROUTER_API_KEY", "").strip()
+
+    if not qnu_key or not router_key:
+        root_dir = Path(__file__).resolve().parents[4]
+        for env_path in (root_dir / ".env", root_dir / "backendV1" / ".env", Path(".env")):
+            if env_path.exists():
+                vals = dotenv_values(env_path, interpolate=False)
+                if not qnu_key and vals.get("E2E_QNU_API_KEY"):
+                    qnu_key = str(vals.get("E2E_QNU_API_KEY", "")).strip()
+                if not router_key and vals.get("E2E_9ROUTER_API_KEY"):
+                    router_key = str(vals.get("E2E_9ROUTER_API_KEY", "")).strip()
+
+    return qnu_key or "qnu-local-api-key", router_key
+
+
 async def seed_modelops_defaults(db: AsyncSession, actor: AuthActor) -> dict[str, str]:
     """Seed ModelOps connections, models, reasoning policy, and default assignments."""
-    qnu_key = os.getenv("E2E_QNU_API_KEY", "").strip() or "qnu-local-api-key"
-    router_key = os.getenv("E2E_9ROUTER_API_KEY", "").strip()
+    qnu_key, router_key = _load_e2e_keys()
     defaults: dict[str, str] = {}
 
     # 1. QNU AI Server (chat, embedding, rerank)
@@ -255,8 +274,9 @@ async def seed_modelops_defaults(db: AsyncSession, actor: AuthActor) -> dict[str
             timeout_seconds=300,
         ),
     )
+    parent_qnu = await conn_service.get_connection(db, conn_qnu.id)
     await key_service.add_key(
-        db, conn_qnu, KeyCreateRequest(name="QNU API Key", secret=qnu_key), actor
+        db, parent_qnu, KeyCreateRequest(name="QNU API Key", secret=qnu_key), actor
     )
 
     m_chat = await conn_service.add_model(
@@ -317,8 +337,9 @@ async def seed_modelops_defaults(db: AsyncSession, actor: AuthActor) -> dict[str
             timeout_seconds=300,
         ),
     )
+    parent_mineru = await conn_service.get_connection(db, conn_mineru.id)
     await key_service.add_key(
-        db, conn_mineru, KeyCreateRequest(name="MinerU Key", secret=qnu_key), actor
+        db, parent_mineru, KeyCreateRequest(name="MinerU Key", secret=qnu_key), actor
     )
     m_ocr = await conn_service.add_model(
         db,
@@ -342,8 +363,9 @@ async def seed_modelops_defaults(db: AsyncSession, actor: AuthActor) -> dict[str
                     timeout_seconds=300,
                 ),
             )
+            parent_router = await conn_service.get_connection(db, conn_router.id)
             await key_service.add_key(
-                db, conn_router, KeyCreateRequest(name="9router Key", secret=router_key), actor
+                db, parent_router, KeyCreateRequest(name="9router Key", secret=router_key), actor
             )
             await conn_service.add_model(
                 db,

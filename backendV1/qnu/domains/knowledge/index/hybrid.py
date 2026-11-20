@@ -223,15 +223,73 @@ def is_single_document_scope(
     return len(matched_buckets) == 1
 
 
+def extract_hit_pages(hit) -> set[int]:
+    pages: set[int] = set()
+    citations = getattr(hit, "citations", None) or {}
+    if isinstance(citations, dict):
+        for cit in citations.values():
+            if isinstance(cit, dict) and cit.get("page") is not None:
+                try:
+                    pages.add(int(cit["page"]))
+                except (ValueError, TypeError):
+                    pass
+    if not pages:
+        text = getattr(hit, "text", "") or ""
+        for match in re.finditer(r"\|\s*Trang:\s*(\d+)\s*\|", text):
+            try:
+                pages.add(int(match.group(1)))
+            except (ValueError, TypeError):
+                pass
+    return pages
+
+
 def apply_source_diversity(
     candidates: list,
     count: int,
     *,
     is_single_doc_target: bool = False,
+    query: str | None = None,
 ) -> list:
-    """Select top `count` hits while preventing a single document from starving others in open multi-doc queries."""
+    """Select top `count` hits while preventing a single document or single page from starving others.
+    When query specifically targets page numbers (e.g. 'trang 11', 'trang 12'), allocates balanced quota across target pages.
+    """
     if len(candidates) <= count:
         return candidates
+
+    # Page-targeted balancing if query explicitly references pages
+    if query:
+        target_pages = {
+            int(m.group(1))
+            for m in re.finditer(r"\b(?:trang|page)\s*(\d+)\b", query, re.IGNORECASE)
+        }
+        if target_pages:
+            page_candidates: dict[int, list] = {p: [] for p in sorted(target_pages)}
+            for hit in candidates:
+                h_pages = extract_hit_pages(hit)
+                matched = target_pages & h_pages
+                if matched:
+                    for p in matched:
+                        page_candidates[p].append(hit)
+            present_pages = [p for p in sorted(target_pages) if page_candidates[p]]
+            if present_pages:
+                selected = []
+                seen_chunk_ids = set()
+                quota = max(2, count // len(present_pages))
+                for p in present_pages:
+                    added = 0
+                    for hit in page_candidates[p]:
+                        if hit.chunk_id not in seen_chunk_ids and len(selected) < count:
+                            selected.append(hit)
+                            seen_chunk_ids.add(hit.chunk_id)
+                            added += 1
+                            if added >= quota:
+                                break
+                if len(selected) < count:
+                    for hit in candidates:
+                        if hit.chunk_id not in seen_chunk_ids and len(selected) < count:
+                            selected.append(hit)
+                            seen_chunk_ids.add(hit.chunk_id)
+                return selected
 
     docs_in_candidates = {h.document_id for h in candidates if getattr(h, "document_id", None)}
     if len(docs_in_candidates) <= 1 or is_single_doc_target:
@@ -302,6 +360,7 @@ def select_reranked(
     count: int,
     *,
     is_single_doc_target: bool = False,
+    query: str | None = None,
 ):
     """Cross-encoder order is authoritative; base fusion only built the pool."""
     known = {hit.chunk_id for hit in hits}
@@ -311,7 +370,9 @@ def select_reranked(
             continue
         seen.add(hit.chunk_id)
         candidates.append(hit)
-    return apply_source_diversity(candidates, count, is_single_doc_target=is_single_doc_target)
+    return apply_source_diversity(
+        candidates, count, is_single_doc_target=is_single_doc_target, query=query
+    )
 
 
 async def rerank(
@@ -381,7 +442,13 @@ async def rerank(
     if current.configuration_hash != runtime.configuration_hash:
         raise Conflict("Provider rerank đã thay đổi.", code="rerank_configuration_changed")
     reranked = [hits[h.index].model_copy(update={"score": h.score}) for h in result.hits]
-    selected = select_reranked(hits, reranked, req.top_k, is_single_doc_target=is_single_doc_target)
+    selected = select_reranked(
+        hits,
+        reranked,
+        req.top_k,
+        is_single_doc_target=is_single_doc_target,
+        query=req.query,
+    )
     trace["ranking"]["rerank"] = [
         {"chunk_id": h.chunk_id, "score": h.score} for h in reranked
     ]
