@@ -213,6 +213,7 @@ async def request_index(
             or publication.content.get("index")
             or {},
             headings=table_headings,
+            max_chunk_bytes=maximum,
         )
         chunks.extend(card_chunks)
         reports = [

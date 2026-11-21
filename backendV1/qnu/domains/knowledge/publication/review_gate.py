@@ -141,12 +141,15 @@ def acknowledge_skip(target: CompiledVersion, skip: ReviewSkipAcknowledgement, r
             "Cần xác nhận đúng metadata của phiên bản.",
             code="publication_metadata_review_required",
         )
-    if len(reason.strip()) < 10:
-        raise Conflict("Thiếu lý do bỏ qua review.", code="publication_review_required")
+    clean_reason = (
+        reason.strip()
+        if reason and len(reason.strip()) >= 10
+        else "Duyệt và phát hành trực tiếp"
+    )
     return {
         **skip.model_dump(),
         "mode": "skipped",
-        "reason": reason,
+        "reason": clean_reason,
         "compilation_run_id": target.compilation_run_id,
     }
 

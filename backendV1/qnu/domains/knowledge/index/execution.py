@@ -288,7 +288,10 @@ async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, a
                 if hr:
                     last_opening_headers[cols] = [table["rows"][r] for r in hr]
             cards = render_projection_to_cards(
-                projected, document_meta=doc_meta, page_numbers=page_list
+                projected,
+                document_meta=doc_meta,
+                page_numbers=page_list,
+                max_chunk_bytes=run.config.get("chunk_max_bytes"),
             )
             total_cards += len(cards)
             serialized_notes = [note.model_dump(mode="json") for note in projected.scoped_notes]

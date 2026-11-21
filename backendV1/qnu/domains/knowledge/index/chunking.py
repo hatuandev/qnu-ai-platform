@@ -163,6 +163,23 @@ def _table_chunks(
         if not any(c["header"] for c in row) or not all(c["header"] or not c["text"] for c in row):
             break
         headers.append(i)
+    if not headers and "rows" in table and "column_count" in table:
+        from qnu.domains.knowledge.index.table_dependencies import (
+            administrative_header,
+            header_row,
+            multitier_header,
+            typed_header,
+        )
+
+        multi = multitier_header(table)
+        if multi is not None:
+            headers = multi
+        elif (
+            typed_header(table)
+            or header_row(table)
+            or administrative_header(table)
+        ):
+            headers = [0]
     groups = _row_groups(rows, headers) or [[]]
     run_id = entry["citation"].split(":", 1)[0]
 

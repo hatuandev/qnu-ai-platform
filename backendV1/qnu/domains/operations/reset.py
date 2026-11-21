@@ -21,6 +21,7 @@ from qnu.domains.assistants.models import Assistant, AssistantCollection
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.identity.dev_accounts import SHL_PILOT_PROFILES
 from qnu.domains.knowledge.models import KBCollection
+from qnu.domains.modelops.capacity.schemas import ModelTokenLimits
 from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.connections import service as conn_service
 from qnu.domains.modelops.connections.schemas import ConnectionCreate, ConnectionModelCreate
@@ -283,7 +284,13 @@ async def seed_modelops_defaults(db: AsyncSession, actor: AuthActor) -> dict[str
         db,
         actor,
         conn_qnu.id,
-        ConnectionModelCreate(model_name=QWEN_MODEL, capabilities=["chat"]),
+        ConnectionModelCreate(
+            model_name=QWEN_MODEL,
+            capabilities=["chat"],
+            token_limits=ModelTokenLimits(
+                context_window_tokens=131072, max_input_tokens=122880, max_output_tokens=8192
+            ),
+        ),
     )
     m_embed = await conn_service.add_model(
         db,
@@ -293,6 +300,7 @@ async def seed_modelops_defaults(db: AsyncSession, actor: AuthActor) -> dict[str
             model_name="bge-m3",
             capabilities=["embedding"],
             embedding_dimension=1024,
+            token_limits=ModelTokenLimits(context_window_tokens=8192, max_input_tokens=8192),
         ),
     )
     m_rerank = await conn_service.add_model(
@@ -302,6 +310,7 @@ async def seed_modelops_defaults(db: AsyncSession, actor: AuthActor) -> dict[str
         ConnectionModelCreate(
             model_name="bge-reranker-v2-m3",
             capabilities=["rerank"],
+            token_limits=ModelTokenLimits(context_window_tokens=8192, max_input_tokens=8192),
         ),
     )
 

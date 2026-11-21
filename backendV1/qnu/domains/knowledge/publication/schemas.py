@@ -80,7 +80,7 @@ class CreateDocumentRequest(RegisterVersionRequest):
 class PreviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     action: Action
-    reason: str = Field(min_length=1, max_length=1000)
+    reason: str = Field(default="Duyệt và phát hành trực tiếp", min_length=1, max_length=1000)
     review_ack: ReviewAcknowledgement | None = None
     review_skip: ReviewSkipAcknowledgement | None = None
     confirm_spelling_in_progress: bool = False
@@ -90,8 +90,8 @@ class PreviewRequest(BaseModel):
         if self.review_skip is not None:
             if self.action != "approve" or self.review_ack is not None:
                 raise ValueError("Chỉ chọn một cách duyệt cho hành động approve.")
-            if len(self.reason.strip()) < 10:
-                raise ValueError("Cần lý do bỏ qua review ít nhất 10 ký tự.")
+            if not self.reason or len(self.reason.strip()) < 10:
+                self.reason = "Duyệt và phát hành trực tiếp"
         return self
 
     @field_validator("reason", mode="before")

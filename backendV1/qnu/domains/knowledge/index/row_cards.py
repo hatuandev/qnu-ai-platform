@@ -211,6 +211,7 @@ def render_projection_to_cards(
     *,
     document_meta: DocumentCardMeta | None = None,
     page_numbers: list[int] | None = None,
+    max_chunk_bytes: int | None = None,
 ) -> list[RowCard]:
     """Project a table into either 1 whole-table card (small/raw) or per-row Row-Cards."""
     if projection.storage_mode == "invalid":
@@ -237,19 +238,68 @@ def render_projection_to_cards(
         sections = [header, *row_lines]
         if note_lines:
             sections.append("Lưu ý phạm vi áp dụng: " + " | ".join(note_lines))
-        return [
-            RowCard(
-                card_id=f"card:{projection.table_id}:whole",
-                table_id=projection.table_id,
-                source_table_citation=projection.source_table_citation,
-                fact_ids=[],
-                row_kind="raw_rows",
-                keep_whole_in_chunk=True,
-                data_years=list(projection.data_years),
-                text="\n".join(sections),
-                source_cell_refs=refs,
+        full_text = "\n".join(sections)
+        if max_chunk_bytes is None or len(full_text.encode("utf-8")) <= max_chunk_bytes:
+            return [
+                RowCard(
+                    card_id=f"card:{projection.table_id}:whole",
+                    table_id=projection.table_id,
+                    source_table_citation=projection.source_table_citation,
+                    fact_ids=[],
+                    row_kind="raw_rows",
+                    keep_whole_in_chunk=True,
+                    data_years=list(projection.data_years),
+                    text=full_text,
+                    source_cell_refs=refs,
+                )
+            ]
+        # Split raw_rows across multiple cards
+        parts: list[RowCard] = []
+        batch_lines: list[str] = []
+        part_idx = 1
+        for row in projection.raw_rows:
+            line = " | ".join(row.cells)
+            candidate = [header, *batch_lines, line]
+            if note_lines:
+                candidate.append("Lưu ý phạm vi áp dụng: " + " | ".join(note_lines))
+            if batch_lines and len("\n".join(candidate).encode("utf-8")) > max_chunk_bytes:
+                part_secs = [header, *batch_lines]
+                if note_lines:
+                    part_secs.append("Lưu ý phạm vi áp dụng: " + " | ".join(note_lines))
+                parts.append(
+                    RowCard(
+                        card_id=f"card:{projection.table_id}:raw:p{part_idx}",
+                        table_id=projection.table_id,
+                        source_table_citation=projection.source_table_citation,
+                        fact_ids=[],
+                        row_kind="raw_rows",
+                        keep_whole_in_chunk=False,
+                        data_years=list(projection.data_years),
+                        text="\n".join(part_secs),
+                        source_cell_refs=refs,
+                    )
+                )
+                part_idx += 1
+                batch_lines = []
+            batch_lines.append(line)
+        if batch_lines:
+            part_secs = [header, *batch_lines]
+            if note_lines:
+                part_secs.append("Lưu ý phạm vi áp dụng: " + " | ".join(note_lines))
+            parts.append(
+                RowCard(
+                    card_id=f"card:{projection.table_id}:raw:p{part_idx}",
+                    table_id=projection.table_id,
+                    source_table_citation=projection.source_table_citation,
+                    fact_ids=[],
+                    row_kind="raw_rows",
+                    keep_whole_in_chunk=False,
+                    data_years=list(projection.data_years),
+                    text="\n".join(part_secs),
+                    source_cell_refs=refs,
+                )
             )
-        ]
+        return parts
 
     if projection.keep_whole_in_chunk:
         note_index = {note.note_id: note for note in projection.scoped_notes}
@@ -288,21 +338,22 @@ def render_projection_to_cards(
 
         header = _header_line(projection, document_meta=document_meta, page_numbers=whole_pages or None)
         text = "\n".join([header, *body_blocks])
-        return [
-            RowCard(
-                card_id=f"card:{projection.table_id}:whole",
-                table_id=projection.table_id,
-                source_table_citation=projection.source_table_citation,
-                fact_ids=fact_ids,
-                row_kind="whole_table",
-                keep_whole_in_chunk=True,
-                data_years=list(projection.data_years),
-                text=text,
-                detail_md_pointers=detail_pointers,
-                cross_references=xrefs,
-                source_cell_refs=cell_refs,
-            )
-        ]
+        if max_chunk_bytes is None or len(text.encode("utf-8")) <= max_chunk_bytes:
+            return [
+                RowCard(
+                    card_id=f"card:{projection.table_id}:whole",
+                    table_id=projection.table_id,
+                    source_table_citation=projection.source_table_citation,
+                    fact_ids=fact_ids,
+                    row_kind="whole_table",
+                    keep_whole_in_chunk=True,
+                    data_years=list(projection.data_years),
+                    text=text,
+                    detail_md_pointers=detail_pointers,
+                    cross_references=xrefs,
+                    source_cell_refs=cell_refs,
+                )
+            ]
 
     cards: list[RowCard] = []
     for fact in projection.facts:
@@ -448,6 +499,7 @@ def build_row_card_chunks(
     annotations: list[dict] | None = None,
     index: dict | None = None,
     headings: dict[str, str] | None = None,
+    max_chunk_bytes: int | None = None,
 ) -> list[Chunk]:
     from qnu.domains.knowledge.index.facts import project_table
 
@@ -530,7 +582,10 @@ def build_row_card_chunks(
                 last_opening_headers[cols] = [table["rows"][r] for r in hr]
 
         cards = render_projection_to_cards(
-            projected, document_meta=doc_meta, page_numbers=page_list
+            projected,
+            document_meta=doc_meta,
+            page_numbers=page_list,
+            max_chunk_bytes=max_chunk_bytes,
         )
         for card in cards:
             chunks.append(row_card_to_chunk(card, index=index))
