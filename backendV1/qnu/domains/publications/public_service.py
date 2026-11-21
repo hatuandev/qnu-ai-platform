@@ -13,7 +13,7 @@ import secrets
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import and_, delete, select
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +24,7 @@ from qnu.domains.identity.service_actor import public_chatbot_actor
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.index.directory import directory_ready
 from qnu.domains.lifecycle.guards import visible
+from qnu.domains.modelops.inference.service import prepare_chat_request
 from qnu.domains.modelops.usage.scope import use_account
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.publications.limits import DailyBudget
@@ -49,7 +50,7 @@ from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException, Conflict, EntityNotFound
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
-from qnu.ports.chat_model import ChatModel
+from qnu.ports.chat_model import ChatMessage, ChatModel
 from qnu.ports.embedding_model import EmbeddingModel
 from qnu.ports.reranker import Reranker
 from qnu.ports.vector_store import VectorStore
@@ -303,7 +304,10 @@ async def listing(db: AsyncSession) -> PublicChatbotListResponse:
                 and_(
                     Workspace.status == "active",
                     visible("assistant", Assistant.id),
-                    visible("collection", Assistant.collection_id),
+                    or_(
+                        Assistant.collection_id.is_(None),
+                        visible("collection", Assistant.collection_id),
+                    ),
                 ).label("visible_for_serving"),
             )
             .join(Workspace, Workspace.id == AssistantPublication.workspace_id)
@@ -319,12 +323,16 @@ async def listing(db: AsyncSession) -> PublicChatbotListResponse:
         {
             (row.workspace_id, collection_id)
             for row, active, collection_id, visible_for_serving in rows
-            if active and visible_for_serving
+            if active and visible_for_serving and collection_id is not None
         },
     )
     items: list[PublicChatbotSummary] = []
     for row, active, collection_id, visible_for_serving in rows:
-        available = active and visible_for_serving and (row.workspace_id, collection_id) in ready
+        available = (
+            active
+            and visible_for_serving
+            and (collection_id is None or (row.workspace_id, collection_id) in ready)
+        )
         items.append(
             PublicChatbotSummary(
                 slug=row.slug,
@@ -444,7 +452,54 @@ async def turn(
             )
         )
         if not collection_ids:
-            raise Conflict(UNAVAILABLE_TEXT, code="public_chatbot_unavailable")
+            messages = [
+                ChatMessage(
+                    role="system",
+                    content=assistant.persona
+                    or "Bạn là trợ lý AI của Trường Đại học Quy Nhơn (QNU). Hãy hỗ trợ người dùng chu đáo, thân thiện và chuẩn mực sư phạm.",
+                ),
+                ChatMessage(role="user", content=req.question),
+            ]
+            with use_account(budget):
+                _runtime, chat_req, _b = await prepare_chat_request(
+                    db,
+                    actor,
+                    row.workspace_id,
+                    messages,
+                    provider_id=assistant.chat_provider_id,
+                    task="chat",
+                    max_output_tokens=assistant.max_output_tokens,
+                )
+                chat_res = await chat.complete(messages, chat_req)
+            pub_raw = chat_res.content.strip()
+            pub_ans = pub_raw
+            if pub_raw.startswith("{") and pub_raw.endswith("}"):
+                try:
+                    p = json.loads(pub_raw)
+                    if isinstance(p, dict):
+                        extracted = (
+                            p.get("answer")
+                            or p.get("message")
+                            or p.get("content")
+                            or p.get("text")
+                        )
+                        if extracted and isinstance(extracted, str):
+                            pub_ans = extracted.strip()
+                except Exception:
+                    pass
+            if not pub_ans or pub_ans == "{}":
+                pub_ans = (
+                    "Tôi đã ghi nhận câu hỏi của bạn. Về nội dung này, bạn có thể diễn đạt cụ thể hơn "
+                    "hoặc cung cấp thêm chi tiết để mình hỗ trợ chính xác nhất nhé."
+                )
+            return PublicTurnResponse(
+                session_id=req.session_id,
+                status="answered",
+                answer=pub_ans,
+                message=None,
+                citations=[],
+                remaining_turns=remaining,
+            )
         policy = AssistantRagPolicy.model_validate(assistant.rag_policy or {}).model_dump(
             mode="json", exclude={"guardrail_policy", "suggested_prompts"}
         )

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import type { ConversationTurn, DirectReply } from "@/api/conversations";
 import { AnswerBody } from "@/components/assistants/answer-body";
+import { MarkdownContent } from "@/components/knowledge/markdown-content";
 import { Badge } from "@/components/ui/badge";
 
 export const TURN_ERROR_TEXT: Record<string, string> = {
@@ -36,6 +37,7 @@ const DIRECT_ROUTE_TEXT: Record<DirectReply["route"], string> = {
   identity: "Giới thiệu",
   protected_request: "Yêu cầu cần bảo vệ",
   guardrail: "Ngoài phạm vi hỗ trợ",
+  direct_chat: "Hội thoại trực tiếp",
 };
 
 export function ResolvedContextNotice({
@@ -69,16 +71,30 @@ function directReplyBody(
   onPromptClick?: (prompt: string) => void,
 ) {
   const isSocial = reply.route === "greeting" || reply.route === "courtesy";
+  const isDirectChat = reply.route === "direct_chat";
+  const rawAnswer = reply.answer?.trim() || "";
+  const displayAnswer =
+    rawAnswer && rawAnswer !== "{}"
+      ? reply.answer
+      : "Tôi đã ghi nhận câu hỏi của bạn. Về nội dung này, bạn có thể diễn đạt cụ thể hơn hoặc cung cấp thêm chi tiết để mình hỗ trợ chính xác nhất nhé.";
 
   return (
     <div className="space-y-3">
       <div className="space-y-2">
         <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-normal">
-          Trả lời trực tiếp · {DIRECT_ROUTE_TEXT[reply.route]}
+          {isDirectChat
+            ? "Hội thoại trực tiếp với mô hình AI"
+            : `Trả lời trực tiếp · ${DIRECT_ROUTE_TEXT[reply.route]}`}
         </Badge>
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-          {reply.answer}
-        </p>
+        {isDirectChat ? (
+          <div className="text-sm leading-relaxed text-foreground">
+            <MarkdownContent content={displayAnswer} />
+          </div>
+        ) : (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            {displayAnswer}
+          </p>
+        )}
       </div>
 
       {isSocial && onPromptClick && (

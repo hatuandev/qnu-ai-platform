@@ -105,11 +105,18 @@ export function AskTestPanel({
       ) : null}
 
       {!isInactive && isUnbound ? (
-        <Alert variant="warning">
-          <AlertTitle>Trợ lý chưa gắn kho tri thức</AlertTitle>
-          <AlertDescription>
-            Trợ lý chưa có kho tri thức nào nên chưa thể kiểm thử. Gắn ít nhất
-            một kho trong tab Cấu hình trước khi hỏi thử.
+        <Alert variant="info">
+          <AlertTitle>Chế độ hội thoại trực tiếp</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>
+              Trợ lý đang hoạt động ở chế độ hội thoại LLM trực tiếp (không gắn kho tri thức). Bạn có thể trò chuyện trực tiếp với trợ lý trong màn hình Hội thoại.
+            </p>
+            <Button size="sm" variant="outline" asChild className="h-7 text-xs gap-1.5 mt-1">
+              <Link to="/chat">
+                <MessageSquare className="size-3 text-primary" />
+                <span>Mở màn hình Hội thoại để trò chuyện</span>
+              </Link>
+            </Button>
           </AlertDescription>
         </Alert>
       ) : null}

@@ -1,3 +1,5 @@
+import json
+import re
 from datetime import UTC, datetime
 
 from pydantic import ValidationError
@@ -12,6 +14,8 @@ from qnu.domains.assistants.schemas import (
     AssistantRagPolicy,
     AssistantReadiness,
     AssistantUpdate,
+    PersonaCraftRequest,
+    PersonaCraftResponse,
 )
 from qnu.domains.conversations.models import Conversation, ConversationTurn
 from qnu.domains.identity.actor import AuthActor
@@ -23,12 +27,14 @@ from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.lifecycle.effects import cancel_related_jobs
 from qnu.domains.lifecycle.guards import require_available, visible
 from qnu.domains.lifecycle.models import ResourceState
+from qnu.domains.modelops.inference.service import prepare_chat_request
 from qnu.domains.modelops.public_api import assert_provider_allowed
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.workspaces.access import actor_ref, resolve_workspace_access
 from qnu.domains.workspaces.public_api import record_workspace_event
 from qnu.platform.errors import AppException, Conflict, EntityNotFound
 from qnu.ports.blob_store import BlobStore
+from qnu.ports.chat_model import ChatMessage, ChatModel
 
 
 async def collection_bindings(
@@ -495,10 +501,10 @@ async def assistant_readiness(
     if not assistant.collection_ids:
         return AssistantReadiness(
             assistant_id=assistant.id,
-            status="empty",
+            status="ready",
             published_document_count=0,
             served_document_count=0,
-            sync_status="not_requested",
+            sync_status="not_applicable",
             collections=[],
             checked_at=datetime.now(UTC),
         )
@@ -521,3 +527,103 @@ async def assistant_readiness(
         collections=entries,
         checked_at=datetime.now(UTC),
     )
+
+
+def _parse_persona_craft_json(content: str) -> dict:
+    text = content.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
+        raise AppException(
+            "Mô hình AI không trả về cấu trúc JSON hợp lệ khi soạn persona.",
+            code="persona_craft_invalid",
+            status_code=502,
+        )
+
+
+async def craft_persona(
+    db: AsyncSession,
+    actor: AuthActor,
+    workspace_id: str,
+    req: PersonaCraftRequest,
+    chat_model: ChatModel,
+) -> PersonaCraftResponse:
+    await resolve_workspace_access(db, actor, workspace_id)
+
+    meta_prompt = (
+        "Bạn là chuyên gia thiết kế AI Persona và cấu hình trợ lý ảo cho Trường Đại học Quy Nhơn (QNU).\n"
+        "Nhiệm vụ của bạn là dựa trên chủ đề hoặc yêu cầu của người dùng để tạo ra một cấu hình Trợ lý AI chuẩn chỉnh, "
+        "thân thiện, chuẩn mực sư phạm, bảo đảm tính xác thực và an toàn thông tin.\n\n"
+        "BẮT BUỘC tuân thủ các nguyên tắc sau khi soạn nội dung persona:\n"
+        "1. ĐỊNH DANH & VAI TRÒ: Nêu rõ trợ lý là ai, thuộc đơn vị/chức năng nào của Trường Đại học Quy Nhơn (QNU), phạm vi nghiệp vụ.\n"
+        "2. PHONG CÁCH & XƯNG HÔ: Thân thiện, chuẩn mực sư phạm, xưng 'mình' hoặc 'Trợ lý...', gọi người hỏi là 'bạn' (hoặc 'em' nếu là thí sinh/học sinh).\n"
+        "3. NGUYÊN TẮC THÔNG TIN & CĂN CỨ: Bám sát 100% căn cứ tài liệu được cấp trong kho tri thức, KHÔNG tự suy đoán điểm chuẩn, chỉ tiêu hoặc quy định ngoài văn bản.\n"
+        "4. QUY TẮC TIẾP NỐI HỘI THOẠI QUAN TRỌNG: Ghi rõ 'Từ lượt nói chuyện thứ 2 trở đi trong phiên chat, TUYỆT ĐỐI KHÔNG chào hỏi lại hoặc giới thiệu lại danh tính ('Chào bạn, mình là...'). Hãy đi thẳng vào nội dung câu trả lời một cách tự nhiên như đang trò chuyện tiếp nối.'\n"
+        "5. CẤU TRÚC PHẢN HỒI: Trình bày rõ ràng, phân nhóm gạch đầu dòng Markdown, kết bài nhã nhặn kèm gợi ý câu hỏi tiếp theo.\n\n"
+        "Định dạng JSON trả về bắt buộc:\n"
+        "{\n"
+        '  "name": "Tên trợ lý ngắn gọn, chuẩn mực (VD: Trợ lý Tuyển sinh QNU 2026)",\n'
+        '  "description": "Mô tả ngắn 1-2 câu về phạm vi phục vụ và đối tượng sử dụng",\n'
+        '  "persona": "Nội dung chỉ dẫn persona đầy đủ và chi tiết theo cấu trúc các mục ở trên",\n'
+        '  "suggested_prompts": ["Câu hỏi gợi ý mở đầu 1", "Câu hỏi gợi ý mở đầu 2", "Câu hỏi gợi ý mở đầu 3", "Câu hỏi gợi ý mở đầu 4"]\n'
+        "}"
+    )
+
+    user_parts = [f"Chủ đề / Mục đích: {req.topic}"]
+    if req.name:
+        user_parts.append(f"Tên trợ lý mong muốn: {req.name}")
+    if req.target_audience:
+        user_parts.append(f"Đối tượng phục vụ: {req.target_audience}")
+    if req.tone:
+        user_parts.append(f"Phong cách mong muốn: {req.tone}")
+
+    messages = [
+        ChatMessage(role="system", content=meta_prompt),
+        ChatMessage(role="user", content="\n".join(user_parts)),
+    ]
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "description": {"type": "string"},
+            "persona": {"type": "string"},
+            "suggested_prompts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 3,
+                "maxItems": 6,
+            },
+        },
+        "required": ["name", "description", "persona", "suggested_prompts"],
+        "additionalProperties": False,
+    }
+
+    _runtime, request, _budget = await prepare_chat_request(
+        db,
+        actor,
+        workspace_id,
+        messages,
+        provider_id=req.provider_id,
+        task="chat",
+        max_output_tokens=1500,
+        output_schema=schema,
+        temperature=0.4,
+    )
+
+    result = await chat_model.complete(messages, request)
+    data = _parse_persona_craft_json(result.content)
+    return PersonaCraftResponse.model_validate(data)

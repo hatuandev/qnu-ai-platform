@@ -96,3 +96,18 @@ export type AssistantReadiness = {
   collections: AssistantCollectionReadiness[];
   checked_at: string;
 };
+
+export type PersonaCraftRequest = {
+  topic: string;
+  name?: string | null;
+  target_audience?: string | null;
+  tone?: string | null;
+  provider_id?: string | null;
+};
+
+export type PersonaCraftResponse = {
+  name: string;
+  description: string;
+  persona: string;
+  suggested_prompts: string[];
+};

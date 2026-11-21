@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.assistants.schemas import AssistantConfig, AssistantRagPolicy
@@ -52,11 +52,6 @@ async def create(
             if item
         )
     )
-    if not collection_ids:
-        raise Conflict(
-            "Trợ lý chưa gắn kho tri thức nên chưa thể bắt đầu hội thoại.",
-            code="assistant_no_collections",
-        )
     for document_id in req.document_ids or []:
         await _require_document(db, workspace_id, collection_ids, document_id)
     snapshot = AssistantConfig.model_validate(assistant, from_attributes=True).model_dump(
@@ -66,7 +61,7 @@ async def create(
     row = Conversation(
         id=new_id("cnv"),
         workspace_id=workspace_id,
-        collection_id=collection_ids[0],
+        collection_id=collection_ids[0] if collection_ids else "",
         assistant_id=assistant.id,
         assistant_revision=assistant.revision,
         assistant_snapshot=snapshot,
@@ -102,7 +97,11 @@ async def listing(
         Conversation.owner_ref == actor_ref(actor),
         visible("conversation", Conversation.id),
         visible("assistant", Conversation.assistant_id),
-        visible("collection", Conversation.collection_id),
+        or_(
+            Conversation.collection_id == "",
+            Conversation.collection_id.is_(None),
+            visible("collection", Conversation.collection_id),
+        ),
     )
     if assistant_id is not None:
         query = query.where(Conversation.assistant_id == assistant_id)

@@ -168,13 +168,22 @@ export function AssistantCard({
           {assistant.description || "Chưa có mô tả."}
         </p>
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge
-            variant="secondary"
-            className="h-4 gap-1 px-1.5 text-[10px] font-normal"
-          >
-            <Database className="size-3" />
-            <span className="max-w-52 truncate">{collectionName}</span>
-          </Badge>
+          {isUnbound ? (
+            <Badge
+              variant="secondary"
+              className="h-4 px-1.5 text-[10px] font-normal text-primary bg-primary/10"
+            >
+              {UNBOUND_LABEL}
+            </Badge>
+          ) : (
+            <Badge
+              variant="secondary"
+              className="h-4 gap-1 px-1.5 text-[10px] font-normal"
+            >
+              <Database className="size-3" />
+              <span className="max-w-52 truncate">{collectionName}</span>
+            </Badge>
+          )}
           {!assistant.is_active && (
             <Badge
               variant="warning"
@@ -183,12 +192,12 @@ export function AssistantCard({
               Tạm dừng
             </Badge>
           )}
-          {readinessBadge && (
+          {!isUnbound && readinessBadge && (
             <Badge
               variant={readinessBadge.variant}
               className="h-4 px-1.5 text-[10px] font-normal"
             >
-              {isUnbound ? UNBOUND_LABEL : readinessBadge.label}
+              {readinessBadge.label}
             </Badge>
           )}
           {publication?.configured && publication.enabled && (

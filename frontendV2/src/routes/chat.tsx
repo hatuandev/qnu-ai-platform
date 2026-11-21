@@ -110,12 +110,16 @@ function formatTime(isoString: string): string {
 
 function turnAnswerText(turn: ConversationTurn): string | null {
   if (!turn.result) return null;
-  if (turn.result.status === "direct_reply") return turn.result.answer;
+  if (turn.result.status === "direct_reply") {
+    const ans = turn.result.answer?.trim();
+    return ans && ans !== "{}" ? ans : null;
+  }
   const text =
     turn.result.statements.length > 0
       ? turn.result.statements.map((statement) => statement.text).join("\n")
       : (turn.result.answer ?? "");
-  return text.trim() ? text : null;
+  const trimmed = text.trim();
+  return trimmed && trimmed !== "{}" ? trimmed : null;
 }
 
 function UserBubble({ question }: { question: string }) {
@@ -398,7 +402,7 @@ function WelcomePanel({
 
         <p className="px-1 text-center text-[11px] leading-relaxed text-muted-foreground">
           {isCollectionUnbound
-            ? "Trợ lý chưa gắn kho tri thức nên chưa thể trả lời. Gắn kho trong tab Cấu hình của trợ lý trước khi hỏi."
+            ? "Trợ lý hoạt động ở chế độ hội thoại trực tiếp với mô hình AI theo Persona cấu hình."
             : isCollectionEmpty
               ? "Kho tri thức chưa có tài liệu xuất bản nên hiện chỉ trả lời được câu hỏi chào hỏi, giới thiệu."
               : "Câu trả lời được đối soát trực tiếp từ kho tri thức và có trích dẫn [1], [2] để kiểm chứng."}
@@ -519,7 +523,6 @@ function ChatPage() {
   const isComposerDisabled =
     !assistant ||
     isInactive ||
-    isCollectionUnbound ||
     isSending ||
     !workspaceId;
 
@@ -900,16 +903,6 @@ function ChatPage() {
             </Alert>
           ) : null}
 
-          {!isInactive && isCollectionUnbound ? (
-            <Alert variant="warning">
-              <AlertTitle>Trợ lý chưa gắn kho tri thức</AlertTitle>
-              <AlertDescription>
-                Trợ lý chưa có kho tri thức nào nên chưa thể trả lời. Mở tab Cấu
-                hình của trợ lý trong trang Trợ lý để gắn ít nhất một kho.
-              </AlertDescription>
-            </Alert>
-          ) : null}
-
           {!isInactive && isCollectionEmpty ? (
             <Alert variant="warning">
               <AlertTitle>Kho tri thức chưa có tài liệu xuất bản</AlertTitle>
@@ -1051,9 +1044,7 @@ function ChatPage() {
               placeholder={
                 isInactive
                   ? "Trợ lý đang tạm dừng nhận câu hỏi..."
-                  : isCollectionUnbound
-                    ? "Trợ lý chưa gắn kho tri thức..."
-                    : "Nhập câu hỏi cho trợ lý (Enter để gửi, Shift+Enter xuống dòng)..."
+                  : "Nhập câu hỏi hoặc nội dung trò chuyện (Enter để gửi, Shift+Enter xuống dòng)..."
               }
               rows={1}
               maxLength={8000}
@@ -1079,7 +1070,9 @@ function ChatPage() {
           <p className="text-center text-[10px] text-muted-foreground/80">
             {isInactive
               ? "Bật lại trợ lý trong trang Trợ lý để tiếp tục hội thoại."
-              : "Câu trả lời được đối soát trực tiếp từ kho tri thức đã xuất bản. Nhấn vào các trích dẫn [1], [2] để mở ngăn đối chiếu nguồn."}
+              : isCollectionUnbound
+                ? "Trợ lý hoạt động ở chế độ hội thoại trực tiếp với mô hình AI theo Persona."
+                : "Câu trả lời được đối soát trực tiếp từ kho tri thức đã xuất bản. Nhấn vào các trích dẫn [1], [2] để mở ngăn đối chiếu nguồn."}
           </p>
         </div>
       </div>

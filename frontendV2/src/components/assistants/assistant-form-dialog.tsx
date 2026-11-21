@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Bot, Loader2, Save } from "lucide-react";
+import { Bot, Loader2, Save, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { AssistantResponse } from "@/api/assistants";
@@ -39,6 +39,7 @@ import {
   type RagPolicyFormState,
 } from "./assistant-advanced-fields";
 import { AssistantCollectionPicker } from "./assistant-collection-picker";
+import { AssistantPersonaCraftDialog } from "./assistant-persona-craft-dialog";
 import {
   type AssistantFormState,
   AUTO_MODEL,
@@ -82,6 +83,23 @@ export function AssistantFormDialog({
     initialState(assistant),
   );
   const [error, setError] = useState<string | null>(null);
+  const [isPersonaCraftOpen, setIsPersonaCraftOpen] = useState(false);
+
+  const handleApplyCraftedPersona = (crafted: {
+    name?: string;
+    description?: string;
+    persona?: string;
+    suggestedPrompts?: string[];
+  }) => {
+    patch({
+      ...(crafted.name ? { name: crafted.name } : {}),
+      ...(crafted.description ? { description: crafted.description } : {}),
+      ...(crafted.persona ? { persona: crafted.persona } : {}),
+      ...(crafted.suggestedPrompts
+        ? { suggestedPrompts: crafted.suggestedPrompts }
+        : {}),
+    });
+  };
 
   useEffect(() => {
     if (open) {
@@ -145,7 +163,8 @@ export function AssistantFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <DialogHeader className="space-y-1">
@@ -206,9 +225,22 @@ export function AssistantFormDialog({
                 </Field>
 
                 <Field>
-                  <FieldLabel className="text-xs font-medium">
-                    Chỉ dẫn cho trợ lý
-                  </FieldLabel>
+                  <div className="flex items-center justify-between mb-1">
+                    <FieldLabel className="text-xs font-medium">
+                      Chỉ dẫn cho trợ lý (Persona)
+                    </FieldLabel>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-[11px] gap-1 cursor-pointer"
+                      disabled={isPending}
+                      onClick={() => setIsPersonaCraftOpen(true)}
+                    >
+                      <Sparkles className="size-3 text-primary" />
+                      <span>Soạn bằng AI</span>
+                    </Button>
+                  </div>
                   <Textarea
                     value={form.persona}
                     onChange={(event) => patch({ persona: event.target.value })}
@@ -225,7 +257,7 @@ export function AssistantFormDialog({
 
                 <div className="grid gap-3.5 sm:grid-cols-2">
                   <Field>
-                    <FieldLabel required className="text-xs font-medium">
+                    <FieldLabel className="text-xs font-medium">
                       Kho tri thức
                     </FieldLabel>
                     <AssistantCollectionPicker
@@ -235,9 +267,11 @@ export function AssistantFormDialog({
                       disabled={isPending || isEdit}
                     />
                     <FieldDescription>
-                      {isEdit
-                        ? "Đổi bộ kho ở tab Cấu hình kèm xác nhận."
-                        : "Chọn một hoặc nhiều kho; trợ lý tra cứu trong tất cả kho đã chọn."}
+                      {form.collectionIds.length === 0
+                        ? "Không gắn kho tri thức · Trợ lý hội thoại trực tiếp với mô hình AI."
+                        : isEdit
+                          ? "Đổi bộ kho ở tab Cấu hình kèm xác nhận."
+                          : "Chọn một hoặc nhiều kho; trợ lý tra cứu trong tất cả kho đã chọn."}
                     </FieldDescription>
                   </Field>
 
@@ -386,5 +420,15 @@ export function AssistantFormDialog({
         </form>
       </DialogContent>
     </Dialog>
+
+    <AssistantPersonaCraftDialog
+      open={isPersonaCraftOpen}
+      onOpenChange={setIsPersonaCraftOpen}
+      workspaceId={workspaceId}
+      providerId={form.providerId === AUTO_MODEL ? null : form.providerId}
+      currentName={form.name}
+      onApply={handleApplyCraftedPersona}
+    />
+    </>
   );
 }

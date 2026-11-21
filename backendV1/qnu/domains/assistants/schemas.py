@@ -125,3 +125,19 @@ class AssistantReadiness(BaseModel):
     sync_error_code: str | None = None
     collections: list[AssistantCollectionReadiness] = Field(default_factory=list)
     checked_at: datetime
+
+
+class PersonaCraftRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    topic: str = Field(min_length=2, max_length=500, description="Mô tả mục đích hoặc chủ đề của trợ lý")
+    name: str | None = Field(default=None, max_length=160, description="Tên gợi ý ban đầu nếu có")
+    target_audience: str | None = Field(default=None, max_length=200, description="Đối tượng phục vụ")
+    tone: str | None = Field(default=None, max_length=100, description="Phong cách/văn phong")
+    provider_id: str | None = Field(default=None, max_length=64, description="Mã nhà cung cấp mô hình AI")
+
+
+class PersonaCraftResponse(BaseModel):
+    name: str = Field(description="Tên trợ lý được gợi ý")
+    description: str = Field(description="Mô tả ngắn gọn về trợ lý")
+    persona: str = Field(description="Chỉ dẫn đầy đủ cho trợ lý (Persona)")
+    suggested_prompts: list[str] = Field(default_factory=list, description="Danh sách các câu hỏi gợi ý mở đầu")

@@ -16,10 +16,10 @@ export const READINESS_MAP: Record<
   uncertain: { label: "Chưa xác định", variant: "warning" },
 };
 
-/** An unbound assistant also reports readiness "empty"; say what is actually missing. */
-export const UNBOUND_LABEL = "Chưa gắn kho";
+/** Label for assistant without knowledge base collections (pure LLM mode). */
+export const UNBOUND_LABEL = "Hội thoại trực tiếp";
 export const UNBOUND_DETAIL =
-  "Trợ lý chưa gắn kho tri thức. Gắn ít nhất một kho trong tab Cấu hình để bắt đầu phục vụ.";
+  "Không gắn kho tri thức · Trợ lý hội thoại trực tiếp với mô hình AI theo Persona.";
 
 /** Hero wording: a ready assistant serves answers, not just "ready". */
 export function readinessHeroLabel(status: AssistantReadinessStatus): string {
@@ -33,6 +33,9 @@ export function readinessDetail(
   published: number,
 ): string {
   if (status === "ready") {
+    if (published === 0) {
+      return "Chế độ hội thoại trực tiếp với mô hình AI";
+    }
     return `${served}/${published} tài liệu đang được phục vụ`;
   }
   if (status === "empty") return "Kho chưa có tài liệu xuất bản";

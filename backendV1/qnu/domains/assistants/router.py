@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.api.dependencies import get_actor, get_blob_store, get_db
@@ -10,14 +10,32 @@ from qnu.domains.assistants.schemas import (
     AssistantReadiness,
     AssistantResponse,
     AssistantUpdate,
+    PersonaCraftRequest,
+    PersonaCraftResponse,
 )
 from qnu.domains.identity.actor import AuthActor
+from qnu.platform.errors import DependencyUnavailable
 from qnu.ports.blob_store import BlobStore
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/assistants", tags=["Assistants"])
 DB = Annotated[AsyncSession, Depends(get_db)]
 Actor = Annotated[AuthActor, Depends(get_actor)]
 Blob = Annotated[BlobStore, Depends(get_blob_store)]
+
+
+@router.post("/craft-persona", response_model=PersonaCraftResponse)
+async def craft_persona(
+    workspace_id: str,
+    body: PersonaCraftRequest,
+    db: DB,
+    actor: Actor,
+    request: Request,
+):
+    container = getattr(request.app.state, "container", None)
+    chat_model = getattr(container, "chat_model", None)
+    if chat_model is None:
+        raise DependencyUnavailable("Mô hình chat chưa được khởi tạo.", code="chat_unavailable")
+    return await service.craft_persona(db, actor, workspace_id, body, chat_model)
 
 
 @router.post("", response_model=AssistantResponse, status_code=201)

@@ -31,7 +31,8 @@ async def owned(
         raise EntityNotFound("Không tìm thấy hội thoại.", code="conversation_not_found")
     await require_available(db, workspace_id, "conversation", conversation_id)
     await require_available(db, workspace_id, "assistant", row.assistant_id)
-    await load_collection(db, workspace_id, row.collection_id)
+    if row.collection_id:
+        await load_collection(db, workspace_id, row.collection_id)
     return row
 
 

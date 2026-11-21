@@ -64,6 +64,7 @@ import {
   AssistantCollectionPicker,
   type CollectionOption,
 } from "./assistant-collection-picker";
+import { AssistantPersonaCraftDialog } from "./assistant-persona-craft-dialog";
 import {
   type AssistantFormState,
   AUTO_MODEL,
@@ -124,6 +125,23 @@ export function AssistantConfigForm({
   const [error, setError] = useState<string | null>(null);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isCollectionConfirmOpen, setIsCollectionConfirmOpen] = useState(false);
+  const [isPersonaCraftOpen, setIsPersonaCraftOpen] = useState(false);
+
+  const handleApplyCraftedPersona = (crafted: {
+    name?: string;
+    description?: string;
+    persona?: string;
+    suggestedPrompts?: string[];
+  }) => {
+    patch({
+      ...(crafted.name ? { name: crafted.name } : {}),
+      ...(crafted.description ? { description: crafted.description } : {}),
+      ...(crafted.persona ? { persona: crafted.persona } : {}),
+      ...(crafted.suggestedPrompts
+        ? { suggestedPrompts: crafted.suggestedPrompts }
+        : {}),
+    });
+  };
 
   const baselineCollectionIds = useMemo(
     () => collectionIdsOf(baseline.data),
@@ -409,9 +427,22 @@ export function AssistantConfigForm({
               </Field>
 
               <Field>
-                <FieldLabel className="text-xs font-medium">
-                  Chỉ dẫn cho trợ lý (Persona)
-                </FieldLabel>
+                <div className="flex items-center justify-between mb-1.5">
+                  <FieldLabel className="text-xs font-medium">
+                    Chỉ dẫn cho trợ lý (Persona)
+                  </FieldLabel>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-[11px] gap-1 cursor-pointer"
+                    disabled={isPending}
+                    onClick={() => setIsPersonaCraftOpen(true)}
+                  >
+                    <Sparkles className="size-3 text-primary" />
+                    <span>Soạn bằng AI</span>
+                  </Button>
+                </div>
                 <Textarea
                   value={form.persona}
                   onChange={(event) => patch({ persona: event.target.value })}
@@ -558,9 +589,9 @@ export function AssistantConfigForm({
                     readiness={readiness}
                   />
                   <FieldDescription className="mt-1.5 text-xs leading-relaxed">
-                    Trợ lý tra cứu trong tất cả kho đã chọn. Đổi bộ kho áp dụng
-                    ngay khi lưu; hội thoại đã có giữ bộ kho cũ và cần hội thoại
-                    mới để hỏi tiếp.
+                    {form.collectionIds.length === 0
+                      ? "Không gắn kho tri thức · Trợ lý hoạt động ở chế độ hội thoại trực tiếp với mô hình AI theo Persona."
+                      : "Trợ lý tra cứu trong tất cả kho đã chọn. Đổi bộ kho áp dụng ngay khi lưu; hội thoại đã có giữ bộ kho cũ và cần hội thoại mới để hỏi tiếp."}
                   </FieldDescription>
                 </Field>
 
@@ -1129,19 +1160,28 @@ export function AssistantConfigForm({
         onOpenChange={setIsCollectionConfirmOpen}
         title={
           form.collectionIds.length === 0
-            ? "Bỏ toàn bộ kho tri thức của trợ lý?"
+            ? "Chuyển trợ lý sang chế độ hội thoại trực tiếp?"
             : "Đổi bộ kho tri thức của trợ lý?"
         }
         description={
           form.collectionIds.length === 0
-            ? "Sau khi lưu, trợ lý không còn kho tri thức nào: mọi lượt hỏi mới và lượt kiểm thử sẽ bị chặn, kênh công khai phải tắt, cho tới khi bạn gắn lại ít nhất một kho."
+            ? "Sau khi lưu, trợ lý sẽ hoạt động ở chế độ hội thoại LLM trực tiếp (không dùng kho tri thức). Các câu hỏi sẽ được trả lời dựa trên Persona cấu hình mà không cần đối soát tài liệu."
             : `Trợ lý sẽ tra cứu trong ${form.collectionIds.length} kho (${selectedCollectionNames}) ngay sau khi lưu. Hội thoại đã có vẫn giữ bộ kho cũ; muốn hỏi tiếp cần tạo hội thoại mới.`
         }
         confirmLabel={
-          form.collectionIds.length === 0 ? "Bỏ kho và lưu" : "Đổi kho và lưu"
+          form.collectionIds.length === 0 ? "Chuyển sang hội thoại trực tiếp" : "Đổi kho và lưu"
         }
         isLoading={isPending}
         onConfirm={() => void runSave()}
+      />
+
+      <AssistantPersonaCraftDialog
+        open={isPersonaCraftOpen}
+        onOpenChange={setIsPersonaCraftOpen}
+        workspaceId={workspaceId}
+        providerId={form.providerId === AUTO_MODEL ? null : form.providerId}
+        currentName={form.name}
+        onApply={handleApplyCraftedPersona}
       />
     </div>
   );

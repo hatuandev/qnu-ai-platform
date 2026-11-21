@@ -125,7 +125,7 @@ export function AssistantOverview({
   const readinessBadge = readiness ? READINESS_MAP[readiness.status] : null;
   const readinessCollections = readiness?.collections ?? [];
   const collectionSummary = isUnbound
-    ? "Chưa gắn kho tri thức"
+    ? "Hội thoại trực tiếp (không gắn kho)"
     : readinessCollections.length > 1
       ? `${readinessCollections.length} kho · ${readinessCollections
           .map((item) => sanitizeDisplayText(item.collection_name))
@@ -149,14 +149,19 @@ export function AssistantOverview({
             <CardTitle className="flex items-center gap-2 text-sm">
               <Activity className="size-4 text-primary" />
               <span>Trạng thái phục vụ</span>
-              {readinessBadge ? (
+              {isUnbound ? (
+                <Badge
+                  variant="secondary"
+                  className="h-5 px-1.5 text-[11px] font-normal text-primary bg-primary/10"
+                >
+                  {UNBOUND_LABEL}
+                </Badge>
+              ) : readinessBadge ? (
                 <Badge
                   variant={readinessBadge.variant}
                   className="h-5 px-1.5 text-[11px] font-normal"
                 >
-                  {isUnbound
-                    ? UNBOUND_LABEL
-                    : readinessHeroLabel(readiness?.status ?? "uncertain")}
+                  {readinessHeroLabel(readiness?.status ?? "uncertain")}
                 </Badge>
               ) : null}
             </CardTitle>

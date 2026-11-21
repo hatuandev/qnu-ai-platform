@@ -57,7 +57,7 @@ class TurnRequest(BaseModel):
 class DirectReply(BaseModel):
     id: str
     status: Literal["direct_reply"] = "direct_reply"
-    route: Literal["greeting", "courtesy", "identity", "protected_request", "guardrail"]
+    route: Literal["greeting", "courtesy", "identity", "protected_request", "guardrail", "direct_chat"]
     answer: str
 
 

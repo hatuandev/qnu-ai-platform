@@ -4,6 +4,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  craftPersona,
   createAssistant,
   deleteAssistant,
   getAssistant,
@@ -11,7 +12,12 @@ import {
   listAssistants,
   updateAssistant,
 } from "./requests";
-import type { AssistantCreateRequest, AssistantUpdateRequest } from "./types";
+import type {
+  AssistantCreateRequest,
+  AssistantUpdateRequest,
+  PersonaCraftRequest,
+  PersonaCraftResponse,
+} from "./types";
 
 export const assistantKeys = {
   all: ["v1", "assistants"] as const,
@@ -141,6 +147,15 @@ export function useDeleteAssistantMutation(workspaceId?: string | null) {
           queryKey: assistantKeys.list(workspaceId),
         });
       }
+    },
+  });
+}
+
+export function useCraftPersonaMutation(workspaceId?: string | null) {
+  return useMutation<PersonaCraftResponse, Error, PersonaCraftRequest>({
+    mutationFn: (data: PersonaCraftRequest) => {
+      if (!workspaceId) throw new Error("workspaceId is required");
+      return craftPersona(workspaceId, data);
     },
   });
 }

@@ -10,6 +10,8 @@ import type {
   AssistantReadiness,
   AssistantResponse,
   AssistantUpdateRequest,
+  PersonaCraftRequest,
+  PersonaCraftResponse,
 } from "./types";
 
 export async function listAssistants(
@@ -80,6 +82,18 @@ export async function getAssistantReadiness(
 ): Promise<AssistantReadiness> {
   return v1Client.get<AssistantReadiness>(
     assistantPaths.readiness(workspaceId, assistantId),
+    options,
+  );
+}
+
+export async function craftPersona(
+  workspaceId: string,
+  data: PersonaCraftRequest,
+  options?: { signal?: AbortSignal },
+): Promise<PersonaCraftResponse> {
+  return v1Client.post<PersonaCraftResponse>(
+    assistantPaths.craftPersona(workspaceId),
+    data,
     options,
   );
 }

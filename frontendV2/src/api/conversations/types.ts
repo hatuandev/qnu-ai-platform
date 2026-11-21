@@ -38,7 +38,8 @@ export type DirectReply = {
     | "courtesy"
     | "identity"
     | "protected_request"
-    | "guardrail";
+    | "guardrail"
+    | "direct_chat";
   answer: string;
 };
 

@@ -105,6 +105,7 @@ async def prepare_chat_request(
     reasoning=None,
     admission_limit: int | None = None,
     temperature: float | None = None,
+    json_mode: bool | None = None,
 ) -> tuple[ChatRuntime, ChatRequest, RequestTokenBudget]:
     await resolve_workspace_access(db, actor, workspace_id)
     provider_id, routing = await choose_target(db, workspace_id, task, provider_id)
@@ -130,6 +131,11 @@ async def prepare_chat_request(
     )
     if current != snapshot.configuration_hash:
         raise Conflict("Model thay đổi trong lúc lập ngân sách.", code="chat_provider_changed")
+    effective_json_mode = (
+        json_mode
+        if json_mode is not None
+        else (output_schema is not None or task != "chat")
+    )
     return (
         runtime,
         ChatRequest(
@@ -142,6 +148,7 @@ async def prepare_chat_request(
             wait_for_completion=runtime.wait_for_completion and task in DOCUMENT_CHAT_TASKS,
             api_key=runtime.api_key,
             output_schema=output_schema,
+            json_mode=effective_json_mode,
             execution=runtime.execution_scope,
             reasoning=reasoning,
             admission_limit=admission_limit,

@@ -1,5 +1,7 @@
 export const assistantPaths = {
   list: (workspaceId: string) => `/workspaces/${workspaceId}/assistants`,
+  craftPersona: (workspaceId: string) =>
+    `/workspaces/${workspaceId}/assistants/craft-persona`,
   detail: (workspaceId: string, assistantId: string) =>
     `/workspaces/${workspaceId}/assistants/${assistantId}`,
   readiness: (workspaceId: string, assistantId: string) =>
