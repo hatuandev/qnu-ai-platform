@@ -111,9 +111,6 @@ export function PublicationDialog({
 
   const version = versionQuery.data;
   const gate = gateQuery.data;
-  const isNoAiReview =
-    (gateQuery.error as { code?: string } | null)?.code ===
-    "publication_review_required";
 
   const handleApproveAndPublish = async () => {
     if (isProcessing) return;
@@ -326,7 +323,7 @@ export function PublicationDialog({
 
           {/* Ghi chú thông tin rà soát AI & tiến trình ngầm (chỉ để tham khảo) */}
           <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
-            {gateQuery.isPending ? (
+            {gateQuery.isFetching && Boolean(versionId) ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="size-3.5 animate-spin shrink-0" />
                 <span>Đang kiểm tra trạng thái rà soát AI...</span>
@@ -344,7 +341,7 @@ export function PublicationDialog({
                 <CheckCircle2 className="size-4 shrink-0" />
                 <span>Báo cáo rà soát AI không ghi nhận bất thường.</span>
               </div>
-            ) : isNoAiReview || gateQuery.error ? (
+            ) : (
               <div className="flex items-start gap-2 text-muted-foreground">
                 <Info className="size-4 shrink-0 mt-0.5 text-muted-foreground/80" />
                 <span>
@@ -352,7 +349,7 @@ export function PublicationDialog({
                   duyệt và phát hành trực tiếp.
                 </span>
               </div>
-            ) : null}
+            )}
 
             {gate?.spelling_in_progress && (
               <div className="flex items-start gap-2 text-amber-700 dark:text-amber-400 pt-1 border-t border-border/40">
