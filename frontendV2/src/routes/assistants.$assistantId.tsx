@@ -3,6 +3,7 @@ import {
   Bot,
   Database,
   Globe,
+  KeyRound,
   LayoutDashboard,
   ListChecks,
   MessageSquare,
@@ -31,6 +32,7 @@ import { PageHeader } from "@/components/admin/page-header";
 import { AnswerReviewHistory } from "@/components/assistants/answer-review-history";
 import { AskTestPanel } from "@/components/assistants/ask-test-panel";
 import { AssistantConfigForm } from "@/components/assistants/assistant-config-form";
+import { AssistantIntegrationsTab } from "@/components/assistants/assistant-integrations-tab";
 import { AssistantLogs } from "@/components/assistants/assistant-logs";
 import { AssistantOverview } from "@/components/assistants/assistant-overview";
 import { AssistantPublicationTab } from "@/components/assistants/assistant-publication-tab";
@@ -50,12 +52,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { sanitizeDisplayText } from "@/lib/utils";
 import { useUiStore } from "@/lib/ui-store";
+import { sanitizeDisplayText } from "@/lib/utils";
 
 const assistantDetailSearchSchema = z.object({
   tab: z
-    .enum(["overview", "config", "ask", "reviews", "logs", "publication"])
+    .enum([
+      "overview",
+      "config",
+      "ask",
+      "reviews",
+      "logs",
+      "publication",
+      "integrations",
+    ])
     .catch("overview"),
 });
 
@@ -332,6 +342,10 @@ function AssistantDetailPage() {
             <Globe className="size-3.5" />
             <span>Công khai</span>
           </TabsTrigger>
+          <TabsTrigger value="integrations" className="gap-1.5 text-xs">
+            <KeyRound className="size-3.5" />
+            <span>Tích hợp API</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -374,6 +388,13 @@ function AssistantDetailPage() {
 
         <TabsContent value="publication">
           <AssistantPublicationTab
+            workspaceId={workspaceId}
+            assistant={assistant}
+          />
+        </TabsContent>
+
+        <TabsContent value="integrations">
+          <AssistantIntegrationsTab
             workspaceId={workspaceId}
             assistant={assistant}
           />
