@@ -12,7 +12,12 @@ from qnu.domains.knowledge.public_api import (
 )
 from qnu.domains.modelops.public_api import resolve_ocr_runtime
 from qnu.domains.modelops.resilience.routing import choose_target
-from qnu.domains.ocr.config import DOCX_VERSION, PDF_INSPECTOR_VERSION, ocr_contract_hash
+from qnu.domains.ocr.config import (
+    DOCX_VERSION,
+    PDF_INSPECTOR_VERSION,
+    XLSX_VERSION,
+    ocr_contract_hash,
+)
 from qnu.domains.ocr.execution import (
     _assemble,
     _ocr_pages,
@@ -72,6 +77,7 @@ async def execute_auto(db, blob, run, actor, engine, config, settings):
         )
     payload = await read_revision_bytes(blob, scope)
     direct_word = scope.extension == ".docx"
+    direct_excel = scope.extension == ".xlsx"
     inspector = pinned.get("pdf_inspector")
     if direct_word:
         from qnu.domains.ocr.direct_docx import extract_docx_async
@@ -85,6 +91,18 @@ async def execute_auto(db, blob, run, actor, engine, config, settings):
         with observe_stage(run, "read_docx", logger=logger) as observation:
             rendered, plan = await extract_docx_async(payload)
             observation.item_count = len(plan.pages[0].layout.blocks)
+    elif direct_excel:
+        from qnu.domains.ocr.direct_xlsx import extract_xlsx_async
+
+        if pinned.get("xlsx") != XLSX_VERSION:
+            raise AppException(
+                "Luồng XLSX đã đổi sang đọc trực tiếp. Hãy tạo lượt bóc tách mới.",
+                code="native_version_changed",
+                status_code=409,
+            )
+        with observe_stage(run, "read_xlsx", logger=logger) as observation:
+            rendered, plan = await extract_xlsx_async(payload)
+            observation.item_count = sum(len(p.layout.blocks) for p in plan.pages)
     else:
         rendered = await _render_for_run(db, blob, run, payload, scope.extension, config)
         if inspector:

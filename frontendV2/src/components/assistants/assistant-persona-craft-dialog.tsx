@@ -98,7 +98,13 @@ export function AssistantPersonaCraftDialog({
       setApplyPrompts(true);
     } catch (err) {
       if (err instanceof ApiProblemError) {
-        setError(err.problem?.detail || err.message);
+        if (err.status === 405 || err.problem?.detail === "Method Not Allowed") {
+          setError(
+            "Đường dẫn soạn thảo chưa được máy chủ nạp hoặc phiên bản backend chưa đồng bộ. Vui lòng làm mới trang (F5) hoặc khởi động lại backend.",
+          );
+        } else {
+          setError(err.problem?.detail || err.message);
+        }
       } else if (err instanceof Error) {
         setError(err.message);
       } else {

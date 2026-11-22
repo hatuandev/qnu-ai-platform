@@ -135,13 +135,23 @@ def validate_document(canonical: dict[str, Any], *, expected_pages: int) -> Repo
                     Issue("evidence_unmapped", f"Không có mapping cho {block_id}", number)
                 )
             locator = block.get("source_locator") or {}
-            direct_word = (
-                canonical.get("processing", {}).get("renderer", {}).get("pagination") == "document"
-                and locator.get("format") == "docx"
-                and bool(locator.get("docling_ref"))
+            pagination = (
+                canonical.get("processing", {}).get("renderer", {}).get("pagination")
+            )
+            direct_native = (
+                (
+                    pagination == "document"
+                    and locator.get("format") == "docx"
+                    and bool(locator.get("docling_ref"))
+                )
+                or (pagination == "sheets" and locator.get("format") == "xlsx")
+                or (
+                    pagination in {"document", "slides"}
+                    and locator.get("format") in {"pptx", "md", "txt"}
+                )
             )
             if not _valid_bbox(block.get("bbox") or {}) and not (
-                direct_word and not block.get("bbox")
+                direct_native and not block.get("bbox")
             ):
                 errors.append(
                     Issue("block_bbox_invalid", f"bbox không hợp lệ ở {block_id}", number)

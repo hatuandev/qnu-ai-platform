@@ -117,6 +117,11 @@ class Settings(BaseSettings):
     INDEX_MAX_ATTEMPTS: int = Field(default=3, ge=1, le=10)
     INDEX_RETAIN_INACTIVE: int = Field(default=1, ge=0)
     INDEX_RETIRE_AFTER_SECONDS: int = Field(default=86400, ge=0)
+    XLSX_MAX_ROWS: int = Field(
+        default=500,
+        ge=1,
+        description="Số dòng dữ liệu tối đa cho phép xử lý trong một file/sheet Excel.",
+    )
     CONVERSATION_TURN_LEASE_SECONDS: int = Field(default=900, ge=60)
     CONVERSATION_HISTORY_MAX_BYTES: int = Field(default=16000, ge=1024)
     # Ownership rule (docs/runtime-ownership.md): only one backend reconciles its own queue.

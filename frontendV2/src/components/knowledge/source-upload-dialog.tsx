@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
 import { cn } from "@/lib/utils";
 
-const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".xlsx"];
+const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".pptx", ".md", ".txt"];
 const MAX_FILE_SIZE = 60 * 1024 * 1024; // 60 MB
 
 export function SourceUploadDialog({

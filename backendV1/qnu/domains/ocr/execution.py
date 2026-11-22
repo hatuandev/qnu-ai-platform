@@ -475,9 +475,9 @@ async def _execute_claimed(
         observation.byte_count = len(payload_bytes)
         observation.sha256 = scope.sha256
 
-    if scope.extension == ".docx":
+    if scope.extension in {".docx", ".xlsx"}:
         raise AppException(
-            "Luồng DOCX đã đổi sang đọc trực tiếp. Hãy tạo lượt bóc tách mới.",
+            f"Luồng {scope.extension.upper()} đã đổi sang đọc trực tiếp. Hãy tạo lượt bóc tách mới.",
             code="native_version_changed",
             status_code=409,
         )
@@ -828,7 +828,7 @@ async def _assemble_result(
                 db, blob_store, run, "native_page", page.page_number
             )
             native = page_from_payload(json.loads(native_bytes))
-            if rendered.renderer.get("pagination") == "document":
+            if rendered.renderer.get("pagination") in {"document", "sheets", "slides"}:
                 from qnu.domains.ocr.direct_docx import merge_docx_layout
 
                 layout = merge_docx_layout(native, layout)
