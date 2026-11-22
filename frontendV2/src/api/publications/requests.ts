@@ -74,11 +74,12 @@ export async function getPublicChatbotInfo(
 
 export async function createPublicChatSession(
   slug: string,
+  data?: { website?: string },
   options?: { signal?: AbortSignal },
 ): Promise<PublicChatSession> {
   return v1PublicClient.post<PublicChatSession>(
     publicationPaths.publicSessions(slug),
-    undefined,
+    data,
     options,
   );
 }

@@ -89,6 +89,12 @@ function turnErrorMessage(err: unknown): string {
     if (err.code === "public_chatbot_unavailable") {
       return "Trợ lý đang tạm ngưng phục vụ. Vui lòng quay lại sau.";
     }
+    if (err.code === "public_chat_bot_detected") {
+      return "Yêu cầu không hợp lệ.";
+    }
+    if (err.code === "public_chat_too_fast") {
+      return "Bạn gửi tin quá nhanh. Vui lòng thử lại sau ít giây.";
+    }
     if (err.status === 0) {
       return "Không kết nối được máy chủ. Vui lòng kiểm tra mạng và thử lại.";
     }
@@ -453,6 +459,7 @@ function PublicChatbotPage() {
   const [session, setSession] = useState<PublicChatSession | null>(null);
   const [turnsRemaining, setTurnsRemaining] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  const [honeypot, setHoneypot] = useState("");
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   // Synchronous lock: isSending state updates a render late, so two rapid sends
@@ -461,6 +468,45 @@ function PublicChatbotPage() {
   const hasSentInitialQuestion = useRef(false);
 
   const info = infoQuery.data;
+
+  // Check whether embedding in an iframe is permitted by allowed_embed_origins
+  const embedOriginViolation = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const isInIframe = window.self !== window.top;
+    if (!isInIframe) return null;
+
+    let parentOrigin: string | null = null;
+    try {
+      if (
+        window.location.ancestorOrigins &&
+        window.location.ancestorOrigins.length > 0
+      ) {
+        parentOrigin = window.location.ancestorOrigins[0].toLowerCase();
+      } else if (document.referrer) {
+        parentOrigin = new URL(document.referrer).origin.toLowerCase();
+      }
+    } catch {
+      // parse error
+    }
+
+    const selfOrigin = window.location.origin.toLowerCase();
+    const allowed = (info?.allowed_embed_origins || []).map((o) =>
+      o.toLowerCase(),
+    );
+
+    if (parentOrigin) {
+      if (parentOrigin === selfOrigin || allowed.includes(parentOrigin)) {
+        return null;
+      }
+      return parentOrigin;
+    }
+
+    if (allowed.length > 0) {
+      return "không xác định";
+    }
+
+    return null;
+  }, [info?.allowed_embed_origins]);
 
   useEffect(() => {
     if (info?.display_name) {
@@ -507,7 +553,11 @@ function PublicChatbotPage() {
   }, [messages.length, isSending]);
 
   const canAsk =
-    Boolean(info?.available) && !blockedReason && !isSending && remaining !== 0;
+    Boolean(info?.available) &&
+    !blockedReason &&
+    !embedOriginViolation &&
+    !isSending &&
+    remaining !== 0;
 
   const handleResetSession = () => {
     setMessages([]);
@@ -531,13 +581,16 @@ function PublicChatbotPage() {
     try {
       let activeSession = session;
       if (!activeSession) {
-        activeSession = await createSessionMutation.mutateAsync();
+        activeSession = await createSessionMutation.mutateAsync({
+          website: honeypot || undefined,
+        });
         setSession(activeSession);
         setTurnsRemaining(activeSession.turns_remaining);
       }
       const reply = await sendTurnMutation.mutateAsync({
         session_id: activeSession.session_id,
         question,
+        website: honeypot || undefined,
       });
       setTurnsRemaining(reply.turns_remaining);
       setMessages((prev) => [
@@ -710,6 +763,17 @@ function PublicChatbotPage() {
         </Alert>
       ) : null}
 
+      {embedOriginViolation ? (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTitle>Tên miền chưa được cấp phép nhúng</AlertTitle>
+          <AlertDescription>
+            Trang web hiện tại ({embedOriginViolation}) chưa được cấu hình trong
+            danh sách tên miền được phép nhúng của trợ lý này. Vui lòng liên hệ
+            quản trị viên để được cấp phép.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {blockedReason ? (
         <Alert variant="destructive" className="mb-4">
           <AlertTitle>Trợ lý tạm ngưng nhận câu hỏi</AlertTitle>
@@ -778,6 +842,16 @@ function PublicChatbotPage() {
             : "sticky bottom-0 border-t border-border/60 bg-background/95 pb-1 pt-3 backdrop-blur"
         }
       >
+        <input
+          type="text"
+          name="website"
+          value={honeypot}
+          onChange={(event) => setHoneypot(event.target.value)}
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          className="absolute -left-[9999px] -top-[9999px] opacity-0 pointer-events-none"
+        />
         <Textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}

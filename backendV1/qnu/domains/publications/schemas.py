@@ -6,10 +6,23 @@ chunk or document identifiers cross the anonymous boundary.
 
 from datetime import date, datetime
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 SLUG_PATTERN = r"^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])$"
+
+
+def normalize_origin(raw: str) -> str:
+    text = raw.strip()
+    if not text:
+        return ""
+    parsed = urlparse(text)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError(
+            f"Tên miền '{text}' không hợp lệ. Phải bắt đầu bằng http:// hoặc https:// (VD: https://qnu.edu.vn)."
+        )
+    return f"{parsed.scheme}://{parsed.netloc}".lower()
 
 
 class PublicationConfig(BaseModel):
@@ -18,6 +31,7 @@ class PublicationConfig(BaseModel):
     display_name: str = Field(min_length=1, max_length=160)
     welcome_message: str = Field("", max_length=2000)
     starter_prompts: list[str] = Field(default_factory=list, max_length=6)
+    allowed_embed_origins: list[str] = Field(default_factory=list, max_length=50)
     max_turns_per_session: int = Field(15, strict=True, ge=1, le=100)
     daily_token_budget: int | None = Field(None, strict=True, ge=1000)
     enabled: bool = False
@@ -52,6 +66,19 @@ class PublicationConfig(BaseModel):
             cleaned.append(text)
         return cleaned
 
+    @field_validator("allowed_embed_origins")
+    @classmethod
+    def clean_origins(cls, values: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for raw in values:
+            origin = normalize_origin(raw)
+            if not origin or origin in seen:
+                continue
+            seen.add(origin)
+            cleaned.append(origin)
+        return cleaned
+
 
 class PublicationUpdate(PublicationConfig):
     expected_revision: int | None = Field(None, strict=True, ge=1)
@@ -64,6 +91,7 @@ class PublicationResponse(BaseModel):
     display_name: str
     welcome_message: str
     starter_prompts: list[str]
+    allowed_embed_origins: list[str] = Field(default_factory=list)
     max_turns_per_session: int
     daily_token_budget: int | None
     revision: int
@@ -78,6 +106,7 @@ class PublicChatbotInfo(BaseModel):
     display_name: str
     welcome_message: str
     starter_prompts: list[str]
+    allowed_embed_origins: list[str] = Field(default_factory=list)
     max_turns_per_session: int
     available: bool
     unavailable_reason: str | None
@@ -95,6 +124,11 @@ class PublicChatbotListResponse(BaseModel):
     chatbots: list[PublicChatbotSummary]
 
 
+class PublicSessionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    website: str | None = Field(default=None, max_length=200)
+
+
 class PublicSessionResponse(BaseModel):
     session_id: str
     expires_in_seconds: int
@@ -106,6 +140,7 @@ class PublicTurnRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_id: str = Field(min_length=16, max_length=64)
     question: str = Field(min_length=1, max_length=1000)
+    website: str | None = Field(default=None, max_length=200)
 
     @field_validator("question")
     @classmethod

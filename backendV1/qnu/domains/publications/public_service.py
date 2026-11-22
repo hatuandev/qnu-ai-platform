@@ -10,9 +10,11 @@ import asyncio
 import hashlib
 import json
 import secrets
+import time
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
+from fastapi import Request
 from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +40,7 @@ from qnu.domains.publications.schemas import (
     PublicChatbotListResponse,
     PublicChatbotSummary,
     PublicCitation,
+    PublicSessionRequest,
     PublicSessionResponse,
     PublicTurnRequest,
     PublicTurnResponse,
@@ -71,6 +74,19 @@ logger = get_logger(__name__)
 def business_day() -> date:
     """Calendar day in the unit's local time; stats and the budget reset together."""
     return datetime.now(BUSINESS_TZ).date()
+
+
+def extract_client_ip(request: Request) -> str:
+    """Extract real client IP honoring reverse proxies (Cloudflare, Nginx) before direct host."""
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip and cf_ip.strip():
+        return cf_ip.strip()
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded and forwarded.strip():
+        return forwarded.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host.strip()
+    return "unknown"
 
 
 def client_key(host: str | None) -> str:
@@ -285,6 +301,7 @@ async def info(db: AsyncSession, blob: BlobStore, slug: str) -> PublicChatbotInf
         display_name=row.display_name,
         welcome_message=row.welcome_message,
         starter_prompts=list(row.starter_prompts),
+        allowed_embed_origins=list(row.allowed_embed_origins) if row.allowed_embed_origins else [],
         max_turns_per_session=row.max_turns_per_session,
         available=available,
         unavailable_reason=None if available else UNAVAILABLE_TEXT,
@@ -345,14 +362,29 @@ async def listing(db: AsyncSession) -> PublicChatbotListResponse:
     return PublicChatbotListResponse(chatbots=items)
 
 
-async def create_session(db: AsyncSession, slug: str, requester: str) -> PublicSessionResponse:
+async def create_session(
+    db: AsyncSession,
+    slug: str,
+    requester: str,
+    body: PublicSessionRequest | None = None,
+) -> PublicSessionResponse:
+    if body and body.website and body.website.strip():
+        raise AppException(
+            "Yêu cầu không hợp lệ.",
+            code="public_chat_bot_detected",
+            status_code=400,
+        )
     row, active = await _publication(db, slug)
     if not active:
         raise Conflict(UNAVAILABLE_TEXT, code="public_chatbot_unavailable")
     await _rate_limit(f"sessions:{requester}:{row.id}", SESSIONS_PER_HOUR)
     ttl = get_settings().PUBLIC_CHATBOT_SESSION_TTL_SECONDS
     session_id = secrets.token_urlsafe(24)
-    await set_json(_session_key(session_id), {"publication_id": row.id, "turns": 0}, ttl)
+    await set_json(
+        _session_key(session_id),
+        {"publication_id": row.id, "turns": 0, "created_at": time.time()},
+        ttl,
+    )
     await _bump_stats(db, row.id, sessions=1)
     await db.commit()
     return PublicSessionResponse(
@@ -412,6 +444,12 @@ async def turn(
     req: PublicTurnRequest,
     requester: str,
 ) -> PublicTurnResponse:
+    if req.website and req.website.strip():
+        raise AppException(
+            "Yêu cầu không hợp lệ.",
+            code="public_chat_bot_detected",
+            status_code=400,
+        )
     row, active = await _publication(db, slug)
     if not active:
         raise Conflict(UNAVAILABLE_TEXT, code="public_chatbot_unavailable")
@@ -427,6 +465,13 @@ async def turn(
         raise AppException(
             "Phiên đã đạt giới hạn số câu hỏi. Hãy bắt đầu phiên mới.",
             code="public_chat_session_limit",
+            status_code=429,
+        )
+    created_at = float(session.get("created_at") or 0)
+    if int(session.get("turns", 0)) == 0 and created_at > 0 and (time.time() - created_at) < 0.8:
+        raise AppException(
+            "Thao tác quá nhanh. Vui lòng thử lại sau ít giây.",
+            code="public_chat_too_fast",
             status_code=429,
         )
     publication_id = row.id
@@ -478,10 +523,7 @@ async def turn(
                     p = json.loads(pub_raw)
                     if isinstance(p, dict):
                         extracted = (
-                            p.get("answer")
-                            or p.get("message")
-                            or p.get("content")
-                            or p.get("text")
+                            p.get("answer") or p.get("message") or p.get("content") or p.get("text")
                         )
                         if extracted and isinstance(extracted, str):
                             pub_ans = extracted.strip()

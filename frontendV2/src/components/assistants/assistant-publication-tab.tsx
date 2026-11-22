@@ -48,6 +48,7 @@ type PublicationFormState = {
   displayName: string;
   welcome: string;
   starterPrompts: string;
+  allowedEmbedOrigins: string;
   maxTurns: string;
   dailyBudget: string;
   unlimitedBudget: boolean;
@@ -77,6 +78,7 @@ function initialState(
     displayName: publication.display_name || assistantName,
     welcome: publication.welcome_message,
     starterPrompts: publication.starter_prompts.join("\n"),
+    allowedEmbedOrigins: (publication.allowed_embed_origins || []).join("\n"),
     maxTurns: String(publication.max_turns_per_session || 15),
     dailyBudget:
       publication.daily_token_budget === null
@@ -85,6 +87,30 @@ function initialState(
     unlimitedBudget: publication.daily_token_budget === null,
     enabled: publication.enabled,
   };
+}
+
+function parseOrigins(raw: string): string[] {
+  const seen = new Set<string>();
+  const origins: string[] = [];
+  for (const line of raw.split("\n")) {
+    let text = line.trim();
+    if (!text) continue;
+    if (!text.startsWith("http://") && !text.startsWith("https://")) {
+      text = `https://${text}`;
+    }
+    try {
+      const url = new URL(text);
+      if (url.protocol !== "http:" && url.protocol !== "https:") continue;
+      const origin = url.origin.toLowerCase();
+      if (!seen.has(origin)) {
+        seen.add(origin);
+        origins.push(origin);
+      }
+    } catch {
+      // Ignore invalid URL
+    }
+  }
+  return origins;
 }
 
 function parsePrompts(raw: string): string[] {
@@ -494,6 +520,7 @@ export function AssistantPublicationTab({
         display_name: form.displayName.trim(),
         welcome_message: form.welcome,
         starter_prompts: parsePrompts(form.starterPrompts),
+        allowed_embed_origins: parseOrigins(form.allowedEmbedOrigins),
         max_turns_per_session: Number(form.maxTurns),
         daily_token_budget: form.unlimitedBudget
           ? null
@@ -868,46 +895,73 @@ export function AssistantPublicationTab({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <Textarea
-            readOnly
-            value={embedSnippet}
-            placeholder="Lưu cấu hình để nhận mã nhúng"
-            rows={4}
-            className="resize-none bg-muted/30 font-mono text-[11px] leading-relaxed"
-            aria-label="Mã nhúng iframe"
-          />
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] text-muted-foreground">
-              {isLive
-                ? "Mã nhúng hoạt động ngay khi kênh đang công khai; có thể chỉnh height cho vừa khung website."
-                : "Mã nhúng chỉ hiển thị trò chuyện khi kênh công khai đang bật."}
-            </p>
-            <div className="flex shrink-0 items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 text-xs"
-                disabled={!embedUrl}
-                onClick={() => void handleCopySnippet()}
-              >
-                <Copy className="size-3.5" />
-                <span>Sao chép mã</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 text-xs"
-                disabled={!embedUrl || !isLive}
-                onClick={() => {
-                  if (embedUrl) {
-                    window.open(embedUrl, "_blank", "noopener,noreferrer");
-                  }
-                }}
-              >
-                <ExternalLink className="size-3.5" />
-                <span>Xem dạng nhúng</span>
-              </Button>
+        <CardContent className="space-y-4">
+          <Field>
+            <FieldLabel className="text-xs font-medium">
+              Tên miền được phép nhúng
+            </FieldLabel>
+            <Textarea
+              value={form.allowedEmbedOrigins}
+              onChange={(event) =>
+                patch({ allowedEmbedOrigins: event.target.value })
+              }
+              placeholder={
+                "Mỗi dòng một tên miền/origin (VD: https://qnu.edu.vn, http://localhost:3000).\nĐể trống nghĩa là chỉ cho phép chính hệ thống này (self)."
+              }
+              rows={3}
+              className="resize-none bg-background font-mono text-xs leading-relaxed"
+              disabled={saveMutation.isPending}
+            />
+            <FieldDescription>
+              Kiểm soát trang web nào được phép nhúng iframe trợ lý này. Để
+              trống để giới hạn nội bộ.
+            </FieldDescription>
+          </Field>
+
+          <div className="space-y-2">
+            <FieldLabel className="text-xs font-medium">
+              Mã nhúng iframe
+            </FieldLabel>
+            <Textarea
+              readOnly
+              value={embedSnippet}
+              placeholder="Lưu cấu hình để nhận mã nhúng"
+              rows={3}
+              className="resize-none bg-muted/30 font-mono text-[11px] leading-relaxed"
+              aria-label="Mã nhúng iframe"
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[11px] text-muted-foreground">
+                {isLive
+                  ? "Mã nhúng hoạt động ngay khi kênh đang công khai; có thể chỉnh height cho vừa khung website."
+                  : "Mã nhúng chỉ hiển thị trò chuyện khi kênh công khai đang bật."}
+              </p>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs"
+                  disabled={!embedUrl}
+                  onClick={() => void handleCopySnippet()}
+                >
+                  <Copy className="size-3.5" />
+                  <span>Sao chép mã</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs"
+                  disabled={!embedUrl || !isLive}
+                  onClick={() => {
+                    if (embedUrl) {
+                      window.open(embedUrl, "_blank", "noopener,noreferrer");
+                    }
+                  }}
+                >
+                  <ExternalLink className="size-3.5" />
+                  <span>Xem dạng nhúng</span>
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>

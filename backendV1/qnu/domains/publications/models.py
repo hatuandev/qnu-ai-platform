@@ -50,6 +50,9 @@ class AssistantPublication(Base):
     starter_prompts: Mapped[list] = mapped_column(
         JSONB, nullable=False, default=list, server_default="[]"
     )
+    allowed_embed_origins: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
     max_turns_per_session: Mapped[int] = mapped_column(nullable=False, default=15)
     daily_token_budget: Mapped[int | None] = mapped_column(nullable=True)
     enabled: Mapped[bool] = mapped_column(nullable=False, default=False)

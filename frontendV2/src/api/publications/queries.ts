@@ -120,7 +120,8 @@ export function usePublicChatbotInfoQuery(slug?: string | null) {
 
 export function useCreatePublicChatSessionMutation(slug: string) {
   return useMutation({
-    mutationFn: () => createPublicChatSession(slug),
+    mutationFn: (data?: { website?: string }) =>
+      createPublicChatSession(slug, data),
   });
 }
 

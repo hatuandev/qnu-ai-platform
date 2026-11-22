@@ -42,6 +42,9 @@ def _view(row: AssistantPublication | None, readiness: str) -> PublicationRespon
         display_name=row.display_name if row else "",
         welcome_message=row.welcome_message if row else "",
         starter_prompts=list(row.starter_prompts) if row else [],
+        allowed_embed_origins=list(row.allowed_embed_origins)
+        if row and row.allowed_embed_origins
+        else [],
         max_turns_per_session=row.max_turns_per_session if row else DEFAULT_TURNS,
         daily_token_budget=row.daily_token_budget if row else None,
         revision=row.revision if row else 0,
@@ -125,6 +128,7 @@ async def save_publication(
             display_name=req.display_name,
             welcome_message=req.welcome_message,
             starter_prompts=req.starter_prompts,
+            allowed_embed_origins=req.allowed_embed_origins,
             max_turns_per_session=req.max_turns_per_session,
             daily_token_budget=req.daily_token_budget,
             enabled=req.enabled,
@@ -145,6 +149,7 @@ async def save_publication(
         row.display_name = req.display_name
         row.welcome_message = req.welcome_message
         row.starter_prompts = req.starter_prompts
+        row.allowed_embed_origins = req.allowed_embed_origins
         row.max_turns_per_session = req.max_turns_per_session
         row.daily_token_budget = req.daily_token_budget
         row.enabled = req.enabled

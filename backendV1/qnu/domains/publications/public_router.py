@@ -10,6 +10,7 @@ from qnu.domains.publications import public_service
 from qnu.domains.publications.schemas import (
     PublicChatbotInfo,
     PublicChatbotListResponse,
+    PublicSessionRequest,
     PublicSessionResponse,
     PublicTurnRequest,
     PublicTurnResponse,
@@ -22,7 +23,8 @@ Blob = Annotated[BlobStore, Depends(get_blob_store)]
 
 
 def _requester(request: Request) -> str:
-    return public_service.client_key(request.client.host if request.client else None)
+    ip = public_service.extract_client_ip(request)
+    return public_service.client_key(ip)
 
 
 @router.get("", response_model=PublicChatbotListResponse)
@@ -38,9 +40,15 @@ async def info(slug: str, response: Response, db: DB, blob: Blob) -> PublicChatb
 
 
 @router.post("/{slug}/sessions", response_model=PublicSessionResponse, status_code=201)
-async def session(slug: str, request: Request, response: Response, db: DB) -> PublicSessionResponse:
+async def session(
+    slug: str,
+    request: Request,
+    response: Response,
+    db: DB,
+    body: PublicSessionRequest | None = None,
+) -> PublicSessionResponse:
     response.headers["Cache-Control"] = "no-store"
-    return await public_service.create_session(db, slug, _requester(request))
+    return await public_service.create_session(db, slug, _requester(request), body)
 
 
 @router.post("/{slug}/turns", response_model=PublicTurnResponse)

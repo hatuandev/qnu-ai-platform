@@ -12,6 +12,7 @@ export type PublicationResponse = {
   display_name: string;
   welcome_message: string;
   starter_prompts: string[];
+  allowed_embed_origins: string[];
   max_turns_per_session: number;
   daily_token_budget: number | null;
   revision: number;
@@ -27,6 +28,7 @@ export type PublicationUpdateRequest = {
   display_name: string;
   welcome_message: string;
   starter_prompts: string[];
+  allowed_embed_origins?: string[];
   max_turns_per_session: number;
   daily_token_budget: number | null;
   enabled: boolean;
@@ -37,6 +39,7 @@ export type PublicChatbotInfo = {
   display_name: string;
   welcome_message: string;
   starter_prompts: string[];
+  allowed_embed_origins: string[];
   max_turns_per_session: number;
   available: boolean;
   unavailable_reason: string | null;
@@ -64,6 +67,7 @@ export type PublicChatSession = {
 export type PublicTurnRequest = {
   session_id: string;
   question: string;
+  website?: string;
 };
 
 export type PublicCitation = {
