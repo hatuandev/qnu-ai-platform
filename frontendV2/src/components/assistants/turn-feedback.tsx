@@ -1,18 +1,30 @@
 import { Check, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useSubmitTurnFeedbackMutation } from "@/api/conversations";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useUiStore } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
 
 type FeedbackState = {
   rating: "like" | "dislike";
   reason?: string;
 };
+
+export interface TurnFeedbackProps {
+  turnId: string;
+  workspaceId?: string;
+  conversationId?: string;
+  initialFeedback?: {
+    rating: "like" | "dislike";
+    reason?: string | null;
+  } | null;
+}
 
 const DISLIKE_REASONS = [
   "Thiếu ý / thiếu tiểu mục từ văn bản",
@@ -45,24 +57,64 @@ function saveFeedback(turnId: string, feedback: FeedbackState | null) {
   }
 }
 
-export function TurnFeedback({ turnId }: { turnId: string }) {
-  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
+export function TurnFeedback({
+  turnId,
+  workspaceId,
+  conversationId,
+  initialFeedback,
+}: TurnFeedbackProps) {
+  const activeWorkspaceId = useUiStore((state) => state.activeWorkspaceId);
+  const effectiveWs = workspaceId ?? activeWorkspaceId;
+  const submitFeedbackMutation = useSubmitTurnFeedbackMutation(effectiveWs);
+
+  const [feedback, setFeedback] = useState<FeedbackState | null>(() => {
+    if (initialFeedback) {
+      return {
+        rating: initialFeedback.rating,
+        reason: initialFeedback.reason ?? undefined,
+      };
+    }
+    return getStoredFeedback(turnId);
+  });
   const [popoverOpen, setPopoverOpen] = useState(false);
 
   useEffect(() => {
-    setFeedback(getStoredFeedback(turnId));
-  }, [turnId]);
+    if (initialFeedback) {
+      setFeedback({
+        rating: initialFeedback.rating,
+        reason: initialFeedback.reason ?? undefined,
+      });
+    } else {
+      setFeedback(getStoredFeedback(turnId));
+    }
+  }, [turnId, initialFeedback]);
 
   const handleLike = () => {
     if (feedback?.rating === "like") {
       setFeedback(null);
       saveFeedback(turnId, null);
+      if (effectiveWs && conversationId) {
+        submitFeedbackMutation.mutate({
+          conversationId,
+          turnId,
+          rating: null,
+          reason: null,
+        });
+      }
       toast.info("Đã bỏ đánh giá.");
       return;
     }
     const next: FeedbackState = { rating: "like" };
     setFeedback(next);
     saveFeedback(turnId, next);
+    if (effectiveWs && conversationId) {
+      submitFeedbackMutation.mutate({
+        conversationId,
+        turnId,
+        rating: "like",
+        reason: null,
+      });
+    }
     toast.success("Cảm ơn bạn đã đánh giá câu trả lời hữu ích!");
   };
 
@@ -70,6 +122,14 @@ export function TurnFeedback({ turnId }: { turnId: string }) {
     const next: FeedbackState = { rating: "dislike", reason };
     setFeedback(next);
     saveFeedback(turnId, next);
+    if (effectiveWs && conversationId) {
+      submitFeedbackMutation.mutate({
+        conversationId,
+        turnId,
+        rating: "dislike",
+        reason,
+      });
+    }
     setPopoverOpen(false);
     toast.info(`Đã ghi nhận phản hồi kiểm thử: ${reason}`);
   };

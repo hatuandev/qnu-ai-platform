@@ -43,6 +43,17 @@ export type DirectReply = {
   answer: string;
 };
 
+export type TurnFeedback = {
+  rating: "like" | "dislike";
+  reason?: string | null;
+  updated_at?: string;
+};
+
+export type TurnFeedbackRequest = {
+  rating: "like" | "dislike" | null;
+  reason?: string | null;
+};
+
 export type ConversationTurn = {
   id: string;
   conversation_id: string;
@@ -54,6 +65,7 @@ export type ConversationTurn = {
   status: TurnStatus;
   error_code: string | null;
   result: AnswerResult | DirectReply | null;
+  feedback?: TurnFeedback | null;
   rewrite_trace: Record<string, unknown> | null;
   source_status: string;
   source_status_reason: string | null;

@@ -67,3 +67,17 @@ export async function listConversationTurns(
     },
   );
 }
+
+export async function submitTurnFeedback(
+  workspaceId: string,
+  conversationId: string,
+  turnId: string,
+  body: { rating: "like" | "dislike" | null; reason?: string | null },
+  options?: { signal?: AbortSignal },
+): Promise<ConversationTurn> {
+  return v1Client.post<ConversationTurn>(
+    conversationPaths.feedback(workspaceId, conversationId, turnId),
+    body,
+    { signal: options?.signal },
+  );
+}

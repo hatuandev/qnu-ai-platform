@@ -97,6 +97,7 @@ class ConversationTurn(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="running")
     error_code: Mapped[str | None] = mapped_column(String(100))
     result: Mapped[dict | None] = mapped_column(JSONB)
+    feedback: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     rewrite_trace: Mapped[dict | None] = mapped_column(JSONB)
     lease_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

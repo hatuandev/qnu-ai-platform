@@ -54,6 +54,12 @@ class TurnRequest(BaseModel):
         return value.strip() if isinstance(value, str) else value
 
 
+class TurnFeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rating: Literal["like", "dislike"] | None = None
+    reason: str | None = Field(default=None, max_length=500)
+
+
 class DirectReply(BaseModel):
     id: str
     status: Literal["direct_reply"] = "direct_reply"
@@ -73,6 +79,7 @@ class TurnResponse(BaseModel):
     status: str
     error_code: str | None
     result: AnswerResponse | DirectReply | None
+    feedback: dict | None = None
     rewrite_trace: dict | None
     source_status: str = "current"
     source_status_reason: str | None = None

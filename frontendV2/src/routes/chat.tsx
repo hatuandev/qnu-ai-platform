@@ -209,7 +209,11 @@ function TurnRow({
               ) : null}
             </div>
             <div className="flex items-center gap-1">
-              <TurnFeedback turnId={turn.id} />
+              <TurnFeedback
+                turnId={turn.id}
+                conversationId={turn.conversation_id}
+                initialFeedback={turn.feedback}
+              />
               {copyText ? (
                 <Button
                   variant="ghost"

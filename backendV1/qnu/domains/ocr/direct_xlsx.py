@@ -275,7 +275,12 @@ def extract_xlsx(payload: bytes, max_rows: int | None = None) -> tuple[RenderedD
                 status="parsed",
                 rows=tuple(tuple(r) for r in table_rows),
                 column_count=col_count,
-                source_mapping={"format": "xlsx", "sheet": sheet_name, "rows": len(table_rows)},
+                source_mapping={
+                    "format": "xlsx",
+                    "sheet": sheet_name,
+                    "title": f"Sheet: {sheet_name}",
+                    "rows": len(table_rows),
+                },
             )
             md_table = _build_markdown_table(table_rows, col_count)
             table_intro = f"### Bảng dữ liệu: {sheet_name}\n\n{md_table}"

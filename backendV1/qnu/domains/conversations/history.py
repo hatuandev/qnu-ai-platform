@@ -5,9 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.conversations.access import owned
 from qnu.domains.conversations.models import ConversationTurn
-from qnu.domains.conversations.schemas import TurnResponse
+from qnu.domains.conversations.schemas import TurnFeedbackRequest, TurnResponse
 from qnu.domains.conversations.service import expire
 from qnu.domains.identity.actor import AuthActor
+from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.index.multi import validate_collections
 from qnu.domains.knowledge.index.schemas import SearchHit, SearchResponse
 from qnu.domains.knowledge.index.validation import validate_results
@@ -170,3 +171,38 @@ async def get_turn(
     result = await readable(db, blob, vectors, actor, row, conversation.document_ids)
     await db.commit()
     return result
+
+
+async def set_feedback(
+    db: AsyncSession,
+    blob: BlobStore,
+    vectors: VectorStore,
+    actor: AuthActor,
+    workspace_id: str,
+    conversation_id: str,
+    turn_id: str,
+    body: TurnFeedbackRequest,
+) -> TurnResponse:
+    conversation = await owned(db, actor, workspace_id, conversation_id)
+    await expire(db, conversation)
+    row = await db.scalar(
+        select(ConversationTurn).where(
+            ConversationTurn.id == turn_id, ConversationTurn.conversation_id == conversation.id
+        )
+    )
+    if row is None:
+        raise EntityNotFound("Không tìm thấy lượt hỏi.", code="conversation_turn_not_found")
+
+    if body.rating is None:
+        row.feedback = None
+    else:
+        row.feedback = {
+            "rating": body.rating,
+            "reason": body.reason,
+            "updated_at": utcnow().isoformat(),
+        }
+
+    await db.commit()
+    await db.refresh(row)
+    return await readable(db, blob, vectors, actor, row, conversation.document_ids)
+

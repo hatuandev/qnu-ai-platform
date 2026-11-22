@@ -159,14 +159,24 @@ def citation_index(documents: list[dict]) -> dict:
 
 
 def literal_tables(documents: list[dict]) -> list[dict]:
-    return [
-        {
-            "citation": f"{doc['ocr_run_id']}:{block['evidence_id']}",
-            "page_number": page["page_number"],
-            "table": block["table"],
-        }
-        for doc in documents
-        for page in doc["pages"]
-        for block in page["blocks"]
-        if block.get("table") is not None
-    ]
+    result = []
+    for doc in documents:
+        for page in doc["pages"]:
+            for block in page["blocks"]:
+                table = block.get("table")
+                if table is not None:
+                    entry = {
+                        "citation": f"{doc['ocr_run_id']}:{block['evidence_id']}",
+                        "page_number": page["page_number"],
+                        "table": table,
+                    }
+                    sheet = (
+                        (block.get("source_locator") or {}).get("sheet")
+                        or (table.get("source_mapping") or {}).get("sheet")
+                    )
+                    if sheet:
+                        entry["title"] = f"Sheet: {sheet}"
+                    elif block.get("title"):
+                        entry["title"] = block["title"]
+                    result.append(entry)
+    return result

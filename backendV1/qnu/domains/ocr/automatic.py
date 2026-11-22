@@ -14,6 +14,7 @@ from qnu.domains.modelops.public_api import resolve_ocr_runtime
 from qnu.domains.modelops.resilience.routing import choose_target
 from qnu.domains.ocr.config import (
     DOCX_VERSION,
+    MD_VERSION,
     PDF_INSPECTOR_VERSION,
     XLSX_VERSION,
     ocr_contract_hash,
@@ -78,6 +79,7 @@ async def execute_auto(db, blob, run, actor, engine, config, settings):
     payload = await read_revision_bytes(blob, scope)
     direct_word = scope.extension == ".docx"
     direct_excel = scope.extension == ".xlsx"
+    direct_md = scope.extension == ".md"
     inspector = pinned.get("pdf_inspector")
     if direct_word:
         from qnu.domains.ocr.direct_docx import extract_docx_async
@@ -102,6 +104,18 @@ async def execute_auto(db, blob, run, actor, engine, config, settings):
             )
         with observe_stage(run, "read_xlsx", logger=logger) as observation:
             rendered, plan = await extract_xlsx_async(payload)
+            observation.item_count = sum(len(p.layout.blocks) for p in plan.pages)
+    elif direct_md:
+        from qnu.domains.ocr.direct_md import extract_md_async
+
+        if pinned.get("md") != MD_VERSION:
+            raise AppException(
+                "Luồng Markdown đã đổi sang đọc trực tiếp. Hãy tạo lượt bóc tách mới.",
+                code="native_version_changed",
+                status_code=409,
+            )
+        with observe_stage(run, "read_md", logger=logger) as observation:
+            rendered, plan = await extract_md_async(payload)
             observation.item_count = sum(len(p.layout.blocks) for p in plan.pages)
     else:
         rendered = await _render_for_run(db, blob, run, payload, scope.extension, config)

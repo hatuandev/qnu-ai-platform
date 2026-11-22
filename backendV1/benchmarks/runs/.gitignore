@@ -1,0 +1,4 @@
+# Ignore ephemeral benchmark execution run results
+run_*.json
+tmp_*.json
+*.tmp

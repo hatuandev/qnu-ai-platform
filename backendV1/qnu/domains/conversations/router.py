@@ -11,6 +11,7 @@ from qnu.domains.conversations.schemas import (
     ConversationCreate,
     ConversationResponse,
     ConversationUpdate,
+    TurnFeedbackRequest,
     TurnRequest,
     TurnResponse,
 )
@@ -134,3 +135,27 @@ async def turn(
         conversation_id,
         turn_id,
     )
+
+
+@router.post("/{conversation_id}/turns/{turn_id}/feedback", response_model=TurnResponse)
+async def feedback(
+    workspace_id: str,
+    conversation_id: str,
+    turn_id: str,
+    body: TurnFeedbackRequest,
+    request: Request,
+    db: DB,
+    actor: Actor,
+    blob: Blob,
+):
+    return await history.set_feedback(
+        db,
+        blob,
+        request.app.state.container.vector_store,
+        actor,
+        workspace_id,
+        conversation_id,
+        turn_id,
+        body,
+    )
+

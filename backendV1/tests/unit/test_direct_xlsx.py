@@ -145,3 +145,68 @@ def test_extract_xlsx_ignores_empty_and_summary_rows_when_counting():
     table = plan.pages[0].layout.blocks[0].table
     assert len(table.rows) == 3  # 1 header + 2 data rows
 
+
+def test_extract_xlsx_preserves_sheet_name_in_source_mapping_and_row_card():
+    from qnu.domains.knowledge.compilation.evidence import literal_tables
+    from qnu.domains.knowledge.index.row_cards import build_row_card_chunks
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Dữ liệu chuẩn hóa"
+    ws.append(["Mã sách", "Tên sách", "Năm"])
+    ws.append(["BK01", "American business terms Dictionary", 1994])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    payload = buf.getvalue()
+
+    _rendered, plan = extract_xlsx(payload)
+    block = plan.pages[0].layout.blocks[0]
+    assert block.table.source_mapping["sheet"] == "Dữ liệu chuẩn hóa"
+    assert block.table.source_mapping["title"] == "Sheet: Dữ liệu chuẩn hóa"
+
+    # Simulate compilation document
+    doc = {
+        "ocr_run_id": "ocr_test",
+        "pages": [
+            {
+                "page_number": 1,
+                "blocks": [
+                    {
+                        "evidence_id": "ev_tbl_1",
+                        "table": {
+                            "status": "parsed",
+                            "rows": [
+                                [
+                                    {
+                                        "text": c.text,
+                                        "header": c.header,
+                                        "row_span": c.row_span,
+                                        "col_span": c.col_span,
+                                    }
+                                    for c in row
+                                ]
+                                for row in block.table.rows
+                            ],
+                            "column_count": block.table.column_count,
+                            "source_mapping": block.table.source_mapping,
+                        },
+                        "source_locator": block.source_locator,
+                    }
+                ],
+            }
+        ],
+    }
+
+    lit_tables = literal_tables([doc])
+    assert len(lit_tables) == 1
+    assert lit_tables[0]["title"] == "Sheet: Dữ liệu chuẩn hóa"
+
+    # Convert to Row Card Chunks
+    chunks = build_row_card_chunks(lit_tables, doc_title="TaiLieuThuVien.xlsx")
+    assert len(chunks) == 1
+    chunk_text = chunks[0].text
+    assert "[Nguồn: TaiLieuThuVien.xlsx | Trang: 1 | Bảng: Sheet: Dữ liệu chuẩn hóa]" in chunk_text
+    assert "American business terms Dictionary" in chunk_text
+
+

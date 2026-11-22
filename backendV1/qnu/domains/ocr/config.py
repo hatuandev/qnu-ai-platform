@@ -19,6 +19,7 @@ from qnu.platform.errors import AppException
 PROCESSOR_VERSION = "qnu-ocr/v1"
 DOCX_VERSION = "qnu-docling-word/v1"
 XLSX_VERSION = "qnu-openpyxl/v1"
+MD_VERSION = "qnu-markdown/v1"
 PDF_INSPECTOR_VERSION = "1.25.2"
 PROMPT_VERSION = "nemotron-parse/v1"
 CANONICAL_SCHEMA = "qnu.ocr.document/v1"
@@ -40,7 +41,7 @@ def ocr_contract_hash(provider_type: str) -> str:
     return hashlib.sha256(material.encode()).hexdigest()
 
 
-SUPPORTED_PROCESSING_EXTENSIONS = (".pdf", ".docx", ".xlsx")
+SUPPORTED_PROCESSING_EXTENSIONS = (".pdf", ".docx", ".xlsx", ".md")
 
 
 @dataclass(frozen=True, slots=True)

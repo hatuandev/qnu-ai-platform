@@ -530,6 +530,13 @@ def build_row_card_chunks(
             or ""
         )
         base_title = entry.get("title") or ""
+        if not base_title:
+            source_map = table.get("source_mapping") or {}
+            sheet = source_map.get("sheet")
+            if sheet:
+                base_title = f"Sheet: {sheet}"
+            elif source_map.get("title"):
+                base_title = source_map["title"]
         if heading_prefix and base_title and base_title != doc_title:
             table_title = f"{heading_prefix}: {base_title}"
         elif heading_prefix:

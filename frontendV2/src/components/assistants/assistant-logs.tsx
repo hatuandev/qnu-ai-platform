@@ -1,5 +1,15 @@
-import { ChevronDown, History, RefreshCw, ScrollText } from "lucide-react";
-import { useState } from "react";
+import {
+  ChevronDown,
+  FileQuestion,
+  History,
+  ListFilter,
+  RefreshCw,
+  ScrollText,
+  ThumbsDown,
+  ThumbsUp,
+  XCircle,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 import {
   type Conversation,
   type ConversationTurn,
@@ -8,6 +18,7 @@ import {
   useConversationTurnsQuery,
 } from "@/api/conversations";
 import { EmptyState } from "@/components/admin/empty-state";
+import { TurnFeedback } from "@/components/assistants/turn-feedback";
 import { TurnResult } from "@/components/assistants/turn-result";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +29,42 @@ import {
 } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+
+export type TurnFilterType =
+  | "all"
+  | "insufficient_evidence"
+  | "failed"
+  | "dislike";
+
+const FILTER_OPTIONS: {
+  id: TurnFilterType;
+  label: string;
+  icon: typeof ListFilter;
+}[] = [
+  { id: "all", label: "Tất cả", icon: ListFilter },
+  { id: "insufficient_evidence", label: "Thiếu dẫn chứng", icon: FileQuestion },
+  { id: "failed", label: "Lỗi", icon: XCircle },
+  { id: "dislike", label: "Bị Dislike", icon: ThumbsDown },
+];
+
+function matchesTurnFilter(
+  turn: ConversationTurn,
+  filter: TurnFilterType,
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "insufficient_evidence") {
+    return (
+      turn.result != null && turn.result.status === "insufficient_evidence"
+    );
+  }
+  if (filter === "failed") {
+    return turn.status === "failed";
+  }
+  if (filter === "dislike") {
+    return turn.feedback?.rating === "dislike";
+  }
+  return true;
+}
 
 const TURN_STATUS_MAP: Record<
   TurnStatus,
@@ -73,7 +120,15 @@ function TurnMeta({ turn }: { turn: ConversationTurn }) {
   );
 }
 
-function TurnLogEntry({ turn }: { turn: ConversationTurn }) {
+function TurnLogEntry({
+  turn,
+  workspaceId,
+  conversationId,
+}: {
+  turn: ConversationTurn;
+  workspaceId: string;
+  conversationId: string;
+}) {
   const status = TURN_STATUS_MAP[turn.status] ?? {
     label: turn.status,
     variant: "secondary" as const,
@@ -94,16 +149,44 @@ function TurnLogEntry({ turn }: { turn: ConversationTurn }) {
             </p>
           </div>
         </div>
-        <Badge
-          variant={status.variant}
-          className="h-4 shrink-0 px-1.5 text-[10px] font-normal"
-        >
-          {status.label}
-        </Badge>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {turn.feedback?.rating === "dislike" ? (
+            <Badge
+              variant="destructive"
+              className="h-4 px-1.5 text-[10px] font-normal gap-1"
+              title={turn.feedback.reason ?? "Cần cải thiện"}
+            >
+              <ThumbsDown className="size-2.5" />
+              <span>Bị Dislike</span>
+            </Badge>
+          ) : turn.feedback?.rating === "like" ? (
+            <Badge
+              variant="success"
+              className="h-4 px-1.5 text-[10px] font-normal gap-1"
+            >
+              <ThumbsUp className="size-2.5" />
+              <span>Hữu ích</span>
+            </Badge>
+          ) : null}
+          <Badge
+            variant={status.variant}
+            className="h-4 px-1.5 text-[10px] font-normal"
+          >
+            {status.label}
+          </Badge>
+        </div>
       </div>
       <div className="space-y-3 px-3 py-2.5">
         <TurnResult turn={turn} />
-        <TurnMeta turn={turn} />
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-1.5">
+          <TurnMeta turn={turn} />
+          <TurnFeedback
+            turnId={turn.id}
+            workspaceId={workspaceId}
+            conversationId={conversationId}
+            initialFeedback={turn.feedback}
+          />
+        </div>
       </div>
     </div>
   );
@@ -112,15 +195,23 @@ function TurnLogEntry({ turn }: { turn: ConversationTurn }) {
 function ConversationTurns({
   workspaceId,
   conversationId,
+  filter,
 }: {
   workspaceId: string;
   conversationId: string;
+  filter: TurnFilterType;
 }) {
   const {
     data: turns,
     isError,
     refetch,
   } = useConversationTurnsQuery(workspaceId, conversationId);
+
+  const filteredTurns = useMemo(() => {
+    if (!turns) return [];
+    if (filter === "all") return turns;
+    return turns.filter((turn) => matchesTurnFilter(turn, filter));
+  }, [turns, filter]);
 
   if (isError) {
     return (
@@ -158,10 +249,23 @@ function ConversationTurns({
     );
   }
 
+  if (filteredTurns.length === 0) {
+    return (
+      <p className="px-1 py-1.5 text-xs text-muted-foreground italic">
+        Không có lượt hỏi nào trong hội thoại này khớp với bộ lọc đã chọn.
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-2">
-      {turns.map((turn) => (
-        <TurnLogEntry key={turn.id} turn={turn} />
+      {filteredTurns.map((turn) => (
+        <TurnLogEntry
+          key={turn.id}
+          turn={turn}
+          workspaceId={workspaceId}
+          conversationId={conversationId}
+        />
       ))}
     </div>
   );
@@ -170,9 +274,11 @@ function ConversationTurns({
 function ConversationLogCard({
   workspaceId,
   conversation,
+  filter,
 }: {
   workspaceId: string;
   conversation: Conversation;
+  filter: TurnFilterType;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const isArchived = conversation.status === "archived";
@@ -186,7 +292,7 @@ function ConversationLogCard({
       <CollapsibleTrigger asChild>
         <Button
           variant="ghost"
-          className="group h-auto w-full justify-between gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-muted/40"
+          className="group h-auto w-full justify-between gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-muted/40 cursor-pointer"
         >
           <span className="flex min-w-0 flex-1 items-center gap-2">
             <History className="size-4 shrink-0 text-muted-foreground" />
@@ -215,6 +321,7 @@ function ConversationLogCard({
             <ConversationTurns
               workspaceId={workspaceId}
               conversationId={conversation.id}
+              filter={filter}
             />
           ) : null}
         </div>
@@ -230,6 +337,8 @@ export function AssistantLogs({
   workspaceId: string;
   assistantId: string;
 }) {
+  const [activeFilter, setActiveFilter] = useState<TurnFilterType>("all");
+
   const {
     data: conversations,
     isError,
@@ -271,9 +380,34 @@ export function AssistantLogs({
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-muted-foreground">
-          Hội thoại của bạn với trợ lý · 20 hội thoại gần nhất
-        </p>
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border/60 bg-muted/20 p-1">
+          {FILTER_OPTIONS.map((opt) => {
+            const Icon = opt.icon;
+            const isActive = activeFilter === opt.id;
+            return (
+              <Button
+                key={opt.id}
+                type="button"
+                variant={isActive ? "secondary" : "ghost"}
+                size="sm"
+                className={cn(
+                  "h-7 gap-1.5 px-2.5 text-xs font-normal transition-colors cursor-pointer",
+                  isActive &&
+                    "bg-background font-medium text-foreground shadow-2xs border border-border/60",
+                )}
+                onClick={() => setActiveFilter(opt.id)}
+              >
+                <Icon
+                  className={cn(
+                    "size-3.5",
+                    isActive ? "text-primary" : "text-muted-foreground",
+                  )}
+                />
+                <span>{opt.label}</span>
+              </Button>
+            );
+          })}
+        </div>
         <Button
           variant="ghost"
           size="sm"
@@ -290,6 +424,7 @@ export function AssistantLogs({
           key={conversation.id}
           workspaceId={workspaceId}
           conversation={conversation}
+          filter={activeFilter}
         />
       ))}
     </div>

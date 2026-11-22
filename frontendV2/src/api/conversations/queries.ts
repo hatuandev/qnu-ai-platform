@@ -8,6 +8,7 @@ import {
   listConversations,
   listConversationTurns,
   sendConversationTurn,
+  submitTurnFeedback,
 } from "./requests";
 import type { Conversation, ConversationTurn } from "./types";
 
@@ -139,7 +140,9 @@ export function useSendTurnMutation(workspaceId?: string | null) {
         if (exists) {
           return previous.map((item) => (item.id === turn.id ? turn : item));
         }
-        return [...previous, turn].sort((left, right) => left.turn_no - right.turn_no);
+        return [...previous, turn].sort(
+          (left, right) => left.turn_no - right.turn_no,
+        );
       });
       void queryClient.invalidateQueries({
         queryKey: [...conversationKeys.all, "list", workspaceId],
@@ -149,6 +152,44 @@ export function useSendTurnMutation(workspaceId?: string | null) {
       if (!workspaceId) return;
       void queryClient.invalidateQueries({
         queryKey: conversationKeys.turns(workspaceId, variables.conversationId),
+      });
+    },
+  });
+}
+
+export function useSubmitTurnFeedbackMutation(workspaceId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      turnId,
+      rating,
+      reason,
+      signal,
+    }: {
+      conversationId: string;
+      turnId: string;
+      rating: "like" | "dislike" | null;
+      reason?: string | null;
+      signal?: AbortSignal;
+    }) => {
+      if (!workspaceId) throw new Error("workspaceId is required");
+      return submitTurnFeedback(
+        workspaceId,
+        conversationId,
+        turnId,
+        { rating, reason },
+        { signal },
+      );
+    },
+    onSuccess: (updatedTurn, variables) => {
+      if (!workspaceId) return;
+      const key = conversationKeys.turns(workspaceId, variables.conversationId);
+      queryClient.setQueryData<ConversationTurn[]>(key, (previous) => {
+        if (!previous) return [updatedTurn];
+        return previous.map((item) =>
+          item.id === updatedTurn.id ? updatedTurn : item,
+        );
       });
     },
   });

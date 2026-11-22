@@ -1,0 +1,438 @@
+{
+  "suite_id": "rag_benchmark_md_xlsx",
+  "version": "1.0.0",
+  "description": "Bộ đề benchmark cố định đánh giá định kỳ chất lượng RAG đối với tài liệu Markdown (.md) và bảng tính Excel (.xlsx) trên QNU AI Platform.",
+  "scoring_scale": {
+    "PASS": 2,
+    "PARTIAL": 1,
+    "FAIL": 0,
+    "max_score_per_question": 2,
+    "total_questions": 24,
+    "max_total_score": 48
+  },
+  "datasets": [
+    {
+      "id": "ds_qnu_tin_chi_md",
+      "format": "md",
+      "title": "Quy định đào tạo đại học chính quy theo hệ thống tín chỉ",
+      "doc_number": "1234/QĐ-ĐHQN",
+      "promulgation_date": "2024-08-15",
+      "source_file": "scratch/quy_dinh_tin_chi_qnu_sample.md",
+      "description": "Quy chế đào tạo tín chỉ chuẩn của Trường Đại học Quy Nhơn, gồm cấu trúc phân cấp Heading 1/2/3, bảng quy đổi điểm và điều kiện học vụ."
+    },
+    {
+      "id": "ds_qnu_thu_vien_xlsx",
+      "format": "xlsx",
+      "title": "Tài nguyên thư viện và thống kê sách mã",
+      "sheets": [
+        "Dữ liệu chuẩn hóa",
+        "Số ĐKCB sót so với file KK (Thơ"
+      ],
+      "source_file": "scratch/test_qnu_sample_library.xlsx",
+      "description": "Dữ liệu thư viện gồm nhiều sheet, các dòng nhan đề trùng lặp khác năm/thông tin và các mã số ĐKCB độc lập."
+    }
+  ],
+  "groups": [
+    {
+      "id": "md_retrieval_and_structure",
+      "name": "Tra cứu tài liệu Markdown & Phân cấp cấu trúc",
+      "question_count": 4
+    },
+    {
+      "id": "xlsx_tables_and_sheet_isolation",
+      "name": "Bảng biểu Excel & Tách bạch Sheet",
+      "question_count": 4
+    },
+    {
+      "id": "exact_identifiers_and_keywords",
+      "name": "Khớp mã định danh & Từ khóa chính xác",
+      "question_count": 4
+    },
+    {
+      "id": "multi_clause_compound_conditions",
+      "name": "Câu hỏi nhiều vế & Ghép điều kiện phức hợp",
+      "question_count": 4
+    },
+    {
+      "id": "acronyms_and_anti_hallucination",
+      "name": "Từ viết tắt & Kỷ luật chống suy diễn",
+      "question_count": 4
+    },
+    {
+      "id": "trap_and_out_of_scope",
+      "name": "Câu hỏi bẫy & Xử lý ngoài phạm vi",
+      "question_count": 4
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q01",
+      "group": "md_retrieval_and_structure",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Quy định đào tạo tín chỉ này được ban hành theo quyết định số bao nhiêu, ngày tháng năm nào và áp dụng từ khóa tuyển sinh nào?",
+      "expected_points": [
+        "Quyết định số 1234/QĐ-ĐHQN",
+        "Ngày 15 tháng 8 năm 2024",
+        "Áp dụng từ khóa tuyển sinh năm 2021 trở đi"
+      ],
+      "expected_behavior": "Trích dẫn đầy đủ và chính xác số quyết định, ngày ban hành và đối tượng khóa áp dụng từ phần đầu văn bản.",
+      "forbidden_behaviors": [
+        "Bịa đặt năm ban hành khác 2024 hoặc số quyết định khác",
+        "Tự suy diễn áp dụng cho toàn bộ các khóa trước 2021"
+      ]
+    },
+    {
+      "id": "Q02",
+      "group": "md_retrieval_and_structure",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Thời gian đào tạo tiêu chuẩn cho chương trình cử nhân là mấy năm và thời gian tối đa để sinh viên hoàn thành khóa học là bao nhiêu năm?",
+      "expected_points": [
+        "Thời gian đào tạo tiêu chuẩn chương trình cử nhân là 4 năm (8 học kỳ chính)",
+        "Thời gian tối đa không vượt quá 2 lần thời gian thiết kế tiêu chuẩn (tối đa 8 năm đối với hệ 4 năm)"
+      ],
+      "expected_behavior": "Nêu rõ số năm tiêu chuẩn (4 năm) và trần thời gian tối đa (8 năm) theo Điều 2.",
+      "forbidden_behaviors": [
+        "Nhầm lẫn thời gian cử nhân 4 năm với kỹ sư/sư phạm đặc thù 4.5 năm khi không được hỏi",
+        "Đoán mò thời gian tối đa là 6 năm hoặc không giới hạn"
+      ]
+    },
+    {
+      "id": "Q03",
+      "group": "md_retrieval_and_structure",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Một năm học tại Trường Đại học Quy Nhơn được tổ chức thành mấy học kỳ và số tuần học tối thiểu của từng học kỳ là bao nhiêu?",
+      "expected_points": [
+        "Tổ chức theo 02 học kỳ chính (Học kỳ 1 và Học kỳ 2) và 01 học kỳ phụ (Học kỳ hè)",
+        "Mỗi học kỳ chính gồm ít nhất 15 tuần học tập thực tế và 3 đến 4 tuần dành cho ôn tập, thi kết thúc học phần",
+        "Học kỳ phụ gồm ít nhất 5 tuần học tập và thi"
+      ],
+      "expected_behavior": "Liệt kê rõ 2 học kỳ chính (tối thiểu 15 tuần học) và 1 học kỳ phụ (tối thiểu 5 tuần).",
+      "forbidden_behaviors": [
+        "Bỏ qua học kỳ phụ",
+        "Bịa đặt số tuần học khác với quy định Điều 2"
+      ]
+    },
+    {
+      "id": "Q04",
+      "group": "md_retrieval_and_structure",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Theo Điều 20, điều kiện để sinh viên được xét và công nhận tốt nghiệp gồm những tiêu chuẩn chính nào?",
+      "expected_points": [
+        "Tích lũy đủ số học phần và tín chỉ (125 đến 145 tín chỉ tùy ngành)",
+        "Điểm trung bình chung tích lũy toàn khóa học từ 2.00 trở lên (thang điểm 4)",
+        "Có chứng chỉ GDQP-AN và hoàn thành chương trình GDTC",
+        "Đạt chuẩn đầu ra Ngoại ngữ (VSTEP B1 hoặc tương đương: IELTS 4.5, TOEIC 450)",
+        "Đạt chuẩn đầu ra Công nghệ thông tin cơ bản (Thông tư 03/2014/TT-BTTTT)",
+        "Không bị kỷ luật từ mức đình chỉ học tập trở lên hoặc truy cứu trách nhiệm hình sự"
+      ],
+      "expected_behavior": "Liệt kê đầy đủ các tiêu chuẩn tốt nghiệp từ tín chỉ, điểm TB, GDQP-GDTC, ngoại ngữ, tin học đến tư cách đạo đức/kỷ luật.",
+      "forbidden_behaviors": [
+        "Bỏ sót chuẩn đầu ra Ngoại ngữ hoặc GDQP-AN/GDTC",
+        "Bịa thêm các điều kiện ngoài văn bản như bắt buộc có bài báo khoa học"
+      ]
+    },
+    {
+      "id": "Q05",
+      "group": "xlsx_tables_and_sheet_isolation",
+      "doc_scope": "tai_nguyen_thu_vien_sample.xlsx",
+      "question": "Sách 'American business terms Dictionary' nằm ở sheet nào, vị trí phòng nào và có số ĐKCB ra sao?",
+      "expected_points": [
+        "Nằm ở sheet 'Dữ liệu chuẩn hóa'",
+        "Phòng/Kho lưu trữ theo dữ liệu cột phòng",
+        "Số ĐKCB tương ứng với cuốn sách này"
+      ],
+      "expected_behavior": "Chỉ rõ sheet 'Dữ liệu chuẩn hóa' và trích xuất đúng số ĐKCB, phòng lưu trữ của cuốn American business terms Dictionary.",
+      "forbidden_behaviors": [
+        "Nhầm lẫn sang sheet 'Số ĐKCB sót'",
+        "Bịa đặt vị trí phòng hoặc số ĐKCB"
+      ]
+    },
+    {
+      "id": "Q06",
+      "group": "xlsx_tables_and_sheet_isolation",
+      "doc_scope": "tai_nguyen_thu_vien_sample.xlsx",
+      "question": "Trong sheet 'Dữ liệu chuẩn hóa', có những cuốn sách nào có nhan đề 'Practice and Progress' và thông tin năm xuất bản, số ĐKCB của từng cuốn khác nhau như thế nào?",
+      "expected_points": [
+        "Nhận diện được các dòng trùng nhan đề 'Practice and Progress' trong sheet 'Dữ liệu chuẩn hóa'",
+        "Liệt kê phân biệt rõ từng cuốn theo năm xuất bản, tác giả và số ĐKCB tương ứng"
+      ],
+      "expected_behavior": "Trình bày tách bạch từng bản ghi trùng nhan đề, chỉ rõ sự khác biệt về năm hoặc mã ĐKCB thay vì chỉ lấy 1 dòng đầu tiên.",
+      "forbidden_behaviors": [
+        "Gộp chung hoặc chỉ trả lời 1 cuốn duy nhất rồi bỏ qua các cuốn trùng tên còn lại",
+        "Lấy nhầm dữ liệu từ sheet khác mà không nêu rõ"
+      ]
+    },
+    {
+      "id": "Q07",
+      "group": "xlsx_tables_and_sheet_isolation",
+      "doc_scope": "tai_nguyen_thu_vien_sample.xlsx",
+      "question": "Sheet 'Số ĐKCB sót so với file KK (Thơ' ghi nhận những cuốn sách nào và số ĐKCB của chúng là gì?",
+      "expected_points": [
+        "Trích xuất danh sách sách từ đúng sheet 'Số ĐKCB sót so với file KK (Thơ'",
+        "Bảo toàn nguyên vẹn số ĐKCB của từng cuốn",
+        "Bỏ qua dòng công thức tổng cộng nếu có"
+      ],
+      "expected_behavior": "Truy xuất chính xác dữ liệu của riêng sheet 'Số ĐKCB sót...', giữ đúng mã ĐKCB.",
+      "forbidden_behaviors": [
+        "Lấy dữ liệu từ sheet 'Dữ liệu chuẩn hóa' để trả lời cho câu hỏi về sheet sót",
+        "Chế thêm số ĐKCB không có trong sheet"
+      ]
+    },
+    {
+      "id": "Q08",
+      "group": "xlsx_tables_and_sheet_isolation",
+      "doc_scope": "tai_nguyen_thu_vien_sample.xlsx",
+      "question": "Sách 'Practice and Progress' xuất hiện ở cả 2 sheet của file Excel hay chỉ xuất hiện ở 1 sheet? Hãy nêu rõ thông tin ở từng sheet.",
+      "expected_points": [
+        "Xác định cuốn 'Practice and Progress' có mặt ở cả 2 sheet ('Dữ liệu chuẩn hóa' và 'Số ĐKCB sót so với file KK (Thơ')",
+        "Chỉ rõ số ĐKCB và thông tin tương ứng ở từng sheet một cách tách bạch"
+      ],
+      "expected_behavior": "Đối soát đa sheet, phân biệt rõ ràng dữ liệu ở sheet chuẩn hóa và sheet số ĐKCB sót.",
+      "forbidden_behaviors": [
+        "Khẳng định sách chỉ xuất hiện ở 1 sheet duy nhất",
+        "Trộn lẫn thông tin giữa 2 sheet thành 1 dòng hỗn hợp"
+      ]
+    },
+    {
+      "id": "Q09",
+      "group": "exact_identifiers_and_keywords",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Mã trường của Trường Đại học Quy Nhơn được ghi nhận chính thức trong Quy định đào tạo tín chỉ là gì?",
+      "expected_points": [
+        "Mã trường là 'DQN'"
+      ],
+      "expected_behavior": "Trả lời chính xác mã định danh 3 ký tự 'DQN' theo Khoản 1 Điều 1.",
+      "forbidden_behaviors": [
+        "Đoán mã khác như QNU, DHQN, BDI",
+        "Trả lời sai định dạng mã"
+      ]
+    },
+    {
+      "id": "Q10",
+      "group": "exact_identifiers_and_keywords",
+      "doc_scope": "tai_nguyen_thu_vien_sample.xlsx",
+      "question": "Khi tra cứu các mã số ĐKCB có số 0 ở đầu trong thư viện (ví dụ dạng mã 7 chữ số), hệ thống có giữ nguyên các số 0 ở đầu không và hãy nêu ví dụ mã ĐKCB cụ thể trong dữ liệu?",
+      "expected_points": [
+        "Hệ thống bảo toàn nguyên vẹn số 0 ở đầu mã định danh ĐKCB",
+        "Nêu đúng mã ĐKCB thực tế có số 0 ở đầu trong dữ liệu tài liệu"
+      ],
+      "expected_behavior": "Bảo toàn số 0 ở đầu của mã ĐKCB, không tự ý rút gọn số nguyên dạng chuỗi.",
+      "forbidden_behaviors": [
+        "Cắt cụt số 0 ở đầu (ví dụ 0012015 biến thành 12015)",
+        "Tự tạo mã không có trong dữ liệu"
+      ]
+    },
+    {
+      "id": "Q11",
+      "group": "exact_identifiers_and_keywords",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Theo bảng quy đổi điểm ở Điều 12, điểm chữ F quy đổi sang thang điểm 4 tương ứng là bao nhiêu điểm, xếp loại gì và trạng thái đạt hay không đạt?",
+      "expected_points": [
+        "Điểm thang 4: 0.0",
+        "Xếp loại kết quả: Kém / Không đạt",
+        "Trạng thái: Không đạt (Học lại)"
+      ],
+      "expected_behavior": "Khớp chính xác từng cột của dòng điểm F trong bảng quy đổi (0.0, Kém, Không đạt / Học lại).",
+      "forbidden_behaviors": [
+        "Quy đổi điểm F thành 1.0 hoặc điểm khác",
+        "Ghi trạng thái đạt hoặc bỏ qua yêu cầu học lại"
+      ]
+    },
+    {
+      "id": "Q12",
+      "group": "exact_identifiers_and_keywords",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Chuẩn đầu ra Ngoại ngữ để xét tốt nghiệp đại học yêu cầu chứng chỉ tương đương Bậc mấy theo Khung 6 bậc Việt Nam và các chứng chỉ quốc tế tương đương cụ thể gồm những loại nào?",
+      "expected_points": [
+        "Trình độ tương đương Bậc 3 theo Khung năng lực ngoại ngữ 6 bậc dùng cho Việt Nam (VSTEP B1)",
+        "Các chứng chỉ tương đương: IELTS 4.5, TOEIC 450"
+      ],
+      "expected_behavior": "Trích xuất chuẩn xác các từ khóa và mức điểm: VSTEP B1 (Bậc 3), IELTS 4.5, TOEIC 450.",
+      "forbidden_behaviors": [
+        "Nhầm Bậc 3 thành Bậc 2 hoặc Bậc 4",
+        "Tự bịa mức điểm IELTS 5.0 hay TOEIC 500 không có trong văn bản"
+      ]
+    },
+    {
+      "id": "Q13",
+      "group": "multi_clause_compound_conditions",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Sinh viên bị điểm F có được tính tín chỉ tích lũy không và sinh viên có học lực yếu được đăng ký tối đa bao nhiêu tín chỉ trong một học kỳ chính?",
+      "expected_points": [
+        "Điểm F không được tính vào số tín chỉ tích lũy (phải đạt từ điểm D trở lên, bị điểm F bắt buộc học lại)",
+        "Sinh viên học lực yếu (TB tích lũy < 2.00) được đăng ký tối thiểu 10 tín chỉ và tối đa 14 tín chỉ trong học kỳ chính"
+      ],
+      "expected_behavior": "Trả lời đầy đủ cả 2 vế độc lập của câu hỏi, đối soát chính xác bảng quy đổi điểm và quy định giới hạn tín chỉ.",
+      "forbidden_behaviors": [
+        "Bỏ quên vế điểm F hoặc vế tín chỉ học lực yếu",
+        "Nhầm lẫn trần 14 tín chỉ của học lực yếu sang mức 24 tín chỉ của học lực bình thường"
+      ]
+    },
+    {
+      "id": "Q14",
+      "group": "multi_clause_compound_conditions",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Sinh viên muốn rút bớt học phần đã đăng ký thì phải thực hiện trong thời hạn bao lâu và sau khi rút thì số lượng tín chỉ còn lại phải thỏa mãn điều kiện gì?",
+      "expected_points": [
+        "Thời hạn rút bớt học phần: trong vòng 02 tuần đầu kể từ ngày bắt đầu học kỳ chính hoặc 01 tuần đầu đối với học kỳ phụ",
+        "Điều kiện tín chỉ còn lại: số lượng tín chỉ còn lại trong học kỳ chính không được thấp hơn mức tối thiểu quy định tại Điều 5 (tối thiểu 14 tín chỉ với sinh viên bình thường, 10 tín chỉ với sinh viên yếu)"
+      ],
+      "expected_behavior": "Giải đáp trọn vẹn cả thời hạn cho học kỳ chính/phụ và điều kiện chặn mức tín chỉ tối thiểu còn lại sau khi rút.",
+      "forbidden_behaviors": [
+        "Bỏ sót thời hạn của học kỳ phụ",
+        "Không nêu điều kiện khống chế mức tín chỉ tối thiểu sau rút"
+      ]
+    },
+    {
+      "id": "Q15",
+      "group": "multi_clause_compound_conditions",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Hãy so sánh số lượng tín chỉ đăng ký tối thiểu và tối đa trong một học kỳ chính giữa sinh viên có học lực bình thường và sinh viên có học lực yếu.",
+      "expected_points": [
+        "Sinh viên bình thường (TB tích lũy >= 2.00): tối thiểu 14 tín chỉ, tối đa 24 tín chỉ",
+        "Sinh viên yếu / cảnh báo (TB tích lũy < 2.00): tối thiểu 10 tín chỉ, tối đa 14 tín chỉ",
+        "Chỉ ra sự chênh lệch rõ ràng: mức tối đa của sinh viên yếu (14) chỉ bằng mức tối thiểu của sinh viên bình thường"
+      ],
+      "expected_behavior": "Lập bảng hoặc so sánh đối chiếu trực tiếp từng tiêu chí tối thiểu/tối đa giữa 2 nhóm sinh viên.",
+      "forbidden_behaviors": [
+        "Đảo ngược số liệu giữa 2 nhóm học lực",
+        "Bỏ qua một trong hai nhóm"
+      ]
+    },
+    {
+      "id": "Q16",
+      "group": "multi_clause_compound_conditions",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Theo Điều 18, sinh viên bị cảnh báo học tập khi rơi vào những trường hợp nào và nếu bị cảnh báo bao nhiêu lần liên tiếp thì bị buộc thôi học?",
+      "expected_points": [
+        "Điểm TB học kỳ dưới 0.80 đối với học kỳ đầu, dưới 1.00 đối với các học kỳ tiếp theo",
+        "Điểm TB tích lũy dưới 1.20 (năm 1), dưới 1.40 (năm 2), dưới 1.60 (năm 3)",
+        "Bị cảnh báo học tập 03 lần liên tiếp sẽ bị buộc thôi học"
+      ],
+      "expected_behavior": "Trình bày đủ cả 2 trường hợp cảnh báo (theo học kỳ và theo tích lũy từng năm) kèm chế tài 3 lần liên tiếp buộc thôi học.",
+      "forbidden_behaviors": [
+        "Bỏ sót ngưỡng điểm theo từng năm học",
+        "Đoán 2 lần hoặc 4 lần liên tiếp bị thôi học"
+      ]
+    },
+    {
+      "id": "Q17",
+      "group": "acronyms_and_anti_hallucination",
+      "doc_scope": "tai_nguyen_thu_vien_sample.xlsx",
+      "question": "Từ viết tắt 'ĐKCB' trong bảng dữ liệu thư viện có nghĩa là gì theo các tài liệu đã được cung cấp?",
+      "expected_points": [
+        "Tài liệu bảng tính không có phần chú thích hoặc định nghĩa cụ thể nghĩa đầy đủ của từ viết tắt 'ĐKCB'",
+        "Trợ lý giữ nguyên thuật ngữ 'ĐKCB' (hoặc giải thích rõ tài liệu không định nghĩa, không tự ý suy diễn từ bên ngoài)"
+      ],
+      "expected_behavior": "Tuân thủ kỷ luật chống suy diễn: giữ nguyên 'ĐKCB', nêu rõ tài liệu không có định nghĩa, tuyệt đối không bịa đặt nghĩa từ kiến thức ngoài.",
+      "forbidden_behaviors": [
+        "Tự suy diễn ĐKCB là 'Đăng ký cán bộ', 'Điều kiện cơ bản', hoặc các cách dịch tự biên tự diễn khi tài liệu không có",
+        "Khẳng định một định nghĩa ngoài luồng là quy định chính thức của tài liệu"
+      ]
+    },
+    {
+      "id": "Q18",
+      "group": "acronyms_and_anti_hallucination",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Các từ viết tắt 'GDQP-AN' và 'GDTC' trong Điều 20 của Quy định được văn bản chú thích đầy đủ là gì?",
+      "expected_points": [
+        "GDQP-AN là Giáo dục Quốc phòng - An ninh",
+        "GDTC là Giáo dục Thể chất"
+      ],
+      "expected_behavior": "Giải thích đúng nghĩa hai từ viết tắt vì văn bản nguồn có ghi rõ tên đầy đủ đi kèm trong ngoặc đơn.",
+      "forbidden_behaviors": [
+        "Đoán sai tên chuyên môn (ví dụ GDTC thành Giáo dục Tiêu chuẩn)",
+        "Báo không có dữ liệu trong khi văn bản đã ghi rõ nguyên văn"
+      ]
+    },
+    {
+      "id": "Q19",
+      "group": "acronyms_and_anti_hallucination",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Ký hiệu 'DQN' trong Khoản 1 Điều 1 được văn bản định nghĩa là gì?",
+      "expected_points": [
+        "DQN là mã trường của Trường Đại học Quy Nhơn"
+      ],
+      "expected_behavior": "Khẳng định DQN là mã trường Đại học Quy Nhơn căn cứ trực tiếp vào văn bản.",
+      "forbidden_behaviors": [
+        "Tự đoán DQN là tên viết tắt của một khoa hay phòng ban",
+        "Không dẫn được căn cứ tại Điều 1"
+      ]
+    },
+    {
+      "id": "Q20",
+      "group": "acronyms_and_anti_hallucination",
+      "doc_scope": "tai_nguyen_thu_vien_sample.xlsx",
+      "question": "Từ viết tắt 'KK' trong tên sheet 'Số ĐKCB sót so với file KK (Thơ' có được văn bản giải thích nghĩa cụ thể không?",
+      "expected_points": [
+        "Văn bản/sheet không có định nghĩa hay chú giải nghĩa của từ 'KK'",
+        "Trợ lý giữ nguyên cụm từ 'file KK' theo đúng tên sheet trong tài liệu, không tự ý đoán nghĩa"
+      ],
+      "expected_behavior": "Minh bạch rằng tài liệu không định nghĩa từ 'KK', giữ nguyên dạng viết tắt theo tài liệu.",
+      "forbidden_behaviors": [
+        "Tự đoán KK là 'Kiểm kê', 'Ký kết', 'Kê khai' như một sự thật hiển nhiên từ tài liệu",
+        "Bịa đặt nội dung giải thích không có trong sheet"
+      ]
+    },
+    {
+      "id": "Q21",
+      "group": "trap_and_out_of_scope",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Mức học phí cho mỗi tín chỉ của ngành Sư phạm Toán học năm học 2026-2027 được quy định là bao nhiêu tiền trong văn bản này?",
+      "expected_points": [
+        "Quy định đào tạo tín chỉ (QĐ 1234/QĐ-ĐHQN) không có quy định về mức thu học phí cụ thể cho từng ngành hoặc năm 2026-2027",
+        "Trợ lý thông báo rõ ràng là tài liệu chưa có/không chứa thông tin này"
+      ],
+      "expected_behavior": "Xử lý câu hỏi bẫy ngoài phạm vi: thông báo minh bạch tài liệu không có thông tin về học phí, không suy đoán số tiền.",
+      "forbidden_behaviors": [
+        "Bịa đặt ra số tiền học phí cụ thể (ví dụ 300.000đ hay 400.000đ/tín chỉ)",
+        "Tự tiện lấy biểu giá của trường khác để trả lời"
+      ]
+    },
+    {
+      "id": "Q22",
+      "group": "trap_and_out_of_scope",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Sinh viên tốt nghiệp loại Xuất sắc có được Trường Đại học Quy Nhơn tặng học bổng du học toàn phần tại Nhật Bản theo văn bản này không?",
+      "expected_points": [
+        "Văn bản Quy định đào tạo tín chỉ hoàn toàn không đề cập đến chính sách cấp học bổng du học Nhật Bản",
+        "Trợ lý khẳng định tài liệu không có quy định về nội dung này"
+      ],
+      "expected_behavior": "Từ chối khẳng định điều không có căn cứ, nêu rõ tài liệu không quy định về học bổng du học Nhật Bản.",
+      "forbidden_behaviors": [
+        "Tự ý trả lời 'Có' hoặc 'Không' như thể tài liệu có quy định cấm/cho phép",
+        "Bịa thêm thủ tục xin học bổng du học ngoài văn bản"
+      ]
+    },
+    {
+      "id": "Q23",
+      "group": "trap_and_out_of_scope",
+      "doc_scope": "tai_nguyen_thu_vien_sample.xlsx",
+      "question": "Thư viện Trường Đại học Quy Nhơn có bao nhiêu bản in của cuốn sách 'Giáo trình Triết học Mác - Lênin' xuất bản năm 2025 theo file Excel?",
+      "expected_points": [
+        "Trong các sheet dữ liệu thư viện được cấp không có thông tin về cuốn 'Giáo trình Triết học Mác - Lênin'",
+        "Trợ lý báo rõ không tìm thấy cuốn sách này trong tài nguyên dữ liệu hiện có"
+      ],
+      "expected_behavior": "Thông báo không tìm thấy cuốn sách trong dữ liệu, từ chối trả lời số lượng.",
+      "forbidden_behaviors": [
+        "Bịa ra số lượng hoặc số ĐKCB giả",
+        "Nhầm sang một cuốn sách khác có trong file mà không giải thích"
+      ]
+    },
+    {
+      "id": "Q24",
+      "group": "trap_and_out_of_scope",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "question": "Quy định đào tạo tín chỉ này có áp dụng cho sinh viên học hệ từ xa và vừa làm vừa học của trường không?",
+      "expected_points": [
+        "Khoản 1 Điều 1 nêu rõ: văn bản chỉ áp dụng cho sinh viên trình độ đại học hình thức chính quy theo hệ thống tín chỉ",
+        "Văn bản không áp dụng hoặc không đề cập đối tượng đào tạo từ xa và vừa làm vừa học"
+      ],
+      "expected_behavior": "Đối soát phạm vi điều chỉnh tại Điều 1: chỉ áp dụng cho hệ chính quy, không mở rộng sang hệ từ xa/vừa làm vừa học.",
+      "forbidden_behaviors": [
+        "Tự ý suy đoán áp dụng chung cho tất cả các hệ đào tạo của trường",
+        "Bỏ qua giới hạn phạm vi 'hình thức chính quy' đã nêu rõ ở Điều 1"
+      ]
+    }
+  ]
+}

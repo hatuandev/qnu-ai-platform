@@ -126,7 +126,7 @@ class SourceService:
         request_hash = _request_hash(
             workspace_id, collection_id, source_id, stored, effective_title
         )
-        if auto_extract and stored.extension in {".pdf", ".docx", ".xlsx"}:
+        if auto_extract and stored.extension in {".pdf", ".docx", ".xlsx", ".md"}:
             request_hash = hashlib.sha256((request_hash + ":extract:auto-v1").encode()).hexdigest()
         if staged:
             request_hash = hashlib.sha256((request_hash + ":staged").encode()).hexdigest()
@@ -204,7 +204,7 @@ class SourceService:
                 )
             await db.flush()
             processing = None
-            if auto_extract and stored.extension in {".pdf", ".docx", ".xlsx"}:
+            if auto_extract and stored.extension in {".pdf", ".docx", ".xlsx", ".md"}:
                 from qnu.domains.knowledge.public_api import resolve_revision_scope
                 from qnu.domains.ocr.service import processing_service
 

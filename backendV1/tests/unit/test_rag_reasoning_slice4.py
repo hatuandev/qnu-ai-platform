@@ -227,6 +227,8 @@ def test_prompt_version_and_system_instructions():
     assert "KHÔNG GIẤU XUNG ĐỘT" in SYSTEM_PROMPT
     assert "KỶ LUẬT PHỦ ĐỊNH & NGOẠI LỆ" in SYSTEM_PROMPT
     assert "BẢO TOÀN ĐỊNH DANH & KÝ HIỆU" in SYSTEM_PROMPT
+    assert "Chỉ giải nghĩa hoặc mở rộng từ viết tắt" in SYSTEM_PROMPT
+    assert "tuyệt đối không dùng kiến thức ngoài để tự suy diễn hay đoán nghĩa" in SYSTEM_PROMPT
 
 
 # ============================================================================
