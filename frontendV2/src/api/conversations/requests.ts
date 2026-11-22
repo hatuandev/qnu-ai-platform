@@ -5,7 +5,12 @@
 
 import { v1Client } from "../v1-client";
 import { conversationPaths } from "./endpoints";
-import type { Conversation, ConversationTurn } from "./types";
+import type {
+  Conversation,
+  ConversationTurn,
+  PromoteToBenchmarkRequest,
+  PromoteToBenchmarkResponse,
+} from "./types";
 
 export async function listConversations(
   workspaceId: string,
@@ -78,6 +83,20 @@ export async function submitTurnFeedback(
   return v1Client.post<ConversationTurn>(
     conversationPaths.feedback(workspaceId, conversationId, turnId),
     body,
+    { signal: options?.signal },
+  );
+}
+
+export async function promoteTurnToBenchmark(
+  workspaceId: string,
+  conversationId: string,
+  turnId: string,
+  body?: PromoteToBenchmarkRequest,
+  options?: { signal?: AbortSignal },
+): Promise<PromoteToBenchmarkResponse> {
+  return v1Client.post<PromoteToBenchmarkResponse>(
+    conversationPaths.promoteToBenchmark(workspaceId, conversationId, turnId),
+    body ?? {},
     { signal: options?.signal },
   );
 }

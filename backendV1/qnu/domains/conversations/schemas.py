@@ -85,3 +85,20 @@ class TurnResponse(BaseModel):
     source_status_reason: str | None = None
     created_at: datetime
     finished_at: datetime | None
+
+
+class PromoteToBenchmarkRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_points: list[str] | None = None
+    expected_behavior: str | None = None
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class PromoteToBenchmarkResponse(BaseModel):
+    turn_id: str
+    question_id: str
+    question: str
+    already_exists: bool
+    benchmark_file: str
+    total_questions: int
+

@@ -11,6 +11,8 @@ from qnu.domains.conversations.schemas import (
     ConversationCreate,
     ConversationResponse,
     ConversationUpdate,
+    PromoteToBenchmarkRequest,
+    PromoteToBenchmarkResponse,
     TurnFeedbackRequest,
     TurnRequest,
     TurnResponse,
@@ -158,4 +160,27 @@ async def feedback(
         turn_id,
         body,
     )
+
+
+@router.post(
+    "/{conversation_id}/turns/{turn_id}/promote-to-benchmark",
+    response_model=PromoteToBenchmarkResponse,
+)
+async def promote_to_benchmark(
+    workspace_id: str,
+    conversation_id: str,
+    turn_id: str,
+    db: DB,
+    actor: Actor,
+    body: PromoteToBenchmarkRequest | None = None,
+):
+    return await history.promote_turn_to_benchmark(
+        db,
+        actor,
+        workspace_id,
+        conversation_id,
+        turn_id,
+        body or PromoteToBenchmarkRequest(),
+    )
+
 

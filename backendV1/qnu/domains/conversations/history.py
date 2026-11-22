@@ -5,7 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.domains.conversations.access import owned
 from qnu.domains.conversations.models import ConversationTurn
-from qnu.domains.conversations.schemas import TurnFeedbackRequest, TurnResponse
+from qnu.domains.conversations.schemas import (
+    PromoteToBenchmarkRequest,
+    PromoteToBenchmarkResponse,
+    TurnFeedbackRequest,
+    TurnResponse,
+)
 from qnu.domains.conversations.service import expire
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import utcnow
@@ -205,4 +210,28 @@ async def set_feedback(
     await db.commit()
     await db.refresh(row)
     return await readable(db, blob, vectors, actor, row, conversation.document_ids)
+
+
+async def promote_turn_to_benchmark(
+    db: AsyncSession,
+    actor: AuthActor,
+    workspace_id: str,
+    conversation_id: str,
+    turn_id: str,
+    body: PromoteToBenchmarkRequest,
+) -> PromoteToBenchmarkResponse:
+    from qnu.domains.conversations.benchmarks import add_turn_to_benchmark, get_benchmark_path
+
+    conversation = await owned(db, actor, workspace_id, conversation_id)
+    await expire(db, conversation)
+    row = await db.scalar(
+        select(ConversationTurn).where(
+            ConversationTurn.id == turn_id, ConversationTurn.conversation_id == conversation.id
+        )
+    )
+    if row is None:
+        raise EntityNotFound("Không tìm thấy lượt hỏi.", code="conversation_turn_not_found")
+
+    return add_turn_to_benchmark(get_benchmark_path(), row, body)
+
 

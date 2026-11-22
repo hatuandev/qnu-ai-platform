@@ -72,3 +72,18 @@ export type ConversationTurn = {
   created_at: string;
   finished_at: string | null;
 };
+
+export type PromoteToBenchmarkRequest = {
+  expected_points?: string[];
+  expected_behavior?: string;
+  notes?: string;
+};
+
+export type PromoteToBenchmarkResponse = {
+  turn_id: string;
+  question_id: string;
+  question: string;
+  already_exists: boolean;
+  benchmark_file: string;
+  total_questions: number;
+};

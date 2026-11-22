@@ -7,10 +7,15 @@ import {
   createConversation,
   listConversations,
   listConversationTurns,
+  promoteTurnToBenchmark,
   sendConversationTurn,
   submitTurnFeedback,
 } from "./requests";
-import type { Conversation, ConversationTurn } from "./types";
+import type {
+  Conversation,
+  ConversationTurn,
+  PromoteToBenchmarkRequest,
+} from "./types";
 
 export const conversationKeys = {
   all: ["v1", "conversations"] as const,
@@ -190,6 +195,27 @@ export function useSubmitTurnFeedbackMutation(workspaceId?: string | null) {
         return previous.map((item) =>
           item.id === updatedTurn.id ? updatedTurn : item,
         );
+      });
+    },
+  });
+}
+
+export function usePromoteTurnToBenchmarkMutation(workspaceId?: string | null) {
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      turnId,
+      body,
+      signal,
+    }: {
+      conversationId: string;
+      turnId: string;
+      body?: PromoteToBenchmarkRequest;
+      signal?: AbortSignal;
+    }) => {
+      if (!workspaceId) throw new Error("workspaceId is required");
+      return promoteTurnToBenchmark(workspaceId, conversationId, turnId, body, {
+        signal,
       });
     },
   });

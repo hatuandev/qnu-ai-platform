@@ -1,8 +1,11 @@
 import {
+  Check,
   ChevronDown,
   FileQuestion,
+  FlaskConical,
   History,
   ListFilter,
+  Loader2,
   RefreshCw,
   ScrollText,
   ThumbsDown,
@@ -10,12 +13,14 @@ import {
   XCircle,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   type Conversation,
   type ConversationTurn,
   type TurnStatus,
   useAssistantConversationsQuery,
   useConversationTurnsQuery,
+  usePromoteTurnToBenchmarkMutation,
 } from "@/api/conversations";
 import { EmptyState } from "@/components/admin/empty-state";
 import { TurnFeedback } from "@/components/assistants/turn-feedback";
@@ -120,6 +125,87 @@ function TurnMeta({ turn }: { turn: ConversationTurn }) {
   );
 }
 
+function PromoteToBenchmarkButton({
+  workspaceId,
+  conversationId,
+  turn,
+  isProblematic,
+}: {
+  workspaceId: string;
+  conversationId: string;
+  turn: ConversationTurn;
+  isProblematic: boolean;
+}) {
+  const [promotedId, setPromotedId] = useState<string | null>(null);
+  const promoteMutation = usePromoteTurnToBenchmarkMutation(workspaceId);
+
+  const handlePromote = () => {
+    if (promoteMutation.isPending || promotedId) return;
+    promoteMutation.mutate(
+      {
+        conversationId,
+        turnId: turn.id,
+      },
+      {
+        onSuccess: (data) => {
+          setPromotedId(data.question_id);
+          if (data.already_exists) {
+            toast.info(`Câu hỏi này đã có trong bộ đề (${data.question_id}).`);
+          } else {
+            toast.success(
+              `Đã đưa câu hỏi vào bộ đề (${data.question_id}, tổng ${data.total_questions} câu) thành công!`,
+            );
+          }
+        },
+        onError: () => {
+          toast.error("Không thể đưa câu hỏi vào bộ đề kiểm thử.");
+        },
+      },
+    );
+  };
+
+  if (promotedId) {
+    return (
+      <Badge
+        variant="outline"
+        className="h-6 gap-1 px-2 text-[10px] font-normal text-primary border-primary/30 bg-primary/5"
+        title="Đã lưu trong bộ đề kiểm thử"
+      >
+        <Check className="size-3 text-primary" />
+        <span>Bộ đề ({promotedId})</span>
+      </Badge>
+    );
+  }
+
+  return (
+    <Button
+      type="button"
+      variant={isProblematic ? "outline" : "ghost"}
+      size="sm"
+      className={cn(
+        "h-6 gap-1 px-2 text-[10px] cursor-pointer",
+        isProblematic
+          ? "border-primary/30 text-primary hover:bg-primary/10 shadow-2xs font-medium"
+          : "text-muted-foreground hover:text-foreground",
+      )}
+      onClick={handlePromote}
+      disabled={promoteMutation.isPending}
+      title={
+        isProblematic
+          ? "Đưa câu hỏi lỗi / cần cải thiện này vào bộ đề kiểm thử để đánh giá hồi quy"
+          : "Đưa câu hỏi này vào bộ đề kiểm thử"
+      }
+    >
+      {promoteMutation.isPending ? (
+        <Loader2 className="size-3 animate-spin shrink-0" />
+      ) : (
+        <FlaskConical className="size-3 shrink-0" />
+      )}
+      <span>{isProblematic ? "+ Bộ đề kiểm thử" : "+ Bộ đề"}</span>
+    </Button>
+  );
+}
+
 function TurnLogEntry({
   turn,
   workspaceId,
@@ -133,6 +219,11 @@ function TurnLogEntry({
     label: turn.status,
     variant: "secondary" as const,
   };
+  const isProblematic =
+    turn.status === "failed" ||
+    (turn.result != null && turn.result.status === "insufficient_evidence") ||
+    turn.feedback?.rating === "dislike";
+
   return (
     <div className="rounded-lg border border-border/60">
       <div className="flex items-start justify-between gap-3 border-b border-border/50 px-3 py-2">
@@ -180,12 +271,20 @@ function TurnLogEntry({
         <TurnResult turn={turn} />
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-1.5">
           <TurnMeta turn={turn} />
-          <TurnFeedback
-            turnId={turn.id}
-            workspaceId={workspaceId}
-            conversationId={conversationId}
-            initialFeedback={turn.feedback}
-          />
+          <div className="flex items-center gap-1.5">
+            <PromoteToBenchmarkButton
+              workspaceId={workspaceId}
+              conversationId={conversationId}
+              turn={turn}
+              isProblematic={isProblematic}
+            />
+            <TurnFeedback
+              turnId={turn.id}
+              workspaceId={workspaceId}
+              conversationId={conversationId}
+              initialFeedback={turn.feedback}
+            />
+          </div>
         </div>
       </div>
     </div>

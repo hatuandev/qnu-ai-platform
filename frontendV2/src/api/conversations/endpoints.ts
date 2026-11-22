@@ -8,4 +8,10 @@ export const conversationPaths = {
     `/workspaces/${workspaceId}/conversations/${conversationId}/turns/${turnId}`,
   feedback: (workspaceId: string, conversationId: string, turnId: string) =>
     `/workspaces/${workspaceId}/conversations/${conversationId}/turns/${turnId}/feedback`,
+  promoteToBenchmark: (
+    workspaceId: string,
+    conversationId: string,
+    turnId: string,
+  ) =>
+    `/workspaces/${workspaceId}/conversations/${conversationId}/turns/${turnId}/promote-to-benchmark`,
 } as const;
