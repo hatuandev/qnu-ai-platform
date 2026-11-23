@@ -71,3 +71,36 @@ export interface WorkspaceBackupListResponse {
   limit: number;
   offset: number;
 }
+
+export type SystemBackupTarget = "all" | "postgres" | "qdrant";
+
+export interface SystemBackupRestoreReport {
+  status: "verified" | "restored";
+  format:
+    | "system_bundle_tar_gz"
+    | "postgres_native_tar_gz"
+    | "pg_dump_custom"
+    | string;
+  backup_id: string;
+  created_at?: string | null;
+  alembic_head?: string | null;
+  postgres_tables?: number | null;
+  postgres_rows?: number | null;
+  qdrant_collections: string[];
+  total_bytes: number;
+  sha256: string;
+  targets?: {
+    postgres?: {
+      status?: string;
+      tool?: string;
+      table_count?: number;
+      total_rows_restored?: number;
+      size_bytes?: number;
+    };
+    qdrant?: Array<{
+      collection: string;
+      status: string;
+      points_count?: number | null;
+    }>;
+  };
+}

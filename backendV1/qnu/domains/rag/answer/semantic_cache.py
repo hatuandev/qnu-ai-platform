@@ -7,9 +7,12 @@ peak admission seasons, automatically invalidated upon index re-runs.
 from __future__ import annotations
 
 import re
+import time
 import unicodedata
+from collections import OrderedDict
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.platform import cache
@@ -18,7 +21,8 @@ from qnu.platform.logging import get_logger
 
 logger = get_logger(__name__)
 
-VERSION = "qnu.rag.semantic-cache/v1"
+VERSION = "qnu.rag.semantic-cache/v2"
+LOCAL_CACHE_MAX_ENTRIES = 256
 
 _FILLER_PHRASES = [
     "thầy cô cho em hỏi",
@@ -91,10 +95,36 @@ def semantic_cache_key(
     collection_id: str,
     index_run_id: str,
     normalized_query: str,
+    *,
+    collection_ids: list[str] | None = None,
+    document_ids: list[str] | None = None,
+    metadata_filter: dict[str, Any] | None = None,
+    scope_resolution: str | None = None,
+    persona: str = "",
+    provider_id: str | None = None,
+    model_name: str | None = None,
+    prompt_version: str | None = None,
+    collection_manifests: dict[str, Any] | None = None,
 ) -> str:
-    """Generate a cache key bound strictly to (workspace_id, collection_id, index_run_id)."""
-    payload = f"{workspace_id}:{collection_id}:{index_run_id}:{normalized_query}"
-    return f"sem_cache:{digest(payload)}"
+    """Generate a cache key bound strictly to full isolation and generation scope."""
+    material: dict[str, Any] = {
+        "version": VERSION,
+        "workspace_id": workspace_id,
+        "collection_id": collection_id,
+        "collection_ids": sorted(dict.fromkeys(collection_ids or [collection_id])),
+        "index_run_id": index_run_id,
+        "normalized_query": normalized_query,
+        "document_ids": sorted(dict.fromkeys(document_ids or [])),
+        "metadata_filter": metadata_filter or {},
+        "scope_resolution": scope_resolution or "",
+        "persona": persona or "",
+        "provider_id": provider_id or "",
+        "model_name": model_name or "",
+        "prompt_version": prompt_version or "",
+    }
+    if collection_manifests:
+        material["collection_manifests"] = sorted(collection_manifests.items())
+    return f"sem_cache:{digest(material)}"
 
 
 class SemanticCacheEntry(BaseModel):
@@ -105,25 +135,68 @@ class SemanticCacheEntry(BaseModel):
     index_run_id: str
     normalized_query: str
     raw_answer: str
+    contract: dict = Field(default_factory=dict)
     statements: list[dict] = Field(default_factory=list)
     sources: list[dict] = Field(default_factory=list)
     reasoning: dict = Field(default_factory=dict)
     saved_tokens: int | None = None
 
 
-# In-memory fast cache layer for tests or when Redis is absent
-_LOCAL_SEMANTIC_CACHE: dict[str, dict] = {}
+# Bounded in-memory LRU+TTL cache layer: key -> (expires_at_monotonic, entry_dict)
+_LOCAL_SEMANTIC_CACHE: OrderedDict[str, tuple[float, dict]] = OrderedDict()
+
+
+def _local_get(cache_key: str) -> dict | None:
+    item = _LOCAL_SEMANTIC_CACHE.get(cache_key)
+    if item is None:
+        return None
+    expires_at, data = item
+    if time.monotonic() >= expires_at:
+        _LOCAL_SEMANTIC_CACHE.pop(cache_key, None)
+        return None
+    _LOCAL_SEMANTIC_CACHE.move_to_end(cache_key)
+    return data
+
+
+def _local_set(cache_key: str, data: dict, ttl_seconds: int) -> None:
+    if ttl_seconds <= 0:
+        _LOCAL_SEMANTIC_CACHE.pop(cache_key, None)
+        return
+    now = time.monotonic()
+    # Evict expired entries opportunistically before enforcing size cap
+    expired = [k for k, (exp, _) in _LOCAL_SEMANTIC_CACHE.items() if now >= exp]
+    for k in expired:
+        _LOCAL_SEMANTIC_CACHE.pop(k, None)
+    _LOCAL_SEMANTIC_CACHE[cache_key] = (now + ttl_seconds, data)
+    _LOCAL_SEMANTIC_CACHE.move_to_end(cache_key)
+    while len(_LOCAL_SEMANTIC_CACHE) > LOCAL_CACHE_MAX_ENTRIES:
+        _LOCAL_SEMANTIC_CACHE.popitem(last=False)
 
 
 async def get_semantic_cache(cache_key: str) -> SemanticCacheEntry | None:
-    if cache_key in _LOCAL_SEMANTIC_CACHE:
-        data = _LOCAL_SEMANTIC_CACHE[cache_key]
-        return SemanticCacheEntry.model_validate(data)
+    local_data = _local_get(cache_key)
+    if local_data is not None:
+        try:
+            entry = SemanticCacheEntry.model_validate(local_data)
+            if entry.version == VERSION:
+                return entry
+        except (ValidationError, TypeError):
+            pass
+        await discard_semantic_cache(cache_key)
+        return None
 
     try:
         raw = await cache.get_json(cache_key)
         if raw is not None:
-            return SemanticCacheEntry.model_validate(raw)
+            try:
+                entry = SemanticCacheEntry.model_validate(raw)
+            except (ValidationError, TypeError):
+                await discard_semantic_cache(cache_key)
+                return None
+            if entry.version != VERSION:
+                await discard_semantic_cache(cache_key)
+                return None
+            return entry
     except Exception as exc:
         logger.warning("semantic_cache_read_failed", error=str(exc))
     return None
@@ -132,9 +205,10 @@ async def get_semantic_cache(cache_key: str) -> SemanticCacheEntry | None:
 async def store_semantic_cache(
     cache_key: str, entry: SemanticCacheEntry, ttl_seconds: int = 3600
 ) -> None:
-    _LOCAL_SEMANTIC_CACHE[cache_key] = entry.model_dump()
+    payload = entry.model_dump()
+    _local_set(cache_key, payload, ttl_seconds)
     try:
-        await cache.set_json(cache_key, entry.model_dump(), ttl_seconds)
+        await cache.set_json(cache_key, payload, ttl_seconds)
     except Exception as exc:
         logger.warning("semantic_cache_write_failed", error=str(exc))
 
@@ -155,13 +229,13 @@ async def invalidate_semantic_cache(
     """Purge cache entries for a specific index run or workspace."""
     cleared = 0
     to_delete = []
-    for k, v in _LOCAL_SEMANTIC_CACHE.items():
+    for k, (_, v) in list(_LOCAL_SEMANTIC_CACHE.items()):
         if v.get("workspace_id") == workspace_id and (
             index_run_id is None or v.get("index_run_id") == index_run_id
         ):
             to_delete.append(k)
     for k in to_delete:
-        del _LOCAL_SEMANTIC_CACHE[k]
+        _LOCAL_SEMANTIC_CACHE.pop(k, None)
         cleared += 1
         try:
             await cache.get_redis().delete(cache.namespaced(k))

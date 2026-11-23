@@ -31,4 +31,6 @@ export const operationsPaths = {
   action: (workspaceId: string, id: string) =>
     `/workspaces/${workspaceId}/operations/actions/${id}`,
   systemResetAndSeed: () => "/operations/system-reset-and-seed",
+  systemBackupExport: () => "/operations/system-backups/export",
+  systemBackupRestore: () => "/operations/system-backups/restore",
 } as const;

@@ -1,14 +1,14 @@
 """Thin operations API: observed progress, explicit recovery, protected evidence backups."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Header, Query, Request, Response
+from fastapi import APIRouter, Depends, File, Form, Header, Query, Request, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.api.dependencies import get_actor, get_blob_store, get_db, get_job_queue
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.identity.permissions import require_permission
-from qnu.domains.operations import gc, readiness, reset, service
+from qnu.domains.operations import gc, readiness, reset, service, system_backup
 from qnu.domains.operations.backups import service as backups
 from qnu.domains.operations.jobs import actions
 from qnu.domains.operations.schemas import (
@@ -22,6 +22,7 @@ from qnu.domains.operations.schemas import (
     SystemResetRequest,
     SystemResetResponse,
 )
+from qnu.platform.errors import PayloadTooLarge
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.job_queue import JobQueue
 
@@ -204,5 +205,55 @@ async def system_reset_and_seed(
         blob=blob,
         vectors=vectors,
         request=body,
+    )
+
+
+@system_router.post("/system-backups/export")
+async def system_backup_export(
+    _actor: Annotated[AuthActor, Depends(require_permission("ai.admin"))],
+    target: Literal["all", "postgres", "qdrant"] = Query("all"),
+) -> Response:
+    payload, filename, meta = await system_backup.export_system_backup(target=target)
+    return Response(
+        payload,
+        media_type="application/gzip",
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+            "X-Backup-Sha256": str(meta.get("bundle_sha256") or ""),
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+@system_router.post("/system-backups/restore")
+async def system_backup_restore(
+    _actor: Annotated[AuthActor, Depends(require_permission("ai.admin"))],
+    file: UploadFile = File(...),
+    target: Literal["all", "postgres", "qdrant"] = Form("all"),
+    confirm: bool = Form(False),
+) -> dict:
+    chunks: list[bytes] = []
+    total = 0
+    try:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > system_backup.MAX_UPLOAD_BYTES:
+                raise PayloadTooLarge(
+                    "Tệp sao lưu vượt giới hạn dung lượng (512 MB).",
+                    code="backup_limit_exceeded",
+                )
+            chunks.append(chunk)
+    finally:
+        await file.close()
+    payload = b"".join(chunks)
+    return await system_backup.inspect_and_restore_system_backup(
+        payload,
+        file.filename or "backup.tar.gz",
+        target=target,
+        confirm=confirm,
     )
 

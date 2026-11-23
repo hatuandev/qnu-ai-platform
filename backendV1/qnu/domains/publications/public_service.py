@@ -11,6 +11,7 @@ import hashlib
 import json
 import secrets
 import time
+import uuid
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
@@ -25,9 +26,11 @@ from qnu.domains.assistants.service import assistant_readiness, get_assistant
 from qnu.domains.identity.service_actor import public_chatbot_actor
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.index.directory import directory_ready
+from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.lifecycle.guards import visible
 from qnu.domains.modelops.inference.service import prepare_chat_request
 from qnu.domains.modelops.usage.scope import use_account
+from qnu.domains.modelops.usage.service import usage_service
 from qnu.domains.ocr.ids import new_id
 from qnu.domains.publications.limits import DailyBudget
 from qnu.domains.publications.models import (
@@ -53,8 +56,9 @@ from qnu.platform.config import get_settings
 from qnu.platform.errors import AppException, Conflict, EntityNotFound
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
-from qnu.ports.chat_model import ChatMessage, ChatModel
+from qnu.ports.chat_model import ChatMessage, ChatModel, ChatResponseError
 from qnu.ports.embedding_model import EmbeddingModel
+from qnu.ports.provider_execution import bind_usage
 from qnu.ports.reranker import Reranker
 from qnu.ports.vector_store import VectorStore
 
@@ -506,7 +510,7 @@ async def turn(
                 ChatMessage(role="user", content=req.question),
             ]
             with use_account(budget):
-                _runtime, chat_req, _b = await prepare_chat_request(
+                runtime, chat_req, chat_budget = await prepare_chat_request(
                     db,
                     actor,
                     row.workspace_id,
@@ -515,7 +519,38 @@ async def turn(
                     task="chat",
                     max_output_tokens=assistant.max_output_tokens,
                 )
-                chat_res = await chat.complete(messages, chat_req)
+                usage = await usage_service.reserve(
+                    db,
+                    actor,
+                    row.workspace_id,
+                    "chat",
+                    f"pub:{row.id}:{uuid.uuid4().hex}",
+                    digest(
+                        {
+                            "publication_id": row.id,
+                            "question": req.question,
+                            "config": runtime.inference_configuration_hash("chat"),
+                        }
+                    ),
+                    chat_budget.total_reserved_tokens,
+                    runtime.provider_id,
+                )
+                try:
+                    await db.commit()
+                except BaseException:
+                    await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
+                    raise
+                try:
+                    chat_res = await chat.complete(messages, bind_usage(chat_req, usage.id))
+                except ChatResponseError as exc:
+                    await usage_service.settle(
+                        db, usage.id, total_tokens=exc.usage_tokens, failed=True
+                    )
+                    raise
+                except BaseException:
+                    await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
+                    raise
+                await usage_service.settle(db, usage.id, total_tokens=chat_res.total_tokens)
             pub_raw = chat_res.content.strip()
             pub_ans = pub_raw
             if pub_raw.startswith("{") and pub_raw.endswith("}"):
@@ -534,13 +569,21 @@ async def turn(
                     "Tôi đã ghi nhận câu hỏi của bạn. Về nội dung này, bạn có thể diễn đạt cụ thể hơn "
                     "hoặc cung cấp thêm chi tiết để mình hỗ trợ chính xác nhất nhé."
                 )
+            await _bump_stats(
+                db,
+                row.id,
+                turns=1,
+                insufficient_turns=0,
+                tokens=budget.observed_tokens,
+                day=day,
+            )
+            await db.commit()
             return PublicTurnResponse(
-                session_id=req.session_id,
                 status="answered",
                 answer=pub_ans,
                 message=None,
                 citations=[],
-                remaining_turns=remaining,
+                turns_remaining=remaining,
             )
         policy = AssistantRagPolicy.model_validate(assistant.rag_policy or {}).model_dump(
             mode="json", exclude={"guardrail_policy", "suggested_prompts"}

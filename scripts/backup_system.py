@@ -64,6 +64,21 @@ def compute_bytes_sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def resolve_qdrant_api_key(env: dict[str, str] | None = None) -> str | None:
+    """Resolve optional QDRANT_API_KEY from process environment or .env defaults."""
+    key = os.environ.get("QDRANT_API_KEY")
+    if not key and env:
+        key = env.get("QDRANT_API_KEY")
+    if key:
+        key = key.strip()
+    return key or None
+
+
+def qdrant_headers(api_key: str | None) -> dict[str, str]:
+    """Build Qdrant HTTP headers including api-key when configured."""
+    return {"api-key": api_key} if api_key else {}
+
+
 async def backup_postgres_native(
     db_dsn: str, out_file: Path
 ) -> dict[str, Any]:
@@ -73,94 +88,96 @@ async def backup_postgres_native(
     raw_dsn = db_dsn.replace("postgresql+asyncpg://", "postgresql://", 1)
     conn = await asyncpg.connect(raw_dsn)
     try:
-        # Get Alembic revision
-        alembic_head = None
-        try:
-            alembic_head = await conn.fetchval(
-                "SELECT version_num FROM alembic_version_backendv1 LIMIT 1"
-            )
-        except Exception:
-            pass
-
-        # Query list of base tables
-        tables = await conn.fetch(
-            """
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-            ORDER BY table_name
-            """
-        )
-        table_names = [r["table_name"] for r in tables]
-
-        table_stats: dict[str, int] = {}
-        total_rows = 0
-
-        # Create tar.gz archive in memory/streaming to file
-        with tarfile.open(out_file, "w:gz") as tar:
-            now_dt = datetime.datetime.now(datetime.UTC)
-            schema_info: dict[str, Any] = {
-                "alembic_head": alembic_head,
-                "exported_at": now_dt.isoformat(),
-                "tables": {},
-            }
-
-            for tbl in table_names:
-                # Get column schema info
-                cols = await conn.fetch(
-                    """
-                    SELECT column_name, data_type, is_nullable
-                    FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = $1
-                    ORDER BY ordinal_position
-                    """,
-                    tbl,
+        # Use a single REPEATABLE READ read-only transaction for cross-table snapshot consistency
+        async with conn.transaction(isolation="repeatable_read", readonly=True):
+            # Get Alembic revision
+            alembic_head = None
+            try:
+                alembic_head = await conn.fetchval(
+                    "SELECT version_num FROM alembic_version_backendv1 LIMIT 1"
                 )
-                col_defs = [
-                    {
-                        "name": c["column_name"],
-                        "type": c["data_type"],
-                        "nullable": c["is_nullable"] == "YES",
-                    }
-                    for c in cols
-                ]
-                schema_info["tables"][tbl] = col_defs
+            except Exception:
+                pass
 
-                # Stream table data to in-memory buffer
-                buf = io.BytesIO()
-                await conn.copy_from_table(tbl, output=buf, format="csv", header=True)
-                csv_bytes = buf.getvalue()
-                buf.close()
+            # Query list of base tables
+            tables = await conn.fetch(
+                """
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+                """
+            )
+            table_names = [r["table_name"] for r in tables]
 
-                # Row count
-                row_count = await conn.fetchval(f'SELECT count(*) FROM "{tbl}"')
-                table_stats[tbl] = row_count
-                total_rows += row_count
+            table_stats: dict[str, int] = {}
+            total_rows = 0
 
-                # Add to tar archive
-                tarinfo = tarfile.TarInfo(name=f"tables/{tbl}.csv")
-                tarinfo.size = len(csv_bytes)
-                tarinfo.mtime = int(now_dt.timestamp())
-                tar.addfile(tarinfo, io.BytesIO(csv_bytes))
-
-            # Add schema metadata JSON to tar
-            meta_bytes = json.dumps(
-                {
-                    "schema_version": "qnu.postgres-dump/v1",
+            # Create tar.gz archive streaming to file
+            with tarfile.open(out_file, "w:gz") as tar:
+                now_dt = datetime.datetime.now(datetime.UTC)
+                schema_info: dict[str, Any] = {
                     "alembic_head": alembic_head,
-                    "table_count": len(table_names),
-                    "total_rows": total_rows,
-                    "table_stats": table_stats,
-                    "columns": schema_info["tables"],
-                },
-                indent=2,
-                ensure_ascii=False,
-            ).encode("utf-8")
+                    "exported_at": now_dt.isoformat(),
+                    "tables": {},
+                }
 
-            meta_info = tarfile.TarInfo(name="schema_metadata.json")
-            meta_info.size = len(meta_bytes)
-            meta_info.mtime = int(now_dt.timestamp())
-            tar.addfile(meta_info, io.BytesIO(meta_bytes))
+                for tbl in table_names:
+                    # Get column schema info
+                    cols = await conn.fetch(
+                        """
+                        SELECT column_name, data_type, is_nullable
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = $1
+                        ORDER BY ordinal_position
+                        """,
+                        tbl,
+                    )
+                    col_defs = [
+                        {
+                            "name": c["column_name"],
+                            "type": c["data_type"],
+                            "nullable": c["is_nullable"] == "YES",
+                        }
+                        for c in cols
+                    ]
+                    schema_info["tables"][tbl] = col_defs
+
+                    # Stream table data to buffer
+                    buf = io.BytesIO()
+                    await conn.copy_from_table(tbl, output=buf, format="csv", header=True)
+                    csv_bytes = buf.getvalue()
+                    buf.close()
+
+                    # Row count within the same consistent snapshot
+                    row_count = await conn.fetchval(f'SELECT count(*) FROM "{tbl}"')
+                    table_stats[tbl] = row_count
+                    total_rows += row_count
+
+                    # Add to tar archive
+                    tarinfo = tarfile.TarInfo(name=f"tables/{tbl}.csv")
+                    tarinfo.size = len(csv_bytes)
+                    tarinfo.mtime = int(now_dt.timestamp())
+                    tar.addfile(tarinfo, io.BytesIO(csv_bytes))
+
+                # Add schema metadata JSON to tar
+                meta_bytes = json.dumps(
+                    {
+                        "schema_version": "qnu.postgres-dump/v1",
+                        "alembic_head": alembic_head,
+                        "table_count": len(table_names),
+                        "total_rows": total_rows,
+                        "table_stats": table_stats,
+                        "columns": schema_info["tables"],
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                ).encode("utf-8")
+
+                meta_info = tarfile.TarInfo(name="schema_metadata.json")
+                meta_info.size = len(meta_bytes)
+                meta_info.mtime = int(now_dt.timestamp())
+                tar.addfile(meta_info, io.BytesIO(meta_bytes))
 
         size_bytes = out_file.stat().st_size
         if size_bytes == 0:
@@ -168,6 +185,8 @@ async def backup_postgres_native(
 
         return {
             "tool": "asyncpg_native",
+            "format": "tar_gz",
+            "output_file": str(out_file),
             "alembic_head": alembic_head,
             "table_count": len(table_names),
             "total_rows": total_rows,
@@ -212,43 +231,64 @@ def backup_postgres_pg_dump(
 
     return {
         "tool": "pg_dump_custom",
+        "format": "pg_dump_custom",
+        "output_file": str(out_file),
         "size_bytes": size_bytes,
         "sha256": compute_sha256(out_file),
     }
+
+
+def _resolve_pg_output_path(out_target: Path, use_pg_dump: bool) -> Path:
+    """Ensure the output filename extension strictly matches the export format."""
+    if out_target.is_dir() or not out_target.suffix:
+        return out_target / ("database_dump.dump" if use_pg_dump else "database_dump.tar.gz")
+    name = out_target.name
+    if use_pg_dump:
+        if name.endswith(".tar.gz"):
+            return out_target.with_name(name[:-7] + ".dump")
+        return out_target if name.endswith(".dump") else out_target.with_suffix(".dump")
+    if name.endswith(".dump"):
+        return out_target.with_name(name[:-5] + ".tar.gz")
+    return out_target if name.endswith(".tar.gz") else out_target.with_name(out_target.stem + ".tar.gz")
 
 
 async def backup_postgres(
     db_dsn: str, out_file: Path, tool_preference: str = "auto"
 ) -> dict[str, Any]:
     """Execute PostgreSQL backup using preferred or available tool."""
-    out_file.parent.mkdir(parents=True, exist_ok=True)
-
     has_pg_dump = shutil.which("pg_dump") is not None
     use_pg_dump = (tool_preference == "pg_dump") or (
         tool_preference == "auto" and has_pg_dump
     )
 
     if use_pg_dump:
+        dump_file = _resolve_pg_output_path(out_file, use_pg_dump=True)
+        dump_file.parent.mkdir(parents=True, exist_ok=True)
         try:
-            return backup_postgres_pg_dump(db_dsn, out_file)
+            return backup_postgres_pg_dump(db_dsn, dump_file)
         except Exception as e:
+            if dump_file.exists():
+                dump_file.unlink(missing_ok=True)
             if tool_preference == "pg_dump":
                 raise
             print(f"[WARN] pg_dump failed ({e}), falling back to native asyncpg export...")
 
-    return await backup_postgres_native(db_dsn, out_file)
+    native_file = _resolve_pg_output_path(out_file, use_pg_dump=False)
+    native_file.parent.mkdir(parents=True, exist_ok=True)
+    return await backup_postgres_native(db_dsn, native_file)
 
 
 async def backup_qdrant_collections(
-    qdrant_url: str, out_dir: Path
+    qdrant_url: str, out_dir: Path, api_key: str | None = None
 ) -> list[dict[str, Any]]:
     """Discover all Qdrant collections, snapshot them, and download snapshot files."""
     import httpx
 
     out_dir.mkdir(parents=True, exist_ok=True)
     results: list[dict[str, Any]] = []
+    headers = qdrant_headers(api_key)
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=120.0, headers=headers) as client:
         # List all collections
         resp = await client.get(f"{qdrant_url}/collections")
         if resp.status_code != 200:
@@ -403,12 +443,24 @@ def verify_backup(backup_dir: Path) -> dict[str, Any]:
                 f"Checksum mismatch for {rel_path}: expected {expected_sha}, got {actual_sha}"
             )
 
-        # Decompression check for tar.gz archives
+        # Format-specific integrity check
+        item_tool = item.get("tool")
         if target_file.name.endswith(".tar.gz"):
             with tarfile.open(target_file, "r:gz") as tar:
                 members = tar.getnames()
                 if not members:
                     raise ValueError(f"Tar archive {rel_path} has no members.")
+                if item.get("kind") == "postgres" and "schema_metadata.json" not in members:
+                    raise ValueError(
+                        f"PostgreSQL tar archive {rel_path} is missing schema_metadata.json."
+                    )
+        elif target_file.name.endswith(".dump") or item_tool == "pg_dump_custom":
+            with target_file.open("rb") as f:
+                magic = f.read(5)
+            if magic != b"PGDMP":
+                raise ValueError(
+                    f"PostgreSQL custom dump {rel_path} has invalid header (expected PGDMP)."
+                )
 
         total_bytes += actual_size
         verified_items.append(
@@ -452,6 +504,7 @@ async def run_backup(
         or env.get("QDRANT_URL")
         or "http://127.0.0.1:6333"
     )
+    qdrant_api_key = resolve_qdrant_api_key(env)
 
     now_utc = datetime.datetime.now(datetime.UTC)
     timestamp_str = now_utc.strftime("%Y%m%d_%H%M%S")
@@ -459,77 +512,86 @@ async def run_backup(
     current_backup_dir = out_root / timestamp_str
     current_backup_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"=== QNU AI Platform Â· System Backup [{backup_id}] ===")
+    print(f"=== QNU AI Platform · System Backup [{backup_id}] ===")
     print(f"Output directory: {current_backup_dir}")
     print(f"Target scope:     {target}")
 
     manifest_items: list[dict[str, Any]] = []
     alembic_head = None
 
-    # 1. PostgreSQL Backup
-    if target in {"all", "postgres"}:
-        print("\n--- 1. PostgreSQL Backup ---")
-        pg_filename = "database_dump.tar.gz" if pg_tool != "pg_dump" else "database_dump.dump"
-        pg_file = current_backup_dir / "postgres" / pg_filename
-        pg_info = await backup_postgres(db_dsn, pg_file, tool_preference=pg_tool)
-        alembic_head = pg_info.get("alembic_head")
-        manifest_items.append(
-            {
-                "kind": "postgres",
-                "path": pg_file.relative_to(current_backup_dir).as_posix(),
-                "tool": pg_info.get("tool"),
-                "size_bytes": pg_info.get("size_bytes"),
-                "sha256": pg_info.get("sha256"),
-                "table_count": pg_info.get("table_count"),
-                "total_rows": pg_info.get("total_rows"),
-            }
-        )
-        print(
-            f"âœ“ PostgreSQL backup completed: {pg_info.get('size_bytes', 0):,} bytes | "
-            f"{pg_info.get('table_count', 0)} tables | {pg_info.get('total_rows', 0)} rows"
-        )
-
-    # 2. Qdrant Backup
-    if target in {"all", "qdrant"}:
-        print("\n--- 2. Qdrant Snapshot Backup ---")
-        qdrant_dir = current_backup_dir / "qdrant"
-        qdrant_items = await backup_qdrant_collections(qdrant_url, qdrant_dir)
-        for item in qdrant_items:
+    try:
+        # 1. PostgreSQL Backup
+        if target in {"all", "postgres"}:
+            print("\n--- 1. PostgreSQL Backup ---")
+            pg_dir = current_backup_dir / "postgres"
+            pg_info = await backup_postgres(db_dsn, pg_dir, tool_preference=pg_tool)
+            pg_file = Path(pg_info["output_file"])
+            alembic_head = pg_info.get("alembic_head")
             manifest_items.append(
                 {
-                    "kind": "qdrant",
-                    "collection": item["collection"],
-                    "path": item["snapshot_file"],
-                    "size_bytes": item["size_bytes"],
-                    "sha256": item["sha256"],
+                    "kind": "postgres",
+                    "path": pg_file.relative_to(current_backup_dir).as_posix(),
+                    "tool": pg_info.get("tool"),
+                    "format": pg_info.get("format"),
+                    "size_bytes": pg_info.get("size_bytes"),
+                    "sha256": pg_info.get("sha256"),
+                    "table_count": pg_info.get("table_count"),
+                    "total_rows": pg_info.get("total_rows"),
                 }
             )
-        print(f"âœ“ Qdrant backup completed: {len(qdrant_items)} collections snapshot.")
+            print(
+                f"[OK] PostgreSQL backup completed ({pg_info.get('tool')}): "
+                f"{pg_info.get('size_bytes', 0):,} bytes | "
+                f"{pg_info.get('table_count', 0)} tables | {pg_info.get('total_rows', 0)} rows"
+            )
 
-    # 3. Create Manifest
-    manifest = {
-        "schema_version": "qnu.system-backup/v1",
-        "backup_id": backup_id,
-        "created_at": now_utc.isoformat(),
-        "target": target,
-        "alembic_head": alembic_head,
-        "platform_version": "v1",
-        "items": manifest_items,
-        "status": "completed",
-    }
-    manifest_file = current_backup_dir / "manifest.json"
-    with manifest_file.open("w", encoding="utf-8") as f:
-        json.dump(manifest, f, indent=2, ensure_ascii=False)
-    print(f"\nâœ“ Manifest written to: {manifest_file}")
+        # 2. Qdrant Backup
+        if target in {"all", "qdrant"}:
+            print("\n--- 2. Qdrant Snapshot Backup ---")
+            qdrant_dir = current_backup_dir / "qdrant"
+            qdrant_items = await backup_qdrant_collections(
+                qdrant_url, qdrant_dir, api_key=qdrant_api_key
+            )
+            for item in qdrant_items:
+                manifest_items.append(
+                    {
+                        "kind": "qdrant",
+                        "collection": item["collection"],
+                        "path": item["snapshot_file"],
+                        "size_bytes": item["size_bytes"],
+                        "sha256": item["sha256"],
+                    }
+                )
+            print(f"[OK] Qdrant backup completed: {len(qdrant_items)} collections snapshot.")
 
-    # 4. Immediate Integrity Verification
-    if verify_immediately:
-        print("\n--- 3. Verifying Integrity ---")
-        report = verify_backup(current_backup_dir)
-        print(
-            f"âœ“ Integrity verification PASSED: {report['verified_items_count']} items verified, "
-            f"total {report['total_bytes']:,} bytes."
-        )
+        # 3. Create Manifest
+        manifest = {
+            "schema_version": "qnu.system-backup/v1",
+            "backup_id": backup_id,
+            "created_at": now_utc.isoformat(),
+            "target": target,
+            "alembic_head": alembic_head,
+            "platform_version": "v1",
+            "items": manifest_items,
+            "status": "completed",
+        }
+        manifest_file = current_backup_dir / "manifest.json"
+        with manifest_file.open("w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2, ensure_ascii=False)
+        print(f"\n[OK] Manifest written to: {manifest_file}")
+
+        # 4. Immediate Integrity Verification
+        if verify_immediately:
+            print("\n--- 3. Verifying Integrity ---")
+            report = verify_backup(current_backup_dir)
+            print(
+                f"[OK] Integrity verification PASSED: {report['verified_items_count']} items verified, "
+                f"total {report['total_bytes']:,} bytes."
+            )
+    except BaseException:
+        if not (current_backup_dir / "manifest.json").is_file():
+            shutil.rmtree(current_backup_dir, ignore_errors=True)
+        raise
 
     # 5. Apply Retention
     if retention_days is not None or retention_keep is not None:

@@ -26,13 +26,13 @@ for p in [SCRIPTS_DIR, ROOT, ROOT / "backendV1"]:
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from backup_system import (  # noqa: E402
+from backup_system import (
     apply_retention,
     compute_bytes_sha256,
     compute_sha256,
     verify_backup,
 )
-from restore_system import run_restore  # noqa: E402
+from restore_system import run_restore
 
 
 class BackupRestoreTests(unittest.TestCase):
@@ -184,6 +184,119 @@ class BackupRestoreTests(unittest.TestCase):
 
         result = asyncio.run(run_restore(backup_dir, verify_only=True))
         self.assertEqual(result["status"], "verified_ready")
+
+    def test_verify_backup_supports_pg_dump_custom_and_rejects_bad_magic(self):
+        backup_dir = self.root_path / "20261122_140002"
+        pg_dir = backup_dir / "postgres"
+        pg_dir.mkdir(parents=True, exist_ok=True)
+        dump_file = pg_dir / "database_dump.dump"
+        dump_file.write_bytes(b"PGDMP\x01\x0e\x00dummy_custom_dump")
+
+        manifest = {
+            "schema_version": "qnu.system-backup/v1",
+            "backup_id": "backup_pg_dump",
+            "created_at": "2026-11-22T14:00:02+00:00",
+            "target": "postgres",
+            "alembic_head": None,
+            "items": [
+                {
+                    "kind": "postgres",
+                    "path": "postgres/database_dump.dump",
+                    "tool": "pg_dump_custom",
+                    "format": "pg_dump_custom",
+                    "size_bytes": dump_file.stat().st_size,
+                    "sha256": compute_sha256(dump_file),
+                }
+            ],
+        }
+        (backup_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        report = verify_backup(backup_dir)
+        self.assertEqual(report["status"], "verified")
+
+        # Corrupt magic bytes while updating sha256/size to test PGDMP header check
+        dump_file.write_bytes(b"NOTPG_bad_header")
+        manifest["items"][0]["size_bytes"] = dump_file.stat().st_size
+        manifest["items"][0]["sha256"] = compute_sha256(dump_file)
+        (backup_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaises(ValueError) as ctx:
+            verify_backup(backup_dir)
+        self.assertIn("PGDMP", str(ctx.exception))
+
+    def test_restore_postgres_native_truncates_all_tables_once_before_copy(self):
+        import asyncio
+        from unittest.mock import patch
+
+        from restore_system import restore_postgres_native
+
+        archive_path = self.root_path / "native.tar.gz"
+        with tarfile.open(archive_path, "w:gz") as tar:
+            meta = json.dumps(
+                {
+                    "schema_version": "qnu.postgres-dump/v1",
+                    "table_stats": {"a_child": 1, "b_parent": 1},
+                }
+            ).encode("utf-8")
+            mi = tarfile.TarInfo("schema_metadata.json")
+            mi.size = len(meta)
+            tar.addfile(mi, io.BytesIO(meta))
+
+            for tbl, body in [
+                ("a_child", b"id,parent_id\n1,10\n"),
+                ("b_parent", b"id\n10\n"),
+            ]:
+                ci = tarfile.TarInfo(f"tables/{tbl}.csv")
+                ci.size = len(body)
+                tar.addfile(ci, io.BytesIO(body))
+
+        executed_sql: list[str] = []
+        copied_tables: list[str] = []
+
+        class FakeTx:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        class FakeConn:
+            def transaction(self):
+                return FakeTx()
+
+            async def execute(self, sql: str, *args):
+                executed_sql.append(sql)
+
+            async def copy_to_table(self, tbl: str, source, format: str, header: bool):
+                copied_tables.append(tbl)
+
+            async def fetchval(self, sql: str):
+                return 1
+
+            async def fetch(self, sql: str):
+                return []
+
+            async def close(self):
+                pass
+
+        async def fake_connect(dsn: str):
+            return FakeConn()
+
+        with patch("asyncpg.connect", side_effect=fake_connect):
+            res = asyncio.run(restore_postgres_native("postgresql://u:p@127.0.0.1/db", archive_path))
+
+        truncates = [s for s in executed_sql if s.startswith("TRUNCATE TABLE")]
+        self.assertEqual(len(truncates), 1)
+        self.assertIn('"a_child"', truncates[0])
+        self.assertIn('"b_parent"', truncates[0])
+        self.assertEqual(copied_tables, ["a_child", "b_parent"])
+        self.assertEqual(res["table_count"], 2)
+        self.assertEqual(res["total_rows_restored"], 2)
+
+    def test_qdrant_headers_include_api_key_when_configured(self):
+        from backup_system import qdrant_headers
+
+        self.assertEqual(qdrant_headers(None), {})
+        self.assertEqual(qdrant_headers(""), {})
+        self.assertEqual(qdrant_headers("secret-qdrant-key"), {"api-key": "secret-qdrant-key"})
 
 
 if __name__ == "__main__":

@@ -12,10 +12,20 @@ _ROW_CELL = re.compile(r"^table:(.+):row:(\d+):column:(\d+)$")
 _ROW = re.compile(r"^table:(.+):row:(\d+)$")
 _COLUMN = re.compile(r"^table:(.+):column:(\d+)$")
 _CELL_KEY = re.compile(r":r(\d+):k(\d+)$")
+_PAREN_QUALIFIER = re.compile(r"\([^)]*\)")
 
 
 def _words(text: str) -> str:
     return " ".join(re.findall(r"[^\W_]+", unicodedata.normalize("NFC", text).casefold()))
+
+
+def _subject_keys(label: str) -> set[str]:
+    full = _words(label)
+    keys = {full} if full else set()
+    base = _words(_PAREN_QUALIFIER.sub(" ", label))
+    if base and base != full and len(base.split()) >= 2:
+        keys.add(base)
+    return keys
 
 
 def _matches(question: str, labels: set[str]) -> set[str]:
@@ -184,10 +194,11 @@ def select_catalog(
     matched_families = 0
     for tables in families.values():
         labels = {
-            _words(cell["subject_labels"][0])
+            key
             for table in tables
             for cell in table["cells"]
             if cell.get("subject_labels")
+            for key in _subject_keys(cell["subject_labels"][0])
         }
         matches = _matches(_words(question), labels) if can_narrow else set()
         if needs["comparison"] and len(matches) < 2:
@@ -200,7 +211,8 @@ def select_catalog(
             kept = [
                 cell
                 for cell in table["cells"]
-                if not cell.get("subject_labels") or _words(cell["subject_labels"][0]) in matches
+                if not cell.get("subject_labels")
+                or bool(_subject_keys(cell["subject_labels"][0]) & matches)
             ]
             selected[table["evidence_id"]] = kept
     years = data_years or set()

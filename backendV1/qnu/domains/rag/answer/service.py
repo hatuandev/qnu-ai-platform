@@ -35,6 +35,7 @@ from qnu.domains.rag.answer.drafting import (
     sources_for,
 )
 from qnu.domains.rag.answer.fallback import compose as compose_fallback
+from qnu.domains.rag.answer.fallback import is_prompt_echo
 from qnu.domains.rag.answer.hygiene import clean_model_answer
 from qnu.domains.rag.answer.intent_router import classify_intent
 from qnu.domains.rag.answer.narrative import continuation_supports
@@ -397,9 +398,12 @@ async def answer(
             await answer_cache.discard(cache_key)
             cached = None
 
-    # Slice 6C: Semantic Cache tied to (workspace_id, active_index_run_id)
+    # Slice 6C: Semantic Cache tied to full isolation scope (workspace, collections,
+    # index run, document/metadata filters, persona, model, prompt version).
+    # Bypassed whenever personalized conversation history/memory is present.
     from qnu.domains.rag.answer.semantic_cache import (
         SemanticCacheEntry,
+        discard_semantic_cache,
         get_semantic_cache,
         normalize_for_semantic_cache,
         semantic_cache_key,
@@ -410,9 +414,26 @@ async def answer(
     )
 
     norm_q = normalize_for_semantic_cache(effective_query)
-    sem_key = semantic_cache_key(workspace_id, collection_id, retrieval.index_run_id, norm_q)
+    sem_key = semantic_cache_key(
+        workspace_id,
+        collection_id,
+        retrieval.index_run_id,
+        norm_q,
+        collection_ids=ids,
+        document_ids=req.document_ids,
+        metadata_filter=packing_metadata,
+        scope_resolution=req.scope_resolution,
+        persona=persona,
+        provider_id=runtime.provider_id,
+        model_name=runtime.model_name,
+        prompt_version=PROMPT_VERSION,
+        collection_manifests=trace.retrieval.get("manifests") if len(ids) > 1 else None,
+    )
+    has_session_context = bool(req.conversation_memory) or bool(req.history)
     sem_cache_enabled = (
-        getattr(req, "semantic_cache", True) and semantic_cache_ttl_seconds() > 0
+        getattr(req, "semantic_cache", True)
+        and semantic_cache_ttl_seconds() > 0
+        and not has_session_context
     )
     sem_cache_ttl = semantic_cache_ttl_seconds() if sem_cache_enabled else 0
     if cached is None and sem_cache_ttl > 0:
@@ -438,10 +459,11 @@ async def answer(
                 cached = answer_cache.Entry(
                     version=answer_cache.VERSION,
                     content=sem_cached.raw_answer,
-                    contract=trace.contract,
+                    contract=dict(sem_cached.contract),
                     total_tokens=sem_cached.saved_tokens,
                 )
             except AppException:
+                await discard_semantic_cache(sem_key)
                 sem_cached = None
     trace.evidence_sha256 = proof
     trace.provider_id, trace.model_name = runtime.provider_id, runtime.model_name
@@ -876,7 +898,7 @@ async def answer(
     else:
         response.reason = "model_abstained"
         trace.verification["skip_reason"] = "model_abstained"
-        if draft.message:
+        if draft.message and not is_prompt_echo(draft.message):
             response.message = draft.message
             trace.fallback = {"source": "draft", "version": PROMPT_VERSION}
         elif compose_insufficient_message:
@@ -921,6 +943,7 @@ async def answer(
                 index_run_id=retrieval.index_run_id,
                 normalized_query=norm_q,
                 raw_answer=result.content,
+                contract=trace.contract,
                 saved_tokens=result.total_tokens,
             ),
             sem_cache_ttl,

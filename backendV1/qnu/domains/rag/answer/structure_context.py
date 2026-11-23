@@ -170,15 +170,18 @@ def _kept_records(records: list[dict], anchors: set[str]) -> tuple[list[dict], l
 
 def _bullet_group(records: list[dict], start: int) -> list[dict]:
     heading = records[start]
-    if heading["ref"] != heading["section"]:
+    if heading["is_table"] or _BULLET.match(heading["text"]):
         return []
+    owner_section = heading["ref"] if heading["ref"] == heading["section"] else heading["section"]
     group = [heading]
     bullets = 0
     for record in records[start + 1 :]:
         if (
-            record["section"] != heading["ref"]
+            record["section"] != owner_section
             or record["is_table"]
             or _POINT.match(record["text"])
+            or _ARTICLE.match(record["text"])
+            or _CHAPTER.match(record["text"])
         ):
             break
         if _BULLET.match(record["text"]):

@@ -95,6 +95,9 @@ function turnErrorMessage(err: unknown): string {
     if (err.code === "public_chat_too_fast") {
       return "Bạn gửi tin quá nhanh. Vui lòng thử lại sau ít giây.";
     }
+    if (err.code === "answer_context_budget_exceeded") {
+      return "Nội dung liên quan đến câu hỏi quá dài để tổng hợp trong một lượt. Bạn hãy hỏi cụ thể hơn theo từng mục nhé.";
+    }
     if (err.status === 0) {
       return "Không kết nối được máy chủ. Vui lòng kiểm tra mạng và thử lại.";
     }
@@ -108,7 +111,11 @@ function turnErrorMessage(err: unknown): string {
 
 function isRetryable(err: unknown): boolean {
   return (
-    err instanceof ApiProblemError && (err.status === 0 || err.status >= 500)
+    err instanceof ApiProblemError &&
+    (err.status === 0 ||
+      err.status >= 500 ||
+      err.code === "public_chat_too_fast" ||
+      err.code === "public_chat_session_expired")
   );
 }
 
@@ -466,6 +473,8 @@ function PublicChatbotPage() {
   // (double-click, Enter, prefill + click) could both pass canAsk before re-render.
   const isSendingRef = useRef(false);
   const hasSentInitialQuestion = useRef(false);
+  const sessionInitPromiseRef = useRef<Promise<PublicChatSession> | null>(null);
+  const sessionCreatedAtRef = useRef<number>(0);
 
   const info = infoQuery.data;
 
@@ -559,9 +568,48 @@ function PublicChatbotPage() {
     !isSending &&
     remaining !== 0;
 
+  // Pre-warm public session as soon as the chatbot is available so the first
+  // human turn does not immediately collide with the server's 800ms anti-bot gate.
+  useEffect(() => {
+    if (
+      !info?.available ||
+      session ||
+      embedOriginViolation ||
+      blockedReason ||
+      sessionInitPromiseRef.current
+    ) {
+      return;
+    }
+    let cancelled = false;
+    const promise = createSessionMutation
+      .mutateAsync({ website: honeypot || undefined })
+      .then((created) => {
+        if (!cancelled) {
+          sessionCreatedAtRef.current = Date.now();
+          setSession(created);
+          setTurnsRemaining(created.turns_remaining);
+        }
+        return created;
+      })
+      .finally(() => {
+        if (sessionInitPromiseRef.current === promise) {
+          sessionInitPromiseRef.current = null;
+        }
+      });
+    sessionInitPromiseRef.current = promise;
+    void promise.catch(() => {
+      // Errors on background pre-warm are handled cleanly on the actual send turn.
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [info?.available, session, embedOriginViolation, blockedReason]);
+
   const handleResetSession = () => {
     setMessages([]);
     setSession(null);
+    sessionInitPromiseRef.current = null;
+    sessionCreatedAtRef.current = 0;
     setTurnsRemaining(null);
     setBlockedReason(null);
     setDraft("");
@@ -581,17 +629,52 @@ function PublicChatbotPage() {
     try {
       let activeSession = session;
       if (!activeSession) {
-        activeSession = await createSessionMutation.mutateAsync({
+        if (sessionInitPromiseRef.current) {
+          try {
+            activeSession = await sessionInitPromiseRef.current;
+          } catch {
+            activeSession = null;
+          }
+        }
+        if (!activeSession) {
+          activeSession = await createSessionMutation.mutateAsync({
+            website: honeypot || undefined,
+          });
+          sessionCreatedAtRef.current = Date.now();
+          setSession(activeSession);
+          setTurnsRemaining(activeSession.turns_remaining);
+        }
+      }
+      // On LAN/fast networks, a freshly created session may be <850ms old;
+      // pause briefly before the very first turn so the server's anti-bot gate passes.
+      if (sessionCreatedAtRef.current > 0 && messages.length === 0) {
+        const elapsed = Date.now() - sessionCreatedAtRef.current;
+        if (elapsed < 850) {
+          await new Promise((resolve) => setTimeout(resolve, 850 - elapsed));
+        }
+      }
+      let reply;
+      try {
+        reply = await sendTurnMutation.mutateAsync({
+          session_id: activeSession.session_id,
+          question,
           website: honeypot || undefined,
         });
-        setSession(activeSession);
-        setTurnsRemaining(activeSession.turns_remaining);
+      } catch (firstErr: unknown) {
+        if (
+          firstErr instanceof ApiProblemError &&
+          firstErr.code === "public_chat_too_fast"
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 900));
+          reply = await sendTurnMutation.mutateAsync({
+            session_id: activeSession.session_id,
+            question,
+            website: honeypot || undefined,
+          });
+        } else {
+          throw firstErr;
+        }
       }
-      const reply = await sendTurnMutation.mutateAsync({
-        session_id: activeSession.session_id,
-        question,
-        website: honeypot || undefined,
-      });
       setTurnsRemaining(reply.turns_remaining);
       setMessages((prev) => [
         ...prev,
