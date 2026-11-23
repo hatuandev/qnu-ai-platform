@@ -121,3 +121,6 @@ backend/storage/*
 !backend/storage/.gitkeep
 !backend/storage/e2e_fixtures/
 !backend/storage/e2e_fixtures/**
+
+backups/**
+!backups/.gitkeep

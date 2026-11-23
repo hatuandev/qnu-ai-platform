@@ -37,6 +37,8 @@ COMMANDS = {
     "v1-test": "Isolated backend tests; Frontend V2 has no test suite",
     "v1-lint": "Backend Ruff then Frontend V2 Biome; no automatic fixes",
     "v1-lint-fix": "Explicit Ruff/Biome fixes, backend and Frontend V2 source",
+    "v1-backup": "Create verified backup of PostgreSQL database and Qdrant snapshots",
+    "v1-backup-verify": "Verify integrity and checksums of existing system backups",
     "v1-help": "Show QNU runner commands",
 }
 
@@ -173,6 +175,21 @@ def command_plan(
         "v1-lint-fix": [
             (backend, [*uv, "ruff", "check", "--fix", "."]),
             (frontend_v2, ["npm", "run", "lint:fix"]),
+        ],
+        "v1-backup": [
+            (runtime, [*uv, "python", str(root / "scripts/backup_system.py")])
+        ],
+        "v1-backup-verify": [
+            (
+                runtime,
+                [
+                    *uv,
+                    "python",
+                    str(root / "scripts/backup_system.py"),
+                    "--verify-dir",
+                    str(root / "backups"),
+                ],
+            )
         ],
     }
     plans["v1-test"] = [*plans["v1-test-be"]]
@@ -320,6 +337,8 @@ def main(argv: list[str] | None = None) -> int:
         "v1-seed-modelops",
         "v1-infra-status",
         "v1-infra-logs",
+        "v1-backup",
+        "v1-backup-verify",
     }:
         env_path = (ROOT if args.env_dir == "root" else ROOT / "backendV1") / ".env"
         if not env_path.is_file():
