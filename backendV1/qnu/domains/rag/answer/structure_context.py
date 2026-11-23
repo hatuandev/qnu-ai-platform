@@ -168,27 +168,42 @@ def _kept_records(records: list[dict], anchors: set[str]) -> tuple[list[dict], l
     return kept, compressed
 
 
+_SUBHEADING = re.compile(r"^(?:[IVXLCDM]+|[A-Z])[.)]\s+\S")
+
+
 def _bullet_group(records: list[dict], start: int) -> list[dict]:
     heading = records[start]
     if heading["is_table"] or _BULLET.match(heading["text"]):
         return []
-    owner_section = heading["ref"] if heading["ref"] == heading["section"] else heading["section"]
+    owner_section = heading["section"]
     group = [heading]
     bullets = 0
+    trailing_prose = 0
     for record in records[start + 1 :]:
+        text = record["text"]
         if (
             record["section"] != owner_section
             or record["is_table"]
-            or _POINT.match(record["text"])
-            or _ARTICLE.match(record["text"])
-            or _CHAPTER.match(record["text"])
+            or _POINT.match(text)
+            or _ARTICLE.match(text)
+            or _CHAPTER.match(text)
+            or _SUBHEADING.match(text)
+            or text.endswith(":")
         ):
             break
-        if _BULLET.match(record["text"]):
+        if _BULLET.match(text):
             bullets += 1
+            trailing_prose = 0
+            group.append(record)
         elif not bullets:
             break
-        group.append(record)
+        else:
+            # Allow at most one continuation/note line directly after a bullet;
+            # stop before swallowing subsequent unrelated prose paragraphs.
+            trailing_prose += 1
+            if trailing_prose > 1:
+                break
+            group.append(record)
     return group if bullets >= 2 else []
 
 

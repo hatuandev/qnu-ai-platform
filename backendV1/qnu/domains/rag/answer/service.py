@@ -784,6 +784,7 @@ async def answer(
                         and first_error.code == "answer_table_value_not_extractive"
                         and names_schema is None
                         and bool(appeal_draft.message)
+                        and not is_prompt_echo(appeal_draft.message)
                     )
                     if appeal_draft.status == "answered" or repaired_abstention:
                         trace.appeal["first_tokens"] = {
@@ -905,11 +906,20 @@ async def answer(
     else:
         response.reason = "model_abstained"
         trace.verification["skip_reason"] = "model_abstained"
-        if draft.message and not is_prompt_echo(draft.message):
+        draft_echoed = bool(draft.message and is_prompt_echo(draft.message))
+        if draft.message and not draft_echoed:
             response.message = draft.message
             trace.fallback = {"source": "draft", "version": PROMPT_VERSION}
         elif compose_insufficient_message:
             await compose_message(response.reason)
+            if draft_echoed:
+                trace.fallback["draft_message_rejected"] = "prompt_echo"
+        elif draft_echoed:
+            trace.fallback = {
+                "source": "none",
+                "version": PROMPT_VERSION,
+                "draft_message_rejected": "prompt_echo",
+            }
     # Store exact answer cache
     if (
         cache_key is not None

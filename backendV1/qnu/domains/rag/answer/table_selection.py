@@ -12,29 +12,79 @@ _ROW_CELL = re.compile(r"^table:(.+):row:(\d+):column:(\d+)$")
 _ROW = re.compile(r"^table:(.+):row:(\d+)$")
 _COLUMN = re.compile(r"^table:(.+):column:(\d+)$")
 _CELL_KEY = re.compile(r":r(\d+):k(\d+)$")
-_PAREN_QUALIFIER = re.compile(r"\([^)]*\)")
+_PAREN_QUALIFIER = re.compile(r"\([^()]*\)")
+_SINGLE_WORD_SUBJECT_PREFIX = re.compile(
+    r"(?:ngành|chuyên\s+ngành|môn|lĩnh\s+vực|khoa|chương\s+trình)\s+",
+    re.IGNORECASE,
+)
+_GENERIC_BASE_KEYS = frozenset(
+    {
+        "đại học",
+        "cao đẳng",
+        "chính quy",
+        "liên thông",
+        "khu vực",
+        "ưu tiên",
+        "đối tượng",
+        "nhóm ngành",
+        "chương trình",
+        "phương thức",
+        "tổ hợp",
+        "chỉ tiêu",
+        "điểm chuẩn",
+        "học phí",
+        "mức phí",
+        "năm học",
+        "đợt 1",
+        "đợt 2",
+        "nhóm 1",
+        "nhóm 2",
+    }
+)
 
 
 def _words(text: str) -> str:
     return " ".join(re.findall(r"[^\W_]+", unicodedata.normalize("NFC", text).casefold()))
 
 
+def _strip_parentheticals(text: str) -> str:
+    """Iteratively remove balanced parenthetical qualifiers, including nested ones."""
+    current = text
+    while True:
+        updated = _PAREN_QUALIFIER.sub(" ", current)
+        if updated == current:
+            return current
+        current = updated
+
+
 def _subject_keys(label: str) -> set[str]:
     full = _words(label)
     keys = {full} if full else set()
-    base = _words(_PAREN_QUALIFIER.sub(" ", label))
-    if base and base != full and len(base.split()) >= 2:
+    base = _words(_strip_parentheticals(label))
+    if not base or base == full:
+        return keys
+    tokens = base.split()
+    if len(tokens) >= 2:
+        if base not in _GENERIC_BASE_KEYS:
+            keys.add(base)
+    elif len(tokens) == 1 and any(c.isalpha() for c in base):
         keys.add(base)
     return keys
 
 
 def _matches(question: str, labels: set[str]) -> set[str]:
-    spans = [
-        (match.start(), match.end(), label)
-        for label in labels
-        if label and any(c.isalpha() for c in label)
-        for match in re.finditer(r"(?<!\w)" + re.escape(label) + r"(?!\w)", question)
-    ]
+    spans = []
+    for label in labels:
+        if not label or not any(c.isalpha() for c in label):
+            continue
+        if " " not in label:
+            # A 1-syllable base subject (e.g. "luật", "dược") only matches when
+            # explicitly qualified by a subject noun in the question (e.g. "ngành luật").
+            pattern = _SINGLE_WORD_SUBJECT_PREFIX.pattern + re.escape(label) + r"(?!\w)"
+        else:
+            pattern = r"(?<!\w)" + re.escape(label) + r"(?!\w)"
+        for match in re.finditer(pattern, question):
+            spans.append((match.start(), match.end(), label))
     # A prefix name inside a longer named subject is not a second subject.
     return {
         label
