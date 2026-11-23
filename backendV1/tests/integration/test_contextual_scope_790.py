@@ -91,7 +91,8 @@ def test_new_recipe_preserves_body_and_scope_before_topk(client, metadata_index)
     assert unknown.status_code == 200 and unknown.json()["hits"] == []
     assert unknown.json()["trace"]["scope_resolution"]["filters"] == [{"data_year": 2099}]
     assert len(data["embedding"].requests) == count  # No retry and no unfiltered fallback.
-    ambiguous = client.post(
+    # Both data years occur within one published version and can be read together.
+    overview = client.post(
         data["base"] + "/search",
         json={
             "query": "Nguồn dữ liệu?",
@@ -99,8 +100,22 @@ def test_new_recipe_preserves_body_and_scope_before_topk(client, metadata_index)
             "mode": "dense",
         },
     )
-    assert ambiguous.status_code == 409
-    assert ambiguous.json()["code"] == "answer_scope_clarification_required"
+    assert overview.status_code == 200, overview.text
+    assert overview.json()["trace"]["scope_resolution"]["filters"] == [{}]
+    assert len(data["embedding"].requests) == count + 1
+
+    count = len(data["embedding"].requests)
+    conflict = client.post(
+        data["base"] + "/search",
+        json={
+            "query": "Nguồn dữ liệu năm 2024",
+            "scope_resolution": "catalog",
+            "mode": "dense",
+            "metadata_filter": {"data_year": 2023},
+        },
+    )
+    assert conflict.status_code == 409, conflict.text
+    assert conflict.json()["code"] == "answer_scope_conflict"
     assert len(data["embedding"].requests) == count
     artifact = Path("storage/context790/functional-comparison.json")
     artifact.parent.mkdir(parents=True, exist_ok=True)

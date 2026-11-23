@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from qnu.domains.knowledge.index.chunking import build_chunks
+from qnu.domains.knowledge.index.chunking import Chunk, build_chunks
 from qnu.domains.knowledge.index.contextual import enrich, glossary, original_text
 from qnu.domains.knowledge.index.query_scope import resolve, result_scopes
 from qnu.domains.knowledge.metadata import MetadataFilter, validate_annotations
@@ -180,6 +180,39 @@ def test_glossary_mined_only_from_explicit_cited_definition_and_stays_out_of_ans
     changed["search_context"]["original_text"] = "invented"
     with pytest.raises(AppException):
         original_text(SimpleNamespace(text=enriched.text, structure=changed))
+
+
+def test_row_card_is_sealed_without_duplicating_its_rendered_breadcrumb():
+    content, documents = fixture()
+    card = Chunk(
+        kind="row_card",
+        text="Phụ lục · Chỉ tiêu\nNhóm A: 15",
+        citations={"ocr:cell": {"page": 1}},
+        structure={"context": {"source_scope": {"kind": "sheet", "name": "Tổng hợp"}}},
+    )
+    [sealed] = enrich([card], content, documents, len(card.text.encode("utf-8")))
+
+    assert sealed.text == original_text(sealed) == card.text
+    assert sealed.sha256 == card.sha256
+    assert sealed.citations == card.citations
+    assert sealed.structure["context"] == card.structure["context"]
+    assert sealed.structure["search_context"]["prefix"] == ""
+    assert sealed.structure["search_context"]["original_sha256"] == card.sha256
+    changed = copy.deepcopy(sealed.structure)
+    changed["search_context"]["original_sha256"] = "invalid"
+    with pytest.raises(AppException) as caught:
+        original_text(SimpleNamespace(text=sealed.text, structure=changed))
+    assert caught.value.code == "index_context_invalid"
+
+
+def test_general_question_requires_year_when_issued_years_differ():
+    versions = [
+        scoped(year=2023, issued_year=2023),
+        scoped(year=2024, issued_year=2024),
+    ]
+    with pytest.raises(AppException) as caught:
+        resolve("Nguồn dữ liệu?", MetadataFilter(), versions)
+    assert caught.value.code == "answer_scope_clarification_required"
 
 
 def test_aliases_are_dynamic_scoped_and_ambiguous_definitions_are_not_merged():

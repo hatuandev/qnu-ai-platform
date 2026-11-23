@@ -4,7 +4,8 @@ import pytest
 
 from qnu.domains.knowledge.compilation.schemas import DRAFT_PARAGRAPH_TEXT_LIMIT
 from qnu.domains.knowledge.index.chunking import build_chunks
-from qnu.domains.knowledge.source_sections import reading_groups
+from qnu.domains.knowledge.metadata import table_chain_labels
+from qnu.domains.knowledge.source_sections import reading_groups, source_sections
 from qnu.platform.errors import AppException
 
 
@@ -219,3 +220,108 @@ def test_both_compiler_modes_share_source_headings_without_changing_draft_or_cit
         assert tight.structure["rows"] == chunks[-1].structure["rows"]
     section["paragraphs"][0]["citations"].append("ocr-example:ev-intro")
     assert reading_groups(content, documents)[0]["heading"] == section["heading"]
+
+
+def test_nested_outline_is_kept_for_paragraphs_and_tables():
+    content, documents = fixture()
+    blocks = documents[0]["pages"][0]["blocks"]
+    blocks[:0] = [
+        {"evidence_id": "chapter", "text": "Chương II Điều kiện"},
+        {"evidence_id": "article", "text": "Điều 4 Hồ sơ"},
+        {"evidence_id": "item", "text": "1. Thành phần cần nộp"},
+        {"evidence_id": "ev-text", "text": "Đoạn văn nguồn có dẫn chứng."},
+    ]
+    expected = [
+        {"level": 2, "text": "Chương II Điều kiện", "citation": "ocr-example:chapter"},
+        {"level": 5, "text": "Điều 4 Hồ sơ", "citation": "ocr-example:article"},
+    ]
+    for chunk in build_chunks(content, documents, 3000):
+        assert chunk.structure["context"]["heading_path"] == expected
+        assert chunk.structure["context"]["source_heading_citation"] == "ocr-example:article"
+        assert "ocr-example:chapter" not in chunk.citations
+
+
+def test_native_outline_prefers_levels_and_resets_on_sibling_heading():
+    def heading(ref, number):
+        return {
+            "evidence_id": ref,
+            "text": f"Điều {number} {ref}",
+            "source_locator": {"format": "md", "level": number},
+        }
+
+    doc = {
+        "ocr_run_id": "run",
+        "pages": [
+            {"page_number": 1, "blocks": [heading("root", 1), heading("nested", 3)]},
+            {
+                "page_number": 2,
+                "blocks": [
+                    heading("peer", 2),
+                    {
+                        "evidence_id": "item",
+                        "text": "1. Chứng minh nhân thân",
+                        "source_locator": {"format": "md"},
+                    },
+                ],
+            },
+        ],
+    }
+    outline = source_sections([doc])
+    assert [entry.level for entry in outline["run:nested"].path] == [1, 3]
+    assert [entry.citation for entry in outline["run:item"].path] == ["run:root", "run:peer"]
+
+
+def test_sheet_without_title_does_not_inherit_previous_sheet_outline():
+    content, documents = fixture()
+    pages = documents[0]["pages"]
+    pages[0]["blocks"].insert(
+        0,
+        {
+            "evidence_id": "sheet-title",
+            "text": "# Báo cáo tháng",
+            "type": "title",
+            "source_locator": {"format": "xlsx", "sheet": "Tháng 1"},
+        },
+    )
+    pages.append(
+        {
+            "page_number": 2,
+            "blocks": [
+                {
+                    "evidence_id": "ev-text",
+                    "text": "Dữ liệu kỳ sau",
+                    "source_locator": {"format": "xlsx", "sheet": "Tháng 2"},
+                }
+            ],
+        }
+    )
+    first, second = build_chunks(content, documents, 3000)[:2]
+    assert first.structure["context"]["source_scope"] == {"kind": "sheet", "name": "Tháng 2"}
+    assert "heading_path" not in first.structure["context"]
+    assert second.structure["context"]["heading_path"][0]["citation"] == "ocr-example:sheet-title"
+
+
+@pytest.mark.parametrize("unit", [None, "sheet", "slide"])
+def test_adjacent_table_header_does_not_cross_native_units(unit):
+    content, _ = fixture()
+    first = content["source_tables"][0]
+    # This would otherwise be a continuation because its leading identity is blank.
+    follow_table = {
+        **first["table"],
+        "rows": [
+            [
+                {**cell, "evidence_id": f"later-{idx}", "text": text, "header": False}
+                for idx, (cell, text) in enumerate(
+                    zip(first["table"]["rows"][0], ("", "12", "13"), strict=True)
+                )
+            ]
+        ],
+        "row_count": 1,
+    }
+    later = {"citation": "ocr-example:later", "page_number": 2, "table": follow_table}
+    if unit:
+        first["table"]["source_mapping"] = {unit: 1}
+        later["table"]["source_mapping"] = {unit: 2}
+    labels = table_chain_labels([first, later])
+    assert first["citation"] in labels
+    assert (later["citation"] in labels) == (unit is None)

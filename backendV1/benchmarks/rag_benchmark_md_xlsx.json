@@ -1,14 +1,14 @@
 {
   "suite_id": "rag_benchmark_md_xlsx",
-  "version": "1.0.0",
-  "description": "Bộ đề benchmark cố định đánh giá định kỳ chất lượng RAG đối với tài liệu Markdown (.md) và bảng tính Excel (.xlsx) trên QNU AI Platform.",
+  "version": "1.1.0",
+  "description": "Bộ đề benchmark cố định đánh giá định kỳ chất lượng RAG đối với tài liệu Markdown (.md), bảng tính Excel (.xlsx) và các nhóm đối chứng chất lượng G1–G5 trên QNU AI Platform.",
   "scoring_scale": {
     "PASS": 2,
     "PARTIAL": 1,
     "FAIL": 0,
     "max_score_per_question": 2,
-    "total_questions": 24,
-    "max_total_score": 48
+    "total_questions": 34,
+    "max_total_score": 68
   },
   "datasets": [
     {
@@ -62,6 +62,36 @@
       "id": "trap_and_out_of_scope",
       "name": "Câu hỏi bẫy & Xử lý ngoài phạm vi",
       "question_count": 4
+    },
+    {
+      "id": "g1_direct_grounded_evidence",
+      "code": "G1",
+      "name": "G1: Trích xuất căn cứ trực tiếp",
+      "question_count": 2
+    },
+    {
+      "id": "g2_mandatory_conditions_and_exceptions",
+      "code": "G2",
+      "name": "G2: Điều kiện & Ngoại lệ bắt buộc",
+      "question_count": 2
+    },
+    {
+      "id": "g3_tables_and_multi_year_metrics",
+      "code": "G3",
+      "name": "G3: Bảng biểu & Số liệu nhiều năm",
+      "question_count": 2
+    },
+    {
+      "id": "g4_out_of_scope_refusal",
+      "code": "G4",
+      "name": "G4: Ngoài phạm vi & Từ chối thẳng (insufficient_evidence)",
+      "question_count": 2
+    },
+    {
+      "id": "g5_multi_part_and_partial_comparison",
+      "code": "G5",
+      "name": "G5: Nhiều ý & So sánh khuyết một vế",
+      "question_count": 2
     }
   ],
   "questions": [
@@ -319,6 +349,7 @@
       "id": "Q17",
       "group": "acronyms_and_anti_hallucination",
       "doc_scope": "tai_nguyen_thu_vien_sample.xlsx",
+      "expected_status": "insufficient_evidence",
       "question": "Từ viết tắt 'ĐKCB' trong bảng dữ liệu thư viện có nghĩa là gì theo các tài liệu đã được cung cấp?",
       "expected_points": [
         "Tài liệu bảng tính không có phần chú thích hoặc định nghĩa cụ thể nghĩa đầy đủ của từ viết tắt 'ĐKCB'",
@@ -432,6 +463,278 @@
       "forbidden_behaviors": [
         "Tự ý suy đoán áp dụng chung cho tất cả các hệ đào tạo của trường",
         "Bỏ qua giới hạn phạm vi 'hình thức chính quy' đã nêu rõ ở Điều 1"
+      ]
+    },
+    {
+      "id": "Q25",
+      "group": "g1_direct_grounded_evidence",
+      "benchmark_category": "G1",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "expected_status": "answered",
+      "question": "Theo Khoản 1 Điều 12 Quy định đào tạo tín chỉ, điểm tổng kết học phần được tính từ những thành phần nào và trọng số của từng thành phần là bao nhiêu?",
+      "expected_points": [
+        "Điểm quá trình có trọng số từ 40% đến 50%",
+        "Điểm thi kết thúc học phần có trọng số từ 50% đến 60%"
+      ],
+      "must_contain": [
+        "40%",
+        "50%",
+        "60%"
+      ],
+      "must_not_contain": [
+        "30%",
+        "70%"
+      ],
+      "expected_behavior": "Trích xuất chính xác 2 thành phần điểm và khoảng trọng số tương ứng (40%–50% và 50%–60%) kèm trích dẫn Điều 12.",
+      "forbidden_behaviors": [
+        "Bịa đặt tỷ lệ trọng số khác (ví dụ 30%–70%)",
+        "Bỏ sót một trong hai thành phần điểm"
+      ]
+    },
+    {
+      "id": "Q26",
+      "group": "g1_direct_grounded_evidence",
+      "benchmark_category": "G1",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "expected_status": "answered",
+      "question": "Theo Điều 2 và Điều 5 Quy định đào tạo tín chỉ, thời gian đào tạo tiêu chuẩn của chương trình kỹ sư/sư phạm đặc thù là bao nhiêu năm và sinh viên được đăng ký tối đa bao nhiêu tín chỉ trong học kỳ phụ?",
+      "expected_points": [
+        "Chương trình kỹ sư/sư phạm đặc thù có thời gian đào tạo tiêu chuẩn là 4.5 năm",
+        "Trong học kỳ phụ (học kỳ hè), sinh viên được đăng ký tối đa 10 tín chỉ"
+      ],
+      "must_contain": [
+        "10"
+      ],
+      "must_contain_any": [
+        [
+          "4.5",
+          "4,5"
+        ]
+      ],
+      "must_not_contain": [
+        "14 tín chỉ trong học kỳ phụ"
+      ],
+      "expected_behavior": "Trích xuất đúng hai mốc số trực tiếp từ Điều 2 (4.5 năm) và Điều 5 (tối đa 10 tín chỉ học kỳ phụ).",
+      "forbidden_behaviors": [
+        "Nhầm thời gian kỹ sư/sư phạm đặc thù 4.5 năm thành 4 năm của cử nhân",
+        "Nhầm trần 10 tín chỉ học kỳ phụ sang 14 hoặc 24 tín chỉ của học kỳ chính"
+      ]
+    },
+    {
+      "id": "Q27",
+      "group": "g2_mandatory_conditions_and_exceptions",
+      "benchmark_category": "G2",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "expected_status": "answered",
+      "question": "Sinh viên đã tích lũy đủ 130 tín chỉ và điểm trung bình chung tích lũy đạt 2.50 nhưng đang trong thời gian bị kỷ luật mức đình chỉ học tập thì có được xét công nhận tốt nghiệp theo Điều 20 không?",
+      "expected_points": [
+        "Không được xét công nhận tốt nghiệp",
+        "Khoản 6 Điều 20 quy định điều kiện bắt buộc tại thời điểm xét tốt nghiệp không bị truy cứu trách nhiệm hình sự hoặc không đang trong thời gian bị kỷ luật từ mức đình chỉ học tập trở lên"
+      ],
+      "must_contain": [
+        "không",
+        "đình chỉ học tập",
+        "Điều 20"
+      ],
+      "must_not_contain": [
+        "vẫn được xét tốt nghiệp vì đã đủ tín chỉ"
+      ],
+      "expected_behavior": "Giữ nguyên điều kiện loại trừ bắt buộc tại Khoản 6 Điều 20 và kết luận không đủ điều kiện xét tốt nghiệp dù đã đạt tín chỉ và GPA.",
+      "forbidden_behaviors": [
+        "Chỉ kiểm tra tín chỉ và GPA rồi kết luận được xét tốt nghiệp",
+        "Bỏ sót điều kiện loại trừ về kỷ luật đình chỉ học tập"
+      ]
+    },
+    {
+      "id": "Q28",
+      "group": "g2_mandatory_conditions_and_exceptions",
+      "benchmark_category": "G2",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "expected_status": "answered",
+      "question": "Sinh viên có học lực yếu đang học kỳ chính đăng ký 12 tín chỉ có được rút bớt một học phần 3 tín chỉ trong tuần đầu tiên không? Nêu rõ điều kiện ràng buộc.",
+      "expected_points": [
+        "Không được rút bớt học phần 3 tín chỉ dù đang ở tuần đầu tiên của học kỳ chính",
+        "Sau khi rút chỉ còn 9 tín chỉ, vi phạm điều kiện ràng buộc tại Điều 6 kết hợp Điều 5 (tối thiểu 10 tín chỉ đối với sinh viên học lực yếu)"
+      ],
+      "must_contain": [
+        "10",
+        "Điều 5",
+        "Điều 6"
+      ],
+      "must_not_contain": [
+        "được rút bình thường vì trong 2 tuần đầu"
+      ],
+      "expected_behavior": "Kết hợp điều kiện thời hạn (Điều 6) và điều kiện trần tối thiểu sau khi rút (Điều 5), kết luận không được rút do còn 9 < 10 tín chỉ.",
+      "forbidden_behaviors": [
+        "Chỉ dựa vào điều kiện trong vòng 02 tuần đầu mà cho phép rút",
+        "Áp nhầm ngưỡng tối thiểu 14 tín chỉ của sinh viên bình thường cho sinh viên yếu"
+      ]
+    },
+    {
+      "id": "Q29",
+      "group": "g3_tables_and_multi_year_metrics",
+      "benchmark_category": "G3",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "expected_status": "answered",
+      "question": "Theo bảng quy đổi ở Điều 12, hãy liệt kê tách bạch mức điểm hệ 10, điểm hệ 4 và xếp loại kết quả của từng mức điểm chữ A, B, C, D.",
+      "expected_points": [
+        "A: 8.5 đến 10.0, hệ 4 là 4.0, Giỏi / Xuất sắc",
+        "B: 7.0 đến 8.4, hệ 4 là 3.0, Khá",
+        "C: 5.5 đến 6.9, hệ 4 là 2.0, Trung bình",
+        "D: 4.0 đến 5.4, hệ 4 là 1.0, Trung bình yếu"
+      ],
+      "must_contain": [
+        "8.5",
+        "4.0",
+        "7.0",
+        "3.0",
+        "5.5",
+        "2.0",
+        "1.0"
+      ],
+      "must_not_contain": [
+        "B+",
+        "C+",
+        "D+"
+      ],
+      "expected_behavior": "Trình bày đầy đủ, tách bạch đúng 4 hàng A, B, C, D của bảng quy đổi điểm Điều 12 mà không tự thêm các bậc điểm dấu cộng không có trong bảng.",
+      "forbidden_behaviors": [
+        "Tự bịa thêm các mức điểm B+, C+, D+ từ quy chế trường khác",
+        "Gộp hoặc làm lệch cột giữa điểm hệ 10 và điểm hệ 4"
+      ]
+    },
+    {
+      "id": "Q30",
+      "group": "g3_tables_and_multi_year_metrics",
+      "benchmark_category": "G3",
+      "doc_scope": "tai_nguyen_thu_vien_sample.xlsx",
+      "expected_status": "answered",
+      "question": "Trong sheet 'Số ĐKCB sót so với file KK (Thơ', các báo cáo đề tài khoa học công nghệ cấp bộ có năm xuất bản 2006, 2011 và 2012 gồm những mã ĐKCB nào? Có bản ghi nào xuất bản năm 2015 không?",
+      "expected_points": [
+        "Năm 2006: DTB.000102 (Phạm Văn Cường)",
+        "Năm 2011: DTB.000095-000096, DTB.000097-000099, DTB.000107",
+        "Năm 2012: DTB.000100, DTB.000101, DTB.000103, DTB.000105-000106",
+        "Không có bản ghi nào xuất bản năm 2015 trong sheet này"
+      ],
+      "must_contain": [
+        "2006",
+        "2011",
+        "2012",
+        "DTB.000102"
+      ],
+      "must_not_contain": [
+        "năm 2015 gồm"
+      ],
+      "expected_behavior": "Tách bạch mã ĐKCB theo đúng từng năm 2006, 2011, 2012 và khẳng định không có bản ghi năm 2015.",
+      "forbidden_behaviors": [
+        "Trộn lẫn mã ĐKCB giữa các năm 2006, 2011 và 2012",
+        "Bịa mã ĐKCB cho năm 2015 hoặc bỏ qua câu hỏi về năm 2015"
+      ]
+    },
+    {
+      "id": "Q31",
+      "group": "g4_out_of_scope_refusal",
+      "benchmark_category": "G4",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "expected_status": "insufficient_evidence",
+      "question": "Theo Quy định đào tạo tín chỉ (QĐ 1234/QĐ-ĐHQN), mức lệ phí thi lại và quy trình nộp đơn phúc khảo bài thi kết thúc học phần được quy định như thế nào?",
+      "expected_points": [
+        "Văn bản QĐ 1234/QĐ-ĐHQN không có quy định về mức lệ phí thi lại hay quy trình phúc khảo bài thi",
+        "Hệ thống từ chối thẳng với trạng thái insufficient_evidence và không suy diễn"
+      ],
+      "must_contain": [
+        "chưa",
+        "thông tin"
+      ],
+      "must_not_contain": [
+        "lệ phí thi lại là",
+        "trong vòng 7 ngày kể từ ngày công bố điểm"
+      ],
+      "expected_behavior": "Từ chối thẳng khi thiếu căn cứ (`insufficient_evidence`), thông báo rõ tài liệu không đề cập lệ phí thi lại và quy trình phúc khảo.",
+      "forbidden_behaviors": [
+        "Tự bịa mức lệ phí thi lại hoặc thời hạn nộp đơn phúc khảo",
+        "Trả lời trạng thái answered dựa trên kiến thức chung bên ngoài"
+      ]
+    },
+    {
+      "id": "Q32",
+      "group": "g4_out_of_scope_refusal",
+      "benchmark_category": "G4",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "expected_status": "insufficient_evidence",
+      "question": "Nội dung chi tiết 6 mô-đun kỹ năng trong Thông tư số 03/2014/TT-BTTTT được quy định cụ thể như thế nào trong văn bản này?",
+      "expected_points": [
+        "Văn bản chỉ dẫn chiếu tên Thông tư 03/2014/TT-BTTTT tại Khoản 5 Điều 20, không cung cấp toàn văn hay danh sách 6 mô-đun kỹ năng",
+        "Từ chối suy diễn từ kiến thức ngoài và trả trạng thái insufficient_evidence"
+      ],
+      "must_contain": [
+        "không",
+        "Thông tư"
+      ],
+      "must_not_contain": [
+        "IU01",
+        "IU02",
+        "IU06"
+      ],
+      "expected_behavior": "Phân biệt rõ văn bản chỉ nhắc tên Thông tư 03/2014/TT-BTTTT và từ chối diễn giải chi tiết nội dung văn bản ngoài chưa được cung cấp.",
+      "forbidden_behaviors": [
+        "Tự liệt kê các mô-đun IU01–IU06 từ kiến thức huấn luyện ngoài tài liệu",
+        "Khẳng định văn bản có quy định chi tiết 6 mô-đun"
+      ]
+    },
+    {
+      "id": "Q33",
+      "group": "g5_multi_part_and_partial_comparison",
+      "benchmark_category": "G5",
+      "doc_scope": "quy_dinh_tin_chi_qnu_sample.md",
+      "expected_status": "answered",
+      "question": "So sánh ngưỡng điểm trung bình chung tích lũy bị cảnh báo học tập của sinh viên năm thứ nhất, năm thứ hai, năm thứ ba và năm thứ tư theo Điều 18.",
+      "expected_points": [
+        "Năm thứ nhất: dưới 1.20",
+        "Năm thứ hai: dưới 1.40",
+        "Năm thứ ba: dưới 1.60",
+        "Nêu minh bạch rằng Điều 18 của văn bản không đề cập ngưỡng riêng cho sinh viên năm thứ tư"
+      ],
+      "must_contain": [
+        "1.20",
+        "1.40",
+        "1.60",
+        "năm thứ tư"
+      ],
+      "must_not_contain": [
+        "năm thứ tư dưới 1.80"
+      ],
+      "expected_behavior": "Trả lời đầy đủ 3 vế có căn cứ (năm 1/2/3) ở trạng thái answered và nêu minh bạch vế khuyết (năm thứ tư không được quy định trong văn bản).",
+      "forbidden_behaviors": [
+        "Từ chối trắng toàn bộ câu hỏi chỉ vì thiếu dữ liệu năm thứ tư",
+        "Tự suy diễn tuyến tính ngưỡng năm thứ tư là 1.80"
+      ]
+    },
+    {
+      "id": "Q34",
+      "group": "g5_multi_part_and_partial_comparison",
+      "benchmark_category": "G5",
+      "doc_scope": "tai_nguyen_thu_vien_sample.xlsx",
+      "expected_status": "answered",
+      "question": "So sánh giá tiền và số trang của hai cuốn sách cùng nhan đề 'English in Focus' (năm 1995) trong sheet 'Dữ liệu chuẩn hóa' và cho biết số lượt mượn thực tế trong năm 2025 của hai cuốn này.",
+      "expected_points": [
+        "Cuốn 1 (Nicholas Sampson, Level A, Teacher's Book): giá 45.000đ, 416 tr",
+        "Cuốn 2 (Diana Green, Level A, Workbook, Teacher's Book): giá 15.000đ, 216 tr",
+        "Nêu rõ tài liệu Excel không có dữ liệu về số lượt mượn thực tế trong năm 2025"
+      ],
+      "must_contain": [
+        "45.000đ",
+        "416",
+        "15.000đ",
+        "216"
+      ],
+      "must_not_contain": [
+        "lượt mượn năm 2025 là"
+      ],
+      "expected_behavior": "So sánh tách bạch đúng 2 bản ghi trùng nhan đề có căn cứ và minh bạch phần khuyết về số lượt mượn năm 2025.",
+      "forbidden_behaviors": [
+        "Gộp 2 cuốn thành 1 bản ghi duy nhất",
+        "Tự bịa số lượt mượn năm 2025 hoặc từ chối luôn phần so sánh giá/số trang"
       ]
     }
   ]

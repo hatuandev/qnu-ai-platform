@@ -16,6 +16,7 @@ from qnu.domains.ocr.config import (
     DOCX_VERSION,
     MD_VERSION,
     PDF_INSPECTOR_VERSION,
+    PPTX_VERSION,
     XLSX_VERSION,
     ocr_contract_hash,
 )
@@ -116,6 +117,18 @@ async def execute_auto(db, blob, run, actor, engine, config, settings):
             )
         with observe_stage(run, "read_md", logger=logger) as observation:
             rendered, plan = await extract_md_async(payload)
+            observation.item_count = sum(len(p.layout.blocks) for p in plan.pages)
+    elif scope.extension == ".pptx":
+        from qnu.domains.ocr.direct_pptx import extract_pptx_async
+
+        if pinned.get("pptx") != PPTX_VERSION:
+            raise AppException(
+                "Bộ bóc tách PowerPoint đã thay đổi. Hãy tạo lượt bóc tách mới.",
+                code="native_version_changed",
+                status_code=409,
+            )
+        with observe_stage(run, "read_pptx", logger=logger) as observation:
+            rendered, plan = await extract_pptx_async(payload, config.max_pages)
             observation.item_count = sum(len(p.layout.blocks) for p in plan.pages)
     else:
         rendered = await _render_for_run(db, blob, run, payload, scope.extension, config)

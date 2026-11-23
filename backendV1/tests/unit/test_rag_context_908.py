@@ -133,33 +133,56 @@ def test_fragment_family_filters_only_with_a_shared_source_table():
     assert values(messages) == {"12", "18"}
 
 
-def test_required_clause_is_not_removed_as_optional_when_packing():
-    evidence = sources(corpus()[0][:2])
-    evidence[0].text += " Source-bound context." * 20
-    _, _, _, size, _ = _pack_messages(
-        AnswerRequest(question="Article 4", context_max_bytes=100000), evidence[:1], {}
-    )
+@pytest.mark.parametrize("include_optional", [False, True])
+def test_required_clause_is_not_removed_as_optional_when_packing(include_optional):
+    primary, clause, bullet = sources(corpus()[0][:3])
+    primary.text += " Source-bound context." * 20
+    req = AnswerRequest(question="Article 4", context_max_bytes=100000)
+    _, _, _, size, _ = _pack_messages(req, [primary], {})
+    evidence = [primary, clause]
+    trace = {"added": [{"chunk_id": clause.chunk_id, "kind": "clause"}]}
+    if include_optional:
+        evidence.append(bullet)
+        trace["added"].append({"chunk_id": bullet.chunk_id, "kind": "bullet_list"})
+
     with pytest.raises(AppException) as caught:
-        _pack_messages(
-            AnswerRequest(question="Article 4", context_max_bytes=size),
-            evidence,
-            {"added": [{"chunk_id": evidence[1].chunk_id, "kind": "clause"}]},
-        )
+        _pack_messages(req.model_copy(update={"context_max_bytes": size}), evidence, trace)
+
     assert caught.value.code == "answer_context_budget_exceeded"
+    assert caught.value.status_code == 422
+    assert evidence == [primary, clause]
+
+
+def test_primary_chunks_are_not_removed_when_packing_exceeds_budget():
+    first, second = sources(corpus()[0][:2])
+    first.text += " Source-bound context." * 20
+    req = AnswerRequest(question="Article 4", context_max_bytes=100000)
+    _, _, _, size, _ = _pack_messages(req, [first], {})
+    evidence = [first, second]
+    trace = {"primary_ids": [first.chunk_id, second.chunk_id]}
+
+    with pytest.raises(AppException) as caught:
+        _pack_messages(req.model_copy(update={"context_max_bytes": size}), evidence, trace)
+
+    assert caught.value.code == "answer_context_budget_exceeded"
+    assert evidence == [first, second]
 
 
 def test_expansion_reading_is_trimmed_before_a_required_clause():
-    primary, clause, bullet = sources(corpus()[0][:3])
+    primary, clause, first_bullet, second_bullet = sources(corpus()[0][:4])
     req = AnswerRequest(question="Article 4", context_max_bytes=100000)
     trace = {"added": [{"chunk_id": clause.chunk_id, "kind": "clause"}]}
     _, _, _, size, _ = _pack_messages(req, [primary, clause], trace)
-    trace["added"].append({"chunk_id": bullet.chunk_id, "kind": "bullet_list"})
+    trace["added"].extend(
+        {"chunk_id": bullet.chunk_id, "kind": "bullet_list"}
+        for bullet in (first_bullet, second_bullet)
+    )
     messages, _, _, used, skipped = _pack_messages(
         req.model_copy(update={"context_max_bytes": size}),
-        [primary, clause, bullet],
+        [primary, clause, first_bullet, second_bullet],
         trace,
     )
-    assert skipped == [bullet.chunk_id]
+    assert skipped == [second_bullet.chunk_id, first_bullet.chunk_id]
     assert used == size
     assert [item["id"] for item in json.loads(messages[-1].content)["evidence"]] == [
         primary.evidence_id,

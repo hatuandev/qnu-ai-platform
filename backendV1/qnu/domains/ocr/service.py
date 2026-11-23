@@ -24,6 +24,7 @@ from qnu.domains.ocr.config import (
     DOCX_VERSION,
     MD_VERSION,
     PDF_INSPECTOR_VERSION,
+    PPTX_VERSION,
     SUPPORTED_PROCESSING_EXTENSIONS,
     XLSX_VERSION,
     config_payload,
@@ -89,9 +90,11 @@ class ProcessingService:
         direct_word = scope.extension == ".docx"
         direct_excel = scope.extension == ".xlsx"
         direct_md = scope.extension == ".md"
+        direct_slides = scope.extension == ".pptx"
+        direct = direct_word or direct_excel or direct_md or direct_slides
         config = processing_config(
             get_settings(),
-            ".pdf" if (direct_word or direct_excel or direct_md) else scope.extension,
+            ".pdf" if direct else scope.extension,
         )
         if render_dpi is not None:
             if not 72 <= render_dpi <= 300:
@@ -105,7 +108,7 @@ class ProcessingService:
         if provider_id:
             payload["provider_requested"] = provider_id
         fingerprint = config.fingerprint
-        if strategy == "auto" or direct_word or direct_excel or direct_md:
+        if strategy == "auto" or direct:
             from qnu.domains.ocr.native import NATIVE_VERSION
 
             payload["extraction"] = {
@@ -119,6 +122,8 @@ class ProcessingService:
                 payload["extraction"].update(xlsx=XLSX_VERSION)
             elif direct_md:
                 payload["extraction"].update(md=MD_VERSION)
+            elif direct_slides:
+                payload["extraction"].update(pptx=PPTX_VERSION)
             else:
                 payload["extraction"].update(pdf_inspector=PDF_INSPECTOR_VERSION)
             fingerprint = hashlib.sha256(

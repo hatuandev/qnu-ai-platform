@@ -7,7 +7,14 @@ from dataclasses import replace
 from importlib.metadata import version
 from pathlib import PurePosixPath
 
-from docling_core.types.doc import ContentLayer, PictureItem, TableData, TableItem, TextItem
+from docling_core.types.doc import (
+    ContentLayer,
+    PictureItem,
+    SectionHeaderItem,
+    TableData,
+    TableItem,
+    TextItem,
+)
 from docx.table import _Cell
 
 from qnu.domains.ocr.artifacts.render import PageImage, RenderedDocument
@@ -228,6 +235,8 @@ def extract_docx(payload: bytes) -> tuple[RenderedDocument, NativePlan]:
                 parent = parent.parent.resolve(document) if parent.parent else None
             if parent is None:
                 value = getattr(item, "marker", "") or ""
+                if isinstance(item, SectionHeaderItem):
+                    locator["level"] = item.level
                 blocks.append(
                     Block(
                         order,

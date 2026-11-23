@@ -24,8 +24,7 @@ def _anchor_rank(context: dict):
         chunk_id: rank for rank, chunk_id in enumerate(context.get("primary_ids") or [])
     }
     anchors = {
-        item["chunk_id"]: item.get("primary_chunk_id")
-        for item in context.get("added") or []
+        item["chunk_id"]: item.get("primary_chunk_id") for item in context.get("added") or []
     }
     outside = len(primary_rank)
     return lambda chunk_id: primary_rank.get(anchors.get(chunk_id), outside)
@@ -33,11 +32,12 @@ def _anchor_rank(context: dict):
 
 def pack_messages(req, sources, context, **options):
     """Trim added reading context; clause and table support stay mandatory."""
-    optional = {
-        item["chunk_id"]
-        for item in context.get("added", [])
-        if item.get("kind") not in MANDATORY_ADDED_KINDS
-    }
+    added = context.get("added") or []
+    mandatory = set(context.get("primary_ids") or [])
+    mandatory.update(
+        item["chunk_id"] for item in added if item.get("kind") in MANDATORY_ADDED_KINDS
+    )
+    optional = {item["chunk_id"] for item in added if item["chunk_id"] not in mandatory}
     rank = _anchor_rank(context)
     skipped = []
     needs = question_needs(req.question)
@@ -74,7 +74,15 @@ def pack_messages(req, sources, context, **options):
         envelope = json.loads(messages[-1].content)
         evidence = {
             key: envelope[key]
-            for key in ("evidence", "tables", "unselectable", "reading", "joins", "plan", "computed")
+            for key in (
+                "evidence",
+                "tables",
+                "unselectable",
+                "reading",
+                "joins",
+                "plan",
+                "computed",
+            )
             if key in envelope
         }
         size = len(json.dumps(evidence, ensure_ascii=False, separators=(",", ":")).encode())
@@ -82,17 +90,7 @@ def pack_messages(req, sources, context, **options):
             context["computed"] = computed_summary
             return messages, cells, evidence, size, skipped
         trimmable = [index for index, source in enumerate(sources) if source.chunk_id in optional]
-        if not sources:
-            raise AppException(
-                "Bằng chứng bắt buộc vượt ngân sách context.",
-                code="answer_context_budget_exceeded",
-                status_code=422,
-            )
         if not trimmable:
-            if len(sources) > 1:
-                worst = len(sources) - 1
-                skipped.append(sources.pop(worst).chunk_id)
-                continue
             raise AppException(
                 "Bằng chứng bắt buộc vượt ngân sách context.",
                 code="answer_context_budget_exceeded",

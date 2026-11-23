@@ -30,6 +30,7 @@ from qnu.domains.knowledge.index.row_cards import (
     render_projection_to_cards,
 )
 from qnu.domains.knowledge.index.snapshots import assert_snapshot, publication_identity
+from qnu.domains.knowledge.index.table_layout import can_inherit_headers
 from qnu.domains.knowledge.publication.access import authorize
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.modelops.embedding.runtime import resolve_embedding_runtime
@@ -235,7 +236,8 @@ async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, a
             if table.get("status") != "parsed" or not table.get("rows") or not citation:
                 continue
             cols = table.get("column_count", 0)
-            inherited = last_opening_headers.get(cols)
+            inherit_headers = can_inherit_headers(table)
+            inherited = last_opening_headers.get(cols) if inherit_headers else None
             p_num = entry.get("page_number") or entry.get("page")
             page_list = (
                 [p_num]
@@ -263,7 +265,12 @@ async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, a
             )
             if not projected.facts:
                 continue
-            if projected.has_header and projected.storage_mode == "facts" and not inherited:
+            if (
+                inherit_headers
+                and projected.has_header
+                and projected.storage_mode == "facts"
+                and not inherited
+            ):
                 from qnu.domains.knowledge.index.table_layout import header_rows, table_structure
 
                 st = table_structure(table)

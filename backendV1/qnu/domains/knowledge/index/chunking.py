@@ -310,6 +310,7 @@ def build_chunks(
                     "part": 0,
                     "title": title,
                     "heading": heading,
+                    **(source.context() if source else {}),
                     **(
                         {"source_heading_citation": source.citation}
                         if source and source.heading
@@ -365,6 +366,7 @@ def build_chunks(
                 "position": part,
                 "part": 0,
                 "title": title,
+                **(source.context() if source else {}),
             }
             if source and source.citation:
                 targets.add(f"section:{source.citation}")

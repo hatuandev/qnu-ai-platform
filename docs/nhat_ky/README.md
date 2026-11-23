@@ -1,5 +1,8 @@
 # THƯ MỤC NHẬT KÝ LÀM VIỆC (ENGINEERING WORK LOGS DIRECTORY)
 
+- [Phiên 1021 — Kiểm chứng nội dung row card trong chỉ mục có ngữ cảnh.](2026-11-22_phien_1021_search_context_row_card.md)
+- [Phiên 1020 — Giữ cây đề mục và bóc tách PowerPoint.](2026-11-22_phien_1020_cay_de_muc_va_pptx.md)
+- [Phiên 1019 — Bảo toàn dẫn chứng bắt buộc khi đóng gói câu trả lời.](2026-11-22_phien_1019_context_packing_bat_buoc.md)
 - [Phiên 1018 — Báo cáo Q01: vấn đề gặp phải, việc đã làm, việc còn lại.](2026-11-18_phien_1018_bao_cao_Q01_quy_tac_thay_the.md)
 - [Phiên 1017 — Chặng C: prompt v39 và mở cổng gọi lại khi chỉ thiếu nhóm nối câu.](2026-11-18_phien_1017_quy_tac_thay_the_phuong_an.md)
 - [Phiên 1016 — Chặng A: ghép mảnh câu cho đầu vào rerank (không reindex).](2026-11-18_phien_1016_ghep_manh_cau_rerank.md)

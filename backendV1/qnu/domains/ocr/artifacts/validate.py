@@ -146,9 +146,13 @@ def validate_document(canonical: dict[str, Any], *, expected_pages: int) -> Repo
                 )
                 or (pagination == "sheets" and locator.get("format") == "xlsx")
                 or (
-                    pagination in {"document", "slides"}
-                    and locator.get("format") in {"pptx", "md", "txt"}
+                    pagination == "slides"
+                    and locator.get("format") == "pptx"
+                    and locator.get("slide") == number
+                    and type(locator.get("shape_id")) is int
+                    and locator["shape_id"] > 0
                 )
+                or (pagination == "document" and locator.get("format") in {"md", "txt"})
             )
             if not _valid_bbox(block.get("bbox") or {}) and not (
                 direct_native and not block.get("bbox")

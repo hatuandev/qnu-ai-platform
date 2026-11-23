@@ -22,12 +22,13 @@ SUPPORTED_FORMATS: dict[str, str] = {
     ".pdf": "application/pdf",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     ".txt": "text/plain; charset=utf-8",
     ".md": "text/markdown; charset=utf-8",
 }
 
 TEXT_FORMATS = frozenset({".txt", ".md"})
-ZIP_FORMATS = {".docx": "word/", ".xlsx": "xl/"}
+ZIP_FORMATS = {".docx": "word/", ".xlsx": "xl/", ".pptx": "ppt/"}
 
 MAX_FILE_NAME_LENGTH = 200
 READ_CHUNK_BYTES = 1024 * 1024
@@ -86,6 +87,8 @@ def _prove_zip(payload: bytes, extension: str) -> bool:
             names = archive.namelist()
     except (zipfile.BadZipFile, OSError):
         return False
+    if extension == ".pptx":
+        return "[Content_Types].xml" in names and "ppt/presentation.xml" in names
     prefix = ZIP_FORMATS[extension]
     return any(name.startswith(prefix) for name in names)
 

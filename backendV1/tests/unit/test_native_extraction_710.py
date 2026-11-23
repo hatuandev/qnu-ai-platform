@@ -74,6 +74,25 @@ def test_blank_pdf_is_not_sent_to_ocr():
     assert not page.layout.blocks
 
 
+def test_docx_preserves_native_outline_levels():
+    from docx import Document
+
+    source = Document()
+    source.add_heading("Chương mở đầu", 1)
+    source.add_heading("Điều kiện", 3)
+    source.add_paragraph("Nội dung yêu cầu.")
+    payload = io.BytesIO()
+    source.save(payload)
+
+    _, plan = extract_docx(payload.getvalue())
+    blocks = plan.pages[0].layout.blocks
+    assert [(block.text, block.source_locator.get("level")) for block in blocks] == [
+        ("Chương mở đầu", 1),
+        ("Điều kiện", 3),
+        ("Nội dung yêu cầu.", None),
+    ]
+
+
 def test_image_is_preserved_and_marks_only_that_page_for_ocr():
     page = plan(pdf(image=True)).pages[0]
     assert page.needs_ocr

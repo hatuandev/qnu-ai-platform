@@ -14,7 +14,12 @@ from qnu.domains.knowledge.compilation.table_year import (
     year_mentions,
 )
 from qnu.domains.knowledge.index.table_dependencies import multitier_header, typed_header
-from qnu.domains.knowledge.index.table_layout import header_rows, layout, table_structure
+from qnu.domains.knowledge.index.table_layout import (
+    can_inherit_headers,
+    header_rows,
+    layout,
+    table_structure,
+)
 from qnu.domains.knowledge.source_sections import source_sections
 from qnu.platform.errors import AppException
 
@@ -569,6 +574,11 @@ def table_chain_labels(tables: list[dict]) -> dict[str, dict[int, tuple[str, str
         citation = entry["citation"]
         run, columns = citation.split(":", 1)[0], entry["table"].get("column_count") or 0
         labels = _local_header_labels(entry)
+        if not can_inherit_headers(entry["table"]):
+            if labels:
+                labels_by_table[citation] = labels
+            previous = None
+            continue
         if not labels and previous is not None:
             previous_run, previous_page, previous_columns, previous_labels, previous_table = (
                 previous

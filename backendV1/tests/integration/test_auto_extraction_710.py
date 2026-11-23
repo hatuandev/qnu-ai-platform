@@ -5,6 +5,8 @@ import json
 import zipfile
 
 import pytest
+from pptx import Presentation
+from pptx.util import Inches
 from sqlalchemy import func, select
 
 from qnu.domains.knowledge.compilation.evidence import load_documents
@@ -126,6 +128,34 @@ def test_docx_table_has_real_structure_and_original_is_unchanged(client, monkeyp
     assert kinds.isdisjoint({"render_pdf", "page_image", "raw_response"})
     pdf = client.get(url + "/pdf")
     assert pdf.status_code == 409 and pdf.json()["code"] == "run_not_ready"
+
+
+def test_powerpoint_upload_extracts_slides_with_no_ocr_provider(client):
+    deck = Presentation()
+    slide = deck.slides.add_slide(deck.slide_layouts[5])
+    slide.shapes.title.text = "Điều kiện"
+    slide.notes_slide.notes_text_frame.text = "Ghi chú thuyết trình."
+    table = slide.shapes.add_table(2, 2, 0, Inches(1), Inches(4), Inches(2)).table
+    table.cell(0, 0).text = "Ngành"
+    table.cell(0, 1).text = "Điểm"
+    table.cell(1, 0).text = "Toán"
+    table.cell(1, 1).text = "15"
+    data = io.BytesIO()
+    deck.save(data)
+
+    _, _, _, run, url, queue = setup(client, data.getvalue(), "source.pptx")
+    assert len(queue.jobs) == 1
+    assert execute_now(client, run["id"]).status == "completed"
+    result = client.get(url + "/document")
+    assert result.status_code == 200, result.text
+    doc = result.json()
+    assert doc["processing"]["provider"] is None
+    assert doc["processing"]["renderer"]["pagination"] == "slides"
+    title, grid, notes = doc["pages"][0]["blocks"]
+    assert title["source_locator"]["slide"] == 1
+    assert grid["table"]["rows"][1][1]["text"] == "15"
+    assert notes["source_locator"]["part"] == "notes"
+    assert "Ghi chú thuyết trình." in client.get(url + "/markdown").text
 
 
 def test_mixed_page_preserves_native_text_image_and_raw_ocr(client):

@@ -18,6 +18,7 @@ class AnswerExpectation(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_status: Literal["answered", "insufficient_evidence"] | None = None
     must_contain: list[str] = Field(default_factory=list)
+    must_contain_any: list[list[str]] = Field(default_factory=list)
     must_not_contain: list[str] = Field(default_factory=list)
     expected_citations: list[str] = Field(default_factory=list)
     expected_year_conflict: bool | None = None
@@ -101,6 +102,19 @@ def evaluate_answer(
         else:
             breakdown[f"contain:{term}"] = "fail"
             failures.append(f"Câu trả lời thiếu cụm từ bắt buộc: '{term}'")
+
+    # 2b. Must contain any of each alternative group (e.g. ['4.5', '4,5'])
+    for group in expectation.must_contain_any:
+        if not group:
+            continue
+        total_checks += 1
+        label = "|".join(group)
+        if any(variant.lower() in combined_text.lower() for variant in group):
+            passed_checks += 1
+            breakdown[f"contain_any:{label}"] = "pass"
+        else:
+            breakdown[f"contain_any:{label}"] = "fail"
+            failures.append(f"Câu trả lời thiếu một trong các cụm từ bắt buộc: {group}")
 
     # 3. Must not contain phrases (hallucination & improper default defense)
     for forbidden in expectation.must_not_contain:

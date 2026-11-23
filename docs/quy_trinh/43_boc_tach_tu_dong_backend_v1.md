@@ -6,15 +6,15 @@ tắc dữ liệu chung của `backend/` để bỏ kiểm membership/quyền c�
 
 ## Luồng mặc định
 
-1. Admin/editor tải PDF/DOCX hoặc thêm revision. Backend giữ bytes gốc, SHA256,
+1. Admin/editor tải PDF, DOCX, Markdown, XLSX hoặc PPTX qua API hoặc thêm revision. Backend giữ bytes gốc, SHA256,
    revision và yêu cầu bóc tách trong cùng transaction. Lưu yêu cầu thất bại thì
    không commit nguồn/revision mới. Blob ghi trước transaction có thể còn mồ côi
    khi DB lỗi theo giới hạn lưu trữ hiện có; không tự xóa blob dùng chung.
 2. Sau commit, gửi tác vụ vào queue/worker OCR V1 hiện có. Không chờ model trong
    request upload. Queue lỗi giữ run `queued`/`dispatch_pending`; reconcile có
    thể giao lại khi `OWN_RECONCILE` bật, hoặc dùng dispatch API hiện có.
-3. Chọn luồng theo định dạng tệp. PDF Inspector đọc PDF theo trang. Docling đọc
-   trực tiếp gói Word. Có thể rời trình duyệt vì worker giữ trạng thái công việc
+3. Chọn luồng theo định dạng tệp. PDF Inspector đọc PDF theo trang. Các bộ đọc
+   trực tiếp xử lý Word, Markdown, Excel và PowerPoint. Có thể rời trình duyệt vì worker giữ trạng thái công việc
    trong PostgreSQL.
 4. Tạo canonical JSON, Markdown và manifest có hash. Chỉ `completed` mới có
    `results_ready=true` và tải kết quả được. Lỗi provider/hạ tầng giữ lỗi thật,
@@ -28,6 +28,8 @@ tắc dữ liệu chung của `backend/` để bỏ kiểm membership/quyền c�
 |---|---|
 | PDF có chữ dùng được, không ảnh | PDF Inspector đọc chữ. PyMuPDF đo tọa độ. Không gọi model/đặt chỗ token |
 | DOCX | Docling đọc chữ và bảng trực tiếp từ Word. MinerU xử lý riêng ảnh raster nhúng |
+| Markdown / XLSX | Giữ cấp tiêu đề Markdown và phạm vi sheet Excel. Bảng Excel giữ dẫn chứng theo lưới ô |
+| PPTX | Đọc chữ, bảng và ghi chú bằng `python-pptx`. Mỗi khối giữ số slide và mã shape. Slide có chữ kèm ảnh hoặc biểu đồ chưa đọc có cảnh báo. Slide chỉ có đồ họa chưa đọc trả `pptx_slide_requires_review` |
 | Trang scan/không có chữ dùng được | Gửi các trang cần OCR qua ModelOps. Với MinerU, số trang của tệp gửi được ánh xạ lại về số trang nguồn |
 | Chữ và ảnh tách vùng | Giữ chữ native. MinerU OCR riêng ảnh raster nhúng và trả dẫn chứng về vùng ảnh nguồn |
 | Chữ nằm chồng ảnh/lớp chữ ẩn của scan | Giữ snapshot native để đối chiếu, dùng một layout OCR trang để tránh nối trùng hai lớp chữ |

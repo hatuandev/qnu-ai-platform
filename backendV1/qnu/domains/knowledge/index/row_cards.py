@@ -502,6 +502,7 @@ def build_row_card_chunks(
     max_chunk_bytes: int | None = None,
 ) -> list[Chunk]:
     from qnu.domains.knowledge.index.facts import project_table
+    from qnu.domains.knowledge.index.table_layout import can_inherit_headers
 
     chunks = []
     # Extract document number and year from doc_title if possible for richer breadcrumbs
@@ -520,7 +521,8 @@ def build_row_card_chunks(
         if table.get("status") != "parsed" or not table.get("rows") or not citation:
             continue
         cols = table.get("column_count", 0)
-        inherited = last_opening_headers.get(cols)
+        inherit_headers = can_inherit_headers(table)
+        inherited = last_opening_headers.get(cols) if inherit_headers else None
         column_years = column_years_for_table(citation, annotations)
 
         heading_prefix = (
@@ -563,7 +565,12 @@ def build_row_card_chunks(
         )
         if not projected.facts:
             continue
-        if projected.has_header and projected.storage_mode == "facts" and not inherited:
+        if (
+            inherit_headers
+            and projected.has_header
+            and projected.storage_mode == "facts"
+            and not inherited
+        ):
             from qnu.domains.knowledge.index.table_layout import header_rows, table_structure
 
             st = table_structure(table)

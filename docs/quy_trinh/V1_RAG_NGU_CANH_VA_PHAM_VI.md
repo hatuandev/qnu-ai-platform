@@ -31,6 +31,12 @@ Recipe `qnu.search-context/v1` thêm tiêu đề, heading, từng target metadat
 
 Bộ sinh câu trả lời dùng bản đọc từ body gốc và nguồn canonical như trước. Prefix/glossary không trở thành bằng chứng mới, không được nhân đôi vào prompt. Ngân sách được kiểm trên UTF-8 bytes thực; dự phòng ngữ cảnh tối đa 2 KB hoặc 1/4 cap chunk, lấy mức nhỏ hơn. Đơn vị bảng có rowspan vẫn được giữ nguyên; nếu không vừa thì báo lỗi rõ ràng.
 
+Chunk mới giữ `structure.context.heading_path` với cấp, tiêu đề và mã dẫn chứng từng nút nguồn. Markdown dùng cấp đã được bóc tách. Word dùng cấp đề mục từ Docling. PDF dùng tín hiệu đề mục nhận diện được từ nguồn. `source_scope` giữ tên sheet Excel hoặc số slide PowerPoint. Bảng ở sheet và slide độc lập giữ nhãn cột của chính bảng. Trường cũ `heading` vẫn là tiêu đề gần nhất. Đường dẫn mới nằm trong metadata của chunk.
+
+Khi bật `contextual_search`, row card cũng có `search_context.original_text` và `original_sha256`. Prefix của row card rỗng vì chính nội dung thẻ đã có thông tin nguồn. Chuỗi gửi embedding và dẫn chứng theo ô của thẻ giữ nguyên.
+
+Khi đóng gói câu trả lời, `context_max_bytes` giới hạn tổng dữ liệu dẫn chứng chuyển cho model. Nếu vượt ngân sách, hệ thống chỉ loại các đoạn mở rộng tùy chọn. Khi các đoạn truy xuất chính và điều khoản bắt buộc còn lại vẫn không vừa, API trả HTTP 422 với mã `answer_context_budget_exceeded` trước khi gọi model sinh câu trả lời.
+
 ## 3. Nhận diện câu hỏi và hỏi lại
 
 Ở cấu hình nâng cao của trợ lý, chọn **Phạm vi câu hỏi → Nhận diện từ dữ liệu đã xuất bản**, lưu revision mới và tạo hội thoại mới. Cấu hình được ghim theo hội thoại. Chọn **Theo bộ lọc đã chọn** để giữ cách cũ.

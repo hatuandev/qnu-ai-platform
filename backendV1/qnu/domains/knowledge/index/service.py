@@ -197,8 +197,6 @@ async def request_index(
             annotations,
             **sizing,
         )
-        if req.contextual_search:
-            chunks = enrich(chunks, publication.content, documents, maximum)
         source_outline = source_sections(documents)
         table_headings = {
             cit: s.heading for cit, s in source_outline.items() if s and s.heading
@@ -215,7 +213,13 @@ async def request_index(
             headings=table_headings,
             max_chunk_bytes=maximum,
         )
+        for chunk in card_chunks:
+            source = source_outline.get(chunk.structure["source_table_citation"])
+            if source and (context := source.context()):
+                chunk.structure["context"] = context
         chunks.extend(card_chunks)
+        if req.contextual_search:
+            chunks = enrich(chunks, publication.content, documents, maximum)
         reports = [
             c.structure["reading_quality"]
             for c in chunks

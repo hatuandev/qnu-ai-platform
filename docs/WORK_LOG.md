@@ -1,5 +1,8 @@
 # BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
+- [Context1021 — Kiểm chứng nội dung row card trong chỉ mục có ngữ cảnh.](nhat_ky/2026-11-22_phien_1021_search_context_row_card.md)
+- [Context1020 — Giữ cây đề mục và bóc tách PowerPoint.](nhat_ky/2026-11-22_phien_1020_cay_de_muc_va_pptx.md)
+- [Context1019 — Bảo toàn dẫn chứng bắt buộc khi đóng gói câu trả lời.](nhat_ky/2026-11-22_phien_1019_context_packing_bat_buoc.md)
 - [Context1017 — Chặng C: prompt v39 và mở cổng gọi lại khi chỉ thiếu nhóm nối câu.](nhat_ky/2026-11-18_phien_1017_quy_tac_thay_the_phuong_an.md)
 - [Context1016 — Chặng A: ghép mảnh câu cho đầu vào rerank (không reindex).](nhat_ky/2026-11-18_phien_1016_ghep_manh_cau_rerank.md)
 - [Context1015 — Chặng 4: hợp đồng trả lời eligibility tính sẵn từ bảng (closed-set facts).](nhat_ky/2026-11-18_phien_1015_hop_dong_eligibility.md)

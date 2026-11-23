@@ -100,7 +100,9 @@ export function SourceUploadDialog({
 
     const ext = `.${file.name.split(".").pop()?.toLowerCase()}`;
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      setError("Chỉ hỗ trợ tệp định dạng .docx, .pdf hoặc .xlsx");
+      setError(
+        "Chỉ hỗ trợ tệp định dạng .pdf, .docx, .xlsx, .pptx, .md hoặc .txt",
+      );
       return;
     }
 
@@ -204,7 +206,8 @@ export function SourceUploadDialog({
               <span>Tải tài liệu vào kho</span>
             </DialogTitle>
             <DialogDescription className="text-xs break-words">
-              Hỗ trợ văn bản Word (.docx), PDF (.pdf) hoặc bảng tính (.xlsx).
+              Hỗ trợ PDF (.pdf), Word (.docx), Excel (.xlsx), PowerPoint (.pptx)
+              và Markdown (.md).
             </DialogDescription>
           </DialogHeader>
 
@@ -253,7 +256,7 @@ export function SourceUploadDialog({
                     : "Kéo thả hoặc nhấp để chọn tệp từ máy tính"}
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-1">
-                  .DOCX, .PDF, .XLSX (Tối đa 60 MB)
+                  .PDF, .DOCX, .XLSX, .PPTX, .MD (Tối đa 60 MB)
                 </div>
               </button>
             ) : (
@@ -290,7 +293,7 @@ export function SourceUploadDialog({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.docx,.xlsx"
+              accept={ALLOWED_EXTENSIONS.join(",")}
               className="hidden"
               onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
             />

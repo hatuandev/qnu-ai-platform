@@ -5,6 +5,12 @@ from dataclasses import dataclass
 VERSION = "qnu.table-layout/v1"
 
 
+def can_inherit_headers(table: dict) -> bool:
+    """Native sheet and slide tables are independent source grids."""
+    mapping = table.get("source_mapping") or {}
+    return "sheet" not in mapping and "slide" not in mapping
+
+
 @dataclass(frozen=True)
 class CellPosition:
     row: int

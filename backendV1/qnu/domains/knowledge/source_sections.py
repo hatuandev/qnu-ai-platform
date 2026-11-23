@@ -5,10 +5,30 @@ from dataclasses import dataclass
 from itertools import groupby
 
 _OUTLINE = re.compile(
-    r"^(?:[IVXLCDM]+[.)]\s+\S|(?i:chương|phần|phụ lục|điều|chapter|appendix)\s+[IVXLCDMivxlcdm\d]+\b)"
+    r"^(phần|phụ lục|appendix|chương|chapter|mục|tiểu mục|điều|article)\s+(?:[ivxlcdm]+|\d+)\b",
+    re.IGNORECASE,
 )
+_LEVELS = {
+    "phần": 1,
+    "phụ lục": 1,
+    "appendix": 1,
+    "chương": 2,
+    "chapter": 2,
+    "mục": 3,
+    "tiểu mục": 4,
+    "điều": 5,
+    "article": 5,
+}
+_ROMAN = re.compile(r"^[IVXLCDM]+[.)]\s+\S")
 _NUMBERED = re.compile(r"^\d{1,2}[.)]\s+[^:;.!?]+:?$")
 _HEADING_LABELS = {"title", "section-header", "section_header", "paragraph_title", "heading"}
+
+
+@dataclass(frozen=True, slots=True)
+class SourceHeading:
+    level: int
+    text: str
+    citation: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,22 +37,55 @@ class SourceSection:
     page: int
     heading: str = ""
     citation: str = ""
+    path: tuple[SourceHeading, ...] = ()
+    sheet: str | None = None
+    slide: int | None = None
+
+    def context(self) -> dict:
+        result = {}
+        if self.path:
+            result["heading_path"] = [
+                {"level": entry.level, "text": entry.text, "citation": entry.citation}
+                for entry in self.path
+            ]
+        if self.sheet is not None:
+            result["source_scope"] = {"kind": "sheet", "name": self.sheet}
+        elif self.slide is not None:
+            result["source_scope"] = {"kind": "slide", "number": self.slide}
+        return result
 
 
-def _heading(block: dict) -> str:
+def _heading(block: dict, path: list[SourceHeading]) -> tuple[str, int] | None:
     if block.get("table") or block.get("type") in {"table", "figure"}:
-        return ""
+        return None
     title = block["text"].strip()
     if not title or len(title) > 160 or "\n" in title:
-        return ""
+        return None
+    locator = block.get("source_locator") or {}
+    level = locator.get("level")
+    if type(level) is int and 1 <= level <= 9:
+        return title, level
+    if locator.get("format") == "pptx":
+        return None
+    marked = (block.get("label") or "").casefold() in _HEADING_LABELS or block.get(
+        "type"
+    ) in _HEADING_LABELS
+    numbered_heading = (
+        not locator.get("format")
+        and len(title) <= 60
+        and _NUMBERED.fullmatch(title)
+        and not any(_OUTLINE.match(entry.text) for entry in path)
+    )
+    outline = _OUTLINE.match(title)
+    if outline and (marked or not title.endswith((".", ";", "?", "!"))):
+        return title, _LEVELS[outline[1].lower()]
     if (
-        (block.get("label") or "").casefold() in _HEADING_LABELS
-        or block.get("type") in _HEADING_LABELS
-        or (_OUTLINE.match(title) and not title.endswith((".", ";", "?", "!")))
-        or (len(title) <= 60 and _NUMBERED.fullmatch(title))
+        marked
+        or numbered_heading
+        or (_ROMAN.match(title) and not title.endswith((".", ";", "?", "!")))
     ):
-        return title
-    return ""
+        return title, 1
+    return None
 
 
 def source_sections(documents: list[dict]) -> dict[str, SourceSection]:
@@ -40,13 +93,27 @@ def source_sections(documents: list[dict]) -> dict[str, SourceSection]:
     for source, document in enumerate(documents, start=1):
         run = document["ocr_run_id"]
         active = None
+        path: list[SourceHeading] = []
         for page in document["pages"]:
-            fallback = SourceSection(source, page["page_number"])
+            first = next(iter(page["blocks"]), {})
+            locator = first.get("source_locator") or {}
+            sheet = locator.get("sheet") if locator.get("format") == "xlsx" else None
+            slide = locator.get("slide") if locator.get("format") == "pptx" else None
+            if locator.get("format") in {"xlsx", "pptx"}:
+                active = None
+                path.clear()
+            fallback = SourceSection(source, page["page_number"], sheet=sheet, slide=slide)
             for block in page["blocks"]:
                 ref = f"{run}:{block['evidence_id']}"
-                heading = _heading(block)
+                heading = _heading(block, path)
                 if heading:
-                    active = SourceSection(source, page["page_number"], heading, ref)
+                    title, level = heading
+                    while path and path[-1].level >= level:
+                        path.pop()
+                    path.append(SourceHeading(level, title, ref))
+                    active = SourceSection(
+                        source, page["page_number"], title, ref, tuple(path), sheet, slide
+                    )
                 section = active or fallback
                 sections[ref] = section
                 for row in (block.get("table") or {}).get("rows", []):

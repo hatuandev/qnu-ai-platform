@@ -29,6 +29,9 @@ def glossary(content: dict, documents: list[dict]) -> list[dict]:
 
 
 def _prefix(chunk: Chunk, content: dict, definitions: list[dict]) -> str:
+    if chunk.kind == "row_card":
+        # The card renderer already adds a source breadcrumb to the indexed text.
+        return ""
     structure = chunk.structure or {}
     # Structured metadata stays per annotated unit; do not turn all values
     # in a table fragment into a claim about every row.
@@ -63,7 +66,7 @@ def enrich(chunks, content: dict, documents: list[dict], maximum: int):
     for chunk in chunks:
         prefix = _prefix(chunk, content, definitions)
         text = prefix + chunk.text
-        if len(text.encode("utf-8")) > maximum:
+        if prefix and len(text.encode("utf-8")) > maximum:
             raise AppException(
                 "Ngữ cảnh nguồn vượt ngân sách chunk; giảm kích thước đơn vị hoặc metadata.",
                 code="index_context_too_large",
@@ -80,7 +83,7 @@ def enrich(chunks, content: dict, documents: list[dict], maximum: int):
                         "original_text": chunk.text,
                         "original_sha256": chunk.sha256,
                         "prefix": prefix,
-                        "glossary": definitions,
+                        "glossary": definitions if prefix else [],
                     },
                 },
             )
