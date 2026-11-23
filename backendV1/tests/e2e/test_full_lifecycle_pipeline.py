@@ -104,15 +104,18 @@ class E2EClient:
         self._test_client: TestClient | None = None
         self._httpx_client: Any = None
 
-        try:
-            import httpx
+        # Never auto-target a running local dev server (which would mutate/purge live DB data)
+        # unless explicitly opted in via QNU_E2E_ALLOW_LIVE=1.
+        if os.environ.get("QNU_E2E_ALLOW_LIVE", "").strip() == "1":
+            try:
+                import httpx
 
-            resp = httpx.get(f"{DEFAULT_BASE_URL}/health", timeout=1.5)
-            if resp.status_code == 200:
-                self.is_live = True
-                self._httpx_client = httpx.Client(base_url=DEFAULT_BASE_URL, timeout=90.0)
-        except Exception:
-            self.is_live = False
+                resp = httpx.get(f"{DEFAULT_BASE_URL}/health", timeout=1.5)
+                if resp.status_code == 200:
+                    self.is_live = True
+                    self._httpx_client = httpx.Client(base_url=DEFAULT_BASE_URL, timeout=90.0)
+            except Exception:
+                self.is_live = False
 
         if not self.is_live:
             self._test_client = TestClient(app)

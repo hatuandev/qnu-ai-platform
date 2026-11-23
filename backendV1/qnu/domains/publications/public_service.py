@@ -8,7 +8,9 @@ reply is reduced to presentation fields before it leaves the server.
 
 import asyncio
 import hashlib
+import ipaddress
 import json
+import os
 import secrets
 import time
 import uuid
@@ -80,16 +82,59 @@ def business_day() -> date:
     return datetime.now(BUSINESS_TZ).date()
 
 
+_DEFAULT_TRUSTED_PROXIES = (
+    "127.0.0.1",
+    "::1",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+)
+
+
+def _is_trusted_proxy(host: str) -> bool:
+    """Check whether the direct peer IP belongs to configured trusted reverse proxies."""
+    raw_allow = os.environ.get("FORWARDED_ALLOW_IPS", "").strip()
+    entries = (
+        [item.strip() for item in raw_allow.split(",") if item.strip()]
+        if raw_allow
+        else list(_DEFAULT_TRUSTED_PROXIES)
+    )
+    if "*" in entries:
+        return True
+    try:
+        peer = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    for entry in entries:
+        try:
+            if "/" in entry:
+                if peer in ipaddress.ip_network(entry, strict=False):
+                    return True
+            elif peer == ipaddress.ip_address(entry):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def extract_client_ip(request: Request) -> str:
-    """Extract real client IP honoring reverse proxies (Cloudflare, Nginx) before direct host."""
-    cf_ip = request.headers.get("cf-connecting-ip")
-    if cf_ip and cf_ip.strip():
-        return cf_ip.strip()
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded and forwarded.strip():
-        return forwarded.split(",")[0].strip()
-    if request.client and request.client.host:
-        return request.client.host.strip()
+    """Extract client IP, honoring proxy headers only when received from a trusted proxy."""
+    direct_host = request.client.host.strip() if request.client and request.client.host else ""
+    if direct_host and _is_trusted_proxy(direct_host):
+        cf_ip = request.headers.get("cf-connecting-ip")
+        if cf_ip and cf_ip.strip():
+            return cf_ip.strip()
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded and forwarded.strip():
+            hops = [part.strip() for part in forwarded.split(",") if part.strip()]
+            # Pick the rightmost non-proxy hop to resist client-injected leading XFF values.
+            for hop in reversed(hops):
+                if not _is_trusted_proxy(hop):
+                    return hop
+            if hops:
+                return hops[0]
+    if direct_host:
+        return direct_host
     return "unknown"
 
 
@@ -500,6 +545,8 @@ async def turn(
                 if item
             )
         )
+        # Release any read transaction snapshot/locks before long-running LLM inference.
+        await db.commit()
         if not collection_ids:
             messages = [
                 ChatMessage(

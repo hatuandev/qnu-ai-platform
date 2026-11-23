@@ -66,7 +66,7 @@ def enrich(chunks, content: dict, documents: list[dict], maximum: int):
     for chunk in chunks:
         prefix = _prefix(chunk, content, definitions)
         text = prefix + chunk.text
-        if prefix and len(text.encode("utf-8")) > maximum:
+        if len(text.encode("utf-8")) > maximum:
             raise AppException(
                 "Ngữ cảnh nguồn vượt ngân sách chunk; giảm kích thước đơn vị hoặc metadata.",
                 code="index_context_too_large",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import io
 import re
+import zipfile
 from importlib.metadata import version
 
 import openpyxl
@@ -14,6 +15,8 @@ from qnu.domains.ocr.layout import MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, Block, Cel
 from qnu.domains.ocr.native import NativePage, NativePlan
 from qnu.platform.errors import AppException
 
+MAX_XLSX_EXPANDED_BYTES = 256 * 1024 * 1024
+MAX_XLSX_ZIP_ENTRIES = 10_000
 _FORMULA_TOTAL_RE = re.compile(r"^\s*=(?:SUM|TOTAL|SUBTOTAL)\b", re.IGNORECASE)
 
 
@@ -32,9 +35,10 @@ def _is_summary_or_formula_row(row_values: list[str]) -> bool:
     # If any cell starts with =SUM or similar formula
     if any(_FORMULA_TOTAL_RE.search(v) for v in non_empty):
         return True
-    # If the only text is a summary label like "Tổng cộng", "Cộng"
+    # Only drop a standalone label-only summary line (1 cell); preserve 2-column metric rows
+    # such as ("Tổng số tín chỉ", "120").
     first = non_empty[0].lower()
-    return len(non_empty) <= 2 and any(k in first for k in ("tổng cộng", "tổng số", "=sum"))
+    return len(non_empty) == 1 and any(k in first for k in ("tổng cộng", "tổng số", "=sum"))
 
 
 def _build_markdown_table(rows: list[list[Cell]], col_count: int) -> str:
@@ -78,6 +82,24 @@ def extract_xlsx(payload: bytes, max_rows: int | None = None) -> tuple[RenderedD
             effective_max_rows = 500
     else:
         effective_max_rows = max_rows
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            infos = archive.infolist()
+            if len(infos) > MAX_XLSX_ZIP_ENTRIES or sum(i.file_size for i in infos) > MAX_XLSX_EXPANDED_BYTES:
+                raise AppException(
+                    "Tệp Excel vượt giới hạn dung lượng giải nén cho phép.",
+                    code="xlsx_expanded_limit_exceeded",
+                    status_code=422,
+                )
+    except AppException:
+        raise
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise AppException(
+            f"Không thể đọc tệp Excel: {exc}",
+            code="xlsx_read_failed",
+            status_code=422,
+        ) from exc
 
     try:
         wb = openpyxl.load_workbook(io.BytesIO(payload), data_only=True)
@@ -140,7 +162,6 @@ def extract_xlsx(payload: bytes, max_rows: int | None = None) -> tuple[RenderedD
             col_count = MAX_TABLE_COLUMNS
             max_c = min_c + MAX_TABLE_COLUMNS - 1
 
-        page_number += 1
         blocks: list[Block] = []
         warnings: list[str] = []
         order = 1
@@ -221,6 +242,8 @@ def extract_xlsx(payload: bytes, max_rows: int | None = None) -> tuple[RenderedD
 
         col_count = len(active_cols)
         header_determined = False
+        kept_row_nums = [r[0][0] for r in non_summary_rows]
+        kept_row_set = set(kept_row_nums)
 
         for r_row in non_summary_rows:
             is_header = not header_determined
@@ -239,11 +262,22 @@ def extract_xlsx(payload: bytes, max_rows: int | None = None) -> tuple[RenderedD
                 r_num = r_row[0][0]
                 if (r_num, c_idx) in merged_slots:
                     start_r, start_c, span_r, span_c = merged_slots[(r_num, c_idx)]
-                    if (r_num, c_idx) == (start_r, start_c):
-                        # Top-left of merged range
+                    effective_start_r = (
+                        start_r
+                        if start_r in kept_row_set
+                        else next(
+                            (rn for rn in kept_row_nums if start_r <= rn < start_r + span_r),
+                            r_num,
+                        )
+                    )
+                    if (r_num, c_idx) == (effective_start_r, start_c):
+                        # Top-left of surviving merged range
                         active_span_c = sum(1 for ac in active_cols[col_pos:] if ac < start_c + span_c)
                         c_span = max(1, active_span_c)
-                        r_span = span_r
+                        active_span_r = sum(
+                            1 for rn in kept_row_nums if effective_start_r <= rn < start_r + span_r
+                        )
+                        r_span = max(1, active_span_r)
                         curr_row_cells.append(
                             Cell(text=text, row_span=r_span, col_span=c_span, header=is_header)
                         )
@@ -302,6 +336,7 @@ def extract_xlsx(payload: bytes, max_rows: int | None = None) -> tuple[RenderedD
         if not blocks:
             continue
 
+        page_number += 1
         page_layout = PageLayout(blocks=tuple(blocks), warnings=tuple(warnings))
         pages.append(
             NativePage(

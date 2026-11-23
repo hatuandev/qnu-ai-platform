@@ -510,11 +510,8 @@ function PublicChatbotPage() {
       return parentOrigin;
     }
 
-    if (allowed.length > 0) {
-      return "không xác định";
-    }
-
-    return null;
+    // Fail-closed when framed with stripped referrer (e.g. referrerpolicy="no-referrer").
+    return "không xác định";
   }, [info?.allowed_embed_origins]);
 
   useEffect(() => {

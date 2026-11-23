@@ -218,11 +218,19 @@ async def _write_table_facts(db: AsyncSession, blob: BlobStore, run: IndexRun, a
         ]
         doc_title = publication.document.title
         doc_num_match = re.search(r"\b(\d+/[A-ZĐ]+(?:-[A-ZĐ]+)*)\b", doc_title)
-        doc_year_match = re.search(r"\b(19\d\d|20\d\d)\b", doc_title)
+        verified_issued_year = next(
+            (
+                a["values"]["issued_year"]
+                for a in annotations
+                if a.get("target") == "document"
+                and type((a.get("values") or {}).get("issued_year")) is int
+            ),
+            None,
+        )
         doc_meta = DocumentCardMeta(
             title=doc_title,
             doc_number=doc_num_match.group(1) if doc_num_match else "",
-            doc_year=int(doc_year_match.group(1)) if doc_year_match else None,
+            doc_year=verified_issued_year,
         )
         tables = (
             publication.content.get("source_tables")

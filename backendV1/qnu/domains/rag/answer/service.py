@@ -275,8 +275,15 @@ async def answer(
     if req.conversation_memory:
         trace.context["conversation_memory"] = req.conversation_memory
     trace.stage_ms["packing"] = round((time.monotonic() - packing_started) * 1000, 3)
+    kept_chunk_ids = {source.chunk_id for source in sources}
+    if len(kept_chunk_ids) != len(retrieval.hits) or any(
+        hit.chunk_id not in kept_chunk_ids for hit in retrieval.hits
+    ):
+        hit_by_id = {hit.chunk_id: hit for hit in retrieval.hits}
+        retrieval = retrieval.model_copy(
+            update={"hits": [hit_by_id[s.chunk_id] for s in sources if s.chunk_id in hit_by_id]}
+        )
     if skipped:
-        retrieval = retrieval.model_copy(update={"hits": retrieval.hits[: len(sources)]})
         if "added" in trace.context:
             trace.context["added"] = [
                 item for item in trace.context["added"] if item["chunk_id"] not in skipped

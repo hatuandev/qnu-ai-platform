@@ -358,15 +358,38 @@ def render_projection_to_cards(
     cards: list[RowCard] = []
     for fact in projection.facts:
         if fact.row_kind in {"data", "summary", "inline_note"}:
-            cards.append(
-                render_fact_to_row_card(
-                    fact,
-                    projection,
-                    document_meta=document_meta,
-                    page_numbers=page_numbers,
-                )
+            card = render_fact_to_row_card(
+                fact,
+                projection,
+                document_meta=document_meta,
+                page_numbers=page_numbers,
             )
+            if max_chunk_bytes is not None and len(card.text.encode("utf-8")) > max_chunk_bytes:
+                card = _truncate_row_card(card, max_chunk_bytes)
+            cards.append(card)
     return cards
+
+
+def _truncate_row_card(card: RowCard, max_bytes: int) -> RowCard:
+    """Trim an oversized individual row card to fit max_bytes safely on UTF-8 boundaries."""
+    suffix = "…"
+    budget = max(1, max_bytes - len(suffix.encode("utf-8")))
+    encoded = card.text.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return card
+    trimmed = encoded[:budget].decode("utf-8", errors="ignore").rstrip()
+    return RowCard(
+        card_id=card.card_id,
+        table_id=card.table_id,
+        source_table_citation=card.source_table_citation,
+        fact_ids=card.fact_ids,
+        row_kind=card.row_kind,
+        data_years=card.data_years,
+        text=trimmed + suffix,
+        detail_md_pointers=card.detail_md_pointers,
+        cross_references=card.cross_references,
+        source_cell_refs=card.source_cell_refs,
+    )
 
 
 def expand_cards_context(
@@ -463,7 +486,11 @@ def column_years_for_table(citation: str, annotations: list[dict]) -> dict[int, 
     return years
 
 
-def row_card_to_chunk(card: RowCard, index: dict | None = None) -> Chunk:
+def row_card_to_chunk(
+    card: RowCard,
+    index: dict | None = None,
+    retrieval_metadata: list[dict] | None = None,
+) -> Chunk:
     from qnu.domains.knowledge.index.chunking import Chunk
 
     if index:
@@ -484,6 +511,7 @@ def row_card_to_chunk(card: RowCard, index: dict | None = None) -> Chunk:
         "cross_references": card.cross_references,
         "source_cell_refs": card.source_cell_refs,
         "table": True,
+        "retrieval_metadata": retrieval_metadata or [],
     }
     return Chunk(
         kind="row_card",
@@ -500,20 +528,30 @@ def build_row_card_chunks(
     index: dict | None = None,
     headings: dict[str, str] | None = None,
     max_chunk_bytes: int | None = None,
+    section_citations: dict[str, str] | None = None,
 ) -> list[Chunk]:
     from qnu.domains.knowledge.index.facts import project_table
     from qnu.domains.knowledge.index.table_layout import can_inherit_headers
+    from qnu.domains.knowledge.metadata import chunk_metadata
 
     chunks = []
-    # Extract document number and year from doc_title if possible for richer breadcrumbs
+    annotations = annotations or []
+    # Extract verified issuance year from document-level annotations only; never infer from title.
     doc_num_match = re.search(r"\b(\d+/[A-ZĐ]+(?:-[A-ZĐ]+)*)\b", doc_title)
-    doc_year_match = re.search(r"\b(19\d\d|20\d\d)\b", doc_title)
+    verified_issued_year = next(
+        (
+            a["values"]["issued_year"]
+            for a in annotations
+            if a.get("target") == "document"
+            and type((a.get("values") or {}).get("issued_year")) is int
+        ),
+        None,
+    )
     doc_meta = DocumentCardMeta(
         title=doc_title,
         doc_number=doc_num_match.group(1) if doc_num_match else "",
-        doc_year=int(doc_year_match.group(1)) if doc_year_match else None,
+        doc_year=verified_issued_year,
     )
-    annotations = annotations or []
     last_opening_headers: dict[int, list[list[dict]]] = {}
     for entry in tables:
         table = entry.get("table") or {}
@@ -601,6 +639,20 @@ def build_row_card_chunks(
             page_numbers=page_list,
             max_chunk_bytes=max_chunk_bytes,
         )
+        parent = f"table:{citation}"
+        fact_row_by_id = {f.fact_id: f.row_index for f in projected.facts}
+        sec_cit = (section_citations or {}).get(citation)
+        base_targets = {parent, *(f"{parent}:column:{c}" for c in range(cols))}
+        if sec_cit:
+            base_targets.add(f"section:{sec_cit}")
         for card in cards:
-            chunks.append(row_card_to_chunk(card, index=index))
+            targets = set(base_targets)
+            row_indices = [
+                fact_row_by_id[fid] for fid in card.fact_ids if fid in fact_row_by_id
+            ]
+            for r_idx in row_indices:
+                targets.add(f"{parent}:row:{r_idx}")
+                targets.update(f"{parent}:row:{r_idx}:column:{c}" for c in range(cols))
+            card_meta = chunk_metadata(annotations, targets)
+            chunks.append(row_card_to_chunk(card, index=index, retrieval_metadata=card_meta))
     return chunks

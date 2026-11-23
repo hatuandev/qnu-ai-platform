@@ -31,8 +31,8 @@ x-runtime: &runtime
   SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
   PROVIDER_ENCRYPTION_KEY: ${PROVIDER_ENCRYPTION_KEY:?Keep the existing provider encryption key}
   INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
-  DEV_AUTH_ENABLED: ${DEV_AUTH_ENABLED:-true}
-  DEV_ACCESS_PASSWORD: ${DEV_ACCESS_PASSWORD:-QNU@2026}
+  DEV_AUTH_ENABLED: ${DEV_AUTH_ENABLED:-false}
+  DEV_ACCESS_PASSWORD: ${DEV_ACCESS_PASSWORD:-}
   SSO_ENABLED: ${SSO_ENABLED:-false}
   SSO_AUTHORITY: ${SSO_AUTHORITY:-}
   SSO_AUDIENCE: ${SSO_AUDIENCE:-ai_api}
@@ -106,6 +106,7 @@ services:
       bootstrap:
         condition: service_completed_successfully
   frontend:
+    profiles: ["frontend"]
     image: qnu-ai-platform-frontend-v2:${APP_IMAGE_TAG:-latest}
     build:
       context: ./frontendV2

@@ -201,6 +201,9 @@ async def request_index(
         table_headings = {
             cit: s.heading for cit, s in source_outline.items() if s and s.heading
         }
+        table_section_citations = {
+            cit: s.citation for cit, s in source_outline.items() if s and s.citation
+        }
         card_chunks = build_row_card_chunks(
             publication.content.get("source_tables")
             or publication.content.get("tables")
@@ -212,6 +215,7 @@ async def request_index(
             or {},
             headings=table_headings,
             max_chunk_bytes=maximum,
+            section_citations=table_section_citations,
         )
         for chunk in card_chunks:
             source = source_outline.get(chunk.structure["source_table_citation"])

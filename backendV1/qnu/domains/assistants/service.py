@@ -112,7 +112,7 @@ async def get_assistant(
     db: AsyncSession, actor: AuthActor, workspace_id: str, assistant_id: str, *, write: bool = False
 ) -> Assistant:
     await resolve_workspace_access(
-        db, actor, workspace_id, required_roles=("admin",) if write else None, for_update=True
+        db, actor, workspace_id, required_roles=("admin",) if write else None, for_update=write
     )
     row = await db.scalar(
         select(Assistant)

@@ -27,16 +27,31 @@ def _requester(request: Request) -> str:
     return public_service.client_key(ip)
 
 
+def _apply_frame_headers(response: Response, allowed_origins: list[str] | None = None) -> None:
+    """Emit server-side CSP frame-ancestors policy derived from validated embed origins."""
+    origins = [o for o in (allowed_origins or []) if o]
+    if origins:
+        response.headers["Content-Security-Policy"] = (
+            "frame-ancestors 'self' " + " ".join(origins)
+        )
+    else:
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'self'"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+
+
 @router.get("", response_model=PublicChatbotListResponse)
 async def listing(response: Response, db: DB) -> PublicChatbotListResponse:
     response.headers["Cache-Control"] = "no-store"
+    _apply_frame_headers(response)
     return await public_service.listing(db)
 
 
 @router.get("/{slug}", response_model=PublicChatbotInfo)
 async def info(slug: str, response: Response, db: DB, blob: Blob) -> PublicChatbotInfo:
     response.headers["Cache-Control"] = "no-store"
-    return await public_service.info(db, blob, slug)
+    result = await public_service.info(db, blob, slug)
+    _apply_frame_headers(response, result.allowed_embed_origins)
+    return result
 
 
 @router.post("/{slug}/sessions", response_model=PublicSessionResponse, status_code=201)
@@ -48,6 +63,7 @@ async def session(
     body: PublicSessionRequest | None = None,
 ) -> PublicSessionResponse:
     response.headers["Cache-Control"] = "no-store"
+    _apply_frame_headers(response)
     return await public_service.create_session(db, slug, _requester(request), body)
 
 
@@ -61,6 +77,7 @@ async def turn(
     blob: Blob,
 ) -> PublicTurnResponse:
     response.headers["Cache-Control"] = "no-store"
+    _apply_frame_headers(response)
     container = request.app.state.container
     return await public_service.turn(
         db,

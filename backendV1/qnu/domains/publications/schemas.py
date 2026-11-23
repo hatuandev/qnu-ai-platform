@@ -4,6 +4,7 @@ Public DTOs carry presentation data only: no workspace, collection, assistant,
 chunk or document identifiers cross the anonymous boundary.
 """
 
+import re
 from datetime import date, datetime
 from typing import Literal
 from urllib.parse import urlparse
@@ -11,40 +12,54 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 SLUG_PATTERN = r"^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])$"
+_ORIGIN_HOST_RE = re.compile(
+    r"^(?:localhost|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}|\d{1,3}(?:\.\d{1,3}){3})$",
+    re.IGNORECASE,
+)
+
+
+def _invalid_origin_error(raw: str) -> ValueError:
+    return ValueError(
+        f"Tên miền '{raw}' không hợp lệ. Phải có dạng https://domain.edu.vn hoặc http://localhost:3000 (để trống nếu chỉ dùng nội bộ)."
+    )
 
 
 def normalize_origin(raw: str) -> str:
     text = raw.strip()
     if not text:
         return ""
+    if any(ch in text for ch in (" ", "\t", "\r", "\n", ";", ",", "*", "@", "?", "#")):
+        raise _invalid_origin_error(raw)
     if "://" in text or text.startswith(("javascript:", "mailto:", "data:")):
         parsed = urlparse(text)
-        if parsed.scheme not in ("http", "https") or not parsed.netloc or " " in parsed.netloc:
-            raise ValueError(
-                f"Tên miền '{raw}' không hợp lệ. Phải có dạng https://domain.edu.vn hoặc http://localhost:3000 (để trống nếu chỉ dùng nội bộ)."
-            )
-        return f"{parsed.scheme}://{parsed.netloc}".lower()
-    if (
-        " " in text
-        or "/" in text
-        or "@" in text
-        or (":" in text and not text.split(":")[-1].isdigit())
-    ):
-        raise ValueError(
-            f"Tên miền '{raw}' không hợp lệ. Phải có dạng https://domain.edu.vn hoặc http://localhost:3000 (để trống nếu chỉ dùng nội bộ)."
-        )
-    if text.startswith(("localhost", "127.0.0.1")):
-        candidate = f"http://{text}"
     else:
-        candidate = f"https://{text}"
-    parsed = urlparse(candidate)
-    if not parsed.netloc or (
-        "." not in parsed.netloc and not parsed.netloc.startswith(("localhost", "127.0.0.1"))
+        if "/" in text:
+            raise _invalid_origin_error(raw)
+        scheme = "http" if text.lower().startswith(("localhost", "127.0.0.1")) else "https"
+        parsed = urlparse(f"{scheme}://{text}")
+
+    if (
+        parsed.scheme not in ("http", "https")
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or (parsed.path and parsed.path != "/")
+        or parsed.query
+        or parsed.fragment
     ):
-        raise ValueError(
-            f"Tên miền '{raw}' không hợp lệ. Phải có dạng https://domain.edu.vn hoặc http://localhost:3000 (để trống nếu chỉ dùng nội bộ)."
-        )
-    return f"{parsed.scheme}://{parsed.netloc}".lower()
+        raise _invalid_origin_error(raw)
+
+    host = parsed.hostname.lower().rstrip(".")
+    if not _ORIGIN_HOST_RE.fullmatch(host):
+        raise _invalid_origin_error(raw)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise _invalid_origin_error(raw) from exc
+    if port is not None and not (1 <= port <= 65535):
+        raise _invalid_origin_error(raw)
+    port_part = f":{port}" if port is not None else ""
+    return f"{parsed.scheme}://{host}{port_part}".lower()
 
 
 class PublicationConfig(BaseModel):

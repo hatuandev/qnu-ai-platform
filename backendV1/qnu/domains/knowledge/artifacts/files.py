@@ -79,12 +79,21 @@ def _prove_pdf(payload: bytes) -> bool:
     return payload.startswith(b"%PDF-")
 
 
+MAX_ZIP_EXPANDED_BYTES = 256 * 1024 * 1024
+MAX_ZIP_ENTRIES = 10_000
+
+
 def _prove_zip(payload: bytes, extension: str) -> bool:
     if not payload.startswith(b"PK\x03\x04"):
         return False
     try:
         with zipfile.ZipFile(io.BytesIO(payload)) as archive:
-            names = archive.namelist()
+            infos = archive.infolist()
+            if len(infos) > MAX_ZIP_ENTRIES:
+                return False
+            if sum(info.file_size for info in infos) > MAX_ZIP_EXPANDED_BYTES:
+                return False
+            names = [info.filename for info in infos]
     except (zipfile.BadZipFile, OSError):
         return False
     if extension == ".pptx":

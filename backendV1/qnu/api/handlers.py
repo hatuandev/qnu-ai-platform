@@ -11,7 +11,10 @@ from qnu.contracts.problem import ProblemDetail, problem_type
 from qnu.platform.config import get_settings
 from qnu.platform.correlation import current_correlation_id
 from qnu.platform.errors import AppException
+from qnu.platform.logging import get_logger
 from qnu.platform.redaction import redact
+
+logger = get_logger(__name__)
 
 
 def _is_gateway(request: Request) -> bool:
@@ -110,7 +113,11 @@ def register_exception_handlers(app: FastAPI) -> None:
         for err in exc.errors():
             loc = ".".join(str(x) for x in err.get("loc", []) if x != "body")
             field_errors.setdefault(loc or "body", []).append(str(err.get("msg", "invalid")))
-        print(f"REQUEST_VALIDATION_ERROR on {_.url.path}: {exc.errors()}", flush=True)
+        logger.warning(
+            "request_validation_error",
+            path=_.url.path,
+            fields=list(field_errors.keys()),
+        )
         detail_msg = "Một hoặc nhiều trường không đúng định dạng."
         if field_errors:
             fields_str = ", ".join(field_errors.keys())
