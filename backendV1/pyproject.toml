@@ -49,3 +49,13 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
 filterwarnings = ["ignore::DeprecationWarning:pydantic.*"]
+markers = [
+    "stage1: Stage 1 workspace management",
+    "stage2: Stage 2 knowledge and documents",
+    "stage3: Stage 3 assistant lifecycle",
+    "stage4: Stage 4 RAG QA and truthfulness",
+    "stage5: Stage 5 feedback and benchmark bridge",
+    "stage6: Stage 6 publication and OpenAI gateway",
+    "stage7: Stage 7 cleanup and residual audit",
+    "e2e_full: Full end-to-end pipeline run from A to Z",
+]
