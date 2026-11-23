@@ -32,6 +32,8 @@ def test_normalize_origin_valid():
         == "https://sub.qnu.edu.vn:8443"
     )
     assert normalize_origin("https://QNU.EDU.VN/") == "https://qnu.edu.vn"
+    assert normalize_origin("qnu.edu.vn") == "https://qnu.edu.vn"
+    assert normalize_origin("localhost:3000") == "http://localhost:3000"
     assert normalize_origin("") == ""
 
 
@@ -41,7 +43,7 @@ def test_normalize_origin_invalid():
     with pytest.raises(ValueError, match="không hợp lệ"):
         normalize_origin("javascript:alert(1)")
     with pytest.raises(ValueError, match="không hợp lệ"):
-        normalize_origin("qnu.edu.vn")
+        normalize_origin("invalid domain with spaces")
 
 
 def test_publication_config_origins_cleaning():
@@ -51,10 +53,33 @@ def test_publication_config_origins_cleaning():
         allowed_embed_origins=[
             "https://qnu.edu.vn",
             "https://qnu.edu.vn/",
+            "qnu.edu.vn",
             "http://localhost:3000",
+            "localhost:3000",
+            "",
+            "   ",
         ],
     )
     assert config.allowed_embed_origins == [
+        "https://qnu.edu.vn",
+        "http://localhost:3000",
+    ]
+
+
+def test_publication_config_origins_none_and_string():
+    config_none = PublicationConfig(
+        slug="test-bot",
+        display_name="Test Bot",
+        allowed_embed_origins=None,
+    )
+    assert config_none.allowed_embed_origins == []
+
+    config_str = PublicationConfig(
+        slug="test-bot",
+        display_name="Test Bot",
+        allowed_embed_origins="https://qnu.edu.vn\nhttp://localhost:3000",
+    )
+    assert config_str.allowed_embed_origins == [
         "https://qnu.edu.vn",
         "http://localhost:3000",
     ]

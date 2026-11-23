@@ -17,10 +17,32 @@ def normalize_origin(raw: str) -> str:
     text = raw.strip()
     if not text:
         return ""
-    parsed = urlparse(text)
-    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+    if "://" in text or text.startswith(("javascript:", "mailto:", "data:")):
+        parsed = urlparse(text)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc or " " in parsed.netloc:
+            raise ValueError(
+                f"Tên miền '{raw}' không hợp lệ. Phải có dạng https://domain.edu.vn hoặc http://localhost:3000 (để trống nếu chỉ dùng nội bộ)."
+            )
+        return f"{parsed.scheme}://{parsed.netloc}".lower()
+    if (
+        " " in text
+        or "/" in text
+        or "@" in text
+        or (":" in text and not text.split(":")[-1].isdigit())
+    ):
         raise ValueError(
-            f"Tên miền '{text}' không hợp lệ. Phải bắt đầu bằng http:// hoặc https:// (VD: https://qnu.edu.vn)."
+            f"Tên miền '{raw}' không hợp lệ. Phải có dạng https://domain.edu.vn hoặc http://localhost:3000 (để trống nếu chỉ dùng nội bộ)."
+        )
+    if text.startswith(("localhost", "127.0.0.1")):
+        candidate = f"http://{text}"
+    else:
+        candidate = f"https://{text}"
+    parsed = urlparse(candidate)
+    if not parsed.netloc or (
+        "." not in parsed.netloc and not parsed.netloc.startswith(("localhost", "127.0.0.1"))
+    ):
+        raise ValueError(
+            f"Tên miền '{raw}' không hợp lệ. Phải có dạng https://domain.edu.vn hoặc http://localhost:3000 (để trống nếu chỉ dùng nội bộ)."
         )
     return f"{parsed.scheme}://{parsed.netloc}".lower()
 
@@ -66,12 +88,22 @@ class PublicationConfig(BaseModel):
             cleaned.append(text)
         return cleaned
 
-    @field_validator("allowed_embed_origins")
+    @field_validator("allowed_embed_origins", mode="before")
     @classmethod
-    def clean_origins(cls, values: list[str]) -> list[str]:
+    def clean_origins(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            raw_items = value.splitlines()
+        elif isinstance(value, (list, tuple, set)):
+            raw_items = list(value)
+        else:
+            raise TypeError("Danh sách tên miền phải là mảng hoặc chuỗi phân tách dòng.")
         cleaned: list[str] = []
         seen: set[str] = set()
-        for raw in values:
+        for raw in raw_items:
+            if not isinstance(raw, str):
+                continue
             origin = normalize_origin(raw)
             if not origin or origin in seen:
                 continue

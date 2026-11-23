@@ -96,7 +96,11 @@ function parseOrigins(raw: string): string[] {
     let text = line.trim();
     if (!text) continue;
     if (!text.startsWith("http://") && !text.startsWith("https://")) {
-      text = `https://${text}`;
+      if (text.startsWith("localhost") || text.startsWith("127.0.0.1")) {
+        text = `http://${text}`;
+      } else {
+        text = `https://${text}`;
+      }
     }
     try {
       const url = new URL(text);
@@ -155,6 +159,35 @@ function validateForm(form: PublicationFormState): string | null {
     const budget = Number(form.dailyBudget);
     if (!Number.isInteger(budget) || budget < 1000) {
       return "Ngân sách token mỗi ngày phải là số nguyên từ 1000 trở lên, hoặc chọn Không giới hạn.";
+    }
+  }
+  if (form.allowedEmbedOrigins) {
+    for (const rawLine of form.allowedEmbedOrigins.split("\n")) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      if (line.includes(" ")) {
+        return `Tên miền nhúng '${line}' không được chứa khoảng trắng. Vui lòng nhập dạng https://domain.edu.vn hoặc http://localhost:3000 (để trống nếu chỉ dùng nội bộ).`;
+      }
+      const checkCandidate =
+        line.startsWith("http://") || line.startsWith("https://")
+          ? line
+          : line.startsWith("localhost") || line.startsWith("127.0.0.1")
+            ? `http://${line}`
+            : `https://${line}`;
+      try {
+        const url = new URL(checkCandidate);
+        if (
+          (url.protocol !== "http:" && url.protocol !== "https:") ||
+          !url.hostname ||
+          (!url.hostname.includes(".") &&
+            !url.hostname.startsWith("localhost") &&
+            !url.hostname.startsWith("127.0.0.1"))
+        ) {
+          return `Tên miền nhúng '${line}' không đúng định dạng. Vui lòng nhập dạng https://domain.edu.vn hoặc http://localhost:3000 (để trống nếu chỉ dùng nội bộ).`;
+        }
+      } catch {
+        return `Tên miền nhúng '${line}' không đúng định dạng. Vui lòng nhập dạng https://domain.edu.vn hoặc http://localhost:3000 (để trống nếu chỉ dùng nội bộ).`;
+      }
     }
   }
   return null;
@@ -424,6 +457,18 @@ function saveErrorMessage(err: unknown): string {
     }
     if (err.kind === "forbidden") {
       return "Chỉ quản trị viên của đơn vị mới có thể thay đổi kênh công khai.";
+    }
+    if (err.fieldErrors) {
+      const messages: string[] = [];
+      for (const [, fieldErrs] of Object.entries(err.fieldErrors)) {
+        if (Array.isArray(fieldErrs) && fieldErrs.length > 0) {
+          const cleanMsg = fieldErrs[0].replace(/^Value error,\s*/i, "");
+          messages.push(cleanMsg);
+        }
+      }
+      if (messages.length > 0) {
+        return messages.join("; ");
+      }
     }
     return err.message;
   }
@@ -906,15 +951,16 @@ export function AssistantPublicationTab({
                 patch({ allowedEmbedOrigins: event.target.value })
               }
               placeholder={
-                "Mỗi dòng một tên miền/origin (VD: https://qnu.edu.vn, http://localhost:3000).\nĐể trống nghĩa là chỉ cho phép chính hệ thống này (self)."
+                "Mỗi dòng một tên miền (VD: https://qnu.edu.vn hoặc http://localhost:3000).\nĐể trống nếu chỉ cho phép nhúng nội bộ chính hệ thống này (self)."
               }
               rows={3}
               className="resize-none bg-background font-mono text-xs leading-relaxed"
               disabled={saveMutation.isPending}
             />
             <FieldDescription>
-              Kiểm soát trang web nào được phép nhúng iframe trợ lý này. Để
-              trống để giới hạn nội bộ.
+              Tên miền website được phép nhúng iframe trợ lý này (VD:
+              https://qnu.edu.vn, http://localhost:3000). Để trống nếu chỉ dùng
+              nội bộ.
             </FieldDescription>
           </Field>
 
