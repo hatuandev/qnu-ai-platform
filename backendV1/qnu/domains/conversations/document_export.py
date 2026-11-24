@@ -264,6 +264,52 @@ def dialogue_turn_policy(prior_turns: int) -> str:
     )
 
 
+_LEADING_GREETING_RE = re.compile(
+    r"^\s*(?:xin\s+chào|chào\s+(?:bạn|anh/chị|anh\s+chị|quý\s+thầy/cô|thầy/cô|em))"
+    r"(?:\s+ạ)?\s*[.,!:;\-–—]+\s*",
+    re.IGNORECASE,
+)
+_INCOMPLETE_DRAFT_PREAMBLE_RE = re.compile(
+    r"(?:dưới\s+đây\s+là\s+(?:bản\s+thảo|nội\s+dung|văn\s+bản|mẫu)|"
+    r"sau\s+đây\s+là\s+(?:bản\s+thảo|nội\s+dung|văn\s+bản|mẫu)|"
+    r"(?:tôi|mình)\s+đã\s+(?:cập\s+nhật|chỉnh\s+sửa|điều\s+chỉnh|soạn\s+xong|hoàn\s+thiện))",
+    re.IGNORECASE,
+)
+
+
+def strip_leading_repeated_greeting(text: str, prior_turns: int) -> str:
+    """Remove redundant leading 'Chào bạn.' / 'Xin chào,' on follow-up turns."""
+    if prior_turns <= 0 or not text:
+        return text
+    match = _LEADING_GREETING_RE.match(text)
+    if not match:
+        return text
+    rest = text[match.end() :].lstrip()
+    if len(rest) < 15:
+        return text
+    return rest[0].upper() + rest[1:]
+
+
+def is_incomplete_draft_preamble(
+    text: str,
+    *,
+    has_active_draft: bool = False,
+    question: str = "",
+) -> bool:
+    """Detect when a quantized model stops right after a draft intro (e.g. 'Dưới đây là bản thảo:') with no body."""
+    cleaned = (text or "").strip()
+    if not cleaned or "<<<DOCUMENT" in cleaned.upper() or _has_document_structure(cleaned):
+        return False
+    if cleaned.endswith(":") and len(cleaned) < 420 and _INCOMPLETE_DRAFT_PREAMBLE_RE.search(cleaned):
+        return True
+    return (
+        has_active_draft
+        and len(cleaned) < 320
+        and bool(_DRAFT_EDIT_INTENT_RE.search(question or ""))
+        and bool(_INCOMPLETE_DRAFT_PREAMBLE_RE.search(cleaned))
+    )
+
+
 def is_abnormally_truncated_reply(text: str, question: str = "") -> bool:
     """Detect sudden early-EOS cutoffs (e.g., 1-word 'Cảm' on quantized Q4 models)."""
     cleaned = (text or "").strip()
@@ -1215,8 +1261,9 @@ def safe_download_filename(title: str, fmt: ExportFormat) -> str:
 
 
 def content_disposition_header(filename: str) -> str:
+    ascii_source = filename.replace("Đ", "D").replace("đ", "d")
     ascii_fallback = (
-        unicodedata.normalize("NFKD", filename)
+        unicodedata.normalize("NFKD", ascii_source)
         .encode("ascii", "ignore")
         .decode("ascii")
         .strip()

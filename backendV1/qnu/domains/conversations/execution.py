@@ -22,9 +22,11 @@ from qnu.domains.conversations.document_export import (
     export_policy_prompt_addon,
     extract_document_draft,
     is_abnormally_truncated_reply,
+    is_incomplete_draft_preamble,
     requested_export_format,
     resolve_preferred_format,
     strip_document_markers,
+    strip_leading_repeated_greeting,
     trim_direct_history,
     vietnam_time_context,
 )
@@ -174,7 +176,12 @@ async def _direct_llm_turn(
     )
     inference_hash = runtime.inference_configuration_hash("chat")
 
-    async def _run_completion(key_prefix: str, version_tag: str):
+    async def _run_completion(
+        key_prefix: str,
+        version_tag: str,
+        call_messages: list[ChatMessage] | None = None,
+    ):
+        active_messages = call_messages if call_messages is not None else messages
         usage = await usage_service.reserve(
             db,
             actor,
@@ -183,7 +190,7 @@ async def _direct_llm_turn(
             key_prefix + turn.id,
             digest(
                 {
-                    "messages": [m.content for m in messages],
+                    "messages": [m.content for m in active_messages],
                     "config": inference_hash,
                     "version": version_tag,
                 }
@@ -192,7 +199,7 @@ async def _direct_llm_turn(
             runtime.provider_id,
         )
         try:
-            completion = await chat.complete(messages, bind_usage(request, usage.id))
+            completion = await chat.complete(active_messages, bind_usage(request, usage.id))
         except ChatResponseError as exc:
             await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
             raise
@@ -206,20 +213,48 @@ async def _direct_llm_turn(
     total_tokens = result_chat.total_tokens
     answer_text = _extract_direct_text(result_chat.content)
     retried_truncated = False
-    if is_abnormally_truncated_reply(answer_text, effective_question):
+    incomplete_preamble = bool(export_formats) and is_incomplete_draft_preamble(
+        answer_text,
+        has_active_draft=latest_draft is not None,
+        question=effective_question,
+    )
+    if is_abnormally_truncated_reply(answer_text, effective_question) or incomplete_preamble:
         logger.warning(
             "direct_chat_truncated_reply_retry",
             turn_id=turn.id,
             provider_id=runtime.provider_id,
             raw_len=len(answer_text.strip()),
+            incomplete_preamble=incomplete_preamble,
         )
         retried_truncated = True
-        retry_chat = await _run_completion("direct_chat_retry:", "direct_chat_retry/v1")
+        retry_messages = (
+            [
+                *messages,
+                ChatMessage(role="assistant", content=answer_text),
+                ChatMessage(
+                    role="user",
+                    content=(
+                        "Bạn vừa dừng ở lời dẫn mà chưa xuất nội dung văn bản. "
+                        "Hãy xuất NGAY toàn bộ bản thảo hoàn chỉnh đặt trong cặp thẻ "
+                        '<<<DOCUMENT title="..." layout="administrative" format="docx">>> ... <<<END_DOCUMENT>>>.'
+                    ),
+                ),
+            ]
+            if incomplete_preamble
+            else messages
+        )
+        retry_chat = await _run_completion(
+            "direct_chat_retry:",
+            "direct_chat_retry/v1",
+            call_messages=retry_messages,
+        )
         if total_tokens is not None or retry_chat.total_tokens is not None:
             total_tokens = (total_tokens or 0) + (retry_chat.total_tokens or 0)
         retry_text = _extract_direct_text(retry_chat.content)
         if retry_text.strip():
             answer_text = retry_text
+
+    answer_text = strip_leading_repeated_greeting(answer_text, len(trimmed_history))
 
     if not answer_text.strip() or answer_text.strip() == "{}":
         answer_text = (

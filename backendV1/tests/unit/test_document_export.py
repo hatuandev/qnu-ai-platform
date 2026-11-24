@@ -1233,6 +1233,134 @@ async def test_edit_turn_always_attaches_updated_document_draft(monkeypatch):
     assert draft_4["preferred_format"] == "docx"
 
 
+def test_strip_leading_repeated_greeting_and_content_disposition_vietnamese_d():
+    assert (
+        document_export.strip_leading_repeated_greeting(
+            "Chào bạn. Để soạn đơn xin nghỉ phép, bạn vui lòng cung cấp thông tin sau.",
+            prior_turns=1,
+        )
+        == "Để soạn đơn xin nghỉ phép, bạn vui lòng cung cấp thông tin sau."
+    )
+    assert (
+        document_export.strip_leading_repeated_greeting(
+            "Chào bạn! Mình là Trợ lý soạn thảo văn bản hành chính.",
+            prior_turns=0,
+        )
+        == "Chào bạn! Mình là Trợ lý soạn thảo văn bản hành chính."
+    )
+    header = document_export.content_disposition_header("Đơn xin nghỉ phép.docx")
+    assert 'filename="Don_xin_nghi_phep.docx"' in header
+
+
+@pytest.mark.asyncio
+async def test_direct_llm_turn_retries_when_model_stops_at_draft_preamble(monkeypatch):
+    from qnu.domains.conversations import execution
+
+    calls = 0
+
+    class PreambleThenDraftChat:
+        async def complete(self, messages, _request):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return SimpleNamespace(
+                    content=(
+                        'Tôi đã cập nhật lý do nghỉ phép thành "về quê có việc gấp" và '
+                        'điều chỉnh phần "Kính gửi" thành Ban Giám hiệu. '
+                        "Dưới đây là bản thảo hoàn chỉnh của văn bản:"
+                    ),
+                    total_tokens=None,
+                )
+            assert "chưa xuất nội dung văn bản" in messages[-1].content
+            return SimpleNamespace(
+                content=(
+                    '<<<DOCUMENT title="Đơn xin nghỉ phép" layout="administrative" format="docx">>>\n'
+                    "# ĐƠN XIN NGHỈ PHÉP\n\n"
+                    "Kính gửi: Ban Giám hiệu Trường Đại học Quy Nhơn\n\n"
+                    "Tôi tên là [Họ và tên]. Xin nghỉ phép 02 ngày từ 25/11/2026 đến 26/11/2026 "
+                    "vì lý do về quê có việc gấp.\n"
+                    "<<<END_DOCUMENT>>>"
+                ),
+                total_tokens=None,
+            )
+
+    fake_runtime = SimpleNamespace(
+        provider_id="prov_1",
+        model_name="qwen3.8-27b-q4",
+        inference_configuration_hash=lambda _task: "cfg_hash",
+    )
+    fake_budget = SimpleNamespace(total_reserved_tokens=512)
+    monkeypatch.setattr(
+        execution,
+        "prepare_chat_request",
+        AsyncMock(return_value=(fake_runtime, SimpleNamespace(), fake_budget)),
+    )
+    monkeypatch.setattr(
+        execution.usage_service,
+        "reserve",
+        AsyncMock(side_effect=[SimpleNamespace(id="usg_p1"), SimpleNamespace(id="usg_p2")]),
+    )
+    monkeypatch.setattr(execution.usage_service, "settle", AsyncMock())
+    monkeypatch.setattr(execution, "_live_export_formats", AsyncMock(return_value=["docx"]))
+    monkeypatch.setattr(execution, "bind_usage", lambda req, _uid: req)
+
+    prior_turn_3 = SimpleNamespace(
+        id="turn_3",
+        status="completed",
+        question="nghỉ từ ngày mai, 2 ngày, lý do việc gia đình, phần thiếu tự điền",
+        result={"answer": "Đã soạn xong bản thảo Đơn xin nghỉ phép."},
+        rewrite_trace={
+            "document_draft": {
+                "title": "Đơn xin nghỉ phép",
+                "layout": "administrative",
+                "markdown": "# ĐƠN XIN NGHỈ PHÉP\n\nKính gửi: [Nơi nhận]\n\nLý do: Việc gia đình.",
+                "has_tables": False,
+                "preferred_format": "docx",
+            }
+        },
+    )
+    fake_db = SimpleNamespace(
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: [prior_turn_3]))
+    )
+    fake_conv = SimpleNamespace(
+        id="conv_preamble_4",
+        assistant_id="ast_1",
+        assistant_snapshot={
+            "persona": document_export.DECREE_30_DRAFTING_PERSONA,
+            "history_turns": 3,
+            "rag_policy": {"allow_export_docx": True},
+        },
+    )
+    turn_4 = SimpleNamespace(
+        id="turn_4",
+        turn_no=4,
+        question="sửa lý do thành về quê có việc gấp, và ghi nơi nhận là Ban Giám hiệu",
+        resolved_question="sửa lý do thành về quê có việc gấp, và ghi nơi nhận là Ban Giám hiệu",
+        history_turn_ids=[],
+        rewrite_trace={},
+    )
+
+    await execution._direct_llm_turn(
+        fake_db,
+        SimpleNamespace(actor_id="act_1"),
+        "ws_1",
+        fake_conv,
+        turn_4,
+        PreambleThenDraftChat(),
+        "prov_1",
+    )
+    assert calls == 2
+    assert turn_4.rewrite_trace["retried_truncated"] is True
+    # None + None stays None (never fake 0)
+    assert turn_4.rewrite_trace["total_tokens"] is None
+    draft_4 = turn_4.rewrite_trace.get("document_draft")
+    assert draft_4 is not None
+    assert "Ban Giám hiệu" in draft_4["markdown"]
+    assert "về quê có việc gấp" in draft_4["markdown"]
+    assert "[Họ và tên]" in draft_4["markdown"]
+
+
+
 
 
 

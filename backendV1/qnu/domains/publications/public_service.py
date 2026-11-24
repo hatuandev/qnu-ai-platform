@@ -41,6 +41,7 @@ from qnu.domains.conversations.document_export import (
     export_policy_prompt_addon,
     extract_document_draft,
     is_abnormally_truncated_reply,
+    is_incomplete_draft_preamble,
     render_docx,
     render_pdf,
     render_xlsx,
@@ -48,6 +49,7 @@ from qnu.domains.conversations.document_export import (
     resolve_preferred_format,
     safe_download_filename,
     strip_document_markers,
+    strip_leading_repeated_greeting,
     trim_direct_history,
     vietnam_time_context,
 )
@@ -952,7 +954,8 @@ async def turn(
                     max_output_tokens=assistant.max_output_tokens,
                 )
 
-                async def _run_public_completion():
+                async def _run_public_completion(call_messages: list[ChatMessage] | None = None):
+                    active_messages = call_messages if call_messages is not None else messages
                     usage = await usage_service.reserve(
                         db,
                         actor,
@@ -975,7 +978,7 @@ async def turn(
                         await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
                         raise
                     try:
-                        res = await chat.complete(messages, bind_usage(chat_req, usage.id))
+                        res = await chat.complete(active_messages, bind_usage(chat_req, usage.id))
                     except ChatResponseError as exc:
                         await usage_service.settle(
                             db, usage.id, total_tokens=exc.usage_tokens, failed=True
@@ -989,17 +992,48 @@ async def turn(
 
                 chat_res = await _run_public_completion()
                 pub_ans = _parse_pub_reply(chat_res.content)
-                if not social_only and is_abnormally_truncated_reply(pub_ans, req.question):
+                incomplete_pub_preamble = (
+                    not social_only
+                    and bool(export_formats)
+                    and is_incomplete_draft_preamble(
+                        pub_ans,
+                        has_active_draft=latest_draft is not None,
+                        question=req.question,
+                    )
+                )
+                if not social_only and (
+                    is_abnormally_truncated_reply(pub_ans, req.question)
+                    or incomplete_pub_preamble
+                ):
                     logger.warning(
                         "public_chat_truncated_reply_retry",
                         publication_id=row.id,
                         provider_id=runtime.provider_id,
                         raw_len=len(pub_ans.strip()),
+                        incomplete_preamble=incomplete_pub_preamble,
                     )
-                    retry_res = await _run_public_completion()
+                    retry_pub_messages = (
+                        [
+                            *messages,
+                            ChatMessage(role="assistant", content=pub_ans),
+                            ChatMessage(
+                                role="user",
+                                content=(
+                                    "Bạn vừa dừng ở lời dẫn mà chưa xuất nội dung văn bản. "
+                                    "Hãy xuất NGAY toàn bộ bản thảo hoàn chỉnh đặt trong cặp thẻ "
+                                    '<<<DOCUMENT title="..." layout="administrative" format="docx">>> ... <<<END_DOCUMENT>>>.'
+                                ),
+                            ),
+                        ]
+                        if incomplete_pub_preamble
+                        else messages
+                    )
+                    retry_res = await _run_public_completion(call_messages=retry_pub_messages)
                     retry_ans = _parse_pub_reply(retry_res.content)
                     if retry_ans.strip():
                         pub_ans = retry_ans
+            if not social_only:
+                pub_ans = strip_leading_repeated_greeting(pub_ans, len(trimmed_history))
             if not pub_ans or pub_ans == "{}":
                 pub_ans = (
                     "Tôi đã ghi nhận câu hỏi của bạn. Về nội dung này, bạn có thể diễn đạt cụ thể hơn "
