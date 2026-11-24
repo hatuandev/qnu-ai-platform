@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 import httpx
 import pymupdf
 from docx import Document
+from docx.enum.section import WD_ORIENT
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
@@ -882,11 +883,88 @@ def _set_run_font(
     r_fonts.set(qn("w:cs"), font_name)
 
 
+def _reset_paragraph_indents(paragraph) -> None:
+    """Explicitly zero out left/right/first-line indents so Word never inherits stray indents."""
+    pf = paragraph.paragraph_format
+    pf.left_indent = Cm(0)
+    pf.right_indent = Cm(0)
+    pf.first_line_indent = Cm(0)
+
+
+def _configure_fixed_two_col_table(table, left_cm: float, right_cm: float) -> None:
+    """Lock a 2-column borderless Decree 30 table to exact fixed column widths in Word XML."""
+    table.autofit = False
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _remove_table_borders(table)
+
+    total_dxa = round((left_cm + right_cm) * 567)
+    left_dxa = round(left_cm * 567)
+    right_dxa = total_dxa - left_dxa
+
+    tbl_pr = table._tbl.tblPr
+    for tag in ("w:tblW", "w:tblLayout", "w:tblCellMar"):
+        old = tbl_pr.find(qn(tag))
+        if old is not None:
+            tbl_pr.remove(old)
+
+    tbl_w = OxmlElement("w:tblW")
+    tbl_w.set(qn("w:w"), str(total_dxa))
+    tbl_w.set(qn("w:type"), "dxa")
+    tbl_pr.append(tbl_w)
+
+    tbl_layout = OxmlElement("w:tblLayout")
+    tbl_layout.set(qn("w:type"), "fixed")
+    tbl_pr.append(tbl_layout)
+
+    cell_mar = OxmlElement("w:tblCellMar")
+    for side, val in (("top", "0"), ("bottom", "0"), ("left", "40"), ("right", "40")):
+        m = OxmlElement(f"w:{side}")
+        m.set(qn("w:w"), val)
+        m.set(qn("w:type"), "dxa")
+        cell_mar.append(m)
+    tbl_pr.append(cell_mar)
+
+    tbl_grid = table._tbl.tblGrid
+    if tbl_grid is not None:
+        for child in list(tbl_grid):
+            tbl_grid.remove(child)
+        for col_dxa in (left_dxa, right_dxa):
+            gc = OxmlElement("w:gridCol")
+            gc.set(qn("w:w"), str(col_dxa))
+            tbl_grid.append(gc)
+
+    for row in table.rows:
+        tr_pr = row._tr.get_or_add_trPr()
+        if tr_pr.find(qn("w:cantSplit")) is None:
+            tr_pr.append(OxmlElement("w:cantSplit"))
+        for col_idx, (col_cm, col_dxa) in enumerate(((left_cm, left_dxa), (right_cm, right_dxa))):
+            cell = row.cells[col_idx]
+            cell.width = Cm(col_cm)
+            tc_pr = cell._tc.get_or_add_tcPr()
+            old_tcw = tc_pr.find(qn("w:tcW"))
+            if old_tcw is not None:
+                tc_pr.remove(old_tcw)
+            tc_w = OxmlElement("w:tcW")
+            tc_w.set(qn("w:w"), str(col_dxa))
+            tc_w.set(qn("w:type"), "dxa")
+            tc_pr.append(tc_w)
+
+
 def _add_page_number_header(section) -> None:
-    """Add centered Arabic page number (13pt Times New Roman) in top header, hidden on page 1."""
+    """Add centered Arabic page number (13pt Times New Roman) in top header, starting at 1, hidden on page 1."""
     section.different_first_page_header_footer = True
+    sect_pr = section._sectPr
+    old_pg = sect_pr.find(qn("w:pgNumType"))
+    if old_pg is not None:
+        sect_pr.remove(old_pg)
+    pg_num_type = OxmlElement("w:pgNumType")
+    pg_num_type.set(qn("w:fmt"), "decimal")
+    pg_num_type.set(qn("w:start"), "1")
+    sect_pr.append(pg_num_type)
+
     header = section.header
     p = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+    _reset_paragraph_indents(p)
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.space_before = Pt(0)
     p.paragraph_format.space_after = Pt(0)
@@ -1103,7 +1181,8 @@ def render_docx(draft: DocumentDraft) -> bytes:
     """Render a DocumentDraft into a print-ready A4 .docx compliant with Decree 30/2020/NĐ-CP Appendix I."""
     doc = Document()
     section = doc.sections[0]
-    # Decree 30/2020/NĐ-CP Appendix I: A4 (210mm x 297mm), margins Top 20mm, Bottom 20mm, Left 30mm, Right 15mm
+    # Decree 30/2020/NĐ-CP Appendix I: A4 portrait (210mm x 297mm), margins Top 20mm, Bottom 20mm, Left 30mm, Right 15mm
+    section.orientation = WD_ORIENT.PORTRAIT
     section.page_width = Cm(21.0)
     section.page_height = Cm(29.7)
     section.top_margin = Cm(2.0)
@@ -1116,6 +1195,12 @@ def render_docx(draft: DocumentDraft) -> bytes:
     normal.font.name = "Times New Roman"
     normal.font.size = Pt(13)
     normal.font.color.rgb = _BLACK
+    normal.paragraph_format.left_indent = Cm(0)
+    normal.paragraph_format.right_indent = Cm(0)
+    normal.paragraph_format.first_line_indent = Cm(0)
+    normal.paragraph_format.line_spacing = 1.15
+    normal.paragraph_format.space_before = Pt(0)
+    normal.paragraph_format.space_after = Pt(6)
     normal_rpr = normal.element.get_or_add_rPr()
     normal_rfonts = normal_rpr.find(qn("w:rFonts"))
     if normal_rfonts is None:
@@ -1137,13 +1222,11 @@ def render_docx(draft: DocumentDraft) -> bytes:
 
         if org_lines or so_line or not is_personal_petition:
             hdr_tbl = doc.add_table(rows=1, cols=2)
-            hdr_tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
-            _remove_table_borders(hdr_tbl)
-            hdr_tbl.cell(0, 0).width = Cm(7.0)
-            hdr_tbl.cell(0, 1).width = Cm(9.5)
+            _configure_fixed_two_col_table(hdr_tbl, 6.5, 10.0)
 
             left_cell = hdr_tbl.cell(0, 0)
             left_p = left_cell.paragraphs[0]
+            _reset_paragraph_indents(left_p)
             left_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             left_p.paragraph_format.space_before = Pt(0)
             left_p.paragraph_format.space_after = Pt(2)
@@ -1156,6 +1239,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
                 _set_run_font(run, size_pt=12, bold=(idx_org == len(effective_org_lines) - 1))
             if so_line:
                 so_p = left_cell.add_paragraph()
+                _reset_paragraph_indents(so_p)
                 so_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 so_p.paragraph_format.space_before = Pt(4)
                 so_p.paragraph_format.space_after = Pt(0)
@@ -1163,6 +1247,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
 
             right_cell = hdr_tbl.cell(0, 1)
             right_p = right_cell.paragraphs[0]
+            _reset_paragraph_indents(right_p)
             right_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             right_p.paragraph_format.space_before = Pt(0)
             right_p.paragraph_format.space_after = Pt(0)
@@ -1179,6 +1264,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
             )
             if date_line:
                 date_p = right_cell.add_paragraph()
+                _reset_paragraph_indents(date_p)
                 date_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 date_p.paragraph_format.space_before = Pt(6)
                 date_p.paragraph_format.space_after = Pt(0)
@@ -1186,6 +1272,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
         else:
             # Personal petition (e.g. Đơn xin nghỉ phép): centered National Motto + right-aligned date
             motto_p = doc.add_paragraph()
+            _reset_paragraph_indents(motto_p)
             motto_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             motto_p.paragraph_format.space_before = Pt(0)
             motto_p.paragraph_format.space_after = Pt(2)
@@ -1202,12 +1289,14 @@ def render_docx(draft: DocumentDraft) -> bytes:
             )
             if date_line:
                 date_p = doc.add_paragraph()
+                _reset_paragraph_indents(date_p)
                 date_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                 date_p.paragraph_format.space_before = Pt(6)
                 date_p.paragraph_format.space_after = Pt(6)
                 _set_run_font(date_p.add_run(date_line), size_pt=13, italic=True)
 
         spacer = doc.add_paragraph()
+        _reset_paragraph_indents(spacer)
         spacer.paragraph_format.space_before = Pt(0)
         spacer.paragraph_format.space_after = Pt(6)
 
@@ -1218,6 +1307,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
     )
     if not has_explicit_title_line:
         title_p = doc.add_paragraph()
+        _reset_paragraph_indents(title_p)
         title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         title_p.paragraph_format.space_before = Pt(6)
         title_p.paragraph_format.space_after = Pt(10)
@@ -1258,6 +1348,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
                     cell = table.cell(0, col_idx)
                     _set_cell_shading(cell, "E6F4F1")
                     p = cell.paragraphs[0]
+                    _reset_paragraph_indents(p)
                     p.paragraph_format.space_before = Pt(3)
                     p.paragraph_format.space_after = Pt(3)
                     _set_run_font(p.add_run(header_text), size_pt=12, bold=True)
@@ -1265,10 +1356,12 @@ def render_docx(draft: DocumentDraft) -> bytes:
                     for col_idx, val in enumerate(row_vals):
                         cell = table.cell(row_idx, col_idx)
                         p = cell.paragraphs[0]
+                        _reset_paragraph_indents(p)
                         p.paragraph_format.space_before = Pt(2)
                         p.paragraph_format.space_after = Pt(2)
                         _add_inline_runs(p, val, size_pt=12)
                 after_tbl = doc.add_paragraph()
+                _reset_paragraph_indents(after_tbl)
                 after_tbl.paragraph_format.space_after = Pt(4)
             continue
 
@@ -1277,6 +1370,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
             level = len(stripped) - len(stripped.lstrip("#"))
             heading_text = _strip_md_emphasis(stripped.lstrip("#").strip())
             p = doc.add_paragraph()
+            _reset_paragraph_indents(p)
             if level == 1:
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 p.paragraph_format.space_before = Pt(8)
@@ -1311,6 +1405,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
         num_match = re.match(r"^(\d+[.)])\s+(.*)$", stripped)
         if num_match:
             p = doc.add_paragraph()
+            _reset_paragraph_indents(p)
             p.paragraph_format.left_indent = Cm(0.6)
             p.paragraph_format.space_after = Pt(4)
             p.paragraph_format.line_spacing = 1.15
@@ -1320,6 +1415,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
 
         # Regular paragraph (preserving explicit <div align="..."> alignment & Decree 30 date/title rules)
         p = doc.add_paragraph()
+        _reset_paragraph_indents(p)
         p.paragraph_format.space_after = Pt(6)
         p.paragraph_format.line_spacing = 1.15
         plain = _strip_md_emphasis(stripped)
@@ -1337,15 +1433,13 @@ def render_docx(draft: DocumentDraft) -> bytes:
     # Decree 30 2-column borderless footer (Nơi nhận left + Signature block right)
     if is_admin and (noi_nhan_lines or sign_lines):
         ftr_tbl = doc.add_table(rows=1, cols=2)
-        ftr_tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
-        _remove_table_borders(ftr_tbl)
-        ftr_tbl.cell(0, 0).width = Cm(8.0)
-        ftr_tbl.cell(0, 1).width = Cm(8.5)
+        _configure_fixed_two_col_table(ftr_tbl, 8.0, 8.5)
 
         left_cell = ftr_tbl.cell(0, 0)
         if noi_nhan_lines:
             for idx_n, n_line in enumerate(noi_nhan_lines):
                 np = left_cell.paragraphs[0] if idx_n == 0 else left_cell.add_paragraph()
+                _reset_paragraph_indents(np)
                 np.paragraph_format.space_before = Pt(2 if idx_n == 0 else 0)
                 np.paragraph_format.space_after = Pt(2)
                 plain_n = _strip_md_emphasis(n_line)
@@ -1358,6 +1452,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
         if sign_lines:
             for idx_s, s_line in enumerate(sign_lines):
                 sp = right_cell.paragraphs[0] if idx_s == 0 else right_cell.add_paragraph()
+                _reset_paragraph_indents(sp)
                 sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 plain_s = _strip_md_emphasis(s_line)
                 if idx_s == 0:

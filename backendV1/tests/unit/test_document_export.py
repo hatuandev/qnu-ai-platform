@@ -1463,10 +1463,77 @@ def test_render_docx_strips_raw_html_div_align_right_and_applies_decree_30_appen
     assert right_para is not None
     assert right_para.alignment == WD_ALIGN_PARAGRAPH.RIGHT
 
-    # 5. Header 2-col table + Footer 2-col table both present
+    # 5. Header 2-col table + Footer 2-col table both present with fixed layout
     assert len(doc.tables) >= 2
     assert len(doc.tables[0].columns) == 2
     assert len(doc.tables[-1].columns) == 2
+    assert 'w:type="fixed"' in doc.tables[0]._tbl.tblPr.xml
+    assert 'w:type="fixed"' in doc.tables[-1]._tbl.tblPr.xml
+    assert "cantSplit" in doc.tables[-1].rows[0]._tr.xml
+
+
+def test_render_docx_personal_petition_alignment_indents_and_page_numbering():
+    from docx.enum.section import WD_ORIENT
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Cm
+
+    petition = DocumentDraft(
+        title="Đơn xin nghỉ phép",
+        layout="administrative",
+        markdown=(
+            "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n"
+            "Độc lập - Tự do - Hạnh phúc\n\n"
+            "*Quy Nhơn, ngày 24 tháng 11 năm 2026*\n\n"
+            "# ĐƠN XIN NGHỈ PHÉP\n\n"
+            "Kính gửi: Ban Giám hiệu Trường Đại học Quy Nhơn\n\n"
+            "Tôi tên là: [Họ và tên], đơn vị [Chức vụ/Đơn vị]. "
+            "Xin nghỉ phép 02 ngày từ 25/11/2026 đến 26/11/2026 vì lý do về quê có việc gấp.\n\n"
+            "NGƯỜI LÀM ĐƠN\n"
+            "(Ký và ghi rõ họ tên)\n"
+            "[Họ và tên]"
+        ),
+        has_tables=False,
+    )
+    doc = Document(io.BytesIO(render_docx(petition)))
+    sec = doc.sections[0]
+
+    # Portrait A4 + Decree 30 margins + Arabic page numbering starting at 1, hidden on page 1
+    assert sec.orientation == WD_ORIENT.PORTRAIT
+    assert abs(sec.page_width - Cm(21.0)) < 2000
+    assert abs(sec.page_height - Cm(29.7)) < 2000
+    assert abs(sec.top_margin - Cm(2.0)) < 2000
+    assert abs(sec.bottom_margin - Cm(2.0)) < 2000
+    assert abs(sec.left_margin - Cm(3.0)) < 2000
+    assert abs(sec.right_margin - Cm(1.5)) < 2000
+    assert sec.different_first_page_header_footer is True
+    assert 'w:start="1"' in sec._sectPr.xml
+    assert "PAGE" in sec.header._element.xml
+
+    # Motto centered with zero indent; date right-aligned with zero indent; title centered
+    motto_p = next(p for p in doc.paragraphs if "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" in p.text)
+    assert motto_p.alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert motto_p.paragraph_format.left_indent == 0
+    assert motto_p.paragraph_format.first_line_indent == 0
+
+    date_p = next(p for p in doc.paragraphs if "Quy Nhơn, ngày 24 tháng 11 năm 2026" in p.text)
+    assert date_p.alignment == WD_ALIGN_PARAGRAPH.RIGHT
+    assert date_p.paragraph_format.left_indent == 0
+    assert date_p.paragraph_format.first_line_indent == 0
+
+    title_p = next(p for p in doc.paragraphs if "ĐƠN XIN NGHỈ PHÉP" in p.text)
+    assert title_p.alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert title_p.paragraph_format.left_indent == 0
+
+    # Personal petition signature block stays in fixed 2-col footer table (right cell centered, zero indent)
+    assert len(doc.tables) == 1
+    ftr = doc.tables[0]
+    assert 'w:type="fixed"' in ftr._tbl.tblPr.xml
+    assert "cantSplit" in ftr.rows[0]._tr.xml
+    assert ftr.cell(0, 0).text.strip() == ""
+    assert "NGƯỜI LÀM ĐƠN" in ftr.cell(0, 1).text
+    assert ftr.cell(0, 1).paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert ftr.cell(0, 1).paragraphs[0].paragraph_format.left_indent == 0
+
 
 
 
