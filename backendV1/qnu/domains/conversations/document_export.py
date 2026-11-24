@@ -932,21 +932,180 @@ def _add_bottom_border(
     p_pr.append(p_bdr)
 
 
-def _configure_content_table(table) -> None:
-    """Apply Decree 30 pure B&W table rules: thin black borders, padding, tblHeader, cantSplit, vertical center."""
+_PRINTABLE_WIDTH_MM = 165.0
+_PRINTABLE_WIDTH_DXA = 9355  # 165.0 mm * (1440 / 25.4) = 9354.33 dxa
+_TABLE_NUMERIC_COL_HEADER_RE = re.compile(
+    r"(?:kinh\s+phí|thành\s+tiền|đơn\s+giá|số\s+tiền|dự\s+toán|tổng\s+cộng|"
+    r"ngân\s+sách|số\s+lượng|^sl$|tỷ\s+lệ|%|điểm|chi\s+phí|giá\s+trị)",
+    re.IGNORECASE,
+)
+_TABLE_NUMERIC_VAL_RE = re.compile(
+    r"^[+\-]?\s*\d[\d.,\s]*(?:\s*(?:đ|vnđ|vnd|%|triệu|tỷ|ngàn|nghìn|k|tr))?$",
+    re.IGNORECASE,
+)
+_TABLE_INDEX_COL_HEADER_RE = re.compile(r"^(?:stt|tt|số\s*tt|no\.?)$", re.IGNORECASE)
+_ADMIN_CONG_VAN_VV_RE = re.compile(r"^(?:v/v|về\s+việc)\b", re.IGNORECASE)
+
+
+def _mm_to_dxa(mm: float) -> int:
+    return round(mm * _PRINTABLE_WIDTH_DXA / _PRINTABLE_WIDTH_MM)
+
+
+def _compute_header_col_widths_mm(org_lines: list[str], so_line: str | None) -> tuple[float, float]:
+    """Compute adaptive 2-column header widths (mm) summing to 165mm (left in 40%..52%, min 72mm)."""
+    left_candidates = [len(line.strip()) for line in org_lines if line.strip()]
+    if so_line and so_line.strip():
+        left_candidates.append(len(so_line.strip()))
+    left_len = max(left_candidates) if left_candidates else 23
+    right_len = len("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM")
+    ratio = left_len / max(left_len + right_len, 1)
+    min_left = max(72.0, _PRINTABLE_WIDTH_MM * 0.40)
+    max_left = _PRINTABLE_WIDTH_MM * 0.52
+    left_mm = round(max(min_left, min(max_left, _PRINTABLE_WIDTH_MM * ratio)), 2)
+    right_mm = round(_PRINTABLE_WIDTH_MM - left_mm, 2)
+    return left_mm, right_mm
+
+
+def _add_short_centered_rule(cell_or_doc, *, col_width_mm: float, text_len: int) -> None:
+    """Add a compact centered solid black horizontal rule (w:pBdr) without shrinking text indents."""
+    rule_p = cell_or_doc.add_paragraph()
+    _reset_paragraph_indents(rule_p)
+    rule_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    rule_p.paragraph_format.space_before = Pt(0)
+    rule_p.paragraph_format.space_after = Pt(2)
+    rule_p.paragraph_format.line_spacing = 1.0
+    tiny = rule_p.add_run("")
+    _set_run_font(tiny, size_pt=2)
+    rule_width_mm = min(col_width_mm * 0.72, max(24.0, text_len * 2.0))
+    side_indent_mm = max(4.0, (col_width_mm - rule_width_mm) / 2.0)
+    _add_bottom_border(
+        rule_p,
+        left_indent_cm=side_indent_mm / 10.0,
+        right_indent_cm=side_indent_mm / 10.0,
+        width_sz="6",
+        space="1",
+    )
+
+
+def _compute_content_table_layout(
+    headers: list[str],
+    rows: list[list[str]],
+    *,
+    total_mm: float = _PRINTABLE_WIDTH_MM,
+) -> tuple[list[int], list[WD_ALIGN_PARAGRAPH]]:
+    """Compute content-aware column widths (exact dxa summing to 165mm) and per-column alignments."""
+    ncols = len(headers)
+    if ncols == 0:
+        return [], []
+
+    min_mms: list[float] = []
+    weights: list[float] = []
+    aligns: list[WD_ALIGN_PARAGRAPH] = []
+    long_indices: list[int] = []
+
+    for col_idx, raw_hdr in enumerate(headers):
+        hdr = (raw_hdr or "").strip()
+        vals = [
+            (r[col_idx] if col_idx < len(r) else "").strip()
+            for r in rows
+        ]
+        non_empty = [v for v in vals if v]
+        lengths = sorted(len(v) for v in non_empty) or [len(hdr)]
+        avg_len = sum(lengths) / len(lengths)
+        p85_len = lengths[min(len(lengths) - 1, int(0.85 * len(lengths)))]
+        max_len = lengths[-1]
+
+        is_index = bool(_TABLE_INDEX_COL_HEADER_RE.match(hdr)) or (
+            bool(non_empty) and all(v.isdigit() and len(v) <= 4 for v in non_empty) and len(hdr) <= 6
+        )
+        is_long_hdr = bool(_TABLE_LONG_COL_HEADER_RE.search(hdr))
+        is_short_hdr = bool(_TABLE_SHORT_COL_HEADER_RE.search(hdr))
+        numeric_hits = sum(1 for v in non_empty if _TABLE_NUMERIC_VAL_RE.match(v))
+        mostly_numeric_vals = bool(non_empty) and (numeric_hits / len(non_empty) >= 0.7)
+        is_numeric = not is_index and (
+            mostly_numeric_vals or (not is_long_hdr and bool(_TABLE_NUMERIC_COL_HEADER_RE.search(hdr)))
+        )
+
+        if is_index:
+            min_mms.append(11.0)
+            weights.append(0.0)
+            aligns.append(WD_ALIGN_PARAGRAPH.CENTER)
+        elif is_numeric:
+            min_mms.append(max(18.0, min(32.0, max(max_len, len(hdr)) * 2.0 + 5.0)))
+            weights.append(max(1.0, p85_len * 0.35))
+            aligns.append(WD_ALIGN_PARAGRAPH.RIGHT)
+        elif not is_long_hdr and (is_short_hdr or p85_len <= 24):
+            min_mms.append(max(20.0, min(26.0, max(p85_len, len(hdr)) * 1.15 + 6.0)))
+            weights.append(max(1.5, p85_len * 0.55))
+            aligns.append(WD_ALIGN_PARAGRAPH.CENTER)
+        else:
+            effective_len = 0.45 * avg_len + 0.55 * p85_len
+            min_mms.append(26.0)
+            weights.append(max(4.0, effective_len))
+            aligns.append(WD_ALIGN_PARAGRAPH.LEFT)
+            long_indices.append(col_idx)
+
+    total_min = sum(min_mms)
+    if total_min >= total_mm:
+        widths_mm = [m * total_mm / total_min for m in min_mms]
+    else:
+        remaining = total_mm - total_min
+        total_weight = sum(weights)
+        if total_weight <= 0:
+            widths_mm = [m + remaining / ncols for m in min_mms]
+        else:
+            widths_mm = [m + remaining * (w / total_weight) for m, w in zip(min_mms, weights, strict=True)]
+
+    total_dxa = _mm_to_dxa(total_mm)
+    dxa_widths = [max(450, round(w * total_dxa / total_mm)) for w in widths_mm]
+    delta = total_dxa - sum(dxa_widths)
+    if delta != 0:
+        if long_indices:
+            target_idx = max(long_indices, key=lambda idx: dxa_widths[idx])
+        else:
+            target_idx = max(range(ncols), key=lambda idx: dxa_widths[idx])
+        dxa_widths[target_idx] += delta
+    return dxa_widths, aligns
+
+
+def _configure_content_table(table, col_dxa_widths: list[int] | None = None) -> None:
+    """Apply Decree 30 pure B&W table rules: exact 165mm fixed widths, black borders, padding, tblHeader, cantSplit."""
+    table.autofit = False
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     _set_table_borders(table, color="000000")
     tbl_pr = table._tbl.tblPr
-    old_mar = tbl_pr.find(qn("w:tblCellMar"))
-    if old_mar is not None:
-        tbl_pr.remove(old_mar)
+    for tag in ("w:tblW", "w:tblLayout", "w:tblCellMar"):
+        old = tbl_pr.find(qn(tag))
+        if old is not None:
+            tbl_pr.remove(old)
+
+    total_dxa = sum(col_dxa_widths) if col_dxa_widths else _PRINTABLE_WIDTH_DXA
+    tbl_w = OxmlElement("w:tblW")
+    tbl_w.set(qn("w:w"), str(total_dxa))
+    tbl_w.set(qn("w:type"), "dxa")
+    tbl_pr.append(tbl_w)
+
+    tbl_layout = OxmlElement("w:tblLayout")
+    tbl_layout.set(qn("w:type"), "fixed")
+    tbl_pr.append(tbl_layout)
+
     cell_mar = OxmlElement("w:tblCellMar")
-    for side, val in (("top", "55"), ("bottom", "55"), ("left", "85"), ("right", "85")):
+    for side, val in (("top", "55"), ("bottom", "55"), ("left", "75"), ("right", "75")):
         m = OxmlElement(f"w:{side}")
         m.set(qn("w:w"), val)
         m.set(qn("w:type"), "dxa")
         cell_mar.append(m)
     tbl_pr.append(cell_mar)
+
+    if col_dxa_widths:
+        tbl_grid = table._tbl.tblGrid
+        if tbl_grid is not None:
+            for child in list(tbl_grid):
+                tbl_grid.remove(child)
+            for col_dxa in col_dxa_widths:
+                gc = OxmlElement("w:gridCol")
+                gc.set(qn("w:w"), str(col_dxa))
+                tbl_grid.append(gc)
 
     for row_idx, row in enumerate(table.rows):
         tr_pr = row._tr.get_or_add_trPr()
@@ -954,19 +1113,18 @@ def _configure_content_table(table) -> None:
             tr_pr.append(OxmlElement("w:cantSplit"))
         if row_idx == 0 and tr_pr.find(qn("w:tblHeader")) is None:
             tr_pr.append(OxmlElement("w:tblHeader"))
-        for cell in row.cells:
+        for col_idx, cell in enumerate(row.cells):
             cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-
-
-def _is_short_center_table_column(header_text: str, col_values: list[str]) -> bool:
-    """Return True when a content-table column should be center-aligned (STT, time, short unit names)."""
-    hdr = (header_text or "").strip()
-    if _TABLE_LONG_COL_HEADER_RE.search(hdr):
-        return False
-    if _TABLE_SHORT_COL_HEADER_RE.search(hdr):
-        return True
-    non_empty = [v.strip() for v in col_values if v and v.strip()]
-    return bool(non_empty) and all(len(v) <= 25 for v in non_empty)
+            if col_dxa_widths and col_idx < len(col_dxa_widths):
+                col_dxa = col_dxa_widths[col_idx]
+                tc_pr = cell._tc.get_or_add_tcPr()
+                old_tcw = tc_pr.find(qn("w:tcW"))
+                if old_tcw is not None:
+                    tc_pr.remove(old_tcw)
+                tc_w = OxmlElement("w:tcW")
+                tc_w.set(qn("w:w"), str(col_dxa))
+                tc_w.set(qn("w:type"), "dxa")
+                tc_pr.append(tc_w)
 
 
 def _reset_paragraph_indents(paragraph) -> None:
@@ -983,8 +1141,8 @@ def _configure_fixed_two_col_table(table, left_cm: float, right_cm: float) -> No
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     _remove_table_borders(table)
 
-    total_dxa = round((left_cm + right_cm) * 567)
-    left_dxa = round(left_cm * 567)
+    total_dxa = _mm_to_dxa((left_cm + right_cm) * 10.0)
+    left_dxa = _mm_to_dxa(left_cm * 10.0)
     right_dxa = total_dxa - left_dxa
 
     tbl_pr = table._tbl.tblPr
@@ -1275,19 +1433,25 @@ def _extract_admin_footer(
         tbl_start = len(trimmed) - 1
         while tbl_start > 0 and "|" in trimmed[tbl_start - 1][1] and trimmed[tbl_start - 1][1].strip():
             tbl_start -= 1
+        non_sep_rows = [
+            _split_table_row(ln[1])
+            for ln in trimmed[tbl_start:]
+            if not _TABLE_SEP_RE.match(ln[1].strip())
+        ]
+        is_two_col_table = bool(non_sep_rows) and all(len(cells) == 2 for cells in non_sep_rows)
         tbl_block = "\n".join(ln[1] for ln in trimmed[tbl_start:])
-        if _ADMIN_NOI_NHAN_RE.search(tbl_block) or _ADMIN_SIGN_ROLE_RE.search(tbl_block) or "HIỆU TRƯỞNG" in tbl_block.upper():
+        if is_two_col_table and (
+            _ADMIN_NOI_NHAN_RE.search(tbl_block)
+            or _ADMIN_SIGN_ROLE_RE.search(tbl_block)
+            or "HIỆU TRƯỞNG" in tbl_block.upper()
+        ):
             left_raw: list[str] = []
             right_raw: list[str] = []
-            for _al, row_str in trimmed[tbl_start:]:
-                if _TABLE_SEP_RE.match(row_str.strip()):
-                    continue
-                cells = _split_table_row(row_str)
-                if len(cells) >= 2:
-                    if cells[0].strip():
-                        left_raw.append(cells[0])
-                    if cells[1].strip():
-                        right_raw.append(cells[1])
+            for cells in non_sep_rows:
+                if cells[0].strip():
+                    left_raw.append(cells[0])
+                if cells[1].strip():
+                    right_raw.append(cells[1])
             return trimmed[:tbl_start], _split_noi_nhan_items(left_raw), _split_sign_items(right_raw)
 
     # Look back up to 16 lines for Nơi nhận or signature role
@@ -1429,23 +1593,27 @@ def render_docx(draft: DocumentDraft) -> bytes:
         is_personal_petition = bool(_PERSONAL_PETITION_RE.search(draft.title or ""))
 
         if org_lines or so_line or not is_personal_petition:
-            # Decree 30 / QNU 2-column x 2-row borderless header table
-            hdr_tbl = doc.add_table(rows=2, cols=2)
-            _configure_fixed_two_col_table(hdr_tbl, 6.5, 10.0)
-
-            # Row 0, Col 0: Issuing agency (with short solid bottom rule under direct issuing unit)
-            left_top_cell = hdr_tbl.cell(0, 0)
+            # Decree 30 / QNU 2-column x 2-row borderless header table with content-aware widths (total 165mm)
             effective_org_lines = org_lines or ["TRƯỜNG ĐẠI HỌC QUY NHƠN", "[Đơn vị soạn thảo]"]
+            left_mm, right_mm = _compute_header_col_widths_mm(effective_org_lines, so_line)
+            hdr_tbl = doc.add_table(rows=2, cols=2)
+            _configure_fixed_two_col_table(hdr_tbl, left_mm / 10.0, right_mm / 10.0)
+
+            # Row 0, Col 0: Issuing agency (zero indent on text; compact rule paragraph below)
+            left_top_cell = hdr_tbl.cell(0, 0)
             for idx_org, org_line in enumerate(effective_org_lines):
                 org_p = left_top_cell.paragraphs[0] if idx_org == 0 else left_top_cell.add_paragraph()
                 _reset_paragraph_indents(org_p)
                 org_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 org_p.paragraph_format.space_before = Pt(0)
-                org_p.paragraph_format.space_after = Pt(2)
+                org_p.paragraph_format.space_after = Pt(1)
                 is_last_org = idx_org == len(effective_org_lines) - 1
                 _set_run_font(org_p.add_run(org_line.upper()), size_pt=12, bold=is_last_org)
-                if is_last_org:
-                    _add_bottom_border(org_p, left_indent_cm=1.5, right_indent_cm=1.5, width_sz="6", space="2")
+            _add_short_centered_rule(
+                left_top_cell,
+                col_width_mm=left_mm,
+                text_len=len(effective_org_lines[-1]),
+            )
 
             # Row 1, Col 0: Số, ký hiệu (centered directly below issuing agency)
             left_bot_cell = hdr_tbl.cell(1, 0)
@@ -1457,13 +1625,13 @@ def render_docx(draft: DocumentDraft) -> bytes:
             if so_line:
                 _set_run_font(so_p.add_run(so_line), size_pt=13)
 
-            # Row 0, Col 1: Quốc hiệu + Tiêu ngữ (with crisp solid bottom border matching motto width)
+            # Row 0, Col 1: Quốc hiệu + Tiêu ngữ (zero indent on text; compact rule paragraph below)
             right_top_cell = hdr_tbl.cell(0, 1)
             motto_top_p = right_top_cell.paragraphs[0]
             _reset_paragraph_indents(motto_top_p)
             motto_top_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             motto_top_p.paragraph_format.space_before = Pt(0)
-            motto_top_p.paragraph_format.space_after = Pt(2)
+            motto_top_p.paragraph_format.space_after = Pt(1)
             _set_run_font(
                 motto_top_p.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"),
                 size_pt=12,
@@ -1473,13 +1641,17 @@ def render_docx(draft: DocumentDraft) -> bytes:
             _reset_paragraph_indents(motto_sub_p)
             motto_sub_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             motto_sub_p.paragraph_format.space_before = Pt(0)
-            motto_sub_p.paragraph_format.space_after = Pt(2)
+            motto_sub_p.paragraph_format.space_after = Pt(1)
             _set_run_font(
                 motto_sub_p.add_run("Độc lập - Tự do - Hạnh phúc"),
                 size_pt=13,
                 bold=True,
             )
-            _add_bottom_border(motto_sub_p, left_indent_cm=1.8, right_indent_cm=1.8, width_sz="6", space="2")
+            _add_short_centered_rule(
+                right_top_cell,
+                col_width_mm=right_mm,
+                text_len=len("Độc lập - Tự do - Hạnh phúc"),
+            )
 
             # Row 1, Col 1: Địa danh và ngày tháng năm (italic, centered directly below Tiêu ngữ)
             right_bot_cell = hdr_tbl.cell(1, 1)
@@ -1496,7 +1668,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
             _reset_paragraph_indents(motto_top_p)
             motto_top_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             motto_top_p.paragraph_format.space_before = Pt(0)
-            motto_top_p.paragraph_format.space_after = Pt(2)
+            motto_top_p.paragraph_format.space_after = Pt(1)
             _set_run_font(
                 motto_top_p.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"),
                 size_pt=12,
@@ -1506,13 +1678,17 @@ def render_docx(draft: DocumentDraft) -> bytes:
             _reset_paragraph_indents(motto_sub_p)
             motto_sub_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             motto_sub_p.paragraph_format.space_before = Pt(0)
-            motto_sub_p.paragraph_format.space_after = Pt(4)
+            motto_sub_p.paragraph_format.space_after = Pt(1)
             _set_run_font(
                 motto_sub_p.add_run("Độc lập - Tự do - Hạnh phúc"),
                 size_pt=13,
                 bold=True,
             )
-            _add_bottom_border(motto_sub_p, left_indent_cm=5.0, right_indent_cm=5.0, width_sz="6", space="2")
+            _add_short_centered_rule(
+                doc,
+                col_width_mm=_PRINTABLE_WIDTH_MM,
+                text_len=len("Độc lập - Tự do - Hạnh phúc"),
+            )
             if date_line:
                 date_p = doc.add_paragraph()
                 _reset_paragraph_indents(date_p)
@@ -1534,7 +1710,11 @@ def render_docx(draft: DocumentDraft) -> bytes:
         and not _TABLE_SEP_RE.match(ln.strip())
         and not _RAW_UNDERLINE_LINE_RE.match(ln.strip())
     ][:5]
-    has_explicit_title_line = any(
+    is_cong_van_style = is_admin and any(
+        _ADMIN_CONG_VAN_VV_RE.match(_strip_md_emphasis(ln.lstrip("#").strip()))
+        for ln in leading_non_empty[:2]
+    )
+    has_explicit_title_line = is_cong_van_style or any(
         ln.startswith("#")
         or (is_admin and _strip_md_emphasis(ln).upper() == draft.title.upper())
         or (is_admin and bool(_ADMIN_CUES_RE.match(_strip_md_emphasis(ln))))
@@ -1569,7 +1749,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
             i += 1
             continue
 
-        # Markdown table (pure black-and-white Decree 30 style: NO w:shd, tblHeader, cantSplit, smart alignment)
+        # Markdown table (Content-Aware Auto-Layout on exact 165mm, pure B&W, tblHeader, cantSplit)
         if (
             i + 1 < len(aligned_items)
             and "|" in raw_line
@@ -1589,15 +1769,9 @@ def render_docx(draft: DocumentDraft) -> bytes:
                 rows.append(row[: len(headers)])
                 i += 1
             if headers:
+                col_dxa_widths, col_aligns = _compute_content_table_layout(headers, rows)
                 table = doc.add_table(rows=1 + len(rows), cols=len(headers))
-                _configure_content_table(table)
-                col_center_flags = [
-                    _is_short_center_table_column(
-                        headers[col_idx],
-                        [r[col_idx] for r in rows if col_idx < len(r)],
-                    )
-                    for col_idx in range(len(headers))
-                ]
+                _configure_content_table(table, col_dxa_widths)
                 for col_idx, header_text in enumerate(headers):
                     cell = table.cell(0, col_idx)
                     p = cell.paragraphs[0]
@@ -1611,11 +1785,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
                         cell = table.cell(row_idx, col_idx)
                         p = cell.paragraphs[0]
                         _reset_paragraph_indents(p)
-                        p.alignment = (
-                            WD_ALIGN_PARAGRAPH.CENTER
-                            if col_center_flags[col_idx]
-                            else WD_ALIGN_PARAGRAPH.LEFT
-                        )
+                        p.alignment = col_aligns[col_idx]
                         p.paragraph_format.space_before = Pt(2)
                         p.paragraph_format.space_after = Pt(2)
                         _add_inline_runs(p, val, size_pt=13)
@@ -1752,7 +1922,18 @@ def render_docx(draft: DocumentDraft) -> bytes:
             p.paragraph_format.first_line_indent = Cm(1.0)
             _set_run_font(p.add_run(plain), size_pt=13, italic=True)
             just_emitted_doc_type = False
-        elif is_admin and not plain.startswith("Kính gửi"):
+        elif is_admin and _ADMIN_CONG_VAN_VV_RE.match(plain):
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            p.paragraph_format.space_before = Pt(2)
+            p.paragraph_format.space_after = Pt(6)
+            _set_run_font(p.add_run(plain), size_pt=12)
+            just_emitted_doc_type = False
+        elif is_admin and plain.startswith("Kính gửi"):
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            p.paragraph_format.first_line_indent = Cm(1.0)
+            _add_inline_runs(p, stripped, size_pt=13)
+            just_emitted_doc_type = False
+        elif is_admin:
             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             p.paragraph_format.first_line_indent = Cm(1.0)
             _add_inline_runs(p, stripped, size_pt=13)
@@ -1762,10 +1943,10 @@ def render_docx(draft: DocumentDraft) -> bytes:
             just_emitted_doc_type = False
         i += 1
 
-    # Decree 30 2-column borderless footer (Nơi nhận left + Signature block right)
+    # Decree 30 2-column borderless footer (symmetric 82.5mm + 82.5mm = 165mm)
     if is_admin and (noi_nhan_lines or sign_lines):
         ftr_tbl = doc.add_table(rows=1, cols=2)
-        _configure_fixed_two_col_table(ftr_tbl, 8.0, 8.5)
+        _configure_fixed_two_col_table(ftr_tbl, 8.25, 8.25)
 
         left_cell = ftr_tbl.cell(0, 0)
         if noi_nhan_lines:

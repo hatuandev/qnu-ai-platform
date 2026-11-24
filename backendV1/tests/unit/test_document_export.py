@@ -1726,6 +1726,105 @@ def test_render_docx_qnu_plan_full_decree_30_formatting():
     assert right_ps[1].runs[0].bold is True
 
 
+def test_content_aware_auto_layout_header_plan_and_budget_tables_exact_165mm():
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+
+    def _grid_dxa(table) -> list[int]:
+        return [int(gc.get(qn("w:w"))) for gc in table._tbl.tblGrid.findall(qn("w:gridCol"))]
+
+    def _row_tcw_dxa(row) -> list[int]:
+        return [int(c._tc.tcPr.find(qn("w:tcW")).get(qn("w:w"))) for c in row.cells]
+
+    # 1. Adaptive header column widths: standard org vs very long org, both sum to 165mm
+    left_std, right_std = document_export._compute_header_col_widths_mm(
+        ["BỘ GIÁO DỤC VÀ ĐÀO TẠO", "TRƯỜNG ĐẠI HỌC QUY NHƠN"], "Số: 28/KH-ĐHQN"
+    )
+    assert left_std >= 72.0
+    assert abs((left_std + right_std) - 165.0) < 0.05
+
+    left_long, right_long = document_export._compute_header_col_widths_mm(
+        ["TRUNG TÂM CÔNG NGHỆ THÔNG TIN VÀ CHUYỂN ĐỔI SỐ QUY NHƠN"], None
+    )
+    assert left_long > left_std
+    assert left_long <= 165.0 * 0.52 + 0.05
+    assert abs((left_long + right_long) - 165.0) < 0.05
+
+    # 2. 6-column Plan table: STT/Thời gian/Đơn vị compact, Nội dung/Sản phẩm expanded, exact 165mm (9355 dxa)
+    plan = DocumentDraft(
+        title="Kế hoạch triển khai chuyển đổi số",
+        layout="administrative",
+        markdown=(
+            "BỘ GIÁO DỤC VÀ ĐÀO TẠO\n"
+            "TRƯỜNG ĐẠI HỌC QUY NHƠN\n"
+            "Số: 30/KH-ĐHQN\n"
+            "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n"
+            "Độc lập - Tự do - Hạnh phúc\n"
+            "*Gia Lai, ngày 24 tháng 11 năm 2026*\n\n"
+            "# KẾ HOẠCH\n"
+            "## Triển khai chuyển đổi số năm 2026\n\n"
+            "| STT | Nội dung công việc | Thời gian | Đơn vị chủ trì | Đơn vị phối hợp | Sản phẩm |\n"
+            "| --- | --- | --- | --- | --- | --- |\n"
+            "| 1 | Rà soát, chuẩn hóa toàn bộ danh mục giáo trình và học liệu số phục vụ đào tạo đại học | Tháng 12/2026 | Trung tâm S&HL | Các Khoa | Bộ danh mục học liệu số chuẩn hóa được Hiệu trưởng phê duyệt |\n"
+        ),
+        has_tables=True,
+    )
+    doc = Document(io.BytesIO(render_docx(plan)))
+    hdr_tbl = doc.tables[0]
+    assert sum(_grid_dxa(hdr_tbl)) == 9355
+    assert sum(_row_tcw_dxa(hdr_tbl.rows[0])) == 9355
+    # Org text paragraphs must have zero indent (not squeezed by border indents)
+    assert hdr_tbl.cell(0, 0).paragraphs[0].paragraph_format.left_indent == 0
+    assert hdr_tbl.cell(0, 0).paragraphs[0].paragraph_format.right_indent == 0
+
+    plan_tbl = doc.tables[1]
+    plan_grid = _grid_dxa(plan_tbl)
+    assert sum(plan_grid) == 9355
+    assert all(sum(_row_tcw_dxa(r)) == 9355 for r in plan_tbl.rows)
+    # STT (0) is compact; Nội dung (1) & Sản phẩm (5) are wider than STT (0) and Thời gian (2)
+    assert plan_grid[0] < plan_grid[2]
+    assert plan_grid[1] > plan_grid[2]
+    assert plan_grid[5] > plan_grid[2]
+
+    # 3. Budget / Công văn table: numeric columns right-aligned, exact 165mm, no duplicate title above V/v
+    budget_cv = DocumentDraft(
+        title="Công văn đề nghị cấp kinh phí",
+        layout="administrative",
+        markdown=(
+            "BỘ GIÁO DỤC VÀ ĐÀO TẠO\n"
+            "TRƯỜNG ĐẠI HỌC QUY NHƠN\n"
+            "Số: 102/ĐHQN-KHTC\n"
+            "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n"
+            "Độc lập - Tự do - Hạnh phúc\n"
+            "*Gia Lai, ngày 24 tháng 11 năm 2026*\n\n"
+            "V/v đề nghị phê duyệt dự toán kinh phí triển khai hệ thống AI\n\n"
+            "Kính gửi: Ban Giám hiệu Trường Đại học Quy Nhơn\n\n"
+            "| STT | Nội dung chi tiêu dự toán | Số lượng | Thành tiền (VNĐ) |\n"
+            "| --- | --- | --- | --- |\n"
+            "| 1 | Thuê hạ tầng máy chủ GPU và lưu trữ dữ liệu đào tạo | 12 | 120.000.000 |\n"
+            "| 2 | Tập huấn sử dụng trợ lý AI cho giảng viên các khoa | 5 | 25.000.000 |\n\n"
+            "Nơi nhận:\n- Như trên;\n- Lưu: VT.\n\n"
+            "HIỆU TRƯỞNG\nPGS. TS. Đoàn Đức Tùng"
+        ),
+        has_tables=True,
+    )
+    cv_doc = Document(io.BytesIO(render_docx(budget_cv)))
+    # No duplicate centered "CÔNG VĂN ĐỀ NGHỊ..." title inserted above "V/v ..."
+    assert not any(p.text.strip() == "CÔNG VĂN ĐỀ NGHỊ CẤP KINH PHÍ" for p in cv_doc.paragraphs)
+    budget_tbl = cv_doc.tables[1]
+    assert sum(_grid_dxa(budget_tbl)) == 9355
+    assert all(sum(_row_tcw_dxa(r)) == 9355 for r in budget_tbl.rows)
+    row1 = budget_tbl.rows[1].cells
+    assert row1[0].paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER  # STT
+    assert row1[1].paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.LEFT    # Nội dung chi
+    assert row1[2].paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.RIGHT   # Số lượng
+    assert row1[3].paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.RIGHT   # Thành tiền
+    # Symmetric 165mm footer
+    ftr_tbl = cv_doc.tables[2]
+    assert sum(_grid_dxa(ftr_tbl)) == 9355
+
+
+
 
 
 
