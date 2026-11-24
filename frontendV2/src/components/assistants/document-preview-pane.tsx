@@ -61,6 +61,8 @@ const STRAY_DOC_MARKER_RE = /<<<\s*\/?\s*(?:END_)?DOCUMENT[^>]*>{1,3}/gi;
 const HTML_NBSP_RE = /&nbsp;|&#160;|&#xa0;|\u00a0/gi;
 const STANDALONE_BR_LINE_RE = /^\s*<\s*br\s*\/?\s*>\s*$/gim;
 const INLINE_BR_RE = /<\s*br\s*\/?\s*>/gi;
+const RAW_HTML_TAG_RE =
+  /<\/?\s*(?:div|span|p|center|font|section|article|header|footer|u|b|i|strong|em|small|big|hr)\b[^>]*>/gi;
 
 export function stripDocumentMarkers(text: string): string {
   if (!text || !text.includes("<<<")) return text;
@@ -80,6 +82,7 @@ export function cleanDraftPreviewMarkdown(markdown: string): string {
     .replace(/&#39;|&apos;/g, "'")
     .replace(STANDALONE_BR_LINE_RE, "")
     .replace(INLINE_BR_RE, "  \n")
+    .replace(RAW_HTML_TAG_RE, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -402,7 +405,10 @@ export function DocumentPreviewPane({
       {/* Scrollable paper canvas */}
       <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-5">
         <div
-          className="mx-auto w-full max-w-[720px] origin-top rounded-lg border border-border/70 bg-background px-6 py-6 shadow-xs transition-transform sm:px-8 sm:py-7"
+          className={cn(
+            "mx-auto w-full max-w-[720px] origin-top rounded-lg border border-border/70 bg-background px-6 py-6 shadow-xs transition-transform sm:px-8 sm:py-7",
+            draft.layout === "administrative" && "font-serif",
+          )}
           style={{
             transform: zoom === 100 ? undefined : `scale(${zoom / 100})`,
           }}

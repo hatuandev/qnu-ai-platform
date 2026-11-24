@@ -1360,6 +1360,116 @@ async def test_direct_llm_turn_retries_when_model_stops_at_draft_preamble(monkey
     assert "[Họ và tên]" in draft_4["markdown"]
 
 
+def test_render_docx_strips_raw_html_div_align_right_and_applies_decree_30_appendix_i():
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Cm
+
+    raw_with_html = (
+        "Dưới đây là bản thảo đơn xin nghỉ phép.\n\n"
+        '<<<DOCUMENT title="Đơn xin nghỉ phép" layout="administrative" format="docx">>>\n'
+        "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n"
+        "Độc lập - Tự do - Hạnh phúc\n\n"
+        '<div align="right"><i>Quy Nhơn, ngày 24 tháng 11 năm 2026</i></div>\n\n'
+        "# ĐƠN XIN NGHỈ PHÉP\n\n"
+        "Kính gửi: [Nơi nhận]\n\n"
+        "Tôi tên là: <span>**Nguyễn Văn Ánh**</span>\n"
+        "Chức vụ/Đơn vị: [Chức vụ/Đơn vị] — Trường Đại học Quy Nhơn\n"
+        "Thời gian nghỉ: Từ [Ngày bắt đầu] đến [Ngày kết thúc]\n"
+        "Lý do: Nghỉ việc gia đình.\n\n"
+        '<div align="right">**Ghi chú căn phải**</div>\n\n'
+        "Nơi nhận:\n"
+        "- Như trên;\n"
+        "- Lưu: VT.\n\n"
+        "NGƯỜI LÀM ĐƠN\n"
+        "(Ký và ghi rõ họ tên)\n"
+        "Nguyễn Văn Ánh\n"
+        "<<<END_DOCUMENT>>>"
+    )
+    _, draft = extract_document_draft(raw_with_html, "Soạn giúp mình đơn xin nghỉ phép")
+    assert draft is not None
+    # Extracted markdown itself must contain zero raw HTML tags
+    assert "<div" not in draft.markdown.lower()
+    assert "</div>" not in draft.markdown.lower()
+    assert "<span" not in draft.markdown.lower()
+
+    # Also test direct render_docx when a caller passes raw <div align="right"> directly in DocumentDraft
+    raw_draft = DocumentDraft(
+        title="Đơn xin nghỉ phép",
+        layout="administrative",
+        markdown=(
+            "TRƯỜNG ĐẠI HỌC QUY NHƠN\n"
+            "PHÒNG HÀNH CHÍNH - TỔNG HỢP\n"
+            "Số: 12/ĐX-HC\n"
+            "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n"
+            "Độc lập - Tự do - Hạnh phúc\n"
+            '<div align="right">Quy Nhơn, ngày 24 tháng 11 năm 2026</div>\n\n'
+            "# ĐƠN XIN NGHỈ PHÉP\n\n"
+            "Kính gửi: [Nơi nhận]\n\n"
+            "Tôi tên là: <span>Nguyễn Văn Ánh</span>, đơn vị [Chức vụ/Đơn vị].\n"
+            "Thời gian nghỉ: Từ [Ngày bắt đầu] đến [Ngày kết thúc].\n\n"
+            '<div align="right">Đoạn căn phải riêng</div>\n\n'
+            "Nơi nhận:\n"
+            "- Như trên;\n"
+            "- Lưu: VT.\n\n"
+            "NGƯỜI LÀM ĐƠN\n"
+            "(Ký và ghi rõ họ tên)\n"
+            "Nguyễn Văn Ánh"
+        ),
+        has_tables=False,
+    )
+    docx_bytes = render_docx(raw_draft)
+    doc = Document(io.BytesIO(docx_bytes))
+
+    # 1. Decree 30 Appendix I page geometry (A4 + Top 20mm, Bottom 20mm, Left 30mm, Right 15mm)
+    sec = doc.sections[0]
+    assert abs(sec.page_width - Cm(21.0)) < 2000
+    assert abs(sec.page_height - Cm(29.7)) < 2000
+    assert abs(sec.top_margin - Cm(2.0)) < 2000
+    assert abs(sec.bottom_margin - Cm(2.0)) < 2000
+    assert abs(sec.left_margin - Cm(3.0)) < 2000
+    assert abs(sec.right_margin - Cm(1.5)) < 2000
+
+    # 2. Font Times New Roman + Page 1 hides page number + PAGE field on pages 2+
+    assert doc.styles["Normal"].font.name == "Times New Roman"
+    assert sec.different_first_page_header_footer is True
+    assert "PAGE" in sec.header._element.xml
+
+    # 3. Collect all text from paragraphs & tables: ZERO raw HTML tags, all placeholders & Vietnamese intact
+    all_texts = [p.text for p in doc.paragraphs] + [
+        c.text for tbl in doc.tables for row in tbl.rows for c in row.cells
+    ]
+    joined = "\n".join(all_texts)
+    assert "<div" not in joined.lower()
+    assert "</div>" not in joined.lower()
+    assert "<span" not in joined.lower()
+    for expected in (
+        "TRƯỜNG ĐẠI HỌC QUY NHƠN",
+        "Số: 12/ĐX-HC",
+        "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM",
+        "Độc lập - Tự do - Hạnh phúc",
+        "Quy Nhơn, ngày 24 tháng 11 năm 2026",
+        "[Nơi nhận]",
+        "[Chức vụ/Đơn vị]",
+        "[Ngày bắt đầu]",
+        "[Ngày kết thúc]",
+        "Nguyễn Văn Ánh",
+        "NGƯỜI LÀM ĐƠN",
+        "Nơi nhận:",
+    ):
+        assert expected in joined
+
+    # 4. Explicit <div align="right"> paragraph rendered with RIGHT alignment
+    right_para = next((p for p in doc.paragraphs if "Đoạn căn phải riêng" in p.text), None)
+    assert right_para is not None
+    assert right_para.alignment == WD_ALIGN_PARAGRAPH.RIGHT
+
+    # 5. Header 2-col table + Footer 2-col table both present
+    assert len(doc.tables) >= 2
+    assert len(doc.tables[0].columns) == 2
+    assert len(doc.tables[-1].columns) == 2
+
+
+
 
 
 

@@ -108,6 +108,16 @@ _REFUSAL_REPLY_RE = re.compile(
     re.IGNORECASE,
 )
 _HTML_BR_RE = re.compile(r"<\s*br\s*/?\s*>", re.IGNORECASE)
+_HTML_ALIGN_BLOCK_RE = re.compile(
+    r"<\s*(?:div|p)\b[^>]*\b(?:align\s*=\s*['\"]?(?P<align>right|center|left)['\"]?|"
+    r"style\s*=\s*['\"][^'\"]*text-align\s*:\s*(?P<css_align>right|center|left)[^'\"]*['\"])[^>]*>"
+    r"(?P<inner>[\s\S]*?)</\s*(?:div|p)\s*>",
+    re.IGNORECASE,
+)
+_RAW_HTML_TAG_RE = re.compile(
+    r"</?\s*(?:div|span|p|center|font|section|article|header|footer|u|b|i|strong|em|small|big|hr)\b[^>]*>",
+    re.IGNORECASE,
+)
 _ADMIN_CUES_RE = re.compile(
     r"(?:cộng\s+hòa\s+xã\s+hội\s+chủ\s+nghĩa\s+việt\s+nam|"
     r"\b(?:tờ\s+trình|kế\s+hoạch|quyết\s+định|thông\s+báo|công\s+văn|"
@@ -217,7 +227,8 @@ DECREE_30_DRAFTING_PERSONA = (
     "- Đủ bố cục chuẩn từng loại văn bản (Đơn, Tờ trình, Công văn, Kế hoạch, Thông báo, Báo cáo, Biên bản, Quyết định): "
     "Quốc hiệu & Tiêu ngữ; Tên cơ quan/đơn vị ban hành; Số, ký hiệu; Địa danh và ngày tháng năm; "
     "Tên loại & trích yếu nội dung; Căn cứ (nếu có); Nội dung chính mạch lạc; Nơi nhận; Khối chữ ký.\n"
-    "- Văn phong hành chính chuẩn mực, súc tích, khách quan, 100% tiếng Việt trong sáng.\n\n"
+    "- Văn phong hành chính chuẩn mực, súc tích, 100% tiếng Việt; TUYỆT ĐỐI KHÔNG dùng thẻ HTML thô "
+    "(<div...>, </div>, <br>, <span>...) — chỉ dùng Markdown thuần.\n\n"
     "2. QUY TẮC HỘI THOẠI & KHÔNG HỎI VẶN NHIỀU LƯỢT:\n"
     "- Chỉ hỏi làm rõ tối đa 1 lượt ngắn gọn nếu người dùng mới ngỏ ý quá chung chung (chưa nêu rõ loại văn bản hoặc mục đích cơ bản).\n"
     "- Ngay khi người dùng đã nêu loại văn bản kèm thông tin cơ bản, bổ sung dữ liệu, hoặc yêu cầu chốt "
@@ -372,7 +383,8 @@ def export_policy_prompt_addon(formats: list[ExportFormat]) -> str:
         "không liệt kê các định dạng khác).\n"
         "  2. Đặt TOÀN BỘ thân văn bản sạch (không dính lời chào, lời dẫn hay ghi chú nháp) vào trong cặp thẻ:\n"
         '     <<<DOCUMENT title="Tiêu đề văn bản ngắn gọn" layout="standard|administrative|spreadsheet" format="docx|pdf|xlsx">>>\n'
-        "     ...nội dung văn bản bằng Markdown sạch (tiêu đề #, ##, đoạn văn, danh sách, bảng |...|)...\n"
+        "     ...nội dung văn bản bằng Markdown thuần sạch (tiêu đề #, ##, đoạn văn, danh sách, bảng |...|); "
+        "TUYỆT ĐỐI KHÔNG dùng thẻ HTML thô như <div...>, </div>, <br>, <span>...\n"
         "     <<<END_DOCUMENT>>>\n"
         '  3. Chọn layout="administrative" cho văn bản hành chính/đơn từ/kế hoạch/tờ trình/báo cáo; '
         'layout="spreadsheet" khi nội dung chủ yếu là bảng số liệu/lịch trình; còn lại dùng layout="standard". '
@@ -594,23 +606,25 @@ def _clean_html_entities(text: str) -> str:
 
 
 def _clean_html_br_to_newlines(text: str) -> str:
-    """Convert HTML <br>/<br/> tags to real newlines and decode HTML entities."""
+    """Convert HTML <br>/<br/> tags to real newlines, strip raw HTML tags, and decode entities."""
     if not text:
         return text
     cleaned = _clean_html_entities(text)
     if "<" not in cleaned:
         return cleaned.strip()
     replaced = _HTML_BR_RE.sub("\n", cleaned)
+    replaced = _RAW_HTML_TAG_RE.sub("", replaced)
     return "\n".join(part.strip() for part in replaced.splitlines()).strip()
 
 
 def _normalize_draft_markdown(markdown: str) -> str:
-    """Decode HTML entities and replace <br>/<br/> outside Markdown table rows with real line breaks.
+    """Decode HTML entities, strip raw HTML tags, and convert <br> outside Markdown tables.
 
     Table rows stay single-line so Markdown table syntax stays intact; table cells
     are cleaned separately in ``_split_table_row``.
     """
-    lines = _clean_html_entities(markdown or "").splitlines()
+    decoded = _clean_html_entities(markdown or "")
+    lines = decoded.splitlines()
     out: list[str] = []
     in_table = False
     for idx, line in enumerate(lines):
@@ -620,19 +634,20 @@ def _normalize_draft_markdown(markdown: str) -> str:
         )
         if is_table_header:
             in_table = True
-            out.append(line)
+            out.append(_RAW_HTML_TAG_RE.sub("", line))
             continue
         if in_table:
             if "|" in line and stripped:
-                out.append(line)
+                out.append(_RAW_HTML_TAG_RE.sub("", line))
                 continue
             in_table = False
-        if _HTML_BR_RE.search(line):
-            for sub in _HTML_BR_RE.sub("\n", line).splitlines():
+        cleaned_line = _RAW_HTML_TAG_RE.sub("", line)
+        if _HTML_BR_RE.search(cleaned_line):
+            for sub in _HTML_BR_RE.sub("\n", cleaned_line).splitlines():
                 out.append(sub.rstrip())
         else:
-            out.append(line)
-    return "\n".join(out).strip()
+            out.append(cleaned_line)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
 
 
 def _normalize_format_attr(raw: str | None) -> ExportFormat | None:
@@ -815,32 +830,241 @@ def _split_table_row(line: str) -> list[str]:
     return cells
 
 
+_BLACK = RGBColor(0x00, 0x00, 0x00)
+_ADMIN_DATE_LINE_RE = re.compile(
+    r"^(?:[*_`]+)?(?:\[?[^\n,]{2,45}\]?\s*,\s*)?ngày\s+[^\n]{1,30}tháng\s+[^\n]{1,20}năm\s+[^\n]{2,15}(?:[*_`]+)?$",
+    re.IGNORECASE,
+)
+_ADMIN_SO_LINE_RE = re.compile(r"^(?:[*_`]+)?số\s*[:.]", re.IGNORECASE)
+_PERSONAL_PETITION_RE = re.compile(
+    r"\b(?:đơn\s+xin|giấy\s+xin|đơn\s+đề\s+nghị|đơn\s+khiếu\s+nại|đơn\s+kiến\s+nghị|"
+    r"bản\s+tường\s+trình|bản\s+tự\s+kiểm\s+điểm|giấy\s+nghỉ\s+phép)\b",
+    re.IGNORECASE,
+)
+_ADMIN_NOI_NHAN_RE = re.compile(r"^(?:[*_`#]+\s*)*nơi\s+nhận\s*:?", re.IGNORECASE)
+_ADMIN_SIGN_ROLE_RE = re.compile(
+    r"^(?:[*_`#]+\s*)*(?:người\s+(?:làm\s+đơn|đề\s+nghị|viết\s+đơn|báo\s+cáo|lập\s+biên\s+bản|ký)|"
+    r"kính\s+đơn|hiệu\s+trưởng|phó\s+hiệu\s+trưởng|trưởng\s+(?:phòng|khoa|ban|đơn\s+vị)|"
+    r"giám\s+đốc|chủ\s+tịch|thủ\s+trưởng\s+đơn\s+vị|(?:kt|tl|tm)\.\s+[^\n]{2,60})\s*(?:[*_`]+)?$",
+    re.IGNORECASE,
+)
+_ADMIN_SIGN_HINT_RE = re.compile(
+    r"^(?:[*_`]+)?[\(\[]\s*ký(?:\s*,?\s*(?:đóng\s+dấu\s*,?\s*)?(?:và\s+)?ghi\s+rõ\s+họ(?:\s+và)?\s+tên| tên)\s*[\)\]](?:[*_`]+)?$",
+    re.IGNORECASE,
+)
+
+
+def _set_run_font(
+    run,
+    *,
+    font_name: str = "Times New Roman",
+    size_pt: int = 13,
+    bold: bool | None = None,
+    italic: bool | None = None,
+    underline: bool | None = None,
+) -> None:
+    run.font.name = font_name
+    run.font.size = Pt(size_pt)
+    run.font.color.rgb = _BLACK
+    if bold is not None:
+        run.bold = bold
+    if italic is not None:
+        run.italic = italic
+    if underline is not None:
+        run.underline = underline
+    r_pr = run._r.get_or_add_rPr()
+    r_fonts = r_pr.find(qn("w:rFonts"))
+    if r_fonts is None:
+        r_fonts = OxmlElement("w:rFonts")
+        r_pr.insert(0, r_fonts)
+    r_fonts.set(qn("w:ascii"), font_name)
+    r_fonts.set(qn("w:hAnsi"), font_name)
+    r_fonts.set(qn("w:cs"), font_name)
+
+
+def _add_page_number_header(section) -> None:
+    """Add centered Arabic page number (13pt Times New Roman) in top header, hidden on page 1."""
+    section.different_first_page_header_footer = True
+    header = section.header
+    p = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(0)
+    fld_simple = OxmlElement("w:fldSimple")
+    fld_simple.set(qn("w:instr"), "PAGE")
+    r_el = OxmlElement("w:r")
+    r_pr = OxmlElement("w:rPr")
+    r_fonts = OxmlElement("w:rFonts")
+    r_fonts.set(qn("w:ascii"), "Times New Roman")
+    r_fonts.set(qn("w:hAnsi"), "Times New Roman")
+    r_fonts.set(qn("w:cs"), "Times New Roman")
+    sz = OxmlElement("w:sz")
+    sz.set(qn("w:val"), "26")  # 13pt = 26 half-points
+    sz_cs = OxmlElement("w:szCs")
+    sz_cs.set(qn("w:val"), "26")
+    color = OxmlElement("w:color")
+    color.set(qn("w:val"), "000000")
+    r_pr.append(r_fonts)
+    r_pr.append(sz)
+    r_pr.append(sz_cs)
+    r_pr.append(color)
+    r_el.append(r_pr)
+    fld_simple.append(r_el)
+    p._p.append(fld_simple)
+
+
+def _strip_md_emphasis(text: str) -> str:
+    return re.sub(r"[*_`]+", "", (text or "").strip()).strip()
+
+
+def _extract_aligned_lines(raw_markdown: str) -> list[tuple[str | None, str]]:
+    """Convert raw Markdown (possibly containing <div align='right'>) into (align, line) pairs with zero HTML tags."""
+    decoded = _clean_html_entities(raw_markdown or "")
+    segments: list[tuple[str | None, str]] = []
+    pos = 0
+    for match in _HTML_ALIGN_BLOCK_RE.finditer(decoded):
+        if match.start() > pos:
+            segments.append((None, decoded[pos : match.start()]))
+        align = (match.group("align") or match.group("css_align") or "").lower() or None
+        segments.append((align, match.group("inner") or ""))
+        pos = match.end()
+    if pos < len(decoded):
+        segments.append((None, decoded[pos:]))
+
+    result: list[tuple[str | None, str]] = []
+    for align, chunk in segments:
+        cleaned_chunk = _normalize_draft_markdown(chunk)
+        for line in cleaned_chunk.splitlines():
+            result.append((align, line))
+    return result
+
+
+def _extract_admin_header(
+    items: list[tuple[str | None, str]],
+) -> tuple[list[str], str | None, str | None, bool, list[tuple[str | None, str]]]:
+    """Extract optional Decree 30 header fields (org lines, Số, date line, motto) from top lines."""
+    org_lines: list[str] = []
+    so_line: str | None = None
+    date_line: str | None = None
+    has_motto = False
+    idx = 0
+    scan_limit = min(len(items), 12)
+    while idx < scan_limit:
+        _align, raw = items[idx]
+        stripped = raw.strip()
+        if not stripped or stripped in ("---", "***", "___"):
+            idx += 1
+            continue
+        plain = _strip_md_emphasis(stripped.lstrip("#").strip())
+        upper = plain.upper()
+        if "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" in upper:
+            has_motto = True
+            idx += 1
+            continue
+        if "ĐỘC LẬP" in upper and "TỰ DO" in upper and "HẠNH PHÚC" in upper:
+            has_motto = True
+            idx += 1
+            continue
+        if _ADMIN_SO_LINE_RE.match(plain):
+            so_line = plain
+            idx += 1
+            continue
+        if _ADMIN_DATE_LINE_RE.match(plain):
+            date_line = plain
+            idx += 1
+            continue
+        # Issuing agency line (before motto or Số, e.g. TRƯỜNG ĐẠI HỌC QUY NHƠN / PHÒNG HÀNH CHÍNH)
+        if (
+            not has_motto
+            and not stripped.startswith("#")
+            and len(plain) <= 70
+            and (
+                plain.isupper()
+                or plain.startswith(("[Tên cơ quan", "[Đơn vị"))
+                or "ĐẠI HỌC" in upper
+                or "TRƯỜNG " in upper
+                or "UBND" in upper
+                or "BỘ " in upper
+            )
+            and not _ADMIN_CUES_RE.match(plain)
+        ):
+            org_lines.append(plain)
+            idx += 1
+            continue
+        break
+    return org_lines, so_line, date_line, has_motto, items[idx:]
+
+
+def _extract_admin_footer(
+    items: list[tuple[str | None, str]],
+) -> tuple[list[tuple[str | None, str]], list[str], list[str]]:
+    """Extract trailing Nơi nhận (left) and signature block (right) for Decree 30 2-column footer."""
+    end = len(items)
+    while end > 0 and not items[end - 1][1].strip():
+        end -= 1
+    trimmed = items[:end]
+    if not trimmed:
+        return [], [], []
+
+    # Look back up to 14 lines for Nơi nhận or signature role
+    window_start = max(0, len(trimmed) - 14)
+    noi_nhan_idx: int | None = None
+    sign_idx: int | None = None
+    for i in range(window_start, len(trimmed)):
+        plain = _strip_md_emphasis(trimmed[i][1].strip())
+        if not plain or plain in ("---", "***", "___"):
+            continue
+        if noi_nhan_idx is None and _ADMIN_NOI_NHAN_RE.match(plain):
+            noi_nhan_idx = i
+        if sign_idx is None and _ADMIN_SIGN_ROLE_RE.match(plain):
+            sign_idx = i
+
+    if noi_nhan_idx is None and sign_idx is None:
+        return trimmed, [], []
+
+    cut_idx = min(i for i in (noi_nhan_idx, sign_idx) if i is not None)
+    body = trimmed[:cut_idx]
+    noi_nhan_lines: list[str] = []
+    sign_lines: list[str] = []
+
+    if noi_nhan_idx is not None and sign_idx is not None:
+        if noi_nhan_idx < sign_idx:
+            noi_nhan_lines = [ln[1].strip() for ln in trimmed[noi_nhan_idx:sign_idx] if ln[1].strip()]
+            sign_lines = [ln[1].strip() for ln in trimmed[sign_idx:] if ln[1].strip()]
+        else:
+            sign_lines = [ln[1].strip() for ln in trimmed[sign_idx:noi_nhan_idx] if ln[1].strip()]
+            noi_nhan_lines = [ln[1].strip() for ln in trimmed[noi_nhan_idx:] if ln[1].strip()]
+    elif noi_nhan_idx is not None:
+        noi_nhan_lines = [ln[1].strip() for ln in trimmed[noi_nhan_idx:] if ln[1].strip()]
+    elif sign_idx is not None:
+        sign_lines = [ln[1].strip() for ln in trimmed[sign_idx:] if ln[1].strip()]
+
+    return body, noi_nhan_lines, sign_lines
+
+
 def _add_inline_runs(paragraph, text: str, *, font_name: str = "Times New Roman", size_pt: int = 13):
     """Render simple Markdown inline bold/italic runs into a python-docx paragraph."""
-    cleaned = _HTML_BR_RE.sub("\n", _clean_html_entities(text))
+    cleaned = _RAW_HTML_TAG_RE.sub("", _HTML_BR_RE.sub("\n", _clean_html_entities(text)))
     token_re = re.compile(r"(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)")
     pos = 0
     for match in token_re.finditer(cleaned):
         if match.start() > pos:
             run = paragraph.add_run(cleaned[pos : match.start()])
-            run.font.name = font_name
-            run.font.size = Pt(size_pt)
+            _set_run_font(run, font_name=font_name, size_pt=size_pt)
         token = match.group(0)
         if token.startswith("**") and token.endswith("**"):
             run = paragraph.add_run(token[2:-2])
-            run.bold = True
+            _set_run_font(run, font_name=font_name, size_pt=size_pt, bold=True)
         elif token.startswith("*") and token.endswith("*"):
             run = paragraph.add_run(token[1:-1])
-            run.italic = True
+            _set_run_font(run, font_name=font_name, size_pt=size_pt, italic=True)
         else:
             run = paragraph.add_run(token[1:-1])
-        run.font.name = font_name
-        run.font.size = Pt(size_pt)
+            _set_run_font(run, font_name=font_name, size_pt=size_pt)
         pos = match.end()
     if pos < len(cleaned):
         run = paragraph.add_run(cleaned[pos:])
-        run.font.name = font_name
-        run.font.size = Pt(size_pt)
+        _set_run_font(run, font_name=font_name, size_pt=size_pt)
 
 
 def _set_cell_shading(cell, fill_hex: str) -> None:
@@ -876,81 +1100,152 @@ def _remove_table_borders(table) -> None:
 
 
 def render_docx(draft: DocumentDraft) -> bytes:
-    """Render a DocumentDraft into a clean, print-ready A4 .docx file."""
+    """Render a DocumentDraft into a print-ready A4 .docx compliant with Decree 30/2020/NĐ-CP Appendix I."""
     doc = Document()
     section = doc.sections[0]
+    # Decree 30/2020/NĐ-CP Appendix I: A4 (210mm x 297mm), margins Top 20mm, Bottom 20mm, Left 30mm, Right 15mm
     section.page_width = Cm(21.0)
     section.page_height = Cm(29.7)
     section.top_margin = Cm(2.0)
     section.bottom_margin = Cm(2.0)
-    section.left_margin = Cm(2.5)
-    section.right_margin = Cm(2.0)
+    section.left_margin = Cm(3.0)
+    section.right_margin = Cm(1.5)
+    _add_page_number_header(section)
 
     normal = doc.styles["Normal"]
     normal.font.name = "Times New Roman"
     normal.font.size = Pt(13)
-    normal.font.color.rgb = RGBColor(0x1E, 0x29, 0x3B)
+    normal.font.color.rgb = _BLACK
+    normal_rpr = normal.element.get_or_add_rPr()
+    normal_rfonts = normal_rpr.find(qn("w:rFonts"))
+    if normal_rfonts is None:
+        normal_rfonts = OxmlElement("w:rFonts")
+        normal_rpr.insert(0, normal_rfonts)
+    normal_rfonts.set(qn("w:ascii"), "Times New Roman")
+    normal_rfonts.set(qn("w:hAnsi"), "Times New Roman")
+    normal_rfonts.set(qn("w:cs"), "Times New Roman")
 
-    normalized_md = _normalize_draft_markdown(draft.markdown)
-    body_upper = normalized_md.upper()
-    if draft.layout == "administrative" and "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" not in body_upper:
-        hdr_tbl = doc.add_table(rows=1, cols=2)
-        hdr_tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
-        _remove_table_borders(hdr_tbl)
-        left_p = hdr_tbl.cell(0, 0).paragraphs[0]
-        left_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r1 = left_p.add_run("TRƯỜNG ĐẠI HỌC QUY NHƠN\n")
-        r1.bold = True
-        r1.font.name = "Times New Roman"
-        r1.font.size = Pt(12)
-        r2 = left_p.add_run("[Đơn vị soạn thảo]")
-        r2.font.name = "Times New Roman"
-        r2.font.size = Pt(12)
+    aligned_items = _extract_aligned_lines(draft.markdown)
+    is_admin = draft.layout == "administrative"
+    noi_nhan_lines: list[str] = []
+    sign_lines: list[str] = []
 
-        right_p = hdr_tbl.cell(0, 1).paragraphs[0]
-        right_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r3 = right_p.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n")
-        r3.bold = True
-        r3.font.name = "Times New Roman"
-        r3.font.size = Pt(12)
-        r4 = right_p.add_run("Độc lập - Tự do - Hạnh phúc")
-        r4.bold = True
-        r4.underline = True
-        r4.font.name = "Times New Roman"
-        r4.font.size = Pt(13)
+    if is_admin:
+        org_lines, so_line, date_line, _has_motto, aligned_items = _extract_admin_header(aligned_items)
+        aligned_items, noi_nhan_lines, sign_lines = _extract_admin_footer(aligned_items)
+        is_personal_petition = bool(_PERSONAL_PETITION_RE.search(draft.title or ""))
+
+        if org_lines or so_line or not is_personal_petition:
+            hdr_tbl = doc.add_table(rows=1, cols=2)
+            hdr_tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+            _remove_table_borders(hdr_tbl)
+            hdr_tbl.cell(0, 0).width = Cm(7.0)
+            hdr_tbl.cell(0, 1).width = Cm(9.5)
+
+            left_cell = hdr_tbl.cell(0, 0)
+            left_p = left_cell.paragraphs[0]
+            left_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            left_p.paragraph_format.space_before = Pt(0)
+            left_p.paragraph_format.space_after = Pt(2)
+            effective_org_lines = org_lines or ["TRƯỜNG ĐẠI HỌC QUY NHƠN", "[Đơn vị soạn thảo]"]
+            for idx_org, org_line in enumerate(effective_org_lines):
+                run = left_p.add_run(
+                    org_line.upper()
+                    + ("\n" if idx_org < len(effective_org_lines) - 1 else "")
+                )
+                _set_run_font(run, size_pt=12, bold=(idx_org == len(effective_org_lines) - 1))
+            if so_line:
+                so_p = left_cell.add_paragraph()
+                so_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                so_p.paragraph_format.space_before = Pt(4)
+                so_p.paragraph_format.space_after = Pt(0)
+                _set_run_font(so_p.add_run(so_line), size_pt=13)
+
+            right_cell = hdr_tbl.cell(0, 1)
+            right_p = right_cell.paragraphs[0]
+            right_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            right_p.paragraph_format.space_before = Pt(0)
+            right_p.paragraph_format.space_after = Pt(0)
+            _set_run_font(
+                right_p.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n"),
+                size_pt=12,
+                bold=True,
+            )
+            _set_run_font(
+                right_p.add_run("Độc lập - Tự do - Hạnh phúc"),
+                size_pt=13,
+                bold=True,
+                underline=True,
+            )
+            if date_line:
+                date_p = right_cell.add_paragraph()
+                date_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                date_p.paragraph_format.space_before = Pt(6)
+                date_p.paragraph_format.space_after = Pt(0)
+                _set_run_font(date_p.add_run(date_line), size_pt=13, italic=True)
+        else:
+            # Personal petition (e.g. Đơn xin nghỉ phép): centered National Motto + right-aligned date
+            motto_p = doc.add_paragraph()
+            motto_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            motto_p.paragraph_format.space_before = Pt(0)
+            motto_p.paragraph_format.space_after = Pt(2)
+            _set_run_font(
+                motto_p.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n"),
+                size_pt=12,
+                bold=True,
+            )
+            _set_run_font(
+                motto_p.add_run("Độc lập - Tự do - Hạnh phúc"),
+                size_pt=13,
+                bold=True,
+                underline=True,
+            )
+            if date_line:
+                date_p = doc.add_paragraph()
+                date_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                date_p.paragraph_format.space_before = Pt(6)
+                date_p.paragraph_format.space_after = Pt(6)
+                _set_run_font(date_p.add_run(date_line), size_pt=13, italic=True)
 
         spacer = doc.add_paragraph()
+        spacer.paragraph_format.space_before = Pt(0)
         spacer.paragraph_format.space_after = Pt(6)
 
-    lines = normalized_md.splitlines()
-    first_non_empty = next((ln.strip() for ln in lines if ln.strip()), "")
-    if not first_non_empty.startswith("#"):
+    first_non_empty = next((ln.strip() for _al, ln in aligned_items if ln.strip()), "")
+    first_plain = _strip_md_emphasis(first_non_empty.lstrip("#").strip())
+    has_explicit_title_line = first_non_empty.startswith("#") or (
+        is_admin and first_plain.upper() == draft.title.upper()
+    )
+    if not has_explicit_title_line:
         title_p = doc.add_paragraph()
         title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        title_p.paragraph_format.space_before = Pt(4)
+        title_p.paragraph_format.space_before = Pt(6)
         title_p.paragraph_format.space_after = Pt(10)
-        tr = title_p.add_run(draft.title.upper() if draft.layout == "administrative" else draft.title)
-        tr.bold = True
-        tr.font.name = "Times New Roman"
-        tr.font.size = Pt(15)
+        _set_run_font(
+            title_p.add_run(draft.title.upper() if is_admin else draft.title),
+            size_pt=14,
+            bold=True,
+        )
 
     i = 0
-    while i < len(lines):
-        raw_line = lines[i]
+    while i < len(aligned_items):
+        align_hint, raw_line = aligned_items[i]
         stripped = raw_line.strip()
-        if not stripped:
+        if not stripped or stripped in ("---", "***", "___"):
             i += 1
             continue
-        if stripped in ("---", "***", "___"):
-            i += 1
-            continue
+
         # Markdown table
-        if i + 1 < len(lines) and "|" in raw_line and _TABLE_SEP_RE.match(lines[i + 1]):
+        if (
+            i + 1 < len(aligned_items)
+            and "|" in raw_line
+            and _TABLE_SEP_RE.match(aligned_items[i + 1][1])
+        ):
             headers = _split_table_row(raw_line)
             i += 2
             rows: list[list[str]] = []
-            while i < len(lines) and "|" in lines[i] and lines[i].strip():
-                row = _split_table_row(lines[i])
+            while i < len(aligned_items) and "|" in aligned_items[i][1] and aligned_items[i][1].strip():
+                row = _split_table_row(aligned_items[i][1])
                 if len(row) < len(headers):
                     row.extend([""] * (len(headers) - len(row)))
                 rows.append(row[: len(headers)])
@@ -965,10 +1260,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
                     p = cell.paragraphs[0]
                     p.paragraph_format.space_before = Pt(3)
                     p.paragraph_format.space_after = Pt(3)
-                    run = p.add_run(header_text)
-                    run.bold = True
-                    run.font.name = "Times New Roman"
-                    run.font.size = Pt(12)
+                    _set_run_font(p.add_run(header_text), size_pt=12, bold=True)
                 for row_idx, row_vals in enumerate(rows, start=1):
                     for col_idx, val in enumerate(row_vals):
                         cell = table.cell(row_idx, col_idx)
@@ -983,30 +1275,25 @@ def render_docx(draft: DocumentDraft) -> bytes:
         # Headings
         if stripped.startswith("#"):
             level = len(stripped) - len(stripped.lstrip("#"))
-            heading_text = stripped.lstrip("#").strip()
+            heading_text = _strip_md_emphasis(stripped.lstrip("#").strip())
             p = doc.add_paragraph()
             if level == 1:
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                p.paragraph_format.space_before = Pt(6)
+                p.paragraph_format.space_before = Pt(8)
                 p.paragraph_format.space_after = Pt(8)
-                run = p.add_run(heading_text)
-                run.bold = True
-                run.font.name = "Times New Roman"
-                run.font.size = Pt(15)
+                _set_run_font(
+                    p.add_run(heading_text.upper() if is_admin else heading_text),
+                    size_pt=14,
+                    bold=True,
+                )
             elif level == 2:
-                p.paragraph_format.space_before = Pt(10)
+                p.paragraph_format.space_before = Pt(8)
                 p.paragraph_format.space_after = Pt(4)
-                run = p.add_run(heading_text)
-                run.bold = True
-                run.font.name = "Times New Roman"
-                run.font.size = Pt(14)
+                _set_run_font(p.add_run(heading_text), size_pt=13, bold=True)
             else:
                 p.paragraph_format.space_before = Pt(6)
                 p.paragraph_format.space_after = Pt(3)
-                run = p.add_run(heading_text)
-                run.bold = True
-                run.font.name = "Times New Roman"
-                run.font.size = Pt(13)
+                _set_run_font(p.add_run(heading_text), size_pt=13, bold=True)
             i += 1
             continue
 
@@ -1014,9 +1301,9 @@ def render_docx(draft: DocumentDraft) -> bytes:
         bullet_match = re.match(r"^[-*•]\s+(.*)$", stripped)
         if bullet_match:
             p = doc.add_paragraph(style="List Bullet")
-            p.paragraph_format.space_after = Pt(3)
+            p.paragraph_format.space_after = Pt(4)
             p.paragraph_format.line_spacing = 1.15
-            _add_inline_runs(p, bullet_match.group(1))
+            _add_inline_runs(p, bullet_match.group(1), size_pt=13)
             i += 1
             continue
 
@@ -1025,18 +1312,69 @@ def render_docx(draft: DocumentDraft) -> bytes:
         if num_match:
             p = doc.add_paragraph()
             p.paragraph_format.left_indent = Cm(0.6)
-            p.paragraph_format.space_after = Pt(3)
+            p.paragraph_format.space_after = Pt(4)
             p.paragraph_format.line_spacing = 1.15
-            _add_inline_runs(p, f"**{num_match.group(1)}** {num_match.group(2)}")
+            _add_inline_runs(p, f"**{num_match.group(1)}** {num_match.group(2)}", size_pt=13)
             i += 1
             continue
 
-        # Regular paragraph
+        # Regular paragraph (preserving explicit <div align="..."> alignment & Decree 30 date/title rules)
         p = doc.add_paragraph()
-        p.paragraph_format.space_after = Pt(5)
+        p.paragraph_format.space_after = Pt(6)
         p.paragraph_format.line_spacing = 1.15
-        _add_inline_runs(p, stripped)
+        plain = _strip_md_emphasis(stripped)
+        if align_hint == "right" or (is_admin and _ADMIN_DATE_LINE_RE.match(plain)):
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        elif align_hint == "center" or (
+            is_admin and plain.upper() == draft.title.upper() and len(plain) <= 100
+        ):
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        elif is_admin and not plain.startswith("Kính gửi"):
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        _add_inline_runs(p, stripped, size_pt=13)
         i += 1
+
+    # Decree 30 2-column borderless footer (Nơi nhận left + Signature block right)
+    if is_admin and (noi_nhan_lines or sign_lines):
+        ftr_tbl = doc.add_table(rows=1, cols=2)
+        ftr_tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+        _remove_table_borders(ftr_tbl)
+        ftr_tbl.cell(0, 0).width = Cm(8.0)
+        ftr_tbl.cell(0, 1).width = Cm(8.5)
+
+        left_cell = ftr_tbl.cell(0, 0)
+        if noi_nhan_lines:
+            for idx_n, n_line in enumerate(noi_nhan_lines):
+                np = left_cell.paragraphs[0] if idx_n == 0 else left_cell.add_paragraph()
+                np.paragraph_format.space_before = Pt(2 if idx_n == 0 else 0)
+                np.paragraph_format.space_after = Pt(2)
+                plain_n = _strip_md_emphasis(n_line)
+                if idx_n == 0 and _ADMIN_NOI_NHAN_RE.match(plain_n):
+                    _set_run_font(np.add_run(plain_n), size_pt=12, bold=True, italic=True)
+                else:
+                    _set_run_font(np.add_run(plain_n), size_pt=11)
+
+        right_cell = ftr_tbl.cell(0, 1)
+        if sign_lines:
+            for idx_s, s_line in enumerate(sign_lines):
+                sp = right_cell.paragraphs[0] if idx_s == 0 else right_cell.add_paragraph()
+                sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                plain_s = _strip_md_emphasis(s_line)
+                if idx_s == 0:
+                    sp.paragraph_format.space_before = Pt(2)
+                    sp.paragraph_format.space_after = Pt(2)
+                    _set_run_font(sp.add_run(plain_s.upper()), size_pt=13, bold=True)
+                elif _ADMIN_SIGN_HINT_RE.match(plain_s):
+                    sp.paragraph_format.space_before = Pt(0)
+                    sp.paragraph_format.space_after = Pt(36)
+                    _set_run_font(sp.add_run(plain_s), size_pt=12, italic=True)
+                else:
+                    if idx_s == 1:
+                        sp.paragraph_format.space_before = Pt(36)
+                    else:
+                        sp.paragraph_format.space_before = Pt(2)
+                    sp.paragraph_format.space_after = Pt(2)
+                    _set_run_font(sp.add_run(plain_s), size_pt=13, bold=True)
 
     buf = io.BytesIO()
     doc.save(buf)
