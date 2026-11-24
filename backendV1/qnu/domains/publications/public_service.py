@@ -30,6 +30,7 @@ from qnu.domains.assistants.service import assistant_readiness, get_assistant
 from qnu.domains.conversations.document_export import (
     EXPORT_MEDIA_TYPES,
     NO_KNOWLEDGE_GROUNDING_POLICY,
+    DirectHistoryEntry,
     DocumentDraft,
     ExportFormat,
     active_draft_prompt_context,
@@ -47,6 +48,7 @@ from qnu.domains.conversations.document_export import (
     resolve_preferred_format,
     safe_download_filename,
     strip_document_markers,
+    trim_direct_history,
     vietnam_time_context,
 )
 from qnu.domains.identity.service_actor import public_chatbot_actor
@@ -905,11 +907,19 @@ async def turn(
             history_rows = await _load_public_history(
                 req.session_id, getattr(assistant, "history_turns", 3)
             )
-            system_content += vietnam_time_context() + dialogue_turn_policy(len(history_rows))
+            trimmed_history = trim_direct_history(
+                [
+                    DirectHistoryEntry(question=item["question"], answer=item["answer"])
+                    for item in history_rows
+                ],
+                max_turns=getattr(assistant, "history_turns", 3),
+            )
+            system_content += vietnam_time_context() + dialogue_turn_policy(len(trimmed_history))
             messages = [ChatMessage(role="system", content=system_content)]
-            for item in history_rows:
-                messages.append(ChatMessage(role="user", content=item["question"]))
-                messages.append(ChatMessage(role="assistant", content=item["answer"]))
+            for item in trimmed_history:
+                messages.append(ChatMessage(role="user", content=item.question))
+                if item.answer:
+                    messages.append(ChatMessage(role="assistant", content=item.answer))
             messages.append(ChatMessage(role="user", content=req.question))
 
             def _parse_pub_reply(raw: str) -> str:
@@ -980,6 +990,12 @@ async def turn(
                 chat_res = await _run_public_completion()
                 pub_ans = _parse_pub_reply(chat_res.content)
                 if not social_only and is_abnormally_truncated_reply(pub_ans, req.question):
+                    logger.warning(
+                        "public_chat_truncated_reply_retry",
+                        publication_id=row.id,
+                        provider_id=runtime.provider_id,
+                        raw_len=len(pub_ans.strip()),
+                    )
                     retry_res = await _run_public_completion()
                     retry_ans = _parse_pub_reply(retry_res.content)
                     if retry_ans.strip():

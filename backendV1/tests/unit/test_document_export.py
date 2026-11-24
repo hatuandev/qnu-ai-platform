@@ -794,4 +794,305 @@ async def test_direct_llm_turn_retries_once_on_truncated_reply(monkeypatch):
     assert reply.answer != "Cảm"
 
 
+def test_export_preserves_placeholders_and_vietnamese_diacritics_across_all_formats():
+    import pymupdf
+
+    raw_doc = (
+        "Dưới đây là bản thảo hoàn chỉnh.\n\n"
+        '<<<DOCUMENT title="Đơn xin nghỉ phép" layout="administrative" format="docx">>>\n'
+        "# ĐƠN XIN NGHỈ PHÉP\n\n"
+        "Kính gửi: [Nơi nhận]\n\n"
+        "Tôi tên là: **Nguyễn Văn Ánh**\n"
+        "Chức vụ/Đơn vị: [Chức vụ/Đơn vị] — Trường Đại học Quy Nhơn\n"
+        "Thời gian nghỉ: Từ [Ngày bắt đầu] đến [Ngày kết thúc]\n"
+        "Lý do: Nghỉ ốm theo chỉ định bác sĩ.\n\n"
+        "| Mục | Thông tin |\n"
+        "| --- | --- |\n"
+        "| Nơi nhận | [Nơi nhận] |\n"
+        "| Thời gian | Từ [Ngày bắt đầu] đến [Ngày kết thúc] |\n"
+        "<<<END_DOCUMENT>>>"
+    )
+    _, draft = extract_document_draft(raw_doc, "Soạn giúp mình đơn xin nghỉ phép")
+    assert draft is not None
+    expected_tokens = [
+        "[Nơi nhận]",
+        "[Ngày bắt đầu]",
+        "[Ngày kết thúc]",
+        "[Chức vụ/Đơn vị]",
+        "Nguyễn Văn Ánh",
+        "Trường Đại học Quy Nhơn",
+    ]
+
+    # 1. DOCX
+    docx_doc = Document(io.BytesIO(render_docx(draft)))
+    docx_text = "\n".join(
+        [p.text for p in docx_doc.paragraphs]
+        + [c.text for t in docx_doc.tables for r in t.rows for c in r.cells]
+    )
+    for token in expected_tokens:
+        assert token in docx_text
+
+    # 2. XLSX
+    wb = load_workbook(io.BytesIO(render_xlsx(draft)))
+    xlsx_text = "\n".join(
+        str(val)
+        for ws in wb.worksheets
+        for row in ws.iter_rows(values_only=True)
+        for val in row
+        if val is not None
+    )
+    assert "[Nơi nhận]" in xlsx_text
+    assert "[Ngày bắt đầu]" in xlsx_text
+    assert "[Ngày kết thúc]" in xlsx_text
+
+    # 3. PDF (PyMuPDF fallback text extraction)
+    pdf_bytes = document_export._render_pdf_pymupdf(draft)
+    assert pdf_bytes.startswith(b"%PDF")
+    with pymupdf.open(stream=pdf_bytes, filetype="pdf") as pdf_doc:
+        pdf_text = "\n".join(page.get_text("text") for page in pdf_doc)
+    for token in expected_tokens:
+        assert token in pdf_text
+
+    # 4. Safe filename preserves Vietnamese readability
+    assert document_export.safe_download_filename(draft.title, "docx") == "Đơn xin nghỉ phép.docx"
+
+
+@pytest.mark.asyncio
+async def test_long_conversation_history_is_bounded_and_syncs_history_turn_ids(monkeypatch):
+    from qnu.domains.conversations import execution
+
+    captured_messages: list[list] = []
+
+    class CaptureChat:
+        async def complete(self, messages, _request):
+            captured_messages.append(messages)
+            return SimpleNamespace(content="Đã cập nhật bản thảo theo yêu cầu mới nhất.", total_tokens=90)
+
+    fake_runtime = SimpleNamespace(
+        provider_id="prov_1",
+        model_name="qwen3.8-27b-q4",
+        inference_configuration_hash=lambda _task: "cfg_hash",
+    )
+    fake_budget = SimpleNamespace(total_reserved_tokens=512)
+    monkeypatch.setattr(
+        execution,
+        "prepare_chat_request",
+        AsyncMock(return_value=(fake_runtime, SimpleNamespace(), fake_budget)),
+    )
+    monkeypatch.setattr(
+        execution.usage_service,
+        "reserve",
+        AsyncMock(return_value=SimpleNamespace(id="usg_long_1")),
+    )
+    monkeypatch.setattr(execution.usage_service, "settle", AsyncMock())
+    monkeypatch.setattr(execution, "_live_export_formats", AsyncMock(return_value=["docx"]))
+    monkeypatch.setattr(execution, "bind_usage", lambda req, _uid: req)
+
+    # 10 completed prior turns with very long answers (2500 chars each)
+    long_turns = [
+        SimpleNamespace(
+            id=f"turn_{idx}",
+            status="completed",
+            question=f"Câu hỏi lượt {idx}: " + ("chi tiết " * 120),
+            result={"answer": f"Bản thảo lượt {idx}: " + ("nội dung dài " * 250)},
+            rewrite_trace={},
+        )
+        for idx in range(1, 11)
+    ]
+    fake_db = SimpleNamespace(
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: long_turns))
+    )
+    fake_conv = SimpleNamespace(
+        id="conv_long_1",
+        assistant_id="ast_1",
+        assistant_snapshot={
+            "persona": document_export.DECREE_30_DRAFTING_PERSONA,
+            "history_turns": 10,  # Intentionally above MAX_DIRECT_HISTORY_TURNS
+            "rag_policy": {"allow_export_docx": True},
+        },
+    )
+    turn_11 = SimpleNamespace(
+        id="turn_11",
+        turn_no=11,
+        question="Đổi nơi nhận thành Ban Giám hiệu giúp mình",
+        resolved_question="Đổi nơi nhận thành Ban Giám hiệu giúp mình",
+        history_turn_ids=[],
+        rewrite_trace={},
+    )
+
+    await execution._direct_llm_turn(
+        fake_db,
+        SimpleNamespace(actor_id="act_1"),
+        "ws_1",
+        fake_conv,
+        turn_11,
+        CaptureChat(),
+        "prov_1",
+    )
+    sent = captured_messages[0]
+    history_msgs = sent[1:-1]  # Exclude system prompt and current user question
+    assert len(turn_11.history_turn_ids) <= document_export.MAX_DIRECT_HISTORY_TURNS
+    assert len(turn_11.history_turn_ids) >= 1
+    # Most recent prior turn is always preserved
+    assert turn_11.history_turn_ids[-1] == "turn_10"
+    # Every included turn produces user + assistant messages, strictly matching history_turn_ids
+    assert len(history_msgs) == len(turn_11.history_turn_ids) * 2
+    total_hist_chars = sum(len(m.content) for m in history_msgs)
+    assert total_hist_chars <= document_export.MAX_DIRECT_HISTORY_CHARS
+
+
+@pytest.mark.asyncio
+async def test_retry_failure_settles_both_usages_and_propagates_error(monkeypatch):
+    from qnu.domains.conversations import execution
+    from qnu.platform.errors import AppException
+    from qnu.ports.chat_model import ChatResponseError
+
+    settle_calls: list[tuple[str, int | None, bool]] = []
+    reserve_keys: list[str] = []
+
+    class TruncatedThenTimeoutChat:
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, _messages, _request):
+            self.calls += 1
+            if self.calls == 1:
+                return SimpleNamespace(content="Cảm", total_tokens=15)
+            raise ChatResponseError(
+                AppException("Upstream timeout", code="model_timeout", status_code=504),
+                raw_body=b"",
+                usage_tokens=5,
+            )
+
+    async def fake_reserve(_db, _actor, _ws, _task, idem_key, *_args, **_kwargs):
+        reserve_keys.append(idem_key)
+        return SimpleNamespace(id=f"usg_{len(reserve_keys)}")
+
+    async def fake_settle(_db, usage_id, *, total_tokens, failed=False, **_kwargs):
+        settle_calls.append((usage_id, total_tokens, failed))
+
+    fake_runtime = SimpleNamespace(
+        provider_id="prov_1",
+        model_name="qwen3.8-27b-q4",
+        inference_configuration_hash=lambda _task: "cfg_hash",
+    )
+    fake_budget = SimpleNamespace(total_reserved_tokens=512)
+    monkeypatch.setattr(
+        execution,
+        "prepare_chat_request",
+        AsyncMock(return_value=(fake_runtime, SimpleNamespace(), fake_budget)),
+    )
+    monkeypatch.setattr(execution.usage_service, "reserve", fake_reserve)
+    monkeypatch.setattr(execution.usage_service, "settle", fake_settle)
+    monkeypatch.setattr(execution, "_live_export_formats", AsyncMock(return_value=["docx"]))
+    monkeypatch.setattr(execution, "bind_usage", lambda req, _uid: req)
+
+    fake_db = SimpleNamespace(
+        scalars=AsyncMock(return_value=SimpleNamespace(all=list))
+    )
+    fake_conv = SimpleNamespace(
+        id="conv_err_1",
+        assistant_id="ast_1",
+        assistant_snapshot={
+            "persona": document_export.DECREE_30_DRAFTING_PERSONA,
+            "history_turns": 3,
+            "rag_policy": {"allow_export_docx": True},
+        },
+    )
+    turn = SimpleNamespace(
+        id="turn_err_1",
+        turn_no=1,
+        question="Soạn giúp mình đơn xin nghỉ phép 2 ngày",
+        resolved_question="Soạn giúp mình đơn xin nghỉ phép 2 ngày",
+        history_turn_ids=[],
+        rewrite_trace={},
+    )
+
+    with pytest.raises(ChatResponseError):
+        await execution._direct_llm_turn(
+            fake_db,
+            SimpleNamespace(actor_id="act_1"),
+            "ws_1",
+            fake_conv,
+            turn,
+            TruncatedThenTimeoutChat(),
+            "prov_1",
+        )
+    assert reserve_keys == ["direct_chat:turn_err_1", "direct_chat_retry:turn_err_1"]
+    assert settle_calls == [("usg_1", 15, False), ("usg_2", 5, True)]
+
+
+@pytest.mark.asyncio
+async def test_disabled_format_guard_blocks_before_llm_on_chat_send(monkeypatch):
+    from datetime import UTC, datetime
+
+    from qnu.domains.conversations import execution
+    from qnu.domains.conversations.schemas import TurnRequest
+
+    fake_conv = SimpleNamespace(
+        id="conv_guard_1",
+        workspace_id="ws_1",
+        assistant_id="ast_guard_1",
+        collection_id=None,
+        document_ids=None,
+        assistant_snapshot={
+            "name": "Trợ lý soạn thảo",
+            "persona": document_export.DECREE_30_DRAFTING_PERSONA,
+            "collection_ids": [],
+            "chat_provider_id": "prov_1",
+            "top_k": 5,
+            "history_turns": 3,
+            "max_output_tokens": None,
+            "rag_policy": {"allow_export_docx": True, "allow_export_xlsx": False},
+        },
+    )
+    now = datetime.now(UTC)
+    fake_turn = SimpleNamespace(
+        id="turn_guard_1",
+        conversation_id="conv_guard_1",
+        turn_no=1,
+        question="Xuất file excel bảng chấm công giúp mình",
+        resolved_question="Xuất file excel bảng chấm công giúp mình",
+        metadata_filter={},
+        history_turn_ids=[],
+        status="running",
+        error_code=None,
+        result=None,
+        rewrite_trace={},
+        created_at=now,
+        finished_at=None,
+        lease_expires_at=now,
+    )
+
+    async def fail_if_llm_called(*_args, **_kwargs):
+        raise AssertionError("LLM must not be invoked when requested export format is disabled")
+
+    monkeypatch.setattr(
+        execution, "reserve_turn", AsyncMock(return_value=(fake_conv, fake_turn, True))
+    )
+    monkeypatch.setattr(execution, "_live_export_formats", AsyncMock(return_value=["docx"]))
+    monkeypatch.setattr(execution, "_direct_llm_turn", fail_if_llm_called)
+    monkeypatch.setattr(execution, "checkpoint", AsyncMock())
+    monkeypatch.setattr(execution, "record_workspace_event", AsyncMock())
+
+    fake_db = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+    resp = await execution.send(
+        fake_db,
+        SimpleNamespace(),
+        SimpleNamespace(),
+        SimpleNamespace(),
+        SimpleNamespace(),
+        SimpleNamespace(actor_id="act_1"),
+        "ws_1",
+        "conv_guard_1",
+        TurnRequest(question="Xuất file excel bảng chấm công giúp mình", expected_turn_no=0),
+        "idem_guard_1",
+    )
+    assert resp.status == "completed"
+    assert resp.result is not None
+    assert "Excel" in resp.result.answer
+    assert "document_draft" not in (fake_turn.rewrite_trace or {})
+
+
+
 

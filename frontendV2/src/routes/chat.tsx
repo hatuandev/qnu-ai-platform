@@ -667,37 +667,56 @@ function ChatPage() {
     toast.info("Đã hủy lượt hỏi.");
   };
 
-  const handleSendError = (error: unknown) => {
+  const handleSendError = (error: unknown, failedQuestion?: string) => {
     setLocalTurn(null);
+    const restoreQuestion = () => {
+      if (failedQuestion) {
+        setInput((prev) => (prev.trim() ? prev : failedQuestion));
+      }
+    };
     if (!(error instanceof ApiProblemError)) {
       if (error instanceof Error && error.name === "AbortError") {
         toast.info("Đã hủy lượt hỏi.");
         return;
       }
+      restoreQuestion();
       toast.error(
         error instanceof Error ? error.message : "Không gửi được câu hỏi.",
       );
       return;
     }
+    if (error.status === 0) {
+      restoreQuestion();
+      toast.error(
+        "Không kết nối được máy chủ hoặc yêu cầu bị quá thời gian. Vui lòng thử lại.",
+      );
+      return;
+    }
     if (error.code === "conversation_sequence_conflict") {
+      restoreQuestion();
       toast.error(
         "Hội thoại vừa thay đổi ở nơi khác. Danh sách đã được tải lại; hãy gửi lại câu hỏi.",
       );
       return;
     }
     if (error.code === "conversation_busy") {
+      restoreQuestion();
       toast.warning(
         "Hội thoại đang xử lý một lượt khác. Chờ lượt đó xong rồi gửi lại.",
       );
       return;
     }
     if (error.code === "idempotency_conflict") {
+      restoreQuestion();
       toast.error("Yêu cầu bị trùng mã gửi. Hãy gửi lại câu hỏi.");
       return;
     }
     if (error.code === "request_aborted") {
       toast.info("Đã hủy lượt hỏi.");
       return;
+    }
+    if (error.status >= 500) {
+      restoreQuestion();
     }
     const mapped = TURN_ERROR_TEXT[error.code];
     if (mapped) {
@@ -799,7 +818,7 @@ function ChatPage() {
         toast.warning("Lượt hỏi bị gián đoạn trước khi hoàn tất.");
       }
     } catch (error) {
-      handleSendError(error);
+      handleSendError(error, question);
     } finally {
       if (abortControllerRef.current === controller) {
         abortControllerRef.current = null;

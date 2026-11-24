@@ -361,13 +361,67 @@ def requested_export_format(question: str) -> ExportFormat | None:
     return None
 
 
+MAX_DIRECT_HISTORY_TURNS = 6
+MAX_HISTORY_QUESTION_CHARS = 800
+MAX_HISTORY_ANSWER_CHARS = 1200
+MAX_DIRECT_HISTORY_CHARS = 4800
+
+
+class DirectHistoryEntry(BaseModel):
+    turn_id: str | None = None
+    question: str
+    answer: str = ""
+
+
+def _truncate_history_text(text: str, limit: int) -> str:
+    cleaned = (text or "").strip()
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[: max(limit - 1, 1)].rstrip() + "…"
+
+
+def trim_direct_history(
+    entries: list[DirectHistoryEntry],
+    *,
+    max_turns: int = 3,
+    max_chars: int = MAX_DIRECT_HISTORY_CHARS,
+) -> list[DirectHistoryEntry]:
+    """Bound direct-chat history by turn count, per-message length, and total char budget.
+
+    Keeps the most recent turns (always preserving at least the latest turn when
+    ``max_turns > 0`` and ``entries`` is non-empty) so long 5-10+ turn sessions
+    stay well within quantized Q4 model sweet spots without losing recent context.
+    """
+    cap = min(max(int(max_turns or 0), 0), MAX_DIRECT_HISTORY_TURNS)
+    if cap == 0 or not entries:
+        return []
+    candidates = [
+        DirectHistoryEntry(
+            turn_id=item.turn_id,
+            question=_truncate_history_text(item.question, MAX_HISTORY_QUESTION_CHARS),
+            answer=_truncate_history_text(item.answer, MAX_HISTORY_ANSWER_CHARS),
+        )
+        for item in entries[-cap:]
+    ]
+    kept: list[DirectHistoryEntry] = []
+    used = 0
+    for item in reversed(candidates):
+        size = len(item.question) + len(item.answer)
+        if kept and used + size > max_chars:
+            break
+        kept.append(item)
+        used += size
+    kept.reverse()
+    return kept
+
+
 def active_draft_prompt_context(draft: DocumentDraft | None) -> str:
     """Inject the latest active draft in the session so follow-up export/edit turns stay anchored."""
     if draft is None or not draft.markdown.strip():
         return ""
     body = draft.markdown.strip()
-    if len(body) > 6000:
-        body = body[:6000].rstrip() + "\n..."
+    if len(body) > 4500:
+        body = body[:4500].rstrip() + "\n..."
     return (
         "\n\n[BẢN THẢO HIỆN HÀNH TRONG PHIÊN]\n"
         f"Tiêu đề: {draft.title}\n"

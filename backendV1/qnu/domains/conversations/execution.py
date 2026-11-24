@@ -11,6 +11,7 @@ from qnu.domains.assistants.schemas import AssistantRagPolicy
 from qnu.domains.conversations.access import checkpoint
 from qnu.domains.conversations.document_export import (
     NO_KNOWLEDGE_GROUNDING_POLICY,
+    DirectHistoryEntry,
     DocumentDraft,
     ExportFormat,
     active_draft_prompt_context,
@@ -24,6 +25,7 @@ from qnu.domains.conversations.document_export import (
     requested_export_format,
     resolve_preferred_format,
     strip_document_markers,
+    trim_direct_history,
     vietnam_time_context,
 )
 from qnu.domains.conversations.history import readable
@@ -123,8 +125,19 @@ async def _direct_llm_turn(
             )
         ).all()
     )
-    rows = [t for t in all_turns if t.status == "completed"][-count:] if count else []
-    turn.history_turn_ids = [r.id for r in rows]
+    completed_turns = [t for t in all_turns if t.status == "completed"]
+    trimmed_history = trim_direct_history(
+        [
+            DirectHistoryEntry(
+                turn_id=t.id,
+                question=t.question,
+                answer=_history_answer(t.result) or "",
+            )
+            for t in completed_turns
+        ],
+        max_turns=count,
+    )
+    turn.history_turn_ids = [h.turn_id for h in trimmed_history if h.turn_id is not None]
 
     system_prompt = (
         config.get("persona")
@@ -137,14 +150,13 @@ async def _direct_llm_turn(
         + export_policy_prompt_addon(export_formats)
         + active_draft_prompt_context(latest_draft)
         + vietnam_time_context()
-        + dialogue_turn_policy(len(rows))
+        + dialogue_turn_policy(len(trimmed_history))
     )
     messages = [ChatMessage(role="system", content=system_prompt)]
-    for r in rows:
-        messages.append(ChatMessage(role="user", content=r.question))
-        ans = _history_answer(r.result)
-        if ans:
-            messages.append(ChatMessage(role="assistant", content=ans))
+    for h in trimmed_history:
+        messages.append(ChatMessage(role="user", content=h.question))
+        if h.answer:
+            messages.append(ChatMessage(role="assistant", content=h.answer))
     effective_question = turn.resolved_question or turn.question
     messages.append(ChatMessage(role="user", content=effective_question))
 
@@ -203,7 +215,8 @@ async def _direct_llm_turn(
         )
         retried_truncated = True
         retry_chat = await _run_completion("direct_chat_retry:", "direct_chat_retry/v1")
-        total_tokens = (total_tokens or 0) + (retry_chat.total_tokens or 0)
+        if total_tokens is not None or retry_chat.total_tokens is not None:
+            total_tokens = (total_tokens or 0) + (retry_chat.total_tokens or 0)
         retry_text = _extract_direct_text(retry_chat.content)
         if retry_text.strip():
             answer_text = retry_text
