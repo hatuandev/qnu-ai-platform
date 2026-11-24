@@ -234,7 +234,11 @@ async def _direct_llm_turn(
             or disabled_format_refusal_message(disabled_fmt)
         )
     elif export_formats:
-        answer_text, draft = extract_document_draft(answer_text, turn.question)
+        answer_text, draft = extract_document_draft(
+            answer_text,
+            turn.question,
+            has_active_draft=latest_draft is not None,
+        )
         if draft is None and latest_draft is not None:
             req_fmt = requested_export_format(turn.question)
             if req_fmt is not None and req_fmt in export_formats:
@@ -408,7 +412,11 @@ async def send(
                             update={"answer": cleaned_rag, "statements": []}
                         )
                 elif export_formats and result.status == "answered":
-                    display_rag_text, draft = extract_document_draft(raw_rag_text, turn.question)
+                    display_rag_text, draft = extract_document_draft(
+                        raw_rag_text,
+                        turn.question,
+                        has_active_draft=latest_draft is not None,
+                    )
                     if draft is None and latest_draft is not None:
                         req_fmt = requested_export_format(turn.question)
                         if req_fmt is not None and req_fmt in export_formats:

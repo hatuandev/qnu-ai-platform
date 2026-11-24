@@ -1094,5 +1094,145 @@ async def test_disabled_format_guard_blocks_before_llm_on_chat_send(monkeypatch)
     assert "document_draft" not in (fake_turn.rewrite_trace or {})
 
 
+def test_clarifying_turn_never_produces_document_draft():
+    q = "tôi muốn soạn 1 đơn xin nghỉ phép"
+
+    # Case A: Clarifying checklist without trailing question mark
+    reply_no_qmark = (
+        "Để soạn Đơn xin nghỉ phép chuẩn Nghị định 30/2020/NĐ-CP, bạn vui lòng cung cấp giúp mình:\n"
+        "1. Họ và tên, chức vụ, đơn vị công tác.\n"
+        "2. Thời gian nghỉ (từ ngày đến ngày hoặc số ngày nghỉ).\n"
+        "3. Lý do nghỉ phép và nơi nhận đơn.\n"
+        "Sau khi có thông tin, mình sẽ soạn ngay bản thảo hoàn chỉnh."
+    )
+    text_a, draft_a = extract_document_draft(reply_no_qmark, q)
+    assert draft_a is None
+    assert "vui lòng cung cấp" in text_a
+
+    # Case B: Clarifying checklist with Markdown headings
+    reply_with_headings = (
+        "### Thông tin cần cung cấp\n"
+        "- Họ và tên, đơn vị công tác\n"
+        "- Thời gian và lý do nghỉ phép\n\n"
+        "### Ghi chú\n"
+        "Bạn hãy cung cấp các mục trên để mình soạn đơn chính xác nhất nhé."
+    )
+    _, draft_b = extract_document_draft(reply_with_headings, q)
+    assert draft_b is None
+
+    # Case C: Quantized model accidentally wraps a clarifying list in <<<DOCUMENT>>>
+    rogue_wrapped = (
+        '<<<DOCUMENT title="Thông tin cần cung cấp" layout="administrative">>>\n'
+        "Để soạn đơn xin nghỉ phép, bạn vui lòng cho mình biết họ tên, đơn vị, lý do và thời gian nghỉ.\n"
+        "<<<END_DOCUMENT>>>"
+    )
+    text_c, draft_c = extract_document_draft(rogue_wrapped, q)
+    assert draft_c is None
+    assert "<<<DOCUMENT" not in text_c
+    assert "họ tên" in text_c
+
+
+@pytest.mark.asyncio
+async def test_edit_turn_always_attaches_updated_document_draft(monkeypatch):
+    from qnu.domains.conversations import execution
+
+    # Direct unit test: updated draft without <<<DOCUMENT>>> tags and with a closing question
+    updated_plain = (
+        "Mình đã cập nhật nơi nhận theo yêu cầu của bạn:\n\n"
+        "**CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM**\n"
+        "**Độc lập - Tự do - Hạnh phúc**\n\n"
+        "**ĐƠN XIN NGHỈ PHÉP**\n\n"
+        "Kính gửi: Ban Giám hiệu Trường Đại học Quy Nhơn\n\n"
+        "Tôi tên là Nguyễn Văn A, đơn vị Phòng Hành chính. "
+        "Xin nghỉ phép 02 ngày từ 25/11/2026 đến 26/11/2026 vì lý do nghỉ ốm.\n\n"
+        "Người làm đơn: Nguyễn Văn A\n\n"
+        "Bạn có muốn chỉnh sửa thêm phần nào không?"
+    )
+    _, extracted = extract_document_draft(
+        updated_plain,
+        "Đổi nơi nhận thành Ban Giám hiệu giúp mình",
+        has_active_draft=True,
+    )
+    assert extracted is not None
+    assert "Ban Giám hiệu" in extracted.markdown
+    assert extracted.layout == "administrative"
+
+    # End-to-end _direct_llm_turn on Turn 4 with prior draft in Turn 3
+    class EditTurnChat:
+        async def complete(self, _messages, _request):
+            return SimpleNamespace(content=updated_plain, total_tokens=180)
+
+    fake_runtime = SimpleNamespace(
+        provider_id="prov_1",
+        model_name="qwen3.8-27b-q4",
+        inference_configuration_hash=lambda _task: "cfg_hash",
+    )
+    fake_budget = SimpleNamespace(total_reserved_tokens=512)
+    monkeypatch.setattr(
+        execution,
+        "prepare_chat_request",
+        AsyncMock(return_value=(fake_runtime, SimpleNamespace(), fake_budget)),
+    )
+    monkeypatch.setattr(
+        execution.usage_service,
+        "reserve",
+        AsyncMock(return_value=SimpleNamespace(id="usg_edit_4")),
+    )
+    monkeypatch.setattr(execution.usage_service, "settle", AsyncMock())
+    monkeypatch.setattr(execution, "_live_export_formats", AsyncMock(return_value=["docx"]))
+    monkeypatch.setattr(execution, "bind_usage", lambda req, _uid: req)
+
+    prior_turn_3 = SimpleNamespace(
+        id="turn_3",
+        status="completed",
+        question="Soạn giúp mình đơn xin nghỉ phép",
+        result={"answer": "Mình đã soạn xong bản thảo Đơn xin nghỉ phép."},
+        rewrite_trace={
+            "document_draft": {
+                "title": "Đơn xin nghỉ phép",
+                "layout": "administrative",
+                "markdown": "# ĐƠN XIN NGHỈ PHÉP\n\nKính gửi: [Nơi nhận]\n\nTôi tên là Nguyễn Văn A.",
+                "has_tables": False,
+                "preferred_format": "docx",
+            }
+        },
+    )
+    fake_db = SimpleNamespace(
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: [prior_turn_3]))
+    )
+    fake_conv = SimpleNamespace(
+        id="conv_edit_4",
+        assistant_id="ast_1",
+        assistant_snapshot={
+            "persona": document_export.DECREE_30_DRAFTING_PERSONA,
+            "history_turns": 3,
+            "rag_policy": {"allow_export_docx": True},
+        },
+    )
+    turn_4 = SimpleNamespace(
+        id="turn_4",
+        turn_no=4,
+        question="Đổi nơi nhận thành Ban Giám hiệu giúp mình",
+        resolved_question="Đổi nơi nhận thành Ban Giám hiệu giúp mình",
+        history_turn_ids=[],
+        rewrite_trace={},
+    )
+
+    await execution._direct_llm_turn(
+        fake_db,
+        SimpleNamespace(actor_id="act_1"),
+        "ws_1",
+        fake_conv,
+        turn_4,
+        EditTurnChat(),
+        "prov_1",
+    )
+    draft_4 = turn_4.rewrite_trace.get("document_draft")
+    assert draft_4 is not None
+    assert "Ban Giám hiệu" in draft_4["markdown"]
+    assert draft_4["preferred_format"] == "docx"
+
+
+
 
 

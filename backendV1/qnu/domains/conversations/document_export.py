@@ -78,6 +78,28 @@ _DRAFT_INTENT_RE = re.compile(
     r"xuất\s+(?:file|tệp|docx|word|pdf|excel|xlsx))\b",
     re.IGNORECASE,
 )
+_DRAFT_EDIT_INTENT_RE = re.compile(
+    r"\b(sửa|chỉnh\s*sửa|điều\s*chỉnh|đổi|thay\s*(?:đổi|thế)|cập\s*nhật|"
+    r"bổ\s*sung|thêm|xóa|bỏ|rút\s*gọn|viết\s*lại|giữ\s*nguyên|điền\s*(?:thêm|vào|lại))\b",
+    re.IGNORECASE,
+)
+_DOC_STRUCTURE_RE = re.compile(
+    r"(?:cộng\s+hòa\s+xã\s+hội\s+chủ\s+nghĩa\s+việt\s+nam|"
+    r"độc\s+lập\s*[-–]\s*tự\s+do\s*[-–]\s*hạnh\s+phúc|"
+    r"^\s*(?:#+\s*)?(?:\*\*)?(?:kính\s+gửi|nơi\s+nhận|người\s+làm\s+đơn|người\s+đề\s+nghị|"
+    r"đơn\s+xin\b|tờ\s+trình\b|quyết\s+định\b|thông\s+báo\b|báo\s+cáo\b|"
+    r"biên\s+bản\b|kế\s+hoạch\b|giấy\s+đề\s+nghị\b|công\s+văn\b))",
+    re.IGNORECASE | re.MULTILINE,
+)
+_CLARIFYING_REPLY_RE = re.compile(
+    r"(?:(?:bạn|anh/chị|quý\s+thầy/cô)\s+(?:vui\s+lòng|hãy|có\s+thể)?\s*"
+    r"(?:cung\s+cấp|cho\s+(?:mình|tôi)\s+biết|bổ\s+sung|xác\s+nhận|điền\s+thêm|gửi\s+thêm)|"
+    r"để\s+(?:mình|tôi)?\s*(?:soạn|tạo|viết|lập|hoàn\s+thiện)[^.\n]{0,90}"
+    r"(?:bạn|vui\s+lòng|cần\s+(?:biết|thêm|cung\s+cấp|xác\s+nhận)|cho\s+(?:mình|tôi)\s+biết)|"
+    r"(?:thông\s+tin\s+cần\s+(?:cung\s+cấp|bổ\s+sung|có)|"
+    r"cần\s+(?:thêm\s+)?(?:một\s+số|các|vài)\s+thông\s+tin))",
+    re.IGNORECASE,
+)
 _REFUSAL_REPLY_RE = re.compile(
     r"(?:chưa\s+được\s+gắn\s+kho(?:\s+dữ\s+liệu)?\s+tri\s+thức|"
     r"(?:chưa|không)\s+có\s+(?:dữ\s+liệu|kho)\s+tri\s+thức|"
@@ -429,8 +451,9 @@ def active_draft_prompt_context(draft: DocumentDraft | None) -> str:
         "Nội dung hiện tại:\n"
         f"{body}\n"
         "Nếu người dùng yêu cầu xuất định dạng ĐANG BẬT hoặc chỉnh sửa tiếp, hãy bám sát bản thảo hiện hành "
-        "này (chỉ thay đổi đúng phần người dùng yêu cầu) và đặt bản thảo hoàn chỉnh vào cặp thẻ "
-        "<<<DOCUMENT ...>>> ... <<<END_DOCUMENT>>>."
+        "này (chỉ thay đổi đúng phần người dùng yêu cầu). Khi chỉnh sửa, BẮT BUỘC xuất lại toàn bộ bản thảo "
+        "đã cập nhật trong cặp thẻ <<<DOCUMENT ...>>> ... <<<END_DOCUMENT>>> để người dùng xem trước và tải "
+        "bản mới ngay ở lượt này."
     )
 
 
@@ -600,11 +623,29 @@ def resolve_preferred_format(
     return draft.model_copy(update={"preferred_format": preferred})
 
 
+def _has_document_structure(text: str) -> bool:
+    """Return True when text contains recognizable formal document structure (header/title/sign-off)."""
+    return bool(_DOC_STRUCTURE_RE.search(text or ""))
+
+
+def _is_clarifying_info_request(text: str) -> bool:
+    """Return True when the reply is asking the user for missing details rather than delivering a draft."""
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return False
+    if _has_document_structure(cleaned):
+        return False
+    if _CLARIFYING_REPLY_RE.search(cleaned):
+        return True
+    return "?" in cleaned and not _has_markdown_table(cleaned)
+
+
 def extract_document_draft(
     answer_text: str,
     question: str = "",
     *,
     force_heuristic: bool = False,
+    has_active_draft: bool = False,
 ) -> tuple[str, DocumentDraft | None]:
     """Extract a clean DocumentDraft from an assistant answer.
 
@@ -623,6 +664,10 @@ def extract_document_draft(
         if not body:
             cleaned_empty = strip_document_markers(_DOC_BLOCK_RE.sub("", raw))
             return cleaned_empty or raw, None
+        # Guard against quantized models accidentally wrapping a clarifying question list in <<<DOCUMENT>>>.
+        if not force_heuristic and _is_clarifying_info_request(body):
+            stripped_all = strip_document_markers(raw)
+            return stripped_all or body, None
         title = _clean_title(attrs.get("title") or _extract_title_from_markdown(body, question))
         raw_layout = (attrs.get("layout") or "").strip().lower()
         layout: DocumentLayout = (
@@ -656,14 +701,20 @@ def extract_document_draft(
     heading_count = sum(1 for ln in cleaned_raw.splitlines() if ln.strip().startswith("#"))
     if not force_heuristic and not has_tables and heading_count == 0 and _is_refusal_reply(cleaned_raw):
         return cleaned_raw, None
+
+    has_doc_structure = _has_document_structure(cleaned_raw)
+    if not force_heuristic and _is_clarifying_info_request(cleaned_raw):
+        return cleaned_raw, None
+
     has_draft_intent = bool(_DRAFT_INTENT_RE.search(question or ""))
-    is_clarifying_reply = "?" in cleaned_raw and not has_tables and heading_count == 0
+    has_edit_intent = has_active_draft and bool(_DRAFT_EDIT_INTENT_RE.search(question or ""))
     looks_like_doc = (
         force_heuristic
         or has_tables
+        or has_doc_structure
         or heading_count >= 2
         or (heading_count >= 1 and len(cleaned_raw) >= 220)
-        or (has_draft_intent and not is_clarifying_reply and len(cleaned_raw) >= 120)
+        or ((has_draft_intent or has_edit_intent) and len(cleaned_raw) >= 120)
     )
     if not looks_like_doc:
         return cleaned_raw, None

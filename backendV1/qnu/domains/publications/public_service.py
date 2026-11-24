@@ -1013,7 +1013,11 @@ async def turn(
                     or disabled_format_refusal_message(disabled_fmt)
                 )
             elif export_formats and not social_only:
-                pub_ans, extracted_draft = extract_document_draft(pub_ans, req.question)
+                pub_ans, extracted_draft = extract_document_draft(
+                    pub_ans,
+                    req.question,
+                    has_active_draft=latest_draft is not None,
+                )
                 if extracted_draft is None and latest_draft is not None:
                     req_fmt = requested_export_format(req.question)
                     if req_fmt is not None and req_fmt in export_formats:
@@ -1105,7 +1109,11 @@ async def turn(
                 or disabled_format_refusal_message(disabled_rag_fmt)
             )
     elif export_formats and not insufficient:
-        display_rag_text, extracted_rag = extract_document_draft(raw_rag_text, req.question)
+        display_rag_text, extracted_rag = extract_document_draft(
+            raw_rag_text,
+            req.question,
+            has_active_draft=latest_draft is not None,
+        )
         if extracted_rag is None and latest_draft is not None:
             req_fmt = requested_export_format(req.question)
             if req_fmt is not None and req_fmt in export_formats:
