@@ -1535,6 +1535,79 @@ def test_render_docx_personal_petition_alignment_indents_and_page_numbering():
     assert ftr.cell(0, 1).paragraphs[0].paragraph_format.left_indent == 0
 
 
+def test_render_docx_black_white_tables_no_shading_no_stray_sep_and_clean_line_splits():
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+    plan = DocumentDraft(
+        title="Kế hoạch triển khai chuyển đổi số năm 2026",
+        layout="administrative",
+        markdown=(
+            "| BỘ GIÁO DỤC VÀ ĐÀO TẠO<br>TRƯỜNG ĐẠI HỌC QUY NHƠN | CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM<br>Độc lập - Tự do - Hạnh phúc |\n"
+            "| :---: | :---: |\n"
+            "| Số: 15/KH-ĐHQN | *Bình Định, ngày 24 tháng 11 năm 2026* |\n\n"
+            "|---|---|---|\n\n"
+            "# KẾ HOẠCH\n"
+            "## Triển khai chuyển đổi số năm 2026\n\n"
+            "## II. NỘI DUNG THỰC HIỆN\n"
+            "| STT | Nhiệm vụ | Đơn vị chủ trì | Đơn vị phối hợp |\n"
+            "| :--- | :--- | :--- | :--- |\n"
+            "| 1 | Số hóa học liệu | Trung tâm Số & Học liệu | Phòng Đào tạo |\n"
+            "| 2 | Nâng cấp hạ tầng | Phòng CNTT | Phòng Kế hoạch - Tài chính |\n\n"
+            "Nơi nhận: - Các Phó Hiệu trưởng; - Các đơn vị; - Lưu: VT, S&HL.\n"
+            "HIỆU TRƯỞNG PGS. TS. Đoàn Đức Tùng"
+        ),
+        has_tables=True,
+    )
+    doc = Document(io.BytesIO(render_docx(plan)))
+
+    # 1. Zero w:shd shading anywhere in any table, black borders on content table, centered bold headers
+    assert len(doc.tables) == 3  # header table + content table + footer table
+    for tbl in doc.tables:
+        assert "w:shd" not in tbl._tbl.xml
+    content_tbl = doc.tables[1]
+    assert 'w:color="000000"' in content_tbl._tbl.tblPr.xml
+    assert content_tbl.cell(0, 0).paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert content_tbl.cell(0, 0).paragraphs[0].runs[0].bold is True
+
+    # 2. Zero stray |---| or :--- separator lines in document text
+    all_text = "\n".join(
+        [p.text for p in doc.paragraphs]
+        + [c.text for tbl in doc.tables for row in tbl.rows for c in row.cells]
+    )
+    assert "|---|" not in all_text
+    assert ":---" not in all_text
+    assert "[ĐƠN VỊ SOẠN THẢO]" not in all_text.upper()
+
+    # 3. Header left & right cells split into separate paragraphs (no glued lines)
+    hdr_left_paras = [p.text.strip() for p in doc.tables[0].cell(0, 0).paragraphs if p.text.strip()]
+    assert hdr_left_paras == [
+        "BỘ GIÁO DỤC VÀ ĐÀO TẠO",
+        "TRƯỜNG ĐẠI HỌC QUY NHƠN",
+        "Số: 15/KH-ĐHQN",
+    ]
+    hdr_right_paras = [p.text.strip() for p in doc.tables[0].cell(0, 1).paragraphs if p.text.strip()]
+    assert hdr_right_paras == [
+        "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM",
+        "Độc lập - Tự do - Hạnh phúc",
+        "Bình Định, ngày 24 tháng 11 năm 2026",
+    ]
+
+    # 4. Footer left (Nơi nhận) & right (HIỆU TRƯỞNG / signer) split into separate paragraphs
+    ftr_left_paras = [p.text.strip() for p in doc.tables[2].cell(0, 0).paragraphs if p.text.strip()]
+    assert ftr_left_paras == [
+        "Nơi nhận:",
+        "- Các Phó Hiệu trưởng;",
+        "- Các đơn vị;",
+        "- Lưu: VT, S&HL.",
+    ]
+    ftr_right_paras = [p.text.strip() for p in doc.tables[2].cell(0, 1).paragraphs if p.text.strip()]
+    assert ftr_right_paras == [
+        "HIỆU TRƯỞNG",
+        "PGS. TS. Đoàn Đức Tùng",
+    ]
+
+
+
 
 
 

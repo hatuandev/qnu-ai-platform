@@ -226,20 +226,20 @@ DECREE_30_DRAFTING_PERSONA = (
     "tuân thủ thể thức và kỹ thuật trình bày theo Nghị định 30/2020/NĐ-CP.\n\n"
     "1. THỂ THỨC HÀNH CHÍNH CỐT LÕI (NĐ 30/2020/NĐ-CP):\n"
     "- Đủ bố cục chuẩn từng loại văn bản (Đơn, Tờ trình, Công văn, Kế hoạch, Thông báo, Báo cáo, Biên bản, Quyết định): "
-    "Quốc hiệu & Tiêu ngữ; Tên cơ quan/đơn vị ban hành; Số, ký hiệu; Địa danh và ngày tháng năm; "
-    "Tên loại & trích yếu nội dung; Căn cứ (nếu có); Nội dung chính mạch lạc; Nơi nhận; Khối chữ ký.\n"
-    "- Văn phong hành chính chuẩn mực, súc tích, 100% tiếng Việt; TUYỆT ĐỐI KHÔNG dùng thẻ HTML thô "
-    "(<div...>, </div>, <br>, <span>...) — chỉ dùng Markdown thuần.\n\n"
-    "2. QUY TẮC HỘI THOẠI & KHÔNG HỎI VẶN NHIỀU LƯỢT:\n"
-    "- Chỉ hỏi làm rõ tối đa 1 lượt ngắn gọn nếu người dùng mới ngỏ ý quá chung chung (chưa nêu rõ loại văn bản hoặc mục đích cơ bản).\n"
-    "- Ngay khi người dùng đã nêu loại văn bản kèm thông tin cơ bản, bổ sung dữ liệu, hoặc yêu cầu chốt "
-    '("soạn giúp mình", "làm luôn đi", "phần thiếu tự điền", "nơi nhận tôi tự ghi"), '
-    "PHẢI SOẠN NGAY bản thảo hoàn chỉnh — không hỏi vặn thêm lượt nào nữa.\n"
-    "- Tự quy đổi chính xác mốc thời gian tương đối (hôm nay, ngày mai, ngày kia, tuần sau...) theo ngày giờ Việt Nam hiện tại.\n\n"
-    "3. CHỐNG BỊA DỮ KIỆN & PLACEHOLDER:\n"
-    "- TUYỆT ĐỐI không bịa số văn bản, căn cứ pháp lý, số liệu, họ tên, chức vụ hay quy định nội bộ chưa được cung cấp.\n"
-    "- Mọi trường còn thiếu tự điền chỗ giữ chỗ rõ ràng dạng [Tên thông tin], ví dụ: "
-    "[Nơi nhận], [Ngày bắt đầu], [Ngày kết thúc], [Chức vụ/Đơn vị], [Lý do], [Người ký]."
+    "Quốc hiệu & Tiêu ngữ; Cơ quan chủ quản & cơ quan ban hành; Số, ký hiệu; Địa danh và ngày tháng năm; "
+    "Tên loại & trích yếu; Căn cứ (nếu có); Nội dung chính; Nơi nhận; Khối chữ ký.\n"
+    "- Văn phong hành chính chuẩn mực, 100% tiếng Việt, trình bày trắng đen thuần — KHÔNG chèn chỉ thị màu sắc/tô nền "
+    "cho bảng hay chữ, KHÔNG dùng thẻ HTML thô (<div...>, <br>, <span>...); chỉ dùng Markdown thuần, "
+    "bảng Markdown đủ cột và không chèn dòng |---| thừa ngoài bảng.\n\n"
+    "2. HỘI THOẠI & KHÔNG HỎI VẶN NHIỀU LƯỢT:\n"
+    "- Chỉ hỏi làm rõ tối đa 1 lượt ngắn gọn nếu yêu cầu quá chung chung.\n"
+    '- Khi đã có thông tin cơ bản hoặc tín hiệu chốt ("soạn giúp mình", "làm luôn đi", "phần thiếu tự điền", '
+    '"nơi nhận tôi tự ghi"), PHẢI SOẠN NGAY bản thảo hoàn chỉnh và tự quy đổi mốc thời gian tương đối theo giờ Việt Nam.\n\n'
+    "3. ĐIỀN ĐỦ DỮ LIỆU ĐÃ CÓ & CHỐNG BỊA DỮ KIỆN:\n"
+    "- BẮT BUỘC điền đầy đủ mọi thông tin đã có trong hội thoại/ngữ cảnh (tên cơ quan, đơn vị chủ trì, đơn vị phối hợp "
+    "từng dòng bảng, đầu mối, người ký); TUYỆT ĐỐI không bịa số văn bản, căn cứ hay số liệu chưa cung cấp.\n"
+    "- Chỉ dùng chỗ giữ chỗ dạng [Tên thông tin] (ví dụ: [Nơi nhận], [Ngày bắt đầu], [Ngày kết thúc], [Chức vụ/Đơn vị]) "
+    "cho những thông tin thực sự chưa được cung cấp."
 )
 
 
@@ -384,17 +384,20 @@ def export_policy_prompt_addon(formats: list[ExportFormat]) -> str:
         "không liệt kê các định dạng khác).\n"
         "  2. Đặt TOÀN BỘ thân văn bản sạch (không dính lời chào, lời dẫn hay ghi chú nháp) vào trong cặp thẻ:\n"
         '     <<<DOCUMENT title="Tiêu đề văn bản ngắn gọn" layout="standard|administrative|spreadsheet" format="docx|pdf|xlsx">>>\n'
-        "     ...nội dung văn bản bằng Markdown thuần sạch (tiêu đề #, ##, đoạn văn, danh sách, bảng |...|); "
-        "TUYỆT ĐỐI KHÔNG dùng thẻ HTML thô như <div...>, </div>, <br>, <span>...\n"
+        "     ...nội dung văn bản bằng Markdown thuần sạch (tiêu đề #, ##, đoạn văn, danh sách, bảng Markdown chuẩn đủ cột |...|); "
+        "TUYỆT ĐỐI KHÔNG dùng thẻ HTML thô (<div...>, </div>, <br>, <span>...), KHÔNG chèn dòng phân cách |---| thừa ngoài bảng "
+        "và KHÔNG chèn bất kỳ chỉ thị màu sắc hay tô nền nào cho bảng/chữ...\n"
         "     <<<END_DOCUMENT>>>\n"
         '  3. Chọn layout="administrative" cho văn bản hành chính/đơn từ/kế hoạch/tờ trình/báo cáo; '
         'layout="spreadsheet" khi nội dung chủ yếu là bảng số liệu/lịch trình; còn lại dùng layout="standard". '
         'Đặt format="docx", "pdf" hoặc "xlsx" khớp đúng định dạng người dùng yêu cầu.\n'
-        "  4. Chỉ dùng kiến thức nền để tổ chức bố cục, văn phong và khung mẫu văn bản. "
+        "  4. BẮT BUỘC điền đầy đủ mọi thông tin đã có trong hội thoại hoặc ngữ cảnh (tên cơ quan ban hành, đơn vị chủ trì, "
+        "đơn vị phối hợp trong từng dòng bảng, đơn vị đầu mối, cấp có thẩm quyền phê duyệt). "
+        "Chỉ dùng kiến thức nền để tổ chức bố cục, văn phong và khung mẫu văn bản; "
         "TUYỆT ĐỐI KHÔNG tự suy đoán hoặc bịa thông tin thực tế của đơn vị/nhà trường "
         "(cơ cấu tổ chức, khoa/viện, ngành đào tạo, số liệu, quy định, mốc thời gian) nếu không có "
-        "trong ngữ cảnh hoặc người dùng chưa cung cấp; tự động điền chỗ giữ chỗ rõ ràng dạng [...] hoặc [Tên thông tin] "
-        "(ví dụ: [Nơi nhận], [Ngày bắt đầu], [Ngày kết thúc], [Chức vụ/Đơn vị]) cho phần còn thiếu."
+        "trong ngữ cảnh hoặc người dùng chưa cung cấp; chỉ giữ chỗ giữ chỗ rõ ràng dạng [...] hoặc [Tên thông tin] "
+        "(ví dụ: [Nơi nhận], [Ngày bắt đầu], [Ngày kết thúc], [Chức vụ/Đơn vị]) cho phần thực sự còn thiếu."
     )
 
 
@@ -1017,20 +1020,113 @@ def _extract_aligned_lines(raw_markdown: str) -> list[tuple[str | None, str]]:
     return result
 
 
+_ADMIN_SIGN_ROLE_PREFIX_RE = re.compile(
+    r"^(?P<role>(?:KT\.\s+|TL\.\s+|TM\.\s+)?(?:HIỆU\s+TRƯỞNG|PHÓ\s+HIỆU\s+TRƯỞNG|"
+    r"TRƯỞNG\s+(?:PHÒNG|KHOA|BAN|ĐƠN\s+VỊ)|GIÁM\s+ĐỐC|CHỦ\s+TỊCH|"
+    r"THỦ\s+TRƯỞNG\s+ĐƠN\s+VỊ|NGƯỜI\s+(?:LÀM\s+ĐƠN|ĐỀ\s+NGHỊ|VIẾT\s+ĐƠN|BÁO\s+CÁO|LẬP\s+BIÊN\s+BẢN|KÝ)|"
+    r"KÍNH\s+ĐƠN))\s+(?P<signer>(?:PGS\.?\s*|GS\.?\s*|TS\.?\s*|ThS\.?\s*|CN\.?\s*|\[).+)$",
+    re.IGNORECASE,
+)
+
+
+def _split_noi_nhan_items(raw_lines: list[str]) -> list[str]:
+    """Ensure 'Nơi nhận:' and each '- ...;' recipient sit on their own separate line."""
+    out: list[str] = []
+    for raw in raw_lines:
+        for sub in _clean_html_br_to_newlines(raw).splitlines():
+            line = _strip_md_emphasis(sub)
+            if not line or _TABLE_SEP_RE.match(line):
+                continue
+            # Split inline 'Nơi nhận: - A; - B; - Lưu: VT.'
+            if _ADMIN_NOI_NHAN_RE.match(line):
+                colon_idx = line.find(":")
+                if colon_idx != -1 and line[colon_idx + 1 :].strip():
+                    out.append(line[: colon_idx + 1].strip())
+                    remainder = line[colon_idx + 1 :].strip()
+                    parts = re.split(r"\s+(?=-\s)", remainder)
+                    for part in parts:
+                        cleaned_p = part.strip()
+                        if cleaned_p:
+                            out.append(cleaned_p)
+                    continue
+            parts = re.split(r"\s+(?=-\s)", line)
+            for part in parts:
+                cleaned_p = part.strip()
+                if cleaned_p:
+                    out.append(cleaned_p)
+    return out
+
+
+def _split_sign_items(raw_lines: list[str]) -> list[str]:
+    """Ensure signature role, optional '(Ký...)' hint, and signer name sit on separate lines."""
+    out: list[str] = []
+    for raw in raw_lines:
+        for sub in _clean_html_br_to_newlines(raw).splitlines():
+            line = _strip_md_emphasis(sub)
+            if not line or _TABLE_SEP_RE.match(line):
+                continue
+            glued = _ADMIN_SIGN_ROLE_PREFIX_RE.match(line)
+            if glued:
+                out.append(glued.group("role").strip())
+                out.append(glued.group("signer").strip())
+            else:
+                out.append(line)
+    return out
+
+
 def _extract_admin_header(
     items: list[tuple[str | None, str]],
 ) -> tuple[list[str], str | None, str | None, bool, list[tuple[str | None, str]]]:
-    """Extract optional Decree 30 header fields (org lines, Số, date line, motto) from top lines."""
+    """Extract optional Decree 30 header fields (org lines, Số, date line, motto) from top lines or 2-col table."""
     org_lines: list[str] = []
     so_line: str | None = None
     date_line: str | None = None
     has_motto = False
     idx = 0
-    scan_limit = min(len(items), 12)
+    scan_limit = min(len(items), 14)
+
+    # Support models that format the administrative header as a 2-column Markdown table at top
+    first_idx = next((k for k in range(scan_limit) if items[k][1].strip()), None)
+    if (
+        first_idx is not None
+        and "|" in items[first_idx][1]
+        and "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" in items[first_idx][1].upper()
+    ):
+        tbl_idx = first_idx
+        while tbl_idx < len(items) and "|" in items[tbl_idx][1] and items[tbl_idx][1].strip():
+            row_raw = items[tbl_idx][1].strip()
+            tbl_idx += 1
+            if _TABLE_SEP_RE.match(row_raw):
+                continue
+            cells = _split_table_row(row_raw)
+            if len(cells) < 2:
+                continue
+            for left_sub in cells[0].splitlines():
+                plain_l = _strip_md_emphasis(left_sub)
+                if not plain_l:
+                    continue
+                if _ADMIN_SO_LINE_RE.match(plain_l):
+                    so_line = plain_l
+                else:
+                    org_lines.append(plain_l)
+            for right_sub in cells[1].splitlines():
+                plain_r = _strip_md_emphasis(right_sub)
+                if not plain_r:
+                    continue
+                upper_r = plain_r.upper()
+                if "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" in upper_r or (
+                    "ĐỘC LẬP" in upper_r and "TỰ DO" in upper_r and "HẠNH PHÚC" in upper_r
+                ):
+                    has_motto = True
+                elif _ADMIN_DATE_LINE_RE.match(plain_r):
+                    date_line = plain_r
+        idx = tbl_idx
+        scan_limit = min(len(items), idx + 6)
+
     while idx < scan_limit:
         _align, raw = items[idx]
         stripped = raw.strip()
-        if not stripped or stripped in ("---", "***", "___"):
+        if not stripped or stripped in ("---", "***", "___") or _TABLE_SEP_RE.match(stripped):
             idx += 1
             continue
         plain = _strip_md_emphasis(stripped.lstrip("#").strip())
@@ -1051,11 +1147,11 @@ def _extract_admin_header(
             date_line = plain
             idx += 1
             continue
-        # Issuing agency line (before motto or Số, e.g. TRƯỜNG ĐẠI HỌC QUY NHƠN / PHÒNG HÀNH CHÍNH)
+        # Issuing agency line (before motto or Số, e.g. BỘ GIÁO DỤC VÀ ĐÀO TẠO / TRƯỜNG ĐẠI HỌC QUY NHƠN)
         if (
             not has_motto
             and not stripped.startswith("#")
-            and len(plain) <= 70
+            and len(plain) <= 75
             and (
                 plain.isupper()
                 or plain.startswith(("[Tên cơ quan", "[Đơn vị"))
@@ -1076,25 +1172,49 @@ def _extract_admin_header(
 def _extract_admin_footer(
     items: list[tuple[str | None, str]],
 ) -> tuple[list[tuple[str | None, str]], list[str], list[str]]:
-    """Extract trailing Nơi nhận (left) and signature block (right) for Decree 30 2-column footer."""
+    """Extract trailing Nơi nhận (left) and signature block (right) from plain lines or 2-col table."""
     end = len(items)
-    while end > 0 and not items[end - 1][1].strip():
+    while end > 0 and (
+        not items[end - 1][1].strip() or _TABLE_SEP_RE.match(items[end - 1][1].strip())
+    ):
         end -= 1
     trimmed = items[:end]
     if not trimmed:
         return [], [], []
 
-    # Look back up to 14 lines for Nơi nhận or signature role
-    window_start = max(0, len(trimmed) - 14)
+    # Support models that format Nơi nhận + signature block as a trailing 2-column Markdown table
+    if "|" in trimmed[-1][1]:
+        tbl_start = len(trimmed) - 1
+        while tbl_start > 0 and "|" in trimmed[tbl_start - 1][1] and trimmed[tbl_start - 1][1].strip():
+            tbl_start -= 1
+        tbl_block = "\n".join(ln[1] for ln in trimmed[tbl_start:])
+        if _ADMIN_NOI_NHAN_RE.search(tbl_block) or _ADMIN_SIGN_ROLE_RE.search(tbl_block) or "HIỆU TRƯỞNG" in tbl_block.upper():
+            left_raw: list[str] = []
+            right_raw: list[str] = []
+            for _al, row_str in trimmed[tbl_start:]:
+                if _TABLE_SEP_RE.match(row_str.strip()):
+                    continue
+                cells = _split_table_row(row_str)
+                if len(cells) >= 2:
+                    if cells[0].strip():
+                        left_raw.append(cells[0])
+                    if cells[1].strip():
+                        right_raw.append(cells[1])
+            return trimmed[:tbl_start], _split_noi_nhan_items(left_raw), _split_sign_items(right_raw)
+
+    # Look back up to 16 lines for Nơi nhận or signature role
+    window_start = max(0, len(trimmed) - 16)
     noi_nhan_idx: int | None = None
     sign_idx: int | None = None
     for i in range(window_start, len(trimmed)):
         plain = _strip_md_emphasis(trimmed[i][1].strip())
-        if not plain or plain in ("---", "***", "___"):
+        if not plain or plain in ("---", "***", "___") or _TABLE_SEP_RE.match(plain):
             continue
         if noi_nhan_idx is None and _ADMIN_NOI_NHAN_RE.match(plain):
             noi_nhan_idx = i
-        if sign_idx is None and _ADMIN_SIGN_ROLE_RE.match(plain):
+        if sign_idx is None and (
+            _ADMIN_SIGN_ROLE_RE.match(plain) or _ADMIN_SIGN_ROLE_PREFIX_RE.match(plain)
+        ):
             sign_idx = i
 
     if noi_nhan_idx is None and sign_idx is None:
@@ -1102,22 +1222,22 @@ def _extract_admin_footer(
 
     cut_idx = min(i for i in (noi_nhan_idx, sign_idx) if i is not None)
     body = trimmed[:cut_idx]
-    noi_nhan_lines: list[str] = []
-    sign_lines: list[str] = []
+    noi_nhan_raw: list[str] = []
+    sign_raw: list[str] = []
 
     if noi_nhan_idx is not None and sign_idx is not None:
         if noi_nhan_idx < sign_idx:
-            noi_nhan_lines = [ln[1].strip() for ln in trimmed[noi_nhan_idx:sign_idx] if ln[1].strip()]
-            sign_lines = [ln[1].strip() for ln in trimmed[sign_idx:] if ln[1].strip()]
+            noi_nhan_raw = [ln[1].strip() for ln in trimmed[noi_nhan_idx:sign_idx] if ln[1].strip()]
+            sign_raw = [ln[1].strip() for ln in trimmed[sign_idx:] if ln[1].strip()]
         else:
-            sign_lines = [ln[1].strip() for ln in trimmed[sign_idx:noi_nhan_idx] if ln[1].strip()]
-            noi_nhan_lines = [ln[1].strip() for ln in trimmed[noi_nhan_idx:] if ln[1].strip()]
+            sign_raw = [ln[1].strip() for ln in trimmed[sign_idx:noi_nhan_idx] if ln[1].strip()]
+            noi_nhan_raw = [ln[1].strip() for ln in trimmed[noi_nhan_idx:] if ln[1].strip()]
     elif noi_nhan_idx is not None:
-        noi_nhan_lines = [ln[1].strip() for ln in trimmed[noi_nhan_idx:] if ln[1].strip()]
+        noi_nhan_raw = [ln[1].strip() for ln in trimmed[noi_nhan_idx:] if ln[1].strip()]
     elif sign_idx is not None:
-        sign_lines = [ln[1].strip() for ln in trimmed[sign_idx:] if ln[1].strip()]
+        sign_raw = [ln[1].strip() for ln in trimmed[sign_idx:] if ln[1].strip()]
 
-    return body, noi_nhan_lines, sign_lines
+    return body, _split_noi_nhan_items(noi_nhan_raw), _split_sign_items(sign_raw)
 
 
 def _add_inline_runs(paragraph, text: str, *, font_name: str = "Times New Roman", size_pt: int = 13):
@@ -1154,7 +1274,7 @@ def _set_cell_shading(cell, fill_hex: str) -> None:
     tc_pr.append(shd)
 
 
-def _set_table_borders(table, color: str = "CBD5E1") -> None:
+def _set_table_borders(table, color: str = "000000") -> None:
     tbl_pr = table._tbl.tblPr
     borders = OxmlElement("w:tblBorders")
     for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
@@ -1225,18 +1345,18 @@ def render_docx(draft: DocumentDraft) -> bytes:
             _configure_fixed_two_col_table(hdr_tbl, 6.5, 10.0)
 
             left_cell = hdr_tbl.cell(0, 0)
-            left_p = left_cell.paragraphs[0]
-            _reset_paragraph_indents(left_p)
-            left_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            left_p.paragraph_format.space_before = Pt(0)
-            left_p.paragraph_format.space_after = Pt(2)
             effective_org_lines = org_lines or ["TRƯỜNG ĐẠI HỌC QUY NHƠN", "[Đơn vị soạn thảo]"]
             for idx_org, org_line in enumerate(effective_org_lines):
-                run = left_p.add_run(
-                    org_line.upper()
-                    + ("\n" if idx_org < len(effective_org_lines) - 1 else "")
+                org_p = left_cell.paragraphs[0] if idx_org == 0 else left_cell.add_paragraph()
+                _reset_paragraph_indents(org_p)
+                org_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                org_p.paragraph_format.space_before = Pt(0)
+                org_p.paragraph_format.space_after = Pt(2)
+                _set_run_font(
+                    org_p.add_run(org_line.upper()),
+                    size_pt=12,
+                    bold=(idx_org == len(effective_org_lines) - 1),
                 )
-                _set_run_font(run, size_pt=12, bold=(idx_org == len(effective_org_lines) - 1))
             if so_line:
                 so_p = left_cell.add_paragraph()
                 _reset_paragraph_indents(so_p)
@@ -1246,18 +1366,23 @@ def render_docx(draft: DocumentDraft) -> bytes:
                 _set_run_font(so_p.add_run(so_line), size_pt=13)
 
             right_cell = hdr_tbl.cell(0, 1)
-            right_p = right_cell.paragraphs[0]
-            _reset_paragraph_indents(right_p)
-            right_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            right_p.paragraph_format.space_before = Pt(0)
-            right_p.paragraph_format.space_after = Pt(0)
+            motto_top_p = right_cell.paragraphs[0]
+            _reset_paragraph_indents(motto_top_p)
+            motto_top_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            motto_top_p.paragraph_format.space_before = Pt(0)
+            motto_top_p.paragraph_format.space_after = Pt(2)
             _set_run_font(
-                right_p.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n"),
+                motto_top_p.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"),
                 size_pt=12,
                 bold=True,
             )
+            motto_sub_p = right_cell.add_paragraph()
+            _reset_paragraph_indents(motto_sub_p)
+            motto_sub_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            motto_sub_p.paragraph_format.space_before = Pt(0)
+            motto_sub_p.paragraph_format.space_after = Pt(0)
             _set_run_font(
-                right_p.add_run("Độc lập - Tự do - Hạnh phúc"),
+                motto_sub_p.add_run("Độc lập - Tự do - Hạnh phúc"),
                 size_pt=13,
                 bold=True,
                 underline=True,
@@ -1270,19 +1395,24 @@ def render_docx(draft: DocumentDraft) -> bytes:
                 date_p.paragraph_format.space_after = Pt(0)
                 _set_run_font(date_p.add_run(date_line), size_pt=13, italic=True)
         else:
-            # Personal petition (e.g. Đơn xin nghỉ phép): centered National Motto + right-aligned date
-            motto_p = doc.add_paragraph()
-            _reset_paragraph_indents(motto_p)
-            motto_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            motto_p.paragraph_format.space_before = Pt(0)
-            motto_p.paragraph_format.space_after = Pt(2)
+            # Personal petition (e.g. Đơn xin nghỉ phép): centered National Motto (2 separate lines) + right-aligned date
+            motto_top_p = doc.add_paragraph()
+            _reset_paragraph_indents(motto_top_p)
+            motto_top_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            motto_top_p.paragraph_format.space_before = Pt(0)
+            motto_top_p.paragraph_format.space_after = Pt(2)
             _set_run_font(
-                motto_p.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n"),
+                motto_top_p.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"),
                 size_pt=12,
                 bold=True,
             )
+            motto_sub_p = doc.add_paragraph()
+            _reset_paragraph_indents(motto_sub_p)
+            motto_sub_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            motto_sub_p.paragraph_format.space_before = Pt(0)
+            motto_sub_p.paragraph_format.space_after = Pt(2)
             _set_run_font(
-                motto_p.add_run("Độc lập - Tự do - Hạnh phúc"),
+                motto_sub_p.add_run("Độc lập - Tự do - Hạnh phúc"),
                 size_pt=13,
                 bold=True,
                 underline=True,
@@ -1300,12 +1430,21 @@ def render_docx(draft: DocumentDraft) -> bytes:
         spacer.paragraph_format.space_before = Pt(0)
         spacer.paragraph_format.space_after = Pt(6)
 
-    first_non_empty = next((ln.strip() for _al, ln in aligned_items if ln.strip()), "")
-    first_plain = _strip_md_emphasis(first_non_empty.lstrip("#").strip())
-    has_explicit_title_line = first_non_empty.startswith("#") or (
-        is_admin and first_plain.upper() == draft.title.upper()
+    leading_non_empty = [
+        ln.strip()
+        for _al, ln in aligned_items
+        if ln.strip() and ln.strip() not in ("---", "***", "___") and not _TABLE_SEP_RE.match(ln.strip())
+    ][:5]
+    has_explicit_title_line = any(
+        ln.startswith("#")
+        or (is_admin and _strip_md_emphasis(ln).upper() == draft.title.upper())
+        or (is_admin and bool(_ADMIN_CUES_RE.match(_strip_md_emphasis(ln))))
+        for ln in leading_non_empty
     )
-    if not has_explicit_title_line:
+    first_is_date = bool(
+        leading_non_empty and _ADMIN_DATE_LINE_RE.match(_strip_md_emphasis(leading_non_empty[0]))
+    )
+    if not has_explicit_title_line and not first_is_date:
         title_p = doc.add_paragraph()
         _reset_paragraph_indents(title_p)
         title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -1321,11 +1460,11 @@ def render_docx(draft: DocumentDraft) -> bytes:
     while i < len(aligned_items):
         align_hint, raw_line = aligned_items[i]
         stripped = raw_line.strip()
-        if not stripped or stripped in ("---", "***", "___"):
+        if not stripped or stripped in ("---", "***", "___") or _TABLE_SEP_RE.match(stripped):
             i += 1
             continue
 
-        # Markdown table
+        # Markdown table (pure black-and-white Decree 30 style: NO w:shd background shading)
         if (
             i + 1 < len(aligned_items)
             and "|" in raw_line
@@ -1335,6 +1474,9 @@ def render_docx(draft: DocumentDraft) -> bytes:
             i += 2
             rows: list[list[str]] = []
             while i < len(aligned_items) and "|" in aligned_items[i][1] and aligned_items[i][1].strip():
+                if _TABLE_SEP_RE.match(aligned_items[i][1].strip()):
+                    i += 1
+                    continue
                 row = _split_table_row(aligned_items[i][1])
                 if len(row) < len(headers):
                     row.extend([""] * (len(headers) - len(row)))
@@ -1343,12 +1485,12 @@ def render_docx(draft: DocumentDraft) -> bytes:
             if headers:
                 table = doc.add_table(rows=1 + len(rows), cols=len(headers))
                 table.alignment = WD_TABLE_ALIGNMENT.CENTER
-                _set_table_borders(table)
+                _set_table_borders(table, color="000000")
                 for col_idx, header_text in enumerate(headers):
                     cell = table.cell(0, col_idx)
-                    _set_cell_shading(cell, "E6F4F1")
                     p = cell.paragraphs[0]
                     _reset_paragraph_indents(p)
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     p.paragraph_format.space_before = Pt(3)
                     p.paragraph_format.space_after = Pt(3)
                     _set_run_font(p.add_run(header_text), size_pt=12, bold=True)
