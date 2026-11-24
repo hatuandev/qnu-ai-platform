@@ -98,6 +98,7 @@ async def _direct_llm_turn(
         ).all()
     )
     rows = [t for t in all_turns if t.status == "completed"][-count:] if count else []
+    turn.history_turn_ids = [r.id for r in rows]
 
     system_prompt = (
         config.get("persona")
@@ -265,7 +266,15 @@ async def send(
         async def check():
             await checkpoint(db, actor, turn)
 
-        reply, provider_id = await resolve_turn(db, actor, conversation, turn, chat)
+        if not collection_ids:
+            # Persona-direct assistants (no knowledge collection) converse naturally
+            # with full turn history in _direct_llm_turn — skip the RAG query-rewrite
+            # router so follow-up drafting requests never trip conversation_clarification_required.
+            reply = None
+            provider_id = config.get("chat_provider_id")
+            turn.resolved_question = turn.question
+        else:
+            reply, provider_id = await resolve_turn(db, actor, conversation, turn, chat)
         if reply is None:
             live_formats = await _live_export_formats(db, conversation)
             early_disabled_fmt = disabled_requested_format(turn.question, live_formats)
@@ -287,7 +296,7 @@ async def send(
                     provider_id=provider_id,
                 )
             else:
-                export_formats = await _live_export_formats(db, conversation)
+                export_formats = live_formats
                 prior_turns = list(
                     (
                         await db.scalars(

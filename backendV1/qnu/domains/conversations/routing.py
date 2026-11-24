@@ -77,7 +77,11 @@ Yêu cầu mới tường minh có ưu tiên.
 Chỉ đặt needs_clarification=true khi current_question dựa vào đại từ hoặc cụm
 thay thế (nó, cái đó, điều này, khoản đó...) mà lịch sử không xác định được
 chủ thể. Câu hỏi tự nêu chủ đề (ví dụ "Điều 5 quy định gì?") vẫn là câu hỏi
-knowledge độc lập, không yêu cầu làm rõ. Không dùng lời đáp cũ làm bằng chứng.
+knowledge độc lập, không yêu cầu làm rõ. Yêu cầu soạn thảo, tạo mẫu, chỉnh sửa
+hoặc xuất văn bản/tài liệu (ví dụ "tôi muốn soạn 1 đơn xin nghỉ phép", "lập kế
+hoạch...") luôn là yêu cầu độc lập: TUYỆT ĐỐI KHÔNG đặt needs_clarification=true
+ngay cả khi người dùng chưa cung cấp đủ thông tin chi tiết — hãy để trợ lý tự
+trao đổi và hỏi lại người dùng. Không dùng lời đáp cũ làm bằng chứng.
 Khi không có câu hỏi trước, giữ nguyên current_question. Một yêu cầu tra cứu
 ngắn nêu tên chủ đề vẫn là yêu cầu tra cứu; không đổi thành câu hỏi định nghĩa.
 Ở lượt đầu, cụm chỉ văn bản có tên loại hoặc chủ đề (như "quy định này",

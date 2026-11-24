@@ -166,6 +166,17 @@ def test_render_xlsx_produces_valid_workbook_for_tables_and_outline():
     assert outline_wb.active.cell(row=4, column=2).value == "Thống nhất tiến độ quý II"
 
 
+def test_render_xlsx_keeps_formula_like_markup_as_literal_text():
+    draft = DocumentDraft(
+        title="Bảng thử",
+        markdown="| =1+2 | Giá trị |\n| --- | --- |\n| =2+3 | #N/A |",
+    )
+    sheet = load_workbook(io.BytesIO(render_xlsx(draft))).active
+    for address, expected in {"A3": "=1+2", "A4": "=2+3", "B4": "#N/A"}.items():
+        assert sheet[address].value == expected
+        assert sheet[address].data_type == "s"
+
+
 def test_render_pdf_fallback_produces_valid_pdf_bytes():
     draft = DocumentDraft(
         title="Đơn xin nghỉ phép",
@@ -461,5 +472,92 @@ def test_resolve_preferred_format_and_clean_nbsp_entities():
     assert "&nbsp;" not in xlsx_text
     assert "\u00a0" not in xlsx_text
     assert "Vé xe khứ hồi" in xlsx_text
+
+
+def test_routing_prompt_forbids_clarification_block_on_drafting_requests():
+    from qnu.domains.conversations import routing
+
+    assert "soạn thảo, tạo mẫu" in routing.SYSTEM
+    assert "TUYỆT ĐỐI KHÔNG đặt needs_clarification=true" in routing.SYSTEM
+
+
+@pytest.mark.asyncio
+async def test_execution_send_skips_resolve_turn_for_no_knowledge_assistant_turn2(monkeypatch):
+    from datetime import UTC, datetime
+
+    from qnu.domains.conversations import execution
+    from qnu.domains.conversations.schemas import DirectReply, TurnRequest
+
+    fake_conv = SimpleNamespace(
+        id="conv_draft_1",
+        workspace_id="ws_1",
+        assistant_id="ast_draft_1",
+        collection_id=None,
+        document_ids=None,
+        assistant_snapshot={
+            "name": "Trợ lý soạn thảo văn bản",
+            "persona": "Áp dụng Nghị định 30/2020/NĐ-CP",
+            "collection_ids": [],
+            "chat_provider_id": "prov_1",
+            "top_k": 5,
+            "history_turns": 3,
+            "max_output_tokens": None,
+            "rag_policy": {"allow_export_docx": True},
+        },
+    )
+    now = datetime.now(UTC)
+    fake_turn = SimpleNamespace(
+        id="turn_2",
+        conversation_id="conv_draft_1",
+        turn_no=2,
+        question="tôi muốn soạn 1 đơn xin nghỉ phép",
+        resolved_question="tôi muốn soạn 1 đơn xin nghỉ phép",
+        metadata_filter={},
+        history_turn_ids=[],
+        status="running",
+        error_code=None,
+        result=None,
+        rewrite_trace={},
+        created_at=now,
+        finished_at=None,
+        lease_expires_at=now,
+    )
+
+    async def fail_if_resolve_turn_called(*_args, **_kwargs):
+        raise AssertionError("resolve_turn must not be called for no-knowledge assistants")
+
+    fake_direct_reply = DirectReply(
+        id="turn_2",
+        status="direct_reply",
+        route="direct_chat",
+        answer="Được bạn nhé! Bạn cho mình biết họ tên, đơn vị và thời gian nghỉ phép để mình soạn đơn.",
+    )
+
+    monkeypatch.setattr(
+        execution, "reserve_turn", AsyncMock(return_value=(fake_conv, fake_turn, True))
+    )
+    monkeypatch.setattr(execution, "resolve_turn", fail_if_resolve_turn_called)
+    monkeypatch.setattr(execution, "_live_export_formats", AsyncMock(return_value=["docx"]))
+    monkeypatch.setattr(execution, "_direct_llm_turn", AsyncMock(return_value=fake_direct_reply))
+    monkeypatch.setattr(execution, "checkpoint", AsyncMock())
+    monkeypatch.setattr(execution, "record_workspace_event", AsyncMock())
+
+    fake_db = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+    resp = await execution.send(
+        fake_db,
+        SimpleNamespace(),
+        SimpleNamespace(),
+        SimpleNamespace(),
+        SimpleNamespace(),
+        SimpleNamespace(actor_id="act_1"),
+        "ws_1",
+        "conv_draft_1",
+        TurnRequest(question="tôi muốn soạn 1 đơn xin nghỉ phép", expected_turn_no=1),
+        "idem_key_2",
+    )
+    assert resp.status == "completed"
+    assert resp.result is not None
+    assert resp.result.status == "direct_reply"
+    assert "họ tên" in resp.result.answer
 
 
