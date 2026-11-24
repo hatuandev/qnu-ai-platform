@@ -7,8 +7,10 @@ import html
 import io
 import re
 import unicodedata
+from datetime import datetime
 from typing import Literal
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import httpx
 import pymupdf
@@ -158,6 +160,109 @@ _EXPORT_FORMAT_LABELS: dict[ExportFormat, str] = {
 }
 
 
+_VIETNAM_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+_VIETNAM_WEEKDAYS: tuple[str, ...] = (
+    "Thứ Hai",
+    "Thứ Ba",
+    "Thứ Tư",
+    "Thứ Năm",
+    "Thứ Sáu",
+    "Thứ Bảy",
+    "Chủ Nhật",
+)
+_VALID_SHORT_REPLIES = frozenset(
+    {
+        "ok",
+        "oke",
+        "okay",
+        "được",
+        "vâng",
+        "dạ",
+        "dạ vâng",
+        "có",
+        "không",
+        "cảm ơn",
+        "cảm ơn bạn",
+        "chào bạn",
+        "xin chào",
+    }
+)
+
+DECREE_30_DRAFTING_PERSONA = (
+    "Bạn là Trợ lý soạn thảo văn bản hành chính của Trường Đại học Quy Nhơn, "
+    "tuân thủ thể thức và kỹ thuật trình bày theo Nghị định 30/2020/NĐ-CP.\n\n"
+    "1. THỂ THỨC HÀNH CHÍNH CỐT LÕI (NĐ 30/2020/NĐ-CP):\n"
+    "- Đủ bố cục chuẩn từng loại văn bản (Đơn, Tờ trình, Công văn, Kế hoạch, Thông báo, Báo cáo, Biên bản, Quyết định): "
+    "Quốc hiệu & Tiêu ngữ; Tên cơ quan/đơn vị ban hành; Số, ký hiệu; Địa danh và ngày tháng năm; "
+    "Tên loại & trích yếu nội dung; Căn cứ (nếu có); Nội dung chính mạch lạc; Nơi nhận; Khối chữ ký.\n"
+    "- Văn phong hành chính chuẩn mực, súc tích, khách quan, 100% tiếng Việt trong sáng.\n\n"
+    "2. QUY TẮC HỘI THOẠI & KHÔNG HỎI VẶN NHIỀU LƯỢT:\n"
+    "- Chỉ hỏi làm rõ tối đa 1 lượt ngắn gọn nếu người dùng mới ngỏ ý quá chung chung (chưa nêu rõ loại văn bản hoặc mục đích cơ bản).\n"
+    "- Ngay khi người dùng đã nêu loại văn bản kèm thông tin cơ bản, bổ sung dữ liệu, hoặc yêu cầu chốt "
+    '("soạn giúp mình", "làm luôn đi", "phần thiếu tự điền", "nơi nhận tôi tự ghi"), '
+    "PHẢI SOẠN NGAY bản thảo hoàn chỉnh — không hỏi vặn thêm lượt nào nữa.\n"
+    "- Tự quy đổi chính xác mốc thời gian tương đối (hôm nay, ngày mai, ngày kia, tuần sau...) theo ngày giờ Việt Nam hiện tại.\n\n"
+    "3. CHỐNG BỊA DỮ KIỆN & PLACEHOLDER:\n"
+    "- TUYỆT ĐỐI không bịa số văn bản, căn cứ pháp lý, số liệu, họ tên, chức vụ hay quy định nội bộ chưa được cung cấp.\n"
+    "- Mọi trường còn thiếu tự điền chỗ giữ chỗ rõ ràng dạng [Tên thông tin], ví dụ: "
+    "[Nơi nhận], [Ngày bắt đầu], [Ngày kết thúc], [Chức vụ/Đơn vị], [Lý do], [Người ký]."
+)
+
+
+def vietnam_time_context(now: datetime | None = None) -> str:
+    """Build current Vietnam date/time context so the model resolves relative dates accurately."""
+    current = now.astimezone(_VIETNAM_TZ) if now is not None else datetime.now(_VIETNAM_TZ)
+    weekday = _VIETNAM_WEEKDAYS[current.weekday()]
+    formatted = f"{weekday}, {current.strftime('%d/%m/%Y %H:%M')}"
+    return (
+        "\n\n[NGỮ CẢNH THỜI GIAN HIỆN TẠI]\n"
+        f"Hiện tại là {formatted} (múi giờ Việt Nam — Asia/Ho_Chi_Minh).\n"
+        'Khi người dùng dùng mốc thời gian tương đối ("hôm nay", "ngày mai", "ngày kia", '
+        '"tuần sau", "nghỉ 2 ngày"...), hãy tự quy đổi chính xác sang ngày DD/MM/YYYY dựa trên '
+        "mốc thời gian này; TUYỆT ĐỐI KHÔNG hỏi ngược lại người dùng hôm nay là ngày nào."
+    )
+
+
+def dialogue_turn_policy(prior_turns: int) -> str:
+    """Return turn-aware conversation hygiene rules (no repeated greetings or endless follow-up questions)."""
+    if prior_turns > 0:
+        return (
+            "\n\n[QUY TẮC MẠCH HỘI THOẠI — LƯỢT NỐI TIẾP]\n"
+            f"Đây là lượt tiếp nối trong cùng phiên (đã có {prior_turns} lượt trước đó).\n"
+            '- TUYỆT ĐỐI KHÔNG mở đầu bằng "Chào bạn", "Xin chào", "Chào anh/chị" hay lời chào/tự giới thiệu lặp lại; '
+            "đi thẳng ngay vào nội dung hoặc bản thảo.\n"
+            "- KHÔNG hỏi vặn đi hỏi vặn lại: nếu người dùng đã bổ sung thông tin, hoặc đã nói rõ ý muốn soạn ngay "
+            '("soạn giúp mình", "làm luôn đi", "phần thiếu tự điền", "nơi nhận tôi tự ghi"...), '
+            "hãy SOẠN NGAY bản thảo hoàn chỉnh và dùng chỗ giữ chỗ rõ ràng dạng [Nơi nhận], [Ngày bắt đầu], "
+            "[Ngày kết thúc], [Chức vụ/Đơn vị] cho các trường còn thiếu."
+        )
+    return (
+        "\n\n[QUY TẮC MẠCH HỘI THOẠI — LƯỢT ĐẦU]\n"
+        "Nếu cần chào mở đầu, chỉ chào ngắn gọn tối đa 1 câu rồi đi thẳng vào yêu cầu của người dùng."
+    )
+
+
+def is_abnormally_truncated_reply(text: str, question: str = "") -> bool:
+    """Detect sudden early-EOS cutoffs (e.g., 1-word 'Cảm' on quantized Q4 models)."""
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return True
+    if cleaned[-1] in ",;:-" and len(cleaned) < 20:
+        return True
+    normalized = cleaned.lower().strip(" .!?")
+    if normalized in _VALID_SHORT_REPLIES:
+        return False
+    if len(cleaned) < 10:
+        return True
+    words = cleaned.split()
+    return (
+        len(words) <= 2
+        and len(cleaned) < 16
+        and cleaned[-1] not in ".!?…"
+        and len((question or "").strip()) >= 15
+    )
+
+
 def export_policy_prompt_addon(formats: list[ExportFormat]) -> str:
     """Prompt rules enforcing exact enabled/disabled export toggles (DOCX/PDF/Excel)."""
     if not formats:
@@ -188,12 +293,13 @@ def export_policy_prompt_addon(formats: list[ExportFormat]) -> str:
         f"<<<DOCUMENT ...>>> ... <<<END_DOCUMENT>>> thành tệp tải về thật cho đúng định dạng đang bật ({enabled_labels}). "
         f"TUYỆT ĐỐI KHÔNG trả lời rằng bạn không thể tạo hoặc xuất tệp đối với các định dạng đang bật ({enabled_labels}).\n"
         f"{disabled_rule}"
-        "- KHÔNG TẠO BẢN THẢO SỚM: Khi người dùng mới hỏi thăm khả năng hỗ trợ hoặc ngỏ ý chung chung "
-        '(ví dụ: "tôi muốn làm 1 đơn xin nghỉ phép có được không?", "bạn có soạn được kế hoạch không?") '
-        "mà chưa cung cấp thông tin cụ thể hay yêu cầu tạo tệp ngay, chỉ trả lời xác nhận "
-        "và hỏi lại ngắn gọn, tự nhiên các thông tin cần thiết — TUYỆT ĐỐI KHÔNG xuất thẻ <<<DOCUMENT ...>>> ở lượt này.\n"
-        "- CHỈ khi người dùng đã cung cấp thông tin cụ thể để soạn hoặc yêu cầu tạo bản thảo/tệp ngay "
-        "(và định dạng đó đang bật nếu người dùng có chỉ định):\n"
+        "- KHÔNG TẠO BẢN THẢO SỚM (CHỈ HỎI TỐI ĐA 1 LƯỢT): Chỉ hỏi làm rõ tối đa 1 lượt ngắn gọn khi người dùng mới "
+        'ngỏ ý quá chung chung (ví dụ: "tôi muốn làm 1 đơn xin nghỉ phép có được không?", "tôi muốn soạn đơn") '
+        "mà chưa cung cấp thông tin cơ bản hay yêu cầu soạn ngay — KHÔNG xuất thẻ <<<DOCUMENT ...>>> ở lượt hỏi thăm này.\n"
+        "- XUẤT BẢN THẢO NGAY, KHÔNG HỎI VẶN THÊM: Ngay khi người dùng đã cung cấp thông tin cơ bản để soạn, "
+        'bổ sung dữ kiện ở lượt tiếp theo, hoặc ra tín hiệu chốt ("soạn giúp mình", "làm luôn đi", '
+        '"phần thiếu tự điền", "nơi nhận tôi tự ghi", yêu cầu tạo/xuất tệp ngay): '
+        "BẮT BUỘC tạo ngay bản thảo hoàn chỉnh (không hỏi vặn thêm lượt nào nữa):\n"
         "  1. Trao đổi ngắn gọn, tự nhiên với người dùng ở ngoài thẻ tài liệu (nhắc đúng định dạng tệp đang tạo, "
         "không liệt kê các định dạng khác).\n"
         "  2. Đặt TOÀN BỘ thân văn bản sạch (không dính lời chào, lời dẫn hay ghi chú nháp) vào trong cặp thẻ:\n"
@@ -206,8 +312,8 @@ def export_policy_prompt_addon(formats: list[ExportFormat]) -> str:
         "  4. Chỉ dùng kiến thức nền để tổ chức bố cục, văn phong và khung mẫu văn bản. "
         "TUYỆT ĐỐI KHÔNG tự suy đoán hoặc bịa thông tin thực tế của đơn vị/nhà trường "
         "(cơ cấu tổ chức, khoa/viện, ngành đào tạo, số liệu, quy định, mốc thời gian) nếu không có "
-        "trong ngữ cảnh hoặc người dùng chưa cung cấp; sử dụng chỗ giữ chỗ dạng [...] cho phần cần điền "
-        "hoặc đề nghị người dùng bổ sung dữ kiện."
+        "trong ngữ cảnh hoặc người dùng chưa cung cấp; tự động điền chỗ giữ chỗ rõ ràng dạng [...] hoặc [Tên thông tin] "
+        "(ví dụ: [Nơi nhận], [Ngày bắt đầu], [Ngày kết thúc], [Chức vụ/Đơn vị]) cho phần còn thiếu."
     )
 
 
@@ -814,7 +920,12 @@ def render_xlsx(draft: DocumentDraft) -> bytes:
     body_font = Font(name="Calibri", size=11, color="1E293B")
 
     def populate_sheet(ws, sheet_title: str, headers: list[str], rows: list[list[str]]) -> None:
-        ws.cell(row=1, column=1, value=sheet_title).font = title_font
+        def text_cell(row: int, column: int, value: str):
+            cell = ws.cell(row=row, column=column, value=value)
+            cell.data_type = "s"  # Draft cells are source text, including formula-like strings.
+            return cell
+
+        text_cell(1, 1, sheet_title).font = title_font
         if len(headers) > 1:
             ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
         ws.row_dimensions[1].height = 24
@@ -822,7 +933,7 @@ def render_xlsx(draft: DocumentDraft) -> bytes:
         header_row = 3
         ws.row_dimensions[header_row].height = 22
         for col_idx, h_text in enumerate(headers, start=1):
-            cell = ws.cell(row=header_row, column=col_idx, value=h_text)
+            cell = text_cell(header_row, col_idx, h_text)
             cell.fill = header_fill
             cell.font = header_font
             cell.border = border
@@ -831,7 +942,7 @@ def render_xlsx(draft: DocumentDraft) -> bytes:
         for r_offset, row_vals in enumerate(rows, start=1):
             excel_row = header_row + r_offset
             for col_idx, val in enumerate(row_vals, start=1):
-                cell = ws.cell(row=excel_row, column=col_idx, value=val)
+                cell = text_cell(excel_row, col_idx, val)
                 cell.font = body_font
                 cell.border = border
                 if r_offset % 2 == 0:

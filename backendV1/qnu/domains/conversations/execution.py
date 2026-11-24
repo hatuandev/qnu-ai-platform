@@ -14,14 +14,17 @@ from qnu.domains.conversations.document_export import (
     DocumentDraft,
     ExportFormat,
     active_draft_prompt_context,
+    dialogue_turn_policy,
     disabled_format_refusal_message,
     disabled_requested_format,
     enabled_export_formats,
     export_policy_prompt_addon,
     extract_document_draft,
+    is_abnormally_truncated_reply,
     requested_export_format,
     resolve_preferred_format,
     strip_document_markers,
+    vietnam_time_context,
 )
 from qnu.domains.conversations.history import readable
 from qnu.domains.conversations.models import ConversationTurn
@@ -74,6 +77,29 @@ def _latest_turn_draft(turns: list[ConversationTurn]) -> DocumentDraft | None:
     return None
 
 
+def _extract_direct_text(raw: str) -> str:
+    raw_content = (raw or "").strip()
+    answer_text = raw_content
+    if raw_content.startswith("{") and raw_content.endswith("}"):
+        try:
+            parsed = json.loads(raw_content)
+            if isinstance(parsed, dict):
+                extracted = (
+                    parsed.get("answer")
+                    or parsed.get("message")
+                    or parsed.get("content")
+                    or parsed.get("text")
+                )
+                if extracted and isinstance(extracted, str):
+                    answer_text = extracted.strip()
+                elif not parsed or all(not v for v in parsed.values()):
+                    answer_text = ""
+        except Exception:
+            pass
+    cleaned, _hygiene = clean_text(answer_text)
+    return cleaned
+
+
 async def _direct_llm_turn(
     db: AsyncSession,
     actor: AuthActor,
@@ -110,13 +136,9 @@ async def _direct_llm_turn(
         NO_KNOWLEDGE_GROUNDING_POLICY
         + export_policy_prompt_addon(export_formats)
         + active_draft_prompt_context(latest_draft)
+        + vietnam_time_context()
+        + dialogue_turn_policy(len(rows))
     )
-    if rows:
-        system_prompt += (
-            "\n\n[LƯU Ý HỘI THOẠI]: Đây là lượt trò chuyện tiếp nối trong phiên. "
-            "TUYỆT ĐỐI KHÔNG lặp lại lời chào xã giao ('Chào bạn', 'Xin chào...') hay giới thiệu lại danh tính trợ lý. "
-            "Hãy đi thẳng vào giải đáp trọng tâm câu hỏi của người dùng một cách tự nhiên."
-        )
     messages = [ChatMessage(role="system", content=system_prompt)]
     for r in rows:
         messages.append(ChatMessage(role="user", content=r.question))
@@ -139,52 +161,53 @@ async def _direct_llm_turn(
         json_mode=False,
     )
     inference_hash = runtime.inference_configuration_hash("chat")
-    usage = await usage_service.reserve(
-        db,
-        actor,
-        workspace_id,
-        "chat",
-        "direct_chat:" + turn.id,
-        digest(
-            {
-                "messages": [m.content for m in messages],
-                "config": inference_hash,
-                "version": "direct_chat/v1",
-            }
-        ),
-        budget.total_reserved_tokens,
-        runtime.provider_id,
-    )
-    try:
-        result_chat = await chat.complete(messages, bind_usage(request, usage.id))
-    except ChatResponseError as exc:
-        await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
-        raise
-    except (Exception, asyncio.CancelledError):
-        await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
-        raise
 
-    await usage_service.settle(db, usage.id, total_tokens=result_chat.total_tokens)
-    raw_content = result_chat.content.strip()
-    answer_text = raw_content
-    if raw_content.startswith("{") and raw_content.endswith("}"):
+    async def _run_completion(key_prefix: str, version_tag: str):
+        usage = await usage_service.reserve(
+            db,
+            actor,
+            workspace_id,
+            "chat",
+            key_prefix + turn.id,
+            digest(
+                {
+                    "messages": [m.content for m in messages],
+                    "config": inference_hash,
+                    "version": version_tag,
+                }
+            ),
+            budget.total_reserved_tokens,
+            runtime.provider_id,
+        )
         try:
-            parsed = json.loads(raw_content)
-            if isinstance(parsed, dict):
-                extracted = (
-                    parsed.get("answer")
-                    or parsed.get("message")
-                    or parsed.get("content")
-                    or parsed.get("text")
-                )
-                if extracted and isinstance(extracted, str):
-                    answer_text = extracted.strip()
-                elif not parsed or all(not v for v in parsed.values()):
-                    answer_text = ""
-        except Exception:
-            pass
+            completion = await chat.complete(messages, bind_usage(request, usage.id))
+        except ChatResponseError as exc:
+            await usage_service.settle(db, usage.id, total_tokens=exc.usage_tokens, failed=True)
+            raise
+        except (Exception, asyncio.CancelledError):
+            await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
+            raise
+        await usage_service.settle(db, usage.id, total_tokens=completion.total_tokens)
+        return completion
 
-    answer_text, _hygiene = clean_text(answer_text)
+    result_chat = await _run_completion("direct_chat:", "direct_chat/v1")
+    total_tokens = result_chat.total_tokens
+    answer_text = _extract_direct_text(result_chat.content)
+    retried_truncated = False
+    if is_abnormally_truncated_reply(answer_text, effective_question):
+        logger.warning(
+            "direct_chat_truncated_reply_retry",
+            turn_id=turn.id,
+            provider_id=runtime.provider_id,
+            raw_len=len(answer_text.strip()),
+        )
+        retried_truncated = True
+        retry_chat = await _run_completion("direct_chat_retry:", "direct_chat_retry/v1")
+        total_tokens = (total_tokens or 0) + (retry_chat.total_tokens or 0)
+        retry_text = _extract_direct_text(retry_chat.content)
+        if retry_text.strip():
+            answer_text = retry_text
+
     if not answer_text.strip() or answer_text.strip() == "{}":
         answer_text = (
             "Tôi đã ghi nhận câu hỏi của bạn. Về nội dung này, bạn có thể diễn đạt cụ thể hơn "
@@ -214,7 +237,8 @@ async def _direct_llm_turn(
         "mode": "direct_llm",
         "provider_id": runtime.provider_id,
         "model_name": runtime.model_name,
-        "total_tokens": result_chat.total_tokens,
+        "total_tokens": total_tokens,
+        **({"retried_truncated": True} if retried_truncated else {}),
         **({"document_draft": draft_payload} if draft_payload is not None else {}),
     }
     return DirectReply(

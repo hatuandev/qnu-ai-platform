@@ -561,3 +561,237 @@ async def test_execution_send_skips_resolve_turn_for_no_knowledge_assistant_turn
     assert "họ tên" in resp.result.answer
 
 
+def test_decree_30_persona_compact_and_immediate_draft_placeholders():
+    persona = document_export.DECREE_30_DRAFTING_PERSONA
+    assert 1400 <= len(persona) <= 2000
+    assert "30/2020/NĐ-CP" in persona
+    assert "[Nơi nhận]" in persona
+    assert "[Ngày bắt đầu]" in persona
+    assert "tối đa 1 lượt" in persona.lower()
+
+    addon = document_export.export_policy_prompt_addon(["docx", "pdf"])
+    assert "tối đa 1 lượt" in addon.lower()
+    assert "soạn giúp mình" in addon
+    assert "[Nơi nhận]" in addon
+    assert "[Ngày bắt đầu]" in addon
+    assert "[Ngày kết thúc]" in addon
+    assert "[Chức vụ/Đơn vị]" in addon
+
+
+def test_vietnam_time_context_and_truncated_reply_guard():
+    from datetime import UTC, datetime
+
+    fixed_utc = datetime(2026, 11, 24, 10, 30, tzinfo=UTC)  # 17:30 Asia/Ho_Chi_Minh (Tuesday)
+    ctx = document_export.vietnam_time_context(fixed_utc)
+    assert "Asia/Ho_Chi_Minh" in ctx
+    assert "Thứ Ba, 24/11/2026 17:30" in ctx
+    assert "ngày mai" in ctx
+
+    assert document_export.is_abnormally_truncated_reply("Cảm", "Soạn giúp mình đơn xin nghỉ phép")
+    assert document_export.is_abnormally_truncated_reply("Vâng,", "Tôi nghỉ 2 ngày")
+    assert document_export.is_abnormally_truncated_reply("   ", "Soạn công văn")
+    assert not document_export.is_abnormally_truncated_reply(
+        "Cảm ơn bạn!", "cảm ơn"
+    )
+    assert not document_export.is_abnormally_truncated_reply(
+        "Chào bạn! Mình là Trợ lý soạn thảo văn bản hành chính.", "xin chào"
+    )
+
+
+@pytest.mark.asyncio
+async def test_direct_llm_turn_injects_vietnam_time_and_no_repeated_greeting(monkeypatch):
+    from qnu.domains.conversations import execution
+
+    captured_messages: list[list] = []
+
+    class FakeChat:
+        async def complete(self, messages, _request):
+            captured_messages.append(messages)
+            return SimpleNamespace(
+                content="Đã ghi nhận thông tin. Dưới đây là bản thảo đơn xin nghỉ phép của bạn.",
+                total_tokens=120,
+            )
+
+    fake_runtime = SimpleNamespace(
+        provider_id="prov_1",
+        model_name="qwen3.8-27b-q4",
+        inference_configuration_hash=lambda _task: "cfg_hash",
+    )
+    fake_budget = SimpleNamespace(total_reserved_tokens=512)
+    monkeypatch.setattr(
+        execution,
+        "prepare_chat_request",
+        AsyncMock(return_value=(fake_runtime, SimpleNamespace(), fake_budget)),
+    )
+    monkeypatch.setattr(
+        execution.usage_service,
+        "reserve",
+        AsyncMock(return_value=SimpleNamespace(id="usg_1")),
+    )
+    monkeypatch.setattr(execution.usage_service, "settle", AsyncMock())
+    monkeypatch.setattr(execution, "_live_export_formats", AsyncMock(return_value=["docx"]))
+    monkeypatch.setattr(execution, "bind_usage", lambda req, _uid: req)
+
+    fake_conv = SimpleNamespace(
+        id="conv_time_1",
+        assistant_id="ast_1",
+        assistant_snapshot={
+            "persona": document_export.DECREE_30_DRAFTING_PERSONA,
+            "history_turns": 3,
+            "rag_policy": {"allow_export_docx": True},
+        },
+    )
+
+    # Case 1: prior_turns == 0
+    fake_db_first = SimpleNamespace(
+        scalars=AsyncMock(return_value=SimpleNamespace(all=list))
+    )
+    turn_1 = SimpleNamespace(
+        id="turn_1",
+        turn_no=1,
+        question="Xin chào",
+        resolved_question="Xin chào",
+        history_turn_ids=[],
+        rewrite_trace={},
+    )
+    await execution._direct_llm_turn(
+        fake_db_first,
+        SimpleNamespace(actor_id="act_1"),
+        "ws_1",
+        fake_conv,
+        turn_1,
+        FakeChat(),
+        "prov_1",
+    )
+    sys_turn_1 = captured_messages[0][0].content
+    assert "Asia/Ho_Chi_Minh" in sys_turn_1
+    assert "lượt đầu" in sys_turn_1.lower()
+    assert "chào mở đầu" in sys_turn_1.lower()
+
+    # Case 2: prior_turns > 0
+    prior_turn = SimpleNamespace(
+        id="turn_1",
+        status="completed",
+        question="Xin chào",
+        result={"answer": "Chào bạn! Bạn cần soạn văn bản gì?"},
+        rewrite_trace={},
+    )
+    fake_db_followup = SimpleNamespace(
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: [prior_turn]))
+    )
+    turn_2 = SimpleNamespace(
+        id="turn_2",
+        turn_no=2,
+        question="tôi bắt đầu nghỉ từ ngày mai, nơi nhận tôi tự ghi",
+        resolved_question="tôi bắt đầu nghỉ từ ngày mai, nơi nhận tôi tự ghi",
+        history_turn_ids=[],
+        rewrite_trace={},
+    )
+    await execution._direct_llm_turn(
+        fake_db_followup,
+        SimpleNamespace(actor_id="act_1"),
+        "ws_1",
+        fake_conv,
+        turn_2,
+        FakeChat(),
+        "prov_1",
+    )
+    assert turn_2.history_turn_ids == ["turn_1"]
+    sys_turn_2 = captured_messages[1][0].content
+    assert "Asia/Ho_Chi_Minh" in sys_turn_2
+    assert 'TUYỆT ĐỐI KHÔNG mở đầu bằng "Chào bạn", "Xin chào"' in sys_turn_2
+
+
+@pytest.mark.asyncio
+async def test_direct_llm_turn_retries_once_on_truncated_reply(monkeypatch):
+    from qnu.domains.conversations import execution
+
+    attempts = 0
+    reserve_keys: list[str] = []
+
+    class TruncatedThenFullChat:
+        async def complete(self, _messages, _request):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                return SimpleNamespace(content="Cảm", total_tokens=20)
+            return SimpleNamespace(
+                content=(
+                    "Dưới đây là bản thảo đơn xin nghỉ phép hoàn chỉnh:\n\n"
+                    '<<<DOCUMENT title="Đơn xin nghỉ phép" layout="administrative" format="docx">>>\n'
+                    "# ĐƠN XIN NGHỈ PHÉP\n\n"
+                    "Kính gửi: [Nơi nhận]\n\n"
+                    "Tôi tên là Nguyễn Văn A, đơn vị Phòng Hành chính, Trường Đại học Quy Nhơn. "
+                    "Xin nghỉ phép 02 ngày từ [Ngày bắt đầu] đến [Ngày kết thúc] vì lý do nghỉ ốm.\n"
+                    "<<<END_DOCUMENT>>>"
+                ),
+                total_tokens=240,
+            )
+
+    async def fake_reserve(_db, _actor, _ws, _task, idem_key, *_args, **_kwargs):
+        reserve_keys.append(idem_key)
+        return SimpleNamespace(id=f"usg_{len(reserve_keys)}")
+
+    fake_runtime = SimpleNamespace(
+        provider_id="prov_1",
+        model_name="qwen3.8-27b-q4",
+        inference_configuration_hash=lambda _task: "cfg_hash",
+    )
+    fake_budget = SimpleNamespace(total_reserved_tokens=512)
+    monkeypatch.setattr(
+        execution,
+        "prepare_chat_request",
+        AsyncMock(return_value=(fake_runtime, SimpleNamespace(), fake_budget)),
+    )
+    monkeypatch.setattr(execution.usage_service, "reserve", fake_reserve)
+    monkeypatch.setattr(execution.usage_service, "settle", AsyncMock())
+    monkeypatch.setattr(execution, "_live_export_formats", AsyncMock(return_value=["docx"]))
+    monkeypatch.setattr(execution, "bind_usage", lambda req, _uid: req)
+
+    prior_turn = SimpleNamespace(
+        id="turn_2",
+        status="completed",
+        question="tôi muốn soạn 1 đơn xin nghỉ phép",
+        result={"answer": "Bạn cho mình biết họ tên, đơn vị, lý do và số ngày nghỉ nhé."},
+        rewrite_trace={},
+    )
+    fake_db = SimpleNamespace(
+        scalars=AsyncMock(return_value=SimpleNamespace(all=lambda: [prior_turn]))
+    )
+    fake_conv = SimpleNamespace(
+        id="conv_retry_1",
+        assistant_id="ast_1",
+        assistant_snapshot={
+            "persona": document_export.DECREE_30_DRAFTING_PERSONA,
+            "history_turns": 3,
+            "rag_policy": {"allow_export_docx": True},
+        },
+    )
+    turn_3 = SimpleNamespace(
+        id="turn_3",
+        turn_no=3,
+        question="tôi làm tại trường đại học quy nhơn, họ tên là nguyễn văn a, đơn vị phòng hành chính, lý do là nghỉ ốm thời gian là 2 ngày",
+        resolved_question="tôi làm tại trường đại học quy nhơn, họ tên là nguyễn văn a, đơn vị phòng hành chính, lý do là nghỉ ốm thời gian là 2 ngày",
+        history_turn_ids=[],
+        rewrite_trace={},
+    )
+
+    reply = await execution._direct_llm_turn(
+        fake_db,
+        SimpleNamespace(actor_id="act_1"),
+        "ws_1",
+        fake_conv,
+        turn_3,
+        TruncatedThenFullChat(),
+        "prov_1",
+    )
+    assert attempts == 2
+    assert reserve_keys == ["direct_chat:turn_3", "direct_chat_retry:turn_3"]
+    assert turn_3.rewrite_trace["retried_truncated"] is True
+    assert turn_3.rewrite_trace["total_tokens"] == 260
+    assert turn_3.rewrite_trace["document_draft"]["title"] == "Đơn xin nghỉ phép"
+    assert "[Nơi nhận]" in turn_3.rewrite_trace["document_draft"]["markdown"]
+    assert reply.answer != "Cảm"
+
+
+

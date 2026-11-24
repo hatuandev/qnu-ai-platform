@@ -33,11 +33,13 @@ from qnu.domains.conversations.document_export import (
     DocumentDraft,
     ExportFormat,
     active_draft_prompt_context,
+    dialogue_turn_policy,
     disabled_format_refusal_message,
     disabled_requested_format,
     enabled_export_formats,
     export_policy_prompt_addon,
     extract_document_draft,
+    is_abnormally_truncated_reply,
     render_docx,
     render_pdf,
     render_xlsx,
@@ -45,12 +47,14 @@ from qnu.domains.conversations.document_export import (
     resolve_preferred_format,
     safe_download_filename,
     strip_document_markers,
+    vietnam_time_context,
 )
 from qnu.domains.identity.service_actor import public_chatbot_actor
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.index.directory import directory_ready
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.lifecycle.guards import visible
+from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.inference.service import prepare_chat_request
 from qnu.domains.modelops.providers.service import provider_service
 from qnu.domains.modelops.usage.scope import use_account
@@ -379,28 +383,27 @@ async def list_public_chat_models(
     providers = await provider_service.list(db, active_only=True)
     chat_providers = [p for p in providers if "chat" in (p.capabilities or []) and p.model_name]
 
-    default_model_name: str | None = None
-    if assistant_chat_provider_id:
-        for p in chat_providers:
-            if p.id == assistant_chat_provider_id:
-                default_model_name = p.model_name
-                break
-    if default_model_name is None and chat_providers:
-        default_model_name = chat_providers[0].model_name
+    default_provider_id = assistant_chat_provider_id or await catalog_service.system_default_for(
+        db, "chat"
+    )
+    default_model_name = next(
+        (p.model_name for p in chat_providers if p.id == default_provider_id), None
+    )
 
-    options: list[PublicModelOption] = []
     model_to_provider: dict[str, str] = {}
     for p in chat_providers:
-        if p.model_name in model_to_provider:
-            continue
-        model_to_provider[p.model_name] = p.id
-        options.append(
-            PublicModelOption(
-                model_name=p.model_name,
-                label=_public_model_label(p.model_name),
-                is_default=p.model_name == default_model_name,
-            )
+        if p.id == default_provider_id:
+            model_to_provider[p.model_name] = p.id
+        else:
+            model_to_provider.setdefault(p.model_name, p.id)
+    options = [
+        PublicModelOption(
+            model_name=name,
+            label=_public_model_label(name),
+            is_default=name == default_model_name,
         )
+        for name in model_to_provider
+    ]
     return options, default_model_name, model_to_provider
 
 
@@ -436,11 +439,13 @@ async def info(db: AsyncSession, blob: BlobStore, slug: str) -> PublicChatbotInf
     ast_rev = assistant.revision if assistant is not None else 0
     cache_key = f"pubchat:info:v3:{row.id}:{row.revision}:{ast_rev}:{int(active)}"
     cached = await get_json(cache_key)
-    if cached is not None:
-        return PublicChatbotInfo.model_validate(cached)
-    available = active and await _readiness(db, blob, row) == "ready"
     assistant_provider_id = assistant.chat_provider_id if assistant is not None else None
     models, default_model_name, _ = await list_public_chat_models(db, assistant_provider_id)
+    if cached is not None:
+        return PublicChatbotInfo.model_validate(
+            {**cached, "models": models, "default_model_name": default_model_name}
+        )
+    available = active and await _readiness(db, blob, row) == "ready"
     export_formats = (
         enabled_export_formats({"rag_policy": assistant.rag_policy})
         if assistant is not None
@@ -900,17 +905,32 @@ async def turn(
             history_rows = await _load_public_history(
                 req.session_id, getattr(assistant, "history_turns", 3)
             )
-            if history_rows:
-                system_content += (
-                    "\n\n[MẠCH HỘI THOẠI]: Đây là lượt trò chuyện tiếp nối trong cùng phiên. "
-                    "Không lặp lại lời chào mở đầu hay tự giới thiệu lại nếu đã chào trước đó; "
-                    "phản hồi tự nhiên theo ngữ cảnh các lượt trước."
-                )
+            system_content += vietnam_time_context() + dialogue_turn_policy(len(history_rows))
             messages = [ChatMessage(role="system", content=system_content)]
             for item in history_rows:
                 messages.append(ChatMessage(role="user", content=item["question"]))
                 messages.append(ChatMessage(role="assistant", content=item["answer"]))
             messages.append(ChatMessage(role="user", content=req.question))
+
+            def _parse_pub_reply(raw: str) -> str:
+                pub_raw = (raw or "").strip()
+                parsed_text = pub_raw
+                if pub_raw.startswith("{") and pub_raw.endswith("}"):
+                    try:
+                        p = json.loads(pub_raw)
+                        if isinstance(p, dict):
+                            extracted = (
+                                p.get("answer")
+                                or p.get("message")
+                                or p.get("content")
+                                or p.get("text")
+                            )
+                            if extracted and isinstance(extracted, str):
+                                parsed_text = extracted.strip()
+                    except Exception:
+                        pass
+                return parsed_text
+
             with use_account(budget):
                 runtime, chat_req, chat_budget = await prepare_chat_request(
                     db,
@@ -921,51 +941,49 @@ async def turn(
                     task="chat",
                     max_output_tokens=assistant.max_output_tokens,
                 )
-                usage = await usage_service.reserve(
-                    db,
-                    actor,
-                    row.workspace_id,
-                    "chat",
-                    f"pub:{row.id}:{uuid.uuid4().hex}",
-                    digest(
-                        {
-                            "publication_id": row.id,
-                            "question": req.question,
-                            "config": runtime.inference_configuration_hash("chat"),
-                        }
-                    ),
-                    chat_budget.total_reserved_tokens,
-                    runtime.provider_id,
-                )
-                try:
-                    await db.commit()
-                except BaseException:
-                    await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
-                    raise
-                try:
-                    chat_res = await chat.complete(messages, bind_usage(chat_req, usage.id))
-                except ChatResponseError as exc:
-                    await usage_service.settle(
-                        db, usage.id, total_tokens=exc.usage_tokens, failed=True
+
+                async def _run_public_completion():
+                    usage = await usage_service.reserve(
+                        db,
+                        actor,
+                        row.workspace_id,
+                        "chat",
+                        f"pub:{row.id}:{uuid.uuid4().hex}",
+                        digest(
+                            {
+                                "publication_id": row.id,
+                                "question": req.question,
+                                "config": runtime.inference_configuration_hash("chat"),
+                            }
+                        ),
+                        chat_budget.total_reserved_tokens,
+                        runtime.provider_id,
                     )
-                    raise
-                except BaseException:
-                    await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
-                    raise
-                await usage_service.settle(db, usage.id, total_tokens=chat_res.total_tokens)
-            pub_raw = chat_res.content.strip()
-            pub_ans = pub_raw
-            if pub_raw.startswith("{") and pub_raw.endswith("}"):
-                try:
-                    p = json.loads(pub_raw)
-                    if isinstance(p, dict):
-                        extracted = (
-                            p.get("answer") or p.get("message") or p.get("content") or p.get("text")
+                    try:
+                        await db.commit()
+                    except BaseException:
+                        await usage_service.settle(db, usage.id, total_tokens=0, failed=True)
+                        raise
+                    try:
+                        res = await chat.complete(messages, bind_usage(chat_req, usage.id))
+                    except ChatResponseError as exc:
+                        await usage_service.settle(
+                            db, usage.id, total_tokens=exc.usage_tokens, failed=True
                         )
-                        if extracted and isinstance(extracted, str):
-                            pub_ans = extracted.strip()
-                except Exception:
-                    pass
+                        raise
+                    except BaseException:
+                        await usage_service.settle(db, usage.id, total_tokens=None, failed=True)
+                        raise
+                    await usage_service.settle(db, usage.id, total_tokens=res.total_tokens)
+                    return res
+
+                chat_res = await _run_public_completion()
+                pub_ans = _parse_pub_reply(chat_res.content)
+                if not social_only and is_abnormally_truncated_reply(pub_ans, req.question):
+                    retry_res = await _run_public_completion()
+                    retry_ans = _parse_pub_reply(retry_res.content)
+                    if retry_ans.strip():
+                        pub_ans = retry_ans
             if not pub_ans or pub_ans == "{}":
                 pub_ans = (
                     "Tôi đã ghi nhận câu hỏi của bạn. Về nội dung này, bạn có thể diễn đạt cụ thể hơn "
