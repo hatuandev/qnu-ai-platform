@@ -1325,45 +1325,22 @@ def _extract_admin_header(
     date_line: str | None = None
     has_motto = False
     idx = 0
-    scan_limit = min(len(items), 14)
+    scan_limit = min(len(items), 16)
 
-    # Support models that format the administrative header as a 2-column Markdown table at top
-    first_idx = next((k for k in range(scan_limit) if items[k][1].strip()), None)
-    if (
-        first_idx is not None
-        and "|" in items[first_idx][1]
-        and "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" in items[first_idx][1].upper()
-    ):
-        tbl_idx = first_idx
-        while tbl_idx < len(items) and "|" in items[tbl_idx][1] and items[tbl_idx][1].strip():
-            row_raw = items[tbl_idx][1].strip()
-            tbl_idx += 1
-            if _TABLE_SEP_RE.match(row_raw):
-                continue
-            cells = _split_table_row(row_raw)
-            if len(cells) < 2:
-                continue
-            for left_sub in cells[0].splitlines():
-                plain_l = _strip_md_emphasis(left_sub)
-                if not plain_l or _RAW_UNDERLINE_LINE_RE.match(plain_l):
-                    continue
-                if _ADMIN_SO_LINE_RE.match(plain_l):
-                    so_line = plain_l
-                else:
-                    org_lines.append(plain_l)
-            for right_sub in cells[1].splitlines():
-                plain_r = _strip_md_emphasis(right_sub)
-                if not plain_r or _RAW_UNDERLINE_LINE_RE.match(plain_r):
-                    continue
-                upper_r = plain_r.upper()
-                if "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" in upper_r or (
-                    "ĐỘC LẬP" in upper_r and "TỰ DO" in upper_r and "HẠNH PHÚC" in upper_r
-                ):
-                    has_motto = True
-                elif _ADMIN_DATE_LINE_RE.match(plain_r):
-                    date_line = plain_r
-        idx = tbl_idx
-        scan_limit = min(len(items), idx + 6)
+    def _is_org_cue(text: str) -> bool:
+        upper_t = text.upper()
+        return (
+            len(text) <= 75
+            and (
+                text.isupper()
+                or text.startswith(("[Tên cơ quan", "[Đơn vị"))
+                or "ĐẠI HỌC" in upper_t
+                or "TRƯỜNG " in upper_t
+                or "UBND" in upper_t
+                or "BỘ " in upper_t
+            )
+            and not _ADMIN_CUES_RE.match(text)
+        )
 
     while idx < scan_limit:
         _align, raw = items[idx]
@@ -1376,7 +1353,56 @@ def _extract_admin_header(
         ):
             idx += 1
             continue
-        plain = _strip_md_emphasis(stripped.lstrip("#").strip())
+
+        # Handle pipe-delimited 2-column Markdown header rows (even across blank lines/separators)
+        if "|" in stripped:
+            cells = _split_table_row(stripped)
+            if len(cells) == 2:
+                left_parts = [
+                    _strip_md_emphasis(sub).strip("| ").strip()
+                    for sub in cells[0].splitlines()
+                    if _strip_md_emphasis(sub).strip("| ").strip()
+                    and not _RAW_UNDERLINE_LINE_RE.match(_strip_md_emphasis(sub).strip("| ").strip())
+                ]
+                right_parts = [
+                    _strip_md_emphasis(sub).strip("| ").strip()
+                    for sub in cells[1].splitlines()
+                    if _strip_md_emphasis(sub).strip("| ").strip()
+                    and not _RAW_UNDERLINE_LINE_RE.match(_strip_md_emphasis(sub).strip("| ").strip())
+                ]
+                is_hdr_row = (
+                    any(
+                        "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" in r.upper()
+                        or ("ĐỘC LẬP" in r.upper() and "TỰ DO" in r.upper() and "HẠNH PHÚC" in r.upper())
+                        or bool(_ADMIN_DATE_LINE_RE.match(r))
+                        for r in right_parts
+                    )
+                    or any(
+                        bool(_ADMIN_SO_LINE_RE.match(left_item)) or _is_org_cue(left_item)
+                        for left_item in left_parts
+                    )
+                )
+                if is_hdr_row:
+                    for plain_l in left_parts:
+                        if _ADMIN_SO_LINE_RE.match(plain_l):
+                            so_line = plain_l
+                        else:
+                            org_lines.append(plain_l)
+                    for plain_r in right_parts:
+                        upper_r = plain_r.upper()
+                        if "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" in upper_r or (
+                            "ĐỘC LẬP" in upper_r and "TỰ DO" in upper_r and "HẠNH PHÚC" in upper_r
+                        ):
+                            has_motto = True
+                        elif _ADMIN_DATE_LINE_RE.match(plain_r):
+                            date_line = plain_r
+                    idx += 1
+                    continue
+
+        plain = _strip_md_emphasis(stripped.lstrip("#").strip()).strip("| ").strip()
+        if not plain or _RAW_UNDERLINE_LINE_RE.match(plain):
+            idx += 1
+            continue
         upper = plain.upper()
         if "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" in upper:
             has_motto = True
@@ -1394,21 +1420,7 @@ def _extract_admin_header(
             date_line = plain
             idx += 1
             continue
-        # Issuing agency line (before motto or Số, e.g. BỘ GIÁO DỤC VÀ ĐÀO TẠO / TRƯỜNG ĐẠI HỌC QUY NHƠN)
-        if (
-            not has_motto
-            and not stripped.startswith("#")
-            and len(plain) <= 75
-            and (
-                plain.isupper()
-                or plain.startswith(("[Tên cơ quan", "[Đơn vị"))
-                or "ĐẠI HỌC" in upper
-                or "TRƯỜNG " in upper
-                or "UBND" in upper
-                or "BỘ " in upper
-            )
-            and not _ADMIN_CUES_RE.match(plain)
-        ):
+        if not has_motto and not stripped.startswith("#") and _is_org_cue(plain):
             org_lines.append(plain)
             idx += 1
             continue

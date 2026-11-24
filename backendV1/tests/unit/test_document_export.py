@@ -1827,6 +1827,39 @@ def test_content_aware_auto_layout_header_plan_and_budget_tables_exact_165mm():
     assert sum(_grid_dxa(ftr_tbl)) == 9355
 
 
+def test_extract_admin_header_parses_pipe_wrapped_rows_across_blank_lines_with_zero_pipes():
+    plan = DocumentDraft(
+        title="Kế hoạch triển khai chuyển đổi số",
+        layout="administrative",
+        markdown=(
+            "| BỘ GIÁO DỤC VÀ ĐÀO TẠO | CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM |\n"
+            "| TRƯỜNG ĐẠI HỌC QUY NHƠN | Độc lập - Tự do - Hạnh phúc |\n\n"
+            "| Số: [...]/KH-ĐHQN | Gia Lai, ngày [...] tháng [...] năm 2026 |\n\n"
+            "# KẾ HOẠCH\n"
+            "## Triển khai chuyển đổi số năm 2026\n\n"
+            "Trường Đại học Quy Nhơn ban hành kế hoạch triển khai cụ thể như sau:"
+        ),
+        has_tables=False,
+    )
+    doc = Document(io.BytesIO(render_docx(plan)))
+    hdr = doc.tables[0]
+    assert len(hdr.rows) == 2 and len(hdr.columns) == 2
+
+    left_r0 = [p.text.strip() for p in hdr.cell(0, 0).paragraphs if p.text.strip()]
+    right_r0 = [p.text.strip() for p in hdr.cell(0, 1).paragraphs if p.text.strip()]
+    left_r1 = hdr.cell(1, 0).text.strip()
+    right_r1 = hdr.cell(1, 1).text.strip()
+
+    assert left_r0 == ["BỘ GIÁO DỤC VÀ ĐÀO TẠO", "TRƯỜNG ĐẠI HỌC QUY NHƠN"]
+    assert right_r0 == ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", "Độc lập - Tự do - Hạnh phúc"]
+    assert left_r1 == "Số: [...]/KH-ĐHQN"
+    assert right_r1 == "Gia Lai, ngày [...] tháng [...] năm 2026"
+
+    all_hdr_text = "\n".join(c.text for r in hdr.rows for c in r.cells)
+    assert "|" not in all_hdr_text
+
+
+
 
 
 
