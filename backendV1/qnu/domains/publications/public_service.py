@@ -11,8 +11,10 @@ import hashlib
 import ipaddress
 import json
 import os
+import re
 import secrets
 import time
+import unicodedata
 import uuid
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -22,15 +24,35 @@ from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from qnu.domains.assistants.models import Assistant
+from qnu.domains.assistants.models import Assistant, AssistantCollection
 from qnu.domains.assistants.schemas import AssistantRagPolicy
 from qnu.domains.assistants.service import assistant_readiness, get_assistant
+from qnu.domains.conversations.document_export import (
+    EXPORT_MEDIA_TYPES,
+    NO_KNOWLEDGE_GROUNDING_POLICY,
+    DocumentDraft,
+    ExportFormat,
+    active_draft_prompt_context,
+    disabled_format_refusal_message,
+    disabled_requested_format,
+    enabled_export_formats,
+    export_policy_prompt_addon,
+    extract_document_draft,
+    render_docx,
+    render_pdf,
+    render_xlsx,
+    requested_export_format,
+    resolve_preferred_format,
+    safe_download_filename,
+    strip_document_markers,
+)
 from qnu.domains.identity.service_actor import public_chatbot_actor
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.index.directory import directory_ready
 from qnu.domains.knowledge.publication.evidence import digest
 from qnu.domains.lifecycle.guards import visible
 from qnu.domains.modelops.inference.service import prepare_chat_request
+from qnu.domains.modelops.providers.service import provider_service
 from qnu.domains.modelops.usage.scope import use_account
 from qnu.domains.modelops.usage.service import usage_service
 from qnu.domains.ocr.ids import new_id
@@ -45,6 +67,8 @@ from qnu.domains.publications.schemas import (
     PublicChatbotListResponse,
     PublicChatbotSummary,
     PublicCitation,
+    PublicDocumentDraft,
+    PublicModelOption,
     PublicSessionRequest,
     PublicSessionResponse,
     PublicTurnRequest,
@@ -55,7 +79,7 @@ from qnu.domains.rag.answer.service import answer
 from qnu.domains.workspaces.models import Workspace
 from qnu.platform.cache import get_json, get_redis, namespaced, set_json
 from qnu.platform.config import get_settings
-from qnu.platform.errors import AppException, Conflict, EntityNotFound
+from qnu.platform.errors import AppException, Conflict, EntityNotFound, Forbidden
 from qnu.platform.logging import get_logger
 from qnu.ports.blob_store import BlobStore
 from qnu.ports.chat_model import ChatMessage, ChatModel, ChatResponseError
@@ -339,13 +363,100 @@ async def _readiness(db: AsyncSession, blob: BlobStore, row: AssistantPublicatio
     return report.status
 
 
+def _public_model_label(model_name: str) -> str:
+    text = (model_name or "").strip()
+    if "/" in text:
+        short = text.rsplit("/", 1)[-1].strip()
+        if short:
+            return short
+    return text
+
+
+async def list_public_chat_models(
+    db: AsyncSession, assistant_chat_provider_id: str | None
+) -> tuple[list[PublicModelOption], str | None, dict[str, str]]:
+    """Return active chat models safe for public display (no provider IDs or endpoints)."""
+    providers = await provider_service.list(db, active_only=True)
+    chat_providers = [p for p in providers if "chat" in (p.capabilities or []) and p.model_name]
+
+    default_model_name: str | None = None
+    if assistant_chat_provider_id:
+        for p in chat_providers:
+            if p.id == assistant_chat_provider_id:
+                default_model_name = p.model_name
+                break
+    if default_model_name is None and chat_providers:
+        default_model_name = chat_providers[0].model_name
+
+    options: list[PublicModelOption] = []
+    model_to_provider: dict[str, str] = {}
+    for p in chat_providers:
+        if p.model_name in model_to_provider:
+            continue
+        model_to_provider[p.model_name] = p.id
+        options.append(
+            PublicModelOption(
+                model_name=p.model_name,
+                label=_public_model_label(p.model_name),
+                is_default=p.model_name == default_model_name,
+            )
+        )
+    return options, default_model_name, model_to_provider
+
+
+async def resolve_public_chat_provider(
+    db: AsyncSession,
+    assistant: Assistant,
+    requested_model_name: str | None,
+) -> tuple[str | None, str | None]:
+    """Validate an optional visitor-selected model against active chat providers."""
+    _, default_model_name, model_to_provider = await list_public_chat_models(
+        db, assistant.chat_provider_id
+    )
+    if not requested_model_name:
+        return assistant.chat_provider_id, default_model_name
+    matched_provider_id = model_to_provider.get(requested_model_name)
+    if matched_provider_id is None:
+        raise AppException(
+            "Mô hình AI đã chọn hiện không khả dụng.",
+            code="public_chat_model_unavailable",
+            status_code=422,
+        )
+    return matched_provider_id, requested_model_name
+
+
 async def info(db: AsyncSession, blob: BlobStore, slug: str) -> PublicChatbotInfo:
     row, active = await _publication(db, slug)
-    cache_key = f"pubchat:info:{row.id}:{row.revision}:{int(active)}"
+    assistant = await db.scalar(
+        select(Assistant).where(
+            Assistant.id == row.assistant_id,
+            Assistant.workspace_id == row.workspace_id,
+        )
+    )
+    ast_rev = assistant.revision if assistant is not None else 0
+    cache_key = f"pubchat:info:v3:{row.id}:{row.revision}:{ast_rev}:{int(active)}"
     cached = await get_json(cache_key)
     if cached is not None:
         return PublicChatbotInfo.model_validate(cached)
     available = active and await _readiness(db, blob, row) == "ready"
+    assistant_provider_id = assistant.chat_provider_id if assistant is not None else None
+    models, default_model_name, _ = await list_public_chat_models(db, assistant_provider_id)
+    export_formats = (
+        enabled_export_formats({"rag_policy": assistant.rag_policy})
+        if assistant is not None
+        else []
+    )
+    has_collection = bool(assistant is not None and assistant.collection_id)
+    if not has_collection and assistant is not None:
+        bound_col = await db.scalar(
+            select(AssistantCollection.collection_id)
+            .where(
+                AssistantCollection.assistant_id == assistant.id,
+                AssistantCollection.workspace_id == row.workspace_id,
+            )
+            .limit(1)
+        )
+        has_collection = bool(bound_col)
     value = PublicChatbotInfo(
         display_name=row.display_name,
         welcome_message=row.welcome_message,
@@ -354,6 +465,10 @@ async def info(db: AsyncSession, blob: BlobStore, slug: str) -> PublicChatbotInf
         max_turns_per_session=row.max_turns_per_session,
         available=available,
         unavailable_reason=None if available else UNAVAILABLE_TEXT,
+        models=models,
+        default_model_name=default_model_name,
+        has_knowledge=has_collection,
+        export_formats=export_formats,
     )
     await set_json(cache_key, value.model_dump(mode="json"), INFO_CACHE_SECONDS)
     return value
@@ -451,7 +566,189 @@ def _page(citations: dict) -> int | None:
     return None
 
 
-def _public_reply(result: AnswerResponse, remaining: int) -> PublicTurnResponse:
+_SMALLTALK_MAX_CHARS = 48
+_SMALLTALK_PUNCT_RE = re.compile(r"[^\w\s]+", re.UNICODE)
+_GREETING_RE = re.compile(
+    r"^(?:"
+    r"(?:xin\s+)?chào(?:\s+(?:bạn|ad|admin|bot|trợ\s+lý|thầy|cô|anh|chị|em|shop|mọi\s+người|qnu))?"
+    r"|chào\s+buổi\s+(?:sáng|trưa|chiều|tối)"
+    r"|alo(?:\s+alo)?"
+    r"|(?:hi|hello|hey)(?:\s+(?:there|bot|admin|qnu|assistant))?"
+    r"|good\s+(?:morning|afternoon|evening)"
+    r")(?:\s+(?:ạ|nhé|nha|nhỉ|ơi))?$"
+)
+_THANKS_RE = re.compile(
+    r"^(?:"
+    r"(?:(?:ok|oke|okay|vâng|dạ|rồi)\s+)?(?:xin\s+)?c[ảá]m\s+ơn"
+    r"(?:\s+(?:bạn|ad|admin|bot|trợ\s+lý|thầy|cô|anh|chị|em|nhiều|rất\s+nhiều|nhé|nha|ạ)){0,3}"
+    r"|(?:(?:ok|oke|okay)\s+)?(?:thanks|thank\s+you|tks|ty)(?:\s+(?:so\s+much|a\s+lot))?"
+    r")$"
+)
+_FAREWELL_RE = re.compile(
+    r"^(?:tạm\s+biệt|chào\s+tạm\s+biệt|bye(?:\s+bye)?|goodbye|hẹn\s+gặp\s+lại)"
+    r"(?:\s+(?:bạn|nhé|nha|ạ))?$"
+)
+
+
+def is_pure_smalltalk(question: str) -> bool:
+    """Return True only for short pure greetings/thanks/farewells (no digits or queries).
+
+    Used strictly to avoid heavy RAG retrieval on social turns; the reply itself
+    is always generated naturally by the LLM using the assistant's Persona and
+    session history rather than hardcoded canned strings.
+    """
+    raw = unicodedata.normalize("NFC", question or "").strip()
+    if not raw or len(raw) > _SMALLTALK_MAX_CHARS or any(ch.isdigit() for ch in raw):
+        return False
+    if "?" in raw and len(raw.split()) > 3:
+        return False
+    normalized = " ".join(_SMALLTALK_PUNCT_RE.sub(" ", raw.casefold()).split())
+    if not normalized:
+        return False
+    return bool(
+        _GREETING_RE.fullmatch(normalized)
+        or _THANKS_RE.fullmatch(normalized)
+        or _FAREWELL_RE.fullmatch(normalized)
+    )
+
+
+def _history_key(session_id: str) -> str:
+    return f"pubchat:history:{session_id}"
+
+
+async def _load_public_history(session_id: str, limit: int) -> list[dict[str, str]]:
+    cap = min(max(int(limit or 0), 0), 6)
+    if cap == 0:
+        return []
+    raw = await get_json(_history_key(session_id))
+    if not isinstance(raw, list):
+        return []
+    cleaned = [
+        item
+        for item in raw
+        if isinstance(item, dict)
+        and isinstance(item.get("question"), str)
+        and isinstance(item.get("answer"), str)
+    ]
+    return cleaned[-cap:]
+
+
+async def _append_public_history(
+    session_id: str,
+    question: str,
+    answer_text: str,
+    ttl: int,
+) -> None:
+    if not answer_text or not answer_text.strip():
+        return
+    existing = await _load_public_history(session_id, 6)
+    existing.append(
+        {
+            "question": question.strip()[:1000],
+            "answer": answer_text.strip()[:2000],
+        }
+    )
+    await set_json(_history_key(session_id), existing[-6:], ttl)
+
+
+def _draft_key(session_id: str, draft_id: str) -> str:
+    return f"pubchat:draft:{session_id}:{draft_id}"
+
+
+def _latest_draft_key(session_id: str) -> str:
+    return f"pubchat:latest_draft:{session_id}"
+
+
+async def _load_latest_public_draft(session_id: str) -> DocumentDraft | None:
+    stored = await get_json(_latest_draft_key(session_id))
+    if not isinstance(stored, dict):
+        return None
+    try:
+        return DocumentDraft.model_validate(stored)
+    except Exception:
+        return None
+
+
+async def _store_public_draft(
+    session_id: str,
+    publication_id: str,
+    draft: DocumentDraft,
+    ttl: int,
+) -> PublicDocumentDraft:
+    draft_id = "drf_" + uuid.uuid4().hex[:12]
+    dumped = draft.model_dump(mode="json")
+    await set_json(
+        _draft_key(session_id, draft_id),
+        {"publication_id": publication_id, "draft": dumped},
+        ttl,
+    )
+    await set_json(_latest_draft_key(session_id), dumped, ttl)
+    return PublicDocumentDraft(
+        draft_id=draft_id,
+        title=draft.title,
+        layout=draft.layout,
+        markdown=draft.markdown,
+        has_tables=draft.has_tables,
+        preferred_format=draft.preferred_format,
+    )
+
+
+async def export_public_draft(
+    db: AsyncSession,
+    slug: str,
+    session_id: str,
+    draft_id: str,
+    fmt: ExportFormat,
+) -> tuple[bytes, str, str]:
+    """Authorize public session, enforce assistant export toggles, and render file."""
+    row, active = await _publication(db, slug)
+    if not active:
+        raise Conflict(UNAVAILABLE_TEXT, code="public_chatbot_unavailable")
+    session = await get_json(_session_key(session_id))
+    if not session or session.get("publication_id") != row.id:
+        raise AppException(
+            "Phiên trò chuyện đã hết hạn. Hãy bắt đầu phiên mới.",
+            code="public_chat_session_expired",
+            status_code=410,
+        )
+    assistant = await db.scalar(
+        select(Assistant).where(
+            Assistant.id == row.assistant_id,
+            Assistant.workspace_id == row.workspace_id,
+        )
+    )
+    if assistant is None or not assistant.is_active:
+        raise Conflict(UNAVAILABLE_TEXT, code="public_chatbot_unavailable")
+    allowed_formats = enabled_export_formats({"rag_policy": assistant.rag_policy})
+    if fmt not in allowed_formats:
+        raise Forbidden(
+            f"Trợ lý hiện không bật xuất định dạng {fmt.upper()}.",
+            code="assistant_export_format_disabled",
+        )
+    stored = await get_json(_draft_key(session_id, draft_id))
+    if not stored or stored.get("publication_id") != row.id or not isinstance(stored.get("draft"), dict):
+        raise EntityNotFound(
+            "Không tìm thấy bản thảo để xuất hoặc bản thảo đã hết hạn.",
+            code="public_draft_not_found",
+        )
+    draft = DocumentDraft.model_validate(stored["draft"])
+    if fmt == "docx":
+        payload = await asyncio.to_thread(render_docx, draft)
+    elif fmt == "xlsx":
+        payload = await asyncio.to_thread(render_xlsx, draft)
+    else:
+        payload = await render_pdf(draft)
+    return payload, EXPORT_MEDIA_TYPES[fmt], safe_download_filename(draft.title, fmt)
+
+
+def _public_reply(
+    result: AnswerResponse,
+    remaining: int,
+    *,
+    model_name: str | None = None,
+    document_draft: PublicDocumentDraft | None = None,
+    answer_override: str | None = None,
+) -> PublicTurnResponse:
     citations: list[PublicCitation] = []
     labels: dict[str, int] = {}
     for source in result.sources:
@@ -464,7 +761,7 @@ def _public_reply(result: AnswerResponse, remaining: int) -> PublicTurnResponse:
                 page=_page(source.citations),
             )
         )
-    text = result.answer
+    text = answer_override if answer_override is not None else result.answer
     if text:
         for evidence_id, index in labels.items():
             text = text.replace(f"[{evidence_id}]", f"[{index}]")
@@ -474,6 +771,8 @@ def _public_reply(result: AnswerResponse, remaining: int) -> PublicTurnResponse:
         message=result.message if result.status == "insufficient_evidence" else None,
         citations=citations,
         turns_remaining=remaining,
+        model_name=model_name,
+        document_draft=document_draft,
     )
 
 
@@ -510,14 +809,15 @@ async def turn(
             code="public_chat_session_expired",
             status_code=410,
         )
-    if int(session.get("turns", 0)) >= row.max_turns_per_session:
+    prior_turns = int(session.get("turns", 0))
+    if prior_turns >= row.max_turns_per_session:
         raise AppException(
             "Phiên đã đạt giới hạn số câu hỏi. Hãy bắt đầu phiên mới.",
             code="public_chat_session_limit",
             status_code=429,
         )
     created_at = float(session.get("created_at") or 0)
-    if int(session.get("turns", 0)) == 0 and created_at > 0 and (time.time() - created_at) < 0.8:
+    if prior_turns == 0 and created_at > 0 and (time.time() - created_at) < 0.8:
         raise AppException(
             "Thao tác quá nhanh. Vui lòng thử lại sau ít giây.",
             code="public_chat_too_fast",
@@ -538,6 +838,10 @@ async def turn(
         assistant: Assistant = await get_assistant(db, actor, row.workspace_id, row.assistant_id)
         if not assistant.is_active:
             raise Conflict(UNAVAILABLE_TEXT, code="public_chatbot_unavailable")
+        selected_provider_id, selected_model_name = await resolve_public_chat_provider(
+            db, assistant, req.model_name
+        )
+        export_formats = enabled_export_formats({"rag_policy": assistant.rag_policy})
         collection_ids = list(
             dict.fromkeys(
                 item
@@ -547,22 +851,73 @@ async def turn(
         )
         # Release any read transaction snapshot/locks before long-running LLM inference.
         await db.commit()
-        if not collection_ids:
-            messages = [
-                ChatMessage(
-                    role="system",
-                    content=assistant.persona
-                    or "Bạn là trợ lý AI của Trường Đại học Quy Nhơn (QNU). Hãy hỗ trợ người dùng chu đáo, thân thiện và chuẩn mực sư phạm.",
-                ),
-                ChatMessage(role="user", content=req.question),
-            ]
+        disabled_fmt = disabled_requested_format(req.question, export_formats)
+        if disabled_fmt is not None:
+            refusal_text = disabled_format_refusal_message(disabled_fmt)
+            await _append_public_history(req.session_id, req.question, refusal_text, ttl)
+            await _bump_stats(
+                db,
+                row.id,
+                turns=1,
+                insufficient_turns=0,
+                tokens=0,
+                day=day,
+            )
+            await db.commit()
+            return PublicTurnResponse(
+                status="answered",
+                answer=refusal_text,
+                message=None,
+                citations=[],
+                turns_remaining=remaining,
+                model_name=selected_model_name,
+                document_draft=None,
+            )
+        social_only = is_pure_smalltalk(req.question)
+        latest_draft = (
+            await _load_latest_public_draft(req.session_id)
+            if export_formats and not social_only
+            else None
+        )
+        if not collection_ids or social_only:
+            base_persona = (
+                assistant.persona
+                or "Bạn là trợ lý AI của Trường Đại học Quy Nhơn (QNU). Hãy hỗ trợ người dùng chu đáo, thân thiện và chuẩn mực sư phạm."
+            )
+            if not collection_ids:
+                system_content = (
+                    base_persona
+                    + NO_KNOWLEDGE_GROUNDING_POLICY
+                    + export_policy_prompt_addon(export_formats)
+                    + active_draft_prompt_context(latest_draft)
+                )
+            else:
+                system_content = (
+                    base_persona
+                    + "\n\n[LƯU Ý GIAO TIẾP]: Người dùng đang chào hỏi hoặc trao đổi xã giao. "
+                    "Hãy đáp lại ngắn gọn, tự nhiên và đúng vai trò trong Persona; không tự bịa số liệu."
+                )
+            history_rows = await _load_public_history(
+                req.session_id, getattr(assistant, "history_turns", 3)
+            )
+            if history_rows:
+                system_content += (
+                    "\n\n[MẠCH HỘI THOẠI]: Đây là lượt trò chuyện tiếp nối trong cùng phiên. "
+                    "Không lặp lại lời chào mở đầu hay tự giới thiệu lại nếu đã chào trước đó; "
+                    "phản hồi tự nhiên theo ngữ cảnh các lượt trước."
+                )
+            messages = [ChatMessage(role="system", content=system_content)]
+            for item in history_rows:
+                messages.append(ChatMessage(role="user", content=item["question"]))
+                messages.append(ChatMessage(role="assistant", content=item["answer"]))
+            messages.append(ChatMessage(role="user", content=req.question))
             with use_account(budget):
                 runtime, chat_req, chat_budget = await prepare_chat_request(
                     db,
                     actor,
                     row.workspace_id,
                     messages,
-                    provider_id=assistant.chat_provider_id,
+                    provider_id=selected_provider_id,
                     task="chat",
                     max_output_tokens=assistant.max_output_tokens,
                 )
@@ -616,6 +971,29 @@ async def turn(
                     "Tôi đã ghi nhận câu hỏi của bạn. Về nội dung này, bạn có thể diễn đạt cụ thể hơn "
                     "hoặc cung cấp thêm chi tiết để mình hỗ trợ chính xác nhất nhé."
                 )
+            pub_draft: PublicDocumentDraft | None = None
+            disabled_fmt = disabled_requested_format(req.question, export_formats)
+            if disabled_fmt is not None:
+                pub_ans = (
+                    strip_document_markers(pub_ans, remove_blocks=True)
+                    or disabled_format_refusal_message(disabled_fmt)
+                )
+            elif export_formats and not social_only:
+                pub_ans, extracted_draft = extract_document_draft(pub_ans, req.question)
+                if extracted_draft is None and latest_draft is not None:
+                    req_fmt = requested_export_format(req.question)
+                    if req_fmt is not None and req_fmt in export_formats:
+                        extracted_draft = latest_draft
+                if extracted_draft is not None:
+                    extracted_draft = resolve_preferred_format(
+                        extracted_draft, req.question, export_formats
+                    )
+                    pub_draft = await _store_public_draft(
+                        req.session_id, row.id, extracted_draft, ttl
+                    )
+            else:
+                pub_ans = strip_document_markers(pub_ans, remove_blocks=True)
+            await _append_public_history(req.session_id, req.question, pub_ans, ttl)
             await _bump_stats(
                 db,
                 row.id,
@@ -631,11 +1009,18 @@ async def turn(
                 message=None,
                 citations=[],
                 turns_remaining=remaining,
+                model_name=selected_model_name,
+                document_draft=pub_draft,
             )
         policy = AssistantRagPolicy.model_validate(assistant.rag_policy or {}).model_dump(
             mode="json", exclude={"guardrail_policy", "suggested_prompts"}
         )
         policy["metadata_filter"] = {}
+        effective_persona = (
+            (assistant.persona or "")
+            + export_policy_prompt_addon(export_formats)
+            + active_draft_prompt_context(latest_draft)
+        )
         with use_account(budget):
             result = await answer(
                 db,
@@ -649,14 +1034,16 @@ async def turn(
                 AnswerRequest(
                     question=req.question,
                     top_k=assistant.top_k,
-                    provider_id=assistant.chat_provider_id,
+                    provider_id=selected_provider_id,
                     max_output_tokens=assistant.max_output_tokens,
                     **policy,
                 ),
-                persona=assistant.persona,
+                persona=effective_persona,
                 reranker=reranker,
                 compose_insufficient_message=True,
                 collection_ids=collection_ids,
+                public_channel=True,
+                is_follow_up=prior_turns > 0,
             )
     except (Exception, asyncio.CancelledError):
         try:
@@ -673,6 +1060,33 @@ async def turn(
             logger.warning("public_chat_error_stats_failed", publication_id=publication_id)
         raise
     insufficient = result.status == "insufficient_evidence"
+    rag_draft: PublicDocumentDraft | None = None
+    answer_override: str | None = None
+    raw_rag_text = result.answer or ""
+    disabled_rag_fmt = disabled_requested_format(req.question, export_formats)
+    if disabled_rag_fmt is not None:
+        if "<<<" in raw_rag_text:
+            answer_override = (
+                strip_document_markers(raw_rag_text, remove_blocks=True)
+                or disabled_format_refusal_message(disabled_rag_fmt)
+            )
+    elif export_formats and not insufficient:
+        display_rag_text, extracted_rag = extract_document_draft(raw_rag_text, req.question)
+        if extracted_rag is None and latest_draft is not None:
+            req_fmt = requested_export_format(req.question)
+            if req_fmt is not None and req_fmt in export_formats:
+                extracted_rag = latest_draft
+        if extracted_rag is not None:
+            extracted_rag = resolve_preferred_format(
+                extracted_rag, req.question, export_formats
+            )
+            rag_draft = await _store_public_draft(req.session_id, row.id, extracted_rag, ttl)
+            if "<<<" in raw_rag_text:
+                answer_override = display_rag_text
+        elif "<<<" in raw_rag_text:
+            answer_override = strip_document_markers(raw_rag_text)
+    elif "<<<" in raw_rag_text:
+        answer_override = strip_document_markers(raw_rag_text, remove_blocks=True)
     await _bump_stats(
         db,
         row.id,
@@ -684,4 +1098,13 @@ async def turn(
     if insufficient:
         await _record_unanswered(db, row.id, req.question)
     await db.commit()
-    return _public_reply(result, remaining)
+    reply_payload = _public_reply(
+        result,
+        remaining,
+        model_name=selected_model_name,
+        document_draft=rag_draft,
+        answer_override=answer_override,
+    )
+    if reply_payload.answer:
+        await _append_public_history(req.session_id, req.question, reply_payload.answer, ttl)
+    return reply_payload

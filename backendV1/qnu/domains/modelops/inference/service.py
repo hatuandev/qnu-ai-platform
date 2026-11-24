@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import replace
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,22 +22,22 @@ DOCUMENT_CHAT_TASKS: frozenset[Task] = frozenset({"compiler", "compiler_review",
 
 
 def input_token_upper_bound(messages: list[ChatMessage]) -> int:
-    """UTF-8 bytes plus 64 framing tokens/message and 128 request framing tokens.
+    """Conservative UTF-8 byte estimate (~2 bytes/token) plus message/request framing.
 
-    This is a conservative operational bound for text, not measured tokenizer usage.
+    Vietnamese UTF-8 averages ~3-4 bytes per BPE token, so ceil(bytes / 2) remains
+    a conservative operational bound without 3-4x false context rejections.
     Nothing is cropped to fit; actual tokens are only taken from provider usage.
     """
     encoded = json.dumps(
         [{"role": m.role, "content": m.content} for m in messages], ensure_ascii=False
     ).encode("utf-8")
-    return len(encoded) + 64 * len(messages) + 128
+    return math.ceil(len(encoded) / 2) + 64 * len(messages) + 128
 
 
 def request_input_tokens(messages: list[ChatMessage], schema: dict | None) -> int:
     """Same conservative bound used by ``prepare_chat_request``; never a tokenizer claim."""
-    return input_token_upper_bound(messages) + (
-        len(json.dumps(schema, ensure_ascii=False).encode()) if schema is not None else 0
-    )
+    schema_bytes = len(json.dumps(schema, ensure_ascii=False).encode("utf-8")) if schema is not None else 0
+    return input_token_upper_bound(messages) + math.ceil(schema_bytes / 2)
 
 
 def available_input_tokens(limits, output_tokens: int) -> int | None:

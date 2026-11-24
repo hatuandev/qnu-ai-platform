@@ -149,6 +149,21 @@ class PublicationResponse(BaseModel):
     readiness: str
 
 
+class PublicModelOption(BaseModel):
+    model_name: str
+    label: str
+    is_default: bool = False
+
+
+class PublicDocumentDraft(BaseModel):
+    draft_id: str
+    title: str
+    layout: Literal["standard", "administrative", "spreadsheet"] = "standard"
+    markdown: str
+    has_tables: bool = False
+    preferred_format: Literal["docx", "pdf", "xlsx"] | None = None
+
+
 class PublicChatbotInfo(BaseModel):
     display_name: str
     welcome_message: str
@@ -157,6 +172,10 @@ class PublicChatbotInfo(BaseModel):
     max_turns_per_session: int
     available: bool
     unavailable_reason: str | None
+    models: list[PublicModelOption] = Field(default_factory=list)
+    default_model_name: str | None = None
+    has_knowledge: bool = True
+    export_formats: list[Literal["docx", "pdf", "xlsx"]] = Field(default_factory=list)
 
 
 class PublicChatbotSummary(BaseModel):
@@ -188,6 +207,7 @@ class PublicTurnRequest(BaseModel):
     session_id: str = Field(min_length=16, max_length=64)
     question: str = Field(min_length=1, max_length=1000)
     website: str | None = Field(default=None, max_length=200)
+    model_name: str | None = Field(default=None, max_length=160)
 
     @field_validator("question")
     @classmethod
@@ -196,6 +216,14 @@ class PublicTurnRequest(BaseModel):
         if not text:
             raise ValueError("Câu hỏi không được rỗng.")
         return text
+
+    @field_validator("model_name", mode="before")
+    @classmethod
+    def clean_model_name(cls, value: object) -> object:
+        if isinstance(value, str):
+            text = value.strip()
+            return text or None
+        return value
 
 
 class PublicCitation(BaseModel):
@@ -210,6 +238,8 @@ class PublicTurnResponse(BaseModel):
     message: str | None
     citations: list[PublicCitation]
     turns_remaining: int
+    model_name: str | None = None
+    document_draft: PublicDocumentDraft | None = None
 
 
 class PublicationStatDay(BaseModel):

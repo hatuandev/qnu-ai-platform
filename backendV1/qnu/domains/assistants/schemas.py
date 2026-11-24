@@ -6,18 +6,37 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from qnu.domains.assistants.guardrail_policy import GuardrailPolicy
 from qnu.domains.rag.policy import RagPolicy
 
+_ASSISTANT_ONLY_POLICY_FIELDS = frozenset(
+    {
+        "guardrail_policy",
+        "suggested_prompts",
+        "allow_export_docx",
+        "allow_export_pdf",
+        "allow_export_xlsx",
+    }
+)
+
 
 class AssistantRagPolicy(RagPolicy):
     """RAG policy plus assistant-only behavior; stored in the existing JSONB column."""
 
     guardrail_policy: GuardrailPolicy = Field(default_factory=GuardrailPolicy)
     suggested_prompts: list[str] = Field(default_factory=list, max_length=10)
+    allow_export_docx: bool = False
+    allow_export_pdf: bool = False
+    allow_export_xlsx: bool = False
 
     @field_validator("suggested_prompts")
     @classmethod
     def clean_suggested_prompts(cls, values: list[str]) -> list[str]:
         cleaned = [v.strip() for v in values if isinstance(v, str) and v.strip()]
         return cleaned[:10]
+
+    def model_dump(self, *args, **kwargs):
+        exclude = kwargs.get("exclude")
+        if isinstance(exclude, set) and "guardrail_policy" in exclude:
+            kwargs["exclude"] = exclude | _ASSISTANT_ONLY_POLICY_FIELDS
+        return super().model_dump(*args, **kwargs)
 
 
 class AssistantConfig(BaseModel):

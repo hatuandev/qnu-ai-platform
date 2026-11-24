@@ -1,13 +1,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowDown,
-  ArrowUp,
-  ChevronDown,
+  Eye,
+  FilePlus2,
+  FileSpreadsheet,
+  FileText,
   Loader2,
-  Plus,
+  Pencil,
   Save,
   Sparkles,
-  Trash2,
   Undo2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -23,21 +23,10 @@ import { useCollectionsQuery } from "@/api/knowledge";
 import { useCatalogQuery } from "@/api/modelops";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/admin/field";
+import { MarkdownContent } from "@/components/knowledge/markdown-content";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -51,10 +40,11 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn, sanitizeDisplayText } from "@/lib/utils";
 import {
   ContextFields,
-  MetadataScopeFields,
+  FieldHelpTooltip,
   type RagPolicyFormState,
   RetrievalFields,
   VERIFICATION_OPTIONS,
@@ -70,7 +60,6 @@ import {
   AUTO_MODEL,
   buildAssistantPayload,
   collectionIdsOf,
-  DESCRIPTION_MAX_CHARS,
   initialState,
   NAME_MAX_CHARS,
   PERSONA_MAX_CHARS,
@@ -78,6 +67,12 @@ import {
 } from "./assistant-form-state";
 import { localityLabel, providerLabel } from "./model-label";
 import { READINESS_MAP } from "./readiness";
+
+const FLEXIBLE_DRAFTING_PERSONA_SNIPPET = `## Nguyên tắc soạn thảo văn bản & tạo mẫu linh hoạt
+- Tự nắm bắt mục đích người dùng để dựng bố cục phù hợp từng loại văn bản (kế hoạch, tờ trình, báo cáo, quy chế/quy định, thông báo, đơn xin/giấy nghỉ phép, bảng biểu tổng hợp...).
+- Chỉ dùng kiến thức nền để tổ chức bố cục, văn phong và khung mẫu văn bản.
+- Tuyệt đối không tự suy đoán hoặc bịa thông tin thực tế của đơn vị/nhà trường (cơ cấu tổ chức, khoa/viện, ngành đào tạo, số liệu, quy định, mốc thời gian) nếu không có trong ngữ cảnh hoặc người dùng chưa cung cấp; sử dụng chỗ giữ chỗ dạng [...] cho phần cần điền hoặc đề nghị người dùng bổ sung dữ kiện.
+- Tách bạch rõ lời trao đổi ngắn gọn với thân văn bản chính để bản thảo sạch sẽ, sẵn sàng xem trước và xuất tệp.`;
 
 type Baseline = { revision: number; data: AssistantResponse };
 
@@ -123,9 +118,9 @@ export function AssistantConfigForm({
     initialState(assistant),
   );
   const [error, setError] = useState<string | null>(null);
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isCollectionConfirmOpen, setIsCollectionConfirmOpen] = useState(false);
   const [isPersonaCraftOpen, setIsPersonaCraftOpen] = useState(false);
+  const [personaMode, setPersonaMode] = useState<"edit" | "preview">("edit");
 
   const handleApplyCraftedPersona = (crafted: {
     name?: string;
@@ -195,43 +190,6 @@ export function AssistantConfigForm({
     setForm((prev) => ({ ...prev, ...values }));
   const patchPolicy = (values: Partial<RagPolicyFormState>) =>
     setForm((prev) => ({ ...prev, policy: { ...prev.policy, ...values } }));
-
-  const handleAddPrompt = () => {
-    if (form.suggestedPrompts.length >= 10) return;
-    patch({ suggestedPrompts: [...form.suggestedPrompts, ""] });
-  };
-
-  const handleUpdatePrompt = (index: number, val: string) => {
-    const next = [...form.suggestedPrompts];
-    next[index] = val;
-    patch({ suggestedPrompts: next });
-  };
-
-  const handleRemovePrompt = (index: number) => {
-    const next = form.suggestedPrompts.filter((_, i) => i !== index);
-    patch({ suggestedPrompts: next });
-  };
-
-  const handleMovePrompt = (index: number, direction: "up" | "down") => {
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= form.suggestedPrompts.length) return;
-    const next = [...form.suggestedPrompts];
-    const temp = next[index];
-    next[index] = next[targetIndex];
-    next[targetIndex] = temp;
-    patch({ suggestedPrompts: next });
-  };
-
-  const handleLoadDefaultPrompts = () => {
-    patch({
-      suggestedPrompts: [
-        "Chỉ tiêu tuyển sinh ngành Sư phạm Lịch sử - Địa lý năm 2024 và 2025 là bao nhiêu?",
-        "Tiêu chí chấm điểm LMS/LCMS theo Quyết định 4740 gồm những chức năng nào và điểm tối đa là bao nhiêu?",
-        "So sánh vai trò và nhiệm vụ của Phòng Đào tạo giữa KH 130/KH-ĐHQN và KH 07/KH-AM?",
-        "Phương thức xét tuyển bằng học bạ năm 2025 có những điều kiện và mốc thời gian nào?",
-      ],
-    });
-  };
 
   const handleReset = () => {
     setForm(initialForm);
@@ -307,7 +265,8 @@ export function AssistantConfigForm({
     )?.label ?? "Tắt";
 
   return (
-    <div className="space-y-4">
+    <TooltipProvider delayDuration={180}>
+      <div className="space-y-4">
       {isStale ? (
         <Alert variant="warning">
           <AlertTitle>Cấu hình đã thay đổi ở nơi khác</AlertTitle>
@@ -347,12 +306,13 @@ export function AssistantConfigForm({
       ) : null}
 
       {form.collectionIds.length === 0 ? (
-        <Alert variant="warning">
-          <AlertTitle>Trợ lý chưa gắn kho tri thức</AlertTitle>
+        <Alert variant="info">
+          <AlertTitle>Chế độ Hội thoại trực tiếp theo Persona</AlertTitle>
           <AlertDescription>
-            Vẫn lưu được để hoàn thiện chỉ dẫn và mô hình, nhưng trợ lý chưa trả
-            lời được, chưa hỏi thử được và không thể bật kênh công khai cho tới
-            khi gắn lại ít nhất một kho tri thức.
+            Trợ lý hiện chưa liên kết kho tri thức nên đang hoạt động ở chế độ
+            hội thoại trực tiếp theo Persona — vẫn trả lời, hỏi thử, soạn thảo /
+            tạo mẫu và xuất tệp bình thường. Chỉ cần liên kết kho tri thức khi
+            muốn trợ lý tra cứu bám sát tài liệu nội bộ.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -377,631 +337,145 @@ export function AssistantConfigForm({
         </Alert>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        {/* Cột chính: Thông tin, Mô hình & Cấu hình RAG */}
-        <div className="space-y-5 lg:col-span-2">
-          {/* Khối 1: Thông tin trợ lý */}
-          <Card className="border-border/60 shadow-2xs">
-            <CardHeader className="border-b border-border/50 pb-3">
-              <CardTitle className="text-sm font-semibold">
-                Thông tin & Chỉ dẫn ứng xử
-              </CardTitle>
-              <CardDescription>
-                Định danh, mô tả phạm vi phục vụ và văn phong giao tiếp của trợ
-                lý.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-4">
-              <Field>
-                <FieldLabel required className="text-xs font-medium">
-                  Tên trợ lý
-                </FieldLabel>
-                <Input
-                  value={form.name}
-                  onChange={(event) => patch({ name: event.target.value })}
-                  maxLength={NAME_MAX_CHARS}
-                  placeholder="VD: Trợ lý Tuyển sinh 2026..."
-                  className="h-9 bg-background text-xs"
-                  disabled={isPending}
-                />
-              </Field>
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
+        {/* Cột trái (7/12): Tên trợ lý & Chỉ dẫn ứng xử (Persona) */}
+        <div className="flex flex-col rounded-xl border border-border/60 bg-card p-5 shadow-2xs space-y-4 lg:col-span-7">
+          <Field>
+            <FieldLabel required className="text-xs font-medium">
+              Tên trợ lý
+            </FieldLabel>
+            <Input
+              value={form.name}
+              onChange={(event) => patch({ name: event.target.value })}
+              maxLength={NAME_MAX_CHARS}
+              placeholder="VD: Trợ lý Tuyển sinh 2026..."
+              className="h-9 bg-background text-xs"
+              disabled={isPending}
+            />
+          </Field>
 
-              <Field>
-                <FieldLabel className="text-xs font-medium">
-                  Mô tả ngắn
-                </FieldLabel>
-                <Textarea
-                  value={form.description}
-                  onChange={(event) =>
-                    patch({ description: event.target.value })
-                  }
-                  maxLength={DESCRIPTION_MAX_CHARS}
-                  placeholder="Mô tả phạm vi hỗ trợ và đối tượng sử dụng trợ lý..."
-                  rows={2}
-                  className="resize-none bg-background text-xs leading-relaxed"
-                  disabled={isPending}
-                />
-                <FieldDescription>
-                  Hiển thị tóm tắt trong danh sách trợ lý và cổng thông tin.
-                </FieldDescription>
-              </Field>
-
-              <Field>
-                <div className="flex items-center justify-between mb-1.5">
-                  <FieldLabel className="text-xs font-medium">
-                    Chỉ dẫn cho trợ lý (Persona)
-                  </FieldLabel>
-                  <Button
+          <Field className="flex flex-1 flex-col border-t border-border/50 pt-4">
+            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+              <FieldLabel className="text-xs font-medium">
+                Chỉ dẫn cho trợ lý (Persona)
+              </FieldLabel>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 rounded-md border border-border/70 bg-muted/50 p-0.5 text-[11px]">
+                  <button
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2 text-[11px] gap-1 cursor-pointer"
-                    disabled={isPending}
-                    onClick={() => setIsPersonaCraftOpen(true)}
+                    onClick={() => setPersonaMode("edit")}
+                    className={cn(
+                      "inline-flex cursor-pointer items-center gap-1 rounded px-2 py-0.5 font-medium transition-colors",
+                      personaMode === "edit"
+                        ? "bg-card text-foreground shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
                   >
-                    <Sparkles className="size-3 text-primary" />
-                    <span>Soạn bằng AI</span>
-                  </Button>
-                </div>
-                <Textarea
-                  value={form.persona}
-                  onChange={(event) => patch({ persona: event.target.value })}
-                  maxLength={PERSONA_MAX_CHARS}
-                  placeholder="Định hình vai trò, phong cách xưng hô và nguyên tắc trả lời..."
-                  rows={4}
-                  className="resize-none bg-background text-xs leading-relaxed"
-                  disabled={isPending}
-                />
-                <FieldDescription>
-                  Định hình văn phong và nguyên tắc trả lời; mọi căn cứ thực tế
-                  luôn được trích xuất từ kho tri thức.
-                </FieldDescription>
-              </Field>
-
-              <Field className="border-t border-border/50 pt-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <FieldLabel className="text-xs font-medium">
-                      Câu hỏi gợi ý mở đầu (Suggested Prompts)
-                    </FieldLabel>
-                    <FieldDescription>
-                      Hiển thị dưới dạng thẻ bấm nhanh khi người dùng mở hội thoại mới ({form.suggestedPrompts.length}/10 câu).
-                    </FieldDescription>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {form.suggestedPrompts.length === 0 ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-[11px] gap-1 cursor-pointer"
-                        disabled={isPending}
-                        onClick={handleLoadDefaultPrompts}
-                      >
-                        <Sparkles className="size-3 text-primary" />
-                        <span>Nạp 4 câu mẫu</span>
-                      </Button>
-                    ) : null}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-[11px] gap-1 cursor-pointer"
-                      disabled={isPending || form.suggestedPrompts.length >= 10}
-                      onClick={handleAddPrompt}
-                    >
-                      <Plus className="size-3" />
-                      <span>Thêm gợi ý</span>
-                    </Button>
-                  </div>
-                </div>
-
-                {form.suggestedPrompts.length === 0 ? (
-                  <div className="mt-2 rounded-lg border border-dashed border-border/70 p-3 text-center text-xs text-muted-foreground">
-                    Chưa có câu hỏi gợi ý riêng cho trợ lý này. Màn hình chat sẽ dùng bộ gợi ý thông minh mặc định của hệ thống.
-                  </div>
-                ) : (
-                  <div className="mt-2 space-y-2">
-                    {form.suggestedPrompts.map((promptText, idx) => (
-                      <div
-                        key={`suggested-prompt-${idx}-${promptText.slice(0, 15)}`}
-                        className="flex items-center gap-2"
-                      >
-                        <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold text-muted-foreground">
-                          {idx + 1}
-                        </span>
-                        <Input
-                          value={promptText}
-                          onChange={(e) => handleUpdatePrompt(idx, e.target.value)}
-                          placeholder={`Câu hỏi gợi ý số ${idx + 1}...`}
-                          className="h-8 bg-background text-xs"
-                          disabled={isPending}
-                          maxLength={200}
-                        />
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="size-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
-                            disabled={isPending || idx === 0}
-                            onClick={() => handleMovePrompt(idx, "up")}
-                            title="Di chuyển lên"
-                          >
-                            <ArrowUp className="size-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="size-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
-                            disabled={
-                              isPending ||
-                              idx === form.suggestedPrompts.length - 1
-                            }
-                            onClick={() => handleMovePrompt(idx, "down")}
-                            title="Di chuyển xuống"
-                          >
-                            <ArrowDown className="size-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="size-7 p-0 text-muted-foreground hover:text-destructive cursor-pointer"
-                            disabled={isPending}
-                            onClick={() => handleRemovePrompt(idx)}
-                            title="Xóa gợi ý này"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Field>
-            </CardContent>
-          </Card>
-
-          {/* Khối 2: Kho tri thức & Mô hình cốt lõi */}
-          <Card className="border-border/60 shadow-2xs">
-            <CardHeader className="border-b border-border/50 pb-3">
-              <CardTitle className="text-sm font-semibold">
-                Kho tri thức & Mô hình ngôn ngữ
-              </CardTitle>
-              <CardDescription>
-                Kho dữ liệu tham chiếu và các tham số điều phối sinh câu trả
-                lời.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-4">
-              <div className="grid gap-6 sm:grid-cols-2">
-                <Field className="min-w-0">
-                  <FieldLabel className="text-xs font-medium">
-                    Kho tri thức liên kết
-                  </FieldLabel>
-                  <AssistantCollectionPicker
-                    collections={collectionOptions}
-                    selectedIds={form.collectionIds}
-                    onChange={(ids) => patch({ collectionIds: ids })}
-                    disabled={isPending}
-                    readiness={readiness}
-                  />
-                  <FieldDescription className="mt-1.5 text-xs leading-relaxed">
-                    {form.collectionIds.length === 0
-                      ? "Không gắn kho tri thức · Trợ lý hoạt động ở chế độ hội thoại trực tiếp với mô hình AI theo Persona."
-                      : "Trợ lý tra cứu trong tất cả kho đã chọn. Đổi bộ kho áp dụng ngay khi lưu; hội thoại đã có giữ bộ kho cũ và cần hội thoại mới để hỏi tiếp."}
-                  </FieldDescription>
-                </Field>
-
-                <Field className="min-w-0">
-                  <FieldLabel className="text-xs font-medium">
-                    Mô hình trả lời
-                  </FieldLabel>
-                  <Select
-                    value={form.providerId}
-                    onValueChange={(value) => patch({ providerId: value })}
-                    disabled={isPending}
+                    <Pencil className="size-3" />
+                    <span>Soạn thảo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPersonaMode("preview")}
+                    className={cn(
+                      "inline-flex cursor-pointer items-center gap-1 rounded px-2 py-0.5 font-medium transition-colors",
+                      personaMode === "preview"
+                        ? "bg-card text-foreground shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
                   >
-                    <SelectTrigger className="h-9 bg-background text-xs">
-                      <SelectValue placeholder="Chọn mô hình" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={AUTO_MODEL} description="Mặc định">
-                        Tự động theo hệ thống
-                      </SelectItem>
-                      <SelectSeparator />
-                      {chatModels.map((item) => (
-                        <SelectItem
-                          key={item.id}
-                          value={item.id}
-                          description={
-                            localityLabel(item.provider_type)
-                              ? `${providerLabel(item)} · ${localityLabel(item.provider_type)}`
-                              : providerLabel(item)
-                          }
-                        >
-                          {item.model_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldDescription className="mt-1.5 text-xs leading-relaxed">
-                    Mô hình điều phối qua ModelOps; tự động sẽ dùng cấu hình
-                    trường.
-                  </FieldDescription>
-                </Field>
-              </div>
-
-              <div className="grid gap-4 pt-2 sm:grid-cols-2">
-                {/* Thanh kéo Đoạn trích dẫn */}
-                <div className="space-y-2.5 rounded-lg border border-border/60 bg-muted/20 p-3.5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <FieldLabel className="text-xs font-medium text-foreground">
-                        Đoạn trích dẫn (Top-K)
-                      </FieldLabel>
-                      <p className="text-[11px] text-muted-foreground">
-                        Dẫn chứng tối đa đưa vào câu trả lời
-                      </p>
-                    </div>
-                    <span className="flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
-                      {form.topK || 5} đoạn
-                    </span>
-                  </div>
-
-                  <div className="pt-2">
-                    <Slider
-                      min={1}
-                      max={20}
-                      step={1}
-                      value={[Number(form.topK) || 5]}
-                      onValueChange={([val]) => patch({ topK: String(val) })}
-                      disabled={isPending}
-                    />
-                  </div>
-
-                  <div className="flex justify-between text-[10px] font-medium text-muted-foreground/60">
-                    <span>1 đoạn (ngắn gọn)</span>
-                    <span>10 đoạn</span>
-                    <span>20 đoạn (chi tiết)</span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                    <span className="text-[10px] text-muted-foreground">Mốc gợi ý:</span>
-                    {[
-                      { label: "5 đoạn (chuẩn)", val: "5" },
-                      { label: "8 đoạn (bảng/phụ lục)", val: "8" },
-                      { label: "12 đoạn (đa văn bản)", val: "12" },
-                    ].map((preset) => (
-                      <button
-                        key={preset.val}
-                        type="button"
-                        disabled={isPending}
-                        onClick={() => patch({ topK: preset.val })}
-                        className={cn(
-                          "h-5 cursor-pointer rounded px-1.5 text-[10px] font-medium transition-colors",
-                          form.topK === preset.val
-                            ? "bg-primary text-primary-foreground font-semibold shadow-2xs"
-                            : "border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
-                        )}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[10px] leading-relaxed text-muted-foreground/80">
-                    Khuyến nghị mức <strong className="text-foreground">8 đoạn</strong> khi tra cứu văn bản có nhiều bảng biểu ngắt trang hoặc so sánh chéo.
-                  </p>
+                    <Eye className="size-3" />
+                    <span>Xem Markdown</span>
+                  </button>
                 </div>
-
-                {/* Thanh kéo Lượt ghi nhớ */}
-                <div className="space-y-2.5 rounded-lg border border-border/60 bg-muted/20 p-3.5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <FieldLabel className="text-xs font-medium text-foreground">
-                        Lượt nhớ lịch sử
-                      </FieldLabel>
-                      <p className="text-[11px] text-muted-foreground">
-                        Số lượt trao đổi trước được ghi nhớ
-                      </p>
-                    </div>
-                    <span className="flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
-                      {Number(form.historyTurns) === 0
-                        ? "Không nhớ"
-                        : `${form.historyTurns} lượt`}
-                    </span>
-                  </div>
-
-                  <div className="pt-2">
-                    <Slider
-                      min={0}
-                      max={10}
-                      step={1}
-                      value={[Number(form.historyTurns) || 0]}
-                      onValueChange={([val]) =>
-                        patch({ historyTurns: String(val) })
-                      }
-                      disabled={isPending}
-                    />
-                  </div>
-
-                  <div className="flex justify-between text-[10px] font-medium text-muted-foreground/60">
-                    <span>0 (Chỉ câu hiện tại)</span>
-                    <span>5 lượt</span>
-                    <span>10 lượt</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Giới hạn token với Quick Presets (hỗ trợ tới 128K) */}
-              <Field className="pt-1">
-                <div className="flex items-center justify-between">
-                  <FieldLabel className="text-xs font-medium">
-                    Giới hạn token đầu ra
-                  </FieldLabel>
-                  <span className="text-[11px] font-semibold text-primary">
-                    {form.maxOutputTokens
-                      ? `${Number(form.maxOutputTokens).toLocaleString("vi-VN")} tokens (${formatTokenK(Number(form.maxOutputTokens))})`
-                      : "Tự động theo năng lực mô hình"}
-                  </span>
-                </div>
-                <div className="pt-1">
-                  <Input
-                    type="number"
-                    min={1}
-                    value={form.maxOutputTokens}
-                    onChange={(event) =>
-                      patch({ maxOutputTokens: event.target.value })
-                    }
-                    placeholder="VD: 131072 (để trống: tự động)"
-                    className="h-9 bg-background text-xs"
-                    disabled={isPending}
-                  />
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 pt-2">
-                  <span className="mr-1 text-[11px] font-medium text-muted-foreground">
-                    Mốc gợi ý:
-                  </span>
-                  {[
-                    { label: "Tự động", val: "" },
-                    { label: "2K", val: "2048" },
-                    { label: "4K", val: "4096" },
-                    { label: "8K", val: "8192" },
-                    { label: "16K", val: "16384" },
-                    { label: "32K", val: "32768" },
-                    { label: "64K", val: "65536" },
-                    { label: "128K (Tối đa)", val: "131072" },
-                  ].map((preset) => {
-                    const isSelected =
-                      preset.val === ""
-                        ? !form.maxOutputTokens
-                        : form.maxOutputTokens === preset.val;
-                    return (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        disabled={isPending}
-                        onClick={() => patch({ maxOutputTokens: preset.val })}
-                        className={cn(
-                          "h-7 cursor-pointer rounded-md px-2 text-xs font-medium transition-colors",
-                          isSelected
-                            ? "bg-primary font-semibold text-primary-foreground shadow-2xs"
-                            : "border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
-                        )}
-                      >
-                        {preset.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <FieldDescription>
-                  Hỗ trợ đầy đủ từ câu trả lời ngắn gọn đến các mô hình thế hệ
-                  mới có đầu ra siêu lớn (như GPT-6 Luna, Claude 3.7, Gemini 2.5
-                  với đầu ra lên tới 128K tokens). Bạn có thể chọn mốc 128K hoặc
-                  nhập số cụ thể tùy ý.
-                </FieldDescription>
-              </Field>
-
-              {/* Độ linh hoạt diễn đạt (Temperature) */}
-              <div className="space-y-2.5 rounded-lg border border-border/60 bg-muted/20 p-3.5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <FieldLabel className="text-xs font-medium text-foreground">
-                      Độ linh hoạt diễn đạt (Temperature)
-                    </FieldLabel>
-                    <p className="text-[11px] text-muted-foreground">
-                      Độ tự nhiên của văn phong và mức độ bám sát dữ kiện
-                    </p>
-                  </div>
-                  <span className="flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
-                    {form.temperature === "auto" || !form.temperature.trim()
-                      ? "Tự động (Hệ thống)"
-                      : Number(form.temperature).toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="pt-2">
-                  <Slider
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={[
-                      form.temperature === "auto" || !form.temperature.trim()
-                        ? 0.2
-                        : Number(form.temperature),
-                    ]}
-                    onValueChange={([val]) =>
-                      patch({
-                        temperature: String(val),
-                        policy: { ...form.policy, temperature: String(val) },
-                      })
-                    }
-                    disabled={isPending || form.temperature === "auto"}
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="mr-1 text-[11px] font-medium text-muted-foreground">
-                    Mức khuyến nghị:
-                  </span>
-                  {[
-                    { label: "Tự động", val: "auto" },
-                    { label: "0.0 (Chính xác số liệu)", val: "0" },
-                    { label: "0.2 (Khuyến nghị RAG)", val: "0.2" },
-                    { label: "0.5 (Tự nhiên)", val: "0.5" },
-                    { label: "0.7 (Sáng tạo)", val: "0.7" },
-                  ].map((preset) => {
-                    const isSelected =
-                      preset.val === "auto"
-                        ? form.temperature === "auto" || !form.temperature.trim()
-                        : form.temperature === preset.val;
-                    return (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        disabled={isPending}
-                        onClick={() =>
-                          patch({
-                            temperature: preset.val,
-                            policy: { ...form.policy, temperature: preset.val },
-                          })
-                        }
-                        className={cn(
-                          "h-6 cursor-pointer rounded-md px-2 text-[11px] font-medium transition-colors",
-                          isSelected
-                            ? "bg-primary font-semibold text-primary-foreground shadow-2xs"
-                            : "border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
-                        )}
-                      >
-                        {preset.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <FieldDescription>
-                  Khuyến nghị mức <strong className="text-foreground">0.0 – 0.2</strong> cho văn bản hành chính, quyết định, kế hoạch và bảng biểu tuyển sinh nhằm đảm bảo độ chính xác dữ kiện và loại trừ hoàn toàn ảo giác.
-                </FieldDescription>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Khối 3: Cấu hình RAG & Kiểm chứng nâng cao (Thu gọn) */}
-          <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
-            <Card className="border-border/60 shadow-2xs">
-              <CollapsibleTrigger asChild>
-                <button
+                <Button
                   type="button"
-                  className="flex w-full items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-muted/30"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-[11px] cursor-pointer"
+                  disabled={isPending}
+                  onClick={() => {
+                    if (form.persona.includes("Nguyên tắc soạn thảo văn bản")) {
+                      toast.info("Quy tắc soạn thảo đã có trong chỉ dẫn.");
+                      return;
+                    }
+                    const nextPersona = form.persona.trim()
+                      ? `${form.persona.trim()}\n\n${FLEXIBLE_DRAFTING_PERSONA_SNIPPET}`
+                      : FLEXIBLE_DRAFTING_PERSONA_SNIPPET;
+                    patch({
+                      persona: nextPersona.slice(0, PERSONA_MAX_CHARS),
+                    });
+                    setPersonaMode("edit");
+                    toast.success("Đã chèn quy tắc soạn thảo linh hoạt.");
+                  }}
                 >
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      Cấu hình RAG & Kiểm chứng nâng cao
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Chiến lược tìm kiếm, ngân sách ngữ cảnh, bộ lọc metadata
-                      và kiểm chứng chống suy diễn.
-                    </p>
-                  </div>
-                  <ChevronDown
-                    className={`size-4 shrink-0 text-muted-foreground transition-transform ${
-                      isAdvancedOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent className="space-y-6 border-t border-border/60 pt-5">
-                  <section className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="flex size-5 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
-                        1
-                      </span>
-                      <h4 className="text-xs font-semibold text-foreground">
-                        Chiến lược truy xuất & Xếp hạng lại
-                      </h4>
-                    </div>
-                    <RetrievalFields
-                      form={form.policy}
-                      onChange={patchPolicy}
-                      rerankModels={rerankModels}
-                      disabled={isPending}
-                    />
-                  </section>
+                  <FilePlus2 className="size-3 text-primary" />
+                  <span>Quy tắc soạn thảo</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-[11px] cursor-pointer"
+                  disabled={isPending}
+                  onClick={() => setIsPersonaCraftOpen(true)}
+                >
+                  <Sparkles className="size-3 text-primary" />
+                  <span>Soạn bằng AI</span>
+                </Button>
+              </div>
+            </div>
 
-                  <section className="space-y-3 border-t border-border/60 pt-5">
-                    <div className="flex items-center gap-2">
-                      <span className="flex size-5 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
-                        2
-                      </span>
-                      <h4 className="text-xs font-semibold text-foreground">
-                        Ngân sách ngữ cảnh & Đoạn liền kề
-                      </h4>
-                    </div>
-                    <ContextFields
-                      form={form.policy}
-                      onChange={patchPolicy}
-                      disabled={isPending}
-                    />
-                  </section>
-
-                  <section className="space-y-3 border-t border-border/60 pt-5">
-                    <div className="flex items-center gap-2">
-                      <span className="flex size-5 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
-                        3
-                      </span>
-                      <h4 className="text-xs font-semibold text-foreground">
-                        Bộ lọc tài liệu theo tiêu chí (Metadata)
-                      </h4>
-                    </div>
-                    <MetadataScopeFields
-                      form={form.policy}
-                      onChange={patchPolicy}
-                      disabled={isPending}
-                    />
-                  </section>
-
-                  <section className="space-y-3 border-t border-border/60 pt-5">
-                    <div className="flex items-center gap-2">
-                      <span className="flex size-5 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
-                        4
-                      </span>
-                      <h4 className="text-xs font-semibold text-foreground">
-                        Kiểm chứng câu trả lời & Chống suy diễn
-                      </h4>
-                    </div>
-                    <VerificationFields
-                      form={form.policy}
-                      onChange={patchPolicy}
-                      chatModels={chatModels}
-                      disabled={isPending}
-                    />
-                  </section>
-
-                  <p className="text-[11px] text-muted-foreground">
-                    Cấu hình nâng cao áp dụng cho hội thoại mới; hội thoại đã
-                    bắt đầu giữ cấu hình tại thời điểm mở.
+            {personaMode === "edit" ? (
+              <Textarea
+                value={form.persona}
+                onChange={(event) => patch({ persona: event.target.value })}
+                maxLength={PERSONA_MAX_CHARS}
+                placeholder="Định hình vai trò, phong cách xưng hô và nguyên tắc trả lời (hỗ trợ Markdown)..."
+                rows={16}
+                className="min-h-[360px] flex-1 max-h-[640px] resize-y bg-background text-xs leading-relaxed"
+                disabled={isPending}
+              />
+            ) : (
+              <div className="min-h-[360px] flex-1 max-h-[640px] overflow-y-auto rounded-md border border-input bg-muted/20 px-4 py-3 text-xs">
+                {form.persona.trim() ? (
+                  <MarkdownContent content={form.persona} />
+                ) : (
+                  <p className="text-muted-foreground italic">
+                    Chưa có chỉ dẫn nào. Chuyển sang Soạn thảo để nhập nội dung.
                   </p>
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-2">
+              <FieldDescription>
+                Định hình văn phong và nguyên tắc trả lời (hỗ trợ Markdown).
+              </FieldDescription>
+              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                {form.persona.length.toLocaleString("vi-VN")}/
+                {PERSONA_MAX_CHARS.toLocaleString("vi-VN")}
+              </span>
+            </div>
+          </Field>
         </div>
 
-        {/* Cột phụ: Trạng thái phục vụ & Bảng tóm tắt quản trị */}
-        <div className="space-y-4 lg:col-span-1">
-          {/* Card Trạng thái phục vụ */}
-          <Card className="border-border/60 shadow-2xs">
-            <CardHeader className="border-b border-border/50 pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Trạng thái phục vụ
-                </CardTitle>
+        {/* Cột phải (5/12): Trạng thái, Kho tri thức, Mô hình, Tham số & Nâng cao */}
+        <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/60 shadow-2xs lg:col-span-5">
+          {/* 1. Trạng thái phục vụ */}
+          <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Label
+                  htmlFor="assistant-active-switch"
+                  className="text-xs font-semibold text-foreground cursor-pointer"
+                >
+                  Tiếp nhận câu hỏi
+                </Label>
                 {form.isActive ? (
                   <Badge
                     variant="success"
-                    className="h-5 gap-1.5 px-2 text-[11px] font-medium"
+                    className="h-5 gap-1.5 px-2 text-[10px] font-medium"
                   >
                     <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     Đang hoạt động
@@ -1009,109 +483,482 @@ export function AssistantConfigForm({
                 ) : (
                   <Badge
                     variant="outline"
-                    className="h-5 px-2 text-[11px] font-medium text-muted-foreground"
+                    className="h-5 px-2 text-[10px] font-medium text-muted-foreground"
                   >
                     Tạm dừng
                   </Badge>
                 )}
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-4">
-              <div className="flex items-center justify-between">
-                <Label
-                  htmlFor="assistant-active-switch"
-                  className="text-xs font-medium text-foreground cursor-pointer"
-                >
-                  Tiếp nhận câu hỏi
+              <p
+                className="mt-0.5 text-[11px] text-muted-foreground truncate"
+                title={
+                  form.isActive
+                    ? "Trợ lý đang sẵn sàng tiếp nhận câu hỏi qua các kênh được phân quyền."
+                    : "Các yêu cầu mới sẽ bị từ chối khi tạm dừng."
+                }
+              >
+                {form.isActive
+                  ? "Sẵn sàng phục vụ các kênh được phân quyền."
+                  : "Đang tạm dừng tiếp nhận yêu cầu mới."}
+              </p>
+            </div>
+            <Switch
+              id="assistant-active-switch"
+              checked={form.isActive}
+              onCheckedChange={(checked) => patch({ isActive: checked })}
+              disabled={isPending}
+            />
+          </div>
+
+          {/* 2. Kho tri thức & Mô hình trả lời */}
+          <div className="space-y-3.5 px-4 py-4">
+            <Field className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <FieldLabel className="text-xs font-medium">
+                  Kho tri thức liên kết
+                </FieldLabel>
+                <FieldHelpTooltip text="Chọn các kho tài liệu trợ lý được phép tra cứu. Nếu để trống, trợ lý trò chuyện trực tiếp theo Persona mà không đối soát tài liệu." />
+              </div>
+              <AssistantCollectionPicker
+                collections={collectionOptions}
+                selectedIds={form.collectionIds}
+                onChange={(ids) => patch({ collectionIds: ids })}
+                disabled={isPending}
+                readiness={readiness}
+              />
+              {form.collectionIds.length === 0 ? (
+                <FieldDescription className="text-[11px]">
+                  Chế độ hội thoại trực tiếp theo Persona.
+                </FieldDescription>
+              ) : null}
+            </Field>
+
+            <Field className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <FieldLabel className="text-xs font-medium">
+                  Mô hình trả lời
+                </FieldLabel>
+                <FieldHelpTooltip text="Mô hình ngôn ngữ dùng để tổng hợp câu trả lời. Chọn 'Tự động' để dùng mô hình mặc định của hệ thống qua ModelOps." />
+              </div>
+              <Select
+                value={form.providerId}
+                onValueChange={(value) => patch({ providerId: value })}
+                disabled={isPending}
+              >
+                <SelectTrigger className="h-9 bg-background text-xs">
+                  <SelectValue placeholder="Chọn mô hình" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={AUTO_MODEL} description="Mặc định">
+                    Tự động theo hệ thống
+                  </SelectItem>
+                  <SelectSeparator />
+                  {chatModels.map((item) => (
+                    <SelectItem
+                      key={item.id}
+                      value={item.id}
+                      description={
+                        localityLabel(item.provider_type)
+                          ? `${providerLabel(item)} · ${localityLabel(item.provider_type)}`
+                          : providerLabel(item)
+                      }
+                    >
+                      {item.model_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          {/* 3. Tham số cơ bản (Top-K & Lượt nhớ) */}
+          <div className="space-y-4 px-4 py-4">
+            {/* Số đoạn trích dẫn */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <FieldLabel className="text-xs font-medium text-foreground">
+                    Đoạn trích dẫn (Top-K)
+                  </FieldLabel>
+                  <FieldHelpTooltip text="Số đoạn tài liệu tối đa được chọn làm căn cứ trả lời. Tăng lên 8–12 đoạn khi tài liệu có bảng biểu dài hoặc cần so sánh nhiều nguồn." />
+                </div>
+                <span className="rounded bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary tabular-nums">
+                  {form.topK || 5} đoạn
+                </span>
+              </div>
+              <Slider
+                min={1}
+                max={20}
+                step={1}
+                value={[Number(form.topK) || 5]}
+                onValueChange={([val]) => patch({ topK: String(val) })}
+                disabled={isPending}
+              />
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { label: "5 (chuẩn)", val: "5" },
+                  { label: "8 (bảng biểu)", val: "8" },
+                  { label: "12 (đa văn bản)", val: "12" },
+                ].map((preset) => (
+                  <button
+                    key={preset.val}
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => patch({ topK: preset.val })}
+                    className={cn(
+                      "h-5 cursor-pointer rounded px-1.5 text-[10px] font-medium transition-colors",
+                      form.topK === preset.val
+                        ? "bg-primary font-semibold text-primary-foreground shadow-2xs"
+                        : "border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Lượt nhớ lịch sử */}
+            <div className="space-y-2 border-t border-border/40 pt-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <FieldLabel className="text-xs font-medium text-foreground">
+                    Lượt nhớ lịch sử
+                  </FieldLabel>
+                  <FieldHelpTooltip text="Số lượt hỏi đáp gần nhất trong cuộc trò chuyện được đưa vào ngữ cảnh để trợ lý hiểu các câu hỏi nối tiếp." />
+                </div>
+                <span className="rounded bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary tabular-nums">
+                  {Number(form.historyTurns) === 0
+                    ? "Không nhớ"
+                    : `${form.historyTurns} lượt`}
+                </span>
+              </div>
+              <Slider
+                min={0}
+                max={10}
+                step={1}
+                value={[Number(form.historyTurns) || 0]}
+                onValueChange={([val]) => patch({ historyTurns: String(val) })}
+                disabled={isPending}
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground/70">
+                <span>0 lượt</span>
+                <span>5 lượt</span>
+                <span>10 lượt</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Xuất tài liệu & Tạo mẫu (3 toggle độc lập) */}
+          <div className="space-y-2.5 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs font-semibold text-foreground">
+                  Xuất tài liệu & Tạo mẫu
                 </Label>
+                <FieldHelpTooltip text="Bật từng định dạng cho phép trợ lý soạn thảo văn bản/mẫu linh hoạt, xem trước trực tiếp bên cạnh khung chat và tải tệp thực tế." />
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                {[
+                  form.allowExportDocx && "DOCX",
+                  form.allowExportPdf && "PDF",
+                  form.allowExportXlsx && "Excel",
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "Đang tắt"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <label
+                htmlFor="export-docx-switch"
+                className={cn(
+                  "flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 transition-colors",
+                  form.allowExportDocx
+                    ? "border-primary/40 bg-primary/5"
+                    : "border-border/60 bg-background hover:bg-muted/30",
+                )}
+              >
+                <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                  <FileText className="size-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                  <span>DOCX</span>
+                </span>
                 <Switch
-                  id="assistant-active-switch"
-                  checked={form.isActive}
-                  onCheckedChange={(checked) => patch({ isActive: checked })}
+                  id="export-docx-switch"
+                  checked={form.allowExportDocx}
+                  onCheckedChange={(checked) =>
+                    patch({ allowExportDocx: checked })
+                  }
                   disabled={isPending}
                 />
-              </div>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                {form.isActive
-                  ? "Trợ lý đang sẵn sàng tiếp nhận câu hỏi từ sinh viên và người dùng qua các kênh được phân quyền."
-                  : "Trợ lý đang tạm dừng. Các yêu cầu mới sẽ bị từ chối và các phiên xử lý đang chạy sẽ được dừng an toàn."}
-              </p>
-            </CardContent>
-          </Card>
+              </label>
 
-          {/* Card Tóm tắt phiên bản & Chỉ số */}
-          <Card className="border-border/60 shadow-2xs">
-            <CardHeader className="border-b border-border/50 pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Thông tin phiên bản
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 pt-3 text-xs">
-              <div className="flex items-center justify-between border-b border-border/40 py-1.5">
-                <span className="text-muted-foreground">Phiên bản</span>
-                <span className="font-semibold text-foreground">
-                  v{baseline.revision}
+              <label
+                htmlFor="export-pdf-switch"
+                className={cn(
+                  "flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 transition-colors",
+                  form.allowExportPdf
+                    ? "border-primary/40 bg-primary/5"
+                    : "border-border/60 bg-background hover:bg-muted/30",
+                )}
+              >
+                <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                  <FileText className="size-3.5 shrink-0 text-rose-600 dark:text-rose-400" />
+                  <span>PDF</span>
                 </span>
-              </div>
-              <div className="flex items-center justify-between border-b border-border/40 py-1.5">
-                <span className="text-muted-foreground">Mô hình</span>
-                <span
-                  className="max-w-[140px] truncate font-medium text-foreground text-right"
-                  title={
-                    form.providerId === AUTO_MODEL
-                      ? "Tự động theo hệ thống"
-                      : form.providerId
+                <Switch
+                  id="export-pdf-switch"
+                  checked={form.allowExportPdf}
+                  onCheckedChange={(checked) =>
+                    patch({ allowExportPdf: checked })
                   }
-                >
-                  {form.providerId === AUTO_MODEL
-                    ? "Tự động"
-                    : (chatModels.find((m) => m.id === form.providerId)
-                        ?.model_name ?? form.providerId)}
+                  disabled={isPending}
+                />
+              </label>
+
+              <label
+                htmlFor="export-xlsx-switch"
+                className={cn(
+                  "flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 transition-colors",
+                  form.allowExportXlsx
+                    ? "border-primary/40 bg-primary/5"
+                    : "border-border/60 bg-background hover:bg-muted/30",
+                )}
+              >
+                <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                  <FileSpreadsheet className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span>Excel</span>
                 </span>
-              </div>
-              <div className="flex items-center justify-between border-b border-border/40 py-1.5">
-                <span className="text-muted-foreground">Kiểm chứng</span>
-                <span className="font-medium text-foreground">
-                  {verificationLabel}
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-b border-border/40 py-1.5">
-                <span className="text-muted-foreground">Trích dẫn (Top-K)</span>
-                <span className="font-medium text-foreground">
-                  {form.topK} đoạn
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-b border-border/40 py-1.5">
-                <span className="text-muted-foreground">Linh hoạt (Temp)</span>
-                <span className="font-medium text-foreground">
-                  {form.temperature === "auto" || !form.temperature.trim()
-                    ? "Tự động"
-                    : form.temperature}
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-b border-border/40 py-1.5">
-                <span className="text-muted-foreground">Gợi ý mở đầu</span>
-                <span className="font-medium text-foreground">
-                  {form.suggestedPrompts.length > 0
-                    ? `${form.suggestedPrompts.length} câu`
-                    : "Mặc định"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-1.5">
-                <span className="text-muted-foreground">Trạng thái lưu</span>
-                <span
-                  className={cn(
-                    "font-medium",
-                    isDirty
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-emerald-600 dark:text-emerald-400",
-                  )}
-                >
-                  {isDirty ? "Có thay đổi chưa lưu" : "Đã đồng bộ"}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+                <Switch
+                  id="export-xlsx-switch"
+                  checked={form.allowExportXlsx}
+                  onCheckedChange={(checked) =>
+                    patch({ allowExportXlsx: checked })
+                  }
+                  disabled={isPending}
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* 5. Thông tin phiên bản gọn ở cuối cột */}
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-muted/20 px-4 py-2.5 text-[11px] text-muted-foreground">
+            <span>
+              Phiên bản{" "}
+              <strong className="font-semibold text-foreground">
+                v{baseline.revision}
+              </strong>{" "}
+              · Kiểm chứng: {verificationLabel}
+            </span>
+            <span
+              className={cn(
+                "font-medium",
+                isDirty
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-emerald-600 dark:text-emerald-400",
+              )}
+            >
+              {isDirty ? "Chưa lưu thay đổi" : "Đã đồng bộ"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Khối Cấu hình kỹ thuật nâng cao (Full-width, luôn hiển thị) */}
+      <div className="w-full rounded-xl border border-border/60 bg-card shadow-2xs overflow-hidden">
+        <div className="px-5 py-3.5">
+          <p className="text-xs font-semibold text-foreground">
+            Cấu hình kỹ thuật nâng cao
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Truy xuất, ngữ cảnh, giới hạn đầu ra, độ linh hoạt và kiểm chứng
+          </p>
+        </div>
+        <div className="space-y-5 border-t border-border/50 px-5 py-4">
+              {/* 1. Truy xuất */}
+              <section className="space-y-3">
+                <h4 className="text-xs font-semibold text-foreground">
+                  Chiến lược truy xuất & Xếp hạng lại
+                </h4>
+                <RetrievalFields
+                  form={form.policy}
+                  onChange={patchPolicy}
+                  rerankModels={rerankModels}
+                  disabled={isPending}
+                />
+              </section>
+
+              {/* 2. Ngữ cảnh */}
+              <section className="space-y-3 border-t border-border/50 pt-4">
+                <h4 className="text-xs font-semibold text-foreground">
+                  Ngữ cảnh & Đoạn liền kề
+                </h4>
+                <ContextFields
+                  form={form.policy}
+                  onChange={patchPolicy}
+                  disabled={isPending}
+                />
+              </section>
+
+              {/* 3. Đầu ra & Độ linh hoạt */}
+              <section className="space-y-3 border-t border-border/50 pt-4">
+                <h4 className="text-xs font-semibold text-foreground">
+                  Giới hạn đầu ra & Độ linh hoạt mô hình
+                </h4>
+                <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+                  <Field className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <FieldLabel className="text-xs font-medium">
+                          Giới hạn token đầu ra
+                        </FieldLabel>
+                        <FieldHelpTooltip text="Độ dài tối đa của câu trả lời sinh ra. Để trống để hệ thống tự điều chỉnh theo năng lực mô hình." />
+                      </div>
+                      <span className="text-[11px] font-semibold text-primary">
+                        {form.maxOutputTokens
+                          ? `${Number(form.maxOutputTokens).toLocaleString("vi-VN")} (${formatTokenK(Number(form.maxOutputTokens))})`
+                          : "Tự động"}
+                      </span>
+                    </div>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={form.maxOutputTokens}
+                      onChange={(event) =>
+                        patch({ maxOutputTokens: event.target.value })
+                      }
+                      placeholder="Để trống: tự động"
+                      className="h-8 bg-background text-xs"
+                      disabled={isPending}
+                    />
+                    <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                      {[
+                        { label: "Tự động", val: "" },
+                        { label: "2K", val: "2048" },
+                        { label: "4K", val: "4096" },
+                        { label: "8K", val: "8192" },
+                        { label: "16K", val: "16384" },
+                        { label: "32K", val: "32768" },
+                        { label: "64K", val: "65536" },
+                        { label: "128K", val: "131072" },
+                      ].map((preset) => {
+                        const isSelected =
+                          preset.val === ""
+                            ? !form.maxOutputTokens
+                            : form.maxOutputTokens === preset.val;
+                        return (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            disabled={isPending}
+                            onClick={() =>
+                              patch({ maxOutputTokens: preset.val })
+                            }
+                            className={cn(
+                              "h-6 cursor-pointer rounded px-2 text-[11px] font-medium transition-colors",
+                              isSelected
+                                ? "bg-primary font-semibold text-primary-foreground shadow-2xs"
+                                : "border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                            )}
+                          >
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </Field>
+
+                  <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <FieldLabel className="text-xs font-medium text-foreground">
+                          Độ linh hoạt (Temperature)
+                        </FieldLabel>
+                        <FieldHelpTooltip text="Mức độ sáng tạo của câu trả lời (0.0 bám sát dữ kiện nhất, cao hơn thì diễn đạt tự nhiên hơn). Khuyến nghị 0.0 – 0.2 cho văn bản hành chính và số liệu." />
+                      </div>
+                      <span className="rounded bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                        {form.temperature === "auto" ||
+                        !form.temperature.trim()
+                          ? "Tự động"
+                          : Number(form.temperature).toFixed(2)}
+                      </span>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={[
+                        form.temperature === "auto" ||
+                        !form.temperature.trim()
+                          ? 0.2
+                          : Number(form.temperature),
+                      ]}
+                      onValueChange={([val]) =>
+                        patch({
+                          temperature: String(val),
+                          policy: {
+                            ...form.policy,
+                            temperature: String(val),
+                          },
+                        })
+                      }
+                      disabled={isPending || form.temperature === "auto"}
+                    />
+                    <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                      {[
+                        { label: "Tự động", val: "auto" },
+                        { label: "0.0", val: "0" },
+                        { label: "0.2 (RAG)", val: "0.2" },
+                        { label: "0.5", val: "0.5" },
+                        { label: "0.7", val: "0.7" },
+                      ].map((preset) => {
+                        const isSelected =
+                          preset.val === "auto"
+                            ? form.temperature === "auto" ||
+                              !form.temperature.trim()
+                            : form.temperature === preset.val;
+                        return (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            disabled={isPending}
+                            onClick={() =>
+                              patch({
+                                temperature: preset.val,
+                                policy: {
+                                  ...form.policy,
+                                  temperature: preset.val,
+                                },
+                              })
+                            }
+                            className={cn(
+                              "h-6 cursor-pointer rounded px-2 text-[11px] font-medium transition-colors",
+                              isSelected
+                                ? "bg-primary font-semibold text-primary-foreground shadow-2xs"
+                                : "border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                            )}
+                          >
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* 4. Kiểm chứng */}
+              <section className="space-y-3 border-t border-border/50 pt-4">
+                <h4 className="text-xs font-semibold text-foreground">
+                  Kiểm chứng câu trả lời
+                </h4>
+                <VerificationFields
+                  form={form.policy}
+                  onChange={patchPolicy}
+                  chatModels={chatModels}
+                  disabled={isPending}
+                />
+              </section>
         </div>
       </div>
 
@@ -1183,6 +1030,7 @@ export function AssistantConfigForm({
         currentName={form.name}
         onApply={handleApplyCraftedPersona}
       />
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }

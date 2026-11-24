@@ -32,6 +32,9 @@ export type AssistantFormState = {
   policy: RagPolicyFormState;
   suggestedPrompts: string[];
   temperature: string;
+  allowExportDocx: boolean;
+  allowExportPdf: boolean;
+  allowExportXlsx: boolean;
 };
 
 /** The effective collection set; scalar ``collection_id`` mirrors its first entry. */
@@ -67,6 +70,9 @@ export function initialState(
       assistant?.rag_policy?.temperature != null
         ? String(assistant.rag_policy.temperature)
         : policyForm.temperature || "auto",
+    allowExportDocx: Boolean(assistant?.rag_policy?.allow_export_docx),
+    allowExportPdf: Boolean(assistant?.rag_policy?.allow_export_pdf),
+    allowExportXlsx: Boolean(assistant?.rag_policy?.allow_export_xlsx),
   };
 }
 
@@ -123,6 +129,9 @@ export function buildAssistantPayload(
   policy.suggested_prompts = form.suggestedPrompts
     .map((p) => p.trim())
     .filter(Boolean);
+  policy.allow_export_docx = form.allowExportDocx;
+  policy.allow_export_pdf = form.allowExportPdf;
+  policy.allow_export_xlsx = form.allowExportXlsx;
 
   return {
     name: form.name.trim(),

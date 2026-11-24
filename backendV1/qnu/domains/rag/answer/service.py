@@ -78,6 +78,8 @@ async def answer(
     reranker: Reranker | None = None,
     compose_insufficient_message: bool = False,
     collection_ids: list[str] | None = None,
+    public_channel: bool = False,
+    is_follow_up: bool = False,
 ) -> AnswerResponse:
     answer_id = "ans_" + uuid.uuid4().hex
     ids = list(dict.fromkeys(collection_ids or [collection_id]))
@@ -271,6 +273,8 @@ async def answer(
         persona=persona,
         metadata_filter=packing_metadata,
         conversation_memory=req.conversation_memory,
+        public_channel=public_channel,
+        is_follow_up=is_follow_up,
     )
     if req.conversation_memory:
         trace.context["conversation_memory"] = req.conversation_memory
@@ -345,6 +349,11 @@ async def answer(
     trace.inference_configuration_hash = inference_hash
     trace.reasoning = runtime.reasoning_trace() or {}
     cache_ttl = answer_cache.ttl_seconds()
+    cache_prompt_version = (
+        f"{PROMPT_VERSION}:public-direct:{'followup' if is_follow_up else 'first'}"
+        if public_channel
+        else PROMPT_VERSION
+    )
     cache_material = {
         "version": answer_cache.VERSION,
         "workspace_id": workspace_id,
@@ -370,7 +379,7 @@ async def answer(
         "provider_id": runtime.provider_id,
         "configuration_hash": runtime.configuration_hash,
         "inference_configuration_hash": inference_hash,
-        "prompt_version": PROMPT_VERSION,
+        "prompt_version": cache_prompt_version,
         "appeal_version": APPEAL_VERSION,
         "messages_sha256": digest([{"role": m.role, "content": m.content} for m in messages]),
         "schema_sha256": digest(answer_schema),
@@ -433,7 +442,7 @@ async def answer(
         persona=persona,
         provider_id=runtime.provider_id,
         model_name=runtime.model_name,
-        prompt_version=PROMPT_VERSION,
+        prompt_version=cache_prompt_version,
         collection_manifests=trace.retrieval.get("manifests") if len(ids) > 1 else None,
     )
     has_session_context = bool(req.conversation_memory) or bool(req.history)

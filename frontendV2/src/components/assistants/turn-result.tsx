@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import type { ConversationTurn, DirectReply } from "@/api/conversations";
 import { AnswerBody } from "@/components/assistants/answer-body";
+import { stripDocumentMarkers } from "@/components/assistants/document-preview-pane";
 import { MarkdownContent } from "@/components/knowledge/markdown-content";
 import { Badge } from "@/components/ui/badge";
 
@@ -29,6 +30,8 @@ export const TURN_ERROR_TEXT: Record<string, string> = {
     "Mô hình của trợ lý đã thay đổi trong khi xử lý; hãy gửi lại câu hỏi.",
   conversation_route_invalid:
     "Bước điều phối câu hỏi trả về kết quả không hợp lệ.",
+  answer_context_budget_exceeded:
+    "Bằng chứng bắt buộc vượt ngân sách ngữ cảnh của lượt hỏi; hãy hỏi cụ thể hơn theo từng mục.",
 };
 
 const DIRECT_ROUTE_TEXT: Record<DirectReply["route"], string> = {
@@ -72,10 +75,10 @@ function directReplyBody(
 ) {
   const isSocial = reply.route === "greeting" || reply.route === "courtesy";
   const isDirectChat = reply.route === "direct_chat";
-  const rawAnswer = reply.answer?.trim() || "";
+  const rawAnswer = stripDocumentMarkers(reply.answer?.trim() || "");
   const displayAnswer =
     rawAnswer && rawAnswer !== "{}"
-      ? reply.answer
+      ? rawAnswer
       : "Tôi đã ghi nhận câu hỏi của bạn. Về nội dung này, bạn có thể diễn đạt cụ thể hơn hoặc cung cấp thêm chi tiết để mình hỗ trợ chính xác nhất nhé.";
 
   return (

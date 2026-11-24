@@ -9,4 +9,6 @@ export const publicationPaths = {
     `/public/chatbots/${encodeURIComponent(slug)}/sessions`,
   publicTurns: (slug: string) =>
     `/public/chatbots/${encodeURIComponent(slug)}/turns`,
+  publicExport: (slug: string, draftId: string) =>
+    `/public/chatbots/${encodeURIComponent(slug)}/exports/${encodeURIComponent(draftId)}`,
 } as const;

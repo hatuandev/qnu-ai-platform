@@ -6,8 +6,23 @@ import json
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from qnu.domains.assistants.models import Assistant
 from qnu.domains.assistants.schemas import AssistantRagPolicy
 from qnu.domains.conversations.access import checkpoint
+from qnu.domains.conversations.document_export import (
+    NO_KNOWLEDGE_GROUNDING_POLICY,
+    DocumentDraft,
+    ExportFormat,
+    active_draft_prompt_context,
+    disabled_format_refusal_message,
+    disabled_requested_format,
+    enabled_export_formats,
+    export_policy_prompt_addon,
+    extract_document_draft,
+    requested_export_format,
+    resolve_preferred_format,
+    strip_document_markers,
+)
 from qnu.domains.conversations.history import readable
 from qnu.domains.conversations.models import ConversationTurn
 from qnu.domains.conversations.rewriting import _history_answer, resolve_turn
@@ -32,6 +47,31 @@ from qnu.ports.reranker import Reranker
 from qnu.ports.vector_store import VectorStore
 
 logger = get_logger(__name__)
+
+
+async def _live_export_formats(db: AsyncSession, conversation) -> list[ExportFormat]:
+    """Read live Assistant export toggles so mid-conversation toggle changes apply immediately."""
+    assistant = await db.scalar(
+        select(Assistant).where(Assistant.id == conversation.assistant_id)
+    )
+    if assistant is not None:
+        return enabled_export_formats({"rag_policy": assistant.rag_policy})
+    return enabled_export_formats(conversation.assistant_snapshot)
+
+
+def _latest_turn_draft(turns: list[ConversationTurn]) -> DocumentDraft | None:
+    """Return the most recent DocumentDraft produced in prior completed turns."""
+    for row in reversed(turns):
+        if row.status != "completed":
+            continue
+        trace = row.rewrite_trace if isinstance(row.rewrite_trace, dict) else None
+        raw = trace.get("document_draft") if trace else None
+        if isinstance(raw, dict):
+            try:
+                return DocumentDraft.model_validate(raw)
+            except Exception as exc:
+                logger.debug("conversation_prior_draft_invalid", turn_id=row.id, error=str(exc))
+    return None
 
 
 async def _direct_llm_turn(
@@ -62,6 +102,13 @@ async def _direct_llm_turn(
     system_prompt = (
         config.get("persona")
         or "Bạn là trợ lý AI của Trường Đại học Quy Nhơn (QNU). Hãy hỗ trợ người dùng chu đáo, thân thiện và chuẩn mực sư phạm."
+    )
+    export_formats = await _live_export_formats(db, conversation)
+    latest_draft = _latest_turn_draft(all_turns) if export_formats else None
+    system_prompt += (
+        NO_KNOWLEDGE_GROUNDING_POLICY
+        + export_policy_prompt_addon(export_formats)
+        + active_draft_prompt_context(latest_draft)
     )
     if rows:
         system_prompt += (
@@ -142,12 +189,32 @@ async def _direct_llm_turn(
             "Tôi đã ghi nhận câu hỏi của bạn. Về nội dung này, bạn có thể diễn đạt cụ thể hơn "
             "hoặc cung cấp thêm chi tiết để mình hỗ trợ chính xác nhất nhé."
         )
+    draft_payload = None
+    disabled_fmt = disabled_requested_format(turn.question, export_formats)
+    if disabled_fmt is not None:
+        answer_text = (
+            strip_document_markers(answer_text, remove_blocks=True)
+            or disabled_format_refusal_message(disabled_fmt)
+        )
+    elif export_formats:
+        answer_text, draft = extract_document_draft(answer_text, turn.question)
+        if draft is None and latest_draft is not None:
+            req_fmt = requested_export_format(turn.question)
+            if req_fmt is not None and req_fmt in export_formats:
+                draft = latest_draft
+        if draft is not None:
+            draft = resolve_preferred_format(draft, turn.question, export_formats)
+            draft_payload = draft.model_dump(mode="json")
+    else:
+        answer_text = strip_document_markers(answer_text, remove_blocks=True)
+
     turn.rewrite_trace = {
         **(turn.rewrite_trace or {}),
         "mode": "direct_llm",
         "provider_id": runtime.provider_id,
         "model_name": runtime.model_name,
         "total_tokens": result_chat.total_tokens,
+        **({"document_draft": draft_payload} if draft_payload is not None else {}),
     }
     return DirectReply(
         id=turn.id,
@@ -200,7 +267,16 @@ async def send(
 
         reply, provider_id = await resolve_turn(db, actor, conversation, turn, chat)
         if reply is None:
-            if not collection_ids:
+            live_formats = await _live_export_formats(db, conversation)
+            early_disabled_fmt = disabled_requested_format(turn.question, live_formats)
+            if early_disabled_fmt is not None:
+                result = DirectReply(
+                    id=turn.id,
+                    status="direct_reply",
+                    route="direct_chat",
+                    answer=disabled_format_refusal_message(early_disabled_fmt),
+                )
+            elif not collection_ids:
                 result = await _direct_llm_turn(
                     db,
                     actor,
@@ -211,11 +287,37 @@ async def send(
                     provider_id=provider_id,
                 )
             else:
+                export_formats = await _live_export_formats(db, conversation)
+                prior_turns = list(
+                    (
+                        await db.scalars(
+                            select(ConversationTurn)
+                            .where(
+                                ConversationTurn.conversation_id == conversation.id,
+                                ConversationTurn.turn_no < turn.turn_no,
+                            )
+                            .order_by(ConversationTurn.turn_no.asc())
+                        )
+                    ).all()
+                )
+                latest_draft = _latest_turn_draft(prior_turns) if export_formats else None
                 policy = AssistantRagPolicy.model_validate(config.get("rag_policy", {})).model_dump(
-                    mode="json", exclude={"guardrail_policy", "suggested_prompts"}
+                    mode="json",
+                    exclude={
+                        "guardrail_policy",
+                        "suggested_prompts",
+                        "allow_export_docx",
+                        "allow_export_pdf",
+                        "allow_export_xlsx",
+                    },
                 )
                 policy["metadata_filter"] = turn.metadata_filter or {}
                 conv_mem = (turn.rewrite_trace or {}).get("conversation_memory")
+                effective_persona = (
+                    (config["persona"] or "")
+                    + export_policy_prompt_addon(export_formats)
+                    + active_draft_prompt_context(latest_draft)
+                )
                 result = await answer(
                     db,
                     blob,
@@ -238,12 +340,50 @@ async def send(
                     clarify_source_reference=bool(
                         (turn.rewrite_trace or {}).get("needs_clarification")
                     ),
-                    persona=config["persona"],
+                    persona=effective_persona,
                     checkpoint=check,
                     reranker=reranker,
                     compose_insufficient_message=True,
                     collection_ids=collection_ids,
                 )
+                raw_rag_text = (
+                    "\n".join(s.text for s in result.statements)
+                    if result.statements
+                    else (result.answer or "")
+                )
+                disabled_rag_fmt = disabled_requested_format(turn.question, export_formats)
+                if disabled_rag_fmt is not None:
+                    if "<<<" in raw_rag_text:
+                        cleaned_rag = (
+                            strip_document_markers(raw_rag_text, remove_blocks=True)
+                            or disabled_format_refusal_message(disabled_rag_fmt)
+                        )
+                        result = result.model_copy(
+                            update={"answer": cleaned_rag, "statements": []}
+                        )
+                elif export_formats and result.status == "answered":
+                    display_rag_text, draft = extract_document_draft(raw_rag_text, turn.question)
+                    if draft is None and latest_draft is not None:
+                        req_fmt = requested_export_format(turn.question)
+                        if req_fmt is not None and req_fmt in export_formats:
+                            draft = latest_draft
+                    if draft is not None:
+                        draft = resolve_preferred_format(draft, turn.question, export_formats)
+                        turn.rewrite_trace = {
+                            **(turn.rewrite_trace or {}),
+                            "document_draft": draft.model_dump(mode="json"),
+                        }
+                    if "<<<" in raw_rag_text:
+                        result = result.model_copy(
+                            update={"answer": display_rag_text, "statements": []}
+                        )
+                elif "<<<" in raw_rag_text:
+                    result = result.model_copy(
+                        update={
+                            "answer": strip_document_markers(raw_rag_text, remove_blocks=True),
+                            "statements": [],
+                        }
+                    )
         else:
             result = reply
         await check()

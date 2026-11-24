@@ -6,6 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qnu.api.dependencies import get_actor, get_blob_store, get_db
 from qnu.domains.conversations import history, service
 from qnu.domains.conversations.access import owned
+from qnu.domains.conversations.document_export import (
+    ExportFormat,
+    content_disposition_header,
+    export_turn_document,
+)
 from qnu.domains.conversations.execution import send
 from qnu.domains.conversations.schemas import (
     ConversationCreate,
@@ -182,5 +187,28 @@ async def promote_to_benchmark(
         turn_id,
         body or PromoteToBenchmarkRequest(),
     )
+
+
+@router.get("/{conversation_id}/turns/{turn_id}/export")
+async def export_turn(
+    workspace_id: str,
+    conversation_id: str,
+    turn_id: str,
+    db: DB,
+    actor: Actor,
+    format: ExportFormat = Query(...),
+) -> Response:
+    payload, media_type, filename = await export_turn_document(
+        db, actor, workspace_id, conversation_id, turn_id, format
+    )
+    return Response(
+        content=payload,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": content_disposition_header(filename),
+            "Cache-Control": "private, no-store",
+        },
+    )
+
 
 

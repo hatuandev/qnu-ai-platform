@@ -4,6 +4,7 @@
  */
 
 import type { AssistantReadinessStatus } from "../assistants/types";
+import type { DocumentDraft, ExportFormat } from "../conversations/types";
 
 export type PublicationResponse = {
   configured: boolean;
@@ -35,6 +36,16 @@ export type PublicationUpdateRequest = {
   expected_revision: number | null;
 };
 
+export type PublicModelOption = {
+  model_name: string;
+  label: string;
+  is_default: boolean;
+};
+
+export type PublicDocumentDraft = DocumentDraft & {
+  draft_id: string;
+};
+
 export type PublicChatbotInfo = {
   display_name: string;
   welcome_message: string;
@@ -43,6 +54,10 @@ export type PublicChatbotInfo = {
   max_turns_per_session: number;
   available: boolean;
   unavailable_reason: string | null;
+  models?: PublicModelOption[];
+  default_model_name?: string | null;
+  has_knowledge?: boolean;
+  export_formats?: ExportFormat[];
 };
 
 export type PublicChatbotSummary = {
@@ -68,6 +83,7 @@ export type PublicTurnRequest = {
   session_id: string;
   question: string;
   website?: string;
+  model_name?: string | null;
 };
 
 export type PublicCitation = {
@@ -82,6 +98,8 @@ export type PublicTurnResponse = {
   message: string | null;
   citations: PublicCitation[];
   turns_remaining: number;
+  model_name?: string | null;
+  document_draft?: PublicDocumentDraft | null;
 };
 
 export type PublicationStatDay = {

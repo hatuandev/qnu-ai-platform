@@ -14,7 +14,7 @@ from qnu.domains.modelops.capacity.schemas import (
     OperationalBudget,
 )
 
-CHAT_CONTEXT = 32768
+CHAT_CONTEXT = 131072
 CHAT_OUTPUT = 4096
 TEXT_INPUT = 2048
 

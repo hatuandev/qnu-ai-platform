@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -102,3 +103,38 @@ async def test_generation_change_between_facets_blocks(monkeypatch):
     )
     with pytest.raises(Conflict):
         await retrieval.search(None, None, None, None, None, "ws", ["col"], req)
+
+
+@pytest.mark.asyncio
+async def test_facets_execute_concurrently_and_preserve_order(monkeypatch):
+    first, second = (
+        source([["Name", "Value"], ["A", "10"]], key="E1"),
+        source([["Name", "Value"], ["B", "20"]], key="E2"),
+    )
+    active = 0
+    max_active = 0
+
+    async def fake_search_single(_db, _blob, _model, _vectors, _actor, _ws, _col, scoped, **_kw):
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.05)
+        active -= 1
+        hit = first if "team A" in scoped.query else second
+        return SearchResponse(
+            index_run_id="idx",
+            generation=1,
+            status="results",
+            hits=[hit],
+            eligible_documents=1,
+        )
+
+    monkeypatch.setattr(retrieval, "search_single", fake_search_single)
+    req = SearchRequest(
+        query="How many samples did team A collect? How many samples did team B collect?",
+        top_k=2,
+    )
+    result = await retrieval.search(None, None, None, None, None, "ws", ["col"], req)
+    assert max_active == 2
+    assert [h.chunk_id for h in result.hits] == ["E1", "E2"]
+

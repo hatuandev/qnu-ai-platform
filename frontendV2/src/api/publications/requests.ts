@@ -4,6 +4,8 @@
  * `v1PublicClient` so no session token is ever attached to a public link.
  */
 
+import type { BlobResponse } from "../client";
+import type { ExportFormat } from "../conversations/types";
 import { v1Client, v1PublicClient } from "../v1-client";
 import { publicationPaths } from "./endpoints";
 import type {
@@ -92,6 +94,38 @@ export async function sendPublicTurn(
   return v1PublicClient.post<PublicTurnResponse>(
     publicationPaths.publicTurns(slug),
     data,
-    options,
+    { ...options, timeoutMs: null },
   );
+}
+
+export async function downloadPublicDraft(
+  slug: string,
+  sessionId: string,
+  draftId: string,
+  format: ExportFormat,
+  fallbackTitle?: string,
+): Promise<string> {
+  const result = await v1PublicClient.request<BlobResponse>(
+    publicationPaths.publicExport(slug, draftId),
+    {
+      method: "GET",
+      searchParams: { session_id: sessionId, format },
+      responseType: "blob",
+      timeoutMs: 120_000,
+    },
+  );
+  const safeBase = (fallbackTitle || "ban-thao")
+    .replace(/[\\/:*?"<>|\r\n]+/g, " ")
+    .trim()
+    .slice(0, 80);
+  const filename = result.fileName || `${safeBase || "ban-thao"}.${format}`;
+  const url = URL.createObjectURL(result.blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return filename;
 }

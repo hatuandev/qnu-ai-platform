@@ -3,11 +3,13 @@
  * Mirrors `backendV1/qnu/domains/conversations/router.py`.
  */
 
+import type { BlobResponse } from "../client";
 import { v1Client } from "../v1-client";
 import { conversationPaths } from "./endpoints";
 import type {
   Conversation,
   ConversationTurn,
+  ExportFormat,
   PromoteToBenchmarkRequest,
   PromoteToBenchmarkResponse,
 } from "./types";
@@ -99,4 +101,36 @@ export async function promoteTurnToBenchmark(
     body ?? {},
     { signal: options?.signal },
   );
+}
+
+export async function downloadTurnExport(
+  workspaceId: string,
+  conversationId: string,
+  turnId: string,
+  format: ExportFormat,
+  fallbackTitle?: string,
+): Promise<string> {
+  const result = await v1Client.request<BlobResponse>(
+    conversationPaths.exportTurn(workspaceId, conversationId, turnId),
+    {
+      method: "GET",
+      searchParams: { format },
+      responseType: "blob",
+      timeoutMs: 120_000,
+    },
+  );
+  const safeBase = (fallbackTitle || "ban-thao")
+    .replace(/[\\/:*?"<>|\r\n]+/g, " ")
+    .trim()
+    .slice(0, 80);
+  const filename = result.fileName || `${safeBase || "ban-thao"}.${format}`;
+  const url = URL.createObjectURL(result.blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return filename;
 }

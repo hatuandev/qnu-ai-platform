@@ -73,6 +73,16 @@ export type ConversationTurn = {
   finished_at: string | null;
 };
 
+export type ExportFormat = "docx" | "pdf" | "xlsx";
+
+export type DocumentDraft = {
+  title: string;
+  layout: "standard" | "administrative" | "spreadsheet";
+  markdown: string;
+  has_tables?: boolean;
+  preferred_format?: ExportFormat | null;
+};
+
 export type PromoteToBenchmarkRequest = {
   expected_points?: string[];
   expected_behavior?: string;

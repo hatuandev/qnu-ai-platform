@@ -69,6 +69,18 @@ class Assistant(Base):
             return self.rag_policy.get("temperature")
         return None
 
+    @property
+    def allow_export_docx(self) -> bool:
+        return bool(isinstance(self.rag_policy, dict) and self.rag_policy.get("allow_export_docx"))
+
+    @property
+    def allow_export_pdf(self) -> bool:
+        return bool(isinstance(self.rag_policy, dict) and self.rag_policy.get("allow_export_pdf"))
+
+    @property
+    def allow_export_xlsx(self) -> bool:
+        return bool(isinstance(self.rag_policy, dict) and self.rag_policy.get("allow_export_xlsx"))
+
 
 class AssistantCollection(Base):
     """Collections an assistant answers from; ``position`` keeps the request order.

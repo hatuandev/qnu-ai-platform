@@ -17,6 +17,9 @@ export type RagPolicy = {
   verification_max_output_tokens: number | null;
   temperature?: number | null;
   suggested_prompts?: string[];
+  allow_export_docx?: boolean;
+  allow_export_pdf?: boolean;
+  allow_export_xlsx?: boolean;
 };
 
 export type AssistantResponse = {

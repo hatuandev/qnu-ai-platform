@@ -1,10 +1,15 @@
 """Bounded independent question clauses share the same authorized publication scope."""
 
+import asyncio
 import re
+
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from qnu.domains.knowledge.index.multi import search_collections
 from qnu.domains.knowledge.index.search import search as search_single
 from qnu.platform.errors import Conflict
+
+MAX_FACET_CONCURRENCY = 3
 
 _INTERROGATIVE_RE = re.compile(
     r"bao nhiêu|như thế nào|thế nào|ra sao|ở đâu|khi nào|bao giờ|"
@@ -146,11 +151,11 @@ async def search(
     else:
         ids = list(dict.fromkeys(collection_ids))
 
-    async def run(query):
+    async def run(session, query):
         scoped = req.model_copy(update={"query": query})
         if len(ids) == 1:
             return await search_single(
-                db,
+                session,
                 blob,
                 model,
                 vectors,
@@ -162,7 +167,7 @@ async def search(
                 verify=verify,
             )
         return await search_collections(
-            db,
+            session,
             blob,
             model,
             vectors,
@@ -175,15 +180,42 @@ async def search(
         )
 
     if len(facets) == 1 or req.top_k < len(facets):
-        return await run(req.query)
-    results = []
-    for query in facets:
-        result = await run(query)
-        if results and run_identity(result) != run_identity(results[0]):
+        return await run(db, req.query)
+
+    semaphore = asyncio.Semaphore(MAX_FACET_CONCURRENCY)
+    if isinstance(db, AsyncSession):
+        can_spawn_sibling = (
+            isinstance(db.bind, AsyncEngine)
+            and not db.in_nested_transaction()
+            and not db.new
+            and not db.dirty
+            and not db.deleted
+        )
+        if can_spawn_sibling:
+            session_factory = async_sessionmaker(
+                db.bind, expire_on_commit=False, class_=AsyncSession
+            )
+
+            async def run_facet(query: str):
+                async with semaphore, session_factory() as facet_db:
+                    return await run(facet_db, query)
+
+            results = list(await asyncio.gather(*(run_facet(query) for query in facets)))
+        else:
+            results = [await run(db, query) for query in facets]
+    else:
+
+        async def run_mock_facet(query: str):
+            async with semaphore:
+                return await run(db, query)
+
+        results = list(await asyncio.gather(*(run_mock_facet(query) for query in facets)))
+
+    for result in results[1:]:
+        if run_identity(result) != run_identity(results[0]):
             raise Conflict("Index đổi giữa các ý hỏi.", code="answer_evidence_changed")
-        if results and config_identity(result) != config_identity(results[0]):
+        if config_identity(result) != config_identity(results[0]):
             raise Conflict("Cấu hình tìm kiếm đổi giữa các ý hỏi.", code="answer_evidence_changed")
-        results.append(result)
     # Each clause keeps its own retrieved top_k; the shared context budget,
     # not a global cap, bounds what reaches the prompt.
     hits = interleave(results, req.top_k * len(results))

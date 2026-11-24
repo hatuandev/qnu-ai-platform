@@ -17,6 +17,37 @@ from qnu.ports.chat_model import ChatMessage
 PROMPT_VERSION = "qnu.rag.answer/v42"
 APPEAL_VERSION = "qnu.rag.answer.appeal/v6"
 
+_INTERNAL_OPENING_RULE = (
+    "Mở đầu nhã nhặn trích dẫn nguồn tài liệu tuyển sinh chính thức của Trường Đại học Quy Nhơn;"
+)
+PUBLIC_OPENING_RULE = (
+    "Mở đầu tự nhiên, trả lời thẳng vào câu hỏi "
+    "(không mở đầu kiểu 'Theo tài liệu...', không nêu tên file, tên tài liệu hay số hiệu/tiêu đề bảng nội bộ);"
+)
+PUBLIC_FOLLOW_UP_OPENING_RULE = (
+    "Đi thẳng vào nội dung câu hỏi một cách tự nhiên "
+    "(không lặp lại lời chào 'Chào bạn'/'Xin chào' hay tự giới thiệu 'mình là...', "
+    "không mở đầu kiểu 'Theo tài liệu...', không nêu tên file, tên tài liệu hay số hiệu/tiêu đề bảng nội bộ);"
+)
+_INTERNAL_FORMAT_BLOCK = (
+    "ĐỊNH DẠNG\n"
+    "Trước khi trả JSON, mở thẻ <phan_tich> và đối chiếu nhanh theo 4 bước IRAC "
+    "(ngắn gọn, gạch đầu dòng, tối đa 250 từ):\n"
+    "- Bước 1 (Quy định gốc & Ngoại lệ): Liệt kê các câu quy định, điều kiện áp dụng, "
+    "vế phủ định và năm hiệu lực trong evidence.\n"
+    "- Bước 2 (Đối chiếu dữ kiện): So khớp từng dữ kiện trong câu hỏi với quy định ở Bước 1.\n"
+    "- Bước 3 (Kiểm tra điểm khuyết): Nêu rõ nếu thiếu văn bản dẫn chiếu ngoài chưa có "
+    "trong evidence hoặc thiếu dữ kiện người hỏi.\n"
+    "- Bước 4 (Chốt phạm vi kết luận): Tách rõ phần ĐÃ ĐỦ CĂN CỨ và phần CHƯA ĐỦ CĂN CỨ.\n"
+    "Đóng thẻ </phan_tich>.\n\n"
+    "Sau thẻ </phan_tich>, trả đúng JSON hợp lệ, không thêm khóa hay markdown bên ngoài:"
+)
+PUBLIC_FORMAT_BLOCK = (
+    "ĐỊNH DẠNG\n"
+    "Không xuất thẻ <phan_tich> hay phân tích trung gian. Đối chiếu kỹ quy định, ngoại lệ và "
+    "dữ kiện trong evidence rồi trả thẳng đúng JSON hợp lệ, không thêm khóa hay markdown bên ngoài:"
+)
+
 REPAIR_INSTRUCTIONS = {
     "answer_cell_invalid": "lookups[].cell_id có mã không hợp lệ. Chỉ chép khóa đã có trong cells.",
     "answer_cell_selection_required": "Số từ bảng có ô phải đi qua lookups[].cell_id.",
@@ -368,6 +399,8 @@ def messages_for(
     answer_plan: dict | None = None,
     computed: dict | None = None,
     conversation_memory: dict | None = None,
+    public_channel: bool = False,
+    is_follow_up: bool = False,
 ) -> list[ChatMessage]:
     cells = table_cells if table_cells is not None else catalog(sources, table_context)
     selectable = {t["evidence_id"] for t in cells["tables"] if t["cells"]}
@@ -429,8 +462,14 @@ def messages_for(
             dialogue_ctx["user_session_facts"] = conversation_memory["session_facts"]
         if dialogue_ctx:
             payload["dialogue_context"] = dialogue_ctx
+    system_prompt = SYSTEM_PROMPT
+    if public_channel:
+        opening_rule = PUBLIC_FOLLOW_UP_OPENING_RULE if is_follow_up else PUBLIC_OPENING_RULE
+        system_prompt = system_prompt.replace(_INTERNAL_OPENING_RULE, opening_rule).replace(
+            _INTERNAL_FORMAT_BLOCK, PUBLIC_FORMAT_BLOCK
+        )
     return [
-        ChatMessage("system", SYSTEM_PROMPT),
+        ChatMessage("system", system_prompt),
         ChatMessage("user", json.dumps(payload, ensure_ascii=False, separators=(",", ":"))),
     ]
 

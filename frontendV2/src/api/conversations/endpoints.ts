@@ -14,4 +14,10 @@ export const conversationPaths = {
     turnId: string,
   ) =>
     `/workspaces/${workspaceId}/conversations/${conversationId}/turns/${turnId}/promote-to-benchmark`,
+  exportTurn: (
+    workspaceId: string,
+    conversationId: string,
+    turnId: string,
+  ) =>
+    `/workspaces/${workspaceId}/conversations/${conversationId}/turns/${turnId}/export`,
 } as const;

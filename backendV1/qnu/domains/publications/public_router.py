@@ -2,10 +2,11 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.api.dependencies import get_blob_store, get_db
+from qnu.domains.conversations.document_export import ExportFormat, content_disposition_header
 from qnu.domains.publications import public_service
 from qnu.domains.publications.schemas import (
     PublicChatbotInfo,
@@ -90,3 +91,25 @@ async def turn(
         body,
         _requester(request),
     )
+
+
+@router.get("/{slug}/exports/{draft_id}")
+async def export_draft(
+    slug: str,
+    draft_id: str,
+    db: DB,
+    session_id: str = Query(min_length=16, max_length=64),
+    format: ExportFormat = Query(...),
+) -> Response:
+    payload, media_type, filename = await public_service.export_public_draft(
+        db, slug, session_id, draft_id, format
+    )
+    return Response(
+        content=payload,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": content_disposition_header(filename),
+            "Cache-Control": "no-store",
+        },
+    )
+

@@ -19,7 +19,9 @@ from qnu.domains.modelops.capacity.schemas import (
 )
 from qnu.domains.modelops.models import Provider
 from qnu.platform.errors import AppException
+from qnu.platform.logging import get_logger
 
+logger = get_logger(__name__)
 CAPACITY_KEY = "model_token_capacity_v1"
 
 
@@ -137,11 +139,30 @@ async def plan_model_request(
     minimum_output_tokens: int = 1,
 ) -> tuple[CapacitySnapshot, RequestTokenBudget]:
     snapshot = await resolve_model_capacity(db, actor, workspace_id, capability, provider_id)
+    is_provisional_chat = (
+        capability == "chat"
+        and snapshot.operational_budget is not None
+        and snapshot.operational_budget.status == "provisional"
+    )
+    if (
+        is_provisional_chat
+        and input_tokens is not None
+        and snapshot.token_limits.context_window_tokens is not None
+        and input_tokens + reserve_tokens >= snapshot.token_limits.context_window_tokens
+    ):
+        logger.warning(
+            "model_provisional_budget_soft_pass",
+            provider_id=snapshot.provider_id,
+            model_name=snapshot.model_name,
+            estimated_input_tokens=input_tokens + reserve_tokens,
+            provisional_context_window=snapshot.token_limits.context_window_tokens,
+        )
     budget = plan_token_budget(
         snapshot.token_limits,
         input_tokens=input_tokens,
         requested_output_tokens=requested_output_tokens,
         reserve_tokens=reserve_tokens,
         minimum_output_tokens=minimum_output_tokens,
+        provisional=is_provisional_chat,
     )
     return snapshot, budget

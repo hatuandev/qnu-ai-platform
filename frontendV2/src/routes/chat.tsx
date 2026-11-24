@@ -28,6 +28,9 @@ import { ApiProblemError } from "@/api/client";
 import {
   type ConversationTurn,
   conversationKeys,
+  type DocumentDraft,
+  downloadTurnExport,
+  type ExportFormat,
   useAssistantConversationsQuery,
   useConversationTurnsQuery,
   useCreateConversationMutation,
@@ -35,6 +38,11 @@ import {
 } from "@/api/conversations";
 import { useCatalogQuery } from "@/api/modelops";
 import { EmptyState } from "@/components/admin/empty-state";
+import {
+  DocumentDraftCard,
+  DocumentPreviewPane,
+  extractTurnDocumentDraft,
+} from "@/components/assistants/document-preview-pane";
 import { EvidenceDrawer } from "@/components/assistants/evidence-drawer";
 import { providerLabel } from "@/components/assistants/model-label";
 import { TurnFeedback } from "@/components/assistants/turn-feedback";
@@ -148,13 +156,27 @@ function TurnRow({
   onCopy,
   onOpenEvidence,
   onPromptClick,
+  enabledExportFormats = [],
+  isActivePreview = false,
+  downloadingFormat = null,
+  onOpenPreview,
+  onDownloadExport,
 }: {
   turn: ConversationTurn;
   onCopy: (text: string) => void;
   onOpenEvidence?: (evidenceId?: string, index?: number) => void;
   onPromptClick?: (prompt: string) => void;
+  enabledExportFormats?: ExportFormat[];
+  isActivePreview?: boolean;
+  downloadingFormat?: ExportFormat | null;
+  onOpenPreview?: (draft: DocumentDraft) => void;
+  onDownloadExport?: (format: ExportFormat, draft: DocumentDraft) => void;
 }) {
   const copyText = turnAnswerText(turn);
+  const documentDraft = useMemo(
+    () => extractTurnDocumentDraft(turn.rewrite_trace),
+    [turn.rewrite_trace],
+  );
   const trace =
     turn.result && turn.result.status !== "direct_reply"
       ? turn.result.trace
@@ -187,6 +209,16 @@ function TurnRow({
             }
             onPromptClick={onPromptClick}
           />
+          {documentDraft && enabledExportFormats.length > 0 ? (
+            <DocumentDraftCard
+              draft={documentDraft}
+              enabledFormats={enabledExportFormats}
+              isActivePreview={isActivePreview}
+              downloadingFormat={downloadingFormat}
+              onOpenPreview={() => onOpenPreview?.(documentDraft)}
+              onDownload={(fmt) => onDownloadExport?.(fmt, documentDraft)}
+            />
+          ) : null}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-1.5 text-[10px] text-muted-foreground">
             <div className="flex items-center gap-2 flex-wrap">
               <span>
@@ -218,7 +250,7 @@ function TurnRow({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="size-6 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                  className="relative size-6 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
                   title="Sao chép câu trả lời"
                   onClick={() => onCopy(copyText)}
                 >
@@ -337,11 +369,8 @@ function WelcomePanel({
         <div className="flex items-center justify-between px-1">
           <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase flex items-center gap-1.5">
             <Sparkles className="size-3 text-primary" />
-            <span>Câu hỏi gợi ý mở đầu</span>
+            <span>Câu hỏi gợi ý</span>
           </p>
-          <span className="text-[11px] text-muted-foreground/75">
-            Bấm để gửi ngay
-          </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -455,6 +484,16 @@ function ChatPage() {
     open: false,
     sources: [],
   });
+  const [previewState, setPreviewState] = useState<{
+    turnId: string;
+    conversationId: string;
+    draft: DocumentDraft;
+  } | null>(null);
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+  const [downloadingState, setDownloadingState] = useState<{
+    turnId: string;
+    format: ExportFormat;
+  } | null>(null);
 
   // A question handed over from the landing page prefills the composer once,
   // then the query param is dropped so a reload starts a clean conversation.
@@ -476,6 +515,15 @@ function ChatPage() {
     }
     return assistants.find((item) => item.is_active) ?? assistants[0] ?? null;
   }, [assistants, selectedAssistantId]);
+
+  const enabledExportFormats = useMemo<ExportFormat[]>(() => {
+    const policy = assistant?.rag_policy;
+    const formats: ExportFormat[] = [];
+    if (policy?.allow_export_docx) formats.push("docx");
+    if (policy?.allow_export_pdf) formats.push("pdf");
+    if (policy?.allow_export_xlsx) formats.push("xlsx");
+    return formats;
+  }, [assistant?.rag_policy]);
 
   const conversationsQuery = useAssistantConversationsQuery(
     workspaceId,
@@ -659,6 +707,39 @@ function ChatPage() {
     toast.error(error.message || "Không gửi được câu hỏi.");
   };
 
+  useEffect(() => {
+    setPreviewState(null);
+    setIsPreviewExpanded(false);
+  }, [assistant?.id, activeConversationId]);
+
+  const handleDownloadExport = async (
+    conversationId: string,
+    turnId: string,
+    format: ExportFormat,
+    draft: DocumentDraft,
+  ) => {
+    if (!workspaceId || downloadingState !== null) return;
+    setDownloadingState({ turnId, format });
+    try {
+      const filename = await downloadTurnExport(
+        workspaceId,
+        conversationId,
+        turnId,
+        format,
+        draft.title,
+      );
+      toast.success(`Đã tải xuống ${filename}`);
+    } catch (error) {
+      if (error instanceof ApiProblemError) {
+        toast.error(error.message);
+      } else {
+        toast.error(`Chưa xuất được tệp ${format.toUpperCase()}.`);
+      }
+    } finally {
+      setDownloadingState(null);
+    }
+  };
+
   const handleSend = async (questionOverride?: string) => {
     const question = (questionOverride ?? input).trim();
     if (!question || isSending || !assistant) return;
@@ -703,6 +784,13 @@ function ChatPage() {
       appendTurnToCache(conversationId, turn);
       setLocalTurn({ conversationId, turnNo: turn.turn_no });
 
+      if (enabledExportFormats.length > 0) {
+        const draft = extractTurnDocumentDraft(turn.rewrite_trace);
+        if (draft) {
+          setPreviewState({ turnId: turn.id, conversationId, draft });
+        }
+      }
+
       if (turn.status === "failed") {
         toast.error(
           TURN_ERROR_TEXT[turn.error_code ?? ""] ?? "Lượt hỏi thất bại.",
@@ -722,7 +810,7 @@ function ChatPage() {
 
   if (!workspaceId) {
     return (
-      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-background px-4">
+      <div className="flex h-full min-h-0 items-center justify-center bg-background px-4">
         <EmptyState
           icon={MessageCircle}
           title="Chưa chọn đơn vị"
@@ -734,7 +822,7 @@ function ChatPage() {
 
   if (assistantsQuery.isLoading) {
     return (
-      <div className="flex h-[calc(100vh-3.5rem)] flex-col gap-3 bg-background p-4">
+      <div className="flex h-full min-h-0 flex-col gap-3 bg-background p-4">
         <Skeleton className="h-14 w-full" />
         <div className="mx-auto w-full max-w-3xl space-y-3 pt-6">
           <Skeleton className="ml-auto h-12 w-2/3" />
@@ -747,7 +835,7 @@ function ChatPage() {
 
   if (assistantsQuery.isError) {
     return (
-      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-background px-4">
+      <div className="flex h-full min-h-0 items-center justify-center bg-background px-4">
         <EmptyState
           icon={Bot}
           title="Không tải được danh sách trợ lý"
@@ -767,7 +855,7 @@ function ChatPage() {
 
   if (!assistant) {
     return (
-      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-background px-4">
+      <div className="flex h-full min-h-0 items-center justify-center bg-background px-4">
         <EmptyState
           icon={Bot}
           title="Chưa có trợ lý"
@@ -786,7 +874,7 @@ function ChatPage() {
     : (activeConversation?.id ?? DRAFT_VALUE);
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] flex-col bg-background">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/60 bg-card px-4 py-2">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
@@ -896,7 +984,14 @@ function ChatPage() {
         </div>
       </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col overflow-hidden",
+          previewState && enabledExportFormats.length > 0 && "hidden lg:flex",
+        )}
+      >
+      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-y-auto px-4 py-6">
         <div className="mx-auto w-full max-w-3xl space-y-5">
           {isInactive ? (
             <Alert variant="warning">
@@ -1020,6 +1115,28 @@ function ChatPage() {
                     });
                   }}
                   onPromptClick={(prompt) => void handleSend(prompt)}
+                  enabledExportFormats={enabledExportFormats}
+                  isActivePreview={previewState?.turnId === turn.id}
+                  downloadingFormat={
+                    downloadingState?.turnId === turn.id
+                      ? downloadingState.format
+                      : null
+                  }
+                  onOpenPreview={(draft) => {
+                    setPreviewState({
+                      turnId: turn.id,
+                      conversationId: turn.conversation_id,
+                      draft,
+                    });
+                  }}
+                  onDownloadExport={(format, draft) => {
+                    void handleDownloadExport(
+                      turn.conversation_id,
+                      turn.id,
+                      format,
+                      draft,
+                    );
+                  }}
                 />
               ))}
               {pendingQuestion && !turns.some((t) => t.status === "running") ? (
@@ -1034,7 +1151,7 @@ function ChatPage() {
       </div>
 
       <div className="shrink-0 border-t border-border/60 bg-card p-3">
-        <div className="mx-auto w-full max-w-3xl space-y-1.5">
+        <div className="mx-auto w-full max-w-3xl">
           <div className="flex items-end gap-2 rounded-xl border border-border/60 bg-muted/40 p-1.5 shadow-2xs transition-colors focus-within:border-primary/60 focus-within:bg-background">
             <Textarea
               value={input}
@@ -1048,7 +1165,7 @@ function ChatPage() {
               placeholder={
                 isInactive
                   ? "Trợ lý đang tạm dừng nhận câu hỏi..."
-                  : "Nhập câu hỏi hoặc nội dung trò chuyện (Enter để gửi, Shift+Enter xuống dòng)..."
+                  : "Nhập câu hỏi..."
               }
               rows={1}
               maxLength={8000}
@@ -1071,14 +1188,35 @@ function ChatPage() {
               </span>
             </Button>
           </div>
-          <p className="text-center text-[10px] text-muted-foreground/80">
-            {isInactive
-              ? "Bật lại trợ lý trong trang Trợ lý để tiếp tục hội thoại."
-              : isCollectionUnbound
-                ? "Trợ lý hoạt động ở chế độ hội thoại trực tiếp với mô hình AI theo Persona."
-                : "Câu trả lời được đối soát trực tiếp từ kho tri thức đã xuất bản. Nhấn vào các trích dẫn [1], [2] để mở ngăn đối chiếu nguồn."}
-          </p>
         </div>
+      </div>
+      </div>
+
+      {previewState && enabledExportFormats.length > 0 ? (
+        <DocumentPreviewPane
+          draft={previewState.draft}
+          enabledFormats={enabledExportFormats}
+          downloadingFormat={
+            downloadingState?.turnId === previewState.turnId
+              ? downloadingState.format
+              : null
+          }
+          isExpanded={isPreviewExpanded}
+          onToggleExpand={() => setIsPreviewExpanded((prev) => !prev)}
+          onDownload={(format) => {
+            void handleDownloadExport(
+              previewState.conversationId,
+              previewState.turnId,
+              format,
+              previewState.draft,
+            );
+          }}
+          onClose={() => {
+            setPreviewState(null);
+            setIsPreviewExpanded(false);
+          }}
+        />
+      ) : null}
       </div>
 
       <EvidenceDrawer
