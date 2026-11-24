@@ -1578,19 +1578,15 @@ def test_render_docx_black_white_tables_no_shading_no_stray_sep_and_clean_line_s
     assert ":---" not in all_text
     assert "[ĐƠN VỊ SOẠN THẢO]" not in all_text.upper()
 
-    # 3. Header left & right cells split into separate paragraphs (no glued lines)
-    hdr_left_paras = [p.text.strip() for p in doc.tables[0].cell(0, 0).paragraphs if p.text.strip()]
-    assert hdr_left_paras == [
-        "BỘ GIÁO DỤC VÀ ĐÀO TẠO",
-        "TRƯỜNG ĐẠI HỌC QUY NHƠN",
-        "Số: 15/KH-ĐHQN",
-    ]
-    hdr_right_paras = [p.text.strip() for p in doc.tables[0].cell(0, 1).paragraphs if p.text.strip()]
-    assert hdr_right_paras == [
-        "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM",
-        "Độc lập - Tự do - Hạnh phúc",
-        "Bình Định, ngày 24 tháng 11 năm 2026",
-    ]
+    # 3. Header 2x2 table: Row 0 has org / Quốc hiệu-Tiêu ngữ, Row 1 has Số / date (no glued lines)
+    assert len(doc.tables[0].rows) == 2
+    hdr_r0_left = [p.text.strip() for p in doc.tables[0].cell(0, 0).paragraphs if p.text.strip()]
+    assert hdr_r0_left == ["BỘ GIÁO DỤC VÀ ĐÀO TẠO", "TRƯỜNG ĐẠI HỌC QUY NHƠN"]
+    assert doc.tables[0].cell(1, 0).text.strip() == "Số: 15/KH-ĐHQN"
+
+    hdr_r0_right = [p.text.strip() for p in doc.tables[0].cell(0, 1).paragraphs if p.text.strip()]
+    assert hdr_r0_right == ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", "Độc lập - Tự do - Hạnh phúc"]
+    assert doc.tables[0].cell(1, 1).text.strip() == "Bình Định, ngày 24 tháng 11 năm 2026"
 
     # 4. Footer left (Nơi nhận) & right (HIỆU TRƯỞNG / signer) split into separate paragraphs
     ftr_left_paras = [p.text.strip() for p in doc.tables[2].cell(0, 0).paragraphs if p.text.strip()]
@@ -1605,6 +1601,130 @@ def test_render_docx_black_white_tables_no_shading_no_stray_sep_and_clean_line_s
         "HIỆU TRƯỞNG",
         "PGS. TS. Đoàn Đức Tùng",
     ]
+
+
+def test_render_docx_qnu_plan_full_decree_30_formatting():
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Cm, Pt
+
+    plan = DocumentDraft(
+        title="Kế hoạch triển khai số hóa học liệu năm 2026",
+        layout="administrative",
+        markdown=(
+            "BỘ GIÁO DỤC VÀ ĐÀO TẠO\n"
+            "TRƯỜNG ĐẠI HỌC QUY NHƠN\n"
+            "Số: 28/KH-ĐHQN\n"
+            "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n"
+            "Độc lập - Tự do - Hạnh phúc\n"
+            "____________________\n"
+            "*Gia Lai, ngày 24 tháng 11 năm 2026*\n\n"
+            "# KẾ HOẠCH\n"
+            "## Triển khai số hóa học liệu năm 2026\n\n"
+            "Căn cứ Quyết định số 131/QĐ-TTg của Thủ tướng Chính phủ về chuyển đổi số.\n\n"
+            "Trường Đại học Quy Nhơn ban hành Kế hoạch triển khai số hóa học liệu năm 2026, cụ thể như sau:\n\n"
+            "## I. MỤC ĐÍCH, YÊU CẦU\n"
+            "### 1. Mục đích\n"
+            "- Xây dựng kho học liệu số dùng chung toàn trường.\n"
+            "### 2. Yêu cầu\n"
+            "- Bảo đảm đúng tiến độ và chuẩn dữ liệu.\n\n"
+            "## II. NỘI DUNG KẾ HOẠCH THỰC HIỆN\n"
+            "| STT | Nội dung công việc | Thời gian | Đơn vị chủ trì | Đơn vị phối hợp | Sản phẩm |\n"
+            "| --- | --- | --- | --- | --- | --- |\n"
+            "| 1 | Rà soát danh mục giáo trình cần số hóa toàn trường | Tháng 12/2026 | Trung tâm S&HL | Các Khoa | Danh mục giáo trình số hóa được phê duyệt |\n\n"
+            "## III. TỔ CHỨC THỰC HIỆN\n"
+            "1. Trung tâm Số và Học liệu\n"
+            "- Chủ trì triển khai và tổng hợp báo cáo định kỳ.\n\n"
+            "Nơi nhận:\n"
+            "- Các Phó Hiệu trưởng;\n"
+            "- Các đơn vị;\n"
+            "- Lưu: VT, S&HL.\n\n"
+            "HIỆU TRƯỞNG\n"
+            "PGS. TS. Đoàn Đức Tùng"
+        ),
+        has_tables=True,
+    )
+    doc = Document(io.BytesIO(render_docx(plan)))
+
+    # 1. Header 2x2 table with w:pBdr rules, Số in (1,0), italic date in (1,1), zero raw ____
+    hdr = doc.tables[0]
+    assert len(hdr.rows) == 2 and len(hdr.columns) == 2
+    assert "w:pBdr" in hdr.cell(0, 0).paragraphs[-1]._p.xml
+    assert "w:pBdr" in hdr.cell(0, 1).paragraphs[-1]._p.xml
+    assert hdr.cell(1, 0).text.strip() == "Số: 28/KH-ĐHQN"
+    assert hdr.cell(1, 0).paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert hdr.cell(1, 1).text.strip() == "Gia Lai, ngày 24 tháng 11 năm 2026"
+    assert hdr.cell(1, 1).paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert hdr.cell(1, 1).paragraphs[0].runs[0].italic is True
+    all_text = "\n".join(
+        [p.text for p in doc.paragraphs]
+        + [c.text for t in doc.tables for r in t.rows for c in r.cells]
+    )
+    assert "____" not in all_text
+
+    # 2. Title + Trích yếu + Căn cứ + Intro + Roman heading + Sub-heading + Bullet
+    title_p = next(p for p in doc.paragraphs if p.text.strip() == "KẾ HOẠCH")
+    assert title_p.alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert title_p.runs[0].bold is True
+
+    subtitle_p = next(p for p in doc.paragraphs if "Triển khai số hóa học liệu năm 2026" in p.text and p.alignment == WD_ALIGN_PARAGRAPH.CENTER)
+    assert subtitle_p.runs[0].bold is True
+
+    can_cu_p = next(p for p in doc.paragraphs if p.text.startswith("Căn cứ"))
+    assert can_cu_p.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY
+    assert abs(can_cu_p.paragraph_format.first_line_indent - Cm(1.0)) < 2000
+    assert can_cu_p.runs[0].italic is True
+
+    intro_p = next(p for p in doc.paragraphs if "cụ thể như sau:" in p.text)
+    assert intro_p.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY
+    assert abs(intro_p.paragraph_format.first_line_indent - Cm(1.0)) < 2000
+
+    roman_p = next(p for p in doc.paragraphs if p.text.strip() == "I. MỤC ĐÍCH, YÊU CẦU")
+    assert roman_p.alignment == WD_ALIGN_PARAGRAPH.LEFT
+    assert roman_p.paragraph_format.first_line_indent == 0
+    assert roman_p.runs[0].bold is True
+
+    sub_p = next(p for p in doc.paragraphs if p.text.strip() == "1. Mục đích")
+    assert abs(sub_p.paragraph_format.first_line_indent - Cm(1.0)) < 2000
+    assert sub_p.runs[0].bold is True
+
+    bullet_p = next(p for p in doc.paragraphs if p.text.startswith("- Xây dựng kho học liệu số"))
+    assert bullet_p.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY
+    assert abs(bullet_p.paragraph_format.first_line_indent - Cm(1.0)) < 2000
+
+    # 3. Content table: tblHeader, cantSplit, zero w:shd, smart column alignments
+    tbl = doc.tables[1]
+    assert "w:shd" not in tbl._tbl.xml
+    assert "tblHeader" in tbl.rows[0]._tr.xml
+    assert all("cantSplit" in r._tr.xml for r in tbl.rows)
+    # Header row centered & bold
+    for cell in tbl.rows[0].cells:
+        assert cell.paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
+        assert cell.paragraphs[0].runs[0].bold is True
+    # Data row: STT(0), Thời gian(2), Đơn vị chủ trì(3), Đơn vị phối hợp(4) CENTER; Nội dung(1), Sản phẩm(5) LEFT
+    data_row = tbl.rows[1].cells
+    assert data_row[0].paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert data_row[1].paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.LEFT
+    assert data_row[2].paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert data_row[3].paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert data_row[4].paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert data_row[5].paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.LEFT
+
+    # 4. Footer 2-column table: left Nơi nhận (12pt bold italic + 11pt items), right HIỆU TRƯỞNG + 48pt gap + signer
+    ftr = doc.tables[2]
+    left_ps = [p for p in ftr.cell(0, 0).paragraphs if p.text.strip()]
+    assert left_ps[0].text.strip() == "Nơi nhận:"
+    assert left_ps[0].runs[0].bold is True and left_ps[0].runs[0].italic is True
+    assert left_ps[0].runs[0].font.size == Pt(12)
+    assert left_ps[1].runs[0].font.size == Pt(11)
+    assert left_ps[1].alignment == WD_ALIGN_PARAGRAPH.LEFT
+
+    right_ps = [p for p in ftr.cell(0, 1).paragraphs if p.text.strip()]
+    assert [p.text.strip() for p in right_ps] == ["HIỆU TRƯỞNG", "PGS. TS. Đoàn Đức Tùng"]
+    assert right_ps[0].alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert right_ps[1].alignment == WD_ALIGN_PARAGRAPH.CENTER
+    assert right_ps[1].paragraph_format.space_before == Pt(48)
+    assert right_ps[1].runs[0].bold is True
+
 
 
 

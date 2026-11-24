@@ -16,7 +16,7 @@ import httpx
 import pymupdf
 from docx import Document
 from docx.enum.section import WD_ORIENT
-from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -886,6 +886,89 @@ def _set_run_font(
     r_fonts.set(qn("w:cs"), font_name)
 
 
+_RAW_UNDERLINE_LINE_RE = re.compile(r"^[\s_\-–—=]{4,}$")
+_ADMIN_ROMAN_HEADING_RE = re.compile(r"^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s+.+$")
+_ADMIN_CAN_CU_RE = re.compile(r"^căn\s+cứ\b", re.IGNORECASE)
+_ADMIN_SUBNUM_HEADING_RE = re.compile(r"^\d+\.\s+[^\n]{2,90}$")
+_ADMIN_DOC_TYPE_ONLY_RE = re.compile(
+    r"^(?:kế\s+hoạch|tờ\s+trình|công\s+văn|quyết\s+định|thông\s+báo|báo\s+cáo|"
+    r"biên\s+bản|quy\s+chế|quy\s+định|đơn\s+xin(?:\s+[^\n]{2,50})?|giấy\s+đề\s+nghị(?:\s+[^\n]{2,50})?)$",
+    re.IGNORECASE,
+)
+_TABLE_LONG_COL_HEADER_RE = re.compile(
+    r"(?:nội\s+dung|nhiệm\s+vụ|công\s+việc|sản\s+phẩm|kết\s+quả|mục\s+tiêu|yêu\s+cầu|mô\s+tả|hạng\s+mục)",
+    re.IGNORECASE,
+)
+_TABLE_SHORT_COL_HEADER_RE = re.compile(
+    r"(?:^stt$|^tt$|thời\s+gian|tiến\s+độ|mốc|hạn|ngày|đơn\s+vị\s+chủ\s+trì|đơn\s+vị\s+phối\s+hợp|"
+    r"chủ\s+trì|phối\s+hợp|kinh\s+phí|số\s+lượng|^mã\b)",
+    re.IGNORECASE,
+)
+
+
+def _add_bottom_border(
+    paragraph,
+    *,
+    left_indent_cm: float = 0.0,
+    right_indent_cm: float = 0.0,
+    width_sz: str = "6",
+    space: str = "2",
+) -> None:
+    """Attach a crisp solid black bottom border (w:pBdr) under org name or National Motto."""
+    pf = paragraph.paragraph_format
+    pf.left_indent = Cm(left_indent_cm)
+    pf.right_indent = Cm(right_indent_cm)
+    p_pr = paragraph._p.get_or_add_pPr()
+    old = p_pr.find(qn("w:pBdr"))
+    if old is not None:
+        p_pr.remove(old)
+    p_bdr = OxmlElement("w:pBdr")
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), width_sz)
+    bottom.set(qn("w:space"), space)
+    bottom.set(qn("w:color"), "000000")
+    p_bdr.append(bottom)
+    p_pr.append(p_bdr)
+
+
+def _configure_content_table(table) -> None:
+    """Apply Decree 30 pure B&W table rules: thin black borders, padding, tblHeader, cantSplit, vertical center."""
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _set_table_borders(table, color="000000")
+    tbl_pr = table._tbl.tblPr
+    old_mar = tbl_pr.find(qn("w:tblCellMar"))
+    if old_mar is not None:
+        tbl_pr.remove(old_mar)
+    cell_mar = OxmlElement("w:tblCellMar")
+    for side, val in (("top", "55"), ("bottom", "55"), ("left", "85"), ("right", "85")):
+        m = OxmlElement(f"w:{side}")
+        m.set(qn("w:w"), val)
+        m.set(qn("w:type"), "dxa")
+        cell_mar.append(m)
+    tbl_pr.append(cell_mar)
+
+    for row_idx, row in enumerate(table.rows):
+        tr_pr = row._tr.get_or_add_trPr()
+        if tr_pr.find(qn("w:cantSplit")) is None:
+            tr_pr.append(OxmlElement("w:cantSplit"))
+        if row_idx == 0 and tr_pr.find(qn("w:tblHeader")) is None:
+            tr_pr.append(OxmlElement("w:tblHeader"))
+        for cell in row.cells:
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+
+
+def _is_short_center_table_column(header_text: str, col_values: list[str]) -> bool:
+    """Return True when a content-table column should be center-aligned (STT, time, short unit names)."""
+    hdr = (header_text or "").strip()
+    if _TABLE_LONG_COL_HEADER_RE.search(hdr):
+        return False
+    if _TABLE_SHORT_COL_HEADER_RE.search(hdr):
+        return True
+    non_empty = [v.strip() for v in col_values if v and v.strip()]
+    return bool(non_empty) and all(len(v) <= 25 for v in non_empty)
+
+
 def _reset_paragraph_indents(paragraph) -> None:
     """Explicitly zero out left/right/first-line indents so Word never inherits stray indents."""
     pf = paragraph.paragraph_format
@@ -1103,7 +1186,7 @@ def _extract_admin_header(
                 continue
             for left_sub in cells[0].splitlines():
                 plain_l = _strip_md_emphasis(left_sub)
-                if not plain_l:
+                if not plain_l or _RAW_UNDERLINE_LINE_RE.match(plain_l):
                     continue
                 if _ADMIN_SO_LINE_RE.match(plain_l):
                     so_line = plain_l
@@ -1111,7 +1194,7 @@ def _extract_admin_header(
                     org_lines.append(plain_l)
             for right_sub in cells[1].splitlines():
                 plain_r = _strip_md_emphasis(right_sub)
-                if not plain_r:
+                if not plain_r or _RAW_UNDERLINE_LINE_RE.match(plain_r):
                     continue
                 upper_r = plain_r.upper()
                 if "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" in upper_r or (
@@ -1126,7 +1209,12 @@ def _extract_admin_header(
     while idx < scan_limit:
         _align, raw = items[idx]
         stripped = raw.strip()
-        if not stripped or stripped in ("---", "***", "___") or _TABLE_SEP_RE.match(stripped):
+        if (
+            not stripped
+            or stripped in ("---", "***", "___")
+            or _TABLE_SEP_RE.match(stripped)
+            or _RAW_UNDERLINE_LINE_RE.match(stripped)
+        ):
             idx += 1
             continue
         plain = _strip_md_emphasis(stripped.lstrip("#").strip())
@@ -1341,32 +1429,37 @@ def render_docx(draft: DocumentDraft) -> bytes:
         is_personal_petition = bool(_PERSONAL_PETITION_RE.search(draft.title or ""))
 
         if org_lines or so_line or not is_personal_petition:
-            hdr_tbl = doc.add_table(rows=1, cols=2)
+            # Decree 30 / QNU 2-column x 2-row borderless header table
+            hdr_tbl = doc.add_table(rows=2, cols=2)
             _configure_fixed_two_col_table(hdr_tbl, 6.5, 10.0)
 
-            left_cell = hdr_tbl.cell(0, 0)
+            # Row 0, Col 0: Issuing agency (with short solid bottom rule under direct issuing unit)
+            left_top_cell = hdr_tbl.cell(0, 0)
             effective_org_lines = org_lines or ["TRƯỜNG ĐẠI HỌC QUY NHƠN", "[Đơn vị soạn thảo]"]
             for idx_org, org_line in enumerate(effective_org_lines):
-                org_p = left_cell.paragraphs[0] if idx_org == 0 else left_cell.add_paragraph()
+                org_p = left_top_cell.paragraphs[0] if idx_org == 0 else left_top_cell.add_paragraph()
                 _reset_paragraph_indents(org_p)
                 org_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 org_p.paragraph_format.space_before = Pt(0)
                 org_p.paragraph_format.space_after = Pt(2)
-                _set_run_font(
-                    org_p.add_run(org_line.upper()),
-                    size_pt=12,
-                    bold=(idx_org == len(effective_org_lines) - 1),
-                )
+                is_last_org = idx_org == len(effective_org_lines) - 1
+                _set_run_font(org_p.add_run(org_line.upper()), size_pt=12, bold=is_last_org)
+                if is_last_org:
+                    _add_bottom_border(org_p, left_indent_cm=1.5, right_indent_cm=1.5, width_sz="6", space="2")
+
+            # Row 1, Col 0: Số, ký hiệu (centered directly below issuing agency)
+            left_bot_cell = hdr_tbl.cell(1, 0)
+            so_p = left_bot_cell.paragraphs[0]
+            _reset_paragraph_indents(so_p)
+            so_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            so_p.paragraph_format.space_before = Pt(4)
+            so_p.paragraph_format.space_after = Pt(0)
             if so_line:
-                so_p = left_cell.add_paragraph()
-                _reset_paragraph_indents(so_p)
-                so_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                so_p.paragraph_format.space_before = Pt(4)
-                so_p.paragraph_format.space_after = Pt(0)
                 _set_run_font(so_p.add_run(so_line), size_pt=13)
 
-            right_cell = hdr_tbl.cell(0, 1)
-            motto_top_p = right_cell.paragraphs[0]
+            # Row 0, Col 1: Quốc hiệu + Tiêu ngữ (with crisp solid bottom border matching motto width)
+            right_top_cell = hdr_tbl.cell(0, 1)
+            motto_top_p = right_top_cell.paragraphs[0]
             _reset_paragraph_indents(motto_top_p)
             motto_top_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             motto_top_p.paragraph_format.space_before = Pt(0)
@@ -1376,26 +1469,29 @@ def render_docx(draft: DocumentDraft) -> bytes:
                 size_pt=12,
                 bold=True,
             )
-            motto_sub_p = right_cell.add_paragraph()
+            motto_sub_p = right_top_cell.add_paragraph()
             _reset_paragraph_indents(motto_sub_p)
             motto_sub_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             motto_sub_p.paragraph_format.space_before = Pt(0)
-            motto_sub_p.paragraph_format.space_after = Pt(0)
+            motto_sub_p.paragraph_format.space_after = Pt(2)
             _set_run_font(
                 motto_sub_p.add_run("Độc lập - Tự do - Hạnh phúc"),
                 size_pt=13,
                 bold=True,
-                underline=True,
             )
+            _add_bottom_border(motto_sub_p, left_indent_cm=1.8, right_indent_cm=1.8, width_sz="6", space="2")
+
+            # Row 1, Col 1: Địa danh và ngày tháng năm (italic, centered directly below Tiêu ngữ)
+            right_bot_cell = hdr_tbl.cell(1, 1)
+            date_p = right_bot_cell.paragraphs[0]
+            _reset_paragraph_indents(date_p)
+            date_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            date_p.paragraph_format.space_before = Pt(4)
+            date_p.paragraph_format.space_after = Pt(0)
             if date_line:
-                date_p = right_cell.add_paragraph()
-                _reset_paragraph_indents(date_p)
-                date_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                date_p.paragraph_format.space_before = Pt(6)
-                date_p.paragraph_format.space_after = Pt(0)
                 _set_run_font(date_p.add_run(date_line), size_pt=13, italic=True)
         else:
-            # Personal petition (e.g. Đơn xin nghỉ phép): centered National Motto (2 separate lines) + right-aligned date
+            # Personal petition (e.g. Đơn xin nghỉ phép): centered National Motto + right-aligned date
             motto_top_p = doc.add_paragraph()
             _reset_paragraph_indents(motto_top_p)
             motto_top_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -1410,13 +1506,13 @@ def render_docx(draft: DocumentDraft) -> bytes:
             _reset_paragraph_indents(motto_sub_p)
             motto_sub_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             motto_sub_p.paragraph_format.space_before = Pt(0)
-            motto_sub_p.paragraph_format.space_after = Pt(2)
+            motto_sub_p.paragraph_format.space_after = Pt(4)
             _set_run_font(
                 motto_sub_p.add_run("Độc lập - Tự do - Hạnh phúc"),
                 size_pt=13,
                 bold=True,
-                underline=True,
             )
+            _add_bottom_border(motto_sub_p, left_indent_cm=5.0, right_indent_cm=5.0, width_sz="6", space="2")
             if date_line:
                 date_p = doc.add_paragraph()
                 _reset_paragraph_indents(date_p)
@@ -1433,7 +1529,10 @@ def render_docx(draft: DocumentDraft) -> bytes:
     leading_non_empty = [
         ln.strip()
         for _al, ln in aligned_items
-        if ln.strip() and ln.strip() not in ("---", "***", "___") and not _TABLE_SEP_RE.match(ln.strip())
+        if ln.strip()
+        and ln.strip() not in ("---", "***", "___")
+        and not _TABLE_SEP_RE.match(ln.strip())
+        and not _RAW_UNDERLINE_LINE_RE.match(ln.strip())
     ][:5]
     has_explicit_title_line = any(
         ln.startswith("#")
@@ -1456,20 +1555,27 @@ def render_docx(draft: DocumentDraft) -> bytes:
             bold=True,
         )
 
+    just_emitted_doc_type = False
     i = 0
     while i < len(aligned_items):
         align_hint, raw_line = aligned_items[i]
         stripped = raw_line.strip()
-        if not stripped or stripped in ("---", "***", "___") or _TABLE_SEP_RE.match(stripped):
+        if (
+            not stripped
+            or stripped in ("---", "***", "___")
+            or _TABLE_SEP_RE.match(stripped)
+            or _RAW_UNDERLINE_LINE_RE.match(stripped)
+        ):
             i += 1
             continue
 
-        # Markdown table (pure black-and-white Decree 30 style: NO w:shd background shading)
+        # Markdown table (pure black-and-white Decree 30 style: NO w:shd, tblHeader, cantSplit, smart alignment)
         if (
             i + 1 < len(aligned_items)
             and "|" in raw_line
             and _TABLE_SEP_RE.match(aligned_items[i + 1][1])
         ):
+            just_emitted_doc_type = False
             headers = _split_table_row(raw_line)
             i += 2
             rows: list[list[str]] = []
@@ -1484,8 +1590,14 @@ def render_docx(draft: DocumentDraft) -> bytes:
                 i += 1
             if headers:
                 table = doc.add_table(rows=1 + len(rows), cols=len(headers))
-                table.alignment = WD_TABLE_ALIGNMENT.CENTER
-                _set_table_borders(table, color="000000")
+                _configure_content_table(table)
+                col_center_flags = [
+                    _is_short_center_table_column(
+                        headers[col_idx],
+                        [r[col_idx] for r in rows if col_idx < len(r)],
+                    )
+                    for col_idx in range(len(headers))
+                ]
                 for col_idx, header_text in enumerate(headers):
                     cell = table.cell(0, col_idx)
                     p = cell.paragraphs[0]
@@ -1493,15 +1605,20 @@ def render_docx(draft: DocumentDraft) -> bytes:
                     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     p.paragraph_format.space_before = Pt(3)
                     p.paragraph_format.space_after = Pt(3)
-                    _set_run_font(p.add_run(header_text), size_pt=12, bold=True)
+                    _set_run_font(p.add_run(header_text), size_pt=13, bold=True)
                 for row_idx, row_vals in enumerate(rows, start=1):
                     for col_idx, val in enumerate(row_vals):
                         cell = table.cell(row_idx, col_idx)
                         p = cell.paragraphs[0]
                         _reset_paragraph_indents(p)
+                        p.alignment = (
+                            WD_ALIGN_PARAGRAPH.CENTER
+                            if col_center_flags[col_idx]
+                            else WD_ALIGN_PARAGRAPH.LEFT
+                        )
                         p.paragraph_format.space_before = Pt(2)
                         p.paragraph_format.space_after = Pt(2)
-                        _add_inline_runs(p, val, size_pt=12)
+                        _add_inline_runs(p, val, size_pt=13)
                 after_tbl = doc.add_paragraph()
                 _reset_paragraph_indents(after_tbl)
                 after_tbl.paragraph_format.space_after = Pt(4)
@@ -1516,60 +1633,133 @@ def render_docx(draft: DocumentDraft) -> bytes:
             if level == 1:
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 p.paragraph_format.space_before = Pt(8)
-                p.paragraph_format.space_after = Pt(8)
+                p.paragraph_format.space_after = Pt(4 if is_admin else 8)
                 _set_run_font(
                     p.add_run(heading_text.upper() if is_admin else heading_text),
                     size_pt=14,
                     bold=True,
                 )
+                just_emitted_doc_type = is_admin and bool(_ADMIN_DOC_TYPE_ONLY_RE.match(heading_text))
+            elif is_admin and just_emitted_doc_type and not _ADMIN_ROMAN_HEADING_RE.match(heading_text):
+                # Trích yếu / tên kế hoạch centered & bold immediately under Tên loại văn bản
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p.paragraph_format.space_before = Pt(2)
+                p.paragraph_format.space_after = Pt(10)
+                _set_run_font(p.add_run(heading_text), size_pt=13, bold=True)
+                just_emitted_doc_type = False
+            elif is_admin and _ADMIN_ROMAN_HEADING_RE.match(heading_text):
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                p.paragraph_format.space_before = Pt(10)
+                p.paragraph_format.space_after = Pt(4)
+                _set_run_font(p.add_run(heading_text.upper()), size_pt=13, bold=True)
+                just_emitted_doc_type = False
+            elif is_admin and _ADMIN_SUBNUM_HEADING_RE.match(heading_text):
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                p.paragraph_format.first_line_indent = Cm(1.0)
+                p.paragraph_format.space_before = Pt(6)
+                p.paragraph_format.space_after = Pt(4)
+                _set_run_font(p.add_run(heading_text), size_pt=13, bold=True)
+                just_emitted_doc_type = False
             elif level == 2:
                 p.paragraph_format.space_before = Pt(8)
                 p.paragraph_format.space_after = Pt(4)
                 _set_run_font(p.add_run(heading_text), size_pt=13, bold=True)
+                just_emitted_doc_type = False
             else:
                 p.paragraph_format.space_before = Pt(6)
                 p.paragraph_format.space_after = Pt(3)
                 _set_run_font(p.add_run(heading_text), size_pt=13, bold=True)
+                just_emitted_doc_type = False
             i += 1
             continue
 
         # Bullet list
         bullet_match = re.match(r"^[-*•]\s+(.*)$", stripped)
         if bullet_match:
-            p = doc.add_paragraph(style="List Bullet")
-            p.paragraph_format.space_after = Pt(4)
-            p.paragraph_format.line_spacing = 1.15
-            _add_inline_runs(p, bullet_match.group(1), size_pt=13)
+            just_emitted_doc_type = False
+            if is_admin:
+                p = doc.add_paragraph()
+                _reset_paragraph_indents(p)
+                p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                p.paragraph_format.first_line_indent = Cm(1.0)
+                p.paragraph_format.space_after = Pt(5)
+                p.paragraph_format.line_spacing = 1.15
+                _add_inline_runs(p, f"- {bullet_match.group(1)}", size_pt=13)
+            else:
+                p = doc.add_paragraph(style="List Bullet")
+                p.paragraph_format.space_after = Pt(4)
+                p.paragraph_format.line_spacing = 1.15
+                _add_inline_runs(p, bullet_match.group(1), size_pt=13)
             i += 1
             continue
 
-        # Numbered list
+        # Numbered list / Sub-heading (e.g. "1. Mục đích" or "1. Trung tâm Số và Học liệu")
         num_match = re.match(r"^(\d+[.)])\s+(.*)$", stripped)
         if num_match:
+            just_emitted_doc_type = False
             p = doc.add_paragraph()
             _reset_paragraph_indents(p)
-            p.paragraph_format.left_indent = Cm(0.6)
             p.paragraph_format.space_after = Pt(4)
             p.paragraph_format.line_spacing = 1.15
-            _add_inline_runs(p, f"**{num_match.group(1)}** {num_match.group(2)}", size_pt=13)
+            if is_admin:
+                plain_num = _strip_md_emphasis(stripped)
+                p.paragraph_format.first_line_indent = Cm(1.0)
+                if len(plain_num) <= 85 and not plain_num.endswith("."):
+                    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                    _set_run_font(p.add_run(plain_num), size_pt=13, bold=True)
+                else:
+                    p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                    _add_inline_runs(p, f"**{num_match.group(1)}** {num_match.group(2)}", size_pt=13)
+            else:
+                p.paragraph_format.left_indent = Cm(0.6)
+                _add_inline_runs(p, f"**{num_match.group(1)}** {num_match.group(2)}", size_pt=13)
             i += 1
             continue
 
-        # Regular paragraph (preserving explicit <div align="..."> alignment & Decree 30 date/title rules)
+        # Regular paragraph
         p = doc.add_paragraph()
         _reset_paragraph_indents(p)
         p.paragraph_format.space_after = Pt(6)
         p.paragraph_format.line_spacing = 1.15
         plain = _strip_md_emphasis(stripped)
-        if align_hint == "right" or (is_admin and _ADMIN_DATE_LINE_RE.match(plain)):
+        if is_admin and just_emitted_doc_type and len(plain) <= 180 and not _ADMIN_CAN_CU_RE.match(plain):
+            # Trích yếu directly below Tên loại văn bản
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.space_before = Pt(2)
+            p.paragraph_format.space_after = Pt(10)
+            _set_run_font(p.add_run(plain), size_pt=13, bold=True)
+            just_emitted_doc_type = False
+        elif align_hint == "right" or (is_admin and _ADMIN_DATE_LINE_RE.match(plain)):
             p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            _add_inline_runs(p, stripped, size_pt=13)
+            just_emitted_doc_type = False
         elif align_hint == "center" or (
-            is_admin and plain.upper() == draft.title.upper() and len(plain) <= 100
+            is_admin and (plain.upper() == draft.title.upper() or _ADMIN_DOC_TYPE_ONLY_RE.match(plain)) and len(plain) <= 100
         ):
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.space_before = Pt(8)
+            p.paragraph_format.space_after = Pt(4)
+            _set_run_font(p.add_run(plain.upper()), size_pt=14, bold=True)
+            just_emitted_doc_type = is_admin and bool(_ADMIN_DOC_TYPE_ONLY_RE.match(plain))
+        elif is_admin and _ADMIN_ROMAN_HEADING_RE.match(plain):
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            p.paragraph_format.space_before = Pt(10)
+            p.paragraph_format.space_after = Pt(4)
+            _set_run_font(p.add_run(plain.upper()), size_pt=13, bold=True)
+            just_emitted_doc_type = False
+        elif is_admin and _ADMIN_CAN_CU_RE.match(plain):
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            p.paragraph_format.first_line_indent = Cm(1.0)
+            _set_run_font(p.add_run(plain), size_pt=13, italic=True)
+            just_emitted_doc_type = False
         elif is_admin and not plain.startswith("Kính gửi"):
             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        _add_inline_runs(p, stripped, size_pt=13)
+            p.paragraph_format.first_line_indent = Cm(1.0)
+            _add_inline_runs(p, stripped, size_pt=13)
+            just_emitted_doc_type = False
+        else:
+            _add_inline_runs(p, stripped, size_pt=13)
+            just_emitted_doc_type = False
         i += 1
 
     # Decree 30 2-column borderless footer (Nơi nhận left + Signature block right)
@@ -1582,6 +1772,7 @@ def render_docx(draft: DocumentDraft) -> bytes:
             for idx_n, n_line in enumerate(noi_nhan_lines):
                 np = left_cell.paragraphs[0] if idx_n == 0 else left_cell.add_paragraph()
                 _reset_paragraph_indents(np)
+                np.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 np.paragraph_format.space_before = Pt(2 if idx_n == 0 else 0)
                 np.paragraph_format.space_after = Pt(2)
                 plain_n = _strip_md_emphasis(n_line)
@@ -1603,11 +1794,11 @@ def render_docx(draft: DocumentDraft) -> bytes:
                     _set_run_font(sp.add_run(plain_s.upper()), size_pt=13, bold=True)
                 elif _ADMIN_SIGN_HINT_RE.match(plain_s):
                     sp.paragraph_format.space_before = Pt(0)
-                    sp.paragraph_format.space_after = Pt(36)
+                    sp.paragraph_format.space_after = Pt(48)
                     _set_run_font(sp.add_run(plain_s), size_pt=12, italic=True)
                 else:
                     if idx_s == 1:
-                        sp.paragraph_format.space_before = Pt(36)
+                        sp.paragraph_format.space_before = Pt(48)
                     else:
                         sp.paragraph_format.space_before = Pt(2)
                     sp.paragraph_format.space_after = Pt(2)
