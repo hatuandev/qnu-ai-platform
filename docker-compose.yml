@@ -48,6 +48,9 @@ x-runtime: &runtime
   OWN_RECONCILE: ${OWN_RECONCILE:-true}
   # Env-only kill-switch for /public/chatbots/*; must be passed into the container.
   PUBLIC_CHATBOTS_ENABLED: ${PUBLIC_CHATBOTS_ENABLED:-true}
+  # Optional staging/demo seed keys read only during manual system reset (empty by default).
+  E2E_QNU_API_KEY: ${E2E_QNU_API_KEY:-}
+  E2E_9ROUTER_API_KEY: ${E2E_9ROUTER_API_KEY:-}
 
 x-api: &api
   image: qnu-ai-platform-v1:${APP_IMAGE_TAG:-latest}
