@@ -944,6 +944,7 @@ _TABLE_NUMERIC_VAL_RE = re.compile(
     re.IGNORECASE,
 )
 _TABLE_INDEX_COL_HEADER_RE = re.compile(r"^(?:stt|tt|số\s*tt|no\.?)$", re.IGNORECASE)
+_TABLE_COORD_COL_HEADER_RE = re.compile(r"(?:đơn\s+vị\s+phối\s+hợp|phối\s+hợp)", re.IGNORECASE)
 _ADMIN_CONG_VAN_VV_RE = re.compile(r"^(?:v/v|về\s+việc)\b", re.IGNORECASE)
 
 
@@ -1027,7 +1028,7 @@ def _compute_content_table_layout(
         )
 
         if is_index:
-            min_mms.append(11.0)
+            min_mms.append(15.0)
             weights.append(0.0)
             aligns.append(WD_ALIGN_PARAGRAPH.CENTER)
         elif is_numeric:
@@ -1782,13 +1783,20 @@ def render_docx(draft: DocumentDraft) -> bytes:
                     _set_run_font(p.add_run(header_text), size_pt=13, bold=True)
                 for row_idx, row_vals in enumerate(rows, start=1):
                     for col_idx, val in enumerate(row_vals):
+                        cell_val = val
+                        if (
+                            col_idx < len(headers)
+                            and _TABLE_COORD_COL_HEADER_RE.search(headers[col_idx])
+                            and _strip_md_emphasis(val).casefold() == "không"
+                        ):
+                            cell_val = "-"
                         cell = table.cell(row_idx, col_idx)
                         p = cell.paragraphs[0]
                         _reset_paragraph_indents(p)
                         p.alignment = col_aligns[col_idx]
                         p.paragraph_format.space_before = Pt(2)
                         p.paragraph_format.space_after = Pt(2)
-                        _add_inline_runs(p, val, size_pt=13)
+                        _add_inline_runs(p, cell_val, size_pt=13)
                 after_tbl = doc.add_paragraph()
                 _reset_paragraph_indents(after_tbl)
                 after_tbl.paragraph_format.space_after = Pt(4)

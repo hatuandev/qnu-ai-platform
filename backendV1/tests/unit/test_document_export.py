@@ -1765,7 +1765,7 @@ def test_content_aware_auto_layout_header_plan_and_budget_tables_exact_165mm():
             "## Triển khai chuyển đổi số năm 2026\n\n"
             "| STT | Nội dung công việc | Thời gian | Đơn vị chủ trì | Đơn vị phối hợp | Sản phẩm |\n"
             "| --- | --- | --- | --- | --- | --- |\n"
-            "| 1 | Rà soát, chuẩn hóa toàn bộ danh mục giáo trình và học liệu số phục vụ đào tạo đại học | Tháng 12/2026 | Trung tâm S&HL | Các Khoa | Bộ danh mục học liệu số chuẩn hóa được Hiệu trưởng phê duyệt |\n"
+            "| 1 | Rà soát, chuẩn hóa toàn bộ danh mục giáo trình và học liệu số phục vụ đào tạo đại học | Tháng 12/2026 | Trung tâm S&HL | Không | Bộ danh mục học liệu số chuẩn hóa được Hiệu trưởng phê duyệt |\n"
         ),
         has_tables=True,
     )
@@ -1781,10 +1781,13 @@ def test_content_aware_auto_layout_header_plan_and_budget_tables_exact_165mm():
     plan_grid = _grid_dxa(plan_tbl)
     assert sum(plan_grid) == 9355
     assert all(sum(_row_tcw_dxa(r)) == 9355 for r in plan_tbl.rows)
-    # STT (0) is compact; Nội dung (1) & Sản phẩm (5) are wider than STT (0) and Thời gian (2)
+    # STT (0) >= 15mm (850 dxa) so 13pt bold "STT" stays on 1 line; Nội dung (1) & Sản phẩm (5) wider than Thời gian (2)
+    assert plan_grid[0] >= 850
     assert plan_grid[0] < plan_grid[2]
     assert plan_grid[1] > plan_grid[2]
     assert plan_grid[5] > plan_grid[2]
+    # Standalone "Không" in "Đơn vị phối hợp" normalized to "-"
+    assert plan_tbl.rows[1].cells[4].text.strip() == "-"
 
     # 3. Budget / Công văn table: numeric columns right-aligned, exact 165mm, no duplicate title above V/v
     budget_cv = DocumentDraft(
