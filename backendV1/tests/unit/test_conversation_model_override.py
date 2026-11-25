@@ -28,9 +28,11 @@ def _provider(
     *,
     capabilities: list[str] | None = None,
     is_active: bool = True,
+    parent_id: str | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=pid,
+        parent_id=parent_id,
         model_name=model_name,
         capabilities=capabilities if capabilities is not None else ["chat"],
         is_active=is_active,
@@ -148,3 +150,83 @@ async def test_resolve_turn_provider_id_rejects_unknown_or_non_chat_model(monkey
             TurnRequest(question="Hi", expected_turn_no=0, model="prv_embed"),
             "prv_default",
         )
+
+
+@pytest.mark.asyncio
+async def test_resolve_turn_provider_id_distinguishes_multiple_models_under_same_connection(
+    monkeypatch,
+):
+    qwen = _provider("prv_9r_qwen", "cf/@cf/qwen/qwen3.8-27b", parent_id="conn_9router")
+    luna = _provider("prv_9r_luna", "cx/gpt-6-luna", parent_id="conn_9router")
+    monkeypatch.setattr(
+        "qnu.domains.conversations.execution.catalog_service.visible_providers",
+        AsyncMock(return_value=[qwen, luna]),
+    )
+
+    async def _fake_require(_db, target_id, capability):
+        assert capability == "chat"
+        return qwen if target_id == qwen.id else luna
+
+    monkeypatch.setattr(
+        "qnu.domains.conversations.execution.provider_service.require_capability",
+        _fake_require,
+    )
+
+    # Selecting by exact model name routes to the exact child model record.
+    pid_qwen, req_qwen = await _resolve_turn_provider_id(
+        None,
+        _actor(),
+        "ws_1",
+        TurnRequest(question="Test", expected_turn_no=0, model="cf/@cf/qwen/qwen3.8-27b"),
+        None,
+    )
+    assert pid_qwen == "prv_9r_qwen"
+    assert req_qwen == "cf/@cf/qwen/qwen3.8-27b"
+
+    # Selecting by model + provider_id (child model ID) succeeds and verifies match.
+    pid_luna, req_luna = await _resolve_turn_provider_id(
+        None,
+        _actor(),
+        "ws_1",
+        TurnRequest(
+            question="Test",
+            expected_turn_no=0,
+            model="cx/gpt-6-luna",
+            provider_id="prv_9r_luna",
+        ),
+        None,
+    )
+    assert pid_luna == "prv_9r_luna"
+    assert req_luna == "cx/gpt-6-luna"
+
+    # Selecting by connection parent_id + model_name also resolves the right child model.
+    pid_parent, req_parent = await _resolve_turn_provider_id(
+        None,
+        _actor(),
+        "ws_1",
+        TurnRequest(
+            question="Test",
+            expected_turn_no=0,
+            model="cx/gpt-6-luna",
+            provider_id="conn_9router",
+        ),
+        None,
+    )
+    assert pid_parent == "prv_9r_luna"
+    assert req_parent == "cx/gpt-6-luna"
+
+    # Mismatched provider_id + model raises Conflict.
+    with pytest.raises(Conflict) as exc_info:
+        await _resolve_turn_provider_id(
+            None,
+            _actor(),
+            "ws_1",
+            TurnRequest(
+                question="Test",
+                expected_turn_no=0,
+                model="cx/gpt-6-luna",
+                provider_id="prv_9r_qwen",
+            ),
+            None,
+        )
+    assert exc_info.value.code == "model_mismatch"

@@ -11,6 +11,20 @@ export function providerLabel(item: CatalogItem): string {
   return item.name;
 }
 
+export function modelNameLabel(item: CatalogItem): string {
+  const model = item.model_name?.trim();
+  return model || item.name;
+}
+
+export function modelWithProviderLabel(item: CatalogItem): string {
+  const model = modelNameLabel(item);
+  const provider = providerLabel(item).trim();
+  if (!provider || provider.toLowerCase() === model.toLowerCase()) {
+    return model;
+  }
+  return `${model} · ${provider}`;
+}
+
 export function localityLabel(providerType?: string | null): string {
   if (!providerType) return "";
   return ["local", "ollama", "llamacpp"].includes(providerType)

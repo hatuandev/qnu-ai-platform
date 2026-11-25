@@ -45,7 +45,11 @@ import {
   extractTurnDocumentDraft,
 } from "@/components/assistants/document-preview-pane";
 import { EvidenceDrawer } from "@/components/assistants/evidence-drawer";
-import { providerLabel } from "@/components/assistants/model-label";
+import {
+  modelNameLabel,
+  modelWithProviderLabel,
+  providerLabel,
+} from "@/components/assistants/model-label";
 import { TurnFeedback } from "@/components/assistants/turn-feedback";
 import {
   TURN_ERROR_TEXT,
@@ -613,7 +617,12 @@ function ChatPage() {
     : null;
   const selectedModelItem = useMemo(() => {
     if (!storedModelId) return null;
-    return chatModels.find((entry) => entry.id === storedModelId) ?? null;
+    return (
+      chatModels.find(
+        (entry) =>
+          entry.id === storedModelId || entry.model_name === storedModelId,
+      ) ?? null
+    );
   }, [chatModels, storedModelId]);
   const effectiveModelId = selectedModelItem ? selectedModelItem.id : null;
   const modelSelectValue = effectiveModelId ?? DEFAULT_MODEL_VALUE;
@@ -642,19 +651,21 @@ function ChatPage() {
   const modelLabel = useMemo(() => {
     if (!assistant) return "";
     if (selectedModelItem) {
-      return `Mô hình: ${providerLabel(selectedModelItem)} (tùy chọn phiên)`;
+      return `Mô hình: ${modelWithProviderLabel(selectedModelItem)} (tùy chọn phiên)`;
     }
     if (assistant.chat_provider_id) {
       const item = catalogQuery.data?.find(
         (entry) => entry.id === assistant.chat_provider_id,
       );
-      return item ? `Mô hình: ${providerLabel(item)}` : "Mô hình đã cấu hình";
+      return item
+        ? `Mô hình: ${modelWithProviderLabel(item)}`
+        : "Mô hình đã cấu hình";
     }
     const systemDefault = chatModels.find((entry) =>
       entry.default_capabilities.includes("chat"),
     );
     return systemDefault
-      ? `Mô hình: ${providerLabel(systemDefault)} (mặc định)`
+      ? `Mô hình: ${modelWithProviderLabel(systemDefault)} (mặc định)`
       : "Dùng mô hình mặc định của hệ thống";
   }, [assistant, catalogQuery.data, chatModels, selectedModelItem]);
 
@@ -854,7 +865,7 @@ function ChatPage() {
     setInput("");
     setPendingQuestion(question);
     const assistantId = assistant.id;
-    const selectedModelForSend = effectiveModelId;
+    const selectedModelForSend = selectedModelItem;
 
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -870,7 +881,10 @@ function ChatPage() {
         if (selectedModelForSend) {
           const newConversationKey = `${workspaceId}:${assistantId}:${conversation.id}`;
           setModelOverrides((prev) => {
-            const next = { ...prev, [newConversationKey]: selectedModelForSend };
+            const next = {
+              ...prev,
+              [newConversationKey]: selectedModelForSend.id,
+            };
             writeStoredModelOverrides(next);
             return next;
           });
@@ -889,7 +903,10 @@ function ChatPage() {
         conversationId,
         question,
         expectedTurnNo,
-        model: selectedModelForSend,
+        model: selectedModelForSend
+          ? modelNameLabel(selectedModelForSend)
+          : undefined,
+        providerId: selectedModelForSend?.id,
         signal: controller.signal,
       });
 
@@ -1038,26 +1055,44 @@ function ChatPage() {
             disabled={isSending || catalogQuery.isLoading}
           >
             <SelectTrigger
-              className="h-8 w-[195px] text-xs"
+              className="h-8 w-[220px] sm:w-[240px] text-xs"
               aria-label="Chọn mô hình AI"
               title={
                 selectedModelItem
-                  ? `Đang dùng: ${providerLabel(selectedModelItem)}`
+                  ? `Đang dùng: ${modelWithProviderLabel(selectedModelItem)}`
                   : "Mặc định theo trợ lý"
               }
             >
               <Cpu className="size-3.5 shrink-0 text-muted-foreground" />
-              <SelectValue placeholder="Mặc định theo trợ lý" />
+              <SelectValue placeholder="Mặc định theo trợ lý">
+                {selectedModelItem
+                  ? modelNameLabel(selectedModelItem)
+                  : "Mặc định theo trợ lý"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={DEFAULT_MODEL_VALUE} className="text-xs">
                 Mặc định theo trợ lý
               </SelectItem>
-              {chatModels.map((item) => (
-                <SelectItem key={item.id} value={item.id} className="text-xs">
-                  {providerLabel(item)}
-                </SelectItem>
-              ))}
+              {chatModels.map((item) => {
+                const name = modelNameLabel(item);
+                const provider = providerLabel(item).trim();
+                const showProvider =
+                  Boolean(provider) &&
+                  provider.toLowerCase() !== name.toLowerCase();
+                return (
+                  <SelectItem key={item.id} value={item.id} className="text-xs">
+                    <div className="flex flex-col py-0.5">
+                      <span className="font-medium leading-tight">{name}</span>
+                      {showProvider ? (
+                        <span className="text-[10px] text-muted-foreground leading-tight">
+                          {provider}
+                        </span>
+                      ) : null}
+                    </div>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
 

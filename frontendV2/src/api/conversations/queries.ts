@@ -121,12 +121,14 @@ export function useSendTurnMutation(workspaceId?: string | null) {
       question,
       expectedTurnNo,
       model,
+      providerId,
       signal,
     }: {
       conversationId: string;
       question: string;
       expectedTurnNo: number;
       model?: string | null;
+      providerId?: string | null;
       signal?: AbortSignal;
     }) => {
       if (!workspaceId) throw new Error("workspaceId is required");
@@ -137,6 +139,7 @@ export function useSendTurnMutation(workspaceId?: string | null) {
           question,
           expected_turn_no: expectedTurnNo,
           ...(model ? { model } : {}),
+          ...(providerId ? { provider_id: providerId } : {}),
         },
         `chat_${crypto.randomUUID()}`,
         { signal },

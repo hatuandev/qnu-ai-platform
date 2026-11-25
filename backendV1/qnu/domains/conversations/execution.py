@@ -73,23 +73,70 @@ async def _resolve_turn_provider_id(
     ``requested_selector`` is non-None only when the caller explicitly chose a
     non-default model.
     """
-    selector = req.provider_id or req.model
-    if selector is None or selector.lower() in DEFAULT_MODEL_SELECTORS:
+    req_model = req.model
+    req_provider_id = req.provider_id
+    if req_model and req_model.lower() in DEFAULT_MODEL_SELECTORS:
+        req_model = None
+    if req_provider_id and req_provider_id.lower() in DEFAULT_MODEL_SELECTORS:
+        req_provider_id = None
+    if req_model is None and req_provider_id is None:
         return default_provider_id, None
+
     visible = await catalog_service.visible_providers(db, actor, workspace_id)
-    matched = next((item for item in visible if item.id == selector), None)
-    if matched is None:
+
+    matched = None
+    if req_provider_id is not None and req_model is not None:
+        # 1. Exact child model record ID matching the requested model_name.
+        by_id = next((item for item in visible if item.id == req_provider_id), None)
+        if by_id is not None:
+            if by_id.model_name != req_model:
+                raise Conflict(
+                    "Mô hình AI không khớp với bản ghi provider đã chọn.",
+                    code="model_mismatch",
+                )
+            matched = by_id
+        else:
+            # 2. Parent connection ID + child model_name.
+            matched = next(
+                (
+                    item
+                    for item in visible
+                    if getattr(item, "parent_id", None) == req_provider_id
+                    and item.model_name == req_model
+                    and "chat" in (item.capabilities or [])
+                ),
+                None,
+            )
+        target_id = matched.id if matched is not None else req_provider_id
+        provider = await provider_service.require_capability(db, target_id, "chat")
+        if provider.model_name != req_model:
+            raise Conflict(
+                "Mô hình AI không khớp với bản ghi provider đã chọn.",
+                code="model_mismatch",
+            )
+        return provider.id, req_model
+
+    if req_model is not None:
         matched = next(
             (
                 item
                 for item in visible
-                if item.model_name == selector and "chat" in (item.capabilities or [])
+                if item.model_name == req_model and "chat" in (item.capabilities or [])
             ),
             None,
         )
-    target_id = matched.id if matched is not None else selector
+        if matched is None:
+            matched = next((item for item in visible if item.id == req_model), None)
+        target_id = matched.id if matched is not None else req_model
+        provider = await provider_service.require_capability(db, target_id, "chat")
+        return provider.id, req_model
+
+    # Only req_provider_id was specified.
+    assert req_provider_id is not None
+    matched = next((item for item in visible if item.id == req_provider_id), None)
+    target_id = matched.id if matched is not None else req_provider_id
     provider = await provider_service.require_capability(db, target_id, "chat")
-    return provider.id, selector
+    return provider.id, provider.model_name or req_provider_id
 
 
 async def _live_export_formats(db: AsyncSession, conversation) -> list[ExportFormat]:

@@ -749,14 +749,15 @@ def test_conversation_turn_model_override_and_default_fallback(client, chat_sess
         json={
             "question": "Chỉ tiêu tuyển sinh là bao nhiêu?",
             "expected_turn_no": 0,
-            "model": alt_provider["id"],
+            "model": "luna",
+            "provider_id": alt_provider["id"],
         },
     )
     assert res_override.status_code == 200, res_override.text
     body_override = res_override.json()
     assert body_override["rewrite_trace"]["provider_id"] == alt_provider["id"]
     assert body_override["rewrite_trace"]["model_name"] == "luna"
-    assert body_override["rewrite_trace"]["requested_model"] == alt_provider["id"]
+    assert body_override["rewrite_trace"]["requested_model"] == "luna"
     assert body_override["result"]["trace"]["provider_id"] == alt_provider["id"]
     assert body_override["result"]["trace"]["model_name"] == "luna"
 
