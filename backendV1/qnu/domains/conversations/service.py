@@ -181,7 +181,12 @@ async def reserve_turn(
     await expire(db, conversation)
     fingerprint = digest(
         req.model_dump(
-            mode="json", exclude={"metadata_filter"} if req.metadata_filter is None else set()
+            mode="json",
+            exclude={
+                field
+                for field in ("metadata_filter", "model", "provider_id")
+                if getattr(req, field) is None
+            },
         )
     )
     old = await db.scalar(

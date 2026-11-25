@@ -5,6 +5,7 @@ import {
   Bot,
   CheckCircle2,
   Copy,
+  Cpu,
   Database,
   GraduationCap,
   Loader2,
@@ -75,6 +76,42 @@ export const Route = createFileRoute("/chat")({
 });
 
 const DRAFT_VALUE = "__draft__";
+const DEFAULT_MODEL_VALUE = "__default__";
+const MODEL_OVERRIDE_STORAGE_KEY = "qnu.chat.modelOverrides.v1";
+
+function readStoredModelOverrides(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(MODEL_OVERRIDE_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, string] =>
+          typeof entry[0] === "string" &&
+          typeof entry[1] === "string" &&
+          entry[1].trim().length > 0,
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredModelOverrides(map: Record<string, string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      MODEL_OVERRIDE_STORAGE_KEY,
+      JSON.stringify(map),
+    );
+  } catch {
+    // Ignore storage quota or private browsing errors.
+  }
+}
 
 const SMART_STARTER_PROMPTS = [
   {
@@ -552,10 +589,34 @@ function ChatPage() {
   const readinessQuery = useAssistantReadinessQuery(workspaceId, assistant?.id);
   const readiness = readinessQuery.data;
 
-  const catalogQuery = useCatalogQuery(
-    workspaceId,
-    Boolean(workspaceId) && Boolean(assistant?.chat_provider_id),
+  const catalogQuery = useCatalogQuery(workspaceId, Boolean(workspaceId));
+  const chatModels = useMemo(
+    () =>
+      (catalogQuery.data ?? []).filter((item) =>
+        item.capabilities.includes("chat"),
+      ),
+    [catalogQuery.data],
   );
+
+  const [modelOverrides, setModelOverrides] = useState<Record<string, string>>(
+    () => readStoredModelOverrides(),
+  );
+
+  const modelSessionKey = useMemo(() => {
+    if (!workspaceId || !assistant) return null;
+    const scope = activeConversationId ?? DRAFT_VALUE;
+    return `${workspaceId}:${assistant.id}:${scope}`;
+  }, [workspaceId, assistant, activeConversationId]);
+
+  const storedModelId = modelSessionKey
+    ? (modelOverrides[modelSessionKey] ?? null)
+    : null;
+  const selectedModelItem = useMemo(() => {
+    if (!storedModelId) return null;
+    return chatModels.find((entry) => entry.id === storedModelId) ?? null;
+  }, [chatModels, storedModelId]);
+  const effectiveModelId = selectedModelItem ? selectedModelItem.id : null;
+  const modelSelectValue = effectiveModelId ?? DEFAULT_MODEL_VALUE;
 
   const createMutation = useCreateConversationMutation(workspaceId);
   const sendMutation = useSendTurnMutation(workspaceId);
@@ -580,14 +641,36 @@ function ChatPage() {
 
   const modelLabel = useMemo(() => {
     if (!assistant) return "";
-    if (!assistant.chat_provider_id) {
-      return "Dùng mô hình mặc định của hệ thống";
+    if (selectedModelItem) {
+      return `Mô hình: ${providerLabel(selectedModelItem)} (tùy chọn phiên)`;
     }
-    const item = catalogQuery.data?.find(
-      (entry) => entry.id === assistant.chat_provider_id,
+    if (assistant.chat_provider_id) {
+      const item = catalogQuery.data?.find(
+        (entry) => entry.id === assistant.chat_provider_id,
+      );
+      return item ? `Mô hình: ${providerLabel(item)}` : "Mô hình đã cấu hình";
+    }
+    const systemDefault = chatModels.find((entry) =>
+      entry.default_capabilities.includes("chat"),
     );
-    return item ? `Mô hình: ${providerLabel(item)}` : "Mô hình đã cấu hình";
-  }, [assistant, catalogQuery.data]);
+    return systemDefault
+      ? `Mô hình: ${providerLabel(systemDefault)} (mặc định)`
+      : "Dùng mô hình mặc định của hệ thống";
+  }, [assistant, catalogQuery.data, chatModels, selectedModelItem]);
+
+  const handleModelChange = (value: string) => {
+    if (isSending || !modelSessionKey) return;
+    setModelOverrides((prev) => {
+      const next = { ...prev };
+      if (value === DEFAULT_MODEL_VALUE) {
+        delete next[modelSessionKey];
+      } else {
+        next[modelSessionKey] = value;
+      }
+      writeStoredModelOverrides(next);
+      return next;
+    });
+  };
 
   const turnCount = turns.length;
 
@@ -771,6 +854,7 @@ function ChatPage() {
     setInput("");
     setPendingQuestion(question);
     const assistantId = assistant.id;
+    const selectedModelForSend = effectiveModelId;
 
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -783,6 +867,14 @@ function ChatPage() {
           assistantId,
           title: question.slice(0, 160),
         });
+        if (selectedModelForSend) {
+          const newConversationKey = `${workspaceId}:${assistantId}:${conversation.id}`;
+          setModelOverrides((prev) => {
+            const next = { ...prev, [newConversationKey]: selectedModelForSend };
+            writeStoredModelOverrides(next);
+            return next;
+          });
+        }
         setSelectedConversationId(conversation.id);
         setIsDraftMode(false);
       }
@@ -797,6 +889,7 @@ function ChatPage() {
         conversationId,
         question,
         expectedTurnNo,
+        model: selectedModelForSend,
         signal: controller.signal,
       });
 
@@ -934,6 +1027,35 @@ function ChatPage() {
               {assistants.map((item) => (
                 <SelectItem key={item.id} value={item.id} className="text-xs">
                   {item.is_active ? item.name : `${item.name} (tạm dừng)`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={modelSelectValue}
+            onValueChange={handleModelChange}
+            disabled={isSending || catalogQuery.isLoading}
+          >
+            <SelectTrigger
+              className="h-8 w-[195px] text-xs"
+              aria-label="Chọn mô hình AI"
+              title={
+                selectedModelItem
+                  ? `Đang dùng: ${providerLabel(selectedModelItem)}`
+                  : "Mặc định theo trợ lý"
+              }
+            >
+              <Cpu className="size-3.5 shrink-0 text-muted-foreground" />
+              <SelectValue placeholder="Mặc định theo trợ lý" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={DEFAULT_MODEL_VALUE} className="text-xs">
+                Mặc định theo trợ lý
+              </SelectItem>
+              {chatModels.map((item) => (
+                <SelectItem key={item.id} value={item.id} className="text-xs">
+                  {providerLabel(item)}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -710,3 +710,79 @@ def test_assistant_admin_and_collection_scope_enforced(client, chat_session):
         ).status_code
         == 404
     )
+
+
+def test_conversation_turn_model_override_and_default_fallback(client, chat_session):
+    data = chat_session
+    as_actor(PLATFORM)
+    alt = client.post(
+        f"{API}/modelops/providers",
+        json={
+            "name": "9router · Luna " + data["workspace"]["id"],
+            "provider_type": "openai_compatible",
+            "base_url": data["answer_chat"].base_url,
+            "model_name": "luna",
+            "capabilities": ["chat"],
+            "timeout_seconds": 5,
+            "token_limits": {"context_window_tokens": 131072, "max_output_tokens": 8192},
+        },
+    )
+    assert alt.status_code == 201, alt.text
+    alt_provider = alt.json()
+    assert (
+        client.post(
+            f"{API}/modelops/providers/{alt_provider['id']}/keys",
+            json={"name": "luna-key", "secret": "luna-secret"},
+        ).status_code
+        == 201
+    )
+    as_actor(EDITOR)
+
+    # 1. Explicit model override uses the selected provider/model for both routing and answering.
+    url = (
+        f"{API}/workspaces/{data['workspace']['id']}"
+        f"/conversations/{data['conversation']['id']}/turns"
+    )
+    res_override = client.post(
+        url,
+        headers={"Idempotency-Key": "override-luna-1"},
+        json={
+            "question": "Chỉ tiêu tuyển sinh là bao nhiêu?",
+            "expected_turn_no": 0,
+            "model": alt_provider["id"],
+        },
+    )
+    assert res_override.status_code == 200, res_override.text
+    body_override = res_override.json()
+    assert body_override["rewrite_trace"]["provider_id"] == alt_provider["id"]
+    assert body_override["rewrite_trace"]["model_name"] == "luna"
+    assert body_override["rewrite_trace"]["requested_model"] == alt_provider["id"]
+    assert body_override["result"]["trace"]["provider_id"] == alt_provider["id"]
+    assert body_override["result"]["trace"]["model_name"] == "luna"
+
+    # 2. Omitting model falls back to the assistant's configured default provider.
+    res_default = client.post(
+        url,
+        headers={"Idempotency-Key": "override-default-2"},
+        json={
+            "question": "Chỉ tiêu tuyển sinh là bao nhiêu?",
+            "expected_turn_no": 1,
+        },
+    )
+    assert res_default.status_code == 200, res_default.text
+    body_default = res_default.json()
+    assert body_default["rewrite_trace"]["provider_id"] == data["chat_provider"]["id"]
+    assert body_default["result"]["trace"]["provider_id"] == data["chat_provider"]["id"]
+
+    # 3. Unknown model returns 404 instead of silent fallback.
+    res_invalid = client.post(
+        url,
+        headers={"Idempotency-Key": "override-invalid-3"},
+        json={
+            "question": "Chỉ tiêu tuyển sinh là bao nhiêu?",
+            "expected_turn_no": 2,
+            "model": "prv_does_not_exist",
+        },
+    )
+    assert res_invalid.status_code == 404, res_invalid.text
+    assert res_invalid.json()["code"] == "provider_not_found"

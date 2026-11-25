@@ -46,7 +46,7 @@ export async function createConversation(
 export async function sendConversationTurn(
   workspaceId: string,
   conversationId: string,
-  body: { question: string; expected_turn_no: number },
+  body: { question: string; expected_turn_no: number; model?: string },
   idempotencyKey: string,
   options?: { signal?: AbortSignal },
 ): Promise<ConversationTurn> {

@@ -38,7 +38,9 @@ from qnu.domains.conversations.service import reserve_turn
 from qnu.domains.identity.actor import AuthActor
 from qnu.domains.knowledge.compilation.models import utcnow
 from qnu.domains.knowledge.publication.evidence import digest
+from qnu.domains.modelops.catalog.service import catalog_service
 from qnu.domains.modelops.inference.service import prepare_chat_request
+from qnu.domains.modelops.providers.service import provider_service
 from qnu.domains.modelops.usage.service import usage_service
 from qnu.domains.rag.answer.hygiene import clean_text
 from qnu.domains.rag.answer.schemas import AnswerRequest
@@ -54,6 +56,40 @@ from qnu.ports.reranker import Reranker
 from qnu.ports.vector_store import VectorStore
 
 logger = get_logger(__name__)
+
+DEFAULT_MODEL_SELECTORS = frozenset({"default", "__default__"})
+
+
+async def _resolve_turn_provider_id(
+    db: AsyncSession,
+    actor: AuthActor,
+    workspace_id: str,
+    req: TurnRequest,
+    default_provider_id: str | None,
+) -> tuple[str | None, str | None]:
+    """Resolve optional per-turn model override through ModelOps.
+
+    Returns ``(effective_provider_id, requested_selector)`` where
+    ``requested_selector`` is non-None only when the caller explicitly chose a
+    non-default model.
+    """
+    selector = req.provider_id or req.model
+    if selector is None or selector.lower() in DEFAULT_MODEL_SELECTORS:
+        return default_provider_id, None
+    visible = await catalog_service.visible_providers(db, actor, workspace_id)
+    matched = next((item for item in visible if item.id == selector), None)
+    if matched is None:
+        matched = next(
+            (
+                item
+                for item in visible
+                if item.model_name == selector and "chat" in (item.capabilities or [])
+            ),
+            None,
+        )
+    target_id = matched.id if matched is not None else selector
+    provider = await provider_service.require_capability(db, target_id, "chat")
+    return provider.id, selector
 
 
 async def _live_export_formats(db: AsyncSession, conversation) -> list[ExportFormat]:
@@ -342,15 +378,26 @@ async def send(
         async def check():
             await checkpoint(db, actor, turn)
 
+        effective_provider_id, requested_model = await _resolve_turn_provider_id(
+            db, actor, workspace_id, req, config.get("chat_provider_id")
+        )
+
         if not collection_ids:
             # Persona-direct assistants (no knowledge collection) converse naturally
             # with full turn history in _direct_llm_turn — skip the RAG query-rewrite
             # router so follow-up drafting requests never trip conversation_clarification_required.
             reply = None
-            provider_id = config.get("chat_provider_id")
+            provider_id = effective_provider_id
             turn.resolved_question = turn.question
         else:
-            reply, provider_id = await resolve_turn(db, actor, conversation, turn, chat)
+            reply, provider_id = await resolve_turn(
+                db,
+                actor,
+                conversation,
+                turn,
+                chat,
+                provider_id_override=effective_provider_id,
+            )
         if reply is None:
             live_formats = await _live_export_formats(db, conversation)
             early_disabled_fmt = disabled_requested_format(turn.question, live_formats)
@@ -476,6 +523,12 @@ async def send(
         else:
             result = reply
         await check()
+        if requested_model is not None:
+            turn.rewrite_trace = {
+                **(turn.rewrite_trace or {}),
+                "requested_model": requested_model,
+                "selected_provider_id": effective_provider_id,
+            }
         turn.result = result.model_dump(mode="json")
         turn.status, turn.finished_at = "completed", utcnow()
         await record_workspace_event(

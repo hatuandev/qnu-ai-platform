@@ -51,6 +51,8 @@ async def resolve_turn(
     conversation: Conversation,
     turn: ConversationTurn,
     model: ChatModel,
+    *,
+    provider_id_override: str | None = None,
 ) -> tuple[DirectReply | None, str]:
     config = conversation.assistant_snapshot
     count = config["history_turns"]
@@ -92,12 +94,13 @@ async def resolve_turn(
         session_facts=conv_memory.get("session_facts"),
     )
     await checkpoint(db, actor, turn)
+    requested_provider_id = provider_id_override or config["chat_provider_id"]
     runtime, request, budget = await prepare_chat_request(
         db,
         actor,
         conversation.workspace_id,
         messages,
-        provider_id=config["chat_provider_id"],
+        provider_id=requested_provider_id,
         task="answer",
         max_output_tokens=config["max_output_tokens"],
         output_schema=schema,
@@ -259,7 +262,7 @@ async def _guardrail_reply(
         actor,
         conversation.workspace_id,
         retry_messages,
-        provider_id=config["chat_provider_id"],
+        provider_id=runtime.provider_id,
         task="answer",
         max_output_tokens=config["max_output_tokens"],
         output_schema=schema,

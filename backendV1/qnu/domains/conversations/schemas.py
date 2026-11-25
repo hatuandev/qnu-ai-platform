@@ -47,11 +47,21 @@ class TurnRequest(BaseModel):
     question: str = Field(min_length=1, max_length=8000)
     expected_turn_no: int = Field(strict=True, ge=0)
     metadata_filter: MetadataFilter | None = None
+    model: str | None = Field(default=None, max_length=128)
+    provider_id: str | None = Field(default=None, max_length=64)
 
     @field_validator("question", mode="before")
     @classmethod
     def trim_question(cls, value: object) -> object:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("model", "provider_id", mode="before")
+    @classmethod
+    def normalize_model_selector(cls, value: object) -> object:
+        if isinstance(value, str):
+            trimmed = value.strip()
+            return trimmed or None
+        return value
 
 
 class TurnFeedbackRequest(BaseModel):
