@@ -366,6 +366,14 @@ export function createV1Client(options: V1ClientOptions = {}): V1Client {
       return (await response.text()) as T;
     }
 
+    if (
+      response.status === 204 ||
+      response.status === 205 ||
+      response.headers.get("content-length") === "0"
+    ) {
+      return undefined as T;
+    }
+
     const contentType = response.headers.get("content-type") || "";
     if (
       contentType.includes("text/markdown") ||

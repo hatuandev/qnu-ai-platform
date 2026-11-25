@@ -100,6 +100,12 @@ export function useCreateConnectionMutation() {
       void queryClient.invalidateQueries({
         queryKey: modelopsKeys.connections(),
       });
+      void queryClient.invalidateQueries({
+        queryKey: [...modelopsKeys.all, "catalog"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.providers(),
+      });
     },
   });
 }
@@ -121,6 +127,12 @@ export function useUpdateConnectionMutation() {
       void queryClient.invalidateQueries({
         queryKey: modelopsKeys.connections(),
       });
+      void queryClient.invalidateQueries({
+        queryKey: [...modelopsKeys.all, "catalog"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.providers(),
+      });
     },
   });
 }
@@ -132,6 +144,12 @@ export function useDeleteConnectionMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: modelopsKeys.connections(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [...modelopsKeys.all, "catalog"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.providers(),
       });
     },
   });
@@ -169,6 +187,12 @@ export function useAddModelMutation(connectionId: string) {
       void queryClient.invalidateQueries({
         queryKey: modelopsKeys.connections(),
       });
+      void queryClient.invalidateQueries({
+        queryKey: [...modelopsKeys.all, "catalog"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.providers(),
+      });
     },
   });
 }
@@ -184,6 +208,12 @@ export function useDeleteModelMutation(connectionId: string) {
       });
       void queryClient.invalidateQueries({
         queryKey: modelopsKeys.connections(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [...modelopsKeys.all, "catalog"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: modelopsKeys.providers(),
       });
     },
   });

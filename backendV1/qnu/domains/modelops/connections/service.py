@@ -211,6 +211,7 @@ async def _provider_references(db: AsyncSession, ids: set[str]) -> list[str]:
         ModelDefaults.embedding_provider_id,
         ModelDefaults.rerank_provider_id,
         ModelDefaults.ocr_provider_id,
+        ModelDefaults.document_provider_id,
     )
     checks = (
         (
@@ -234,11 +235,23 @@ async def _provider_references(db: AsyncSession, ids: set[str]) -> list[str]:
             select(ModelUsageRecord.id).where(ModelUsageRecord.provider_id.in_(ids)),
         ),
     )
-    return [
+    references = [
         label
         for label, statement in checks
         if await db.scalar(statement.limit(1)) is not None
     ]
+    defaults_row = await db.scalar(select(ModelDefaults).limit(1))
+    if (
+        defaults_row
+        and isinstance(defaults_row.document_models, list)
+        and any(
+            isinstance(item, dict) and item.get("provider_id") in ids
+            for item in defaults_row.document_models
+        )
+        and "cấu hình mặc định hệ thống" not in references
+    ):
+        references.append("cấu hình xử lý tài liệu")
+    return references
 
 
 async def _require_unreferenced(db: AsyncSession, ids: set[str]) -> None:

@@ -112,7 +112,6 @@ export function ConnectionFormDialog({
           family,
           base_url: baseUrl.trim(),
           timeout_seconds: timeoutSeconds,
-          is_active: true,
         });
 
         // If user provided an initial API key, save it now
@@ -186,8 +185,14 @@ export function ConnectionFormDialog({
                   handleFamilyChange(val as ConnectionFamily)
                 }
               >
-                <SelectTrigger id="conn-family">
-                  <SelectValue placeholder="Chọn chuẩn giao thức" />
+                <SelectTrigger
+                  id="conn-family"
+                  className="w-full justify-between text-left"
+                >
+                  <SelectValue placeholder="Chọn chuẩn giao thức">
+                    {CONNECTION_FAMILIES[family]?.label ??
+                      "Chọn chuẩn giao thức"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {Object.values(CONNECTION_FAMILIES).map((fam) => (

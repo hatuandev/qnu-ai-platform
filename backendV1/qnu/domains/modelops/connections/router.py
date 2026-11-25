@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from qnu.api.dependencies import get_db
@@ -69,8 +69,9 @@ async def update(
 @router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete(
     connection_id: str, db: AsyncSession = Depends(get_db), actor: AuthActor = Depends(admin)
-):
+) -> Response:
     await service.delete_connection(db, actor, connection_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{connection_id}/test", response_model=ConnectionTestResponse)
@@ -113,8 +114,9 @@ async def delete_model(
     model_id: str,
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(admin),
-):
+) -> Response:
     await service.delete_model(db, actor, connection_id, model_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.delete("/{connection_id}/keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -123,5 +125,6 @@ async def delete_key(
     key_id: str,
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(admin),
-):
+) -> Response:
     await service.delete_key(db, actor, connection_id, key_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

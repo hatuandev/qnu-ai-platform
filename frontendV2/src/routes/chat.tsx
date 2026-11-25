@@ -1108,7 +1108,7 @@ function ChatPage() {
               <MessageCircle className="size-3.5 text-muted-foreground" />
               <SelectValue placeholder="Chọn hội thoại" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="w-[320px] max-w-[calc(100vw-2rem)]">
               <SelectItem value={DRAFT_VALUE} className="text-xs">
                 Hội thoại mới
               </SelectItem>
@@ -1117,8 +1117,11 @@ function ChatPage() {
                   key={conversation.id}
                   value={conversation.id}
                   className="text-xs"
+                  title={conversation.title}
                 >
-                  {conversation.title}
+                  <span className="block max-w-[270px] truncate">
+                    {conversation.title}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>

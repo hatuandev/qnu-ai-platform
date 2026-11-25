@@ -302,24 +302,34 @@ function ModelOpsPage() {
           }
         />
       ) : (
-        <div className="rounded-lg border border-border/70 bg-card overflow-hidden shadow-2xs">
+        <div className="rounded-lg border border-border/70 bg-card overflow-x-auto shadow-2xs">
           <Table>
             <TableHeader>
               <TableRow className="h-10 text-xs bg-muted/20 hover:bg-muted/20">
-                <TableHead className="w-[240px]">Nhà cung cấp</TableHead>
-                <TableHead className="w-[160px]">Chuẩn giao thức</TableHead>
-                <TableHead>Endpoint URL</TableHead>
-                <TableHead className="text-center w-[110px]">
+                <TableHead className="min-w-[180px] whitespace-nowrap">
+                  Nhà cung cấp
+                </TableHead>
+                <TableHead className="whitespace-nowrap">
+                  Chuẩn giao thức
+                </TableHead>
+                <TableHead className="min-w-[200px] whitespace-nowrap">
+                  Endpoint URL
+                </TableHead>
+                <TableHead className="text-center whitespace-nowrap">
                   Khóa API
                 </TableHead>
-                <TableHead className="text-center w-[110px]">
-                  Số Model
+                <TableHead className="text-center whitespace-nowrap">
+                  Số mô hình
                 </TableHead>
-                <TableHead className="w-[140px]">Kiểm tra kết nối</TableHead>
-                <TableHead className="w-[100px] text-center">
+                <TableHead className="whitespace-nowrap">
+                  Kiểm tra kết nối
+                </TableHead>
+                <TableHead className="text-center whitespace-nowrap">
                   Trạng thái
                 </TableHead>
-                <TableHead className="w-[70px] text-right">Thao tác</TableHead>
+                <TableHead className="w-[70px] text-right whitespace-nowrap">
+                  Thao tác
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -345,10 +355,10 @@ function ModelOpsPage() {
                     </TableCell>
 
                     {/* Column 2: Họ giao thức */}
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       <Badge
                         variant="outline"
-                        className="text-[10px] h-4.5 px-1.5 font-normal"
+                        className="text-[10px] h-5 px-1.5 font-normal whitespace-nowrap shrink-0"
                       >
                         {fam.label}
                       </Badge>
@@ -372,61 +382,61 @@ function ModelOpsPage() {
                     </TableCell>
 
                     {/* Column 4: Khóa API */}
-                    <TableCell className="text-center">
+                    <TableCell className="text-center whitespace-nowrap">
                       {conn.active_keys_count > 0 ? (
                         <Badge
                           variant="outline"
-                          className="text-[10px] h-4.5 px-1.5 font-normal gap-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+                          className="text-[10px] h-5 px-1.5 font-normal gap-1 whitespace-nowrap shrink-0 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
                         >
-                          <Key className="size-2.5" />
+                          <Key className="size-2.5 shrink-0" />
                           <span>{conn.active_keys_count} hoạt động</span>
                         </Badge>
                       ) : (
-                        <span className="text-muted-foreground text-[11px]">
+                        <span className="text-muted-foreground text-[11px] whitespace-nowrap">
                           Chưa có khóa
                         </span>
                       )}
                     </TableCell>
 
                     {/* Column 5: Số mô hình */}
-                    <TableCell className="text-center">
+                    <TableCell className="text-center whitespace-nowrap">
                       <Badge
                         variant="secondary"
-                        className="text-[10px] h-4.5 px-1.5 font-normal"
+                        className="text-[10px] h-5 px-1.5 font-normal whitespace-nowrap shrink-0"
                       >
-                        {conn.model_count} models
+                        {conn.model_count} mô hình
                       </Badge>
                     </TableCell>
 
                     {/* Column 6: Trạng thái kiểm tra */}
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       {conn.last_probe_status === "success" ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium text-[11px]">
-                          <CheckCircle2 className="size-3.5" />
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium text-[11px] whitespace-nowrap">
+                          <CheckCircle2 className="size-3.5 shrink-0" />
                           <span>Sẵn sàng</span>
                         </span>
                       ) : conn.last_probe_status === "failed" ? (
-                        <span className="inline-flex items-center gap-1 text-destructive font-medium text-[11px]">
-                          <AlertCircle className="size-3.5" />
+                        <span className="inline-flex items-center gap-1 text-destructive font-medium text-[11px] whitespace-nowrap">
+                          <AlertCircle className="size-3.5 shrink-0" />
                           <span>Lỗi kết nối</span>
                         </span>
                       ) : (
-                        <span className="text-muted-foreground text-[11px]">
+                        <span className="text-muted-foreground text-[11px] whitespace-nowrap">
                           Chưa kiểm tra
                         </span>
                       )}
                     </TableCell>
 
                     {/* Column 7: Trạng thái hoạt động */}
-                    <TableCell className="text-center">
+                    <TableCell className="text-center whitespace-nowrap">
                       {conn.is_active ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                           Bật
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <span className="size-1.5 rounded-full bg-muted-foreground/50" />
+                        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground whitespace-nowrap">
+                          <span className="size-1.5 rounded-full bg-muted-foreground/50 shrink-0" />
                           Tắt
                         </span>
                       )}
